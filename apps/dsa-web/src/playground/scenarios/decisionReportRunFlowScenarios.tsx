@@ -2,7 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/common';
 import { ChatComposer } from '../../components/chat/ChatComposer';
-import { ChatMessageList } from '../../components/chat/ChatMessageList';
+import { ChatSendFeedbackAlert } from '../../components/chat/ChatSendFeedback';
+import { ChatMessageList } from '../../components/chat/ChatMessageList'
+import { WhatIfScenarioPanel } from '../../components/chat/WhatIfScenarioPanel'
+import { DEFAULT_WHAT_IF_DRAFT } from '../../components/chat/whatIfScenario';
 import { ChatSessionSidebar } from '../../components/chat/ChatSessionSidebar';
 import {
   ChatThinkingDetails,
@@ -39,6 +42,9 @@ import {
 import { AnalysisContextSummary } from '../../components/report/AnalysisContextSummary';
 import { MarketReviewReportView } from '../../components/report/MarketReviewReportView';
 import { MarketStructureCard } from '../../components/report/MarketStructureCard';
+import { ReportDecisionCard } from '../../components/report/ReportDecisionCard';
+import { ReportRiskGateBanner } from '../../components/report/ReportRiskGateBanner';
+import { parseRiskGateResult } from '../../components/report/reportRiskGateUtils';
 import { ReportDetails } from '../../components/report/ReportDetails';
 import { ReportDiagnostics } from '../../components/report/ReportDiagnostics';
 import { ReportMarkdown } from '../../components/report/ReportMarkdown';
@@ -446,6 +452,25 @@ const ChatComposerStory = () => {
   );
 };
 
+const ChatSendFeedbackAlertStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const toast = scenario === 'empty'
+    ? null
+    : {
+        type: scenario === 'error' ? 'error' as const : 'success' as const,
+        message: scenario === 'error'
+          ? 'The message was not sent. Retry when the connection is restored.'
+          : 'Message sent successfully.',
+      };
+  return (
+    <ChatSendFeedbackAlert
+      toast={toast}
+      successTitle="Sent"
+      failureTitle="Send failed"
+    />
+  );
+};
+
 const ChatMessageListStory = () => {
   const { scenario } = usePlaygroundScenario();
   const t = useChatTranslate();
@@ -542,6 +567,22 @@ const ChatThinkingToggleStory = () => {
   );
 };
 
+const WhatIfScenarioPanelStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const t = (key: string) => key;
+  const enabled = scenario === 'states' || scenario === 'empty';
+  const draft = {
+    ...DEFAULT_WHAT_IF_DRAFT,
+    enabled,
+    turnCount: scenario === 'empty' ? 5 : scenario === 'states' ? 1 : 0,
+  };
+  return (
+    <div className="max-w-3xl rounded-lg border border-subtle bg-card p-2">
+      <WhatIfScenarioPanel t={t as never} draft={draft} onChange={() => undefined} />
+    </div>
+  );
+};
+
 const DeepResearchPanelStory = () => {
   const { scenario, profile } = usePlaygroundScenario();
   const text = useSamples();
@@ -590,6 +631,43 @@ const MarketReviewReportViewStory = () => {
 const MarketStructureCardStory = () => {
   const { scenario } = usePlaygroundScenario();
   return <MarketStructureCard context={scenario === 'empty' ? null : fixtureMarketStructure} language="en" />;
+};
+
+const ReportDecisionCardStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ReportDecisionCard
+      meta={fixtureReport.meta}
+      summary={scenario === 'empty'
+        ? {
+            analysisSummary: '',
+            operationAdvice: '',
+            trendPrediction: '',
+            sentimentScore: Number.NaN,
+          }
+        : fixtureReport.summary}
+      strategy={scenario === 'empty' ? undefined : fixtureReport.strategy}
+      details={scenario === 'empty' ? undefined : fixtureReport.details}
+      language="en"
+    />
+  );
+};
+
+
+const ReportRiskGateBannerStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return <ReportRiskGateBanner presentation={parseRiskGateResult(undefined)} language="en" />;
+  }
+  return (
+    <ReportRiskGateBanner
+      presentation={parseRiskGateResult({
+        schema_version: 'risk-manager-result/v1',
+        verdict: 'reject',
+      })}
+      language="en"
+    />
+  );
 };
 
 const ReportDetailsStory = () => {
@@ -807,6 +885,8 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
   'market-structure-card': MarketStructureCardStory,
+  'report-decision-card': ReportDecisionCardStory,
+  'report-risk-gate-banner': ReportRiskGateBannerStory,
   'report-details': ReportDetailsStory,
   'report-diagnostics': ReportDiagnosticsStory,
   'report-markdown': ReportMarkdownStory,
@@ -823,7 +903,9 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-summary': ReportSummaryStory,
   'deep-research-panel': DeepResearchPanelStory,
   'chat-composer': ChatComposerStory,
+  'chat-send-feedback-alert': ChatSendFeedbackAlertStory,
   'chat-message-list': ChatMessageListStory,
+  'what-if-scenario-panel': WhatIfScenarioPanelStory,
   'chat-session-sidebar': ChatSessionSidebarStory,
   'chat-thinking-details': ChatThinkingDetailsStory,
   'chat-thinking-toggle': ChatThinkingToggleStory,

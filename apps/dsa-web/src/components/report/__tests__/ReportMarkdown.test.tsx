@@ -9,6 +9,7 @@ import { ReportMarkdown } from '../ReportMarkdown';
 vi.mock('../../../api/history', () => ({
   historyApi: {
     getMarkdown: vi.fn(),
+    getDetail: vi.fn().mockRejectedValue(new Error('detail unavailable')),
   },
 }));
 
@@ -53,8 +54,10 @@ describe('ReportMarkdown', () => {
     expect(shareButton.parentElement?.parentElement?.parentElement).toHaveClass(
       '[&_.home-surface-button]:!shadow-none',
     );
-    expect(screen.getByRole('button', { name: '关闭' })).toHaveAttribute('data-control', 'button');
-    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('control-hit-target');
+    const closeButtons = screen.getAllByRole('button', { name: '关闭' });
+    const primaryClose = closeButtons.find((button) => button.getAttribute('data-control') === 'button');
+    expect(primaryClose).toBeDefined();
+    expect(primaryClose).toHaveClass('control-hit-target');
     markdown.resolve('# 中文报告');
     expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
     expect(document.querySelector('.report-markdown-prose')).toHaveClass(

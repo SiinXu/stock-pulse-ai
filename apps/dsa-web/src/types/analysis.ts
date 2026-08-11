@@ -123,6 +123,12 @@ export interface ReportSummary {
   trendPrediction: string;
   sentimentScore: number;
   sentimentLabel?: SentimentLabel;
+  /**
+   * Canonical Risk Manager gate payload (`risk-manager-result/v1`) projected by
+   * the backend analysis service. Missing must present as not-evaluated on Web —
+   * never implied pass.
+   */
+  riskManager?: Record<string, unknown> | null;
 }
 
 /** Strategy section */
@@ -702,6 +708,22 @@ export interface HistoryListResponse {
   page: number;
   limit: number;
   items: HistoryItem[];
+}
+
+/** Bounded full-text report search response */
+export interface HistorySearchItem {
+  id: number;
+  stockCode: string;
+  stockName?: string;
+  reportType?: string;
+  summary?: string;
+  createdAt?: string;
+}
+
+export interface HistorySearchResponse {
+  query: string;
+  limit: number;
+  items: HistorySearchItem[];
 }
 
 /** News item */

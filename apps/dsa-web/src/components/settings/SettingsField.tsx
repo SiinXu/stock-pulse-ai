@@ -14,6 +14,12 @@ import { SettingsHelpButton } from './SettingsHelpButton';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SettingsSwitch } from './SettingsSwitch';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
+import {
+  isMultiValueValidation,
+  numberControlBounds,
+  resolveSettingsFieldControl,
+  type ResolvedSettingsControl,
+} from './settingsFieldControl';
 
 function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['options'] = [], locale: UiLanguage) {
   return options.map((option) => {
@@ -29,8 +35,7 @@ function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['o
 }
 
 function isMultiValueField(item: SystemConfigItem): boolean {
-  const validation = (item.schema?.validation ?? {}) as Record<string, unknown>;
-  return Boolean(validation.multiValue ?? validation.multi_value);
+  return isMultiValueValidation((item.schema?.validation ?? {}) as Record<string, unknown>);
 }
 
 function parseMultiValues(value: string): string[] {
@@ -50,14 +55,18 @@ function inferPasswordIconType(key: string): 'password' | 'key' {
   return key.toUpperCase().includes('PASSWORD') ? 'password' : 'key';
 }
 
-function resolveDisplayValue(item: SystemConfigItem, value: string): string {
+function resolveDisplayValue(
+  item: SystemConfigItem,
+  value: string,
+  resolvedControl: ResolvedSettingsControl,
+): string {
   const schema = item.schema;
 
   // Backfill the backend default for unset fields so the effective value is
   // visible instead of a blank control. Passwords are excluded so a secret-ish
   // default can never leak into a visible input.
   if (
-    schema?.uiControl !== 'password'
+    resolvedControl !== 'password'
     && !value
     && item.rawValueExists === false
     && schema?.defaultValue !== undefined
@@ -101,28 +110,18 @@ function renderFieldControl(
   ariaDescribedBy: string | undefined,
   language: UiLanguage,
   t: (key: UiTextKey) => string,
+  controlType: ResolvedSettingsControl,
   enumOptionFilter?: (optionValue: string) => boolean,
   enumEmptyState?: React.ReactNode,
 ) {
   const schema = item.schema;
-  const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
-  const optionValues = (schema?.options ?? []).map((option) => (
-    typeof option === 'string' ? option : option.value
-  ));
-  const isBooleanControl = controlType === 'switch'
-    || schema?.dataType === 'boolean'
-    || (
-      optionValues.length === 2
-      && optionValues.some((option) => option.toLowerCase() === 'true')
-      && optionValues.some((option) => option.toLowerCase() === 'false')
-    );
 
   // Multi-value enums (finite options + multi_value validation) render as a
   // collapsed multi-select dropdown so users pick from the catalog instead of
   // typing a comma-separated string. Stored values outside the catalog stay
   // visible and deselectable so saving never silently drops them.
-  if (schema?.options?.length && isMultiValue) {
+  if (controlType === 'multi-select' && schema?.options?.length) {
     const normalizedOptions = normalizeSelectOptions(item.key, schema.options, language);
     const selectedValues = value.split(',').map((entry) => entry.trim()).filter(Boolean);
     const visibleOptions = enumOptionFilter
@@ -157,7 +156,7 @@ function renderFieldControl(
     );
   }
 
-  if (isBooleanControl) {
+  if (controlType === 'switch') {
     const checked = value.trim().toLowerCase() === 'true';
     const isDisabled = disabled || !schema?.isEditable;
     return (
@@ -178,7 +177,7 @@ function renderFieldControl(
   // Any field that declares a finite set of options is an enum: render a Select
   // regardless of the backend ui_control hint, so a stray ui_control=text never
   // degrades an enum into a free-text Input.
-  if (schema?.options?.length && !isMultiValue) {
+  if (controlType === 'select' && schema?.options?.length) {
     const options = normalizeSelectOptions(item.key, schema.options, language).map((option) => {
       if (item.key !== 'MARKET_REVIEW_COLOR_SCHEME') {
         return option;
@@ -238,6 +237,8 @@ function renderFieldControl(
   }
 
   if (controlType === 'password') {
+    // Sensitive / masked fields always use CredentialInput even when the
+    // backend ui_control hint is wrong (common for uncategorized secrets).
     const iconType = inferPasswordIconType(item.key);
 
     if (isMultiValue) {
@@ -324,14 +325,7 @@ function renderFieldControl(
   }
 
   const inputType = controlType === 'number' ? 'number' : 'text';
-  const validation = (schema?.validation ?? {}) as Record<string, unknown>;
-  const numberProps = controlType === 'number'
-    ? {
-        min: typeof validation.min === 'number' ? validation.min : undefined,
-        max: typeof validation.max === 'number' ? validation.max : undefined,
-        step: schema?.dataType === 'number' ? 0.1 : 1,
-      }
-    : {};
+  const numberProps = controlType === 'number' ? numberControlBounds(schema) : {};
 
   const unit = schema?.unit?.trim() || null;
   return (
@@ -372,8 +366,9 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
-  const isMultiEnum = Boolean(schema?.options?.length && isMultiValueField(item));
-  const isTextarea = schema?.uiControl === 'textarea' && !isMultiEnum;
+  // Resolve once per render and share across layout, default backfill, and control.
+  const resolvedControl = resolveSettingsFieldControl(schema, { isMasked: item.isMasked });
+  const isTextarea = resolvedControl === 'textarea';
   const helpContent = getSettingsHelpContent(schema?.helpKey, schema?.description, language);
   const localizationKey = schema?.key ?? item.key;
   const fallbackTitle = schema?.title ?? item.key;
@@ -391,7 +386,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   const controlId = `setting-${item.key}`;
   const issueDescriptionIds = issues.map((_, index) => `${controlId}-issue-${index}`);
   const ariaDescribedBy = issueDescriptionIds.join(' ') || undefined;
-  const displayValue = resolveDisplayValue(item, value);
+  const displayValue = resolveDisplayValue(item, value, resolvedControl);
 
   return (
     <div
@@ -456,6 +451,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           ariaDescribedBy,
           language,
           t,
+          resolvedControl,
           enumOptionFilter,
           enumEmptyState,
         )}

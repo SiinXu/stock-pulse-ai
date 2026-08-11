@@ -304,6 +304,25 @@ def test_sdk_guard_allows_configured_loopback_proxy_only_with_fake_ip_opt_in(
                 outbound_policy.socket.getaddrinfo("127.0.0.1", 7898)
 
 
+def test_sdk_guard_rejects_configured_localhost_proxy_that_resolves_off_loopback(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", "true")
+    private_lan_addrinfo = [
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("192.168.1.20", 7897))
+    ]
+    with patch(
+        "src.security.outbound_policy.getproxies",
+        return_value={"https": "http://localhost:7897"},
+    ), patch(
+        "src.security.outbound_policy.socket.getaddrinfo",
+        return_value=private_lan_addrinfo,
+    ):
+        with guard_outbound_urls(("https://api.openai.com/v1",), strict_dns=True):
+            with pytest.raises(OutboundPolicyError, match="private_dns_address"):
+                outbound_policy.socket.getaddrinfo("localhost", 7897)
+
+
 def test_sdk_guard_does_not_trust_loopback_proxy_for_non_public_model_host(
     monkeypatch,
 ) -> None:

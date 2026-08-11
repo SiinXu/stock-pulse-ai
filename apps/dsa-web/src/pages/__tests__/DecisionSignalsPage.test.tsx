@@ -22,6 +22,7 @@ import {
   APP_ROUTE_PATHS,
   HOME_ROUTE_QUERY_KEYS,
   LEGACY_ROUTE_PATHS,
+  SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
@@ -237,6 +238,20 @@ const stockBarResponse: StockBarResponse = {
       marketPhaseSummary: { market: 'CN', phase: 'unknown', warnings: [] },
     },
   ],
+};
+
+const alertRule = {
+  id: 1,
+  name: 'AAPL price breakout',
+  targetScope: 'single_symbol' as const,
+  target: 'AAPL',
+  alertType: 'price_cross' as const,
+  parameters: { direction: 'above' as const, price: 200 },
+  severity: 'warning' as const,
+  enabled: false,
+  source: 'api' as const,
+  createdAt: '2026-07-23T09:00:00Z',
+  updatedAt: '2026-07-23T09:00:00Z',
 };
 
 function makeSignal(overrides: Partial<DecisionSignalItem> = {}): DecisionSignalItem {
@@ -534,9 +549,96 @@ beforeEach(() => {
   vi.mocked(alertsApi.listRules).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
   vi.mocked(alertsApi.listTriggers).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
   vi.mocked(alertsApi.listNotifications).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+  vi.mocked(alertsApi.getRule).mockResolvedValue(alertRule);
 });
 
 describe('DecisionSignalsPage', () => {
+  it('restores and updates embedded Alerts rule filters through the Signal Center URL', async () => {
+    vi.mocked(alertsApi.listRules).mockResolvedValue({
+      items: [alertRule],
+      total: 40,
+      page: 2,
+      pageSize: 20,
+    });
+    const params = new URLSearchParams(new URL(
+      buildSignalCenterHref({ tab: SIGNAL_CENTER_TAB_VALUES.rules }),
+      window.location.origin,
+    ).search);
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled, 'disabled');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesType, 'price_cross');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesPage, '2');
+    params.set('keep', 'yes');
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?${params.toString()}`);
+
+    renderPage();
+
+    await waitFor(() => expect(alertsApi.listRules).toHaveBeenCalledWith(expect.objectContaining({
+      enabled: false,
+      alertType: 'price_cross',
+      page: 2,
+      pageSize: 20,
+    })));
+    fireEvent.click(screen.getByRole('button', { name: '筛选，已启用 2 项' }));
+    const filterDialog = await screen.findByRole('dialog', { name: '筛选' });
+    chooseOption(within(filterDialog).getByLabelText('启停状态'), 'enabled');
+
+    await waitFor(() => {
+      const next = new URLSearchParams(window.location.search);
+      expect(next.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab)).toBe(SIGNAL_CENTER_TAB_VALUES.rules);
+      expect(next.get(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled)).toBe('enabled');
+      expect(next.has(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesPage)).toBe(false);
+      expect(next.get('keep')).toBe('yes');
+    });
+  });
+
+  it('restores embedded notification filters and pagination from the Signal Center URL', async () => {
+    vi.mocked(alertsApi.listNotifications).mockResolvedValue({
+      items: [],
+      total: 40,
+      page: 2,
+      pageSize: 20,
+    });
+    const params = new URLSearchParams(new URL(buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.history,
+      history: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+    }), window.location.origin).search);
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationPage, '2');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationChannel, 'slack');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationSuccess, 'failure');
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?${params.toString()}`);
+
+    renderPage();
+
+    await waitFor(() => expect(alertsApi.listNotifications).toHaveBeenCalledWith({
+      channel: 'slack',
+      success: false,
+      page: 2,
+      pageSize: 20,
+    }));
+    expect(screen.getByRole('tabpanel', { name: '通知尝试记录' })).toBeVisible();
+  });
+
+  it('opens and clears an embedded rule deep link without leaving Signal Center', async () => {
+    const params = new URLSearchParams(new URL(
+      buildSignalCenterHref({ tab: SIGNAL_CENTER_TAB_VALUES.rules }),
+      window.location.origin,
+    ).search);
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert, String(alertRule.id));
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?${params.toString()}`);
+
+    renderPage();
+
+    await waitFor(() => expect(alertsApi.getRule).toHaveBeenCalledWith(alertRule.id));
+    const dialog = await screen.findByRole('dialog', { name: '编辑告警规则' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
+
+    await waitFor(() => {
+      const next = new URLSearchParams(window.location.search);
+      expect(next.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab)).toBe(SIGNAL_CENTER_TAB_VALUES.rules);
+      expect(next.has(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert)).toBe(false);
+    });
+  });
+
   it('registers the canonical Signal Center heading with route-focus coordination', async () => {
     renderPage();
 
@@ -809,6 +911,7 @@ describe('DecisionSignalsPage', () => {
     ).search));
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
     expect(screen.getByRole('tab', { name: '规则' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('button', { name: '创建告警规则' })).toHaveLength(1);
   });
 
   it('prefills a stock-scoped rule from a Signal Center deep link', async () => {
@@ -842,11 +945,12 @@ describe('DecisionSignalsPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('button', { name: '创建告警规则' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: '信号范围' })).toBeInTheDocument();
     await waitFor(() => expect(alertsApi.listRules).toHaveBeenCalledWith(expect.objectContaining({
       targetScope: 'portfolio_holdings',
     })));
+    expect(await screen.findByText('暂无告警规则')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '创建告警规则' })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('tab', { name: '推送历史' }));
 

@@ -1,6 +1,39 @@
+import { z } from 'zod';
 import apiClient from './index';
 import { API_BASE_URL } from '../utils/constants';
-import { createApiError, isApiRequestError, parseApiError } from './error';
+import {
+  createApiError,
+  createParsedApiError,
+  isApiRequestError,
+  parseApiError,
+} from './error';
+// Generated OpenAPI components document the backend snake_case contract for
+// plain (non-streaming) agent request/response surfaces.
+import type { components } from '../types/api.generated';
+
+type OpenApiChatResponse = components['schemas']['ChatResponse'];
+type OpenApiResearchResponse = components['schemas']['ResearchResponse'];
+type OpenApiSkillsResponse = components['schemas']['SkillsResponse'];
+type OpenApiSessionsResponse = components['schemas']['SessionsResponse'];
+type OpenApiSessionMessagesResponse = components['schemas']['SessionMessagesResponse'];
+
+type _AssertChatFields = keyof OpenApiChatResponse;
+type _AssertResearchFields = keyof OpenApiResearchResponse;
+type _AssertSkillsFields = keyof OpenApiSkillsResponse;
+type _AssertSessionsFields = keyof OpenApiSessionsResponse;
+type _AssertMessagesFields = keyof OpenApiSessionMessagesResponse;
+const _chatFieldAnchor: _AssertChatFields = 'session_id';
+const _researchFieldAnchor: _AssertResearchFields = 'token_usage';
+const _skillsFieldAnchor: _AssertSkillsFields = 'default_skill_id';
+const _sessionsFieldAnchor: _AssertSessionsFields = 'sessions';
+const _messagesFieldAnchor: _AssertMessagesFields = 'messages';
+const _messagesStateFieldAnchor: _AssertMessagesFields = 'session_state';
+void _chatFieldAnchor;
+void _researchFieldAnchor;
+void _skillsFieldAnchor;
+void _sessionsFieldAnchor;
+void _messagesFieldAnchor;
+void _messagesStateFieldAnchor;
 
 export interface ChatStreamOptions {
   signal?: AbortSignal;
@@ -14,17 +47,20 @@ export interface ChatRequest {
 export interface ChatStreamRequest extends ChatRequest {
   session_id?: string;
   context?: unknown;
+  turn_id?: string;
 }
 
+/** Snake_case response shapes match OpenAPI and existing Chat UI consumers. */
 export interface ChatResponse {
   success: boolean;
   content: string;
   session_id: string;
-  error?: string;
+  error?: string | null;
+  turn_id?: string | null;
   agent_runtime?: {
     soul_version: string;
     soul_hash: string;
-  };
+  } | null;
 }
 
 export interface SkillInfo {
@@ -51,13 +87,15 @@ export interface ChatSessionMessage {
   role: 'user' | 'assistant';
   content: string;
   created_at: string | null;
-  error?: string;
-  params?: Record<string, unknown>;
+  error?: string | null;
+  params?: Record<string, unknown> | null;
+  turn_id?: string | null;
 }
 
 export interface ChatSessionDetail {
   session_id: string;
   messages: ChatSessionMessage[];
+  turn_identity_supported?: boolean;
   session_state: {
     selected_skill_ids: string[] | null;
   };
@@ -73,7 +111,109 @@ export interface ResearchResponse {
   content: string;
   sources: string[];
   token_usage: number;
-  error?: string;
+  error?: string | null;
+}
+
+/**
+ * Agent plain JSON responses stay snake_case (no toCamelCase) so valid payloads
+ * remain byte-identical to the pre-validation path used by Chat UI.
+ */
+const agentRuntimeSchema = z.object({
+  soul_version: z.string(),
+  soul_hash: z.string(),
+}).passthrough();
+
+const chatResponseSchema = z.object({
+  success: z.boolean(),
+  content: z.string(),
+  session_id: z.string(),
+  error: z.string().nullable().optional(),
+  turn_id: z.string().nullable().optional(),
+  agent_runtime: agentRuntimeSchema.nullable().optional(),
+}).passthrough();
+
+const researchResponseSchema = z.object({
+  success: z.boolean(),
+  content: z.string(),
+  sources: z.array(z.string()).optional(),
+  token_usage: z.number().finite(),
+  error: z.string().nullable().optional(),
+}).passthrough();
+
+const skillInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+}).passthrough();
+
+const skillsResponseSchema = z.object({
+  skills: z.array(skillInfoSchema),
+  default_skill_id: z.string(),
+}).passthrough();
+
+const sessionItemSchema = z.object({
+  session_id: z.string(),
+  title: z.string(),
+  message_count: z.number().int().finite(),
+  created_at: z.string().nullable().optional(),
+  last_active: z.string().nullable().optional(),
+}).passthrough();
+
+const sessionsResponseSchema = z.object({
+  sessions: z.array(sessionItemSchema),
+}).passthrough();
+
+const sessionMessageSchema = z.object({
+  id: z.string(),
+  role: z.string(),
+  content: z.string(),
+  created_at: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+  params: z.record(z.string(), z.unknown()).nullable().optional(),
+  turn_id: z.string().nullable().optional(),
+}).passthrough();
+
+const sessionStateSchema = z.object({
+  selected_skill_ids: z.array(z.string()).nullable(),
+}).passthrough();
+
+const sessionMessagesResponseSchema = z.object({
+  session_id: z.string(),
+  messages: z.array(sessionMessageSchema),
+  session_state: sessionStateSchema,
+  // The current backend always emits this generated default, while omission
+  // remains meaningful for rolling upgrades that predate turn identities.
+  turn_identity_supported: z.boolean().optional(),
+}).passthrough();
+
+function parseSnakeCasePayload<T>(
+  data: unknown,
+  schema: z.ZodTypeAny,
+  label: string,
+): T {
+  const result = schema.safeParse(data);
+  if (!result.success) {
+    const issueSummary = result.error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+    if (import.meta.env.DEV) {
+      console.error(`[agent] response validation failed (${label})`, result.error.issues);
+    }
+    throw createApiError(
+      createParsedApiError({
+        title: '响应校验失败',
+        message: `接口响应未通过校验（${label}）。${issueSummary}`,
+        rawMessage: result.error.message,
+        category: 'unknown',
+        code: 'api_response_validation_failed',
+        params: { label, issues: issueSummary },
+        details: result.error.issues,
+      }),
+    );
+  }
+  // Return the original object so valid payloads stay byte-identical.
+  return data as T;
 }
 
 export const agentApi = {
@@ -83,37 +223,68 @@ export const agentApi = {
     payload: ResearchRequest,
     options?: { signal?: AbortSignal },
   ): Promise<ResearchResponse> {
-    const response = await apiClient.post<ResearchResponse>(
+    const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/agent/research',
       { question: payload.question, stock_code: payload.stockCode },
       { timeout: 200000, signal: options?.signal },
     );
-    return response.data;
+    const parsed = parseSnakeCasePayload<ResearchResponse>(
+      response.data,
+      researchResponseSchema,
+      'ResearchResponse',
+    );
+    // OpenAPI marks sources optional; consumers always expect an array.
+    if (!Array.isArray(parsed.sources)) {
+      return { ...parsed, sources: [] };
+    }
+    return parsed;
   },
   async chat(payload: ChatRequest): Promise<ChatResponse> {
-    const response = await apiClient.post<ChatResponse>('/api/v1/agent/chat', payload, {
+    const response = await apiClient.post<Record<string, unknown>>('/api/v1/agent/chat', payload, {
       timeout: 120000,
     });
-    return response.data;
+    return parseSnakeCasePayload<ChatResponse>(
+      response.data,
+      chatResponseSchema,
+      'ChatResponse',
+    );
   },
   async getSkills(): Promise<SkillsResponse> {
-    const response = await apiClient.get<SkillsResponse>('/api/v1/agent/skills');
-    return response.data;
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/agent/skills');
+    return parseSnakeCasePayload<SkillsResponse>(
+      response.data,
+      skillsResponseSchema,
+      'SkillsResponse',
+    );
   },
   async getChatSessions(limit = 50): Promise<ChatSessionItem[]> {
-    const response = await apiClient.get<{ sessions: ChatSessionItem[] }>('/api/v1/agent/chat/sessions', { params: { limit } });
-    return response.data.sessions;
+    const response = await apiClient.get<Record<string, unknown>>(
+      '/api/v1/agent/chat/sessions',
+      { params: { limit } },
+    );
+    const data = parseSnakeCasePayload<{ sessions: ChatSessionItem[] }>(
+      response.data,
+      sessionsResponseSchema,
+      'SessionsResponse',
+    );
+    return data.sessions;
   },
   async getChatSessionMessages(sessionId: string): Promise<ChatSessionDetail> {
-    const response = await apiClient.get<ChatSessionDetail>(
+    const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`,
     );
-    return response.data;
+    return parseSnakeCasePayload<ChatSessionDetail>(
+      response.data,
+      sessionMessagesResponseSchema,
+      'SessionMessagesResponse',
+    );
   },
   async deleteChatSession(sessionId: string): Promise<void> {
+    // OpenAPI response body is unknown; no structured validation.
     await apiClient.delete(`/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`);
   },
   async sendChat(content: string): Promise<{ success: boolean }> {
+    // OpenAPI response content is unknown; keep the prior success gate.
     const response = await apiClient.post<{
       success: boolean;
       error?: string;
@@ -125,6 +296,11 @@ export const agentApi = {
     }
     return { success: true };
   },
+  /**
+   * Documented skip for issue #721: SSE/streaming surface stays unvalidated.
+   * Follow-up: migrate stream error envelopes if a stable JSON error shape is
+   * added to the OpenAPI document for failed stream starts.
+   */
   async chatStream(
     payload: ChatStreamRequest,
     options?: ChatStreamOptions,

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
@@ -67,5 +67,42 @@ describe('ConfirmDialog', () => {
 
     expect(screen.getByRole('button', { name: '确定' })).toHaveAttribute('data-size', 'comfortable');
     expect(screen.getByRole('button', { name: '取消' })).toHaveAttribute('data-size', 'comfortable');
+  });
+
+  it('returns focus to confirm when an in-dialog retry becomes available', async () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const view = render(
+      <UiLanguageProvider>
+        <ConfirmDialog
+          isOpen
+          title="确认操作"
+          message="确认继续吗？"
+          confirmText="删除中"
+          confirmDisabled
+          cancelDisabled
+          focusConfirmOnError
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
+      </UiLanguageProvider>,
+    );
+
+    view.rerender(
+      <UiLanguageProvider>
+        <ConfirmDialog
+          isOpen
+          title="确认操作"
+          message="确认继续吗？"
+          confirmText="重试"
+          error="请求失败"
+          focusConfirmOnError
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
+      </UiLanguageProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '重试' })).toHaveFocus());
   });
 });

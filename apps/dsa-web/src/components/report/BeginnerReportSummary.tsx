@@ -5,6 +5,8 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, Button, Surface } from '../common';
+import { ReportRiskGateBanner } from './ReportRiskGateBanner';
+import { buildRiskGatePresentation } from './reportRiskGateUtils';
 
 interface BeginnerReportSummaryProps {
   data: AnalysisResult | AnalysisReport;
@@ -66,6 +68,14 @@ const BeginnerReportSummary: React.FC<BeginnerReportSummaryProps> = ({
           </Badge>
         </div>
       </header>
+
+      <ReportRiskGateBanner
+        presentation={buildRiskGatePresentation({
+          summary: report.summary,
+          details: report.details,
+        })}
+        language={normalizeReportLanguage(report.meta.reportLanguage)}
+      />
 
       <section aria-labelledby="beginner-conclusion-heading">
         <h3 id="beginner-conclusion-heading" className="text-sm font-semibold text-foreground">

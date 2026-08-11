@@ -43,17 +43,6 @@ if TYPE_CHECKING:
 
 
 class _SystemConfigSetupMethods:
-    @staticmethod
-    def _setup_model_runtime_route(model: str) -> str:
-        """Return the runtime route for a ModelRef while preserving legacy routes."""
-        from src.llm.model_ref import decode_model_ref
-
-        normalized = (model or "").strip()
-        try:
-            decoded = decode_model_ref(normalized)
-        except ValueError:
-            return normalized
-        return decoded.runtime_route if decoded else normalized
 
     @classmethod
     def _anspire_legacy_llm_enabled(cls, effective_map: Dict[str, str]) -> bool:
@@ -358,6 +347,16 @@ class _SystemConfigSetupMethods:
         effective_map: Dict[str, str],
         primary_check: Dict[str, Any],
     ) -> Dict[str, Any]:
+        from src.llm.model_ref import decode_model_ref
+
+        def runtime_route(model: str) -> str:
+            normalized = (model or "").strip()
+            try:
+                decoded = decode_model_ref(normalized)
+            except ValueError:
+                return normalized
+            return decoded.runtime_route if decoded else normalized
+
         generation_backend = normalize_backend_id(
             effective_map.get("GENERATION_BACKEND"),
             default=LITELLM_BACKEND_ID,
@@ -426,7 +425,7 @@ class _SystemConfigSetupMethods:
                 )
             if primary_check["status"] == "configured":
                 primary_model, _source = self._resolve_setup_primary_model(effective_map)
-                primary_runtime_route = self._setup_model_runtime_route(primary_model)
+                primary_runtime_route = runtime_route(primary_model)
                 if primary_runtime_route in hermes_routes and primary_runtime_route not in non_hermes_routes:
                     return self._setup_check(
                         "llm_agent",
@@ -460,7 +459,7 @@ class _SystemConfigSetupMethods:
         if not yaml_models:
             configured_models.update(self._collect_llm_channel_model_refs_from_map(effective_map))
         agent_model = normalize_agent_litellm_model(agent_model_raw, configured_models=configured_models)
-        agent_runtime_route = self._setup_model_runtime_route(agent_model)
+        agent_runtime_route = runtime_route(agent_model)
         if agent_runtime_route in hermes_routes and agent_runtime_route not in non_hermes_routes:
             return self._setup_check(
                 "llm_agent",

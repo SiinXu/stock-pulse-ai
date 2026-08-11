@@ -42,6 +42,7 @@ const ResearchAnalysisWorkbenchPage = lazy(() => import('./pages/ResearchAnalysi
 const MarketReviewPage = lazy(() => import('./pages/MarketReviewPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
 const SkillOutcomesPage = lazy(() => import('./pages/SkillOutcomesPage'));
+const ReportVersionComparePage = lazy(() => import('./pages/ReportVersionComparePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -49,10 +50,12 @@ const ChatPage = lazy(() => import('./pages/ChatPage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const SignalCenterPage = lazy(() => import('./pages/DecisionSignalsPage'));
 const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage'));
+const NotificationCenterPage = lazy(() => import('./pages/NotificationCenterPage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
 const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
 const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPage'));
+const FinancialCalculatorsPage = lazy(() => import('./pages/FinancialCalculatorsPage'));
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
@@ -174,6 +177,7 @@ const routes = [
           { path: APP_ROUTE_PATHS.portfolio, element: <PortfolioPage /> },
           { path: APP_ROUTE_PATHS.signals, element: <SignalCenterPage /> },
           { path: APP_ROUTE_PATHS.approvals, element: <ApprovalsPage /> },
+          { path: APP_ROUTE_PATHS.notifications, element: <NotificationCenterPage /> },
           { path: APP_ROUTE_PATHS.stockDetails, element: <StockDetailsPage /> },
           { path: APP_ROUTE_PATHS.research, element: <ResearchOverviewPage /> },
           { path: APP_ROUTE_PATHS.researchMarket, element: <MarketReviewPage /> },
@@ -184,6 +188,11 @@ const routes = [
           },
           { path: APP_ROUTE_PATHS.researchBacktest, element: <BacktestPage /> },
           { path: APP_ROUTE_PATHS.researchSkillOutcomes, element: <SkillOutcomesPage /> },
+          { path: APP_ROUTE_PATHS.calculators, element: <FinancialCalculatorsPage /> },
+          {
+            path: APP_ROUTE_PATHS.researchReportCompare,
+            element: <ReportVersionComparePage />,
+          },
           {
             path: LEGACY_ROUTE_PATHS.decisionSignals,
             element: (

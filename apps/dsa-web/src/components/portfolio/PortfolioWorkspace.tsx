@@ -3,7 +3,7 @@
 // Portfolio route workspace — feature-owned composition for PortfolioPage.
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
 import { BriefcaseBusiness, Inbox, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -11,12 +11,14 @@ import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../analysis';
+import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_TEXT } from '../../locales/portfolio';
+import type { PortfolioAnalysisTaskPanelController } from './PortfolioAnalysisTaskPanel';
 import {
   formatBrokerLabel,
   formatCashDirectionLabel,
@@ -72,6 +74,12 @@ import type {
   PendingDelete,
   PortfolioAccountMarket,
 } from '../../hooks/portfolio/types';
+import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells';
+
+const PortfolioRiskMetricsPanel = lazy(
+  () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
+);
+const PortfolioAnalysisTaskPanel = lazy(() => import('./PortfolioAnalysisTaskPanel'));
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -119,7 +127,25 @@ const PortfolioWorkspace: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
   const [positionAnalysisLoadingKey, setPositionAnalysisLoadingKey] = useState<string | null>(null);
-  const [positionAnalysisMessage, setPositionAnalysisMessage] = useState<string | null>(null);
+  const portfolioAnalysisTaskControllerRef = useRef<PortfolioAnalysisTaskPanelController | null>(null);
+  const queuedPortfolioAnalysisTaskActionsRef = useRef<Array<(
+    controller: PortfolioAnalysisTaskPanelController,
+  ) => void>>([]);
+  const handlePortfolioAnalysisTaskControllerReady = useCallback((
+    controller: PortfolioAnalysisTaskPanelController | null,
+  ) => {
+    portfolioAnalysisTaskControllerRef.current = controller;
+    if (!controller) return;
+    const queued = queuedPortfolioAnalysisTaskActionsRef.current.splice(0);
+    queued.forEach((action) => action(controller));
+  }, []);
+  const dispatchPortfolioAnalysisTaskAction = useCallback((
+    action: (controller: PortfolioAnalysisTaskPanelController) => void,
+  ) => {
+    const controller = portfolioAnalysisTaskControllerRef.current;
+    if (controller) action(controller);
+    else queuedPortfolioAnalysisTaskActionsRef.current.push(action);
+  }, []);
 
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -370,7 +396,6 @@ const PortfolioWorkspace: React.FC = () => {
   const handleAnalyzePosition = async (row: FlatPosition) => {
     const key = `${row.accountId}-${row.symbol}-${row.market}`;
     setPositionAnalysisLoadingKey(key);
-    setPositionAnalysisMessage(null);
     setError(null);
     try {
       const task = await portfolioApi.analyzePosition(row.symbol, {
@@ -378,9 +403,24 @@ const PortfolioWorkspace: React.FC = () => {
         analysisPhase: positionAnalysisPhase,
         force: false,
       });
-      setPositionAnalysisMessage(formatUiText(text.analysisSubmitted, { symbol: row.symbol, taskId: task.taskId }));
+      dispatchPortfolioAnalysisTaskAction((controller) => {
+        controller.acceptTask(task, row.symbol, positionAnalysisPhase);
+      });
     } catch (err) {
-      setError(getParsedApiError(err));
+      const parsed = getParsedApiError(err);
+      const existingTaskId = String(
+        parsed.params?.existing_task_id
+          ?? parsed.params?.existingTaskId
+          ?? '',
+      ).trim();
+      // Reattach an in-flight duplicate instead of leaving the user with only an error toast.
+      if (parsed.code === 'duplicate_task' && existingTaskId) {
+        dispatchPortfolioAnalysisTaskAction((controller) => {
+          void controller.attachExistingTask(existingTaskId, row.symbol, positionAnalysisPhase);
+        });
+      } else {
+        setError(parsed);
+      }
     } finally {
       setPositionAnalysisLoadingKey(null);
     }
@@ -412,6 +452,16 @@ const PortfolioWorkspace: React.FC = () => {
 
   const concentrationPieData = sectorPieData.length > 0 ? sectorPieData : positionFallbackPieData;
   const concentrationMode = sectorPieData.length > 0 ? 'sector' : 'position';
+
+  const riskHeatmapCells = useMemo(
+    () => buildPortfolioRiskHeatmapCells(risk, {
+      portfolioRow: text.riskRowPortfolio,
+      weight: text.riskColWeight,
+      stopLoss: text.riskColStopLoss,
+      drawdown: text.riskColDrawdown,
+    }),
+    [risk, text.riskColDrawdown, text.riskColStopLoss, text.riskColWeight, text.riskRowPortfolio],
+  );
 
   const openDeleteDialog = (item: PendingDelete) => {
     if (!writableAccountId) {
@@ -804,13 +854,14 @@ const PortfolioWorkspace: React.FC = () => {
           message={writeWarning}
         />
       ) : null}
-      {hasAccounts && positionAnalysisMessage ? (
-        <InlineAlert
-          variant="success"
-          title={text.analysisTask}
-          message={positionAnalysisMessage}
+      <Suspense fallback={null}>
+        <PortfolioAnalysisTaskPanel
+          searchParams={searchParams}
+          setSearchParams={setSearchParams}
+          visible={hasAccounts}
+          onControllerReady={handlePortfolioAnalysisTaskControllerReady}
         />
-      ) : null}
+      </Suspense>
 
       <Modal
         isOpen={showCreateAccount}
@@ -1228,6 +1279,24 @@ const PortfolioWorkspace: React.FC = () => {
           </div>
         </Card>
       </section>
+
+      {hasAccounts ? (
+        <>
+          <Suspense fallback={<Loading />}>
+            <PortfolioRiskMetricsPanel
+              accountId={queryAccountId}
+              costMethod={costMethod}
+            />
+          </Suspense>
+          <section className="grid grid-cols-1 gap-3">
+            <Card padding="md" data-testid="portfolio-risk-heatmap-card">
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{text.riskHeatmapTitle}</h2>
+              <p className="mb-3 text-xs text-secondary">{text.riskHeatmapDescription}</p>
+              <RiskHeatmap cells={riskHeatmapCells} data-testid="portfolio-risk-heatmap" />
+            </Card>
+          </section>
+        </>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {isPaperAccountSelected ? (

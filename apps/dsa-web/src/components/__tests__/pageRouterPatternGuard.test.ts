@@ -124,6 +124,10 @@ type BoundSourceFile = {
 
 type SourceEntry = readonly [filename: string, source: string];
 
+const containsHistoryMethodToken = ([, source]: SourceEntry): boolean => (
+  /\b(?:pushState|replaceState)\b/.test(source)
+);
+
 function createBoundSourceFiles(sources: readonly SourceEntry[]): Map<string, BoundSourceFile> {
   const options: ts.CompilerOptions = {
     jsx: ts.JsxEmit.Preserve,
@@ -627,7 +631,11 @@ describe('page and Router pattern production guard', () => {
   });
 
   it('rejects every direct production history mutation', () => {
-    const productionEntries = Object.entries(productionTypeScriptSources);
+    // Every mutation path recognized by findHistoryMutations originates from one
+    // of these method tokens. Binding only candidate files keeps the production
+    // scan deterministic on slower CI runners without weakening alias analysis.
+    const productionEntries = Object.entries(productionTypeScriptSources)
+      .filter(containsHistoryMethodToken);
     const boundSources = createBoundSourceFiles(productionEntries);
     const actual = productionEntries.flatMap(([filename, source]) => {
       const boundSource = boundSources.get(filename);

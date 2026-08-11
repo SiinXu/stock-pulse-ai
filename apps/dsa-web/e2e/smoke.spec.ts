@@ -183,6 +183,19 @@ test.describe('web smoke', () => {
               next_run_at: '2026-07-25T10:00:00Z',
               created_at: '2026-07-24T20:00:00Z',
               updated_at: '2026-07-24T20:00:00Z',
+              max_attempts: 3,
+              payload: {
+                stock_code: 'AAPL',
+                report_type: 'detailed',
+                notify: true,
+              },
+              schedule: {
+                kind: 'daily',
+                time: '10:00',
+                timezone: 'Asia/Shanghai',
+                calendar_market: 'us',
+                non_trading_day_policy: 'skip',
+              },
             },
             scheduled_for: '2026-07-25T10:00:00Z',
             status: 'retry_wait',
@@ -228,7 +241,7 @@ test.describe('web smoke', () => {
     await expect(scheduledTasks.getByRole('button', { name: /管理定时定义|Manage schedules/i })).toHaveCount(1);
   });
 
-  test('chat page allows entering a question and starts a request', async ({ page }) => {
+  test('chat page reconciles a request rejected before turn persistence', async ({ page }) => {
     await login(page);
 
     // Navigate to chat page by clicking the link
@@ -246,9 +259,16 @@ test.describe('web smoke', () => {
 
     const prompt = '请简要分析 600519';
     await input.fill(prompt);
+    const responsePromise = page.waitForResponse((response) => (
+      response.url().includes('/api/v1/agent/chat/stream')
+      && response.request().method() === 'POST'
+    ));
     await page.getByRole('button', { name: '发送' }).click();
 
-    await expect(page.locator('p').filter({ hasText: prompt }).last()).toBeVisible({ timeout: 5000 });
+    const response = await responsePromise;
+    expect(response.status()).toBe(400);
+    await expect(page.getByRole('button', { name: '重试' })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('p').filter({ hasText: prompt })).toHaveCount(0);
   });
 
   test('chat page uses accessible labels instead of native title attributes for key actions', async ({ page }) => {
@@ -349,4 +369,3 @@ test.describe('web smoke', () => {
 
   });
 });
-

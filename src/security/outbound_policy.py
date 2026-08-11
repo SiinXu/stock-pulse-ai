@@ -709,6 +709,24 @@ def _matching_configured_loopback_proxy(
     return None
 
 
+def _validate_loopback_proxy_addrinfos(
+    addr_infos: Iterable[Any],
+    target: OutboundTarget,
+) -> None:
+    usable_addresses: List[ipaddress._BaseAddress] = []
+    for info in addr_infos or []:
+        try:
+            raw_address = str(info[4][0]).split("%", 1)[0]
+            address = ipaddress.ip_address(raw_address)
+        except (IndexError, TypeError, ValueError):
+            continue
+        usable_addresses.append(address)
+        if not _is_loopback_ip(address):
+            _reject_target("private_dns_address", target)
+    if not usable_addresses:
+        _reject_target("dns_no_usable_address", target)
+
+
 def _resolve_with_dns_guard(
     resolver: Any,
     host: Any,
@@ -723,8 +741,10 @@ def _resolve_with_dns_guard(
         if context is not None
         else None
     )
+    matching_proxy_target = None
     if context is not None and matching_target is None:
-        matching_target = _matching_configured_loopback_proxy(host, port, context)
+        matching_proxy_target = _matching_configured_loopback_proxy(host, port, context)
+        matching_target = matching_proxy_target
     if context is not None and matching_target is None and context.strict:
         _reject("unexpected_dns_target")
 
@@ -737,6 +757,8 @@ def _resolve_with_dns_guard(
             _reject_target("dns_resolution_failed", matching_target)
         raise
     if matching_target is not None:
+        if matching_proxy_target is not None:
+            _validate_loopback_proxy_addrinfos(addr_infos, matching_proxy_target)
         _validate_addrinfos(addr_infos, matching_target)
     return addr_infos
 

@@ -17,7 +17,7 @@ The policy is enabled without configuration. A default installation can reach pu
 | Proxy Fake-IP DNS | Disabled by default. `OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP=true` accepts the standard Clash/Mihomo IPv4 and IPv6 Fake-IP ranges only when resolving a syntactically public hostname. |
 | Redirects | Library redirects are disabled. StockPulse follows at most five redirects itself and checks every target before the next connection. |
 | Redirect credentials | Authorization, cookies, common API-key/token headers, request auth, and client certificates are removed when a redirect changes origin. |
-| Proxies | Environment HTTP proxies are disabled for policy-owned requests. With Fake-IP opt-in, SDK-owned transports may use only the operating system's explicitly configured loopback proxy for public target hostnames. |
+| Proxies | Environment HTTP proxies are disabled for policy-owned requests. With Fake-IP opt-in, SDK-owned transports may use only a loopback proxy returned by Python's active proxy configuration for public target hostnames. |
 | Timeout | Calls without a narrower caller timeout receive a 15-second timeout. |
 | Response size | Non-streaming responses are limited to 8 MiB. Streaming consumers apply their own smaller domain limit. |
 | TLS | Certificate verification remains enabled unless an existing, explicit channel option disables it. Disabling verification is unsafe on untrusted networks. |
@@ -42,7 +42,7 @@ Clash/Mihomo TUN installations commonly return synthetic addresses from `198.18.
 OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP=true
 ```
 
-The exception applies only to DNS answers for hostnames with a recognized public suffix. SDK-owned transports may also resolve the operating system's explicitly configured loopback HTTP(S) proxy at its exact port. Literal Fake-IP URLs, internal names, unconfigured loopback endpoints, metadata, link-local, and every other private or reserved range remain blocked. Do not enable it on a host where either Fake-IP range or the configured loopback proxy is untrusted. `LOCAL_ONLY_MODE=true` takes precedence and disables this exception.
+The exception applies only to DNS answers for hostnames with a recognized public suffix. SDK-owned transports may also resolve a loopback HTTP(S) proxy returned by Python's active proxy configuration at its exact port. Hostname-based proxy entries must resolve entirely to loopback addresses. Literal Fake-IP URLs, internal names, unconfigured loopback endpoints, metadata, link-local, and every other private or reserved range remain blocked. Do not enable it on a host where either Fake-IP range or the configured loopback proxy is untrusted. `LOCAL_ONLY_MODE=true` takes precedence and disables this exception.
 
 ## Allow A Trusted Self-Hosted Service
 

@@ -6,6 +6,8 @@ export type SystemConfigCategory =
   | 'system'
   | 'agent'
   | 'backtest'
+  | 'indicators'
+  | 'mcp'
   | 'uncategorized';
 
 export type SystemConfigDataType =
@@ -396,8 +398,14 @@ export interface ValidateSystemConfigResponse {
 }
 
 export interface SchedulerStatusResponse {
+  track?: 'legacy_day_batch';
   enabled: boolean;
   running: boolean;
+  attached?: boolean;
+  processMode?: 'serve' | 'desktop' | 'not_attached';
+  scheduleTimezone?: string;
+  runNowAvailable?: boolean;
+  runNowBlockReason?: string | null;
   scheduleTimes: string[];
   nextRunAt?: string | null;
   lastRunAt?: string | null;
@@ -405,12 +413,17 @@ export interface SchedulerStatusResponse {
   lastError?: string | null;
   lastSkippedAt?: string | null;
   lastSkipReason?: string | null;
+  activeRunId?: string | null;
+  lastRunId?: string | null;
+  lastRunOutcome?: 'succeeded' | 'failed' | null;
 }
 
 export interface SchedulerRunNowResponse {
   accepted: boolean;
   running: boolean;
   reason?: string;
+  runId?: string;
+  startedAt?: string;
 }
 
 export interface TestLLMChannelRequest {

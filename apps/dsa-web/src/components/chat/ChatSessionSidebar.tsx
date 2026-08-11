@@ -138,10 +138,10 @@ export function ChatSessionSidebar({
                   </div>
                 </Pressable>
                 <IconButton
-                  variant="danger"
+                  variant="bare"
                   size="compact"
                   tooltip={false}
-                  className="delete-btn absolute right-1 top-1 z-10 !h-7 !w-7 !rounded-md hover:!border-transparent hover:!bg-transparent focus-visible:!border-transparent focus-visible:!bg-transparent"
+                  className="delete-btn absolute right-1 top-1 z-10 text-danger"
                   onClick={() => onRequestDelete(s.session_id)}
                   disabled={sessionLoading}
                   aria-label={t('chat.deleteSession', { title: s.title })}

@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "provider": "tencent",
+    "endpoint": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+    "failure_mode": "empty",
+    "recorded_note": "Tencent fqkline success envelope with empty qfqday. Offline sample 2026-08-08.",
+    "source_shape": "tests/fixtures/provider_contracts/tencent_daily_kline.json"
+  },
+  "payload": {
+    "code": 0,
+    "msg": "",
+    "data": {
+      "sz000001": {
+        "qfqday": []
+      }
+    }
+  }
+}

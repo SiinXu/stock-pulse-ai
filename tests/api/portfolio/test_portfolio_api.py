@@ -532,7 +532,11 @@ class PortfolioApiTestCase(unittest.TestCase):
         self._create_position(name="Main", quantity=10)
         self._create_position(name="Second", quantity=20)
 
-        resp = self.client.post("/api/v1/portfolio/positions/600519/analysis", json={})
+        with patch(
+            "src.services.portfolio_service.PortfolioService._fetch_realtime_position_price",
+            return_value=(None, None),
+        ):
+            resp = self.client.post("/api/v1/portfolio/positions/600519/analysis", json={})
 
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()["error"], "ambiguous_position_account")

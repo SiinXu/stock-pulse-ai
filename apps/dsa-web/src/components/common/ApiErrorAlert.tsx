@@ -1,6 +1,12 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useContext, useEffect, useRef } from 'react';
-import { localizeParsedApiError, type ParsedApiError } from '../../api/error';
+import { useContext, useEffect, useMemo, useRef } from 'react';
+import {
+  localizeParsedApiError,
+  resolveErrorRemediation,
+  type ParsedApiError,
+} from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { ToastProvider } from './ToastProvider';
 import { ToastContext, useToast } from './toastContext';
@@ -24,14 +30,32 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
   const { language, t } = useUiLanguage();
   const { showToast, dismissToast } = useToast();
   const localizedError = localizeParsedApiError(error, language);
-  const onActionRef = useRef(onAction);
+  const remediation = resolveErrorRemediation(localizedError, language);
+  const hasRemediation = remediation !== null;
+  const remediationHref = remediation?.href;
+  const resolvedActionLabel = actionLabel && onAction
+    ? actionLabel
+    : !actionLabel && onAction && remediation
+      ? remediation.actionLabel
+      : !actionLabel && !onAction && remediationHref
+      ? remediation.actionLabel
+      : undefined;
+  const resolvedOnAction = useMemo(() => {
+    if (actionLabel && onAction) return onAction;
+    if (!actionLabel && onAction && hasRemediation) return onAction;
+    if (!actionLabel && !onAction && remediationHref) {
+      return () => window.location.assign(remediationHref);
+    }
+    return undefined;
+  }, [actionLabel, hasRemediation, onAction, remediationHref]);
+  const onActionRef = useRef(resolvedOnAction);
   const onDismissRef = useRef(onDismiss);
-  const hasAction = Boolean(actionLabel && onAction);
+  const hasAction = Boolean(resolvedActionLabel && resolvedOnAction);
   const hasDismiss = Boolean(onDismiss);
 
   useEffect(() => {
-    onActionRef.current = onAction;
-  }, [onAction]);
+    onActionRef.current = resolvedOnAction;
+  }, [resolvedOnAction]);
 
   useEffect(() => {
     onDismissRef.current = onDismiss;
@@ -40,12 +64,17 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
   useEffect(() => {
     const toastId = showToast({
       title: localizedError.title,
-      message: localizedError.message,
+      message: (
+        <>
+          <p>{localizedError.message}</p>
+          {remediation?.hint ? <p className="mt-1">{remediation.hint}</p> : null}
+        </>
+      ),
       tone: 'danger',
       durationMs: 0,
       closeLabel: dismissLabel ?? t('common.close'),
       action: hasAction ? {
-        label: actionLabel as string,
+        label: resolvedActionLabel as string,
         onClick: () => onActionRef.current?.(),
         dismissOnClick: false,
       } : undefined,
@@ -54,13 +83,14 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
 
     return () => dismissToast(toastId);
   }, [
-    actionLabel,
     dismissLabel,
     dismissToast,
     hasAction,
     hasDismiss,
     localizedError.message,
     localizedError.title,
+    remediation?.hint,
+    resolvedActionLabel,
     showToast,
     t,
   ]);

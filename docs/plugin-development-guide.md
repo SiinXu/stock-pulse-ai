@@ -29,8 +29,10 @@ Prefer a **smaller** mechanism when it is enough:
 - Natural-language strategies and tool *metadata* → YAML / `SKILL.md` under
   `AGENT_SKILL_DIR` (no trusted process code).
 - Jinja-only report layout changes → `REPORT_TEMPLATES_DIR`.
-- UI panels, Settings pages, remote marketplaces, dependency installers, or a
-  seventh extension point → new ADR. They are **not** surface v1.
+- Plugin-owned UI components, remote marketplaces, dependency installers, or a
+  seventh extension point → new ADR. They are **not** surface v1. A plugin may
+  declare bounded scalar settings in its manifest; StockPulse owns the generated
+  Settings form and does not execute plugin-supplied frontend code.
 
 ## Security Model (Read This First)
 
@@ -39,8 +41,18 @@ OS privileges as StockPulse. There is:
 
 - no remote marketplace or auto-download;
 - no dependency installer for plugins;
-- no enforced permission sandbox from manifest `permissions` (metadata only);
+- no OS/process sandbox from manifest `permissions` (declaration only; agent_tool load-time subset check is not containment);
 - no hot reload (change requires process restart).
+
+
+### Manifest `permissions` (declaration, not sandbox)
+
+- List every capability your `agent_tool` `ToolPolicy.permissions` will require
+  (use ToolSurface strings such as `market_data:read`).
+- At load/enable, StockPulse rejects the plugin with
+  `manifest_permissions_undeclared` if a tool requires an undeclared capability.
+- Extra declared permissions are allowed; empty means tools must require none.
+- This is **not** sandbox isolation: plugin code still runs with process privileges.
 
 Review every line before enabling a package. Keep `PLUGINS_DIR` unset in
 production unless the packages are reviewed and pinned. The operator trust
@@ -118,6 +130,56 @@ my-plugins/                 # value of PLUGINS_DIR
 in the [package and manifest](plugin-extension-contract.md#package-and-manifest)
 section of the contract. Copy any official example and change the stable IDs.
 
+### Declarative plugin settings
+
+An optional manifest `settings` list lets a plugin request host-owned controls
+without shipping Web code. Supported data types are `string`, `integer`,
+`number`, and `boolean`; supported controls are `text`, `password`, `number`,
+`select`, `textarea`, and `switch`. The manifest parser rejects incompatible
+type/control pairs, duplicate keys/options, invalid regexes, non-finite numeric
+values or bounds, and plaintext defaults for sensitive fields.
+
+```json
+{
+  "settings": [
+    {
+      "key": "endpoint",
+      "title": "Service endpoint",
+      "dataType": "string",
+      "uiControl": "text",
+      "isRequired": true,
+      "validation": {"maxLength": 500},
+      "displayOrder": 10
+    },
+    {
+      "key": "api_token",
+      "title": "API token",
+      "dataType": "string",
+      "uiControl": "password",
+      "isSensitive": true,
+      "isRequired": true,
+      "validation": {"minLength": 8},
+      "displayOrder": 20
+    }
+  ]
+}
+```
+
+Validated effective values are available during load as the immutable
+`context.settings` mapping. Settings → System & Security → Extensions provides
+the generated form and persistent enable/disable switch. Values are stored per
+plugin in `plugin_settings.json` beside the lifecycle-state file; writes are
+atomic and the file is restricted to the current OS user when supported. This
+file is local plaintext, not an encrypted secret vault, so protect its data
+directory accordingly. Sensitive values are masked by the API and Web form;
+leaving the mask unchanged preserves the existing stored value.
+
+Saving settings for an enabled plugin reports `restart_required`. Re-enable the
+plugin or restart the application before assuming its running instance has the
+new values. Omitted keys reset to their declared defaults, and unknown keys,
+wrong types, out-of-range values, NaN, and positive/negative Infinity fail
+closed without changing the persisted file.
+
 ## Frozen Author Import Surface
 
 External plugins should import only:
@@ -172,6 +234,70 @@ inline documentation; prefer the `examples/plugins/` package for new work.
 | Operator security boundaries | [Security baseline](security-baseline.md#operator-security-boundaries) |
 | Surface freeze + reference notification tests | `tests/plugins/test_extension_surface_v1.py` |
 
+
+## Operator / Operations View
+
+This section is for deployers and on-call operators, not plugin authors.
+
+### Lifecycle audit trail
+
+Lifecycle transitions record security-audit events (`event_type=plugin.lifecycle`)
+via the existing security-audit store. Automatic startup loading is best-effort,
+so an unavailable recorder does not block unrelated plugins. Administrator
+enable/disable/reload requests are fail-closed before mutation when the attempt
+event cannot be stored. If the completion write fails after the operation, the
+API returns `503 security_audit_unavailable` and reports the real completed
+state; it does not claim rollback.
+
+### Data Provider auto-bind (opt-in)
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | off | When enabled, the default `ApplicationServices` composition root binds `PluginManager` to a process `DataFetcherManager.plugin_registry` (created or injected) so registered providers route without extra glue |
+
+Leave the flag unset to keep historical manual mode. When enabled without an
+injected manager, `ApplicationServices` constructs one `DataFetcherManager` and
+exposes it as `services.data_fetcher_manager`. Stock quote/history service calls
+and the primary analysis pipeline resolve this installed owner, so plugin
+providers and built-in fallback use the same registry. For an injected manager,
+the composition root atomically adds the Analysis Strategy, Notification
+Channel, Agent Tool, and Event Hook contracts before those points can register.
+An invalid or already-conflicting registry fails process composition with a
+stable bind code; auto-bind never silently falls back to an orphan registry.
+Custom roots may still call `try_build_auto_bound_registry` directly.
+
+```python
+from data_provider import DataFetcherManager
+from src.plugins import (
+    PLUGIN_APPLICATION_VERSION,
+    PluginManager,
+    try_build_auto_bound_registry,
+)
+
+providers = DataFetcherManager()
+registry, error = try_build_auto_bound_registry(providers)
+if error:
+    raise RuntimeError(error)
+plugins = PluginManager(
+    application_version=PLUGIN_APPLICATION_VERSION,
+    registry=registry or providers.plugin_registry,  # explicit when flag off
+)
+```
+
+### Health check
+
+```python
+report = plugin_manager.health_check()
+for entry in report.plugins:
+    print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
+```
+
+Use `last_error_code` for the most recent stable failure (for example
+`plugin_onload_failed`). Disable/intent changes preserve it; a successful
+state-changing load/reload clears it as recovered. An idempotent enable does not
+erase a reload failure that still requires operator action. A single failed
+plugin must not prevent other plugins or core startup.
+
 ## Verification Commands
 
 Offline plugin suite (preferred local gate for this topic):
@@ -191,7 +317,8 @@ python -m pytest tests/plugins/test_example_*.py tests/plugins/test_extension_su
 - Marketplace distribution, signature verification, or multi-tenant isolation
 - Enforced sandboxing of plugin code (process-equivalent trust only)
 - Migrating built-in tools into plugins without ToolSurface preservation (#432 / #539)
-- UI, Settings, or MCP connector extension points
+- Plugin-supplied UI components or MCP connector extension points (the generated
+  scalar settings form remains host-owned)
 
 Those remain separate design tracks. Do not stretch a nearby registration API
 to simulate them.

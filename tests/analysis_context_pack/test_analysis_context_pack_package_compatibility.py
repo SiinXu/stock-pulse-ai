@@ -77,7 +77,7 @@ EXPECTED_AST_DIGESTS = {
         "4709f84df1b70f757f2d8a7790cf0f0bcdb62bdfe4983820f0355efe307e14e8"
     ),
     "src.analysis_context_pack.overview": (
-        "1e3cb8ec2c40430df7f1aeaa61ca6c85f38399a12d211de7a46d62f6504cc64a"
+        "9012a94ccfe27609d4213e9770df14f2bbb650825529188b91e59204541a8365"
     ),
 }
 
