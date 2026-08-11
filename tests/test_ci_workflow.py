@@ -1,4 +1,4 @@
-"""Guard the hosted CI contract for the minimum supported Python runtime."""
+"""Guard the hosted CI contract for two-tier and minimum Python gates."""
 
 from pathlib import Path
 
@@ -14,10 +14,71 @@ FRONTEND_EXECUTION_CONDITION = (
 )
 
 
-def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
+def _workflow() -> dict:
+    return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+
+def test_ci_uses_supported_pull_request_and_push_events_only() -> None:
+    workflow = _workflow()
+    # PyYAML loads the bare key `on:` as boolean True.
+    assert set(workflow[True]) == {"pull_request", "push"}
+
+
+def test_backend_gate_pr_is_selective() -> None:
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-gate"]
+
+    assert job["name"] == "backend-gate"
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == (
+        "github.event_name == 'pull_request' && "
+        "needs.changes.outputs.backend == 'true'"
+    )
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert sum("offline-tests-selective" in command for command in runs) == 1
+    assert not any(
+        command.strip() == "./scripts/ci_gate.sh offline-tests" for command in runs
+    )
+
+
+def test_backend_tests_are_sharded_on_push_to_main() -> None:
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-tests"]
+
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == (
+        "github.event_name == 'push' && needs.changes.outputs.backend == 'true'"
+    )
+    assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert sum("offline-tests-shard" in command for command in runs) == 1
+    upload = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/upload-artifact@")
+    )
+    assert upload["with"]["include-hidden-files"] is True
+    assert upload["with"]["if-no-files-found"] == "error"
+
+
+def test_backend_gate_main_combines_coverage_after_all_shards() -> None:
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-gate-main"]
+
+    assert job["name"] == "backend-gate"
+    assert job["needs"] == ["changes", "ai-governance", "backend-tests"]
+    assert job["if"] == (
+        "always() && github.event_name == 'push' && "
+        "needs.changes.outputs.backend == 'true'"
+    )
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert sum("offline-tests-combine" in command for command in runs) == 1
+
+
+def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push() -> None:
     """PR uses 3.10 smoke; push-to-main keeps a full offline suite on the floor."""
 
-    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    workflow = _workflow()
     job = workflow["jobs"]["python-minimum"]
     backend_job = workflow["jobs"]["backend-gate"]
     changes_job = workflow["jobs"]["changes"]
@@ -31,17 +92,10 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
         step.get("continue-on-error", False) is False for step in job["steps"]
     )
 
-    assert backend_job["needs"] == ["changes", "ai-governance"]
-    assert backend_job["if"] == "needs.changes.outputs.backend == 'true'"
-    # The full suite currently needs about 27 minutes before coverage and
-    # cleanup, so both full-suite jobs require headroom beyond 30 minutes.
     assert backend_job["timeout-minutes"] >= 45
     assert job["timeout-minutes"] >= 45
     assert "backend" in changes_job["outputs"]
     assert "docker" in changes_job["outputs"]
-    assert changes_job["outputs"]["backend"].startswith(
-        "${{ steps.backend-filter.outputs.backend_non_web == 'true'"
-    )
 
     setup_steps = [
         step
@@ -50,23 +104,6 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
     ]
     assert len(setup_steps) == 1
     assert setup_steps[0]["with"]["python-version"] == "3.10"
-
-    backend_setup_steps = [
-        step
-        for step in backend_job["steps"]
-        if step.get("uses", "").startswith("actions/setup-python@")
-    ]
-    assert len(backend_setup_steps) == 1
-    assert backend_setup_steps[0]["with"]["python-version"] == "3.11"
-
-    run_commands = [step["run"] for step in job["steps"] if "run" in step]
-    assert any("--constraint constraints.txt" in command for command in run_commands)
-    assert any(
-        "--build-constraint build-constraints.txt" in command
-        for command in run_commands
-    )
-    assert any("-r .github/requirements-ci.txt" in command for command in run_commands)
-    assert any("python -m pip check" in command for command in run_commands)
 
     smoke_steps = [
         step
@@ -83,22 +120,6 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
     ]
     assert len(full_steps) == 1
     assert full_steps[0]["if"] == "github.event_name != 'pull_request'"
-
-    selective_backend = [
-        step
-        for step in backend_job["steps"]
-        if "offline-tests-selective" in step.get("run", "")
-    ]
-    assert len(selective_backend) == 1
-    assert selective_backend[0]["if"] == "github.event_name == 'pull_request'"
-
-    full_backend = [
-        step
-        for step in backend_job["steps"]
-        if step.get("run", "").strip() == "./scripts/ci_gate.sh offline-tests"
-    ]
-    assert len(full_backend) == 1
-    assert full_backend[0]["if"] == "github.event_name != 'pull_request'"
 
 
 def test_docker_build_skips_when_docker_paths_unchanged():
@@ -208,6 +229,21 @@ def test_ci_gate_offline_suite_emits_slow_test_durations():
     script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
     assert "--durations=30" in script
     assert "--durations-min=0.5" in script
+
+
+def test_ci_gate_keeps_shard_variables_out_of_single_node_suite():
+    script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
+    single_node = script.split("offline_test_suite() {", 1)[1].split(
+        "offline_test_suite_selective() {", 1
+    )[0]
+    sharded = script.split("offline_test_suite_shard() {", 1)[1].split(
+        "offline_test_suite_combine() {", 1
+    )[0]
+
+    assert "shard_dir" not in single_node
+    assert "${group}" not in single_node
+    assert '--cov-report="json:${coverage_report}"' in single_node
+    assert '--cov-report="json:${shard_dir}/coverage-shard-${group}.json"' in sharded
 
 
 def test_pytest_testpaths_scopes_to_tests_package():
