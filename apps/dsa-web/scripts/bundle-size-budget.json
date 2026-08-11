@@ -132,9 +132,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57663,
-      "measuredGzipBytes": 57463,
-      "note": "Linux CI measurement after PR #953's notification-inbox Playground scenario; measured 57463 B + 200 B headroom."
+      "maxGzipBytes": 57281,
+      "measuredGzipBytes": 57081,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 57081 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",

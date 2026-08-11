@@ -1519,4 +1519,54 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "NOTIFICATION_INBOX_RETENTION_DAYS": {
+        "title": "Notification Inbox Retention Days",
+        "description": (
+            "Number of days that notification occurrences and their read markers "
+            "remain eligible for the in-app inbox."
+        ),
+        "category": "notification",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "90",
+        "options": [],
+        "validation": {"min": 1, "max": 3650},
+        "display_order": 72,
+        "examples": ["NOTIFICATION_INBOX_RETENTION_DAYS=90"],
+        "docs": [
+            {
+                "label": "Notification inbox",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/notification-inbox.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "NOTIFICATION_INBOX_MAX_ITEMS": {
+        "title": "Notification Inbox Maximum Items",
+        "description": (
+            "Maximum number of recent notification occurrences retained by each "
+            "source and the final in-app inbox aggregation."
+        ),
+        "category": "notification",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "500",
+        "options": [],
+        "validation": {"min": 10, "max": 5000},
+        "display_order": 73,
+        "examples": ["NOTIFICATION_INBOX_MAX_ITEMS=500"],
+        "docs": [
+            {
+                "label": "Notification inbox",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/notification-inbox.md",
+            },
+        ],
+        "warning_codes": [],
+    },
 }
