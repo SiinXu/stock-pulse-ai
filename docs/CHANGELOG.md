@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
+- [Fixed] Harden shared sensitive-config key detection so token-count / public-key / key-version and response-metadata names stay visible, bare credential `*_KEY` names are redacted in logs and diagnostics, and config read/save paths preserve registered and inferred secrets when a mask token is submitted (Refs #1023).
 - [Tests] Align Playwright analysis, history, and scheduled-task fixtures with required OpenAPI fields so runtime validation exercises successful real-contract paths.
 - [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
 - [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
