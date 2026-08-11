@@ -1,4 +1,3 @@
-import type React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
@@ -24,16 +23,6 @@ vi.mock('../../api/systemConfig', () => ({
     addToWatchlist: vi.fn(),
     getConfig: vi.fn().mockResolvedValue({ configVersion: 'test', maskToken: '******', items: [] }),
   },
-}));
-
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Line: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  Tooltip: () => null,
-  CartesianGrid: () => null,
 }));
 
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
@@ -108,7 +97,7 @@ describe('StockDetailsPage', () => {
     addWatchlistMock.mockReset();
   });
 
-  it('renders the quote and the accessible history table', async () => {
+  it('renders the quote, K-line chart, and accessible history table', async () => {
     getQuoteMock.mockResolvedValue(makeQuote());
     getHistoryMock.mockResolvedValue(makeHistory());
 
@@ -122,10 +111,24 @@ describe('StockDetailsPage', () => {
     const changeNode = screen.getByText(/\+20\.00/);
     expect(changeNode.getAttribute('data-change-color')).toBe('red');
     expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
-    // history table rows
-    expect(screen.getByText('2026-01-05')).toBeTruthy();
-    expect(screen.getByText('2026-01-06')).toBeTruthy();
+    // Product page consumes the shared KlineChart with history API candles.
+    expect(screen.getByTestId('stock-details-kline-chart')).toBeTruthy();
+    expect(screen.getByTestId('stock-details-kline-chart-canvas')).toBeTruthy();
+    // history table rows (dates also appear in the K-line readout/axis)
+    expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('2026-01-06').length).toBeGreaterThanOrEqual(1);
     expect(getHistoryMock).toHaveBeenCalledWith('600519', 90);
+  });
+
+  it('keeps history loading and error states without painting a false chart', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockRejectedValue(new Error('history down'));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Kweichow Moutai')).toBeTruthy());
+    expect(screen.queryByTestId('stock-details-kline-chart')).toBeNull();
+    expect(screen.queryByTestId('stock-details-kline-chart-empty')).toBeNull();
   });
 
   it('formats US quotes with green_up convention and USD currency', async () => {
@@ -253,7 +256,7 @@ describe('StockDetailsPage', () => {
     renderPage();
 
     // history still renders despite quote failure
-    await waitFor(() => expect(screen.getByText('2026-01-05')).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1));
     // quote price not shown (currency-formatted form either)
     expect(screen.queryByText('CNY 1,700.00')).toBeNull();
     expect(screen.queryByText(/1,700/)).toBeNull();

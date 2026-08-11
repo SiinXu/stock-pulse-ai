@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Wire opt-in plan→act→observe into AgentExecutor.run with Config/registry knobs, BoundToolSession tool dispatch, hard budgets, and production-path regression coverage (Refs #199).
+- [Fixed] Shrink config-registry unregistered debt baseline from 243 to 207 after registering MCP server keys and post-#1036 data-source domain keys (Refs #1023, #244).
+- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after merging MCP Settings inventory onto post-#1036/#1031 main (Refs #244).
+- [Added] Register all optional MCP server env keys in config registry category `mcp` with typed controls, validation ranges, sensitive masking, and bilingual Settings titles (Refs #244).
 - [Added] Report Markdown panel download actions call history export for Markdown/PDF so archive export #163 is user-reachable (Refs #163, #1008).
 - [Added] Model Access hub surfaces local model runtime and local CLI detection status (available/unavailable/not configured, last checked, honest probe failures) alongside cloud connections (Refs #865).
 - [Fixed] Config registry type inference treats boolean-named keys and inline-comment value hints as boolean/switch, and select when options are present; CI guard freezes unregistered `.env.example` keys as shrink-only temporary debt (Refs #1023).
 - [Fixed] Register crypto, data-validation, and local-first daily-cache Settings fields in the config registry with correct controls, enums, defaults, and bilingual help so they no longer land as uncategorized free-text (Refs #1023).
 - [Chore] Rebaseline Web locale bundle gzip budgets after data-source Settings help inventory growth (Refs #1023).
 - [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
+- [Added] Wire shared financial charts into product pages: Stock Details KlineChart (history API candles) and Portfolio RiskHeatmap (existing risk API weight/stop-loss/drawdown scores) with loading, empty, and invalid-value guards (Refs #142).
 - [Fixed] Capability inventory availability is projected only from live tool/skill/pipeline/plugin/data owners; registry and config read failures return explicit partial source errors instead of fail-open success snapshots (Refs #221).
 - [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).
 - [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
