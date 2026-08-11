@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Share the Agent session deadline with per-tool completion fences so parallel late tools retain deterministic timeout evidence.
+- [Added] Web report and run-diagnostics surfaces expose reasoning-trace export (JSON/Markdown) with Settings enable guidance when the default-off gate is closed, truncation notice from response headers, and registry-backed `REASONING_TRACE_EXPORT_*` Settings controls (Issue #135, Refs #212).
 - [Fixed] Lazy-load report Playground stories so Risk Manager evidence does not expand the shared Playground render budget.
 - [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
 - [Tests] Align the application-shell Playwright fixture with the server-authoritative notification inbox contract so auth redirects cannot mask shell regressions.
