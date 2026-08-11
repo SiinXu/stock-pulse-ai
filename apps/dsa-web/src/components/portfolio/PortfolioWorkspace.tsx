@@ -865,6 +865,7 @@ const PortfolioWorkspace: React.FC = () => {
                     key={`result-${task.taskId}`}
                     to={buildAnalysisWorkbenchHref({
                       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+                      recordId: task.resultRecordId,
                       stock: task.stockCode,
                     })}
                     data-control="navigation-link"

@@ -20,12 +20,22 @@ describe('portfolioAnalysisTaskState', () => {
 
   it('persists and restores tracked analysis tasks', () => {
     persistPortfolioAnalysisTasks([
-      { taskId: 'task-a', stockCode: 'AAPL', analysisPhase: 'auto' },
+      {
+        taskId: 'task-a',
+        stockCode: 'AAPL',
+        analysisPhase: 'auto',
+        resultRecordId: 42,
+      },
       { taskId: 'task-b', stockCode: 'MSFT' },
     ]);
     expect(window.sessionStorage.getItem(PORTFOLIO_ANALYSIS_TASK_SESSION_KEY)).toContain('task-a');
     expect(readPersistedPortfolioAnalysisTasks()).toEqual([
-      { taskId: 'task-a', stockCode: 'AAPL', analysisPhase: 'auto' },
+      {
+        taskId: 'task-a',
+        stockCode: 'AAPL',
+        analysisPhase: 'auto',
+        resultRecordId: 42,
+      },
       { taskId: 'task-b', stockCode: 'MSFT' },
     ]);
   });
@@ -39,9 +49,15 @@ describe('portfolioAnalysisTaskState', () => {
       taskId: 'task-1',
       stockCode: 'AAPL',
       analysisPhase: 'postmarket',
+      resultRecordId: 73,
     });
     expect(second).toEqual([
-      { taskId: 'task-1', stockCode: 'AAPL', analysisPhase: 'postmarket' },
+      {
+        taskId: 'task-1',
+        stockCode: 'AAPL',
+        analysisPhase: 'postmarket',
+        resultRecordId: 73,
+      },
     ]);
     expect(removePersistedPortfolioAnalysisTask(second, 'task-1')).toEqual([]);
   });

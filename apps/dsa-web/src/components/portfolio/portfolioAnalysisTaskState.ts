@@ -3,6 +3,7 @@
 // Portfolio-owned analysis task continuity (session + URL restore).
 
 import {
+  isPositiveRouteInteger,
   isStableAnalysisWorkbenchTaskId,
 } from '../../routing/routes';
 import {
@@ -22,6 +23,7 @@ export type PersistedPortfolioAnalysisTask = {
   taskId: string;
   stockCode: string;
   analysisPhase?: AnalysisPhase;
+  resultRecordId?: number;
 };
 
 const MAX_TRACKED_TASKS = 12;
@@ -47,6 +49,9 @@ function normalizePersistedTask(
   const task: PersistedPortfolioAnalysisTask = { taskId, stockCode };
   if (isAnalysisPhase(value.analysisPhase)) {
     task.analysisPhase = value.analysisPhase;
+  }
+  if (isPositiveRouteInteger(value.resultRecordId)) {
+    task.resultRecordId = value.resultRecordId;
   }
   return task;
 }

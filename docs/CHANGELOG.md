@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
-- [Fixed] Portfolio position analysis attaches the shared TaskPanel/RunFlow progress surface, restores tracked task state from the URL `task` param and session storage after leave/refresh, and drops unrecoverable (404/not_found) task ids instead of fabricating a stuck pending card (#879 A6).
+- [Fixed] Portfolio position analysis attaches the shared TaskPanel/RunFlow progress surface, reacts to URL `task` changes, restores stock and result identity from session/status data, preserves task identity across 401/403 responses, and drops confirmed-missing (404/not_found) task ids instead of fabricating a stuck pending card (#879 A6).
 - [Fixed] Token Usage period selection is owned by the URL (`?period=`) so refresh/share under Settings keeps the time range (#879 A1).
 - [Fixed] Overflowing pagination controls use safe centering so the leading prev control remains reachable under horizontal scroll (follow-up to #910 / #879 B4).
 - [Fixed] Keep Backtest strategy run options (`minAge`/`limit`) in shareable URLs while preserving stable research-route wire keys (#879 A1).

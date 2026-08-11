@@ -1,12 +1,14 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { SetURLSearchParams } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiError, createParsedApiError } from '../../../api/error';
 import {
   PORTFOLIO_ANALYSIS_TASK_QUERY_KEY,
   PORTFOLIO_ANALYSIS_TASK_SESSION_KEY,
   persistPortfolioAnalysisTasks,
+  readPersistedPortfolioAnalysisTasks,
 } from '../portfolioAnalysisTaskState';
 import { usePortfolioAnalysisTasks } from '../usePortfolioAnalysisTasks';
 
@@ -51,6 +53,30 @@ function timeoutError() {
       code: 'upstream_timeout',
     }),
   );
+}
+
+function authorizationError(status: 401 | 403) {
+  return createApiError(
+    createParsedApiError({
+      title: status === 401 ? '未登录' : '无权限',
+      message: status === 401 ? '请先登录。' : '当前账号无权访问。',
+      status,
+      category: 'http_error',
+      code: status === 401 ? 'unauthorized' : 'forbidden',
+    }),
+  );
+}
+
+function createSearchParamsHarness(initial: string) {
+  let current = new URLSearchParams(initial);
+  const setSearchParams: SetURLSearchParams = vi.fn((nextInit) => {
+    const resolved = typeof nextInit === 'function' ? nextInit(current) : nextInit;
+    current = new URLSearchParams(resolved);
+  });
+  return {
+    setSearchParams,
+    current: () => current,
+  };
 }
 
 describe('usePortfolioAnalysisTasks', () => {
@@ -114,6 +140,25 @@ describe('usePortfolioAnalysisTasks', () => {
         createdAt: '2026-03-18T00:00:00.000Z',
       }],
     });
+    getStatus.mockResolvedValue({
+      taskId: 'task-restored',
+      status: 'completed',
+      progress: 100,
+      result: {
+        stockCode: 'HK00700',
+        stockName: 'Tencent',
+        createdAt: '2026-03-18T00:00:00.000Z',
+        report: {
+          meta: {
+            id: 73,
+            stockCode: 'HK00700',
+            stockName: 'Tencent',
+            reportType: 'detailed',
+            createdAt: '2026-03-18T00:00:00.000Z',
+          },
+        },
+      },
+    });
 
     const setSearchParams = vi.fn();
     const { result } = renderHook(() => usePortfolioAnalysisTasks({
@@ -122,12 +167,18 @@ describe('usePortfolioAnalysisTasks', () => {
     }));
 
     await waitFor(() => {
-      expect(result.current.tasks).toHaveLength(1);
+      expect(result.current.tasks[0]).toMatchObject({
+        taskId: 'task-restored',
+        stockCode: 'HK00700',
+        stockName: 'Tencent',
+        status: 'completed',
+        resultRecordId: 73,
+      });
     });
-    expect(result.current.tasks[0]).toMatchObject({
-      taskId: 'task-restored',
-      stockCode: 'HK00700',
-      status: 'completed',
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem(PORTFOLIO_ANALYSIS_TASK_SESSION_KEY)).toContain(
+        '"resultRecordId":73',
+      );
     });
   });
 
@@ -159,10 +210,12 @@ describe('usePortfolioAnalysisTasks', () => {
     getTasks.mockResolvedValue({ total: 0, pending: 0, processing: 0, tasks: [] });
     getStatus.mockRejectedValue(notFoundError('dead-task'));
 
-    const setSearchParams = vi.fn();
+    const search = createSearchParamsHarness(
+      `${PORTFOLIO_ANALYSIS_TASK_QUERY_KEY}=dead-task&keep=yes`,
+    );
     const { result } = renderHook(() => usePortfolioAnalysisTasks({
       searchParams: new URLSearchParams(`${PORTFOLIO_ANALYSIS_TASK_QUERY_KEY}=dead-task`),
-      setSearchParams,
+      setSearchParams: search.setSearchParams,
     }));
 
     await waitFor(() => {
@@ -171,11 +224,83 @@ describe('usePortfolioAnalysisTasks', () => {
     await waitFor(() => {
       expect(result.current.tasks).toHaveLength(0);
     });
-    expect(window.sessionStorage.getItem(PORTFOLIO_ANALYSIS_TASK_SESSION_KEY)).toBeNull();
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem(PORTFOLIO_ANALYSIS_TASK_SESSION_KEY)).toBeNull();
+      expect(search.setSearchParams).toHaveBeenCalled();
+    });
     // URL ?task= cleared via applyPortfolioAnalysisTaskToSearch(..., null)
-    expect(setSearchParams).toHaveBeenCalled();
-    const lastSearch = setSearchParams.mock.calls.at(-1)?.[0] as URLSearchParams;
-    expect(lastSearch.get(PORTFOLIO_ANALYSIS_TASK_QUERY_KEY)).toBeNull();
+    expect(search.current().get(PORTFOLIO_ANALYSIS_TASK_QUERY_KEY)).toBeNull();
+    expect(search.current().get('keep')).toBe('yes');
+  });
+
+  it.each([401, 403] as const)(
+    'preserves task, stock, and result identity when restore returns %s',
+    async (status) => {
+      persistPortfolioAnalysisTasks([{
+        taskId: 'protected-task',
+        stockCode: 'AAPL',
+        analysisPhase: 'postmarket',
+        resultRecordId: 88,
+      }]);
+      getStatus.mockRejectedValue(authorizationError(status));
+      const search = createSearchParamsHarness('task=protected-task&keep=yes');
+
+      const { result } = renderHook(() => usePortfolioAnalysisTasks({
+        searchParams: new URLSearchParams('task=protected-task&keep=yes'),
+        setSearchParams: search.setSearchParams,
+      }));
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1);
+      });
+      expect(result.current.tasks[0]).toMatchObject({
+        taskId: 'protected-task',
+        stockCode: 'AAPL',
+        analysisPhase: 'postmarket',
+        resultRecordId: 88,
+      });
+      expect(readPersistedPortfolioAnalysisTasks()[0]).toMatchObject({
+        taskId: 'protected-task',
+        stockCode: 'AAPL',
+        resultRecordId: 88,
+      });
+      expect(search.current().get(PORTFOLIO_ANALYSIS_TASK_QUERY_KEY)).toBe('protected-task');
+      expect(search.current().get('keep')).toBe('yes');
+    },
+  );
+
+  it('reacts to a task id introduced into the URL after hydration', async () => {
+    getStatus.mockImplementation(async (taskId: string) => ({
+      taskId,
+      status: 'processing',
+      progress: 35,
+      originalQuery: 'MSFT',
+    }));
+    const setSearchParams = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ search }: { search: string }) => usePortfolioAnalysisTasks({
+        searchParams: new URLSearchParams(search),
+        setSearchParams,
+      }),
+      { initialProps: { search: '' } },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    rerender({ search: 'task=route-task&keep=yes' });
+
+    await waitFor(() => {
+      expect(getStatus).toHaveBeenCalledWith('route-task');
+    });
+    await waitFor(() => {
+      expect(result.current.tasks[0]).toMatchObject({
+        taskId: 'route-task',
+        stockCode: 'MSFT',
+        status: 'processing',
+      });
+    });
   });
 
   it('keeps a recoverable getStatus failure tracked without clearing persistence', async () => {
@@ -220,7 +345,9 @@ describe('usePortfolioAnalysisTasks', () => {
     await waitFor(() => {
       expect(result.current.tasks).toHaveLength(0);
     });
-    expect(window.sessionStorage.getItem(PORTFOLIO_ANALYSIS_TASK_SESSION_KEY)).toBeNull();
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem(PORTFOLIO_ANALYSIS_TASK_SESSION_KEY)).toBeNull();
+    });
   });
 
   it('poll drops unrecoverable 404 and clears persistence; recoverable keeps last state', async () => {

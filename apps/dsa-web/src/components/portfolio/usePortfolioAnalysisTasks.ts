@@ -7,7 +7,7 @@ import type { SetURLSearchParams } from 'react-router-dom';
 import { analysisApi } from '../../api/analysis';
 import {
   getParsedApiError,
-  isPermanentlyUnavailableResourceError,
+  type ParsedApiError,
 } from '../../api/error';
 import { useTaskStream } from '../../hooks/useTaskStream';
 import type {
@@ -20,10 +20,10 @@ import type {
 import type { RunFlowSnapshotSource } from '../../types/runFlow';
 import {
   applyPortfolioAnalysisTaskToSearch,
+  PORTFOLIO_ANALYSIS_TASK_QUERY_KEY,
   persistPortfolioAnalysisTasks,
   readPersistedPortfolioAnalysisTasks,
   readPortfolioAnalysisTaskIdFromSearch,
-  removePersistedPortfolioAnalysisTask,
   upsertPersistedPortfolioAnalysisTask,
   type PersistedPortfolioAnalysisTask,
 } from './portfolioAnalysisTaskState';
@@ -44,26 +44,52 @@ function isRunningStatus(status: TaskLifecycleStatus | string | undefined | null
   return status === 'pending' || status === 'processing' || status === 'cancel_requested';
 }
 
+function isConfirmedMissingTaskError(error: ParsedApiError): boolean {
+  return error.status === 404 || error.code === 'not_found';
+}
+
+export type PortfolioAnalysisTaskInfo = TaskInfo & {
+  resultRecordId?: number;
+};
+
 function taskStatusToInfo(
   status: TaskStatus,
-  fallback: { stockCode: string; analysisPhase?: AnalysisPhase; reportType?: string },
-): TaskInfo {
+  fallback: {
+    stockCode: string;
+    analysisPhase?: AnalysisPhase;
+    reportType?: string;
+    resultRecordId?: number;
+  },
+): PortfolioAnalysisTaskInfo {
+  const resultMeta = status.result?.report?.meta;
+  const resultRecordId = Number(resultMeta?.id);
+  const stockCode = status.result?.stockCode?.trim()
+    || resultMeta?.stockCode?.trim()
+    || status.originalQuery?.trim()
+    || fallback.stockCode;
   return {
     taskId: status.taskId,
-    stockCode: fallback.stockCode,
-    stockName: status.stockName,
+    stockCode,
+    stockName: status.stockName
+      ?? status.result?.stockName
+      ?? resultMeta?.stockName,
     status: status.status,
     progress: Number(status.progress ?? 0),
     message: status.message,
     messageCode: status.messageCode,
     messageParams: status.messageParams,
-    reportType: fallback.reportType ?? 'detailed',
-    createdAt: new Date().toISOString(),
+    reportType: resultMeta?.reportType ?? fallback.reportType ?? 'detailed',
+    createdAt: status.result?.createdAt ?? resultMeta?.createdAt ?? new Date().toISOString(),
     error: status.error,
-    originalQuery: status.originalQuery ?? fallback.stockCode,
+    originalQuery: status.originalQuery ?? stockCode,
     selectionSource: status.selectionSource ?? 'manual',
     analysisPhase: status.analysisPhase ?? fallback.analysisPhase,
     skills: status.skills,
+    ...(Number.isSafeInteger(resultRecordId) && resultRecordId > 0
+      ? { resultRecordId }
+      : fallback.resultRecordId
+        ? { resultRecordId: fallback.resultRecordId }
+        : {}),
     ...(status.traceId ? { traceId: status.traceId } : {}),
     ...(isTerminalStatus(status.status) ? { completedAt: new Date().toISOString() } : {}),
   };
@@ -73,7 +99,7 @@ function acceptedToInfo(
   accepted: TaskAccepted,
   stockCode: string,
   analysisPhase: AnalysisPhase,
-): TaskInfo {
+): PortfolioAnalysisTaskInfo {
   return {
     taskId: accepted.taskId,
     stockCode,
@@ -91,7 +117,10 @@ function acceptedToInfo(
   };
 }
 
-function mergeTask(current: TaskInfo | undefined, incoming: TaskInfo): TaskInfo {
+function mergeTask(
+  current: PortfolioAnalysisTaskInfo | undefined,
+  incoming: PortfolioAnalysisTaskInfo,
+): PortfolioAnalysisTaskInfo {
   if (!current) return incoming;
   return {
     ...current,
@@ -112,14 +141,16 @@ function mergeTask(current: TaskInfo | undefined, incoming: TaskInfo): TaskInfo 
     analysisPhase: incoming.analysisPhase ?? current.analysisPhase,
     skills: incoming.skills ?? current.skills,
     traceId: incoming.traceId ?? current.traceId,
+    resultRecordId: incoming.resultRecordId ?? current.resultRecordId,
   };
 }
 
-function toPersisted(task: TaskInfo): PersistedPortfolioAnalysisTask {
+function toPersisted(task: PortfolioAnalysisTaskInfo): PersistedPortfolioAnalysisTask {
   return {
     taskId: task.taskId,
     stockCode: task.stockCode,
     ...(task.analysisPhase ? { analysisPhase: task.analysisPhase } : {}),
+    ...(task.resultRecordId ? { resultRecordId: task.resultRecordId } : {}),
   };
 }
 
@@ -138,11 +169,11 @@ export function usePortfolioAnalysisTasks({
   setSearchParams,
   enabled = true,
 }: UsePortfolioAnalysisTasksOptions) {
-  const [tasks, setTasks] = useState<TaskInfo[]>([]);
+  const [tasks, setTasks] = useState<PortfolioAnalysisTaskInfo[]>([]);
   const [runFlowTaskId, setRunFlowTaskId] = useState<string | null>(null);
   const [hasHydrated, setHasHydrated] = useState(!enabled);
   const trackedIdsRef = useRef<Set<string>>(new Set());
-  const tasksRef = useRef<TaskInfo[]>([]);
+  const tasksRef = useRef<PortfolioAnalysisTaskInfo[]>([]);
   const searchParamsRef = useRef(searchParams);
   const setSearchParamsRef = useRef(setSearchParams);
   useEffect(() => {
@@ -154,7 +185,7 @@ export function usePortfolioAnalysisTasks({
     setSearchParamsRef.current = setSearchParams;
   }, [searchParams, setSearchParams]);
 
-  const syncPersistence = useCallback((nextTasks: TaskInfo[]) => {
+  const syncPersistence = useCallback((nextTasks: PortfolioAnalysisTaskInfo[]) => {
     const running = nextTasks.filter((task) => isRunningStatus(task.status));
     const terminal = nextTasks.filter((task) => isTerminalStatus(task.status));
     const persistable = [...running, ...terminal].map(toPersisted);
@@ -163,13 +194,18 @@ export function usePortfolioAnalysisTasks({
     const primaryId = running[0]?.taskId
       ?? terminal[0]?.taskId
       ?? null;
-    const nextSearch = applyPortfolioAnalysisTaskToSearch(searchParamsRef.current, primaryId);
-    if (nextSearch) {
-      setSearchParamsRef.current(nextSearch, { replace: true });
+    const currentRawTaskId = searchParamsRef.current
+      .get(PORTFOLIO_ANALYSIS_TASK_QUERY_KEY)
+      ?.trim() || null;
+    if (currentRawTaskId !== primaryId) {
+      setSearchParamsRef.current((current) => (
+        applyPortfolioAnalysisTaskToSearch(current, primaryId)
+        ?? new URLSearchParams(current)
+      ), { replace: true });
     }
   }, []);
 
-  const upsertLocalTask = useCallback((incoming: TaskInfo) => {
+  const upsertLocalTask = useCallback((incoming: PortfolioAnalysisTaskInfo) => {
     trackedIdsRef.current.add(incoming.taskId);
     setTasks((prev) => {
       const index = prev.findIndex((task) => task.taskId === incoming.taskId);
@@ -190,26 +226,12 @@ export function usePortfolioAnalysisTasks({
 
   /**
    * Drop a task the backend has confirmed is gone (or never confirmed exists).
-   * Clears panel state, tracked id, session persistence, and `?task=` when needed.
+   * Persistence and URL reconciliation stay in the effect below so this state
+   * updater remains pure.
    */
   const dropUnrecoverableTask = useCallback((taskId: string) => {
     trackedIdsRef.current.delete(taskId);
-    setTasks((prev) => {
-      const next = prev.filter((task) => task.taskId !== taskId);
-      const persisted = removePersistedPortfolioAnalysisTask(
-        readPersistedPortfolioAnalysisTasks(),
-        taskId,
-      );
-      persistPortfolioAnalysisTasks(persisted);
-      const primaryId = next.find((task) => isRunningStatus(task.status))?.taskId
-        ?? next[0]?.taskId
-        ?? null;
-      const nextSearch = applyPortfolioAnalysisTaskToSearch(searchParamsRef.current, primaryId);
-      if (nextSearch) {
-        setSearchParamsRef.current(nextSearch, { replace: true });
-      }
-      return next;
-    });
+    setTasks((prev) => prev.filter((task) => task.taskId !== taskId));
     setRunFlowTaskId((current) => (current === taskId ? null : current));
   }, []);
 
@@ -237,6 +259,7 @@ export function usePortfolioAnalysisTasks({
     taskId: string,
     stockCode: string,
     analysisPhase?: AnalysisPhase,
+    resultRecordId?: number,
   ) => {
     const existing = tasksRef.current.find((task) => task.taskId === taskId);
     if (existing) {
@@ -257,6 +280,7 @@ export function usePortfolioAnalysisTasks({
       messageCode: 'task.queued',
       messageParams: { stockCode },
       ...(analysisPhase ? { analysisPhase } : {}),
+      ...(resultRecordId ? { resultRecordId } : {}),
     });
   }, [upsertLocalTask]);
 
@@ -264,9 +288,12 @@ export function usePortfolioAnalysisTasks({
     taskId: string,
     stockCode: string,
     analysisPhase?: AnalysisPhase,
+    resultRecordId?: number,
   ) => {
     trackedIdsRef.current.add(taskId);
-    const placeholderStock = stockCode && stockCode !== taskId ? stockCode : taskId;
+    let placeholderStock = stockCode && stockCode !== taskId ? stockCode : taskId;
+    let fallbackAnalysisPhase = analysisPhase;
+    const fallbackResultRecordId = resultRecordId;
 
     try {
       const list = await analysisApi.getTasks({
@@ -279,8 +306,11 @@ export function usePortfolioAnalysisTasks({
           ...fromList,
           stockCode: fromList.stockCode || placeholderStock,
           analysisPhase: fromList.analysisPhase ?? analysisPhase,
+          ...(resultRecordId ? { resultRecordId } : {}),
         });
-        return;
+        placeholderStock = fromList.stockCode || placeholderStock;
+        fallbackAnalysisPhase = fromList.analysisPhase ?? analysisPhase;
+        if (!isTerminalStatus(fromList.status)) return;
       }
     } catch {
       // Fall through to getStatus when the task list is unavailable.
@@ -295,16 +325,23 @@ export function usePortfolioAnalysisTasks({
       }
       upsertLocalTask(taskStatusToInfo(status, {
         stockCode: placeholderStock,
-        analysisPhase,
+        analysisPhase: fallbackAnalysisPhase,
+        resultRecordId: fallbackResultRecordId,
       }));
     } catch (error) {
       const parsed = getParsedApiError(error);
-      if (isPermanentlyUnavailableResourceError(parsed)) {
+      if (isConfirmedMissingTaskError(parsed)) {
         dropUnrecoverableTask(taskId);
         return;
       }
-      // Transient/network/5xx: keep tracking + persistence; poll/SSE can recover.
-      keepRecoverablePlaceholder(taskId, placeholderStock, analysisPhase);
+      // Auth/permission failures do not prove the task is gone. Preserve its
+      // identity so a later authenticated poll can recover the same task.
+      keepRecoverablePlaceholder(
+        taskId,
+        placeholderStock,
+        fallbackAnalysisPhase,
+        fallbackResultRecordId,
+      );
     }
   }, [dropUnrecoverableTask, keepRecoverablePlaceholder, upsertLocalTask]);
 
@@ -322,7 +359,12 @@ export function usePortfolioAnalysisTasks({
     void (async () => {
       for (const item of seed) {
         if (cancelled) return;
-        await attachExistingTask(item.taskId, item.stockCode, item.analysisPhase);
+        await attachExistingTask(
+          item.taskId,
+          item.stockCode,
+          item.analysisPhase,
+          item.resultRecordId,
+        );
       }
       if (!cancelled) setHasHydrated(true);
     })();
@@ -331,6 +373,13 @@ export function usePortfolioAnalysisTasks({
       cancelled = true;
     };
   }, [attachExistingTask, enabled]);
+
+  const urlTaskId = readPortfolioAnalysisTaskIdFromSearch(searchParams);
+  useEffect(() => {
+    if (!enabled || !hasHydrated || !urlTaskId) return;
+    if (trackedIdsRef.current.has(urlTaskId)) return;
+    void attachExistingTask(urlTaskId, urlTaskId);
+  }, [attachExistingTask, enabled, hasHydrated, urlTaskId]);
 
   const applyStreamTask = useCallback((incoming: TaskInfo) => {
     if (!trackedIdsRef.current.has(incoming.taskId)) return;
@@ -370,11 +419,12 @@ export function usePortfolioAnalysisTasks({
             stockCode: task.stockCode,
             analysisPhase: task.analysisPhase,
             reportType: task.reportType,
+            resultRecordId: task.resultRecordId,
           }));
         } catch (error) {
           if (cancelled) return;
           const parsed = getParsedApiError(error);
-          if (isPermanentlyUnavailableResourceError(parsed)) {
+          if (isConfirmedMissingTaskError(parsed)) {
             dropUnrecoverableTask(task.taskId);
             return;
           }
