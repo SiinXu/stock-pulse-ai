@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #1032 agent/report registry inventory merged onto post-#1036/#1033 main. Affected Settings and locale chunks were remeasured locally with a production build; 200B headroom.",
+  "baselineNote": "PR #1032 agent/report registry inventory merged with PR #841 portfolio-risk locale inventory. Affected Settings and locale chunks were remeasured locally with a production build; 200 B headroom, with no i18n baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 143351,
-      "measuredGzipBytes": 143151,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 143151 B + 200 B headroom."
+      "maxGzipBytes": 144551,
+      "measuredGzipBytes": 144351,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 144351 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 136863,
-      "measuredGzipBytes": 136663,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 136663 B + 200 B headroom."
+      "maxGzipBytes": 137891,
+      "measuredGzipBytes": 137691,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 137691 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 137333,
-      "measuredGzipBytes": 137133,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 137133 B + 200 B headroom."
+      "maxGzipBytes": 138497,
+      "measuredGzipBytes": 138297,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 138297 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 137619,
-      "measuredGzipBytes": 137419,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 137419 B + 200 B headroom."
+      "maxGzipBytes": 138698,
+      "measuredGzipBytes": 138498,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 138498 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 133476,
-      "measuredGzipBytes": 133276,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 133276 B + 200 B headroom."
+      "maxGzipBytes": 134624,
+      "measuredGzipBytes": 134424,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 134424 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 130422,
-      "measuredGzipBytes": 130222,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 130222 B + 200 B headroom."
+      "maxGzipBytes": 131513,
+      "measuredGzipBytes": 131313,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 131313 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 123948,
-      "measuredGzipBytes": 123748,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 123748 B + 200 B headroom."
+      "maxGzipBytes": 125036,
+      "measuredGzipBytes": 124836,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 124836 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 123974,
-      "measuredGzipBytes": 123774,
-      "note": "Rebaselined after agent/report Settings inventory merge (PR #1032); measured 123774 B + 200 B headroom."
+      "maxGzipBytes": 125078,
+      "measuredGzipBytes": 124878,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 124878 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -149,10 +149,18 @@
       "measuredGzipBytes": 42365
     },
     {
+      "id": "PortfolioRiskMetricsPanel",
+      "match": "assets/PortfolioRiskMetricsPanel-*.js",
+      "maxGzipBytes": 10654,
+      "measuredGzipBytes": 9685,
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
+    },
+    {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 25543,
-      "measuredGzipBytes": 23220
+      "measuredGzipBytes": 24263,
+      "note": "PR #841 code-splits the risk panel; the route remains below the unchanged 25543 B cap."
     },
     {
       "id": "DecisionSignalsPage",
