@@ -106,7 +106,7 @@ describe('LoadedExtensionsPanel', () => {
     );
     // No marketplace / install affordance.
     expect(screen.queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: /enable or disable Kronos/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /Disabled: Kronos/i })).toBeInTheDocument();
     expect(pluginsApi.list).toHaveBeenCalledTimes(1);
   });
 
@@ -220,7 +220,7 @@ describe('LoadedExtensionsPanel', () => {
     });
 
     render(<LoadedExtensionsPanel t={t} language="en" />);
-    const toggle = await screen.findByRole('switch', { name: /enable or disable Toggle Demo/i });
+    const toggle = await screen.findByRole('switch', { name: /Enabled: Toggle Demo/i });
     fireEvent.click(toggle);
 
     await waitFor(() => {
@@ -292,12 +292,12 @@ describe('LoadedExtensionsPanel', () => {
     });
 
     render(<LoadedExtensionsPanel t={t} language="en" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Configure Configured Demo' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View details: Configured Demo' }));
 
-    expect(await screen.findByRole('dialog', { name: 'Configure Configured Demo' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'View details: Configured Demo' })).toBeInTheDocument();
     const threshold = await screen.findByLabelText(/^Threshold/);
     fireEvent.change(threshold, { target: { value: '0.75' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save plugin settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
 
     await waitFor(() => {
       expect(pluginsApi.updateSettings).toHaveBeenCalledWith(
@@ -306,6 +306,6 @@ describe('LoadedExtensionsPanel', () => {
         '******',
       );
     });
-    expect(await screen.findByText('Plugin reload required')).toBeInTheDocument();
+    expect(await screen.findByText('Restart to apply')).toBeInTheDocument();
   });
 });

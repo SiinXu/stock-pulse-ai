@@ -184,9 +184,7 @@ const PluginField: React.FC<{
       {field.uiControl !== 'switch' ? control : null}
       {issue ? (
         <p id={errorId} className="text-xs text-danger">
-          {t(issue === 'required'
-            ? 'settings.pluginSettingsRequired'
-            : 'settings.pluginSettingsInvalid')}
+          {t(issue === 'required' ? 'settings.fieldRequired' : 'common.invalid')}
         </p>
       ) : null}
     </div>
@@ -229,15 +227,14 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
       isOpen
       onClose={onClose}
       closeDisabled={isSaving}
-      title={t('settings.pluginSettingsTitle', { name: pluginName })}
-      description={t('settings.pluginSettingsDescription')}
+      title={`${t('common.details')}: ${pluginName}`}
       footer={(
         <>
           <Button variant="ghost" disabled={isSaving} onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button variant="primary" isLoading={isSaving} onClick={() => { void submit(); }}>
-            {t('settings.pluginSettingsSave')}
+            {t('settings.saveConfig')}
           </Button>
         </>
       )}
@@ -246,7 +243,7 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
         {saveError ? (
           <InlineAlert
             variant="danger"
-            title={t('settings.pluginSettingsSaveFailed')}
+            title={t('settings.saveFailed')}
             message={saveError}
           />
         ) : null}

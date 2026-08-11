@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { RefreshCw, Settings2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
@@ -23,9 +23,10 @@ import {
   InlineAlert,
   StatePanel,
 } from '../common';
-import PluginSettingsModal from './PluginSettingsModal';
 import { SettingsSwitch } from './SettingsSwitch';
 import { SettingsSectionCard } from './SettingsSectionCard';
+
+const PluginSettingsModal = lazy(() => import('./PluginSettingsModal'));
 
 type LoadedExtensionsPanelProps = {
   disabled?: boolean;
@@ -118,7 +119,7 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
     try {
       const result = await pluginsApi.updateLifecycle(plugin.id, enabled ? 'enable' : 'disable');
       if (!result.success) {
-        setActionError(result.message || result.errorCode || t('settings.pluginActionFailed'));
+        setActionError(result.message || result.errorCode || t('common.failure'));
         return;
       }
       setRestartRequired((current) => current || result.restartRequired);
@@ -242,7 +243,7 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
     },
     {
       id: 'management',
-      header: t('settings.loadedExtensionsColManagement'),
+      header: t('settings.loadedExtensionsColNotes'),
       cell: (plugin) => {
         const reason = failureReason(plugin, t);
         return (
@@ -252,7 +253,9 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
                 checked={plugin.desiredEnabled}
                 disabled={disabled || pendingPluginId === plugin.id}
                 onCheckedChange={(next) => { void updateLifecycle(plugin, next); }}
-                aria-label={t('settings.pluginToggleLabel', { name: plugin.name || plugin.id })}
+                aria-label={`${t(plugin.desiredEnabled
+                  ? 'settings.loadedExtensionsStateDisabled'
+                  : 'settings.loadedExtensionsStateEnabled')}: ${plugin.name || plugin.id}`}
                 testId={`plugin-toggle-${plugin.id}`}
               />
               {plugin.settingsCount > 0 ? (
@@ -261,13 +264,13 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
                   size="default"
                   disabled={disabled || pendingPluginId === plugin.id}
                   onClick={() => { void openSettings(plugin); }}
-                  aria-label={t('settings.pluginConfigureLabel', { name: plugin.name || plugin.id })}
+                  aria-label={`${t('common.details')}: ${plugin.name || plugin.id}`}
                 >
                   <Settings2 aria-hidden="true" className="h-3.5 w-3.5" />
-                  {t('settings.pluginConfigure')}
+                  {t('common.details')}
                 </Button>
               ) : (
-                <span className="text-xs text-muted-text">{t('settings.pluginNoSettings')}</span>
+                <span aria-hidden="true" className="text-xs text-muted-text">—</span>
               )}
             </div>
             {reason ? (
@@ -304,7 +307,7 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
       </div>
 
       <p className="text-xs leading-5 text-muted-text" data-testid="settings-loaded-extensions-management-note">
-        {t('settings.loadedExtensionsManagementNote')}
+        {t('settings.loadedExtensionsReadOnlyNote')}
       </p>
 
       {loadError ? <ApiErrorAlert error={loadError} className="mb-3" /> : null}
@@ -312,7 +315,7 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
         <InlineAlert
           className="mb-3"
           variant="danger"
-          title={t('settings.pluginActionFailed')}
+          title={t('common.failure')}
           message={actionError}
         />
       ) : null}
@@ -320,8 +323,8 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
         <InlineAlert
           className="mb-3"
           variant="warning"
-          title={t('settings.pluginRestartRequiredTitle')}
-          message={t('settings.pluginRestartRequiredBody')}
+          title={t('settings.fieldRestartRequired')}
+          message={t('settings.loadedExtensionsReadOnlyNote')}
         />
       ) : null}
 
@@ -355,15 +358,17 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
       )}
 
       {selectedSettings ? (
-        <PluginSettingsModal
-          pluginName={settingsPluginName}
-          settings={selectedSettings}
-          disabled={disabled}
-          saveError={settingsSaveError}
-          onClose={() => setSelectedSettings(null)}
-          onSave={saveSettings}
-          t={t}
-        />
+        <Suspense fallback={null}>
+          <PluginSettingsModal
+            pluginName={settingsPluginName}
+            settings={selectedSettings}
+            disabled={disabled}
+            saveError={settingsSaveError}
+            onClose={() => setSelectedSettings(null)}
+            onSave={saveSettings}
+            t={t}
+          />
+        </Suspense>
       ) : null}
     </SettingsSectionCard>
   );
