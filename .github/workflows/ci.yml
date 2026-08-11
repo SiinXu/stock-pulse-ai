@@ -108,7 +108,7 @@ jobs:
   # PR tier: fast backend-gate (selective pytest; full suite on uncertain path
   # maps). Required check name: backend-gate
   # ---------------------------------------------------------------------------
-  backend-gate-pr:
+  backend-gate:
     name: backend-gate
     runs-on: ubuntu-latest
     timeout-minutes: 45

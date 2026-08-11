@@ -26,7 +26,7 @@ def test_ci_uses_supported_pull_request_and_push_events_only() -> None:
 
 def test_backend_gate_pr_is_selective() -> None:
     workflow = _workflow()
-    job = workflow["jobs"]["backend-gate-pr"]
+    job = workflow["jobs"]["backend-gate"]
 
     assert job["name"] == "backend-gate"
     assert job["needs"] == ["changes", "ai-governance"]
@@ -80,7 +80,7 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push() -> None:
 
     workflow = _workflow()
     job = workflow["jobs"]["python-minimum"]
-    backend_job = workflow["jobs"]["backend-gate-pr"]
+    backend_job = workflow["jobs"]["backend-gate"]
     changes_job = workflow["jobs"]["changes"]
 
     assert job["name"] == "python-minimum"
