@@ -5,13 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { EventAlertDisplayItem } from '../../../types/eventAlerts';
 import { EventAlertsPanel } from '../EventAlertsPanel';
+import { chooseOption } from '../../../test-utils';
 
 const why = 'Earnings events can reprice profit expectations and valuation anchors.';
 const reg = 'Regulatory events may imply penalties, operating limits, or sentiment shocks.';
 
 const fixtures: EventAlertDisplayItem[] = [
-  { id: 101, target: '600519', status: 'triggered', whatHappened: 'SEC', whyItMatters: reg, eventCategory: 'regulatory', impactGrade: 'major', degraded: false, inWatchlist: true, inPortfolio: true, weightPct: 8.5, matchedCount: 2, triggeredAt: '2026-08-01T09:00:00Z' },
-  { id: 102, target: 'AAPL', status: 'triggered', whatHappened: 'Q1', whyItMatters: why, eventCategory: 'earnings', impactGrade: 'routine', degraded: false, inWatchlist: false, inPortfolio: false, matchedCount: 1, triggeredAt: '2026-08-01T10:00:00Z' },
+  { id: 101, target: '600519', status: 'triggered', whatHappened: 'SEC', whyItMatters: reg, eventCategory: 'regulatory', impactGrade: 'major', impactProvenance: 'rule_severity', degraded: false, inWatchlist: true, inPortfolio: true, weightPct: 8.5, matchedCount: 2, triggeredAt: '2026-08-01T09:00:00Z' },
+  { id: 102, target: 'AAPL', status: 'triggered', whatHappened: 'Q1', whyItMatters: why, eventCategory: 'earnings', impactGrade: 'routine', impactProvenance: 'rule_severity', degraded: false, inWatchlist: false, inPortfolio: false, matchedCount: 1, triggeredAt: '2026-08-01T10:00:00Z' },
 ];
 
 describe('EventAlertsPanel', () => {
@@ -34,5 +35,20 @@ describe('EventAlertsPanel', () => {
       </UiLanguageProvider>,
     );
     expect(screen.getByText('No event alerts')).toBeInTheDocument();
+  });
+
+  it('moves selection into the filtered dataset', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <EventAlertsPanel items={fixtures} embedded />
+      </UiLanguageProvider>,
+    );
+    fireEvent.click(screen.getByTestId('event-alert-row-102'));
+    expect(screen.getByTestId('event-alert-why-it-matters')).toHaveTextContent(why);
+
+    chooseOption(screen.getByLabelText('Status'), 'major');
+
+    expect(screen.queryByTestId('event-alert-row-102')).not.toBeInTheDocument();
+    expect(screen.getByTestId('event-alert-why-it-matters')).toHaveTextContent(reg);
   });
 });

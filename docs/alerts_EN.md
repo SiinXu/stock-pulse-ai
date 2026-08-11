@@ -84,7 +84,9 @@ Notification content appends a public impact excerpt after the existing phase an
 
 ### Web follow-up (issue #241)
 
-- Dedicated `/event-alerts` view renders fired corporate-event triggers using backend-owned `why_it_matters` and impact context.
-- `GET /api/v1/alerts/triggers` exposes first-class `impact_context` / `event_context`.
+- The dedicated `/event-alerts` view uses the server-side `alert_type=corporate_event` filter and an opaque continuation cursor, so corporate events cannot be hidden behind the first page of general trigger history.
+- `GET /api/v1/alerts/triggers` exposes typed, bounded `impact_context` / `event_context` projections. Account identifiers, quantities, market values, raw matched items, and raw corporate-event diagnostics are not returned.
+- The backend derives impact grade from rule `severity` with `rule_severity` provenance. Missing rule metadata yields `unclassified`; the Web client does not infer grade from event category.
+- The Web create/edit form round-trips `event_categories`, `lookback_hours`, and `min_items`.
 
 See the Chinese [alerts.md](alerts.md) for full P0–P8 contracts, storage, cooldown, and Market Light details.

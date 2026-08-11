@@ -30,18 +30,28 @@ export const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
   const text = EVENT_ALERT_PAGE_TEXT[language];
   const isControlled = controlledItems !== undefined;
   const [remoteTriggers, setRemoteTriggers] = useState<AlertTriggerItem[]>([]);
+  const [remoteTotal, setRemoteTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [remoteLoading, setRemoteLoading] = useState(!isControlled);
   const [remoteError, setRemoteError] = useState<ParsedApiError | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [gradeFilter, setGradeFilter] = useState<'all' | EventAlertImpactGrade>('all');
 
-  const loadRemote = async () => {
+  const loadRemote = async ({ append = false }: { append?: boolean } = {}) => {
     if (isControlled) return;
     setRemoteLoading(true);
     setRemoteError(null);
     try {
-      const response = await alertsApi.listTriggers({ page: 1, pageSize: 50, status: 'triggered' });
-      setRemoteTriggers(response.items ?? []);
+      const response = await alertsApi.listTriggers({
+        alertType: 'corporate_event',
+        ...(append && nextCursor ? { cursor: nextCursor } : {}),
+        page: 1,
+        pageSize: 20,
+        status: 'triggered',
+      });
+      setRemoteTriggers((current) => (append ? [...current, ...(response.items ?? [])] : (response.items ?? [])));
+      setRemoteTotal(response.total);
+      setNextCursor(response.nextCursor ?? null);
     } catch (error) {
       setRemoteError(getParsedApiError(error));
     } finally {
@@ -58,13 +68,17 @@ export const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
   }, [isControlled]);
 
   const items = useMemo(() => (isControlled ? (controlledItems ?? []) : projectCorporateEventAlerts(remoteTriggers)), [controlledItems, isControlled, remoteTriggers]);
+  const visibleItems = useMemo(
+    () => (gradeFilter === 'all' ? items : items.filter((item) => item.impactGrade === gradeFilter)),
+    [gradeFilter, items],
+  );
   useEffect(() => {
-    if (items.length === 0) { setSelectedId(null); return; }
-    if (selectedId != null && items.some((item) => item.id === selectedId)) return;
-    setSelectedId(items[0]?.id ?? null);
-  }, [items, selectedId]);
+    if (visibleItems.length === 0) { setSelectedId(null); return; }
+    if (selectedId != null && visibleItems.some((item) => item.id === selectedId)) return;
+    setSelectedId(visibleItems[0]?.id ?? null);
+  }, [selectedId, visibleItems]);
 
-  const selected = items.find((item) => item.id === selectedId) ?? null;
+  const selected = visibleItems.find((item) => item.id === selectedId) ?? null;
   const isLoading = isControlled ? Boolean(controlledLoading) : remoteLoading;
   const error = isControlled ? controlledError : remoteError;
   const Root: React.ElementType = embedded ? 'div' : AppPage;
@@ -73,19 +87,26 @@ export const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
     <Root className="max-w-none space-y-5" data-testid="event-alerts-panel">
       {!embedded ? (
         <PageHeader title={text.title} description={text.description} actions={(
-          <Button type="button" variant="secondary" size="default" onClick={() => { if (onRefresh) onRefresh(); else void loadRemote(); }} isLoading={isLoading} loadingText={text.loading}>
+          <Button type="button" variant="secondary" size="default" onClick={() => { if (onRefresh) onRefresh(); else void loadRemote({ append: false }); }} isLoading={isLoading} loadingText={text.loading}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />{text.refresh}
           </Button>
         )} />
       ) : null}
       <Toolbar aria-label={text.title} left={(
         <Select label={text.status} value={gradeFilter} onChange={(value) => setGradeFilter(value as 'all' | EventAlertImpactGrade)} options={[
-          { value: 'all', label: text.filterAll }, { value: 'major', label: text.filterMajor }, { value: 'routine', label: text.filterRoutine },
+          { value: 'all', label: text.filterAll }, { value: 'major', label: text.filterMajor }, { value: 'routine', label: text.filterRoutine }, { value: 'unclassified', label: text.filterUnclassified },
         ]} />
-      )} right={<span className="text-xs text-muted-text">{formatUiText(text.subtitle, { count: String(items.length) })}</span>} />
+      )} right={<span className="text-xs text-muted-text">{formatUiText(text.subtitle, { count: String(isControlled ? items.length : remoteTotal) })}</span>} />
       {error ? <ApiErrorAlert error={error} onDismiss={() => { if (!isControlled) setRemoteError(null); }} /> : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <EventAlertList items={items} isLoading={isLoading} selectedId={selectedId} gradeFilter={gradeFilter} onSelect={(item) => setSelectedId(item.id)} />
+        <div className="space-y-3">
+          <EventAlertList items={visibleItems} isLoading={isLoading} selectedId={selectedId} onSelect={(item) => setSelectedId(item.id)} />
+          {!isControlled && nextCursor ? (
+            <Button type="button" variant="secondary" onClick={() => void loadRemote({ append: true })} isLoading={isLoading} loadingText={text.loadingMore}>
+              {text.loadMore}
+            </Button>
+          ) : null}
+        </div>
         <EventAlertDetail item={selected} />
       </div>
     </Root>

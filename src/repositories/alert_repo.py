@@ -6,10 +6,10 @@ Provides DB access helpers for alert-center P1 API tables.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from sqlalchemy import and_, delete, desc, func, select
+from sqlalchemy import and_, delete, desc, func, or_, select
 
 from src.storage import (
     AlertCooldownRecord,
@@ -266,6 +266,9 @@ class AlertRepository:
         rule_id: Optional[int] = None,
         target: Optional[str] = None,
         status: Optional[str] = None,
+        alert_type: Optional[str] = None,
+        before_triggered_at: Optional[datetime] = None,
+        before_id: Optional[int] = None,
         page: int = 1,
         page_size: int = 20,
     ) -> Tuple[List[AlertTriggerRecord], int]:
@@ -276,21 +279,128 @@ class AlertRepository:
             conditions.append(AlertTriggerRecord.target == target)
         if status:
             conditions.append(AlertTriggerRecord.status == status)
+        if alert_type:
+            alert_type_condition = AlertRuleRecord.alert_type == alert_type
+            if alert_type == "corporate_event":
+                alert_type_condition = or_(
+                    alert_type_condition,
+                    AlertTriggerRecord.data_source == "intelligence_items",
+                )
+            conditions.append(alert_type_condition)
+        total_where_clause = and_(*conditions) if conditions else True
+        if before_id is not None:
+            if before_triggered_at is None:
+                conditions.append(
+                    and_(
+                        AlertTriggerRecord.triggered_at.is_(None),
+                        AlertTriggerRecord.id < before_id,
+                    )
+                )
+            else:
+                conditions.append(
+                    or_(
+                        AlertTriggerRecord.triggered_at < before_triggered_at,
+                        and_(
+                            AlertTriggerRecord.triggered_at == before_triggered_at,
+                            AlertTriggerRecord.id < before_id,
+                        ),
+                        AlertTriggerRecord.triggered_at.is_(None),
+                    )
+                )
 
         where_clause = and_(*conditions) if conditions else True
-        offset = (page - 1) * page_size
+        offset = 0 if before_id is not None else (page - 1) * page_size
         with self.db.get_session() as session:
+            base_query = select(AlertTriggerRecord).select_from(AlertTriggerRecord)
+            count_query = select(func.count(AlertTriggerRecord.id)).select_from(AlertTriggerRecord)
+            if alert_type:
+                join_condition = AlertRuleRecord.id == AlertTriggerRecord.rule_id
+                base_query = base_query.outerjoin(AlertRuleRecord, join_condition)
+                count_query = count_query.outerjoin(AlertRuleRecord, join_condition)
             total = session.execute(
-                select(func.count(AlertTriggerRecord.id)).select_from(AlertTriggerRecord).where(where_clause)
+                count_query.where(total_where_clause)
             ).scalar() or 0
             rows = session.execute(
-                select(AlertTriggerRecord)
+                base_query
                 .where(where_clause)
                 .order_by(desc(AlertTriggerRecord.triggered_at), desc(AlertTriggerRecord.id))
                 .offset(offset)
                 .limit(page_size)
             ).scalars().all()
+            rule_ids = sorted({int(row.rule_id) for row in rows if row.rule_id is not None})
+            if rule_ids:
+                rule_contexts = session.execute(
+                    select(AlertRuleRecord.id, AlertRuleRecord.alert_type, AlertRuleRecord.severity)
+                    .where(AlertRuleRecord.id.in_(rule_ids))
+                ).all()
+                context_by_id = {
+                    int(context.id): (str(context.alert_type), str(context.severity))
+                    for context in rule_contexts
+                }
+                for row in rows:
+                    context = context_by_id.get(int(row.rule_id)) if row.rule_id is not None else None
+                    if context is not None:
+                        row._public_alert_type, row._public_severity = context
             return list(rows), int(total)
+
+    def list_recent_triggered_for_targets(
+        self,
+        *,
+        targets: Sequence[str],
+        triggered_since: datetime,
+        per_target_limit: int = 1,
+    ) -> List[AlertTriggerRecord]:
+        """Return bounded, stable triggered evidence for the requested targets.
+
+        The window is ranked per stored target so a noisy symbol cannot hide a
+        different requested symbol. Callers may provide market aliases and
+        canonicalize the returned rows at their own domain boundary.
+        """
+        normalized_targets = sorted({str(target or "").strip() for target in targets if str(target or "").strip()})
+        if not normalized_targets:
+            return []
+        safe_per_target_limit = max(1, min(int(per_target_limit), 5))
+        if triggered_since.tzinfo is not None and triggered_since.utcoffset() is not None:
+            triggered_since = triggered_since.astimezone(timezone.utc).replace(tzinfo=None)
+
+        rows_by_id: Dict[int, AlertTriggerRecord] = {}
+        with self.db.get_session() as session:
+            for start in range(0, len(normalized_targets), 200):
+                target_chunk = normalized_targets[start:start + 200]
+                ranked = (
+                    select(
+                        AlertTriggerRecord.id.label("trigger_id"),
+                        func.row_number().over(
+                            partition_by=AlertTriggerRecord.target,
+                            order_by=(
+                                desc(AlertTriggerRecord.triggered_at),
+                                desc(AlertTriggerRecord.id),
+                            ),
+                        ).label("target_rank"),
+                    )
+                    .where(
+                        AlertTriggerRecord.target.in_(target_chunk),
+                        AlertTriggerRecord.status == "triggered",
+                        AlertTriggerRecord.triggered_at >= triggered_since,
+                    )
+                    .subquery()
+                )
+                rows = session.execute(
+                    select(AlertTriggerRecord)
+                    .join(ranked, AlertTriggerRecord.id == ranked.c.trigger_id)
+                    .where(ranked.c.target_rank <= safe_per_target_limit)
+                    .order_by(
+                        desc(AlertTriggerRecord.triggered_at),
+                        desc(AlertTriggerRecord.id),
+                    )
+                ).scalars().all()
+                for row in rows:
+                    rows_by_id[int(row.id)] = row
+        return sorted(
+            rows_by_id.values(),
+            key=lambda row: (row.triggered_at or datetime.min, int(row.id or 0)),
+            reverse=True,
+        )
 
     def list_notifications(
         self,

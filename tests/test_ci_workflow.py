@@ -7,6 +7,11 @@ import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+FRONTEND_EXECUTION_CONDITION = (
+    "${{ needs.ai-governance.result == 'success' && "
+    "needs.changes.result == 'success' && "
+    "needs.changes.outputs.frontend == 'true' }}"
+)
 
 
 def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
@@ -28,6 +33,10 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push():
 
     assert backend_job["needs"] == ["changes", "ai-governance"]
     assert backend_job["if"] == "needs.changes.outputs.backend == 'true'"
+    # The full suite currently needs about 27 minutes before coverage and
+    # cleanup, so both full-suite jobs require headroom beyond 30 minutes.
+    assert backend_job["timeout-minutes"] >= 45
+    assert job["timeout-minutes"] >= 45
     assert "backend" in changes_job["outputs"]
     assert "docker" in changes_job["outputs"]
     assert changes_job["outputs"]["backend"].startswith(
@@ -97,6 +106,102 @@ def test_docker_build_skips_when_docker_paths_unchanged():
     job = workflow["jobs"]["docker-build"]
     assert job["needs"] == ["changes", "ai-governance"]
     assert job["if"] == "needs.changes.outputs.docker == 'true'"
+
+
+def test_web_gate_runs_full_matrix_for_frontend_changes():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    changes_job = workflow["jobs"]["changes"]
+    web_job = workflow["jobs"]["web-gate"]
+    steps_by_name = {step["name"]: step for step in web_job["steps"]}
+
+    filter_step = next(
+        step for step in changes_job["steps"] if step.get("id") == "filter"
+    )
+    filters = yaml.safe_load(filter_step["with"]["filters"])
+    assert filters["frontend"] == ["apps/dsa-web/**"]
+
+    expected_commands = {
+        "📦 Install": "npm ci",
+        "🔎 Lint": "npm run lint",
+        "🌐 i18n guards": "npm run test:i18n",
+        "🧪 Unit tests": "npm run test",
+        "🏗️ Build": "npm run build",
+        "📦 Bundle size budget": "node scripts/check-bundle-size.mjs --print",
+    }
+    frontend_steps = ["📥 Checkout", "🟢 Setup Node", *expected_commands]
+    for name in frontend_steps:
+        assert steps_by_name[name]["if"] == FRONTEND_EXECUTION_CONDITION
+    for name, command in expected_commands.items():
+        assert steps_by_name[name]["run"] == command
+
+
+def test_web_gate_enforces_bundle_budget_immediately_after_build():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    web_job = workflow["jobs"]["web-gate"]
+    steps = web_job["steps"]
+
+    build_indexes = [
+        index
+        for index, step in enumerate(steps)
+        if step.get("run") == "npm run build"
+    ]
+    budget_indexes = [
+        index
+        for index, step in enumerate(steps)
+        if step.get("name") == "📦 Bundle size budget"
+    ]
+
+    assert len(build_indexes) == 1
+    assert len(budget_indexes) == 1
+    assert budget_indexes[0] == build_indexes[0] + 1
+
+    budget_step = steps[budget_indexes[0]]
+    assert budget_step["run"] == "node scripts/check-bundle-size.mjs --print"
+    assert budget_step["if"] == FRONTEND_EXECUTION_CONDITION
+    assert web_job.get("continue-on-error", False) is False
+    assert all(
+        step.get("continue-on-error", False) is False for step in steps
+    )
+
+
+def test_web_gate_concludes_successfully_without_frontend_changes():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    web_job = workflow["jobs"]["web-gate"]
+    steps_by_name = {step["name"]: step for step in web_job["steps"]}
+
+    assert web_job["name"] == "web-gate"
+    assert web_job["needs"] == ["changes", "ai-governance"]
+    assert web_job["if"] == "${{ always() && !cancelled() }}"
+    no_frontend = steps_by_name["No frontend changes"]
+    assert no_frontend["if"] == (
+        "${{ needs.ai-governance.result == 'success' && "
+        "needs.changes.result == 'success' && "
+        "needs.changes.outputs.frontend == 'false' }}"
+    )
+    assert no_frontend["working-directory"] == "."
+    assert "No frontend changes were detected." in no_frontend["run"]
+    assert '>> "$GITHUB_STEP_SUMMARY"' in no_frontend["run"]
+    assert "exit 1" not in no_frontend["run"]
+
+
+def test_web_gate_fails_closed_when_change_detection_fails_or_is_unavailable():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    web_job = workflow["jobs"]["web-gate"]
+    validation = next(
+        step
+        for step in web_job["steps"]
+        if step["name"] == "🔒 Validate web-gate prerequisites"
+    )
+
+    assert validation["if"] == (
+        "${{ always() && (needs.ai-governance.result != 'success' || "
+        "needs.changes.result != 'success' || "
+        "(needs.changes.outputs.frontend != 'true' && "
+        "needs.changes.outputs.frontend != 'false')) }}"
+    )
+    assert validation["working-directory"] == "."
+    assert "fails closed" in validation["run"]
+    assert validation["run"].rstrip().endswith("exit 1")
 
 
 def test_ci_gate_offline_suite_emits_slow_test_durations():

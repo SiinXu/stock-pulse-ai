@@ -15,6 +15,9 @@ TargetScopeValue = Literal["single_symbol", "watchlist", "portfolio_holdings", "
 SeverityValue = Literal["info", "warning", "critical"]
 DryRunStatusValue = Literal["triggered", "not_triggered", "evaluation_error"]
 TargetRecordStatusValue = Literal["triggered", "skipped", "degraded", "failed"]
+CorporateAlertTypeFilter = Literal["corporate_event"]
+CorporateEventCategoryValue = Literal["earnings", "shareholder", "mna", "regulatory", "analyst"]
+EventImpactGradeValue = Literal["major", "routine", "unclassified"]
 
 
 class AlertRuleCreateRequest(BaseModel):
@@ -96,6 +99,36 @@ class AlertRuleTestResponse(BaseModel):
     target_results: List[AlertRuleTargetResult] = Field(default_factory=list)
 
 
+class AlertEventAffectedContext(BaseModel):
+    symbol: Optional[str] = Field(None, max_length=64)
+    in_watchlist: bool = False
+    in_portfolio: bool = False
+    weight_pct: Optional[float] = Field(None, ge=0, le=100, allow_inf_nan=False)
+
+
+class AlertEventContext(BaseModel):
+    what_happened: Optional[str] = Field(None, max_length=512)
+    why_it_matters: Optional[str] = Field(None, max_length=512)
+    event_category: Optional[CorporateEventCategoryValue] = None
+    event_categories: List[CorporateEventCategoryValue] = Field(default_factory=list, max_length=5)
+    matched_count: Optional[int] = Field(None, ge=0, le=100_000)
+    source_item_id: Optional[str] = Field(None, max_length=64)
+    source_name: Optional[str] = Field(None, max_length=100)
+    source_url: Optional[str] = Field(None, max_length=2048)
+
+
+class AlertImpactContext(AlertEventContext):
+    degraded: bool = False
+    affected: Optional[AlertEventAffectedContext] = None
+    related_analysis: Optional[str] = Field(None, max_length=512)
+
+
+class AlertImpactResult(BaseModel):
+    grade: EventImpactGradeValue
+    severity: Optional[SeverityValue] = None
+    provenance: Literal["rule_severity", "unavailable"]
+
+
 class AlertTriggerItem(BaseModel):
     id: int
     rule_id: Optional[int] = None
@@ -107,6 +140,8 @@ class AlertTriggerItem(BaseModel):
     data_timestamp: Optional[str] = None
     triggered_at: Optional[str] = None
     status: str
+    alert_type: Optional[str] = None
+    severity: Optional[SeverityValue] = None
     diagnostics: Optional[str] = None
     market_phase_summary: Optional[MarketPhaseSummary] = None
     analysis_context_pack_overview: Optional[AnalysisContextPackOverview] = None
@@ -118,8 +153,9 @@ class AlertTriggerItem(BaseModel):
         ),
     )
     decision_signal_summary: Optional[Dict[str, Any]] = None
-    impact_context: Optional[Dict[str, Any]] = Field(None, description="Structured impact block (issue #241 Web)")
-    event_context: Optional[Dict[str, Any]] = Field(None, description="Structured event block (issue #241 Web)")
+    impact_context: Optional[AlertImpactContext] = None
+    event_context: Optional[AlertEventContext] = None
+    impact_result: Optional[AlertImpactResult] = None
 
 
 class AlertTriggerListResponse(BaseModel):
@@ -127,6 +163,7 @@ class AlertTriggerListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+    next_cursor: Optional[str] = None
 
 
 class AlertNotificationItem(BaseModel):

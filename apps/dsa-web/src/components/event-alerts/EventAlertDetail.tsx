@@ -35,7 +35,7 @@ export const EventAlertDetail: React.FC<EventAlertDetailProps> = ({ item = null 
     <Card title={text.detailTitle} subtitle={item.target} variant="bordered" padding="md" data-testid={`event-alert-detail-${item.id}`}>
       <div className="space-y-4" data-testid="event-alert-detail">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={item.impactGrade === 'major' ? 'danger' : 'default'}>{item.impactGrade === 'major' ? text.gradeMajor : text.gradeRoutine}</Badge>
+          <Badge variant={item.impactGrade === 'major' ? 'danger' : 'default'}>{item.impactGrade === 'major' ? text.gradeMajor : item.impactGrade === 'routine' ? text.gradeRoutine : text.gradeUnclassified}</Badge>
           <Badge variant="default">{categoryLabel}</Badge>
           {item.degraded ? <Badge variant="warning">{text.degradedNote}</Badge> : null}
         </div>

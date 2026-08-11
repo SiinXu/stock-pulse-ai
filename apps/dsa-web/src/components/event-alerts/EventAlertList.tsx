@@ -27,7 +27,7 @@ export const EventAlertList: React.FC<EventAlertListProps> = ({
   const columns: DataTableColumn<EventAlertDisplayItem>[] = [
     { id: 'grade', header: text.status, cell: (item) => (
       <Badge variant={item.impactGrade === 'major' ? 'danger' : 'default'}>
-        {item.impactGrade === 'major' ? text.gradeMajor : text.gradeRoutine}
+        {item.impactGrade === 'major' ? text.gradeMajor : item.impactGrade === 'routine' ? text.gradeRoutine : text.gradeUnclassified}
       </Badge>
     )},
     { id: 'category', header: text.eventCategory, cell: (item) => (
@@ -45,23 +45,26 @@ export const EventAlertList: React.FC<EventAlertListProps> = ({
       <span className="text-xs">{item.triggeredAt ? formatUiDateTime(item.triggeredAt, language, { dateStyle: 'medium', timeStyle: 'short' }) : '--'}</span>
     )},
   ];
-  const table = (
+  const commonTableProps = {
+    caption: text.listTitle,
+    columns,
+    rows: visible,
+    getRowKey: (item: EventAlertDisplayItem) => item.id,
+    isRowSelected: (item: EventAlertDisplayItem) => item.id === selectedId,
+    getRowTestId: (item: EventAlertDisplayItem) => `event-alert-row-${item.id}`,
+    status: isLoading ? { state: 'loading' as const, title: text.loading } : undefined,
+    emptyState: { icon: <Activity className="h-6 w-6" />, title: text.emptyTitle, description: text.emptyDescription },
+    density: 'compact' as const,
+    minWidth: 'wide' as const,
+  };
+  const table = onSelect ? (
     <DataTable<EventAlertDisplayItem>
-      caption={text.listTitle}
-      columns={columns}
-      rows={visible}
-      getRowKey={(item) => item.id}
-      isRowSelected={(item) => item.id === selectedId}
-      getRowTestId={(item) => `event-alert-row-${item.id}`}
-      status={isLoading ? { state: 'loading', title: text.loading } : undefined}
-      emptyState={{ icon: <Activity className="h-6 w-6" />, title: text.emptyTitle, description: text.emptyDescription }}
-      density="compact"
-      minWidth="wide"
-      {...(onSelect ? {
-        onRowActivate: (item: EventAlertDisplayItem) => onSelect(item),
-        getRowAriaLabel: (item: EventAlertDisplayItem) => `${item.target} ${item.eventCategory ?? ''}`.trim(),
-      } : {})}
+      {...commonTableProps}
+      onRowActivate={onSelect}
+      getRowAriaLabel={(item) => `${item.target} ${item.eventCategory ?? ''}`.trim()}
     />
+  ) : (
+    <DataTable<EventAlertDisplayItem> {...commonTableProps} />
   );
   return <Card title={text.listTitle} variant="bordered" padding="md">{table}</Card>;
 };

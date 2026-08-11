@@ -71,6 +71,18 @@ def _get_fetcher_manager():
     return _fetcher_manager_singleton
 
 
+def active_fetcher_manager():
+    """Return the process-shared manager, or ``None`` when none exists yet.
+
+    Read-only observers (for example the capability inventory) must never
+    construct a manager: a new instance owns a different provider runtime and
+    would report an inventory that no caller is actually served by. Absence is
+    reported as an explicit source state instead.
+    """
+
+    return _fetcher_manager_singleton
+
+
 def reset_fetcher_manager() -> None:
     """Clear the cached DataFetcherManager so runtime config reloads take effect."""
     global _fetcher_manager_singleton

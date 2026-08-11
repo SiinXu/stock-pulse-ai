@@ -1,5 +1,10 @@
 import type { AnalysisContextPackOverview, MarketPhaseSummary } from './analysis';
 import type { DecisionSignalItem } from './decisionSignals';
+import type {
+  EventAlertEventContext,
+  EventAlertImpactContext,
+  EventAlertImpactResult,
+} from './eventAlerts';
 
 export type AlertType =
   | 'price_cross'
@@ -131,13 +136,16 @@ export interface AlertTriggerItem {
   dataTimestamp?: string | null;
   triggeredAt?: string | null;
   status: AlertTriggerStatus | string;
+  alertType?: string | null;
+  severity?: AlertSeverity | null;
   diagnostics?: string | null;
   marketPhaseSummary?: MarketPhaseSummary | null;
   analysisContextPackOverview?: AnalysisContextPackOverview | null;
   analysisVisibilitySource?: string | null;
   decisionSignalSummary?: Partial<DecisionSignalItem> | null;
-  impactContext?: Record<string, unknown> | null;
-  eventContext?: Record<string, unknown> | null;
+  impactContext?: EventAlertImpactContext | null;
+  eventContext?: EventAlertEventContext | null;
+  impactResult?: EventAlertImpactResult | null;
 }
 
 export interface AlertTriggerListResponse {
@@ -145,6 +153,7 @@ export interface AlertTriggerListResponse {
   total: number;
   page: number;
   pageSize: number;
+  nextCursor?: string | null;
 }
 
 export interface AlertNotificationItem {
@@ -181,6 +190,8 @@ export interface AlertTriggerListQuery {
   ruleId?: number;
   target?: string;
   status?: string;
+  alertType?: 'corporate_event';
+  cursor?: string;
   page?: number;
   pageSize?: number;
 }

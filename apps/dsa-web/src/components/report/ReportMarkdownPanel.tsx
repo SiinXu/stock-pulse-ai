@@ -1,18 +1,25 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Code2, FileText } from 'lucide-react';
+import { Check, Code2, Download, ExternalLink, FileText, FileDown } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
+import { reportExportApi } from '../../api/reportExport';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
-import type { ReportLanguage } from '../../types/analysis';
+import type { AnalysisReport, ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
+import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  buildAnalysisWorkbenchHref,
+} from '../../routing/routes';
 import { ApiErrorAlert } from '../common/ApiErrorAlert';
 import { Button } from '../common/Button';
 import { IconButton } from '../common/IconButton';
 import { InlineAlert } from '../common/InlineAlert';
 import { Spinner } from '../common/Spinner';
 import { useClipboard } from '../common/useClipboard';
+import { ReportDecisionCard } from './ReportDecisionCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 import { ShareImageButton } from './ShareImageButton';
 
@@ -33,11 +40,21 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
 }) => {
   const { language: uiLanguage } = useUiLanguage();
   const text = REPORT_CHROME_TEXT[uiLanguage];
+  const reportText = getReportText(normalizeReportLanguage(reportLanguage));
   const [content, setContent] = useState<string>('');
+  const [report, setReport] = useState<AnalysisReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [copiedType, setCopiedType] = useState<'markdown' | 'text' | null>(null);
+  const [exporting, setExporting] = useState<'md' | 'pdf' | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [pdfAvailable, setPdfAvailable] = useState(false);
   const { copyText, copyError } = useClipboard();
+
+  const fullReportHref = buildAnalysisWorkbenchHref({
+    segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    recordId,
+  });
 
   const handleCopyMarkdown = useCallback(async () => {
     if (!content) return;
@@ -56,16 +73,59 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     }
   }, [content, copyText]);
 
+  const handleExport = useCallback(async (format: 'md' | 'pdf') => {
+    setExportError(null);
+    setExporting(format);
+    try {
+      await reportExportApi.download(recordId, format);
+    } catch (error) {
+      const parsed = getParsedApiError(error, uiLanguage);
+      setExportError(parsed.message || text.downloadFailed);
+    } finally {
+      setExporting(null);
+    }
+  }, [recordId, text.downloadFailed, uiLanguage]);
+
+  useEffect(() => {
+    let active = true;
+    reportExportApi.getCapabilities(uiLanguage === 'zh' ? 'zh' : 'en')
+      .then((caps) => {
+        if (active) setPdfAvailable(Boolean(caps.formats.pdf.available));
+      })
+      .catch(() => {
+        if (active) setPdfAvailable(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [uiLanguage]);
+
   useEffect(() => {
     let isMounted = true;
 
-    const fetchMarkdown = async () => {
+    const fetchReportSurfaces = async () => {
       setIsLoading(true);
       setError(null);
+      setReport(null);
       try {
-        const markdownContent = await historyApi.getMarkdown(recordId);
-        if (isMounted) {
-          setContent(markdownContent);
+        const [markdownResult, detailResult] = await Promise.allSettled([
+          historyApi.getMarkdown(recordId),
+          historyApi.getDetail(recordId),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (markdownResult.status === 'rejected') {
+          setError(getParsedApiError(markdownResult.reason, uiLanguage));
+          setContent('');
+          return;
+        }
+
+        setContent(markdownResult.value);
+        if (detailResult.status === 'fulfilled') {
+          setReport(detailResult.value);
         }
       } catch (err) {
         if (isMounted) {
@@ -78,7 +138,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
       }
     };
 
-    fetchMarkdown();
+    fetchReportSurfaces();
 
     return () => {
       isMounted = false;
@@ -133,10 +193,43 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
               <FileText aria-hidden="true" />
             )}
           </IconButton>
+
+          <IconButton
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={() => { void handleExport('md'); }}
+            disabled={isLoading || exporting !== null}
+            aria-label={text.downloadMarkdown}
+            data-testid="report-export-md"
+          >
+            <Download aria-hidden="true" />
+          </IconButton>
+
+          <IconButton
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={() => { void handleExport('pdf'); }}
+            disabled={isLoading || exporting !== null || !pdfAvailable}
+            aria-label={pdfAvailable ? text.downloadPdf : text.downloadPdfUnavailable}
+            title={pdfAvailable ? text.downloadPdf : text.downloadPdfUnavailable}
+            data-testid="report-export-pdf"
+          >
+            <FileDown aria-hidden="true" />
+          </IconButton>
         </div>
       </div>
 
       {copyError ? <InlineAlert variant="danger" message={copyError} className="mb-4" /> : null}
+      {exportError ? (
+        <InlineAlert
+          variant="danger"
+          message={exportError}
+          className="mb-4"
+          data-testid="report-export-error"
+        />
+      ) : null}
 
       {isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center">
@@ -153,7 +246,31 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           />
         </div>
       ) : (
-        <ReportMarkdownBody content={content} />
+        <div className="space-y-4">
+          {report ? (
+            <ReportDecisionCard
+              meta={report.meta}
+              summary={report.summary}
+              strategy={report.strategy}
+              details={report.details}
+              language={normalizeReportLanguage(reportLanguage ?? report.meta.reportLanguage)}
+              compact
+            />
+          ) : null}
+
+          <p className="text-xs text-muted-text">
+            <a
+              href={fullReportHref}
+              className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+              data-testid="report-markdown-open-full-page"
+            >
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              {reportText.openFullReportPage}
+            </a>
+          </p>
+
+          <ReportMarkdownBody content={content} />
+        </div>
       )}
 
       <div className="mt-6 flex justify-end border-t border-border pt-4">

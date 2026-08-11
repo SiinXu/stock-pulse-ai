@@ -15,6 +15,7 @@ import data_provider.base as base
 
 _MOVED_DESCRIPTOR_CONTRACT = {
     "plugin_registry": ("property", "(self) -> 'ExtensionRegistry'"),
+    "data_provider_runtime": ("property", "(self)"),
     "_assign_fetcher_static_order_locked": (
         "function",
         "(self, fetcher: data_provider.base.DataProvider) -> None",

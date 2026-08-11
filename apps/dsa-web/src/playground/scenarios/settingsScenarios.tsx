@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useState, type ReactNode } from 'react';
+import { lazy, useState, type ReactNode } from 'react';
 import { Button } from '../../components/common';
-import { AiOverviewMatrix } from '../../components/settings/AiOverviewMatrix';
 import { AuthSettingsCard } from '../../components/settings/AuthSettingsCard';
 import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard';
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
@@ -16,8 +15,6 @@ import { InvestmentFrameworkPromptPreview } from '../../components/settings/Inve
 import { InvestmentFrameworkSettingsCard } from '../../components/settings/InvestmentFrameworkSettingsCard';
 import { emptyInvestmentFrameworkContent } from '../../components/settings/investmentFrameworkEditorModel';
 import { LLMChannelEditor } from '../../components/settings/LLMChannelEditor';
-import { SettingsModeToggle, type SettingsDisplayMode } from '../../components/settings/SettingsModeToggle';
-import { SettingsAgentOnboardingHost } from '../../components/onboarding/SettingsAgentOnboardingHost';
 import { SettingsOnboardingHosts } from '../../components/onboarding/SettingsOnboardingHosts';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { LLMConfigModeBanner } from '../../components/settings/LLMConfigModeBanner';
@@ -27,6 +24,7 @@ import { ModelMultiSelect } from '../../components/settings/ModelMultiSelect';
 import { MultiSelectDropdown } from '../../components/settings/MultiSelectDropdown';
 import { NotificationChannelsPanel } from '../../components/settings/NotificationChannelsPanel';
 import { NotificationTestPanel } from '../../components/settings/NotificationTestPanel';
+import { buildNotificationEventRoutes } from '../../components/settings/notificationEventRoutes';
 import { ProviderQuickLinks } from '../../components/settings/ProviderQuickLinks';
 import { SettingsAlert } from '../../components/settings/SettingsAlert';
 import { SettingsConfigurationSummary, SystemConfigSummary } from '../../components/settings/SettingsConfigurationSummary';
@@ -137,27 +135,12 @@ const AVAILABLE_MODELS: AvailableModelEntry[] = [{
   available: true,
 }];
 
-const AiOverviewMatrixStory = () => {
-  const { language } = useStoryText();
-  const { scenario } = usePlaygroundScenario();
-  const values: Record<string, string> = scenario === 'states'
-    ? { GENERATION_BACKEND: 'litellm', LITELLM_MODEL: 'unavailable/route' }
-    : {
-        GENERATION_BACKEND: 'litellm',
-        LITELLM_MODEL: MODEL_REF,
-        AGENT_LITELLM_MODEL: MODEL_REF,
-        VISION_MODEL: MODEL_REF,
-        LITELLM_FALLBACK_MODELS: 'fixture/fixture-route-fast',
-      };
-  return (
-    <AiOverviewMatrix
-      getValue={(key) => values[key] ?? ''}
-      language={language}
-      availableRoutes={new Set([MODEL_REF])}
-      onEditRouting={() => undefined}
-    />
-  );
-};
+const agentSettingsScenarios = () => import('./agentBehaviorPanelScenario');
+const LazyAgentSettingsStory = lazy(agentSettingsScenarios);
+const AiOverviewMatrixStory = () => <LazyAgentSettingsStory story="overview" />;
+const SettingsAgentOnboardingHostStory = () => <LazyAgentSettingsStory story="onboarding" />;
+const SettingsModeToggleStory = () => <LazyAgentSettingsStory story="mode" />;
+const AgentBehaviorPanelStory = () => <LazyAgentSettingsStory story="presets" />;
 
 const DataProvidersPanelStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -326,10 +309,16 @@ const NotificationChannelsPanelStory = () => {
   return (
     <NotificationChannelsPanel
       items={items}
-      configuredChannels={scenario === 'empty' ? [] : ['email', 'custom_webhook']}
+      configuredChannels={scenario === 'empty' ? [] : ['email', 'custom']}
       disabled={false}
       issueByKey={{}}
       onChange={(key, value) => setItems((current) => current.map((item) => item.key === key ? { ...item, value } : item))}
+      eventRoutes={buildNotificationEventRoutes(scenario === 'empty' ? {} : {
+        NOTIFICATION_REPORT_CHANNELS: 'email,custom',
+        NOTIFICATION_ALERT_CHANNELS: 'email',
+        NOTIFICATION_SYSTEM_ERROR_CHANNELS: '',
+      }, scenario === 'empty' ? [] : ['email', 'custom'])}
+      maskToken={MASK_TOKEN}
     />
   );
 };
@@ -541,31 +530,6 @@ const InvestmentFrameworkPromptPreviewStory = () => {
   );
 };
 
-const SettingsModeToggleStory = () => {
-  const { language } = useStoryText();
-  const [mode, setMode] = useState<SettingsDisplayMode>('essentials');
-  return <SettingsModeToggle mode={mode} onModeChange={setMode} language={language} />;
-};
-
-const SettingsAgentOnboardingHostStory = () => {
-  const { t } = useUiLanguage();
-  const { text } = useStoryText();
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="space-y-3">
-      <Button variant="primary" onClick={() => setOpen(true)}>{text.openAgentOnboarding}</Button>
-      <SettingsAgentOnboardingHost
-        open={open}
-        onClose={() => setOpen(false)}
-        onApplied={() => setOpen(false)}
-        setupStatus={FIXTURE_SETUP_STATUS}
-        reportLanguage="en"
-        t={t}
-      />
-    </div>
-  );
-};
-
 const SettingsOnboardingHostsStory = () => {
   const { language, text } = useStoryText();
   const { t } = useUiLanguage();
@@ -601,6 +565,7 @@ const SettingsOnboardingHostsStory = () => {
 };
 
 export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'agent-behavior-panel': AgentBehaviorPanelStory,
   'ai-overview-matrix': AiOverviewMatrixStory,
   'auth-settings-card': AuthSettingsCard,
   'change-password-card': ChangePasswordCard,
