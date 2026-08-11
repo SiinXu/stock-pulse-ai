@@ -2255,6 +2255,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         message: 'accepted',
         task_id: submissions === 1 ? 'old-review-task' : 'new-review-task',
         send_notification: false,
+        region: 'cn',
+        message_code: 'task.market_review.queued',
       }, 202);
     });
     await page.route('**/api/v1/analysis/status/old-review-task', async (route) => {
