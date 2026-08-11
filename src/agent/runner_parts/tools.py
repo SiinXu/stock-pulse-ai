@@ -48,7 +48,7 @@ def _execute_tools(
 
     from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
 
-    tool_deadline_monotonic = tool_session.deadline_monotonic
+    tool_deadline_monotonic = getattr(tool_session, "deadline_monotonic", None)
 
     def _safe_tool_trace_name(value: Any) -> str:
         canonicalize = getattr(tool_session, "canonical_tool_name", None)
