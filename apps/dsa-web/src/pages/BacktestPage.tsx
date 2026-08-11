@@ -21,7 +21,7 @@ import {
   getInitialBacktestStrategy,
   type BacktestFilterSnapshot,
   type BacktestStrategySnapshot,
-} from './backtestUrlState';
+} from '../routing/backtestUrlState';
 import {
   BACKTEST_DIRECTION_EXPECTED_LABELS,
   BACKTEST_MOVEMENT_LABELS,

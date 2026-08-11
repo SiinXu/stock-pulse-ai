@@ -16,11 +16,11 @@ import {
   RESEARCH_BACKTEST_LIMITS,
   RESEARCH_BACKTEST_PHASE_VALUES,
   RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
-} from '../routing/routes';
+} from './routes';
 import {
   parseResearchBacktestRouteState,
   type ResearchBacktestRouteState,
-} from '../routing/researchRouteState';
+} from './researchRouteState';
 import type { BacktestPhaseFilter } from '../types/backtest';
 import {
   defineUrlStateSchema,
