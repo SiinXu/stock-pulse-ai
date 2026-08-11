@@ -45,7 +45,7 @@ describe('ApiErrorAlert', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('renders catalog remediation action and hint for high-impact codes', () => {
+  it('renders paired catalog remediation in the shared Toast without raw diagnostics', () => {
     render(
       <ApiErrorAlert
         error={createParsedApiError({
@@ -59,9 +59,60 @@ describe('ApiErrorAlert', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: /打开模型设置|Open model settings/ })).toBeInTheDocument();
-    expect(screen.getByText(/模型接入|Model Access/)).toBeInTheDocument();
-    expect(screen.getByText(/LLM API Key missing diagnostic/)).toBeInTheDocument();
+    const remediationAction = screen.getByRole('button', { name: /打开设置|Open Settings/ });
+    expect(remediationAction.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(screen.getByText(/主要模型|primary model/i)).toBeInTheDocument();
+    expect(screen.queryByText(/LLM API Key missing diagnostic/)).not.toBeInTheDocument();
+  });
+
+  it('keeps catalog guidance without a destination from becoming a dead action', () => {
+    render(
+      <ApiErrorAlert
+        error={createParsedApiError({
+          title: 'Upstream timeout',
+          message: 'Try again later.',
+          category: 'upstream_timeout',
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Try again later.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /重试|Retry/i })).not.toBeInTheDocument();
+  });
+
+  it('pairs a caller retry handler with the catalog retry label', () => {
+    const onAction = vi.fn();
+    render(
+      <ApiErrorAlert
+        error={createParsedApiError({
+          title: 'Upstream timeout',
+          message: 'Try again later.',
+          category: 'upstream_timeout',
+        })}
+        onAction={onAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /重试|Retry/i }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not combine an incomplete caller action with a catalog destination', () => {
+    render(
+      <ApiErrorAlert
+        error={createParsedApiError({
+          title: 'No model',
+          message: 'Configure a model.',
+          category: 'llm_not_configured',
+          code: 'llm_not_configured',
+        })}
+        actionLabel="Custom action"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Custom action' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /打开设置|Open Settings/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/主要模型|primary model/i)).toBeInTheDocument();
   });
 
   it('lets explicit action props override remediation navigation', () => {
@@ -81,6 +132,6 @@ describe('ApiErrorAlert', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Custom retry' }));
     expect(onAction).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: /Open Agent settings|打开 Agent 设置/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open Settings|打开设置/ })).not.toBeInTheDocument();
   });
 });

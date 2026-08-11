@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { useContext, useEffect, useMemo, useRef } from 'react';
 import {
   localizeParsedApiError,
   resolveErrorRemediation,
@@ -30,55 +31,77 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
   const { showToast, dismissToast } = useToast();
   const localizedError = localizeParsedApiError(error, language);
   const remediation = resolveErrorRemediation(localizedError, language);
-  const showDetails = localizedError.rawMessage.trim() && localizedError.rawMessage.trim() !== localizedError.message.trim();
+  const hasRemediation = remediation !== null;
+  const remediationHref = remediation?.href;
+  const resolvedActionLabel = actionLabel && onAction
+    ? actionLabel
+    : !actionLabel && onAction && remediation
+      ? remediation.actionLabel
+      : !actionLabel && !onAction && remediationHref
+      ? remediation.actionLabel
+      : undefined;
+  const resolvedOnAction = useMemo(() => {
+    if (actionLabel && onAction) return onAction;
+    if (!actionLabel && onAction && hasRemediation) return onAction;
+    if (!actionLabel && !onAction && remediationHref) {
+      return () => window.location.assign(remediationHref);
+    }
+    return undefined;
+  }, [actionLabel, hasRemediation, onAction, remediationHref]);
+  const onActionRef = useRef(resolvedOnAction);
+  const onDismissRef = useRef(onDismiss);
+  const hasAction = Boolean(resolvedActionLabel && resolvedOnAction);
+  const hasDismiss = Boolean(onDismiss);
 
-  const resolvedActionLabel = actionLabel ?? remediation?.actionLabel;
-  const remediationHref = !onAction ? remediation?.href : undefined;
-  const resolvedOnAction = onAction ?? (
-    remediationHref
-      ? () => {
-          // Avoid useNavigate so ApiErrorAlert remains usable outside a Router
-          // (unit tests, isolated panels). Deep links still resolve correctly.
-          window.location.assign(remediationHref);
-        }
-      : undefined
-  );
+  useEffect(() => {
+    onActionRef.current = resolvedOnAction;
+  }, [resolvedOnAction]);
 
-  const action = resolvedActionLabel && resolvedOnAction ? (
-    <Button type="button" variant="danger-subtle" size="compact" onClick={resolvedOnAction}>
-      {resolvedActionLabel}
-    </Button>
-  ) : undefined;
-  const content = (
-    <>
-      <p>{localizedError.message}</p>
-      {remediation?.hint ? (
-        <p className="mt-2 text-sm leading-5 text-[hsl(var(--color-danger-alert-text))] opacity-90">
-          {remediation.hint}
-        </p>
-      ) : null}
-      {showDetails ? (
-        <details className="mt-3 rounded-lg border border-subtle bg-surface-2 px-3 py-2">
-          <summary className="flex min-h-11 cursor-pointer items-center text-xs text-[hsl(var(--color-danger-alert-text))] opacity-90">{t('common.details')}</summary>
-          <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-[hsl(var(--color-danger-alert-text))] opacity-85">
-            {localizedError.rawMessage}
-          </pre>
-        </details>
-      ) : null}
-    </>
-  );
-  return onDismiss ? (
-    <Alert
-      tone="danger"
-      urgent
-      title={localizedError.title}
-      className={className}
-      action={action}
-      dismissLabel={dismissLabel ?? t('common.close')}
-      onDismiss={onDismiss}
-    >
-      {content}
-    </Alert>
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  useEffect(() => {
+    const toastId = showToast({
+      title: localizedError.title,
+      message: (
+        <>
+          <p>{localizedError.message}</p>
+          {remediation?.hint ? <p className="mt-1">{remediation.hint}</p> : null}
+        </>
+      ),
+      tone: 'danger',
+      durationMs: 0,
+      closeLabel: dismissLabel ?? t('common.close'),
+      action: hasAction ? {
+        label: resolvedActionLabel as string,
+        onClick: () => onActionRef.current?.(),
+        dismissOnClick: false,
+      } : undefined,
+      onDismiss: hasDismiss ? () => onDismissRef.current?.() : undefined,
+    });
+
+    return () => dismissToast(toastId);
+  }, [
+    dismissLabel,
+    dismissToast,
+    hasAction,
+    hasDismiss,
+    localizedError.message,
+    localizedError.title,
+    remediation?.hint,
+    resolvedActionLabel,
+    showToast,
+    t,
+  ]);
+
+  return null;
+};
+
+export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = (props) => {
+  const toastContext = useContext(ToastContext);
+  return toastContext ? (
+    <ApiErrorToast {...props} />
   ) : (
     <ToastProvider>
       <ApiErrorToast {...props} />

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createUiLanguageRecord } from '../../i18n/createUiLanguageRecord';
-import type { UiLanguage } from '../../i18n/uiText';
+import { UI_TEXT, type UiLanguage, type UiTextKey } from '../../i18n/uiText';
 import { APP_ROUTE_PATHS, buildSettingsHref } from '../../routing/routes';
 import type {
   ApiErrorCategory,
@@ -262,7 +262,7 @@ export const GENERIC_ERROR_TEXT = createUiLanguageRecord('api.error.GENERIC_ERRO
 
 type RemediationDefinition = {
   href?: string;
-  copy: Record<UiLanguage, { actionLabel: string; hint?: string }>;
+  actionKey: UiTextKey;
 };
 
 const SETTINGS_AI_CONNECTIONS = buildSettingsHref({ section: 'ai_models', view: 'connections' });
@@ -276,139 +276,79 @@ const SETTINGS_OVERVIEW = buildSettingsHref({ section: 'overview', view: 'readin
 const ERROR_REMEDIATION_BY_CODE: Record<string, RemediationDefinition> = {
   llm_not_configured: {
     href: SETTINGS_AI_CONNECTIONS,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.llm_not_configured', {
-      zh: { actionLabel: '打开模型设置', hint: '在「AI 与模型 → 模型接入」中配置主要模型或 API Key。' },
-      en: { actionLabel: 'Open model settings', hint: 'Configure a primary model or API key under AI & Models → Model Access.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   unauthorized: {
     href: APP_ROUTE_PATHS.login,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.unauthorized', {
-      zh: { actionLabel: '前往登录', hint: '登录状态已失效，重新登录后即可继续。' },
-      en: { actionLabel: 'Go to sign-in', hint: 'Your session expired. Sign in again to continue.' },
-    }),
+    actionKey: 'login.adminLogin',
   },
   agent_disabled: {
     href: SETTINGS_AGENT_EXECUTION,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.agent_disabled', {
-      zh: { actionLabel: '打开 Agent 设置', hint: '在「Agent 行为 → 执行」中启用 Agent 模式。' },
-      en: { actionLabel: 'Open Agent settings', hint: 'Enable Agent mode under Agent Behavior → Execution.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   auth_disabled: {
     href: SETTINGS_AUTH_SECURITY,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.auth_disabled', {
-      zh: { actionLabel: '打开认证设置', hint: '在「系统与安全 → 认证与安全」中启用密码登录。' },
-      en: { actionLabel: 'Open auth settings', hint: 'Enable password login under System & Security → Auth & Security.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   approval_auth_required: {
     href: SETTINGS_AUTH_SECURITY,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.approval_auth_required', {
-      zh: { actionLabel: '打开认证设置', hint: '启用管理员认证并登录后，才能使用人工审批。' },
-      en: { actionLabel: 'Open auth settings', hint: 'Enable administrator authentication and sign in to use human approvals.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   security_audit_auth_required: {
     href: SETTINGS_AUTH_SECURITY,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.security_audit_auth_required', {
-      zh: { actionLabel: '打开认证设置', hint: '启用管理员认证并登录后，才能查看安全审计。' },
-      en: { actionLabel: 'Open auth settings', hint: 'Enable administrator authentication and sign in to view the security audit.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   no_channels: {
     href: SETTINGS_NOTIFICATIONS,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.no_channels', {
-      zh: { actionLabel: '配置通知渠道', hint: '在「通知 → 渠道」中至少配置一个可用渠道。' },
-      en: { actionLabel: 'Configure channels', hint: 'Add at least one channel under Notifications → Channels.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   config_conflict: {
     href: SETTINGS_OVERVIEW,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.config_conflict', {
-      zh: { actionLabel: '刷新设置页', hint: '服务器配置已更新。刷新后重新应用你的修改。' },
-      en: { actionLabel: 'Refresh settings', hint: 'Server configuration changed. Refresh and re-apply your edits.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   config_version_conflict: {
     href: SETTINGS_OVERVIEW,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.config_version_conflict', {
-      zh: { actionLabel: '刷新设置页', hint: '服务器配置已更新。刷新后重新应用你的修改。' },
-      en: { actionLabel: 'Refresh settings', hint: 'Server configuration changed. Refresh and re-apply your edits.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   rate_limited: {
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.rate_limited', {
-      zh: { actionLabel: '稍后再试', hint: '请求过于频繁，请等待片刻后重试。' },
-      en: { actionLabel: 'Try again later', hint: 'Too many attempts. Wait a moment, then retry.' },
-    }),
+    actionKey: 'common.retry',
   },
   alphasift_disabled: {
     href: SETTINGS_DATA_SOURCES,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.alphasift_disabled', {
-      zh: { actionLabel: '打开数据源设置', hint: '在设置中启用 AlphaSift 后再运行选股。' },
-      en: { actionLabel: 'Open data source settings', hint: 'Enable AlphaSift in Settings before running a screen.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   alphasift_unavailable: {
     href: SETTINGS_DATA_SOURCES,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.alphasift_unavailable', {
-      zh: { actionLabel: '检查选股依赖', hint: '确认 AlphaSift 已安装，并检查后端依赖状态。' },
-      en: { actionLabel: 'Check screening setup', hint: 'Confirm AlphaSift is installed and backend dependencies are healthy.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   model_tool_incompatible: {
     href: SETTINGS_AI_CONNECTIONS,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.model_tool_incompatible', {
-      zh: { actionLabel: '更换模型', hint: '在「AI 与模型 → 模型接入」中选择支持工具调用的模型。' },
-      en: { actionLabel: 'Change model', hint: 'Pick a tool-capable model under AI & Models → Model Access.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   invalid_tool_call: {
     href: SETTINGS_AI_CONNECTIONS,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.invalid_tool_call', {
-      zh: { actionLabel: '调整模型配置', hint: '更换模型，或关闭不兼容的推理模式后重试。' },
-      en: { actionLabel: 'Adjust model settings', hint: 'Switch models, or disable an incompatible reasoning mode, then retry.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   share_image_content_too_large: {
     href: SETTINGS_REPORTS,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.share_image_content_too_large', {
-      zh: { actionLabel: '打开报告设置', hint: '可在「报告 → 输出」提高 SHARE_IMAGE_MAX_CHARS，或缩短报告内容。' },
-      en: { actionLabel: 'Open report settings', hint: 'Raise SHARE_IMAGE_MAX_CHARS under Reports → Output, or shorten the report.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   invalid_password: {
     href: APP_ROUTE_PATHS.login,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.invalid_password', {
-      zh: { actionLabel: '重新登录', hint: '核对密码后重试；如忘记密码，请在认证设置中处理。' },
-      en: { actionLabel: 'Sign in again', hint: 'Check the password and try again. Use auth settings if you need a reset path.' },
-    }),
+    actionKey: 'login.adminLogin',
   },
   analysis_failed: {
     href: SETTINGS_OVERVIEW,
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.analysis_failed', {
-      zh: { actionLabel: '检查就绪状态', hint: '在「概览 → 就绪状态」确认模型与数据源配置完整。' },
-      en: { actionLabel: 'Check readiness', hint: 'Confirm model and data-source setup under Overview → Readiness.' },
-    }),
+    actionKey: 'onboarding.openSettings',
   },
   local_connection_failed: {
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.local_connection_failed', {
-      zh: { actionLabel: '检查本地服务', hint: '确认 Web 服务已启动，并检查地址与端口是否可访问。' },
-      en: { actionLabel: 'Check local service', hint: 'Confirm the Web service is running and its host/port are reachable.' },
-    }),
+    actionKey: 'common.retry',
   },
   upstream_timeout: {
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.upstream_timeout', {
-      zh: { actionLabel: '稍后重试', hint: '上游服务响应超时。可稍后重试，或检查网络与代理设置。' },
-      en: { actionLabel: 'Retry later', hint: 'The upstream service timed out. Retry later, or check network and proxy settings.' },
-    }),
+    actionKey: 'common.retry',
   },
   upstream_network: {
-    copy: createUiLanguageRecord('api.error.ERROR_REMEDIATION.upstream_network', {
-      zh: { actionLabel: '检查出站网络', hint: '本地服务正常，但无法访问外部依赖。请检查代理、DNS 与出站策略。' },
-      en: { actionLabel: 'Check outbound network', hint: 'The local service is up, but an external dependency is unreachable. Check proxy, DNS, and outbound policy.' },
-    }),
+    actionKey: 'common.retry',
   },
 };
 
@@ -431,10 +371,8 @@ export function resolveErrorRemediation(
     ?? ERROR_REMEDIATION_BY_CATEGORY[error.category]
   );
   if (!definition) return null;
-  const localized = definition.copy[language] ?? definition.copy.en;
   return {
-    actionLabel: localized.actionLabel,
-    hint: localized.hint,
+    actionLabel: UI_TEXT[language][definition.actionKey],
     href: definition.href,
   };
 }

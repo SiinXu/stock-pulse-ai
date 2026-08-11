@@ -228,73 +228,6 @@ describe('stable API error contract', () => {
 
 });
 
-describe('phase-1 validation message catalog', () => {
-  it('localizes invalid_stock_or_name while keeping Chinese diagnostic rawMessage', () => {
-    const parsed = parseApiError({
-      response: {
-        status: 400,
-        data: {
-          error: 'invalid_stock_or_name',
-          message: '请输入有效的股票代码或股票名称',
-          params: {},
-          details: null,
-          trace_id: 'trace-validation-1',
-        },
-      },
-    });
-
-    expect(parsed.code).toBe('invalid_stock_or_name');
-    expect(parsed.rawMessage).toContain('请输入有效的股票代码或股票名称');
-
-    const english = getParsedApiError(parsed, 'en');
-    expect(english.title).toBe('Invalid stock code or name');
-    expect(english.message).toMatch(/valid stock code or stock name/i);
-    expect(english.message).not.toContain('请输入有效的股票代码或股票名称');
-
-    const chinese = getParsedApiError(parsed, 'zh');
-    expect(chinese.title).toBe('股票代码或名称无效');
-    expect(chinese.message).toContain('股票代码或股票名称');
-  });
-
-  it('interpolates analysis_batch_limit_exceeded params across locales', () => {
-    const parsed = parseApiError({
-      response: {
-        status: 400,
-        data: {
-          error: 'analysis_batch_limit_exceeded',
-          message: '单次分析请求最多支持 50 只股票',
-          params: { max_batch_size: 50 },
-        },
-      },
-    });
-
-    const english = getParsedApiError(parsed, 'en');
-    expect(english.title).toBe('Analysis batch limit exceeded');
-    expect(english.message).toContain('50');
-
-    const german = getParsedApiError(parsed, 'de');
-    expect(german.message).toContain('50');
-    expect(german.title.toLowerCase()).not.toBe(english.title.toLowerCase());
-  });
-
-  it('localizes invalid_stock_code with stock_code param for ApiErrorAlert path', () => {
-    const parsed = parseApiError({
-      response: {
-        status: 400,
-        data: {
-          error: 'invalid_stock_code',
-          message: "'!!!' 不是合法的股票代码格式",
-          params: { stock_code: '!!!' },
-        },
-      },
-    });
-    const english = getParsedApiError(parsed, 'en');
-    expect(english.code).toBe('invalid_stock_code');
-    expect(english.message).toContain('!!!');
-    expect(english.message).toMatch(/valid stock code format/i);
-  });
-});
-
 describe('actionable error remediation', () => {
   it('resolves settings deep links for top user-impact codes', async () => {
     const { resolveErrorRemediation, parseApiError, getParsedApiError } = await import('../error');
@@ -306,10 +239,10 @@ describe('actionable error remediation', () => {
       },
     }), 'en');
     const remediation = resolveErrorRemediation(llm, 'en');
-    expect(remediation?.actionLabel).toMatch(/model settings/i);
+    expect(remediation?.actionLabel).toBe('Open Settings');
     expect(remediation?.href).toContain('/settings');
     expect(remediation?.href).toContain('section=ai_models');
-    expect(remediation?.hint).toMatch(/Model Access/i);
+    expect(remediation?.hint).toBeUndefined();
   });
 
   it('falls back to category remediation when code is absent', async () => {
@@ -320,9 +253,9 @@ describe('actionable error remediation', () => {
       category: 'local_connection_failed',
     });
     const remediation = resolveErrorRemediation(error, 'en');
-    expect(remediation?.actionLabel).toMatch(/local service/i);
+    expect(remediation?.actionLabel).toBe('Retry');
     expect(remediation?.href).toBeUndefined();
-    expect(remediation?.hint).toMatch(/Web service/i);
+    expect(remediation?.hint).toBeUndefined();
   });
 
   it('keeps export surface including resolveErrorRemediation', async () => {
