@@ -653,6 +653,38 @@ class TestStorage(unittest.TestCase):
         )
         DatabaseManager.reset_instance()
 
+    def test_conversation_user_turn_is_idempotent_by_session_and_turn_id(self):
+        DatabaseManager.reset_instance()
+        db = DatabaseManager(db_url="sqlite:///:memory:")
+
+        first_id = db.save_conversation_user_turn(
+            "turn-session",
+            "compare with the report",
+            ["technical"],
+            turn_id="turn-1",
+            context={"stock_code": "600519", "stock_name": "Example"},
+        )
+        retry_id = db.save_conversation_user_turn(
+            "turn-session",
+            "compare with the report",
+            ["technical"],
+            turn_id="turn-1",
+            context={"stock_code": "600519", "stock_name": "Example"},
+        )
+
+        messages = db.get_conversation_messages("turn-session")
+        self.assertEqual(retry_id, first_id)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]["turn_id"], "turn-1")
+
+        with self.assertRaisesRegex(ValueError, "chat_turn_id_conflict"):
+            db.save_conversation_user_turn(
+                "turn-session",
+                "different content",
+                turn_id="turn-1",
+            )
+        DatabaseManager.reset_instance()
+
     def test_conversation_user_turn_rolls_back_message_when_state_write_fails(self):
         DatabaseManager.reset_instance()
         db = DatabaseManager(db_url="sqlite:///:memory:")

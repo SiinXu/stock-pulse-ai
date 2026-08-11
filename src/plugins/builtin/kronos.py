@@ -34,7 +34,9 @@ class KronosAgentToolPlugin(Plugin):
                         "Optional local Kronos time-series forecasting Agent Tool."
                     ),
                     "author": "StockPulse contributors",
-                    "permissions": ["market-data.read", "local-model.execute"],
+                    # Must match ToolPolicy.permissions on the registered tool
+                    # (load-time subset check; not a process sandbox).
+                    "permissions": ["market_data:read", "local_model:execute"],
                 }
             )
         )

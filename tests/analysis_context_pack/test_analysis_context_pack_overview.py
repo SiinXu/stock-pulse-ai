@@ -159,6 +159,7 @@ def test_renderer_outputs_only_public_schema_fields() -> None:
         "level",
         "block_scores",
         "limitations",
+        "validation_evidence",
     }
     assert overview["data_quality"] == {
         "overall_score": 76,
@@ -172,6 +173,7 @@ def test_renderer_outputs_only_public_schema_fields() -> None:
             "chip": 100,
         },
         "limitations": ["quote: fallback", "technical: partial"],
+        "validation_evidence": [],
     }
 
 
@@ -369,6 +371,7 @@ def test_extract_reprojects_persisted_overview_to_public_schema() -> None:
             "[REDACTED]",
             "technical: partial",
         ],
+        "validation_evidence": [],
     }
     assert extracted["blocks"][1]["missing_reasons"] == [
         "news_context_missing",

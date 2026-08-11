@@ -293,6 +293,56 @@ class ExtensionRegistry:
         self._next_order = 0
         self._lock = threading.RLock()
 
+    def bind_composition_contracts(
+        self,
+        contracts: Mapping[ExtensionPoint, ExtensionContract],
+    ) -> None:
+        """Atomically add process-owned contracts before those points are used.
+
+        A ``DataFetcherManager`` creates the authoritative ``data_provider``
+        registry before the application composition root exists.  The root may
+        therefore bind the remaining process backends into that exact registry,
+        but only while the affected extension points have no registrations.
+        Existing point ownership is never replaced silently.
+        """
+
+        with self._lock:
+            configured = dict(self._contracts)
+            for extension_point, contract in contracts.items():
+                if extension_point not in EXTENSION_POINTS:
+                    raise ValueError("unsupported extension point")
+                if extension_point == "data_provider":
+                    raise ValueError(
+                        "data_provider contract is owned by DataFetcherManager"
+                    )
+                if not isinstance(contract, ExtensionContract):
+                    raise TypeError(
+                        "contracts must contain ExtensionContract values"
+                    )
+                has_registrations = any(
+                    key[0] == extension_point for key in self._entries
+                )
+                current = configured[extension_point]
+                backend_conflicts = (
+                    current.backend is not None
+                    and current.backend is not contract.backend
+                )
+                validator_conflicts = (
+                    current.backend is None
+                    and current.validator is not _reject_unconfigured_implementation
+                    and current.validator is not contract.validator
+                )
+                if current is not contract and (
+                    has_registrations
+                    or backend_conflicts
+                    or validator_conflicts
+                ):
+                    raise ValueError(
+                        "cannot replace an active or configured extension contract"
+                    )
+                configured[extension_point] = contract
+            self._contracts = MappingProxyType(configured)
+
     def register(
         self,
         *,
@@ -595,16 +645,24 @@ class ExtensionRegistry:
             entry = self._entries.get((extension_point, registration_id))
             return None if entry is None or entry.recovery_only else entry.registration
 
+    def extension_contract(
+        self,
+        extension_point: ExtensionPoint,
+    ) -> ExtensionContract:
+        """Return the immutable contract configured for one extension point."""
+
+        contract = self._contracts.get(extension_point)
+        if contract is None:
+            raise ValueError("unsupported extension point")
+        return contract
+
     def native_backend(
         self,
         extension_point: ExtensionPoint,
     ) -> NativeRegistrationBackend | None:
         """Return the immutable point backend for composition pairing checks."""
 
-        contract = self._contracts.get(extension_point)
-        if contract is None:
-            raise ValueError("unsupported extension point")
-        return contract.backend
+        return self.extension_contract(extension_point).backend
 
     def _owns(
         self,

@@ -234,6 +234,7 @@ class Dashboard(BaseModel):
     signal_attribution: Optional[SignalAttribution] = None
     # Issue #616: additive evidence strata; historical payloads omit this field.
     report_strata: Optional[ReportStrata] = None
+    indicator_snapshot: Optional[Dict[str, Any]] = None
     agent_disagreement_explanation: Optional[Any] = None
 
 
@@ -258,6 +259,8 @@ class AnalysisReportSchema(BaseModel):
     dashboard: Optional[Dashboard] = None
     # Top-level strata mirror (Issue #616). Prefer dashboard.report_strata when both set.
     report_strata: Optional[ReportStrata] = None
+    # Resolved indicator evidence used by reports and API clients.
+    indicator_snapshot: Optional[Dict[str, Any]] = None
 
     analysis_summary: Optional[str] = None
     key_points: Optional[str] = None

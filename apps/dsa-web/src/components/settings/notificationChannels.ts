@@ -68,6 +68,20 @@ export const NOTIFICATION_CHANNELS: NotificationChannel[] = [
   },
 ];
 
+export function getNotificationRoutingValue(channel: NotificationChannel): string {
+  return channel.routingValue ?? channel.id;
+}
+
+export const NOTIFICATION_ROUTING_VALUES = NOTIFICATION_CHANNELS.map(getNotificationRoutingValue);
+
+export function getNotificationChannelByRoutingValue(
+  routingValue: string,
+): NotificationChannel | undefined {
+  return NOTIFICATION_CHANNELS.find(
+    (channel) => getNotificationRoutingValue(channel) === routingValue,
+  );
+}
+
 export function isNotificationChannelKey(key: string): boolean {
   return NOTIFICATION_CHANNELS.some((channel) => channel.prefixes.some((prefix) => key.startsWith(prefix)));
 }

@@ -28,6 +28,8 @@ from api.v1.schemas.system_config import (
     LocalModelCatalogResponse,
     LLMProviderCatalogResponse,
     RollbackSystemConfigRequest,
+    SchedulerRunNowResponse,
+    SchedulerStatusResponse,
     SystemConfigConflictResponse,
     SystemConfigResponse,
     SystemConfigSchemaResponse,
@@ -208,36 +210,61 @@ def _log_config_exception(
 
 @router.get(
     "/scheduler/status",
+    response_model=SchedulerStatusResponse,
     summary="Get runtime scheduler status",
     description="Return status for the in-process Web/API/Desktop scheduler.",
 )
 def get_scheduler_status(
     scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
-) -> dict:
+) -> SchedulerStatusResponse:
     """Return runtime scheduler status."""
-    return scheduler.status()
+    return SchedulerStatusResponse.model_validate(scheduler.status())
 
 
 @router.post(
     "/scheduler/run-now",
+    response_model=SchedulerRunNowResponse,
     summary="Run scheduled analysis now",
     description="Trigger one scheduled analysis run in the current process.",
 )
 def run_scheduler_now(
     scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
-) -> dict:
+) -> SchedulerRunNowResponse:
     """Trigger one runtime scheduled analysis run."""
     result = scheduler.run_now()
     if not result.get("accepted", False):
+        reason = result.get("reason", "scheduler_state_unavailable")
+        error_details = {
+            "analysis_already_running": (
+                "scheduler_busy",
+                "A scheduled analysis is already running",
+            ),
+            "scheduler_not_attached": (
+                "scheduler_not_attached",
+                "The legacy day-batch scheduler is not attached to this process",
+            ),
+            "scheduler_disabled": (
+                "scheduler_disabled",
+                "The legacy day-batch scheduler is disabled",
+            ),
+            "scheduler_state_unavailable": (
+                "scheduler_state_unavailable",
+                "The legacy day-batch scheduler state is unavailable",
+            ),
+        }
+        error_code, message = error_details.get(
+            reason,
+            ("scheduler_unavailable", "The scheduler cannot start this run"),
+        )
         raise HTTPException(
             status_code=409,
             detail={
-                "error": "scheduler_busy",
-                "message": "A scheduled analysis is already running",
-                "reason": result.get("reason", "analysis_already_running"),
+                "error": error_code,
+                "message": message,
+                "reason": reason,
             },
         )
-    return result
+    return SchedulerRunNowResponse.model_validate(result)
 
 
 class EnvBackupAccessDenied(Exception):

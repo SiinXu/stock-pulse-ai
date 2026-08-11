@@ -31,6 +31,8 @@ from tests.agent_runtime_replay import (
     BASE_CONFIG_FIELDS,
     FIXTURES_DIR,
     ReplayLLMAdapter,
+    _normalize_dashboard,
+    _normalize_json_content,
     build_replay_tool_registry,
     load_case,
     load_manifest,
@@ -122,6 +124,39 @@ def test_replay_case_matches_frozen_expected(entry):
         f"Runtime behaviour drifted for case '{entry['id']}'. If the change is "
         "intentional, re-freeze with: python -m tests.agent_runtime_replay record"
     )
+
+
+def test_replay_normalizes_only_valid_risk_manager_identity_fields():
+    dashboard = {
+        "decision_type": "hold",
+        "risk_manager": {
+            "verdict": "pass",
+            "evaluation_id": "a" * 32,
+            "evaluated_at": "2026-08-09T12:56:22.531487+00:00",
+        },
+    }
+
+    normalized = _normalize_dashboard(dashboard)
+
+    assert normalized is not dashboard
+    assert normalized["risk_manager"] == {
+        "verdict": "pass",
+        "evaluation_id": "<runtime-generated>",
+        "evaluated_at": "<runtime-evaluated-at>",
+    }
+    assert dashboard["risk_manager"]["evaluation_id"] == "a" * 32
+
+
+def test_replay_does_not_mask_malformed_identity_or_non_json_content():
+    dashboard = {
+        "risk_manager": {
+            "evaluation_id": "not-an-evaluation-id",
+            "evaluated_at": "not-a-timestamp",
+        },
+    }
+
+    assert _normalize_dashboard(dashboard) == dashboard
+    assert _normalize_json_content("plain-text result") == "plain-text result"
 
 
 # ---------------------------------------------------------------------------

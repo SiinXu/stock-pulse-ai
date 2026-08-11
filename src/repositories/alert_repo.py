@@ -6,8 +6,8 @@ Provides DB access helpers for alert-center P1 API tables.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import and_, delete, desc, func, select
 
@@ -291,6 +291,65 @@ class AlertRepository:
                 .limit(page_size)
             ).scalars().all()
             return list(rows), int(total)
+
+    def list_recent_triggered_for_targets(
+        self,
+        *,
+        targets: Sequence[str],
+        triggered_since: datetime,
+        per_target_limit: int = 1,
+    ) -> List[AlertTriggerRecord]:
+        """Return bounded, stable triggered evidence for the requested targets.
+
+        The window is ranked per stored target so a noisy symbol cannot hide a
+        different requested symbol. Callers may provide market aliases and
+        canonicalize the returned rows at their own domain boundary.
+        """
+        normalized_targets = sorted({str(target or "").strip() for target in targets if str(target or "").strip()})
+        if not normalized_targets:
+            return []
+        safe_per_target_limit = max(1, min(int(per_target_limit), 5))
+        if triggered_since.tzinfo is not None and triggered_since.utcoffset() is not None:
+            triggered_since = triggered_since.astimezone(timezone.utc).replace(tzinfo=None)
+
+        rows_by_id: Dict[int, AlertTriggerRecord] = {}
+        with self.db.get_session() as session:
+            for start in range(0, len(normalized_targets), 200):
+                target_chunk = normalized_targets[start:start + 200]
+                ranked = (
+                    select(
+                        AlertTriggerRecord.id.label("trigger_id"),
+                        func.row_number().over(
+                            partition_by=AlertTriggerRecord.target,
+                            order_by=(
+                                desc(AlertTriggerRecord.triggered_at),
+                                desc(AlertTriggerRecord.id),
+                            ),
+                        ).label("target_rank"),
+                    )
+                    .where(
+                        AlertTriggerRecord.target.in_(target_chunk),
+                        AlertTriggerRecord.status == "triggered",
+                        AlertTriggerRecord.triggered_at >= triggered_since,
+                    )
+                    .subquery()
+                )
+                rows = session.execute(
+                    select(AlertTriggerRecord)
+                    .join(ranked, AlertTriggerRecord.id == ranked.c.trigger_id)
+                    .where(ranked.c.target_rank <= safe_per_target_limit)
+                    .order_by(
+                        desc(AlertTriggerRecord.triggered_at),
+                        desc(AlertTriggerRecord.id),
+                    )
+                ).scalars().all()
+                for row in rows:
+                    rows_by_id[int(row.id)] = row
+        return sorted(
+            rows_by_id.values(),
+            key=lambda row: (row.triggered_at or datetime.min, int(row.id or 0)),
+            reverse=True,
+        )
 
     def list_notifications(
         self,
