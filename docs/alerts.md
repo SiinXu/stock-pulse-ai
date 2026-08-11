@@ -494,6 +494,12 @@ P9 在现有 Alert API、worker 与通知链路上扩展**企业事件规则**�
 - `src/services/alert_worker.py`：触发后挂载 impact_context，并 enrich 通知。
 - 配置：`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`（registry + `.env.example`）。
 
+
+### Web 跟进（Issue #241）
+
+- 独立页面 `/event-alerts` 展示已触发企业事件告警（后端文案 + 影响上下文）。
+- `GET /api/v1/alerts/triggers` 一等暴露 `impact_context` / `event_context`。
+
 ### P9 不做
 
 - 不做 Web 创建表单/筛选扩展（#241 follow-up）。
