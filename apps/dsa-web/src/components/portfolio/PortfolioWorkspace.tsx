@@ -869,7 +869,7 @@ const PortfolioWorkspace: React.FC = () => {
                       stock: task.stockCode,
                     })}
                     data-control="navigation-link"
-                    className="control-hit-target inline-flex min-h-9 items-center rounded-md border border-subtle bg-surface px-3 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    className="control-hit-target inline-flex min-h-9 items-center rounded-md border border-subtle bg-elevated px-3 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                   >
                     {t('analysisWorkbench.viewReport')}: {task.stockName || task.stockCode}
                   </Link>
