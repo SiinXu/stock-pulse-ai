@@ -53,6 +53,7 @@ import { TaskPanel } from '../components/tasks';
 import type { WatchlistAnalyzeMode } from '../components/watchlist/HomeStockWorkspace';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { useAnalysisWorkbenchErrorContract } from '../hooks/useAnalysisWorkbenchErrorContract';
+import { useAnalysisErrorToast } from '../hooks/useAnalysisErrorToast';
 import { useAnalysisWorkbenchState } from '../hooks/useAnalysisWorkbenchState';
 import { useDashboardLifecycle } from '../hooks/useDashboardLifecycle';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -64,6 +65,7 @@ import {
   HOME_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
   type AnalysisWorkbenchSegment,
+  buildReportVersionCompareHref,
 } from '../routing/routes';
 import {
   DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
@@ -72,7 +74,7 @@ import {
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
 import { useStockPoolStore, type SubmitAnalysisOptions } from '../stores/stockPoolStore';
-import type { AnalysisPhase, StockReportType, TaskInfo } from '../types/analysis';
+import type { AnalysisPhase, HistoryItem, StockReportType, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { buildDeepLink } from '../utils/deepLink';
@@ -777,6 +779,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       return new Set(visibleIds);
     });
   }, [analysisHistoryItems]);
+  const compareSelectedHistory = useCallback((items: readonly [HistoryItem, HistoryItem]) => navigate(
+    buildReportVersionCompareHref({ stock: items[0].stockCode, baseRunId: items[0].id, targetRunId: items[1].id }),
+  ), [navigate]);
   const requestDeleteSelectedHistory = useCallback(() => {
     if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
     setDeleteError(null);
@@ -1038,13 +1043,10 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     lastBatchIntentRef.current = null;
     setBatchNotice(null);
   }, []);
+  const analysisErrorIsToastOnly = useAnalysisErrorToast(error, clearError);
   const hasWorkbenchErrorNotice = Boolean(
-    inputError
-    || duplicateError
-    || error
-    || reportDetailError
-    || runFlowError
-    || batchNotice,
+    inputError || duplicateError || (error && !analysisErrorIsToastOnly)
+    || reportDetailError || runFlowError || batchNotice,
   );
   return (
     <AppPage data-testid="analysis-workbench-page">
@@ -1089,7 +1091,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             inputError={inputError}
             duplicateError={duplicateError}
             duplicateTask={duplicateTask}
-            analysisError={error}
+            analysisError={analysisErrorIsToastOnly ? null : error}
             reportDetailError={reportDetailError}
             runFlowError={runFlowError}
             batchNotice={batchNotice}
@@ -1231,7 +1233,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                         {({ close }) => (
                           <div data-testid="analysis-history-popover">
                             <IconButton type="button" variant="bare" size="compact" tooltip={false} onClick={close} aria-label={t('common.close')} className="absolute right-3 top-3 z-10"><X aria-hidden="true" /></IconButton>
-                            <HistoryList className="[&>aside]:max-h-[min(22rem,calc(100dvh-14rem))] [&>aside]:rounded-2xl [&>aside]:border-0 [&>aside]:bg-transparent [&_[data-testid=home-history-list-scroll]]:!p-3 [&_[data-testid=home-history-list-scroll]_.text-center.py-5]:hidden [&_[data-testid=history-card-meta]]:flex-nowrap [&_[data-testid=history-card-meta]]:gap-1 [&_[data-testid=history-card-meta]>span]:whitespace-nowrap" items={analysisHistoryItems} isLoading={isLoadingHistory} isLoadingMore={isLoadingMore} hasMore={hasMore} selectedId={routeState.recordId ?? undefined} selectedIds={new Set(selectedHistoryIds)} isDeleting={isDeletingHistory} onItemClick={(recordId) => { navigateToRecord(recordId); close(); }} onLoadMore={() => void loadMoreHistory()} onToggleItemSelection={toggleHistorySelection} onToggleSelectAll={toggleAllHistory} onDeleteSelected={requestDeleteSelectedHistory} />
+                            <HistoryList className="[&>aside]:max-h-[min(22rem,calc(100dvh-14rem))] [&>aside]:rounded-2xl [&>aside]:border-0 [&>aside]:bg-transparent [&_[data-testid=home-history-list-scroll]]:!p-3 [&_[data-testid=home-history-list-scroll]_.text-center.py-5]:hidden [&_[data-testid=history-card-meta]]:flex-nowrap [&_[data-testid=history-card-meta]]:gap-1 [&_[data-testid=history-card-meta]>span]:whitespace-nowrap" items={analysisHistoryItems} isLoading={isLoadingHistory} isLoadingMore={isLoadingMore} hasMore={hasMore} selectedId={routeState.recordId ?? undefined} selectedIds={new Set(selectedHistoryIds)} isDeleting={isDeletingHistory} onItemClick={(recordId) => { navigateToRecord(recordId); close(); }} onLoadMore={() => void loadMoreHistory()} onToggleItemSelection={toggleHistorySelection} onToggleSelectAll={toggleAllHistory} onDeleteSelected={requestDeleteSelectedHistory} onCompareSelected={compareSelectedHistory} />
                           </div>
                         )}
                       </Popover>

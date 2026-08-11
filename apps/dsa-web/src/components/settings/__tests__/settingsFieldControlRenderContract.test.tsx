@@ -211,28 +211,83 @@ describe('SettingsField control render contract', () => {
     expect(screen.queryByRole('switch', { name: 'Legacy Secret Flag' })).not.toBeInTheDocument();
   });
 
-  it('masks already-masked server values without requiring isSensitive on the schema', () => {
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <SettingsField
-          item={buildItem({
-            key: 'LEGACY_SECRET',
-            value: '******',
-            isMasked: true,
-            dataType: 'string',
-            uiControl: 'text',
-            isSensitive: false,
-            title: 'Legacy Secret',
-          })}
-          value="******"
-          onChange={vi.fn()}
-        />
-      </UiLanguageProvider>,
-    );
+  it('presents a saved masked secret as replace-only, then reveals a new draft on request', () => {
+    const item = buildItem({
+      key: 'LEGACY_SECRET',
+      value: '******',
+      isMasked: true,
+      dataType: 'string',
+      uiControl: 'text',
+      isSensitive: false,
+      title: 'Legacy Secret',
+    });
+
+    function MaskedSecretField() {
+      const [value, setValue] = useState('******');
+      return (
+        <UiLanguageProvider initialLanguage="en">
+          <SettingsField
+            item={item}
+            value={value}
+            onChange={(_key, next) => setValue(next)}
+          />
+        </UiLanguageProvider>
+      );
+    }
+
+    render(<MaskedSecretField />);
 
     const input = screen.getByLabelText('Legacy Secret');
     expect(input).toHaveAttribute('type', 'password');
-    expect(input).toHaveValue('******');
+    expect(input).toHaveValue('');
+    expect(input).toHaveAttribute('placeholder', 'Key saved; enter a new key to replace it');
+    expect(screen.getByText('Saved keys are never revealed for security.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show content' })).not.toBeInTheDocument();
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'replacement-secret' } });
+
+    expect(input).toHaveValue('replacement-secret');
+    fireEvent.click(screen.getByRole('button', { name: 'Show content' }));
+    expect(input).toHaveAttribute('type', 'text');
+  });
+
+  it('replaces a saved masked multi-secret without retaining the mask as a key row', () => {
+    const item = buildItem({
+      key: 'LEGACY_API_KEYS',
+      value: '******',
+      isMasked: true,
+      dataType: 'string',
+      uiControl: 'password',
+      isSensitive: true,
+      validation: { multiValue: true },
+      title: 'Legacy API Keys',
+    });
+
+    function MaskedMultiSecretField() {
+      const [value, setValue] = useState('******');
+      return (
+        <UiLanguageProvider initialLanguage="en">
+          <SettingsField
+            item={item}
+            value={value}
+            onChange={(_key, next) => setValue(next)}
+          />
+        </UiLanguageProvider>
+      );
+    }
+
+    render(<MaskedMultiSecretField />);
+
+    const firstInput = screen.getByLabelText('Legacy API Keys 1');
+    expect(firstInput).toHaveValue('');
+    expect(document.querySelectorAll('input[data-credential-purpose="configuration-secret"]')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Show content: Legacy API Keys 1' })).not.toBeInTheDocument();
+
+    fireEvent.focus(firstInput);
+    fireEvent.change(firstInput, { target: { value: 'replacement-a' } });
+    expect(firstInput).toHaveValue('replacement-a');
+    expect(screen.getByRole('button', { name: 'Show content: Legacy API Keys 1' })).toBeInTheDocument();
   });
 });
 

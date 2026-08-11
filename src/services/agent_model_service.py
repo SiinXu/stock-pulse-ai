@@ -7,7 +7,11 @@ from typing import Any, Dict, List
 
 from src.config import get_effective_agent_models_to_try, get_effective_agent_primary_model
 from src.agent.litellm_route_resolution import resolve_agent_litellm_route
-from src.llm.backend_registry import GENERATION_ONLY_BACKEND_IDS
+from src.llm.backend_registry import (
+    LOCAL_CLI_GENERATION_BACKEND_IDS,
+    resolve_agent_generation_backend_id,
+)
+from src.llm.generation_backend import GenerationError
 
 
 _PLACEHOLDER_TO_PROVIDER = {
@@ -124,8 +128,23 @@ def _build_legacy_deployments(config) -> List[Dict[str, Any]]:
 
 def list_agent_model_deployments(config) -> List[Dict[str, Any]]:
     """Return configured Agent model deployments without exposing secrets."""
-    if (getattr(config, "agent_generation_backend", "") or "").strip().lower() in GENERATION_ONLY_BACKEND_IDS:
+    try:
+        backend_id = resolve_agent_generation_backend_id(config)
+    except GenerationError:
         return []
+    if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS:
+        return [
+            {
+                "deployment_id": f"local_cli:{backend_id}",
+                "model": backend_id,
+                "provider": backend_id,
+                "source": "local_cli",
+                "api_base": None,
+                "deployment_name": backend_id,
+                "is_primary": True,
+                "is_fallback": False,
+            }
+        ]
 
     deployments = _build_non_legacy_deployments(config)
     if not deployments:

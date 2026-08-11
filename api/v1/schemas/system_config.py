@@ -538,6 +538,7 @@ class TestLLMChannelRequest(BaseModel):
     base_url: str = ""
     api_key: str = ""
     models: List[str] = Field(default_factory=list)
+    model_id_mode: Literal["route", "literal"] = "route"
     enabled: bool = True
     timeout_seconds: float = 20.0
     capability_checks: List[LLMCapabilityCheck] = Field(default_factory=list)

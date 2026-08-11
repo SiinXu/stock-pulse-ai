@@ -42,6 +42,13 @@ composition root. Calling the inventory never constructs a default
 (`application_services_not_initialized`). Skill configuration or catalog load
 failures surface as `skill_config_unavailable` or `skill_catalog_unavailable`.
 
+The tool source observes only an already-built process `ToolRegistry` and never
+constructs one. Skill source generations include plugin and declarative skill
+identities so equal-count catalog swaps advance generation. Pipeline stages are
+bound only when the live `StockAnalysisPipeline` type exposes a stage runner
+and bound stage methods reference the stage; registration alone never sets
+`healthy=true`.
+
 Owner generations cover every change a record can expose. Tool entries are
 frozen copies captured at registration, so a later in-place mutation of a live
 `ToolDefinition` cannot change a published inventory; a real change requires

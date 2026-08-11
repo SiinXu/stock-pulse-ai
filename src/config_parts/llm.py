@@ -180,6 +180,9 @@ class _ConfigLLMMethods:
             # Models
             models_raw = os.getenv(f'LLM_{ch_upper}_MODELS', '')
             raw_models = [m.strip() for m in models_raw.split(',') if m.strip()]
+            model_id_mode = os.getenv(f'LLM_{ch_upper}_MODEL_ID_MODE', '').strip().lower()
+            if model_id_mode not in {"route", "literal"}:
+                model_id_mode = "route"
             if not raw_models and ch_lower == "anspire":
                 anspire_model = (
                     os.getenv('ANSPIRE_LLM_MODEL') or ANSPIRE_LLM_MODEL_DEFAULT
@@ -284,7 +287,16 @@ class _ConfigLLMMethods:
                     ", ".join(incompatible_models[:3]),
                 )
                 continue
-            models = [normalize_llm_channel_model(m, protocol, base_url) for m in raw_models]
+            models = [normalize_llm_channel_model(model, protocol, base_url) for model in raw_models]
+            wire_models = {
+                route: normalize_llm_channel_model(
+                    raw_model,
+                    protocol,
+                    base_url,
+                    preserve_wire_model=True,
+                )
+                for raw_model, route in zip(raw_models, models)
+            } if provider_id == "custom" and model_id_mode == "literal" else {}
 
             # Extra headers (JSON string, optional)
             extra_headers_raw = os.getenv(f'LLM_{ch_upper}_EXTRA_HEADERS', '').strip()
@@ -322,6 +334,9 @@ class _ConfigLLMMethods:
                 'base_url': base_url,
                 'api_keys': api_keys,
                 'models': models,
+                'raw_models': list(raw_models),
+                'model_id_mode': model_id_mode,
+                'wire_models': wire_models,
                 'extra_headers': extra_headers,
             })
             _logger.info(f"LLM channel '{ch_name}': {len(models)} model(s), {len(api_keys)} key(s)")
@@ -392,14 +407,28 @@ class _ConfigLLMMethods:
                 if isinstance(ref, dict)
             }
             api_surface = normalize_llm_channel_api_surface(ch.get("api_surface"))
+            wire_models = dict(ch.get("wire_models") or {})
             for model_name in ch['models']:
                 for api_key in ch['api_keys']:
                     model_ref = hermes_refs.get(str(model_name))
-                    wire_model = str((model_ref or {}).get("wire_model") or model_name)
+                    wire_model = str(
+                        (model_ref or {}).get("wire_model")
+                        or wire_models.get(str(model_name))
+                        or model_name
+                    )
                     wire_model = apply_litellm_api_surface(wire_model, api_surface)
                     litellm_params: Dict[str, Any] = {
                         'model': wire_model,
                     }
+                    if (
+                        str(ch.get("provider_id") or "").strip().lower() == "custom"
+                        and str(ch.get("protocol") or "").strip().lower() == "openai"
+                        and str(ch.get("model_id_mode") or "").strip().lower() == "literal"
+                    ):
+                        # A literal ID such as ``deepseek/deepseek-v4-flash`` belongs
+                        # to the configured OpenAI-compatible gateway.  Router calls
+                        # must not re-infer the leading segment as a native provider.
+                        litellm_params["custom_llm_provider"] = "openai"
                     if api_key:
                         litellm_params['api_key'] = api_key
                     if ch['base_url']:

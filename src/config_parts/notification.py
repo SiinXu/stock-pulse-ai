@@ -84,6 +84,7 @@ class NotificationConfig:
     notification_timezone: str = ""
     notification_min_severity: str = ""
     notification_daily_digest_enabled: bool = False
+    notification_delta_first: bool = False
 
     # Single stock push mode: Pushes immediately after analyzing each stock, instead of pushing after aggregation
     single_stock_notify: bool = False

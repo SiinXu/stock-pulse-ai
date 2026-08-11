@@ -146,6 +146,32 @@ class _DeliveryStageMixin:
             side_effect_key=side_effect_key,
         )
 
+    def _format_delta_first_notification(
+        self,
+        report_content: str,
+        results: List[AnalysisResult],
+        report_type: Any,
+    ) -> str:
+        """Apply the opt-in notification-only delta prefix with a safe fallback."""
+        config = getattr(self, "config", None)
+        if not bool(getattr(config, "notification_delta_first", False)):
+            return report_content
+        try:
+            from src.services.notification_delta_formatter import (
+                format_delta_first_notification,
+            )
+
+            return format_delta_first_notification(report_content, results, report_type)
+        except Exception as exc:  # broad-exception: fallback_recorded - formatting cannot block notification delivery
+            log_safe_exception(
+                logger,
+                "Notification delta-first formatting skipped",
+                exc,
+                error_code="pipeline_notification_delta_formatting_skipped",
+                level=logging.WARNING,
+            )
+            return report_content
+
     def _send_single_stock_notification(
         self,
         result: AnalysisResult,
@@ -227,6 +253,11 @@ class _DeliveryStageMixin:
                 else:
                     report_content = self.notifier.generate_single_stock_report(result)
                     logger.info("[%s] Using simple report format", stock_code)
+                report_content = self._format_delta_first_notification(
+                    report_content,
+                    [result],
+                    report_type,
+                )
 
                 render_result = PipelineStageResult.success(
                     PipelineStageName.RENDER,
@@ -671,6 +702,12 @@ class _DeliveryStageMixin:
         try:
             logger.info("Generating the decision dashboard")
             report = self._generate_aggregate_report(results, report_type)
+            if not skip_push:
+                report = self._format_delta_first_notification(
+                    report,
+                    results,
+                    report_type,
+                )
             self._finish_pipeline_stage(
                 render_stage,
                 PipelineStageResult.success(
@@ -746,6 +783,20 @@ class _DeliveryStageMixin:
             )
             noise_key = f"report:aggregate:{report_type_key}:{codes_key}"
 
+            def _render_notification_aggregate(
+                selected_results: List[AnalysisResult],
+                selected_report_type: ReportType,
+            ) -> str:
+                selected_report = self._generate_aggregate_report(
+                    selected_results,
+                    selected_report_type,
+                )
+                return self._format_delta_first_notification(
+                    selected_report,
+                    selected_results,
+                    selected_report_type,
+                )
+
             def _execute_attempt(
                 channel_label: str,
                 send: Callable[[], _ChannelAttemptResult],
@@ -775,7 +826,7 @@ class _DeliveryStageMixin:
                     results=results,
                     report_type=report_type,
                     config=self.config,
-                    render_aggregate=self._generate_aggregate_report,
+                    render_aggregate=_render_notification_aggregate,
                     execute_attempt=_execute_attempt,
                     scope_started=lambda: stage_runner.scope_started(
                         static_delivery_scope

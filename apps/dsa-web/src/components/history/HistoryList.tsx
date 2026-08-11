@@ -1,12 +1,13 @@
 import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
-import { Trash2 } from 'lucide-react';
+import { GitCompareArrows, Trash2 } from 'lucide-react';
 import type { HistoryItem } from '../../types/analysis';
-import { Badge, Checkbox, IconButton, ScrollArea, Surface } from '../common';
+import { Badge, Button, Checkbox, IconButton, ScrollArea, Surface } from '../common';
 import { Spinner } from '../common/Spinner';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { REPORT_VERSION_COMPARE_TEXT } from '../../locales/reportVersionCompare';
 
 interface HistoryListProps {
   items: HistoryItem[];
@@ -21,6 +22,7 @@ interface HistoryListProps {
   onToggleItemSelection: (recordId: number) => void;
   onToggleSelectAll: () => void;
   onDeleteSelected: () => void;
+  onCompareSelected?: (items: readonly [HistoryItem, HistoryItem]) => void;
   title?: string;
   emptyTitle?: string;
   emptyDescription?: string;
@@ -41,18 +43,30 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   onToggleItemSelection,
   onToggleSelectAll,
   onDeleteSelected,
+  onCompareSelected,
   title,
   emptyTitle,
   emptyDescription,
   className = '',
 }) => {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const selectAllId = useId();
 
   const selectedCount = items.filter((item) => selectedIds.has(item.id)).length;
+  const selectedItems = [...selectedIds]
+    .map((id) => items.find((item) => item.id === id))
+    .filter((item): item is HistoryItem => Boolean(item));
+  const comparisonStockCode = selectedItems[0]?.stockCode.trim().toUpperCase();
+  const comparisonItems = selectedItems.length === 2
+    && Boolean(comparisonStockCode)
+    && selectedItems.every(
+      (item) => item.stockCode.trim().toUpperCase() === comparisonStockCode,
+    )
+    ? selectedItems as [HistoryItem, HistoryItem]
+    : null;
   const allVisibleSelected = items.length > 0 && selectedCount === items.length;
   const someVisibleSelected = selectedCount > 0 && !allVisibleSelected;
 
@@ -131,6 +145,18 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 containerClassName="min-h-11 flex-1 rounded-lg py-1"
                 label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
               />
+              {onCompareSelected && comparisonItems ? (
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  onClick={() => onCompareSelected(comparisonItems)}
+                  disabled={isDeleting}
+                  data-testid="history-compare-selected"
+                >
+                  <GitCompareArrows aria-hidden="true" />
+                  {REPORT_VERSION_COMPARE_TEXT[language].compare}
+                </Button>
+              ) : null}
               <IconButton
                 variant="danger"
                 size="compact"

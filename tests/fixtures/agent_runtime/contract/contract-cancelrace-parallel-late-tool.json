@@ -56,7 +56,8 @@
         },
         "success": true,
         "result_length": 56,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"echo\": \"fast tool finishes before the batch deadline\"}"
       },
       {
         "step": 1,
@@ -67,6 +68,7 @@
         "success": false,
         "result_length": 66,
         "cached": false,
+        "result_preview": "{\"error\": \"Tool execution timed out after 1.00s\", \"timeout\": true}",
         "timeout": true
       }
     ],

@@ -38,6 +38,7 @@ This is the entry point for project documentation. The README covers the project
 | [Agent-guided onboarding (EN)](agent-guided-onboarding_EN.md) | Profile intake, rule-based config plan, non-secret apply, L0–L3 paths; [中文](agent-guided-onboarding.md) |
 | [UI User Manual](ui-manual/README_EN.md) | Modular Web/desktop UI usage (no deployment); [简体中文](ui-manual/README.md) |
 | [Full Guide (EN)](full-guide_EN.md) | Environment setup, run modes, configuration, deployment paths, and common issues |
+| [Environment variable inventory (EN)](environment-variables_EN.md) | Three-way `.env.example` / registry / docs inventory, config addition process, and consistency check |
 | [FAQ (EN)](FAQ_EN.md) | Common configuration, model, notification, deployment, and runtime issues |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Static/realtime priority, health scoring, adaptive ordering, fallback chains, deployment profiles, and troubleshooting |
 | [Futu OpenD Portfolio Import](futu-opend-portfolio-import_EN.md) | OpenD setup, FUTU_* settings, live position import API, degradation, and local-gateway network policy |

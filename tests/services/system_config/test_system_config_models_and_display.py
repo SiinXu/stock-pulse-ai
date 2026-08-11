@@ -7,7 +7,6 @@ from tests.system_config_service_test_support import (
     Config,
     ConfigValidationError,
     Dict,
-    GENERATION_ONLY_BACKEND_IDS,
     List,
     SimpleNamespace,
     SystemConfigService,
@@ -18,6 +17,7 @@ from tests.system_config_service_test_support import (
     patch,
     requests,
 )
+from src.llm.backend_registry import LOCAL_CLI_GENERATION_BACKEND_IDS
 
 
 class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
@@ -333,6 +333,33 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(saved["AGENT_LITELLM_MODEL"], "openai/spare-model")
         self.assertEqual(saved["VISION_MODEL"], "openai/spare-model")
         self.assertEqual(saved["LITELLM_FALLBACK_MODELS"], "openai/spare-model")
+
+    def test_local_cli_agent_does_not_block_removing_its_stale_litellm_model(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=primary",
+            "LLM_PRIMARY_PROVIDER=openai",
+            "LLM_PRIMARY_PROTOCOL=openai",
+            "LLM_PRIMARY_API_KEY=sk-primary",
+            "LLM_PRIMARY_MODELS=agent-only-model,report-model",
+            "LLM_PRIMARY_ENABLED=true",
+            "LITELLM_MODEL=openai/report-model",
+            "AGENT_GENERATION_BACKEND=codex_cli",
+            "AGENT_LITELLM_MODEL=openai/agent-only-model",
+        )
+
+        result = self.service.update(
+            config_version=self.manager.get_config_version(),
+            reload_now=False,
+            items=[
+                {"key": "LLM_PRIMARY_MODELS", "value": "report-model"},
+            ],
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(
+            self.manager.read_config_map()["LLM_PRIMARY_MODELS"],
+            "report-model",
+        )
 
     def test_validate_keeps_existing_stale_model_as_unknown_model(self) -> None:
         self._rewrite_env(
@@ -1215,8 +1242,8 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(items["REPORT_SHOW_LLM_MODEL"]["value"], "false")
         self.assertTrue(items["REPORT_SHOW_LLM_MODEL"]["raw_value_exists"])
 
-    def test_get_config_preserves_manual_agent_codex_cli_value_without_schema_option(self) -> None:
-        for backend in sorted(GENERATION_ONLY_BACKEND_IDS):
+    def test_get_config_exposes_local_cli_agent_values_as_schema_options(self) -> None:
+        for backend in sorted(LOCAL_CLI_GENERATION_BACKEND_IDS):
             with self.subTest(backend=backend):
                 self._rewrite_env(
                     "STOCK_LIST=600519,000001",
@@ -1228,7 +1255,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
                 agent_item = items["AGENT_GENERATION_BACKEND"]
 
                 self.assertEqual(agent_item["value"], backend)
-                self.assertNotIn(
+                self.assertIn(
                     backend,
                     {option["value"] for option in agent_item["schema"]["options"]},
                 )

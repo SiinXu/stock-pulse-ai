@@ -1271,7 +1271,7 @@ export interface paths {
         };
         /**
          * Get today's focus recommendations
-         * @description Fresh local-calendar-day evidence from the watchlist and persisted holdings cache. Hard-capped, read-only, and explicit about source degradation; never fetches market data, runs analysis, or replays portfolio state.
+         * @description Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.
          */
         get: operations["getTodaysFocus"];
         put?: never;
@@ -1360,7 +1360,7 @@ export interface paths {
         };
         /**
          * Report export capabilities
-         * @description Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.
+         * @description Return which report export formats are available in this process. Markdown is always available. HTML is the office-friendly format and requires markdown-it-py from the optional report-export set. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. DOCX/XLSX are not implemented; office_formats_status is html_only.
          */
         get: operations["get_report_export_capabilities_api_v1_history_export_capabilities_get"];
         put?: never;
@@ -1460,7 +1460,7 @@ export interface paths {
         };
         /**
          * Export a history report
-         * @description Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.
+         * @description Export an analysis history record as Markdown (always), HTML (office-friendly; optional markdown-it-py), or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. HTML and PDF preserve visible wording but drop link destinations and complete image destinations, replace images with an omission note, and enforce explicit byte/table bounds. PDF also enforces page/time/concurrency limits and exact glyph coverage.
          */
         get: operations["export_history_report_api_v1_history__record_id__export_get"];
         put?: never;
@@ -11716,7 +11716,7 @@ export interface components {
              * Office Formats Status
              * @constant
              */
-            office_formats_status: "not_implemented";
+            office_formats_status: "html_only";
             pdf_limits: components["schemas"]["ReportExportPdfLimits"];
             /**
              * Requested Language
@@ -11724,7 +11724,7 @@ export interface components {
              */
             requested_language: "en" | "zh" | "zh-TW" | "ja" | "ko";
             /** Supported Query Formats */
-            supported_query_formats: ("md" | "pdf")[];
+            supported_query_formats: ("md" | "html" | "pdf")[];
         };
         /**
          * ReportExportFormatCapability
@@ -11756,9 +11756,10 @@ export interface components {
         };
         /**
          * ReportExportFormats
-         * @description Closed format map so generated clients expose both known keys.
+         * @description Closed format map so generated clients expose every known key.
          */
         ReportExportFormats: {
+            html: components["schemas"]["ReportExportFormatCapability"];
             md: components["schemas"]["ReportExportFormatCapability"];
             pdf: components["schemas"]["ReportExportFormatCapability"];
         };
@@ -12238,8 +12239,12 @@ export interface components {
         ResearchRequest: {
             /** Question */
             question: string;
+            /** Session Id */
+            session_id?: string | null;
             /** Stock Code */
             stock_code?: string | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ResearchResponse */
         ResearchResponse: {
@@ -14908,6 +14913,12 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+            /**
+             * Model Id Mode
+             * @default route
+             * @enum {string}
+             */
+            model_id_mode: "route" | "literal";
             /** Models */
             models?: string[];
             /**
@@ -15152,6 +15163,33 @@ export interface components {
             /** Weight Pct */
             weight_pct?: number | null;
         };
+        /** TodaysFocusMarketDayWindow */
+        TodaysFocusMarketDayWindow: {
+            /** Is Trading Day */
+            is_trading_day?: boolean | null;
+            /**
+             * Local Date
+             * Format: date
+             */
+            local_date: string;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "cn" | "hk" | "us" | "unknown";
+            /** Timezone */
+            timezone: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+        };
         /** TodaysFocusPresentationBoundary */
         TodaysFocusPresentationBoundary: {
             /**
@@ -15178,7 +15216,7 @@ export interface components {
             /** Empty Message */
             empty_message?: string | null;
             /** Empty Reason */
-            empty_reason?: ("source_unavailable" | "no_fresh_deterministic_signals") | null;
+            empty_reason?: ("source_unavailable" | "no_fresh_deterministic_signals" | "insufficient_finite_data") | null;
             /**
              * Generated At
              * Format: date-time
@@ -15194,7 +15232,7 @@ export interface components {
              * Pack Version
              * @constant
              */
-            pack_version: "todays_focus/2.0";
+            pack_version: "todays_focus/2.1";
             presentation_boundary: components["schemas"]["TodaysFocusPresentationBoundary"];
             /** Sources Used */
             sources_used: ("alert" | "analysis" | "corporate_event" | "alerts" | "analysis_history" | "corporate_events")[];
@@ -15209,10 +15247,14 @@ export interface components {
         /** TodaysFocusTemporalPolicy */
         TodaysFocusTemporalPolicy: {
             /**
-             * Local Date
-             * Format: date
+             * Cross Market Rule
+             * @constant
              */
-            local_date: string;
+            cross_market_rule: "evidence_uses_target_symbol_market_timezone";
+            /** Fallback Timezone */
+            fallback_timezone: string;
+            /** Markets */
+            markets: components["schemas"]["TodaysFocusMarketDayWindow"][];
             /**
              * Missing Timestamp Policy
              * @constant
@@ -15232,22 +15274,19 @@ export interface components {
              * Semantics
              * @constant
              */
-            semantics: "local_calendar_day";
-            /** Timezone */
-            timezone: string;
+            semantics: "per_market_local_calendar_day";
             /**
              * Window End
              * Format: date-time
              */
             window_end: string;
-            /**
-             * Window Start
-             * Format: date-time
-             */
-            window_start: string;
         };
         /** TodaysFocusUniverseContract */
         TodaysFocusUniverseContract: {
+            /** Data Notes */
+            data_notes?: string[];
+            /** Excluded Non Finite Positions */
+            excluded_non_finite_positions: number;
             /**
              * Hard Cap
              * @constant
@@ -19909,8 +19948,8 @@ export interface operations {
     export_history_report_api_v1_history__record_id__export_get: {
         parameters: {
             query?: {
-                /** @description Export format: md (default) or pdf */
-                format?: "md" | "pdf";
+                /** @description Export format: md (default), html, or pdf */
+                format?: "md" | "html" | "pdf";
             };
             header?: never;
             path: {
@@ -19927,6 +19966,7 @@ export interface operations {
                 };
                 content: {
                     "application/pdf": string;
+                    "text/html": string;
                     "text/markdown": string;
                 };
             };
@@ -19984,7 +20024,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description PDF dependency, font, deadline, or render worker unavailable */
+            /** @description PDF/HTML dependency, font, deadline, or render worker unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -50,6 +50,7 @@
         "success": false,
         "result_length": 66,
         "cached": false,
+        "result_preview": "{\"error\": \"Tool execution timed out after 1.00s\", \"timeout\": true}",
         "timeout": true
       }
     ],
