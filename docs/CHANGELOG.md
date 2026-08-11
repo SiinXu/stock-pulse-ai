@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Settings fields resolve controls from `dataType` / options / sensitivity even when `uiControl` is missing or wrong, so uncategorized booleans, enums, numbers, and secrets no longer render as free-text inputs; contract tests lock the schema→control mapping and the change/save display loop.
+- [Docs] Document the shipped Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 security stack, advisory matrix, migration notes, and rollback steps for #615 in bilingual desktop packaging guides.
 - [Fixed] Treat timezone-aware ex-dividend timestamps as calendar dates so the inclusive 365-day TTM window keeps boundary-day events throughout the current day.
 - [Added] Portfolio page surfaces historical VaR, correlation matrix, and concentration/diversification metrics from `GET /api/v1/portfolio/risk-metrics` with always-visible assumptions and honest empty/insufficient/partial states (Refs #239).
 - [Fixed] Shrink config-registry unregistered debt baseline from 243 to 207 after registering MCP server keys and post-#1036 data-source domain keys (Refs #1023, #244).
