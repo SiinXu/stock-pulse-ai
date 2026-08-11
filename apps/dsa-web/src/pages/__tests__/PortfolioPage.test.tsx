@@ -9,10 +9,14 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import type { DecisionSignalItem } from '../../types/decisionSignals';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  buildAnalysisWorkbenchHref,
   buildSignalCenterHref,
 } from '../../routing/routes';
+import { PORTFOLIO_ANALYSIS_TASK_SESSION_KEY } from '../../components/portfolio/portfolioAnalysisTaskState';
 import PortfolioPage from '../PortfolioPage';
 import { createDeferred, chooseOption } from '../../test-utils';
 
@@ -55,6 +59,8 @@ const {
   listDecisionSignals,
   getLatestDecisionSignals,
   getPortfolioRiskMetrics,
+  getAnalysisStatus,
+  getAnalysisTasks,
 } = vi.hoisted(() => ({
   getAccounts: vi.fn(),
   getSnapshot: vi.fn(),
@@ -80,6 +86,8 @@ const {
   listDecisionSignals: vi.fn(),
   getLatestDecisionSignals: vi.fn(),
   getPortfolioRiskMetrics: vi.fn(),
+  getAnalysisStatus: vi.fn(),
+  getAnalysisTasks: vi.fn(),
 }));
 
 vi.mock('../../api/decisionSignals', () => ({
@@ -113,6 +121,28 @@ vi.mock('../../api/portfolio', () => ({
     deleteAccount,
     analyzePosition,
   },
+}));
+
+vi.mock('../../api/analysis', () => ({
+  analysisApi: {
+    getStatus: getAnalysisStatus,
+    getTasks: getAnalysisTasks,
+    getTaskStreamUrl: () => '/api/v1/analysis/tasks/stream',
+    getTaskFlow: vi.fn(async () => ({
+      taskId: 'task-portfolio-1',
+      nodes: [],
+      edges: [],
+      events: [],
+    })),
+  },
+}));
+
+vi.mock('../../hooks/useTaskStream', () => ({
+  useTaskStream: () => ({
+    isConnected: false,
+    reconnect: () => undefined,
+    disconnect: () => undefined,
+  }),
 }));
 
 vi.mock('../../api/portfolioRiskMetrics', () => ({
@@ -324,6 +354,19 @@ describe('PortfolioPage FX refresh', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     window.localStorage.clear();
+    window.sessionStorage.clear();
+
+    getAnalysisStatus.mockResolvedValue({
+      taskId: 'task-portfolio-1',
+      status: 'pending',
+      progress: 0,
+    });
+    getAnalysisTasks.mockResolvedValue({
+      total: 0,
+      pending: 0,
+      processing: 0,
+      tasks: [],
+    });
 
     getAccounts.mockResolvedValue(makeAccounts());
     getSnapshot.mockImplementation(async ({ accountId }: { accountId?: number } = {}) => makeSnapshot({ accountId, fxStale: true }));
@@ -1306,7 +1349,7 @@ describe('PortfolioPage FX refresh', () => {
       { symbol: 'HK00700', market: 'hk', currency: 'HKD', quantity: 10, avgCost: 400, totalCost: 4000, lastPrice: 420, marketValueBase: 4200, unrealizedPnlBase: 200, unrealizedPnlPct: 5, valuationCurrency: 'HKD', priceSource: 'history_close', priceDate: '2026-03-18', priceStale: true, priceAvailable: true },
     ] }));
 
-    renderPortfolioPage();
+    const router = renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1323,7 +1366,74 @@ describe('PortfolioPage FX refresh', () => {
         force: false,
       });
     });
-    expect(await screen.findByText('已提交 HK00700 分析任务：task-portfolio-1')).toBeInTheDocument();
+    const taskPanel = await screen.findByTestId('portfolio-analysis-task-panel');
+    expect(taskPanel).toBeInTheDocument();
+    const taskItem = await within(taskPanel).findByTestId('task-panel-item');
+    expect(taskItem).toBeInTheDocument();
+    expect(within(taskItem).getAllByText('HK00700').length).toBeGreaterThan(0);
+    expect(screen.queryByText('已提交 HK00700 分析任务：task-portfolio-1')).not.toBeInTheDocument();
+
+    fireEvent.click(within(taskItem).getByRole('button', { name: /HK00700/ }));
+    await waitFor(() => {
+      expect(`${router.state.location.pathname}${router.state.location.search}`).toBe(
+        buildAnalysisWorkbenchHref({
+          segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+          runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
+          runFlowTaskId: 'task-portfolio-1',
+          stock: 'HK00700',
+        }),
+      );
+    });
+  });
+
+  it('restores a completed task result link with record and stock identity', async () => {
+    window.sessionStorage.setItem(PORTFOLIO_ANALYSIS_TASK_SESSION_KEY, JSON.stringify([{
+      taskId: 'task-result-73',
+      stockCode: 'HK00700',
+    }]));
+    getAnalysisTasks.mockResolvedValue({
+      total: 1,
+      pending: 0,
+      processing: 0,
+      tasks: [{
+        taskId: 'task-result-73',
+        stockCode: 'HK00700',
+        status: 'completed',
+        progress: 100,
+        reportType: 'detailed',
+        createdAt: '2026-03-18T00:00:00.000Z',
+      }],
+    });
+    getAnalysisStatus.mockResolvedValue({
+      taskId: 'task-result-73',
+      status: 'completed',
+      progress: 100,
+      result: {
+        stockCode: 'HK00700',
+        stockName: 'Tencent',
+        createdAt: '2026-03-18T00:00:00.000Z',
+        report: {
+          meta: {
+            id: 73,
+            stockCode: 'HK00700',
+            stockName: 'Tencent',
+            reportType: 'detailed',
+            createdAt: '2026-03-18T00:00:00.000Z',
+          },
+        },
+      },
+    });
+
+    renderPortfolioPage('/portfolio?task=task-result-73&keep=yes');
+    await waitForInitialLoad();
+
+    const taskPanel = await screen.findByTestId('portfolio-analysis-task-panel');
+    const resultLink = await within(taskPanel).findByRole('link');
+    expect(resultLink).toHaveAttribute('href', buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      recordId: 73,
+      stock: 'HK00700',
+    }));
   });
 
   it('sends an explicit phase for portfolio-triggered analysis', async () => {
