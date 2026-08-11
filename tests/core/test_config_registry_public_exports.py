@@ -48,11 +48,15 @@ EXPECTED_PRIVATE_EXPORTS = {
     "_UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES",
     "_UI_PLACEMENT_LOCAL_MODELS_KEYS",
     "_UI_PLACEMENT_TASK_ROUTING_KEYS",
+    "_BOOLEAN_KEY_PREFIXES",
+    "_BOOLEAN_KEY_SUFFIXES",
     "_extract_option_values",
     "_infer_category",
     "_infer_data_type",
     "_infer_ui_control",
+    "_is_boolean_named_key",
     "_is_sensitive_key",
+    "_normalize_value_hint_token",
 }
 EXPECTED_MODULE_ANNOTATIONS = {
     "_CATEGORY_DEFINITIONS": "List[Dict[str, Any]]",
@@ -60,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "983370b85c2cbb8a7a8d66252a4ac05785c2aace218daf7da4a5d6528d80c55b"
+    "7e265f56fe6797530cb8de158504a41f5bdaf3a916e999111c6d37267f624b3d"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "4b8460bc4b3f9a147d03a5216e5e9537e39a65972b3a0cae70ceeff6af92cc3c"
+    "353ef39262f924323b8e7bf807a7f1e6bc91480c71b463b9fda6a26b6f6753c9"
 )
 
 
@@ -100,6 +104,7 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
+    # Snapshot refresh for converged registry registrations.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256
@@ -120,4 +125,3 @@ def test_config_registry_reload_rebuilds_nested_definitions():
     assert reloaded.get_field_definition is not old_get_field_definition
     assert reloaded._FIELD_DEFINITIONS is not old_field_definitions
     assert reloaded.get_field_definition("STOCK_LIST")["title"] == "Stock List"
-# snapshot refresh note

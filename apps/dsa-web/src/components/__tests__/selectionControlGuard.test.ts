@@ -28,6 +28,9 @@ function isProductionSource(filename: string): boolean {
   return !filename.includes('/__tests__/')
     && !filename.includes('/fixtures/')
     && !filename.includes('/generated/')
+    // Pure locale catalogs are data-only and dominate AST cost after Settings
+    // inventory growth; they cannot declare SelectionChip components.
+    && !filename.includes('/i18n/translations/')
     && !/\.(?:test|spec)\.[jt]sx?$/.test(filename);
 }
 
@@ -142,11 +145,15 @@ describe('SelectionChip production guard', () => {
   });
 
   it('keeps one shared owner and no copied production marker', () => {
+    // Cheap string prefilter before AST parse: any real declaration/marker must
+    // contain these tokens, so full-tree TypeScript parsing is unnecessary.
     const sources = Object.entries(productionSources)
       .filter(([filename]) => isProductionSource(filename));
-    const declarationViolations = sources
+    const declarationCandidates = sources.filter(([, source]) => source.includes('SelectionChip'));
+    const markerCandidates = sources.filter(([, source]) => source.includes('selection-chip'));
+    const declarationViolations = declarationCandidates
       .flatMap(([filename, source]) => findSelectionChipDeclarations(filename, source));
-    const markers = sources
+    const markers = markerCandidates
       .flatMap(([filename, source]) => findSelectionChipControlMarkers(filename, source));
 
     expect(declarationViolations).toEqual([]);
@@ -154,5 +161,5 @@ describe('SelectionChip production guard', () => {
     expect(markers).toEqual([
       expect.objectContaining({ file: SELECTION_CHIP_OWNER, token: 'selection-chip' }),
     ]);
-  });
+  }, 20_000);
 });

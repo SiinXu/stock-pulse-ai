@@ -1,4 +1,5 @@
 import type React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
@@ -53,6 +54,7 @@ const {
   analyzePosition,
   listDecisionSignals,
   getLatestDecisionSignals,
+  getPortfolioRiskMetrics,
 } = vi.hoisted(() => ({
   getAccounts: vi.fn(),
   getSnapshot: vi.fn(),
@@ -77,6 +79,7 @@ const {
   analyzePosition: vi.fn(),
   listDecisionSignals: vi.fn(),
   getLatestDecisionSignals: vi.fn(),
+  getPortfolioRiskMetrics: vi.fn(),
 }));
 
 vi.mock('../../api/decisionSignals', () => ({
@@ -109,6 +112,13 @@ vi.mock('../../api/portfolio', () => ({
     updateAccount,
     deleteAccount,
     analyzePosition,
+  },
+}));
+
+vi.mock('../../api/portfolioRiskMetrics', () => ({
+  getPortfolioRiskMetrics,
+  portfolioRiskMetricsApi: {
+    getRiskMetrics: getPortfolioRiskMetrics,
   },
 }));
 
@@ -361,14 +371,70 @@ describe('PortfolioPage FX refresh', () => {
       analysisPhase: 'auto',
     });
     getLatestDecisionSignals.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 });
+    getPortfolioRiskMetrics.mockResolvedValue({
+      asOf: '2026-03-19',
+      accountId: null,
+      costMethod: 'fifo',
+      currency: 'CNY',
+      status: 'empty_portfolio',
+      statusMessage: 'No positive-value equity holdings',
+      portfolioValue: 0,
+      positionsUsed: 0,
+      assumptions: {
+        varMethod: 'historical',
+        confidence: 0.95,
+        horizonDays: 1,
+        lookbackTradingDays: 252,
+        minReturnObservations: 60,
+        minCorrelationObservations: 30,
+        returnDefinition: 'simple_close_to_close',
+        portfolioAggregation: 'static_current_market_value_weights',
+        cashExcluded: true,
+        weightBasis: 'market_value_base',
+        horizonScaling: 'none',
+        distributionAssumption: 'empirical',
+        correlationMethod: 'pearson',
+        concentrationMetrics: 'hhi_effective_n_normalized_diversification_score',
+        dataSource: 'stored_stock_daily_closes_and_portfolio_holdings',
+        providerCallsOnHotPath: false,
+      },
+      var: {
+        status: 'unavailable',
+        varPct: null,
+        varValue: null,
+        observationCount: 0,
+      },
+      correlation: {
+        status: 'unavailable',
+        symbols: [],
+        matrix: [],
+        observationCount: 0,
+      },
+      concentration: {
+        status: 'empty_portfolio',
+        hhi: null,
+        effectiveN: null,
+        diversificationScore: null,
+        topWeightPct: null,
+        positionCount: 0,
+        weights: [],
+      },
+    });
   });
+
+  function wrapWithQueryClient(ui: React.ReactElement): React.ReactElement {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+  }
 
   function renderPortfolioPage(initialEntry = '/portfolio') {
     const router = createMemoryRouter(
       [{ path: '/portfolio', element: <PortfolioPage /> }],
       { initialEntries: [initialEntry] },
     );
-    render(<RouterProvider router={router} />);
+    render(wrapWithQueryClient(<RouterProvider router={router} />));
     return router;
   }
 
@@ -379,9 +445,11 @@ describe('PortfolioPage FX refresh', () => {
       { initialEntries: ['/portfolio'] },
     );
     render(
-      <UiLanguageProvider>
-        <RouterProvider router={router} />
-      </UiLanguageProvider>,
+      wrapWithQueryClient(
+        <UiLanguageProvider>
+          <RouterProvider router={router} />
+        </UiLanguageProvider>,
+      ),
     );
   }
 
@@ -467,8 +535,10 @@ describe('PortfolioPage FX refresh', () => {
 
     await waitFor(() => expect(router.state.location.search).toBe('?account=1&keep=yes'));
     expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Main (#1)');
-    expect(screen.getByRole('status')).toHaveTextContent('链接无效');
-    expect(screen.getByRole('status')).toHaveTextContent('链接包含无效或敏感的状态参数');
+    // Multiple status regions can exist (deep-link warning + risk-metrics panel).
+    const statusRegions = screen.getAllByRole('status');
+    expect(statusRegions.some((node) => /链接无效/.test(node.textContent || ''))).toBe(true);
+    expect(statusRegions.some((node) => /链接包含无效或敏感的状态参数/.test(node.textContent || ''))).toBe(true);
   });
 
   it('drops a late snapshot response after switching account scope', async () => {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   usageApi,
   type UsageCallRecord,
@@ -26,11 +26,31 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../../i18n/uiText';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { getUiLocale } from '../../utils/uiLocale';
+import {
+  defineUrlStateSchema,
+  enumParam,
+  readParams,
+  writeParams,
+} from '../../utils/urlState';
 
 type Translate = (key: UiTextKey, params?: UiTextParams) => string;
 type UsageDashboardSnapshot = { period: UsagePeriod; dashboard: UsageDashboard };
 
 const PERIOD_OPTIONS: UsagePeriod[] = ['today', 'month', 'all'];
+const DEFAULT_USAGE_PERIOD: UsagePeriod = 'month';
+
+/**
+ * Shareable Token Usage view state (UI-03A / #879 A1).
+ * Period is a filter → replace history. Unknown keys (Settings section/view) are preserved.
+ */
+const tokenUsageUrlSchema = defineUrlStateSchema({
+  period: enumParam({
+    name: 'period',
+    values: PERIOD_OPTIONS,
+    default: DEFAULT_USAGE_PERIOD,
+    history: 'replace',
+  }),
+});
 
 const PERIOD_LABEL_KEYS: Record<UsagePeriod, UiTextKey> = {
   today: 'usage.period.today',
@@ -129,11 +149,20 @@ type TokenUsagePageProps = {
 const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => {
   const { language, t } = useUiLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (embedded) return;
     document.title = t('usage.documentTitle');
   }, [embedded, t]);
-  const [period, setPeriod] = useState<UsagePeriod>('month');
+
+  // Period is owned by the URL so refresh/share keep the selected time range
+  // (including when embedded under Settings next to section/view params).
+  const urlState = useMemo(
+    () => readParams(tokenUsageUrlSchema, searchParams),
+    [searchParams],
+  );
+  const period = urlState.period;
+
   const [snapshot, setSnapshot] = useState<UsageDashboardSnapshot | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [loading, setLoading] = useState(true);
@@ -174,8 +203,13 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
     if (nextPeriod === period) return;
     setError(null);
     setLoading(true);
-    setPeriod(nextPeriod);
-  }, [period]);
+    const next = writeParams(
+      tokenUsageUrlSchema,
+      { period: nextPeriod },
+      { search: searchParams },
+    );
+    setSearchParams(next.params, { replace: next.history === 'replace' });
+  }, [period, searchParams, setSearchParams]);
 
   const largestCallTypeTotal = useMemo(() => {
     return Math.max(...(dashboard?.byCallType.map((item) => item.totalTokens) ?? [0]), 1);

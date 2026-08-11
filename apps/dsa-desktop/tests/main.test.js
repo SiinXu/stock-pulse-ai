@@ -634,6 +634,39 @@ test('desktop update IPC rejects foreign renderers', async (t) => {
       channel
     );
   }
+
+});
+
+test('desktop environment diagnostics logging never blocks the caller', async (t) => {
+  const mainModule = loadMainModule(t, { platform: 'darwin' });
+  const logLines = [];
+  let resolveProbe;
+  const probe = () => new Promise((resolve) => {
+    resolveProbe = resolve;
+  });
+
+  const returned = mainModule.scheduleDesktopEnvironmentDiagnosticsLog({
+    probe,
+    logImpl: (line) => logLines.push(line),
+  });
+
+  assert.equal(returned, undefined);
+  assert.deepEqual(logLines, []);
+  await Promise.resolve();
+  resolveProbe({
+    schemaVersion: 2,
+    platform: 'darwin',
+    path: {
+      policy: 'macos-gui-homebrew-extend',
+      effectiveEntryCount: 4,
+      augmented: true,
+    },
+    cli: [{ name: 'codex', status: 'available', reason: null }],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(logLines.length, 1);
+  assert.match(logLines[0], /codex=available/);
+  assert.equal(logLines[0].includes('/'), false);
 });
 
 test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {

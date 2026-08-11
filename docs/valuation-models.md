@@ -3,7 +3,7 @@
 StockPulse 可通过透明的 DCF 模型与同业相对估值（P/E、P/B）估算内在价值。本文描述
 issue #238 的 **第一阶段**：后端估值服务 + 默认关闭的可选 Agent Tool。
 
-报告模板投影、默认分析链路 Prompt 注入、以及 EV/EBITDA 相对估值属于后续阶段。
+已覆盖报告/prompt 投影、显式输入下的 EV/EBITDA，以及 Web DCF 敏感性 UI。
 
 ## 诚实性契约
 
@@ -63,7 +63,7 @@ DCF 现金流优先级：
 - 可选同业代码（逗号分隔）；对**正**倍数取中位数
 - 隐含价格：`EPS × 同业 PE 中位`、`每股净资产 × 同业 PB 中位`
 - 无同业或倍数缺失 → 相对估值段 `insufficient_fundamentals`（不编造同业）
-- Phase 1 **不**估计 EV/EBITDA（跨市场尚无稳定 EBITDA 字段）
+- EV/EBITDA 仅在具备显式 ebitda、正 market_cap、显式 net_debt 时计算；缺数不编造
 
 ## 工具输入 / 输出
 

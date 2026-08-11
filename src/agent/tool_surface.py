@@ -15,11 +15,14 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from src.agent.tools.execution import (
     _MAX_TOOL_ARGUMENT_INSPECTION_DEPTH,
     _MAX_TOOL_ARGUMENT_INSPECTION_NODES,
+    _MAX_TOOL_CACHE_TEXT_CHARS,
+    _MAX_UNTRUSTED_DOCUMENT_ARGUMENT_CHARS,
     _bounded_tool_arguments,
     ToolAccessContext,
     _guard_tool_definition_stock_scope,
     build_tool_audit,
     redact_diagnostic_value,
+    redact_tool_diagnostic_value,
     serialize_tool_error_result,
     serialize_tool_result,
 )
@@ -258,6 +261,11 @@ class ToolSurface:
             bounded_arguments = _bounded_tool_arguments(
                 arguments,
                 normalize_stock_code=False,
+                max_text_chars=(
+                    _MAX_UNTRUSTED_DOCUMENT_ARGUMENT_CHARS
+                    if tool_name == "parse_earnings_transcript"
+                    else _MAX_TOOL_CACHE_TEXT_CHARS
+                ),
             )
             if bounded_arguments is None:
                 return self._error_result(
@@ -528,7 +536,9 @@ class ToolSurface:
                 "redacted": True,
                 "result_length": len(result_text.encode("utf-8")),
                 "result_truncated": result_truncated,
-                "preview": redact_diagnostic_value(result_text),
+                "preview": redact_tool_diagnostic_value(
+                    tool_name, result_text, kind="result"
+                ),
             },
         }
 

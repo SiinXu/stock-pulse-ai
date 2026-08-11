@@ -27,7 +27,9 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 - 自然语言策略与工具*元数据* → `AGENT_SKILL_DIR` 下的 YAML / `SKILL.md`（无需可信进程代码）
 - 仅改 Jinja 报告版式 → `REPORT_TEMPLATES_DIR`
-- UI 面板、设置页、远程应用商店、依赖安装器或第七扩展点 → 新 ADR；**不属于** surface v1
+- 插件自带 UI 组件、远程应用商店、依赖安装器或第七扩展点 → 新 ADR；**不属于**
+  surface v1。插件可以在 manifest 中声明有界的标量设置；StockPulse 负责生成
+  Settings 表单，不执行插件提供的前端代码。
 
 ## 安全模型（先读）
 
@@ -35,13 +37,20 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 - 无远程应用商店或自动下载；
 - 无插件依赖安装器；
-- manifest `permissions` 仅为描述元数据，**不**形成强制沙箱；
+- manifest `permissions` 是声明而非进程沙箱；`agent_tool` 在 load/enable 时做声明子集校验（非权限隔离）；
 - 无热加载（修改后需重启进程）。
 
 启用任何包前请逐行审阅。生产环境默认保持 `PLUGINS_DIR` 未设置，除非包已审阅并固定。
 运维信任边界亦见
 [安全基线](security-baseline.md#operator-security-boundaries) 与
 [ADR-007](adr/ADR-007-versioned-plugin-extension-boundary.md)。
+
+### Manifest `permissions`（声明 ≠ 沙箱）
+
+- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read`）。
+- 加载/启用时若工具要求未声明能力，将以稳定错误码 `manifest_permissions_undeclared` 拒绝该插件（失败隔离，不影响核心与其它插件）。
+- 允许声明多余权限；空列表表示工具不得要求任何能力。
+- **声明 ≠ 沙箱隔离**：插件代码仍以进程同等权限运行。
 
 ### Agent 工具限制（#539）
 
@@ -111,6 +120,51 @@ manifest 字段、版本规则与入口路径约束见契约
 [Package And Manifest](plugin-extension-contract.md#package-and-manifest)。
 可直接复制任一官方示例并修改稳定 ID。
 
+### 声明式插件设置
+
+可选的 manifest `settings` 列表允许插件请求宿主生成控件，而无需携带 Web 代码。
+支持 `string`、`integer`、`number`、`boolean` 数据类型，以及 `text`、
+`password`、`number`、`select`、`textarea`、`switch` 控件。manifest 解析器会拒绝
+不兼容的类型/控件组合、重复键或选项、无效正则、非有限数值或边界，以及敏感字段的
+明文默认值。
+
+```json
+{
+  "settings": [
+    {
+      "key": "endpoint",
+      "title": "Service endpoint",
+      "dataType": "string",
+      "uiControl": "text",
+      "isRequired": true,
+      "validation": {"maxLength": 500},
+      "displayOrder": 10
+    },
+    {
+      "key": "api_token",
+      "title": "API token",
+      "dataType": "string",
+      "uiControl": "password",
+      "isSensitive": true,
+      "isRequired": true,
+      "validation": {"minLength": 8},
+      "displayOrder": 20
+    }
+  ]
+}
+```
+
+加载时，经过验证的有效值以不可变 `context.settings` 映射提供给插件。
+Settings → System & Security → Extensions 提供生成式表单与持久化启停开关。
+各插件的值写入生命周期状态文件旁的 `plugin_settings.json`；写入采用原子替换，
+并在系统支持时将文件限制为当前 OS 用户可读写。该文件是本机明文文件，**不是加密
+密钥库**，因此必须保护数据目录。API 与 Web 表单会掩码敏感值；保持掩码不变即可
+保留已存值。
+
+为已启用插件保存设置会报告 `restart_required`。必须重新启用插件或重启应用后，
+才能认为运行实例已使用新值。省略的键会恢复声明默认值；未知键、错误类型、越界值、
+NaN 与正负 Infinity 都会 fail-closed，且不会改变持久化文件。
+
 ## 冻结的作者导入面
 
 外部插件应只导入：
@@ -164,6 +218,65 @@ class Plugin(BasePlugin):
 | 运维安全边界 | [安全基线](security-baseline.md#operator-security-boundaries) |
 | 扩展面冻结与通知参考测试 | `tests/plugins/test_extension_surface_v1.py` |
 
+
+## 运维视角
+
+本节面向部署与值班运维，而非插件作者。
+
+### 生命周期审计
+
+生命周期变更会通过既有安全审计设施写入事件（`event_type=plugin.lifecycle`）。
+自动启动加载采用 best-effort，审计存储不可用时不会阻断其它插件。管理员发起
+enable / disable / reload 时，如果 attempt 事件无法持久化，会在状态变更前以
+fail-closed 方式返回错误；如果操作完成后 completion 写入失败，API 会返回
+`503 security_audit_unavailable` 并说明真实完成状态，不会声称已回滚。
+
+### Data Provider 自动绑定（显式开关）
+
+| 配置项 | 默认 | 效果 |
+| --- | --- | --- |
+| `PLUGIN_DATA_PROVIDER_AUTO_BIND` | 关闭 | 开启后，默认 `ApplicationServices` 组合根会将 `PluginManager` 绑定到进程级 `DataFetcherManager.plugin_registry`（注入或自动创建），使已注册 provider 无需额外胶水即可路由 |
+
+保持关闭即可维持历史手动模式。开启且未注入 manager 时，`ApplicationServices`
+会构造一个 `DataFetcherManager` 并通过 `services.data_fetcher_manager` 暴露。
+股票行情与历史服务及主分析流水线会解析这个已安装 owner，因此插件 provider
+与内置 fallback 共用同一个 registry。注入 manager 时，组合根会在任何相关
+插件注册之前原子补齐 Analysis Strategy、Notification Channel、Agent Tool 与
+Event Hook 合同；无效或已冲突的 registry 会以稳定错误码阻断进程组合，绝不
+静默退化为孤立 registry。自定义组合根仍可直接调用
+`try_build_auto_bound_registry`。
+
+```python
+from data_provider import DataFetcherManager
+from src.plugins import (
+    PLUGIN_APPLICATION_VERSION,
+    PluginManager,
+    try_build_auto_bound_registry,
+)
+
+providers = DataFetcherManager()
+registry, error = try_build_auto_bound_registry(providers)
+if error:
+    raise RuntimeError(error)
+plugins = PluginManager(
+    application_version=PLUGIN_APPLICATION_VERSION,
+    registry=registry or providers.plugin_registry,  # 关闭开关时需显式绑定
+)
+```
+
+### 健康检查
+
+```python
+report = plugin_manager.health_check()
+for entry in report.plugins:
+    print(entry.plugin_id, entry.state, entry.last_error_code, entry.extension_points)
+```
+
+`last_error_code` 表示最近一次稳定失败（例如 `plugin_onload_failed`）；禁用或
+修改意图不会清除它，真正改变状态且成功的 load / reload 才表示恢复并清除；
+幂等 enable 不会抹掉仍需运维处理的 reload 失败。单个插件失败不得影响其它
+插件与核心启动。
+
 ## 验证命令
 
 离线插件套件（本主题首选本地门禁）：
@@ -183,6 +296,6 @@ python -m pytest tests/plugins/test_example_*.py tests/plugins/test_extension_su
 - 应用商店分发、签名校验或多租户隔离
 - 对插件代码的强制沙箱（仅进程等价信任）
 - 在不保留 ToolSurface 的前提下迁移内置 Tools（#432 / #539）
-- UI、Settings 或 MCP 连接器扩展点
+- 插件自带 UI 组件或 MCP 连接器扩展点（生成式标量设置表单仍由宿主拥有）
 
 上述仍属独立设计轨道，请勿拉伸邻近注册 API 来模拟它们。

@@ -1,0 +1,16 @@
+{
+  "version": "agent_eval/1.0",
+  "description": "Offline output-quality evaluation cases (#252 / #141). Network-free.",
+  "case_ids": [
+    "fact-grounded-pass",
+    "fact-ungrounded-fail",
+    "tools-required-pass",
+    "tools-missing-fail",
+    "consistency-aligned-pass",
+    "consistency-contradict-fail",
+    "honesty-limited-pass",
+    "honesty-overconfident-fail",
+    "format-schema-pass",
+    "format-schema-fail"
+  ]
+}

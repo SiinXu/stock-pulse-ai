@@ -4,10 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { createParsedApiError, type ParsedApiError } from '../../api/error';
 import {
   ACTIONABLE_ERROR_CLASSES,
+  alignParsedApiErrorWithMapping,
   extractApiErrorReason,
+  isBusyActionableErrorClass,
+  isUiTextActionableKey,
   KNOWN_OUTBOUND_REASONS,
   KNOWN_STABLE_CODES,
   mapApiErrorToActionable,
+  toUiTextKey,
   type ActionableErrorClass,
   type ActionableErrorMapping,
 } from '../apiReasonMapper';
@@ -73,7 +77,7 @@ describe('mapApiErrorToActionable', () => {
   });
 
   describe('llm_not_configured', () => {
-    it('maps code and category to settings navigation', () => {
+    it('maps code and category to Model Sources settings deep-link', () => {
       const byCode = mapFrom({
         title: 'llm',
         message: 'llm',
@@ -85,7 +89,10 @@ describe('mapApiErrorToActionable', () => {
         class: 'llm_not_configured',
         titleKey: 'api.error.STABLE_ERROR_TEXT.llm_not_configured.title',
         messageKey: 'api.error.STABLE_ERROR_TEXT.llm_not_configured.message',
-        cta: { kind: 'navigate', target: '/settings' },
+        cta: {
+          kind: 'navigate',
+          target: '/settings?section=ai_models&view=connections',
+        },
         technicalCode: 'llm_not_configured',
       });
 
@@ -374,5 +381,32 @@ describe('type completeness', () => {
     for (const cls of ACTIONABLE_ERROR_CLASSES) {
       expect(seen.has(cls), `missing mapping sample for class ${cls}`).toBe(true);
     }
+  });
+});
+
+describe('adoption helpers', () => {
+  it('aligns analysis_already_running reason onto scheduler_busy for localization', () => {
+    const error = createParsedApiError({
+      title: 'busy',
+      message: 'busy',
+      status: 409,
+      params: { reason: 'analysis_already_running' },
+    });
+    const mapping = mapApiErrorToActionable(error);
+    const aligned = alignParsedApiErrorWithMapping(error, mapping);
+    expect(aligned.code).toBe('scheduler_busy');
+  });
+
+  it('detects UI_TEXT resource keys and short t() keys', () => {
+    const key = 'i18n.uiText.UI_TEXT.settings.outboundActivityModeOn';
+    expect(isUiTextActionableKey(key)).toBe(true);
+    expect(toUiTextKey(key)).toBe('settings.outboundActivityModeOn');
+    expect(isUiTextActionableKey('api.error.STABLE_ERROR_TEXT.duplicate_task.title')).toBe(false);
+  });
+
+  it('marks busy and config_conflict as submission-blocking classes', () => {
+    expect(isBusyActionableErrorClass('busy')).toBe(true);
+    expect(isBusyActionableErrorClass('config_conflict')).toBe(true);
+    expect(isBusyActionableErrorClass('network')).toBe(false);
   });
 });

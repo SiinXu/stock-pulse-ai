@@ -178,6 +178,58 @@ class AlertApiTestCase(unittest.TestCase):
         self.assertEqual(detail_resp.status_code, 200, detail_resp.text)
         self.assertFalse(detail_resp.json()["cooldown_active"])
 
+    def test_targeted_trigger_query_is_not_hidden_by_unrelated_first_page(self) -> None:
+        repo = AlertRepository(self.db)
+        window_start = datetime(2026, 8, 9, 0, 0)
+        with self.db.get_session() as session:
+            session.add_all(
+                [
+                    AlertTriggerRecord(
+                        rule_id=index + 1,
+                        target=f"NOISE{index:03d}",
+                        reason="unrelated",
+                        triggered_at=window_start + timedelta(minutes=index),
+                        status="triggered",
+                    )
+                    for index in range(60)
+                ]
+                + [
+                    AlertTriggerRecord(
+                        rule_id=100,
+                        target="AAPL",
+                        reason="stale",
+                        triggered_at=window_start - timedelta(seconds=1),
+                        status="triggered",
+                    ),
+                    AlertTriggerRecord(
+                        rule_id=101,
+                        target="AAPL",
+                        reason="failed",
+                        triggered_at=window_start + timedelta(hours=1),
+                        status="failed",
+                    ),
+                    AlertTriggerRecord(
+                        rule_id=102,
+                        target="AAPL",
+                        reason="fresh target",
+                        triggered_at=window_start + timedelta(hours=2),
+                        status="triggered",
+                    ),
+                ]
+            )
+            session.commit()
+
+        rows = repo.list_recent_triggered_for_targets(
+            targets=["AAPL"],
+            triggered_since=window_start,
+            per_target_limit=1,
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].target, "AAPL")
+        self.assertEqual(rows[0].reason, "fresh target")
+        self.assertEqual(rows[0].status, "triggered")
+
     def test_rule_update_rejects_empty_payload(self) -> None:
         rule = self._create_rule()
 

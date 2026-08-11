@@ -837,7 +837,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               {text.chooseMode}
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {(['cloud', 'local_model', 'cli'] as WizardMode[]).map((value) => (
+              {(['local_model', 'cloud', 'cli'] as WizardMode[]).map((value) => (
                 <button
                   key={value}
                   type="button"
@@ -846,7 +846,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
                     mode === value
                       ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] text-foreground'
-                      : 'border-[var(--settings-border)] bg-[var(--settings-surface)] text-secondary-text hover:bg-[var(--settings-surface-hover)]'
+                      : value === 'local_model'
+                        ? 'border-primary/50 bg-primary/5 text-secondary-text hover:bg-primary/10'
+                        : 'border-[var(--settings-border)] bg-[var(--settings-surface)] text-secondary-text hover:bg-[var(--settings-surface-hover)]'
                   }`}
                 >
                   <span className="block font-medium text-foreground">

@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from api.app import create_app
 from src.agent.chat_context import build_agent_chat_market_context
@@ -91,6 +92,7 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         session_id,
         "visible question",
         ["technical"],
+        turn_id="turn-visible",
     )
     assistant_id = db.save_conversation_message(session_id, "assistant", "visible answer")
     db.save_conversation_message(
@@ -148,6 +150,8 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     assert payload["session_state"] == {
         "selected_skill_ids": ["technical"],
     }
+    assert payload["turn_identity_supported"] is True
+    assert payload["messages"][0]["turn_id"] == "turn-visible"
     assert "error" not in payload["messages"][0]
     assert "params" not in payload["messages"][0]
     assert "error" not in payload["messages"][1]
@@ -327,6 +331,14 @@ def test_build_agent_chat_context_normalizes_default_report_language(
         skills=None,
     )
     assert context["report_language"] == expected_language
+
+
+@pytest.mark.parametrize("turn_id", ["   ", " turn-1", "turn-1 "])
+def test_chat_request_rejects_noncanonical_turn_identity(turn_id: str) -> None:
+    from api.v1.endpoints import agent as agent_endpoint
+
+    with pytest.raises(ValidationError):
+        agent_endpoint.ChatRequest(message="question", turn_id=turn_id)
 
 
 def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> None:
@@ -567,6 +579,47 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
     assert kwargs["context"]["stock_code"] == "600519"
     assert kwargs["context"]["stock_name"] == "匿名标的"
     assert kwargs["context"]["report_language"] == "zh"
+
+
+def test_agent_chat_stream_forwards_turn_identity_and_public_ack(tmp_path: Path) -> None:
+    executor = MagicMock()
+
+    def _chat(**kwargs):
+        kwargs["progress_callback"]({
+            "type": "turn_persisted",
+            "turn_id": kwargs["turn_id"],
+            "message_id": "17",
+        })
+        return SimpleNamespace(success=True, content="ok", error=None, total_steps=1)
+
+    executor.chat.side_effect = _chat
+    config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), patch(
+        "api.v1.endpoints.agent.get_config", return_value=config
+    ), patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+        client = TestClient(create_app(static_dir=tmp_path / "static"))
+        response = client.post(
+            "/api/v1/agent/chat/stream",
+            json={
+                "message": "continue",
+                "session_id": "s1",
+                "turn_id": "turn-17",
+            },
+        )
+
+    events = [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert events[0] == {
+        "type": "turn_persisted",
+        "turn_id": "turn-17",
+        "message_id": "17",
+    }
+    assert events[-1]["type"] == "done"
+    assert executor.chat.call_args.kwargs["turn_id"] == "turn-17"
 
 
 def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
