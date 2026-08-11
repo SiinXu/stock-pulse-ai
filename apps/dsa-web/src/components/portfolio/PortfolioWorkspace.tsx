@@ -14,8 +14,6 @@ import { AnalysisPhaseSelect } from '../analysis';
 import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
-import { RunFlowPanel } from '../run-flow';
-import { TaskPanel } from '../tasks';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
@@ -84,6 +82,10 @@ import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells
 
 const PortfolioRiskMetricsPanel = lazy(
   () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
+);
+const TaskPanel = lazy(() => import('../tasks/TaskPanel'));
+const RunFlowPanel = lazy(
+  () => import('../run-flow/RunFlowPanel').then((module) => ({ default: module.RunFlowPanel })),
 );
 
 const PortfolioWorkspace: React.FC = () => {
@@ -850,12 +852,14 @@ const PortfolioWorkspace: React.FC = () => {
       ) : null}
       {hasAccounts && portfolioAnalysisTasks.length > 0 ? (
         <div className="space-y-2" data-testid="portfolio-analysis-task-panel">
-          <TaskPanel
-            tasks={portfolioAnalysisTasks}
-            title={text.analysisTask}
-            onOpenRunFlow={openPortfolioRunFlow}
-            onDismiss={dismissPortfolioAnalysisTask}
-          />
+          <Suspense fallback={<Loading />}>
+            <TaskPanel
+              tasks={portfolioAnalysisTasks}
+              title={text.analysisTask}
+              onOpenRunFlow={openPortfolioRunFlow}
+              onDismiss={dismissPortfolioAnalysisTask}
+            />
+          </Suspense>
           {portfolioAnalysisTasks.some((task) => task.status === 'completed') ? (
             <div className="flex flex-wrap gap-2">
               {portfolioAnalysisTasks
@@ -888,14 +892,16 @@ const PortfolioWorkspace: React.FC = () => {
         size="fullscreen"
       >
         {portfolioRunFlowDialog.open ? (
-          <RunFlowPanel
-            key={`portfolio-run-flow-${portfolioRunFlowDialog.source.type === 'task' ? portfolioRunFlowDialog.source.taskId : 'none'}`}
-            source={portfolioRunFlowDialog.source}
-            title={t('runFlow.taskDrawerTitle', { stock: portfolioRunFlowDialog.title })}
-            onUnavailable={() => {
-              closePortfolioRunFlow();
-            }}
-          />
+          <Suspense fallback={<Loading />}>
+            <RunFlowPanel
+              key={`portfolio-run-flow-${portfolioRunFlowDialog.source.type === 'task' ? portfolioRunFlowDialog.source.taskId : 'none'}`}
+              source={portfolioRunFlowDialog.source}
+              title={t('runFlow.taskDrawerTitle', { stock: portfolioRunFlowDialog.title })}
+              onUnavailable={() => {
+                closePortfolioRunFlow();
+              }}
+            />
+          </Suspense>
         ) : null}
       </Modal>
 
