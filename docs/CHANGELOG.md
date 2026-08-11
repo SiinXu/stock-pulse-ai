@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Added] In-app notification inbox and header bell share best-effort durable event sources, versioned occurrence identities, server read state, stable cursor pagination, source provenance, and localized Web rendering (Refs #181).
 - [Changed] Migrated analysis-cluster Web API modules (`analysis`, `history`, `scheduledTasks`, `agent` plain JSON) to OpenAPI-generated type anchors with Zod boundary validation via `ParsedApiError` (`api_response_validation_failed`); SSE/streaming agent and analysis task stream surfaces remain documented skips for #721.
 - [Added] Signal Center Alerts filters, pagination, and `?alert=` edit deep links restore from namespaced query parameters with replace/push history, while the existing Signal Center route remains the production owner (#879 A1).
 - [Added] Declarative per-plugin settings schemas, atomic local persistence, immutable runtime projection, audited settings API, and a generated Web Settings form with persistent enable/disable controls (Fixes #277).

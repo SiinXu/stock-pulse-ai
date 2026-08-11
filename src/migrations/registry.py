@@ -55,6 +55,9 @@ from src.migrations.versions.v202608090001_watchlist_groups_schema import (
 from src.migrations.versions.v202608090002_portfolio_health_snapshots import (
     MIGRATION as PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
 )
+from src.migrations.versions.v202608090020_notification_inbox_read_state import (
+    MIGRATION as NOTIFICATION_INBOX_READ_STATE_MIGRATION,
+)
 from src.migrations.versions.v202608100001_chat_turn_identity import (
     MIGRATION as CHAT_TURN_IDENTITY_MIGRATION,
 )
@@ -81,6 +84,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         TASK_QUEUE_INFLIGHT_MIGRATION,
         WATCHLIST_GROUPS_SCHEMA_MIGRATION,
         PORTFOLIO_HEALTH_SNAPSHOTS_MIGRATION,
+        NOTIFICATION_INBOX_READ_STATE_MIGRATION,
         CHAT_TURN_IDENTITY_MIGRATION,
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
     )

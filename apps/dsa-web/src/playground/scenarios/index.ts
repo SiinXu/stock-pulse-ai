@@ -45,6 +45,9 @@ const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRe
 const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...COMMON_SCENARIOS,
   ...LAYOUT_DASHBOARD_SCENARIOS,
+  'notification-inbox-list': createLazyScenario(async () => (
+    (await import('./inbox')).default
+  )),
   ...ALERT_HISTORY_SCENARIOS,
   ...DECISION_REPORT_RUN_FLOW_SCENARIOS,
   ...SKILL_OUTCOME_SCENARIOS,
