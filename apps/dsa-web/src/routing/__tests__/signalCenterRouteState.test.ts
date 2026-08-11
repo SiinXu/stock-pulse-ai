@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_ROUTE_PATHS,
   LEGACY_ALERTS_VIEW_VALUES,
+  SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_CREATE_RULE_VALUES,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
@@ -254,8 +255,12 @@ describe('Signal Center route state', () => {
       toSearch({
         [SIGNAL_FEED_ROUTE_QUERY_KEYS.view]: LEGACY_ALERTS_VIEW_VALUES.notifications,
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+        enabled: 'disabled',
+        page: '3',
       }),
       toQuery({
+        [SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled]: 'disabled',
+        [SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesPage]: '3',
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.history,
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.history]: SIGNAL_CENTER_HISTORY_VALUES.notifications,

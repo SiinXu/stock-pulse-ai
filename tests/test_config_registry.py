@@ -1183,6 +1183,8 @@ class TestUiPlacement(unittest.TestCase):
             "VISION_MODEL",
             "LITELLM_FALLBACK_MODELS",
             "LLM_TEMPERATURE",
+            "LLM_TIMEOUT_SEC",
+            "LLM_MAX_TOKENS",
         ):
             self.assertEqual(derive_ui_placement(key), "task_routing", key)
 
@@ -1423,6 +1425,139 @@ class TestDataSourceDomainKeysRegistered(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+class TestLongtailBatch1FieldRegistration(unittest.TestCase):
+    """Historical long-tail keys registered in batch 1 stay categorized and typed."""
+
+    def test_batch1_keys_have_expected_controls_and_categories(self) -> None:
+        expected = {
+            "LLM_TIMEOUT_SEC": ("ai_model", "integer", "number", "60"),
+            "LLM_MAX_TOKENS": ("ai_model", "integer", "number", "2048"),
+            "PAPER_PORTFOLIO_INITIAL_CASH": ("backtest", "number", "number", "1000000"),
+            "FAILURE_NOTIFY_ENABLED": ("notification", "string", "select", ""),
+            "DAILY_BRIEF_NOTIFY": ("system", "boolean", "switch", "true"),
+            "DAILY_BRIEF_PERSIST_HISTORY": ("system", "boolean", "switch", "true"),
+            "DAILY_BRIEF_SAVE_REPORT_FILE": ("system", "boolean", "switch", "true"),
+            "ADMIN_SESSION_MAX_AGE_HOURS": ("system", "integer", "number", "24"),
+            "OUTBOUND_HTTP_ALLOWLIST": ("system", "string", "textarea", ""),
+            "SMARTMONEY_ENABLED": ("system", "boolean", "switch", "false"),
+            "ENABLE_FUNDAMENTAL_PIPELINE": ("system", "boolean", "switch", "true"),
+            "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS": ("system", "number", "number", "8.0"),
+            "FUNDAMENTAL_FETCH_TIMEOUT_SECONDS": ("system", "number", "number", "8.0"),
+            "FUNDAMENTAL_RETRY_MAX": ("system", "integer", "number", "1"),
+            "FUNDAMENTAL_CACHE_TTL_SECONDS": ("system", "integer", "number", "120"),
+            "FUNDAMENTAL_CACHE_MAX_ENTRIES": ("system", "integer", "number", "256"),
+            "PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS": ("system", "integer", "number", "7"),
+            "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT": ("system", "number", "number", "35.0"),
+            "PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT": ("system", "number", "number", "15.0"),
+            "PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT": ("system", "number", "number", "10.0"),
+            "PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO": ("system", "number", "number", "0.8"),
+            "PORTFOLIO_RISK_LOOKBACK_DAYS": ("system", "integer", "number", "180"),
+            "PORTFOLIO_FX_UPDATE_ENABLED": ("system", "boolean", "switch", "true"),
+            "NEWS_INTEL_RETENTION_DAYS": ("system", "integer", "number", "30"),
+            "NEWS_INTEL_FETCH_TIMEOUT_SEC": ("system", "number", "number", "8"),
+            "NEWS_INTEL_MAX_ITEMS_PER_SOURCE": ("system", "integer", "number", "50"),
+            "NEWS_INTEL_AUTO_FETCH_ENABLED": ("system", "boolean", "switch", "false"),
+            "NEWSNOW_BASE_URL": (
+                "system",
+                "string",
+                "text",
+                "https://newsnow.busiyi.world",
+            ),
+        }
+        for key, (category, data_type, ui_control, default_value) in expected.items():
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], category, key)
+            self.assertEqual(field["data_type"], data_type, key)
+            self.assertEqual(field["ui_control"], ui_control, key)
+            self.assertEqual(field["default_value"], default_value, key)
+            self.assertTrue(field.get("is_editable"), key)
+            self.assertTrue(field.get("help_key"), key)
+            self.assertTrue(field.get("title"), key)
+            self.assertTrue(field.get("description"), key)
+            self.assertFalse(field.get("is_sensitive"), key)
+            self.assertNotEqual(field["category"], "uncategorized", key)
+
+            if data_type == "boolean":
+                self.assertEqual(field["ui_control"], "switch", key)
+            if data_type in {"integer", "number"}:
+                self.assertIn("min", field["validation"], key)
+
+    def test_batch1_display_orders_do_not_collide(self) -> None:
+        batch_keys = {
+            "LLM_TIMEOUT_SEC",
+            "LLM_MAX_TOKENS",
+            "PAPER_PORTFOLIO_INITIAL_CASH",
+            "FAILURE_NOTIFY_ENABLED",
+            "DAILY_BRIEF_NOTIFY",
+            "DAILY_BRIEF_PERSIST_HISTORY",
+            "DAILY_BRIEF_SAVE_REPORT_FILE",
+            "ADMIN_SESSION_MAX_AGE_HOURS",
+            "OUTBOUND_HTTP_ALLOWLIST",
+            "SMARTMONEY_ENABLED",
+            "ENABLE_FUNDAMENTAL_PIPELINE",
+            "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS",
+            "FUNDAMENTAL_FETCH_TIMEOUT_SECONDS",
+            "FUNDAMENTAL_RETRY_MAX",
+            "FUNDAMENTAL_CACHE_TTL_SECONDS",
+            "FUNDAMENTAL_CACHE_MAX_ENTRIES",
+            "PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS",
+            "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT",
+            "PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT",
+            "PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT",
+            "PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO",
+            "PORTFOLIO_RISK_LOOKBACK_DAYS",
+            "PORTFOLIO_FX_UPDATE_ENABLED",
+            "NEWS_INTEL_RETENTION_DAYS",
+            "NEWS_INTEL_FETCH_TIMEOUT_SEC",
+            "NEWS_INTEL_MAX_ITEMS_PER_SOURCE",
+            "NEWS_INTEL_AUTO_FETCH_ENABLED",
+            "NEWSNOW_BASE_URL",
+        }
+        all_keys = get_registered_field_keys()
+        for key in batch_keys:
+            field = get_field_definition(key)
+            peers = [
+                other
+                for other in all_keys
+                if get_field_definition(other)["category"] == field["category"]
+                and get_field_definition(other)["display_order"]
+                == field["display_order"]
+            ]
+            self.assertEqual(peers, [key], f"display_order collision for {key}: {peers}")
+
+    def test_failure_notify_select_enum_includes_auto_empty(self) -> None:
+        field = get_field_definition("FAILURE_NOTIFY_ENABLED")
+        self.assertEqual(field["validation"].get("enum"), ["", "true", "false"])
+        self.assertEqual(
+            [option["value"] for option in field["options"]],
+            ["", "true", "false"],
+        )
+
+    def test_newsnow_base_url_accepts_only_http_urls(self) -> None:
+        field = get_field_definition("NEWSNOW_BASE_URL")
+        self.assertEqual(field["validation"]["item_type"], "url")
+        self.assertEqual(field["validation"]["allowed_schemes"], ["http", "https"])
+
+
+    def test_llm_timeout_and_max_tokens_orders_are_unique_in_ai_model(self) -> None:
+        """Regression: do not reuse crowded low display_order slots."""
+        timeout = get_field_definition("LLM_TIMEOUT_SEC")
+        max_tokens = get_field_definition("LLM_MAX_TOKENS")
+        self.assertEqual(timeout["display_order"], 12)
+        self.assertEqual(max_tokens["display_order"], 13)
+        # Each of the two keys must not share order with any other ai_model field.
+        for key in ("LLM_TIMEOUT_SEC", "LLM_MAX_TOKENS"):
+            order = get_field_definition(key)["display_order"]
+            peers = [
+                other
+                for other in get_registered_field_keys()
+                if get_field_definition(other)["category"] == "ai_model"
+                and get_field_definition(other)["display_order"] == order
+            ]
+            self.assertEqual(peers, [key], f"display_order collision for {key}: {peers}")
+
+
+
 class TestMcpFieldsRegistered(unittest.TestCase):
     """Optional MCP process settings must be explicitly registered for Settings UI."""
 
@@ -1527,4 +1662,3 @@ class TestMcpFieldsRegistered(unittest.TestCase):
         # category must sort before uncategorized
         orders = {c["category"]: c["display_order"] for c in schema["categories"]}
         self.assertLess(orders["mcp"], orders["uncategorized"])
-
