@@ -138,6 +138,42 @@ describe('settingsFieldControl contract (schema → control)', () => {
     ).toBe('password');
   });
 
+  it.each([
+    {
+      name: 'sensitive JSON before textarea inference',
+      input: schema({ dataType: 'json', uiControl: 'textarea', isSensitive: true }),
+      options: undefined,
+    },
+    {
+      name: 'sensitive array before multi-select inference',
+      input: schema({
+        dataType: 'array',
+        uiControl: 'text',
+        isSensitive: true,
+        options: ['alpha', 'beta'],
+        validation: { multi_value: true },
+      }),
+      options: undefined,
+    },
+    {
+      name: 'sensitive enum before select inference',
+      input: schema({
+        dataType: 'string',
+        uiControl: 'select',
+        isSensitive: true,
+        options: ['alpha', 'beta'],
+      }),
+      options: undefined,
+    },
+    {
+      name: 'server-masked boolean before switch inference',
+      input: schema({ dataType: 'boolean', uiControl: 'switch' }),
+      options: { isMasked: true },
+    },
+  ])('keeps $name fail-closed', ({ input, options }) => {
+    expect(resolveSettingsFieldControl(input, options)).toBe('password');
+  });
+
   it('falls back to text when schema is absent, password when only isMasked', () => {
     expect(resolveSettingsFieldControl(undefined)).toBe('text');
     expect(resolveSettingsFieldControl(null, { isMasked: true })).toBe('password');

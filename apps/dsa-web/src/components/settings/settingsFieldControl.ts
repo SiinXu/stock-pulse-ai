@@ -55,12 +55,12 @@ export function isBooleanishOptionSet(
  * Resolve the control kind from field schema.
  *
  * Precedence (first match wins):
- * 1. multi-value enum options → multi-select
- * 2. switch / boolean dataType / true|false options → switch
- * 3. finite options → select
- * 4. textarea / json / array dataType → textarea
- * 5. time control or dataType → time
- * 6. password / isSensitive / isMasked → password
+ * 1. password / isSensitive / isMasked → password
+ * 2. multi-value enum options → multi-select
+ * 3. switch / boolean dataType / true|false options → switch
+ * 4. finite options → select
+ * 5. textarea / json / array dataType → textarea
+ * 6. time control or dataType → time
  * 7. number control or integer|number dataType → number
  * 8. text
  *
@@ -73,6 +73,17 @@ export function resolveSettingsFieldControl(
 ): ResolvedSettingsControl {
   if (!schema) {
     return options?.isMasked ? 'password' : 'text';
+  }
+
+  // Secret state is authoritative. Display-shape hints must never downgrade a
+  // sensitive or server-masked value to a switch, select, textarea, or time
+  // control that can expose it as plain text.
+  if (
+    schema.uiControl === 'password'
+    || schema.isSensitive
+    || options?.isMasked
+  ) {
+    return 'password';
   }
 
   const validation = (schema.validation ?? {}) as Record<string, unknown>;
@@ -105,14 +116,6 @@ export function resolveSettingsFieldControl(
 
   if (schema.uiControl === 'time' || schema.dataType === 'time') {
     return 'time';
-  }
-
-  if (
-    schema.uiControl === 'password'
-    || schema.isSensitive
-    || options?.isMasked
-  ) {
-    return 'password';
   }
 
   if (

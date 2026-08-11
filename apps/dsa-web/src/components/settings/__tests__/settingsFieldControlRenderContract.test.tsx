@@ -173,6 +173,44 @@ describe('SettingsField control render contract', () => {
     expect(screen.queryByRole('textbox', { name: 'MCP Server Token' })).not.toBeInTheDocument();
   });
 
+  it('keeps sensitive structured and server-masked typed values in password controls', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <div>
+          <SettingsField
+            item={buildItem({
+              key: 'LLM_EXTRA_HEADERS',
+              value: '{"Authorization":"secret"}',
+              dataType: 'json',
+              uiControl: 'textarea',
+              isSensitive: true,
+              title: 'Extra Headers',
+            })}
+            value={'{"Authorization":"secret"}'}
+            onChange={vi.fn()}
+          />
+          <SettingsField
+            item={buildItem({
+              key: 'LEGACY_SECRET_FLAG',
+              value: '******',
+              isMasked: true,
+              dataType: 'boolean',
+              uiControl: 'switch',
+              title: 'Legacy Secret Flag',
+            })}
+            value="******"
+            onChange={vi.fn()}
+          />
+        </div>
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByLabelText('Extra Headers')).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('Legacy Secret Flag')).toHaveAttribute('type', 'password');
+    expect(screen.queryByRole('textbox', { name: 'Extra Headers' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Legacy Secret Flag' })).not.toBeInTheDocument();
+  });
+
   it('masks already-masked server values without requiring isSensitive on the schema', () => {
     render(
       <UiLanguageProvider initialLanguage="en">
