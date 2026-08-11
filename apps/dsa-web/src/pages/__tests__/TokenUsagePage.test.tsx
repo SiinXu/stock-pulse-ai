@@ -1,8 +1,19 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import { LegacyRouteRedirect } from '../../routing/LegacyRedirectRoute';
+import {
+  APP_ROUTE_PATHS,
+  LEGACY_ROUTE_PATHS,
+  SETTINGS_ROUTE_QUERY_KEYS,
+  SETTINGS_SECTION_IDS,
+} from '../../routing/routes';
 import TokenUsagePage from '../TokenUsagePage';
 import { createDeferred } from '../../test-utils';
 
@@ -444,5 +455,52 @@ describe('TokenUsagePage', () => {
     expect(locationText).toContain('period=all');
     expect(locationText).toContain('keep=yes');
     expect(locationText).toContain('section=usage');
+  });
+
+  it('keeps the period through the legacy /usage redirect into the embedded Settings owner', async () => {
+    const todayResponse = makeDashboardResponse({
+      period: 'today',
+      total_tokens: 900,
+      total_calls: 9,
+    });
+    get.mockResolvedValue({ data: todayResponse });
+
+    render(
+      <MemoryRouter initialEntries={[`${LEGACY_ROUTE_PATHS.usage}?period=today&keep=yes`]}>
+        <UiLanguageProvider>
+          <Routes>
+            <Route
+              path={LEGACY_ROUTE_PATHS.usage}
+              element={(
+                <LegacyRouteRedirect
+                  to={APP_ROUTE_PATHS.settings}
+                  overrideSearchParams={{
+                    [SETTINGS_ROUTE_QUERY_KEYS.section]: SETTINGS_SECTION_IDS.usage,
+                  }}
+                />
+              )}
+            />
+            <Route
+              path={APP_ROUTE_PATHS.settings}
+              element={(
+                <>
+                  <TokenUsagePage embedded />
+                  <LocationProbe />
+                </>
+              )}
+            />
+          </Routes>
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('900')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '今日' })).toHaveAttribute('aria-checked', 'true');
+    expect(get).toHaveBeenCalledWith('/api/v1/usage/dashboard', {
+      params: { period: 'today', limit: 50 },
+    });
+    expect(screen.getByTestId('location-probe')).toHaveTextContent(
+      `${APP_ROUTE_PATHS.settings}?period=today&keep=yes&section=usage`,
+    );
   });
 });
