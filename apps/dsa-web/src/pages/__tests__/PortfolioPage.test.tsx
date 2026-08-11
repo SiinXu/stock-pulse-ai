@@ -477,6 +477,28 @@ describe('PortfolioPage FX refresh', () => {
     );
   }
 
+
+  async function openPortfolioRiskTab() {
+    const riskTab = screen.queryByRole('tab', { name: '风险' })
+      ?? screen.getByRole('tab', { name: 'Risk' });
+    fireEvent.click(riskTab);
+    expect(await screen.findByTestId('portfolio-tab-risk')).toBeInTheDocument();
+  }
+
+  async function openCsvImportWizardAndReachConfirm(file: File) {
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    expect(await screen.findByTestId('portfolio-import-wizard')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.getByLabelText('选择 CSV')).toHaveAttribute('data-control', 'file-input');
+    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveAttribute('data-control', 'button');
+    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    await screen.findByText('CSV 解析结果');
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.getByRole('button', { name: '提交导入' })).toBeInTheDocument();
+  }
+
   it('uses the shared page shell and keeps the overview separate from positions', async () => {
     renderPortfolioPage();
     await waitForInitialLoad();
@@ -548,6 +570,21 @@ describe('PortfolioPage FX refresh', () => {
       costMethod: 'fifo',
       includeRealtime: false,
     }));
+  });
+
+
+  it('restores workspace tab and selected position from the URL', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({
+      accountId: 1,
+      positions: [makePosition({ symbol: 'AAPL', market: 'us' })],
+    }));
+    const router = renderPortfolioPage('/portfolio?account=1&tab=risk&selected=1-AAPL-us');
+    await waitForInitialLoad();
+    expect(router.state.location.search).toContain('tab=risk');
+    expect(router.state.location.search).toContain('selected=1-AAPL-us');
+    expect(screen.getByTestId('portfolio-tab-risk')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '持仓明细' }));
+    await waitFor(() => expect(router.state.location.search).not.toContain('tab=risk'));
   });
 
   it('replaces an unavailable account deep link with the first active account', async () => {
@@ -713,11 +750,11 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    const dialog = screen.getByRole('dialog', { name: '券商 CSV 导入' });
+    const wizard = await screen.findByTestId('portfolio-import-wizard');
 
-    expect(within(dialog).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
-    expect(within(dialog).getByRole('combobox', { name: '券商' })).toBeDisabled();
-    expect(within(dialog).getByRole('button', { name: '解析文件' })).toBeDisabled();
+    expect(within(wizard).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
+    expect(within(wizard).getByRole('combobox', { name: '券商' })).toBeDisabled();
+    expect(within(wizard).getByRole('button', { name: '下一步' })).toBeDisabled();
   });
 
   it('renders stale FX status with a manual refresh button', async () => {
@@ -748,6 +785,7 @@ describe('PortfolioPage FX refresh', () => {
     renderEnglishPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(await screen.findByText('Portfolio management')).toBeInTheDocument();
     expect(screen.getByText('Drawdown monitor')).toBeInTheDocument();
@@ -786,6 +824,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText('AI 风险信号')).toBeInTheDocument();
     expect(screen.getByText(/风险信号: 2/)).toBeInTheDocument();
@@ -816,6 +855,7 @@ describe('PortfolioPage FX refresh', () => {
     renderEnglishPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText('AI risk signals')).toBeInTheDocument();
     expect(screen.getByText('600519 · Sell')).toBeInTheDocument();
@@ -855,6 +895,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText(/卖出: 1 · 减仓: 0 · 预警: 0/)).toBeInTheDocument();
     expect(screen.getByText('600519 · 卖出')).toBeInTheDocument();
@@ -875,6 +916,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText('信号风险暂不可用')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '查看全部' })).toHaveAttribute(
@@ -2068,12 +2110,9 @@ describe('PortfolioPage FX refresh', () => {
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByLabelText('选择 CSV')).toHaveAttribute('data-control', 'file-input');
-    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveAttribute('data-control', 'button');
     const file = new File(['header\nrow'], 'trades.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    await openCsvImportWizardAndReachConfirm(file);
+    expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
     fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
 
@@ -2116,9 +2155,8 @@ describe('PortfolioPage FX refresh', () => {
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
     const file = new File(['header\nrow'], 'partial-trades.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    await openCsvImportWizardAndReachConfirm(file);
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
     fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
 
