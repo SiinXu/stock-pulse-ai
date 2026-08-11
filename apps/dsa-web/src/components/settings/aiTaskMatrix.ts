@@ -60,8 +60,8 @@ export function isGenerationOnlyBackend(backendId: string): boolean {
 export const CLI_AGENT_CAPABILITY_NOTE = createUiLanguageRecord(
   'components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE',
   {
-    zh: 'Codex、Claude Code 和 OpenCode CLI 是报告生成方式，不是模型连接，因此不会出现在模型下拉中；问股 Agent 仍需选择支持工具调用的 API 模型。',
-    en: 'Codex, Claude Code, and OpenCode CLI are report-generation methods, not model connections, so they do not appear in model dropdowns; the Q&A Agent still requires a tool-capable API model.',
+    zh: 'CLI 后端仅生成报告；问股 Agent 需要支持工具调用的 API 模型。',
+    en: 'CLI backends generate reports only; Q&A Agent needs a tool-capable API model.',
   },
 );
 

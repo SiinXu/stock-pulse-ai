@@ -1844,14 +1844,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP': {
     title: 'Allow Trusted Proxy Fake-IP',
-    summary: 'Allows standard Clash/Mihomo Fake-IP answers for public hostnames on a trusted workstation.',
-    usage: 'Keep disabled by default. Enable only when a trusted Clash/Mihomo TUN owns the documented Fake-IP ranges and the configured proxy is loopback-only.',
-    valueNotes: [
-      'Literal Fake-IP URLs, private names, metadata, link-local, and non-loopback proxy targets remain blocked.',
-      'Local Only Mode takes precedence and continues to block every non-loopback target.',
-    ],
-    impact: ['Expands outbound DNS acceptance only for standard Fake-IP ranges and the exact configured loopback proxy.'],
-    notes: ['Disable immediately when the TUN or loopback proxy is no longer trusted.'],
   },
   'settings.system.SMARTMONEY_ENABLED': {
     title: 'SmartMoney Money-Flow Enabled',

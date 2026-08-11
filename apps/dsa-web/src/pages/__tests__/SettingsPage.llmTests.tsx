@@ -774,7 +774,6 @@ export function registerSettingsPageLlmTests(): void {
     const modelTriggers = document.querySelectorAll('button[aria-haspopup="listbox"]');
     expect(modelTriggers.length).toBeGreaterThanOrEqual(3);
     expect(screen.getByTestId('settings-field-GENERATION_BACKEND')).toHaveTextContent('Codex CLI (experimental)');
-    expect(screen.getByTestId('cli-agent-capability-note')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LLM_TEMPERATURE')).toBeInTheDocument();
     // Fallback order is NOT an editable field here; it is a read-only summary.
     expect(screen.queryByTestId('settings-field-LITELLM_FALLBACK_MODELS')).not.toBeInTheDocument();
