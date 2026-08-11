@@ -289,7 +289,9 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       if (!isLatestRequest()) return;
       setTriggers(response.items);
       setTriggersTotal(response.total);
-      setTriggersPage(response.page);
+      if (response.page !== triggersPage) {
+        setTriggersPage(response.page);
+      }
       setTriggersLastUpdated(new Date().toISOString());
     } catch (error) {
       if (!isLatestRequest()) return;
@@ -297,7 +299,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     } finally {
       if (isLatestRequest()) setTriggersLoading(false);
     }
-  }, [setTriggersPage]);
+  }, [setTriggersPage, triggersPage]);
 
   const loadNotifications = useCallback(async (page = 1) => {
     const requestId = notificationsRequestIdRef.current + 1;
@@ -315,7 +317,9 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       if (!isLatestRequest()) return;
       setNotifications(response.items);
       setNotificationsTotal(response.total);
-      setNotificationsPage(response.page);
+      if (response.page !== notificationsPage) {
+        setNotificationsPage(response.page);
+      }
       setNotificationsLastUpdated(new Date().toISOString());
     } catch (error) {
       if (!isLatestRequest()) return;
@@ -323,7 +327,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     } finally {
       if (isLatestRequest()) setNotificationsLoading(false);
     }
-  }, [notificationChannelFilter, notificationSuccessFilter, setNotificationsPage]);
+  }, [notificationChannelFilter, notificationSuccessFilter, notificationsPage, setNotificationsPage]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -445,6 +449,11 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
 
   const handleEditClose = useCallback(() => {
     if (editLoading) return;
+    editRequestIdRef.current += 1;
+    deepLinkAlertIdRef.current = null;
+    setEditModalOpen(false);
+    setEditRule(null);
+    setEditError(null);
     setSelectedAlertId(null);
   }, [editLoading, setSelectedAlertId]);
 

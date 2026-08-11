@@ -578,7 +578,7 @@ describe('DecisionSignalsPage', () => {
       page: 2,
       pageSize: 20,
     })));
-    fireEvent.click(screen.getByRole('button', { name: /筛选/ }));
+    fireEvent.click(screen.getByRole('button', { name: '筛选，已启用 2 项' }));
     const filterDialog = await screen.findByRole('dialog', { name: '筛选' });
     chooseOption(within(filterDialog).getByLabelText('启停状态'), 'enabled');
 
