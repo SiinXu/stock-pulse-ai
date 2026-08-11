@@ -514,6 +514,7 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         # PR3 Phase 3: Report + Notification Route
         "REPORT_SUMMARY_ONLY",
         "REPORT_SHOW_LLM_MODEL",
+        "NOTIFICATION_DELTA_FIRST",
         "REPORT_TEMPLATES_DIR",
         "REPORT_RENDERER_ENABLED",
         "REPORT_INTEGRITY_ENABLED",
@@ -1016,6 +1017,30 @@ class TestReportDisplayFieldsRegistered(unittest.TestCase):
         self.assertIsNotNone(notification_cat, "notification category missing")
         field_keys = {f["key"] for f in notification_cat["fields"]}
         self.assertIn("REPORT_SHOW_LLM_MODEL", field_keys)
+
+    def test_notification_delta_first_field_definition_exists(self):
+        field = get_field_definition("NOTIFICATION_DELTA_FIRST")
+        self.assertEqual(field["category"], "notification")
+        self.assertEqual(field["data_type"], "boolean")
+        self.assertEqual(field["ui_control"], "switch")
+        self.assertEqual(field["default_value"], "false")
+        self.assertFalse(field["is_sensitive"])
+        self.assertFalse(field["is_required"])
+        self.assertTrue(field["is_editable"])
+        self.assertEqual(
+            field["help_key"],
+            "settings.report.NOTIFICATION_DELTA_FIRST",
+        )
+
+    def test_schema_response_includes_notification_delta_first(self):
+        schema = build_schema_response()
+        notification_cat = next(
+            (c for c in schema["categories"] if c["category"] == "notification"),
+            None,
+        )
+        self.assertIsNotNone(notification_cat, "notification category missing")
+        field_keys = {f["key"] for f in notification_cat["fields"]}
+        self.assertIn("NOTIFICATION_DELTA_FIRST", field_keys)
 
 
 class TestMarketReviewFieldsRegistered(unittest.TestCase):

@@ -6025,5 +6025,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_LOOKBACK_DAYS": "Portfolio-Risiko-Lookback-Tage",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT": "Portfoliorisiko-Stop-Loss-Warnung (%)",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO": "Portfolio-Risiko-Stop-Loss-Near-Ratio",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.summary": "Aus. Delta ohne KI; Fehler folgenlos.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.title": "Delta",
+  "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DELTA_FIRST": "Delta",
   "utils.systemConfigI18n.fieldTitleMaps.SMARTMONEY_ENABLED": "SmartMoney Money-Flow aktiviert",
 } as const;

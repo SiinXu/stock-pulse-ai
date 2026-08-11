@@ -6025,5 +6025,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_LOOKBACK_DAYS": "포트폴리오 위험 조회일",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT": "포트폴리오 위험 손절 경고(%)",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO": "포트폴리오 위험 손절매 비율",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.summary": "기본은 꺼짐. 모델 호출 없이 변화를 보이며 실패해도 보고서를 유지합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.title": "차이 우선",
+  "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DELTA_FIRST": "분석 차이 우선",
   "utils.systemConfigI18n.fieldTitleMaps.SMARTMONEY_ENABLED": "SmartMoney 자금 흐름 활성화",
 } as const;

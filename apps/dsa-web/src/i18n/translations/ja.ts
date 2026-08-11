@@ -6025,5 +6025,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_LOOKBACK_DAYS": "ポートフォリオリスクルックバックデー",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT": "ポートフォリオリスクストップロスアラート (%)",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO": "ポートフォリオリスクストップロスニアレシオ",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.summary": "既定OFF。AI不要。差分。失敗時も報告",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.title": "差分",
+  "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DELTA_FIRST": "差分",
   "utils.systemConfigI18n.fieldTitleMaps.SMARTMONEY_ENABLED": "SmartMoney マネーフローが有効化",
 } as const;

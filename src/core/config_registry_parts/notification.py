@@ -327,6 +327,40 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "NOTIFICATION_DELTA_FIRST": {
+        "title": "Show Analysis Delta First",
+        "description": (
+            "Prepend a bounded, deterministic changes-since-previous-analysis "
+            "summary to outbound stock notifications. Defaults off; comparison "
+            "or formatting failures never block the original notification."
+        ),
+        "category": "notification",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 54,
+        "help_key": "settings.report.NOTIFICATION_DELTA_FIRST",
+        "examples": [
+            "NOTIFICATION_DELTA_FIRST=false",
+            "NOTIFICATION_DELTA_FIRST=true",
+        ],
+        "docs": [
+            {
+                "label": "Notification channels and routing",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/notifications.md",
+            },
+            {
+                "label": "Full guide: environment variables",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md#complete-environment-variables-list",
+            },
+        ],
+        "warning_codes": [],
+    },
     # ------------------------------------------------------------------
     # Notification – Feishu
     # ------------------------------------------------------------------

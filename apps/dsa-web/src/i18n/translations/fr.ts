@@ -6025,5 +6025,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_LOOKBACK_DAYS": "Journées d'analyse des risques de portefeuille",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT": "Alerte Stop-Loss de risque de portefeuille (%)",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO": "Ratio stop-loss proche du risque de portefeuille",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.summary": "Désactivé. Affiche les changements sans appeler le modèle ; une erreur conserve le rapport.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.title": "Changements d’abord",
+  "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DELTA_FIRST": "Delta d’analyse d’abord",
   "utils.systemConfigI18n.fieldTitleMaps.SMARTMONEY_ENABLED": "SmartMoney Money-Flow activé",
 } as const;

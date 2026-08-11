@@ -1638,6 +1638,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects model information visibility in notification reports.'],
     notes: ['Enable temporarily when diagnosing model switching issues.'],
   },
+  'settings.report.NOTIFICATION_DELTA_FIRST': {
+    title: 'Delta First',
+    summary: 'Off by default. Shows changes before the full report without model calls; errors keep the report.',
+  },
   'settings.report.REPORT_TEMPLATES_DIR': {
     title: 'Report Templates Directory',
     summary: 'Directory for Jinja2 report templates.',

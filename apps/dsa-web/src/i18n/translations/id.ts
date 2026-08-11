@@ -6025,5 +6025,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_LOOKBACK_DAYS": "Hari Peninjauan Kembali Risiko Portofolio",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT": "Peringatan Stop-Loss Risiko Portofolio (%)",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO": "Rasio Stop-Loss Risiko Portofolio Dekat",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.summary": "Baku mati. Tampilkan perubahan tanpa model; kegagalan tetap mengirim laporan.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.report.NOTIFICATION_DELTA_FIRST.title": "Perubahan",
+  "utils.systemConfigI18n.fieldTitleMaps.NOTIFICATION_DELTA_FIRST": "Delta Analisis",
   "utils.systemConfigI18n.fieldTitleMaps.SMARTMONEY_ENABLED": "Aliran Uang SmartMoney Diaktifkan",
 } as const;
