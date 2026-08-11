@@ -414,11 +414,11 @@ async function openConnections(page: Page, reset = true) {
   await login(page);
   if (reset) await resetModelConfig(page);
   await page.goto(settingsHrefs.modelConnections);
-  await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible({ timeout: 15_000 });
 }
 
 async function addOpenAiConnectionThroughUi(page: Page, id: string, model: string) {
-  await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+  await page.getByRole('button', { name: /添加模型来源/ }).first().click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await dialog.getByLabel('选择模型服务商').click();
   await page.locator('[role="option"][data-value="openai"]').click();
@@ -1733,7 +1733,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('19 Model Access has one connection manager and no second provider credential form', async ({ page }) => {
     await openConnections(page);
     const main = page.locator('main');
-    await expect(main.getByRole('button', { name: /添加模型服务/ })).toHaveCount(1);
+    await expect(main.getByRole('button', { name: /添加模型来源/ })).toHaveCount(1);
     await expect(main.getByLabel('API 密钥')).toHaveCount(0);
     await expect(main.getByLabel('服务地址')).toHaveCount(0);
     await expect(main.getByText(/LLM_|LITELLM_/)).toHaveCount(0);
@@ -1755,7 +1755,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await route.fulfill({ response, json: { ...body, items } });
     });
     await page.goto(settingsHrefs.modelConnections);
-    await expect(page.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /添加模型来源/ })).toBeDisabled();
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
     await page.goto(settingsHrefs.advancedDiagnostics);
     await expect(page.getByText(/schema_ui_placement_missing/).first()).toBeVisible();
@@ -2015,7 +2015,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page);
     await resetModelConfig(page);
     await page.goto(settingsHrefs.modelTaskRouting);
-    await page.getByRole('button', { name: '前往模型接入' }).click();
+    await page.getByRole('button', { name: '前往模型来源' }).click();
     await expect(page).toHaveURL(/view=connections&from=task_routing/);
     const connectionId = await addOpenAiConnectionThroughUi(page, 'alpha_conn', 'round-trip-model');
     await page.getByRole('button', { name: '返回任务路由' }).click();
@@ -2777,7 +2777,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       path: contrastPath,
       contentType: 'application/json',
     });
-    await expect(page.getByRole('button', { name: /添加模型服务/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /添加模型来源/ }).first()).toBeVisible();
   });
 
   test.describe('touch-capable control targets', () => {
