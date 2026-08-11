@@ -18,11 +18,18 @@ from api.v1.schemas.plugins import (
     PluginLifecycleRequest,
     PluginLifecycleResponse,
     PluginListResponse,
+    PluginSettingFieldResponse,
+    PluginSettingOptionResponse,
+    PluginSettingsResponse,
+    PluginSettingsUpdateRequest,
+    PluginSettingsUpdateResponse,
 )
 from src.auth import COOKIE_NAME, is_auth_enabled
 from src.plugins import (
     PluginLifecycleAuditCompletionUnavailable,
     PluginManager,
+    PluginSettingsPersistenceError,
+    PluginSettingsValidationError,
     PluginSnapshot,
 )
 from src.services.security_audit_service import SecurityAuditUnavailable
@@ -76,6 +83,57 @@ def _to_info(snapshot: PluginSnapshot) -> PluginInfo:
         description=snapshot.manifest.description,
         author=snapshot.manifest.author,
         last_error_code=snapshot.last_error_code,
+        settings_count=len(snapshot.manifest.settings),
+    )
+
+
+def _settings_projection(
+    manager: PluginManager,
+    plugin_id: str,
+    *,
+    mask_token: str = "******",
+) -> PluginSettingsResponse:
+    definitions = manager.settings_schema(plugin_id)
+    values = manager.settings_values(plugin_id)
+    if definitions is None or values is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "plugin_not_found",
+                "message": f"Plugin {plugin_id!r} is not registered",
+            },
+        )
+    masked_keys: list[str] = []
+    display_values = dict(values)
+    schema: list[PluginSettingFieldResponse] = []
+    for definition in sorted(definitions, key=lambda field: (field.display_order, field.key)):
+        if definition.is_sensitive and definition.key in display_values:
+            display_values[definition.key] = mask_token
+            masked_keys.append(definition.key)
+        schema.append(
+            PluginSettingFieldResponse(
+                key=definition.key,
+                title=definition.title,
+                description=definition.description,
+                data_type=definition.data_type,
+                ui_control=definition.ui_control,
+                is_sensitive=definition.is_sensitive,
+                is_required=definition.is_required,
+                default_value=definition.default_value,
+                options=[
+                    PluginSettingOptionResponse(label=option.label, value=option.value)
+                    for option in definition.options
+                ],
+                validation=definition.validation.model_dump(by_alias=True, exclude_none=True),
+                display_order=definition.display_order,
+            )
+        )
+    return PluginSettingsResponse(
+        plugin_id=plugin_id,
+        schema=schema,
+        values=display_values,
+        masked_keys=masked_keys,
+        mask_token=mask_token,
     )
 
 
@@ -129,6 +187,128 @@ def get_plugin_health() -> PluginHealthResponse:
             )
             for entry in report.plugins
         ],
+    )
+
+
+@router.get(
+    "/{plugin_id}/settings",
+    response_model=PluginSettingsResponse,
+    responses={
+        **AUTH_RESPONSE,
+        404: {"model": ErrorResponse, "description": "Plugin not found"},
+    },
+    summary="Get one plugin's generated settings contract",
+    description=(
+        "Return the strict manifest-declared settings schema and effective values. "
+        "Sensitive values are represented only by mask_token."
+    ),
+    operation_id="getPluginSettings",
+)
+def get_plugin_settings(plugin_id: str) -> PluginSettingsResponse:
+    return _settings_projection(_plugin_manager(), plugin_id)
+
+
+@router.put(
+    "/{plugin_id}/settings",
+    response_model=PluginSettingsUpdateResponse,
+    responses={
+        **AUTH_RESPONSE,
+        400: {"model": ErrorResponse, "description": "Settings validation failed"},
+        404: {"model": ErrorResponse, "description": "Plugin not found"},
+        500: {"model": ErrorResponse, "description": "Settings persistence failed"},
+        503: {"model": ErrorResponse, "description": "Security audit unavailable"},
+    },
+    summary="Validate and persist one plugin's settings",
+    description=(
+        "Replace explicit per-plugin settings after strict manifest validation. "
+        "Omitted keys reset to defaults; masked sensitive values preserve the stored secret."
+    ),
+    operation_id="updatePluginSettings",
+)
+def update_plugin_settings(
+    plugin_id: str,
+    request: PluginSettingsUpdateRequest,
+) -> PluginSettingsUpdateResponse:
+    manager = _plugin_manager()
+    if manager.snapshot(plugin_id) is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "plugin_not_found",
+                "message": f"Plugin {plugin_id!r} is not registered",
+            },
+        )
+    try:
+        result = manager.update_settings(
+            plugin_id,
+            request.values,
+            mask_token=request.mask_token,
+            require_audit=True,
+            actor_type="administrator",
+            actor_id=_plugin_lifecycle_actor_id(),
+        )
+    except PluginSettingsValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": exc.code,
+                "message": "Plugin settings validation failed",
+                "details": {"issues": list(exc.issues)},
+            },
+        ) from None
+    except PluginSettingsPersistenceError:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "plugin_settings_write_failed",
+                "message": "Plugin settings could not be persisted",
+            },
+        ) from None
+    except PluginLifecycleAuditCompletionUnavailable as exc:
+        result = exc.result
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": (
+                    "Plugin settings were persisted, but audit completion could not be persisted"
+                ),
+                "operation_completed": True,
+                "operation_success": result.success,
+                "changed_keys": list(result.changed_keys),
+                "restart_required": result.restart_required,
+            },
+        ) from None
+    except SecurityAuditUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": "Security audit storage is unavailable",
+                "operation_completed": False,
+            },
+        ) from None
+    except Exception as exc:  # broad-exception: fallback_recorded - map unexpected settings failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Plugin settings update failed",
+            exc,
+            error_code="plugin_settings_update_failed",
+            context={"plugin_id": plugin_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "plugin_settings_update_failed",
+                "message": "Plugin settings update failed",
+            },
+        ) from exc
+
+    projection = _settings_projection(manager, plugin_id, mask_token=request.mask_token)
+    return PluginSettingsUpdateResponse(
+        **projection.model_dump(by_alias=True),
+        changed_keys=list(result.changed_keys),
+        restart_required=result.restart_required,
     )
 
 
@@ -223,10 +403,6 @@ def update_plugin_lifecycle(
         result = exc.result
         detail = {
             "error": "security_audit_unavailable",
-            "message": (
-                "Plugin lifecycle operation completed, but its audit completion "
-                "could not be persisted"
-            ),
             "operation_completed": True,
             "operation_success": result.success,
             "state": result.state,
