@@ -1968,10 +1968,17 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["notified"], 1)
         triggers = self._triggers(rule_id=rule["id"], status="triggered")
         self.assertEqual(len(triggers), 1)
-        diagnostics_text = triggers[0]["diagnostics"] or ""
-        self.assertIn("impact_context", diagnostics_text)
-        self.assertIn("in_watchlist", diagnostics_text)
-        self.assertIn("in_portfolio", diagnostics_text)
+        self.assertIsNone(triggers[0]["diagnostics"])
+        self.assertEqual(
+            triggers[0]["impact_context"]["affected"],
+            {
+                "symbol": "600519",
+                "in_watchlist": True,
+                "in_portfolio": True,
+                "weight_pct": 10.0,
+            },
+        )
+        self.assertEqual(triggers[0]["impact_context"]["what_happened"], "年度业绩预告")
         alert_text = notifier.send_with_results.call_args.args[0]
         self.assertIn("影响上下文", alert_text)
         self.assertIn("年度业绩预告", alert_text)
@@ -2011,8 +2018,9 @@ class AlertWorkerTestCase(unittest.TestCase):
             stats = worker.run_once()
 
         self.assertEqual(stats["triggered"], 1)
-        diagnostics_text = self._triggers(status="triggered")[0]["diagnostics"] or ""
-        self.assertNotIn("impact_context", diagnostics_text)
+        trigger = self._triggers(status="triggered")[0]
+        self.assertIsNone(trigger["diagnostics"])
+        self.assertIsNone(trigger["impact_context"])
         alert_text = notifier.send_with_results.call_args.args[0]
         self.assertNotIn("影响上下文", alert_text)
         self.assertNotIn("Impact context", alert_text)
@@ -2056,9 +2064,14 @@ class AlertWorkerTestCase(unittest.TestCase):
 
         self.assertEqual(stats["triggered"], 1)
         self.assertEqual(stats["notified"], 1)
-        diagnostics_text = self._triggers(status="triggered")[0]["diagnostics"] or ""
-        self.assertIn("impact_context", diagnostics_text)
-        self.assertIn("degraded", diagnostics_text)
+        trigger = self._triggers(status="triggered")[0]
+        self.assertIsNone(trigger["diagnostics"])
+        self.assertTrue(trigger["impact_context"]["degraded"])
+        self.assertEqual(trigger["impact_context"]["affected"], {
+            "symbol": "600519",
+            "in_watchlist": False,
+            "in_portfolio": False,
+        })
         alert_text = notifier.send_with_results.call_args.args[0]
         self.assertIn("影响上下文", alert_text)
         self.assertIn("earnings hit", alert_text)

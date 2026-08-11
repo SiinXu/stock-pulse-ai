@@ -1986,6 +1986,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notification-inbox/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List in-app notification inbox items */
+        get: operations["list_inbox_items_api_v1_notification_inbox_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/items/mark-all-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark the current notification inbox window as read */
+        post: operations["mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/items/mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark specific notification inbox items as read */
+        post: operations["mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get unread notification inbox count */
+        get: operations["get_inbox_unread_count_api_v1_notification_inbox_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/apply": {
         parameters: {
             query?: never;
@@ -3782,6 +3850,84 @@ export interface components {
             /** Deleted */
             deleted: number;
         };
+        /** AlertEventAffectedContext */
+        AlertEventAffectedContext: {
+            /**
+             * In Portfolio
+             * @default false
+             */
+            in_portfolio: boolean;
+            /**
+             * In Watchlist
+             * @default false
+             */
+            in_watchlist: boolean;
+            /** Symbol */
+            symbol?: string | null;
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /** AlertEventContext */
+        AlertEventContext: {
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactContext */
+        AlertImpactContext: {
+            affected?: components["schemas"]["AlertEventAffectedContext"] | null;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Related Analysis */
+            related_analysis?: string | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactResult */
+        AlertImpactResult: {
+            /**
+             * Grade
+             * @enum {string}
+             */
+            grade: "major" | "routine" | "unclassified";
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "rule_severity" | "unavailable";
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
+        };
         /** AlertNotificationItem */
         AlertNotificationItem: {
             /** Attempt */
@@ -3997,6 +4143,8 @@ export interface components {
         };
         /** AlertTriggerItem */
         AlertTriggerItem: {
+            /** Alert Type */
+            alert_type?: string | null;
             analysis_context_pack_overview?: components["schemas"]["AnalysisContextPackOverview"] | null;
             /**
              * Analysis Visibility Source
@@ -4013,8 +4161,11 @@ export interface components {
             } | null;
             /** Diagnostics */
             diagnostics?: string | null;
+            event_context?: components["schemas"]["AlertEventContext"] | null;
             /** Id */
             id: number;
+            impact_context?: components["schemas"]["AlertImpactContext"] | null;
+            impact_result?: components["schemas"]["AlertImpactResult"] | null;
             market_phase_summary?: components["schemas"]["MarketPhaseSummary"] | null;
             /** Observed Value */
             observed_value?: number | null;
@@ -4022,6 +4173,8 @@ export interface components {
             reason?: string | null;
             /** Rule Id */
             rule_id?: number | null;
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
             /** Status */
             status: string;
             /** Target */
@@ -4035,6 +4188,8 @@ export interface components {
         AlertTriggerListResponse: {
             /** Items */
             items?: components["schemas"]["AlertTriggerItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
             /** Page */
             page: number;
             /** Page Size */
@@ -9088,6 +9243,164 @@ export interface components {
              * @description 新闻条数
              */
             total: number;
+        };
+        /**
+         * NotificationInboxItem
+         * @description One aggregated inbox row projected from durable event sources.
+         */
+        NotificationInboxItem: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Href
+             * @description In-app deep link path with query string
+             */
+            href: string;
+            /**
+             * Id
+             * @description Versioned stable occurrence key
+             */
+            id: string;
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "analysis_complete" | "alert_triggered" | "scheduled_task_result" | "decision_signal";
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Severity
+             * @default info
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "error";
+            /** Source Id */
+            source_id: string;
+            /** Summary */
+            summary: string;
+            /**
+             * Title Key
+             * @enum {string}
+             */
+            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle";
+            /** Title Params */
+            title_params?: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * NotificationInboxListResponse
+         * @description GET /notification-inbox/items response body.
+         */
+        NotificationInboxListResponse: {
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["NotificationInboxItem"][];
+            /** Max Items */
+            max_items: number;
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Retention Days */
+            retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
+            /** Total */
+            total: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxMarkAllReadRequest
+         * @description POST /notification-inbox/items/mark-all-read request body.
+         */
+        NotificationInboxMarkAllReadRequest: {
+            /**
+             * Kind
+             * @description Optional kind filter when marking the current window
+             */
+            kind?: string | null;
+        };
+        /**
+         * NotificationInboxMarkAllReadResponse
+         * @description POST /notification-inbox/items/mark-all-read response body.
+         */
+        NotificationInboxMarkAllReadResponse: {
+            /** Marked Count */
+            marked_count: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxMarkReadRequest
+         * @description POST /notification-inbox/items/mark-read request body.
+         */
+        NotificationInboxMarkReadRequest: {
+            /**
+             * Item Ids
+             * @description Versioned stable inbox occurrence ids
+             */
+            item_ids: string[];
+        };
+        /**
+         * NotificationInboxMarkReadResponse
+         * @description POST /notification-inbox/items/mark-read response body.
+         */
+        NotificationInboxMarkReadResponse: {
+            /** Marked Count */
+            marked_count: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxSourceStatus
+         * @description Availability and bounded provenance for one selected inbox source.
+         */
+        NotificationInboxSourceStatus: {
+            /** Available */
+            available: boolean;
+            /** Error Code */
+            error_code?: string | null;
+            /** Item Count */
+            item_count: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals";
+        };
+        /**
+         * NotificationInboxUnreadCountResponse
+         * @description GET /notification-inbox/unread-count response body.
+         */
+        NotificationInboxUnreadCountResponse: {
+            /** Max Items */
+            max_items: number;
+            /** Retention Days */
+            retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
+            /** Unread Total */
+            unread_total: number;
         };
         /**
          * NotificationTestAttempt
@@ -16368,6 +16681,10 @@ export interface operations {
                 target?: string | null;
                 /** @description Optional status filter */
                 status?: string | null;
+                /** @description Optional typed corporate-event filter */
+                alert_type?: "corporate_event" | null;
+                /** @description Stable continuation cursor */
+                cursor?: string | null;
                 page?: number;
                 page_size?: number;
             };
@@ -16384,6 +16701,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertTriggerListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -21067,6 +21393,246 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_inbox_items_api_v1_notification_inbox_items_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                cursor?: string | null;
+                kind?: string | null;
+                unread_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NotificationInboxMarkAllReadRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxMarkAllReadResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationInboxMarkReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxMarkReadResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_inbox_unread_count_api_v1_notification_inbox_unread_count_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxUnreadCountResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

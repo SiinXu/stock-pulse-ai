@@ -693,6 +693,341 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_PLANNING_ENABLED": {
+        "title": "Agent Planning Loop",
+        "description": (
+            "Opt-in plan→act→observe→replan on the Agent analysis RUN path "
+            "(AgentExecutor.run). Default is off so the classic daily pipeline is unchanged. "
+            "When enabled, the planner proposes bounded steps, tools run through BoundToolSession, "
+            "and failures terminate with explicit reasons (no fail-open success). "
+            "See docs/agent-planning-engine_EN.md."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 660,
+        "help_key": "settings.agent.AGENT_PLANNING_ENABLED",
+        "examples": [
+            "AGENT_PLANNING_ENABLED=false",
+            "AGENT_PLANNING_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+            {
+                "label": "Agent 规划引擎（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_STRATEGY": {
+        "title": "Agent Planning Strategy",
+        "description": (
+            "Planner strategy when AGENT_PLANNING_ENABLED=true. "
+            "'template' uses the deterministic stock-analysis template (default); "
+            "'llm' uses the Agent LLM adapter for proposals (falls back to template on failure)."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "template",
+        "options": [
+            {"label": "Template (deterministic)", "value": "template"},
+            {"label": "LLM proposal", "value": "llm"},
+        ],
+        "validation": {"enum": ["template", "llm"]},
+        "display_order": 661,
+        "help_key": "settings.agent.AGENT_PLANNING_STRATEGY",
+        "examples": [
+            "AGENT_PLANNING_STRATEGY=template",
+            "AGENT_PLANNING_STRATEGY=llm",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_MAX_PLAN_STEPS": {
+        "title": "Planning Max Plan Steps",
+        "description": "Maximum steps allowed in one plan proposal (1-16). Default 8.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "8",
+        "options": [],
+        "validation": {"min": 1, "max": 16},
+        "display_order": 662,
+        "help_key": "settings.agent.AGENT_PLANNING_MAX_PLAN_STEPS",
+        "examples": [
+            "AGENT_PLANNING_MAX_PLAN_STEPS=8",
+            "AGENT_PLANNING_MAX_PLAN_STEPS=4",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_MAX_REPLANS": {
+        "title": "Planning Proposal Retries",
+        "description": (
+            "Maximum proposal retries after validation/LLM failure during plan creation (0-3). "
+            "Default 1. Separate from observation-driven replans during execution."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "options": [],
+        "validation": {"min": 0, "max": 3},
+        "display_order": 663,
+        "help_key": "settings.agent.AGENT_PLANNING_MAX_REPLANS",
+        "examples": [
+            "AGENT_PLANNING_MAX_REPLANS=1",
+            "AGENT_PLANNING_MAX_REPLANS=0",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_MAX_TOKENS": {
+        "title": "Planning Proposal Token Budget",
+        "description": "Maximum planner LLM tokens when strategy=llm (1-8192). Default 1500.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1500",
+        "options": [],
+        "validation": {"min": 1, "max": 8192},
+        "display_order": 664,
+        "help_key": "settings.agent.AGENT_PLANNING_MAX_TOKENS",
+        "examples": [
+            "AGENT_PLANNING_MAX_TOKENS=1500",
+            "AGENT_PLANNING_MAX_TOKENS=2048",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS": {
+        "title": "Planning Proposal Timeout",
+        "description": "Wall-clock seconds for one plan proposal attempt (0.1-60). Default 30. Non-finite values are rejected at runtime.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 0.1, "max": 60},
+        "display_order": 665,
+        "help_key": "settings.agent.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS",
+        "examples": [
+            "AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS=30",
+            "AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS=15",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS": {
+        "title": "Planning Max Tool Calls",
+        "description": (
+            "Hard upper bound on tool invocations during plan→act→observe execution (1-32). "
+            "Default 16. Exceeding terminates with max_tool_calls_exceeded."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "16",
+        "options": [],
+        "validation": {"min": 1, "max": 32},
+        "display_order": 666,
+        "help_key": "settings.agent.AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS",
+        "examples": [
+            "AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS=16",
+            "AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS=8",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_MAX_OBSERVATION_REPLANS": {
+        "title": "Planning Observation Replans",
+        "description": (
+            "Maximum observation-driven replans after a failed step (0-3). Default 1. "
+            "When exhausted, execution terminates with max_observation_replans_exceeded."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "options": [],
+        "validation": {"min": 0, "max": 3},
+        "display_order": 667,
+        "help_key": "settings.agent.AGENT_PLANNING_MAX_OBSERVATION_REPLANS",
+        "examples": [
+            "AGENT_PLANNING_MAX_OBSERVATION_REPLANS=1",
+            "AGENT_PLANNING_MAX_OBSERVATION_REPLANS=0",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_EXEC_TIMEOUT_SECONDS": {
+        "title": "Planning Execution Timeout",
+        "description": (
+            "Wall-clock seconds for the full plan→act→observe loop (0.1-120). Default 60. "
+            "Exceeding terminates with execution_timeout. Non-finite values are rejected."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "60",
+        "options": [],
+        "validation": {"min": 0.1, "max": 120},
+        "display_order": 668,
+        "help_key": "settings.agent.AGENT_PLANNING_EXEC_TIMEOUT_SECONDS",
+        "examples": [
+            "AGENT_PLANNING_EXEC_TIMEOUT_SECONDS=60",
+            "AGENT_PLANNING_EXEC_TIMEOUT_SECONDS=30",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_PLANNING_ON_STEP_FAILURE": {
+        "title": "Planning Step Failure Policy",
+        "description": (
+            "When a plan step's tool call fails: 'replan' (if observation replan budget remains) "
+            "or 'terminate' immediately. Default replan. Failures never fail-open as success."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "replan",
+        "options": [
+            {"label": "Replan (if budget remains)", "value": "replan"},
+            {"label": "Terminate immediately", "value": "terminate"},
+        ],
+        "validation": {"enum": ["replan", "terminate"]},
+        "display_order": 669,
+        "help_key": "settings.agent.AGENT_PLANNING_ON_STEP_FAILURE",
+        "examples": [
+            "AGENT_PLANNING_ON_STEP_FAILURE=replan",
+            "AGENT_PLANNING_ON_STEP_FAILURE=terminate",
+        ],
+        "docs": [
+            {
+                "label": "Agent planning guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-planning-engine_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
     "AGENT_SKILL_AUTOWEIGHT": {
         "title": "Auto-Weight Strategies",
         "description": "Automatically weight strategy-skill opinions by their historical backtest performance.",
@@ -1269,6 +1604,72 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
         "warning_codes": ["restart_required"],
+    },
+    "REASONING_TRACE_EXPORT_ENABLED": {
+        "title": "Reasoning Trace Export",
+        "description": (
+            "Master switch for the reasoning-trace export API and service gate. "
+            "Default off. Exports are redacted but still sensitive."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 724,
+        "help_key": "settings.agent.reasoning_trace_export",
+        "examples": [
+            "REASONING_TRACE_EXPORT_ENABLED=false",
+            "REASONING_TRACE_EXPORT_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Reasoning trace export (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export_EN.md",
+            },
+            {
+                "label": "推理轨迹导出（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "REASONING_TRACE_EXPORT_MAX_CHARS": {
+        "title": "Reasoning Trace Max Chars",
+        "description": (
+            "Character budget for complete reasoning-trace export responses. "
+            "Default 500000; clamped to 10000–2000000 when loading config."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "500000",
+        "options": [],
+        "validation": {"min": 10000, "max": 2000000},
+        "display_order": 725,
+        "help_key": "settings.agent.reasoning_trace_export",
+        "examples": [
+            "REASONING_TRACE_EXPORT_MAX_CHARS=500000",
+            "REASONING_TRACE_EXPORT_MAX_CHARS=100000",
+        ],
+        "docs": [
+            {
+                "label": "Reasoning trace export (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export_EN.md",
+            },
+            {
+                "label": "推理轨迹导出（中文）",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export.md",
+            },
+        ],
+        "warning_codes": [],
     },
 
     "AGENT_TOOL_TIMEOUT_S": {

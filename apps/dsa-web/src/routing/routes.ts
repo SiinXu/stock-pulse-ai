@@ -20,6 +20,7 @@ export const APP_ROUTE_PATHS = {
   eventCalendar: '/events',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
+  notifications: '/notifications',
   calculators: '/tools/calculators',
 } as const;
 
@@ -58,6 +59,18 @@ export const SIGNAL_CENTER_ROUTE_QUERY_KEYS = {
   trigger: 'trigger',
   createRule: 'createRule',
   stock: 'stock',
+} as const;
+
+/** Query keys owned by the Alerts workspace embedded in Signal Center. */
+export const SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS = {
+  rulesEnabled: 'rulesEnabled',
+  rulesType: 'rulesType',
+  rulesPage: 'rulesPage',
+  triggerPage: 'triggerPage',
+  notificationPage: 'notificationPage',
+  notificationChannel: 'notificationChannel',
+  notificationSuccess: 'notificationSuccess',
+  alert: 'alert',
 } as const;
 
 export const SIGNAL_CENTER_CREATE_RULE_VALUES = {
@@ -380,4 +393,3 @@ export function buildInvestmentFrameworkSettingsHref(): string {
     view: 'investment_framework',
   });
 }
-
