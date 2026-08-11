@@ -83,7 +83,7 @@ EXPECTED_GROUPS = (
         "_runner_tools",
         "_TOOL_FUNCTION_NAMES",
         ("_execute_tools",),
-        "3b8db811b6ed72a922bb2d52089b45fe7e88b3f730175c2e941f1f15d0749084",
+        "f4f74aaf6fd4795466f5b91b2c41bea2dbbb18fefb92a2ade59a1de377c89aeb",
     ),
 )
 
@@ -154,7 +154,7 @@ EXPECTED_RETAINED_HELPER_AST_HASH = (
     "7e20269836fe2492cbb25356dff13ec293999574892b02e1d486dbac78143009"
 )
 EXPECTED_RETAINED_CLASS_AST_HASH = (
-    "3a1f17f2e966bd0151a861dcf2eada14b30879bbbdc5fd6cf4b9ba566e17ee12"
+    "d3f620819771796d1959e53bc3e4ec01a10a2207f9db1fa1c1e362c2e69fcd0b"
 )
 
 

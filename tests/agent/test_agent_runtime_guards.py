@@ -257,6 +257,46 @@ def test_runtime_policy_tool_timeout_is_enforced_and_logged(caplog):
     )
 
 
+def test_parallel_timeout_uses_the_shared_session_deadline():
+    def _deadline_crossing_echo(message):
+        if message == "slow":
+            time.sleep(0.2)
+        return {"echo": message}
+
+    deadline = time.monotonic() + 0.1
+    session = BoundToolSession(
+        _echo_registry(_deadline_crossing_echo),
+        execution_id="shared-parallel-deadline",
+        allowed_tools=["echo"],
+        granted_permissions=["analysis_context:read"],
+        deadline_monotonic=deadline,
+        security_audit=SecurityAuditRecorderStub(),
+    )
+    tool_calls_log = []
+
+    results = _execute_tools(
+        [
+            ToolCall(id="fast", name="echo", arguments={"message": "fast"}),
+            ToolCall(id="slow", name="echo", arguments={"message": "slow"}),
+        ],
+        session,
+        step=1,
+        progress_callback=None,
+        tool_calls_log=tool_calls_log,
+        tool_wait_timeout_seconds=1.0,
+    )
+
+    slow_log = next(
+        entry
+        for entry in tool_calls_log
+        if entry["arguments"]["message"] == "slow"
+    )
+    slow_result = next(result for result in results if result["tc"].id == "slow")
+    assert slow_log["timeout"] is True
+    assert slow_log["success"] is False
+    assert json.loads(slow_result["result_str"])["timeout"] is True
+
+
 def test_timeout_during_attempt_audit_prevents_late_handler_dispatch():
     attempt_entered = threading.Event()
     release_attempt = threading.Event()

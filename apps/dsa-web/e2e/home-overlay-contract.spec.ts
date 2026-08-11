@@ -8,7 +8,10 @@ import {
   RUN_FLOW_ROUTE_QUERY_VALUES,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
-import { expectAnalyzeButtonReady } from './workbench-fixture';
+import {
+  expectAnalyzeButtonReady,
+  openAnalysisHistoryPopover,
+} from './workbench-fixture';
 
 const UI_LANGUAGE_STORAGE_KEY = 'dsa.uiLanguage';
 const REPORT_A_SUMMARY = 'Contract report A';
@@ -404,8 +407,11 @@ async function expectSearchParams(page: Page, expected: Record<string, string | 
   }).toEqual(expected);
 }
 
-function historyButton(page: Page, name: string, code: string) {
-  return page.getByRole('button', { name: new RegExp(`${name} ${code}`) }).first();
+async function selectHistoryRecord(page: Page, name: string, code: string) {
+  const historyPopover = await openAnalysisHistoryPopover(page);
+  await historyPopover.getByRole('button', {
+    name: new RegExp(`${name} ${code}`),
+  }).first().click();
 }
 
 async function openOverlayFixture(page: Page, width: number) {
@@ -732,7 +738,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await expect.poll(() => fixture.detailRequests.filter((recordId) => recordId === 2).length).toBeGreaterThanOrEqual(2);
 
-    await historyButton(page, 'Moutai', '600519').click();
+    await selectHistoryRecord(page, 'Moutai', '600519');
     await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
 
@@ -832,7 +838,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       { delayFirstRecord: true },
     );
     await expect.poll(() => fixture.detailRequests.includes(1)).toBe(true);
-    await historyButton(page, 'Apple', 'AAPL').click();
+    await selectHistoryRecord(page, 'Apple', 'AAPL');
     await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
     await expectSearchParams(page, { recordId: '2' });
 
@@ -898,8 +904,9 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     const historyLength = await page.evaluate(() => window.history.length);
     const deleteRequestIndex = fixture.detailRequests.length;
 
-    await page.getByRole('checkbox', { name: 'Select Moutai history record' }).click();
-    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    const historyPopover = await openAnalysisHistoryPopover(page);
+    await historyPopover.getByRole('checkbox', { name: 'Select Moutai history record' }).click();
+    await historyPopover.getByRole('button', { name: 'Delete', exact: true }).click();
     await page.getByRole('dialog', { name: 'Delete History' })
       .getByRole('button', { name: 'Delete', exact: true })
       .click();
