@@ -561,6 +561,80 @@ class _RenderingMethods:
 
                 self._append_market_snapshot(report_lines, result)
 
+                indicator_snapshot = getattr(result, "indicator_snapshot", None) or {}
+                configured_mas = indicator_snapshot.get("ma_readings") or {}
+                configured_rsis = indicator_snapshot.get("rsi_readings") or {}
+                configured_macd = indicator_snapshot.get("macd_reading") or {}
+                if configured_mas or configured_rsis or configured_macd:
+                    indicator_copy = {
+                        "en": {
+                            "heading": "Configured indicators", "source": "source",
+                            "bars": "bars", "as_of": "as-of", "indicator": "Indicator",
+                            "value": "Value", "availability": "Availability",
+                            "available": "available", "unavailable": "unavailable",
+                        },
+                        "ko": {
+                            "heading": "설정된 지표", "source": "출처", "bars": "봉",
+                            "as_of": "기준일", "indicator": "지표", "value": "값",
+                            "availability": "사용 가능 여부", "available": "사용 가능",
+                            "unavailable": "사용 불가",
+                        },
+                        "zh": {
+                            "heading": "配置指标", "source": "来源", "bars": "K线",
+                            "as_of": "截止", "indicator": "指标", "value": "数值",
+                            "availability": "可用性", "available": "可用",
+                            "unavailable": "不可用",
+                        },
+                    }.get(report_language, {
+                        "heading": "配置指标", "source": "来源", "bars": "K线",
+                        "as_of": "截止", "indicator": "指标", "value": "数值",
+                        "availability": "可用性", "available": "可用",
+                        "unavailable": "不可用",
+                    })
+                    report_lines.extend([
+                        f"### 📈 {indicator_copy['heading']}",
+                        "",
+                        (
+                            f"> {indicator_copy['source']}={indicator_snapshot.get('indicator_period_source', 'unknown')} · "
+                            f"{indicator_copy['bars']}={indicator_snapshot.get('indicator_bar_count', 0)} · "
+                            f"{indicator_copy['as_of']}={indicator_snapshot.get('indicator_as_of', 'N/A')}"
+                        ),
+                        "",
+                        f"| {indicator_copy['indicator']} | {indicator_copy['value']} | {indicator_copy['availability']} |",
+                        "|---|---:|---|",
+                    ])
+                    for reading in (*configured_mas.values(), *configured_rsis.values()):
+                        value = reading.get("value")
+                        availability = (
+                            indicator_copy["available"]
+                            if reading.get("available")
+                            else reading.get("reason", indicator_copy["unavailable"])
+                        )
+                        report_lines.append(
+                            f"| {reading.get('label', 'indicator')} | "
+                            f"{'N/A' if value is None else value} | {availability} |"
+                        )
+                    if configured_macd:
+                        macd_value = "N/A"
+                        if configured_macd.get("available"):
+                            macd_value = (
+                                f"DIF={configured_macd.get('dif')}, "
+                                f"DEA={configured_macd.get('dea')}, "
+                                f"BAR={configured_macd.get('bar')}"
+                            )
+                        macd_availability = (
+                            indicator_copy["available"]
+                            if configured_macd.get("available")
+                            else configured_macd.get(
+                                "reason", indicator_copy["unavailable"]
+                            )
+                        )
+                        report_lines.append(
+                            f"| {configured_macd.get('label', 'MACD')} | "
+                            f"{macd_value} | {macd_availability} |"
+                        )
+                    report_lines.append("")
+
                 # ========== Data Pivot ==========
                 data_persp = dashboard.get('data_perspective', {}) if dashboard else {}
                 if data_persp:

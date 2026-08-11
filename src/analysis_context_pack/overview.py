@@ -200,12 +200,54 @@ def _sanitize_persisted_overview(overview: Mapping[str, Any]) -> Optional[Dict[s
 def _sanitize_data_quality(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping):
         return None
+    metadata = value.get("metadata")
+    evidence = (
+        metadata.get("validation_evidence")
+        if isinstance(metadata, Mapping)
+        else None
+    )
     return {
         "overall_score": _safe_score(value.get("overall_score")),
         "level": _safe_quality_level(value.get("level")),
         "block_scores": _safe_block_scores(value.get("block_scores")),
         "limitations": _list_strings(value.get("limitations"), limit=5),
+        "validation_evidence": _sanitize_validation_evidence(evidence),
     }
+
+
+def _sanitize_validation_evidence(value: Any) -> List[Dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    sanitized: List[Dict[str, Any]] = []
+    for item in value[-24:]:
+        if not isinstance(item, Mapping):
+            continue
+        if _safe_text(item.get("schema_version")) != "data_quality_evidence.v1":
+            continue
+        issues = item.get("issues")
+        reason_codes = []
+        if isinstance(issues, list):
+            for issue in issues[:24]:
+                if not isinstance(issue, Mapping):
+                    continue
+                code = _safe_text(issue.get("code"))
+                if code and code not in reason_codes:
+                    reason_codes.append(code)
+        sanitized.append(
+            {
+                "schema_version": "data_quality_evidence.v1",
+                "data_type": _safe_text(item.get("data_type")),
+                "severity": _safe_text(item.get("severity")),
+                "symbol": _safe_text(item.get("symbol")) or None,
+                "provider": _safe_text(item.get("provider")) or None,
+                "market": _safe_text(item.get("market")) or "unknown",
+                "instrument_type": _safe_text(item.get("instrument_type"))
+                or "equity",
+                "rejected": item.get("rejected") is True,
+                "reason_codes": reason_codes,
+            }
+        )
+    return sanitized
 
 
 def _safe_status(value: Any) -> Optional[str]:

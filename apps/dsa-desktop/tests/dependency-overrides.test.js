@@ -10,6 +10,12 @@ const tar = require('tar');
 
 const desktopPackage = require('../package.json');
 const tarPackage = require('tar/package.json');
+const jsYamlPackage = require('js-yaml/package.json');
+
+test('js-yaml override pins the GHSA-5p4m-2wfm-xmqj fixed release', () => {
+  assert.equal(desktopPackage.overrides['js-yaml'], '4.3.1');
+  assert.equal(jsYamlPackage.version, '4.3.1');
+});
 
 test('tar override remains compatible with the app-builder-lib archive path', async () => {
   assert.equal(

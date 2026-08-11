@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """Analysis history, daily-data, and context helper methods."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import pandas as pd
-from sqlalchemy import and_, delete, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select, text as _sql_text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
@@ -182,30 +182,35 @@ class _HistoryMethods:
         self,
         code: Optional[str] = None,
         query_id: Optional[str] = None,
-        days: int = 30,
+        days: Optional[int] = 30,
         limit: int = 50,
         exclude_query_id: Optional[str] = None,
+        report_type: Optional[str] = None,
     ) -> List[AnalysisHistory]:
         """
         Query analysis history records.
 
         Notes:
         - If query_id is provided, perform exact lookup and ignore days window.
-        - If query_id is not provided, apply days-based time filtering.
+        - If query_id is not provided and days is not None, apply time filtering.
+        - days=None explicitly removes the age window for bounded latest-row reads.
         - exclude_query_id: exclude records with this query_id (for history comparison).
+        - report_type filters history rows to one persisted report shape.
         """
-        cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_date = datetime.now() - timedelta(days=days) if days is not None else None
 
         with self.get_session() as session:
             conditions = []
 
             if query_id:
                 conditions.append(AnalysisHistory.query_id == query_id)
-            else:
+            elif cutoff_date is not None:
                 conditions.append(AnalysisHistory.created_at >= cutoff_date)
 
             if code:
                 conditions.append(AnalysisHistory.code == code)
+            if report_type:
+                conditions.append(AnalysisHistory.report_type == report_type)
 
             # exclude_query_id only applies when not doing exact lookup (query_id is None)
             if exclude_query_id and not query_id:
@@ -214,11 +219,70 @@ class _HistoryMethods:
             results = session.execute(
                 select(AnalysisHistory)
                 .where(and_(*conditions))
-                .order_by(desc(AnalysisHistory.created_at))
+                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
                 .limit(limit)
             ).scalars().all()
 
             return list(results)
+
+    def get_analysis_history_batch(
+        self,
+        *,
+        codes: Sequence[str],
+        created_at_from: datetime,
+        limit_per_code: int = 2,
+    ) -> List[AnalysisHistory]:
+        """Return a stable bounded latest window for every stored code."""
+        normalized_codes = sorted({str(code or "").strip() for code in codes if str(code or "").strip()})
+        if not normalized_codes:
+            return []
+        safe_limit = max(1, int(limit_per_code))
+        since = created_at_from
+        if since.tzinfo is not None and since.utcoffset() is not None:
+            since = since.astimezone(timezone.utc).replace(tzinfo=None)
+
+        records_by_id: Dict[int, AnalysisHistory] = {}
+        with self.get_session() as session:
+            for start in range(0, len(normalized_codes), 200):
+                code_chunk = normalized_codes[start:start + 200]
+                ranked = (
+                    select(
+                        AnalysisHistory.id.label("history_id"),
+                        func.row_number().over(
+                            partition_by=AnalysisHistory.code,
+                            order_by=(
+                                desc(AnalysisHistory.created_at),
+                                desc(AnalysisHistory.id),
+                            ),
+                        ).label("code_rank"),
+                    )
+                    .where(
+                        AnalysisHistory.code.in_(code_chunk),
+                        AnalysisHistory.created_at >= since,
+                    )
+                    .subquery()
+                )
+                rows = session.execute(
+                    select(AnalysisHistory)
+                    .join(ranked, AnalysisHistory.id == ranked.c.history_id)
+                    .where(ranked.c.code_rank <= safe_limit)
+                    .order_by(
+                        AnalysisHistory.code.asc(),
+                        desc(AnalysisHistory.created_at),
+                        desc(AnalysisHistory.id),
+                    )
+                ).scalars().all()
+                for row in rows:
+                    records_by_id[int(row.id)] = row
+        return sorted(
+            records_by_id.values(),
+            key=lambda row: (
+                str(row.code or ""),
+                row.created_at or datetime.min,
+                int(row.id or 0),
+            ),
+            reverse=True,
+        )
 
     def get_latest_analysis_history_id(
         self,
@@ -252,6 +316,7 @@ class _HistoryMethods:
         self,
         code: Optional[Union[str, List[str]]] = None,
         report_type: Optional[str] = None,
+        excluded_report_types: Optional[Sequence[str]] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         offset: int = 0,
@@ -285,6 +350,21 @@ class _HistoryMethods:
                     conditions.append(AnalysisHistory.code == code)
             if report_type:
                 conditions.append(AnalysisHistory.report_type == report_type)
+            if excluded_report_types:
+                excluded = sorted(
+                    {
+                        str(value).strip()
+                        for value in excluded_report_types
+                        if str(value).strip()
+                    }
+                )
+                if excluded:
+                    conditions.append(
+                        or_(
+                            AnalysisHistory.report_type.is_(None),
+                            AnalysisHistory.report_type.notin_(excluded),
+                        )
+                    )
             if start_date:
                 # created_at >= start_date 00:00:00
                 conditions.append(AnalysisHistory.created_at >= datetime.combine(start_date, datetime.min.time()))
@@ -303,13 +383,81 @@ class _HistoryMethods:
             data_query = (
                 select(AnalysisHistory)
                 .where(where_clause)
-                .order_by(desc(AnalysisHistory.created_at))
+                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
                 .offset(offset)
                 .limit(limit)
             )
             results = session.execute(data_query).scalars().all()
             
             return list(results), total
+
+    def search_analysis_history(
+        self,
+        query: str,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """Search low-sensitive history summaries through the maintained FTS index.
+
+        The query reads only matching row ids from the trigram index, applies a
+        hard result cap, then reads only the bounded low-sensitive projection.
+        Raw results, context snapshots, news content, and configuration values
+        are intentionally absent from the indexed columns. Creation timestamps
+        remain searchable because they are part of the low-sensitive result DTO.
+        """
+        normalized_query = str(query or "").strip()
+        if len(normalized_query) < 3:
+            return []
+        bounded_limit = max(1, min(int(limit), 10))
+        literal_match = f'"{normalized_query.replace(chr(34), chr(34) * 2)}"'
+
+        with self.get_session() as session:
+            rows = session.execute(
+                _sql_text(
+                    "SELECT history.id "
+                    "FROM analysis_history_search "
+                    "JOIN analysis_history AS history "
+                    "ON history.id = analysis_history_search.rowid "
+                    "WHERE analysis_history_search MATCH :match_query "
+                    "ORDER BY "
+                    "CASE WHEN lower(history.code) = lower(:literal_query) "
+                    "OR lower(coalesce(history.name, '')) = lower(:literal_query) "
+                    "THEN 0 ELSE 1 END, "
+                    "bm25(analysis_history_search), "
+                    "history.created_at DESC, history.id DESC "
+                    "LIMIT :limit"
+                ),
+                {
+                    "match_query": literal_match,
+                    "literal_query": normalized_query,
+                    "limit": bounded_limit,
+                },
+            ).fetchall()
+            record_ids = [int(row[0]) for row in rows]
+            if not record_ids:
+                return []
+
+            records = session.execute(
+                select(
+                    AnalysisHistory.id.label("id"),
+                    AnalysisHistory.code.label("stock_code"),
+                    AnalysisHistory.name.label("stock_name"),
+                    AnalysisHistory.report_type.label("report_type"),
+                    AnalysisHistory.analysis_summary.label("analysis_summary"),
+                    AnalysisHistory.operation_advice.label("operation_advice"),
+                    AnalysisHistory.trend_prediction.label("trend_prediction"),
+                    AnalysisHistory.created_at.label("created_at"),
+                ).where(AnalysisHistory.id.in_(record_ids))
+            ).mappings().all()
+            records_by_id = {
+                int(record["id"]): dict(record)
+                for record in records
+                if record["id"] is not None
+            }
+            return [
+                records_by_id[record_id]
+                for record_id in record_ids
+                if record_id in records_by_id
+            ]
     
     def get_analysis_history_by_id(self, record_id: int) -> Optional[AnalysisHistory]:
         """
@@ -482,7 +630,7 @@ class _HistoryMethods:
             result = session.execute(
                 select(AnalysisHistory)
                 .where(and_(*conditions))
-                .order_by(desc(AnalysisHistory.created_at))
+                .order_by(desc(AnalysisHistory.created_at), desc(AnalysisHistory.id))
                 .limit(1)
             ).scalars().first()
             return result

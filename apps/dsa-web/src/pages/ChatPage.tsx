@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { History } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { Button, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
+import { Button, ConfirmDialog, Drawer, IconButton, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
 import { ChatComposer } from '../components/chat/ChatComposer';
+import { ChatSendFeedbackAlert } from '../components/chat/ChatSendFeedback';
+import { WhatIfScenarioPanel } from '../components/chat/WhatIfScenarioPanel';
 import {
   resolveActiveStockContextFromMessage,
   restoreActiveStockContextFromMessages,
@@ -15,13 +17,12 @@ import {
 } from '../components/chat/chatActiveStock';
 import { getMessageSkillLabel } from '../components/chat/chatMessageMeta';
 import { useChatPageUiState } from '../components/chat/useChatPageUiState';
+import { useChatWhatIf } from '../components/chat/useChatWhatIf';
+import { useChatSendFeedback } from '../components/chat/useChatSendFeedback';
 import { useAgentSetupAvailability } from '../hooks/useAgentSetupAvailability';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
-import {
-  useAgentChatStore,
-  type Message,
-} from '../stores/agentChatStore';
+import { useAgentChatStore, type Message } from '../stores/agentChatStore';
 import { downloadSession, formatSessionAsMarkdown } from '../utils/chatExport';
 import type { ChatFollowUpContext } from '../utils/chatFollowUp';
 import {
@@ -54,6 +55,7 @@ const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
 const CHAT_SESSION_QUERY_KEY = 'session';
 const CHAT_CONTEXT_STATE_QUERY_KEY = 'context';
 const CHAT_ACTIVE_CONTEXT_STATE = 'active';
+const CHAT_UNKNOWN_CONTEXT_STATE = 'unknown';
 const CHAT_DESKTOP_RAIL_QUERY = '(min-width: 1280px)';
 const ChatPage: React.FC = () => {
   const { language, t } = useUiLanguage();
@@ -123,10 +125,7 @@ const ChatPage: React.FC = () => {
   }, [dispatchUi]);
   const closeSidebar = useCallback(() => setSidebarPresentationOpen(false), [setSidebarPresentationOpen]);
   const [isFollowUpContextLoading, setIsFollowUpContextLoading] = useState(false);
-  const [sendToast, setSendToast] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
+  const { sendToast, showSendFeedback, clearSendFeedback } = useChatSendFeedback();
   const [contextCompressionEnabled, setContextCompressionEnabled] = useState(false);
   const [contextCompressionLoaded, setContextCompressionLoaded] = useState(false);
   const [contextCompressionSaving, setContextCompressionSaving] = useState(false);
@@ -147,8 +146,8 @@ const ChatPage: React.FC = () => {
   const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
-  const sendToastTimerRef = useRef<number | null>(null);
   const followUpHydrationTokenRef = useRef(0);
+  const sendGenerationRef = useRef(0);
   const lastHydratedFollowUpKeyRef = useRef<string | null>(null);
   const followUpContextRef = useRef<ChatFollowUpContext | null>(null);
   const shouldStickToBottomRef = useRef(true);
@@ -171,9 +170,6 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const timers = copyResetTimerRef.current;
     return () => {
-      if (sendToastTimerRef.current !== null) {
-        window.clearTimeout(sendToastTimerRef.current);
-      }
       Object.values(timers).forEach((timerId) => {
         if (timerId !== undefined) {
           window.clearTimeout(timerId);
@@ -189,6 +185,7 @@ const ChatPage: React.FC = () => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      sendGenerationRef.current += 1;
     };
   }, []);
   useEffect(() => {
@@ -296,6 +293,7 @@ const ChatPage: React.FC = () => {
     stopStream,
     clearCompletionBadge,
   } = useAgentChatStore();
+  const { whatIfDraft, setWhatIfDraft, planWhatIfSend } = useChatWhatIf(messages);
   const selectedSkillIds = sessionSelectedSkillIds ?? defaultSkillIds;
   const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
     setSearchParams((current) => {
@@ -345,6 +343,7 @@ const ChatPage: React.FC = () => {
       return;
     }
     if (urlSessionId !== sessionId) {
+      sendGenerationRef.current += 1;
       void switchSession(urlSessionId);
     }
   }, [hasInitialLoad, searchParams, sessionId, setSessionInUrl, switchSession]);
@@ -553,6 +552,7 @@ const ChatPage: React.FC = () => {
     }
   }, [selectedSkillIds, setSelectedSkillIds]);
   const handleStartNewChat = useCallback(() => {
+    sendGenerationRef.current += 1;
     followUpContextRef.current = null;
     activeStockContextRef.current = null;
     setActiveStockContext(null);
@@ -567,6 +567,7 @@ const ChatPage: React.FC = () => {
       setSidebarPresentationOpen(false);
       return;
     }
+    sendGenerationRef.current += 1;
     const switched = await switchSession(targetSessionId);
     if (switched !== false) {
       followUpContextRef.current = null;
@@ -600,7 +601,8 @@ const ChatPage: React.FC = () => {
     const stock = sanitizeFollowUpStockCode(searchParams.get('stock'));
     const name = sanitizeFollowUpStockName(searchParams.get('name'));
     const recordId = parseFollowUpRecordId(searchParams.get(REPORT_ROUTE_QUERY_KEYS.recordId));
-    const contextIsActive = searchParams.get(CHAT_CONTEXT_STATE_QUERY_KEY) === CHAT_ACTIVE_CONTEXT_STATE;
+    const contextWasSent = [CHAT_ACTIVE_CONTEXT_STATE, CHAT_UNKNOWN_CONTEXT_STATE]
+      .includes(searchParams.get(CHAT_CONTEXT_STATE_QUERY_KEY) ?? '');
     if (!stock) {
       lastHydratedFollowUpKeyRef.current = null;
       return;
@@ -620,7 +622,7 @@ const ChatPage: React.FC = () => {
     };
     activeStockContextRef.current = stockContext;
     setActiveStockContext(stockContext);
-    if (contextIsActive) {
+    if (contextWasSent) {
       followUpContextRef.current = stockContext;
       setIsFollowUpContextLoading(false);
       return;
@@ -653,6 +655,8 @@ const ChatPage: React.FC = () => {
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
       if (!msgText || loading || sessionLoading || isFollowUpContextLoading || isSkillsLoading) return;
+      const sendGeneration = ++sendGenerationRef.current;
+      const sendSessionId = sessionId;
       const requestedSkillIds = overrideSkillIds ?? sessionSelectedSkillIds;
       const usedSkillIds = normalizeSelectedSkillIds(
         requestedSkillIds ?? selectedSkillIds,
@@ -669,20 +673,34 @@ const ChatPage: React.FC = () => {
         setActiveStockContext(nextActiveStockContext);
         setActiveStockCode(nextActiveStockContext.stock_code);
       }
-      const contextForSend = useActiveContextForThisSend
+      const baseContextForSend = useActiveContextForThisSend
         ? nextActiveStockContext
         : followUpContextRef.current ?? nextActiveStockContext ?? undefined;
+      const whatIfPlan = planWhatIfSend(
+        msgText,
+        baseContextForSend as Record<string, unknown> | null | undefined,
+      );
+      if (!whatIfPlan.ok) {
+        showSendFeedback(
+          {
+            type: 'error',
+            message: t(whatIfPlan.errorKey, whatIfPlan.errorParams),
+          },
+          5000,
+        );
+        return;
+      }
+      const contextForSend = whatIfPlan.context;
       const payload = {
-        message: msgText,
+        message: whatIfPlan.message,
         session_id: sessionId,
         ...(requestedSkillIds !== null
           ? { skills: normalizeSelectedSkillIds(requestedSkillIds) }
           : {}),
         context: contextForSend ?? undefined,
       };
-      // Keep stock/name/recordId query params unsent until the stream succeeds so a
-      // mid-flight refresh can restore the report→chat draft. Only mark context=active
-      // after backend persistence (stream without lastFailedRequest).
+      // Keep report query context unsent until the identified user turn is durably
+      // acknowledged (or found by exact session/turn reconciliation).
       const pendingFollowUpContext = followUpContextRef.current;
       const unsentFollowUpParamsPresent = Boolean(
         sanitizeFollowUpStockCode(searchParams.get('stock'))
@@ -695,24 +713,51 @@ const ChatPage: React.FC = () => {
       setInput('');
       setMobileSkillPickerOpen(false);
       requestScrollToBottom('smooth');
-      await startStream(payload, {
+      const streamOutcome = await startStream(payload, {
         skillNames: usedSkillNames,
         skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
 
-      const { lastFailedRequest } = useAgentChatStore.getState();
-      if (!lastFailedRequest) {
+      const continuationIsCurrent = (
+        isMountedRef.current
+        && sendGenerationRef.current === sendGeneration
+        && useAgentChatStore.getState().sessionId === sendSessionId
+      );
+      if (!continuationIsCurrent) {
+        return;
+      }
+
+      if (streamOutcome.persistence === 'persisted') {
         persistActiveContextInUrl(nextActiveStockContext);
         return;
       }
 
-      // Stream failed: restore draft + pending context so refresh can retry.
-      followUpContextRef.current = pendingFollowUpContext ?? contextForSend ?? null;
-      if (unsentFollowUpParamsPresent || pendingFollowUpContext) {
-        setInput(msgText);
+      if (streamOutcome.persistence === 'unknown'
+        && (unsentFollowUpParamsPresent || pendingFollowUpContext)) {
+        setSearchParams((previous) => {
+          const next = new URLSearchParams(previous);
+          if (sessionId) next.set(CHAT_SESSION_QUERY_KEY, sessionId);
+          next.set(CHAT_CONTEXT_STATE_QUERY_KEY, CHAT_UNKNOWN_CONTEXT_STATE);
+          return next;
+        }, { replace: true });
+        return;
+      }
+
+      // Restore a resendable draft only when the exact turn is confirmed absent.
+      // Unknown acknowledgement stays non-resendable because a legacy or unreachable
+      // service may already have persisted the turn.
+      if (streamOutcome.persistence === 'not_persisted') {
+        // Prefer the pre-what-if stock/follow-up context; a what_if payload is not
+        // a ChatFollowUpContext and must not become the next turn's base context.
+        followUpContextRef.current = pendingFollowUpContext
+          ?? (baseContextForSend as typeof followUpContextRef.current)
+          ?? null;
+        if (unsentFollowUpParamsPresent || pendingFollowUpContext) {
+          setInput(msgText);
+        }
       }
     },
-    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, planWhatIfSend, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, setSearchParams, showSendFeedback, startStream, t],
   );
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Ignore the Enter that confirms an IME candidate so CJK input isn't sent
@@ -730,16 +775,6 @@ const ChatPage: React.FC = () => {
     setSelectedSkillIds(quickSkillIds);
     handleSend(q.label, quickSkillIds);
   };
-  const showSendFeedback = useCallback((nextToast: { type: 'success' | 'error'; message: string }, durationMs: number) => {
-    if (sendToastTimerRef.current !== null) {
-      window.clearTimeout(sendToastTimerRef.current);
-    }
-    setSendToast(nextToast);
-    sendToastTimerRef.current = window.setTimeout(() => {
-      setSendToast(null);
-      sendToastTimerRef.current = null;
-    }, durationMs);
-  }, []);
   const toggleThinking = (msgId: string) => {
     dispatchUi({ type: 'toggleThinking', messageId: msgId });
   };
@@ -921,7 +956,7 @@ const ChatPage: React.FC = () => {
                       onClick={async () => {
                         if (sending) return;
                         setSending(true);
-                        setSendToast(null);
+                        clearSendFeedback();
                         try {
                           const content = formatSessionAsMarkdown(messages, language);
                           await agentApi.sendChat(content);
@@ -971,15 +1006,7 @@ const ChatPage: React.FC = () => {
               ]}
             />
           </div>
-          {sendToast ? (
-            <InlineAlert
-              variant={sendToast.type === 'success' ? 'success' : 'danger'}
-              size="compact"
-              title={sendToast.type === 'success' ? t('chat.sendSuccess') : t('chat.sendFailure')}
-              message={sendToast.message}
-              className="max-w-md"
-            />
-          ) : null}
+          <ChatSendFeedbackAlert toast={sendToast} successTitle={t('chat.sendSuccess')} failureTitle={t('chat.sendFailure')} />
         </header>
 
         {chatMode === 'research' ? (
@@ -1028,6 +1055,9 @@ const ChatPage: React.FC = () => {
             </div>
           )}
 
+          <WhatIfScenarioPanel t={t} draft={whatIfDraft} onChange={setWhatIfDraft}
+            disabled={loading || sessionLoading || isSkillsLoading} />
+
           <ChatComposer
             language={language}
             t={t}
@@ -1069,7 +1099,6 @@ const ChatPage: React.FC = () => {
             onStop={() => stopStream()}
             onSend={() => handleSend()}
           />
-
         </Surface>
       </div>
     </div>

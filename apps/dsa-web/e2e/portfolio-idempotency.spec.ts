@@ -89,7 +89,7 @@ test.describe('portfolio idempotent mobile mutations', () => {
     }
 
     releaseFirstRequest();
-    await expect(dialog.getByText('请求失败', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-toast-tone="danger"]').getByText('请求失败', { exact: true })).toBeVisible();
     await expect(dialog.getByLabel('股票代码')).toHaveValue('AAPL');
     await dialog.getByRole('button', { name: '提交交易' }).click();
     await expect(dialog).toBeHidden();

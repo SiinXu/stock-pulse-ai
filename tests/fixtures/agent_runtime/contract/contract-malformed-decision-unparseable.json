@@ -134,12 +134,34 @@
       "decision_type",
       "key_points",
       "operation_advice",
+      "risk_manager",
       "risk_warning",
       "sentiment_score",
       "stock_name",
       "trend_prediction"
     ],
     "dashboard": {
+      "risk_manager": {
+        "schema_version": "risk-manager-result/v1",
+        "verdict": "pass",
+        "original_action": "buy",
+        "final_action": "buy",
+        "reason_codes": [
+          "no_risk_evidence"
+        ],
+        "reason_params": {},
+        "adjustment": null,
+        "evidence_codes": [],
+        "evidence_provenance": [],
+        "profile": "balanced",
+        "override_enabled": true,
+        "override_would_apply": false,
+        "exit_id": "orchestrator_multi_agent",
+        "evaluation_id": "<runtime-generated>",
+        "evaluated_at": "<runtime-evaluated-at>",
+        "authorized_bypass_id": null,
+        "fail_closed": false
+      },
       "stock_name": "贵州茅台",
       "sentiment_score": 75,
       "trend_prediction": "技术面bullish，趋势评分 78",
@@ -191,7 +213,7 @@
         }
       }
     },
-    "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 75,\n  \"trend_prediction\": \"技术面bullish，趋势评分 78\",\n  \"operation_advice\": \"买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"analysis_summary\": \"均线多头排列且量能配合，趋势延续概率较高。\",\n  \"key_points\": [\n    \"均线多头排列且量能配合，趋势延续概率较高。\",\n    \"季报超预期，行业政策中性，无重大负面消息。\"\n  ],\n  \"risk_warning\": \"暂无额外风险提示\",\n  \"dashboard\": {\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"core_conclusion\": {\n      \"one_sentence\": \"均线多头排列且量能配合，趋势延续概率较高。\",\n      \"time_sensitivity\": \"本周内\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"可结合支撑位分批试仓，避免一次性追高。\",\n        \"has_position\": \"可继续持有，回踩关键位不破再考虑加仓。\"\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": [],\n      \"positive_catalysts\": [\n        \"季报业绩超预期\"\n      ]\n    },\n    \"battle_plan\": {\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"可结合支撑位分批试仓，避免一次性追高。\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    }\n  }\n}",
+    "content": "{\n  \"risk_manager\": {\n    \"schema_version\": \"risk-manager-result/v1\",\n    \"verdict\": \"pass\",\n    \"original_action\": \"buy\",\n    \"final_action\": \"buy\",\n    \"reason_codes\": [\n      \"no_risk_evidence\"\n    ],\n    \"reason_params\": {},\n    \"adjustment\": null,\n    \"evidence_codes\": [],\n    \"evidence_provenance\": [],\n    \"profile\": \"balanced\",\n    \"override_enabled\": true,\n    \"override_would_apply\": false,\n    \"exit_id\": \"orchestrator_multi_agent\",\n    \"evaluation_id\": \"<runtime-generated>\",\n    \"evaluated_at\": \"<runtime-evaluated-at>\",\n    \"authorized_bypass_id\": null,\n    \"fail_closed\": false\n  },\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 75,\n  \"trend_prediction\": \"技术面bullish，趋势评分 78\",\n  \"operation_advice\": \"买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"analysis_summary\": \"均线多头排列且量能配合，趋势延续概率较高。\",\n  \"key_points\": [\n    \"均线多头排列且量能配合，趋势延续概率较高。\",\n    \"季报超预期，行业政策中性，无重大负面消息。\"\n  ],\n  \"risk_warning\": \"暂无额外风险提示\",\n  \"dashboard\": {\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"core_conclusion\": {\n      \"one_sentence\": \"均线多头排列且量能配合，趋势延续概率较高。\",\n      \"time_sensitivity\": \"本周内\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"可结合支撑位分批试仓，避免一次性追高。\",\n        \"has_position\": \"可继续持有，回踩关键位不破再考虑加仓。\"\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": [],\n      \"positive_catalysts\": [\n        \"季报业绩超预期\"\n      ]\n    },\n    \"battle_plan\": {\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"可结合支撑位分批试仓，避免一次性追高。\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    }\n  }\n}",
     "error": null
   }
 }
