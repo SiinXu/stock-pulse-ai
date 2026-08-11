@@ -163,4 +163,3 @@ BACKTEST_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
 }
-
