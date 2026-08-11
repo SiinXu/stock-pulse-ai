@@ -231,6 +231,21 @@ def test_ci_gate_offline_suite_emits_slow_test_durations():
     assert "--durations-min=0.5" in script
 
 
+def test_ci_gate_keeps_shard_variables_out_of_single_node_suite():
+    script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
+    single_node = script.split("offline_test_suite() {", 1)[1].split(
+        "offline_test_suite_selective() {", 1
+    )[0]
+    sharded = script.split("offline_test_suite_shard() {", 1)[1].split(
+        "offline_test_suite_combine() {", 1
+    )[0]
+
+    assert "shard_dir" not in single_node
+    assert "${group}" not in single_node
+    assert '--cov-report="json:${coverage_report}"' in single_node
+    assert '--cov-report="json:${shard_dir}/coverage-shard-${group}.json"' in sharded
+
+
 def test_pytest_testpaths_scopes_to_tests_package():
     setup_cfg = (REPOSITORY_ROOT / "setup.cfg").read_text(encoding="utf-8")
     assert "testpaths = tests" in setup_cfg

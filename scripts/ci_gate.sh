@@ -96,7 +96,6 @@ offline_test_suite() {
   _run_pytest_offline "${test_data_dir}" \
       --durations=30 --durations-min=0.5 \
       --cov=src --cov=api --cov=data_provider --cov=bot \
-      --cov-report="json:${shard_dir}/coverage-shard-${group}.json" \
       --cov-report="json:${coverage_report}" \
     || test_exit_code=$?
   if [ "${test_exit_code}" -eq 0 ]; then
@@ -179,7 +178,7 @@ offline_test_suite_shard() {
       -o faulthandler_timeout=300 \
       --durations=30 --durations-min=0.5 \
       --cov=src --cov=api --cov=data_provider --cov=bot \
-      --cov-report=term \
+      --cov-report="json:${shard_dir}/coverage-shard-${group}.json" \
       || test_exit_code=$?
   rm -rf "${test_data_dir}"
   if [[ "${test_exit_code}" -eq 0 && ! -f "${coverage_file}" ]]; then
