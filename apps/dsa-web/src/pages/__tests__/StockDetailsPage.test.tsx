@@ -2,7 +2,7 @@ import type React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import StockDetailsPage from '../StockDetailsPage';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
@@ -44,10 +44,20 @@ vi.mock('recharts', () => ({
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
 const getHistoryMock = vi.mocked(stocksApi.getDailyHistory);
 const addWatchlistMock = vi.mocked(systemConfigApi.addToWatchlist);
+const estimateStockValuationMock = vi.mocked(estimateStockValuation);
 
 function SignalLocationProbe() {
   const location = useLocation();
   return <output data-testid="signal-location">{`${location.pathname}${location.search}`}</output>;
+}
+
+function StockRouteNavigationProbe() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate('/stocks/AAPL')}>
+      Navigate to AAPL
+    </button>
+  );
 }
 
 function makeQuote(overrides: Partial<StockQuote> = {}): StockQuote {
@@ -90,11 +100,12 @@ function wrapWithQueryClient(ui: ReactElement): ReactElement {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
-function renderPage(code = '600519') {
+function renderPage(code = '600519', includeNavigationProbe = false) {
   return render(
     wrapWithQueryClient(
       <UiLanguageProvider initialLanguage="en">
         <MemoryRouter initialEntries={[`/stocks/${code}`]}>
+          {includeNavigationProbe && <StockRouteNavigationProbe />}
           <Routes>
             <Route path="/stocks/:stockCode" element={<StockDetailsPage />} />
             <Route path="/" element={<div>home-route</div>} />
@@ -111,6 +122,7 @@ describe('StockDetailsPage', () => {
     getQuoteMock.mockReset();
     getHistoryMock.mockReset();
     addWatchlistMock.mockReset();
+    estimateStockValuationMock.mockReset();
   });
 
   it('renders the quote and the accessible history table', async () => {
@@ -335,6 +347,52 @@ describe('StockDetailsPage', () => {
     expect(section).toHaveAttribute('aria-label', 'DCF sensitivity');
     expect(screen.getByTestId('dcf-sensitivity-panel')).toBeInTheDocument();
     expect(screen.getByTestId('dcf-stock-code')).toHaveValue('600519');
+  });
+
+  it('remounts DCF state and estimates only the new canonical route stock', async () => {
+    getQuoteMock.mockImplementation(async (stockCode) => makeQuote({ stockCode }));
+    getHistoryMock.mockImplementation(async (stockCode) => ({
+      ...makeHistory(),
+      stockCode,
+    }));
+    estimateStockValuationMock.mockResolvedValue({
+      status: 'ok',
+      stockCode: 'AAPL',
+      dcf: {
+        status: 'ok',
+        assumptions: {
+          growthRate: 0.05,
+          discountRate: 0.1,
+          terminalGrowthRate: 0.03,
+          projectionYears: 5,
+        },
+        sensitivity: { rows: [] },
+      },
+    });
+
+    renderPage('600519', true);
+    expect(await screen.findByTestId('dcf-stock-code')).toHaveValue('600519');
+    fireEvent.change(screen.getByTestId('dcf-growth-rate'), {
+      target: { value: '0.09' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Navigate to AAPL' }));
+
+    await waitFor(() => expect(screen.getByTestId('dcf-stock-code')).toHaveValue('AAPL'));
+    expect(screen.getByTestId('dcf-growth-rate')).toHaveValue('0.05');
+
+    fireEvent.click(screen.getByTestId('dcf-recompute'));
+
+    await waitFor(() => expect(estimateStockValuationMock).toHaveBeenCalledWith({
+      stockCode: 'AAPL',
+      growthRate: 0.05,
+      discountRate: 0.1,
+      terminalGrowthRate: 0.03,
+      projectionYears: 5,
+    }));
+    expect(estimateStockValuationMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ stockCode: '600519' }),
+    );
   });
 
 });
