@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Docs] Add three-way config source consistency check and bilingual environment-variable inventory with the required config addition process.
+- [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
 
 - [Fixed] Route the Home Today's Focus request through the versioned API so the panel loads without a persistent request-failure toast.
 - [Chore] Run path-selective backend tests on pull requests and duration-balanced full-suite shards with combined coverage on pushes to main.

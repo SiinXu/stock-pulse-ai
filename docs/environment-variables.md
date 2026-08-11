@@ -29,13 +29,14 @@ python scripts/check_config_doc_consistency.py --write-inventory
 python scripts/check_config_doc_consistency.py --self-test
 ```
 
-检查输出三类主清单（以及中英清单不一致、默认值不一致）：
+检查输出以下主清单（以及中英清单不一致、默认值不一致）：
 
 1. **文档缺失**（`missing_from_docs`）：在 `.env.example` 中存在，但中/英清单缺一或双缺；
 2. **`.env.example` 缺失**（`missing_from_env`）：在清单或注册表中存在，但模板没有 `KEY=`（含注释行）；
-3. **注册表缺失**（`missing_from_registry`）：在 `.env.example` 中存在，但未在配置注册表显式登记。
+3. **注册表缺失**（`missing_from_registry`）：在 `.env.example` 中存在，但未在配置注册表显式登记；
+4. **注册状态不一致**（`registry_status_mismatch`）：某语言的“已注册”单元格不是该语言允许的是/否字面量，或与实时注册表不一致。
 
-默认失败类为 `docs,env,cn_en,defaults`：**注册表缺口默认只报告、不使检查失败**，由注册表分区任务与 Task 1 守卫收敛。需要把注册表也变成硬门禁时：
+默认失败类为 `docs,env,cn_en,defaults,registry_status`：历史**注册表缺口仍默认只报告、不使检查失败**，但过期或非法的文档注册状态会失败。注册表分区任务与 Task 1 守卫负责收敛历史缺口；需要把历史注册表覆盖也变成硬门禁时：
 
 ```bash
 python scripts/check_config_doc_consistency.py --fail-on all
@@ -62,7 +63,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
    - 用户可见能力变更时更新 `docs/CHANGELOG.md` 的 `[Unreleased]` 扁平条目。
 
 4. **验证**
-   - `python scripts/check_config_doc_consistency.py`（文档/模板/中英/默认值）；
+   - `python scripts/check_config_doc_consistency.py`（文档/模板/中英/默认值/文档注册状态）；
    - 涉及注册表时再跑相关 `tests/test_config_registry.py` 与设置页契约测试；
    - 不要在未登记注册表的情况下声称「设置页已支持」。
 
@@ -85,7 +86,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 下表由 `scripts/check_config_doc_consistency.py --write-inventory` 根据 `.env.example` 与当前注册表生成。
 
 - **默认值**列对齐 `.env.example` 赋值（空值记为 `空`）。
-- **已注册**列表示是否出现在 `get_registered_field_keys()`；`否` 表示注册表缺口（见 [#1026](https://github.com/SiinXu/stock-pulse-ai/issues/1026)，勿在文档 PR 中顺手改注册表）。
+- **已注册**列表示是否出现在 `get_registered_field_keys()`；仅允许 `是` / `否`，单元格过期时检查默认失败。`否` 表示注册表缺口（见 [#1026](https://github.com/SiinXu/stock-pulse-ai/issues/1026)，勿在文档 PR 中顺手改注册表）。
 - 长说明、枚举取值与排障以 `.env.example` 注释及专题文档为准。
 
 <!-- config-env-inventory:start -->
