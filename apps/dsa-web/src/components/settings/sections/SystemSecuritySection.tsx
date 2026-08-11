@@ -8,6 +8,7 @@ import ScheduledTasksPanel from '../ScheduledTasksPanel';
 import SecurityAuditPanel from '../SecurityAuditPanel';
 import SignalScorecardPanel from '../SignalScorecardPanel';
 import SystemAboutCard from '../SystemAboutCard';
+import PluginsPanel from '../plugins/PluginsPanel';
 
 type SchedulerProps = React.ComponentProps<typeof SchedulerSettingsCard>;
 type ExtensionProps = React.ComponentProps<typeof LoadedExtensionsPanel>;
@@ -82,7 +83,7 @@ const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (props) => {
 
   if (props.activeView === 'about') return <SystemAboutCard />;
   if (props.activeView === 'extensions') {
-    return <LoadedExtensionsPanel disabled={props.disabled} t={props.t} language={props.language} />;
+    return <PluginsPanel disabled={props.disabled} t={props.t} language={props.language} />;
   }
   return null;
 };
