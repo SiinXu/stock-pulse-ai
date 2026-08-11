@@ -3,7 +3,7 @@
 // Full-page portfolio CSV import wizard (#872 / #877 surface contract).
 
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import type { ParsedApiError } from '../../api/error';
 import type {
@@ -36,7 +36,7 @@ import {
 } from '../common';
 import type { PortfolioFileText, PortfolioText } from '../../hooks/portfolio/types';
 
-export const IMPORT_WIZARD_STEPS = [
+const IMPORT_WIZARD_STEPS = [
   'format',
   'upload',
   'mapping',
@@ -44,7 +44,7 @@ export const IMPORT_WIZARD_STEPS = [
   'confirm',
 ] as const;
 
-export type ImportWizardStep = (typeof IMPORT_WIZARD_STEPS)[number];
+type ImportWizardStep = (typeof IMPORT_WIZARD_STEPS)[number];
 
 type PortfolioImportWizardProps = {
   text: PortfolioText;
@@ -68,7 +68,7 @@ type PortfolioImportWizardProps = {
   setCsvParseResult: (result: PortfolioImportParseResponse | null) => void;
   csvCommitResult: PortfolioImportCommitResponse | null;
   setCsvCommitResult: (result: PortfolioImportCommitResponse | null) => void;
-  onParse: () => Promise<void> | void;
+  onParse: (file?: File) => Promise<void> | void;
   onCommit: () => Promise<void> | void;
   onClose: () => void;
   commonCancelLabel: string;
@@ -79,7 +79,7 @@ function buildPastedCsvFile(content: string): File {
   return new File([content], 'pasted-import.csv', { type: 'text/csv' });
 }
 
-export const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
+const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
   text,
   fileText,
   language,
@@ -163,12 +163,6 @@ export const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
     && csvCommitResult.insertedCount > 0,
   );
 
-  useEffect(() => {
-    if (step !== 'mapping') return;
-    if (csvParsing || csvParseResult || !selectedBroker || !csvFile) return;
-    void onParse();
-  }, [step, csvFile, csvParseResult, csvParsing, selectedBroker, onParse]);
-
   const goNext = () => {
     if (busy) return;
     if (step === 'format') {
@@ -178,12 +172,15 @@ export const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
     }
     if (step === 'upload') {
       if (!canAdvanceFromUpload) return;
-      if (!csvFile && pasteText.trim()) {
-        setCsvFile(buildPastedCsvFile(pasteText.trim()));
+      let fileToParse = csvFile;
+      if (!fileToParse && pasteText.trim()) {
+        fileToParse = buildPastedCsvFile(pasteText.trim());
+        setCsvFile(fileToParse);
         setCsvParseResult(null);
         setCsvCommitResult(null);
       }
       setStep('mapping');
+      if (fileToParse) void onParse(fileToParse);
       return;
     }
     if (step === 'mapping') {
@@ -227,11 +224,13 @@ export const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
   };
 
   const handleReparse = async () => {
-    if (!csvFile && pasteText.trim()) {
-      setCsvFile(buildPastedCsvFile(pasteText.trim()));
+    let fileToParse = csvFile;
+    if (!fileToParse && pasteText.trim()) {
+      fileToParse = buildPastedCsvFile(pasteText.trim());
+      setCsvFile(fileToParse);
     }
     setCsvCommitResult(null);
-    await onParse();
+    await onParse(fileToParse ?? undefined);
   };
 
   return (
@@ -520,11 +519,21 @@ export const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
                   </ul>
                 ) : null}
                 {hasPartialCommit ? (
-                  <InlineAlert
-                    variant="warning"
-                    size="compact"
-                    message={text.importWizardPartialHelp}
-                  />
+                  <div className="space-y-2">
+                    <InlineAlert
+                      variant="warning"
+                      size="compact"
+                      message={text.importWizardPartialHelp}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="comfortable"
+                      onClick={() => setStep('upload')}
+                    >
+                      {text.importWizardContinueEdit}
+                    </Button>
+                  </div>
                 ) : null}
               </>
             ) : null}

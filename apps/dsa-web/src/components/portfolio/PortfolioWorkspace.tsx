@@ -63,7 +63,6 @@ import { usePortfolioLedgerMutationWorkflow } from '../../hooks/portfolio/usePor
 import { usePortfolioHoldingSignals } from '../../hooks/portfolio/usePortfolioHoldingSignals';
 import { usePortfolioLedgerEntryForms } from '../../hooks/portfolio/usePortfolioLedgerEntryForms';
 import { usePortfolioCsvImportSession } from '../../hooks/portfolio/usePortfolioCsvImportSession';
-import PortfolioImportWizard from './PortfolioImportWizard';
 import {
   buildPositionRowKey,
   portfolioUrlSchema,
@@ -84,6 +83,7 @@ const PortfolioRiskMetricsPanel = lazy(
   () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
 );
 const PortfolioAnalysisTaskPanel = lazy(() => import('./PortfolioAnalysisTaskPanel'));
+const PortfolioImportWizard = lazy(() => import('./PortfolioImportWizard'));
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -199,11 +199,16 @@ const PortfolioWorkspace: React.FC = () => {
     const next = new URLSearchParams(searchParamsRef.current);
     if (account === 'all') next.delete('account');
     else next.set('account', String(account));
+    next.delete('selected');
+    next.delete('page');
     setSearchParamsRef.current(next, { replace });
   }, []);
 
   const setActiveTab = useCallback((tab: PortfolioTab) => {
-    patchPortfolioUrl({ tab }, 'replace');
+    patchPortfolioUrl({
+      tab,
+      ...(tab === 'ledger' ? {} : { page: 1 }),
+    }, 'replace');
   }, [patchPortfolioUrl]);
 
   const setSelectedPositionKey = useCallback((key: string | null) => {
@@ -320,9 +325,30 @@ const PortfolioWorkspace: React.FC = () => {
     setLedgerPageInUrl(nextPage);
   }, [setEventPage, setLedgerPageInUrl]);
 
+  useEffect(() => {
+    if (eventLoading || eventPage <= totalEventPages) return;
+    handleLedgerPageChange(totalEventPages);
+  }, [eventLoading, eventPage, handleLedgerPageChange, totalEventPages]);
+
+  const handleEventTypeChange = useCallback((nextEventType: PortfolioEventType) => {
+    setEventType(nextEventType);
+    setLedgerPageInUrl(1);
+  }, [setEventType, setLedgerPageInUrl]);
+
+  const handleApplyEventFilters = useCallback(() => {
+    applyEventFilters();
+    setLedgerPageInUrl(1);
+  }, [applyEventFilters, setLedgerPageInUrl]);
+
+  const refreshPaperTradeSurfaces = useCallback(async (): Promise<boolean> => {
+    const refreshed = await refreshPaperTradeProjection();
+    if (refreshed) setLedgerPageInUrl(1);
+    return refreshed;
+  }, [refreshPaperTradeProjection, setLedgerPageInUrl]);
+
   const mutation = usePortfolioLedgerMutationWorkflow({
     refreshPortfolioData,
-    refreshPaperTradeSurfaces: refreshPaperTradeProjection,
+    refreshPaperTradeSurfaces,
   });
   const {
     tradeSubmitting,
@@ -426,6 +452,19 @@ const PortfolioWorkspace: React.FC = () => {
     }
     return accounts.length === 0 || Number(snapshot.accountCount || 0) === accounts.length;
   }, [accounts.length, queryAccountId, snapshot]);
+
+  useEffect(() => {
+    if (!selectedPositionKey || !snapshotMatchesAccountScope) return;
+    const selectionExists = positionRows.some((row) => (
+      buildPositionRowKey(row.accountId, row.symbol, row.market) === selectedPositionKey
+    ));
+    if (!selectionExists) setSelectedPositionKey(null);
+  }, [
+    positionRows,
+    selectedPositionKey,
+    setSelectedPositionKey,
+    snapshotMatchesAccountScope,
+  ]);
 
   const {
     portfolioSignalsLoading,
@@ -830,7 +869,8 @@ const PortfolioWorkspace: React.FC = () => {
   return (
     <AppPage className="portfolio-page space-y-4">
       {csvModalOpen ? (
-        <PortfolioImportWizard
+        <Suspense fallback={<Loading />}>
+          <PortfolioImportWizard
           text={text}
           fileText={fileText}
           language={language}
@@ -860,7 +900,8 @@ const PortfolioWorkspace: React.FC = () => {
           }}
           commonCancelLabel={t('common.cancel')}
           commonCloseLabel={t('common.close')}
-        />
+          />
+        </Suspense>
       ) : (
       <>
       <section className="space-y-3">
@@ -1441,7 +1482,7 @@ const PortfolioWorkspace: React.FC = () => {
         </Card>
       ) : null}
 
-      {hasAccounts ? (
+      {hasAccounts && activeTab !== 'ledger' ? (
         <>
           <Suspense fallback={<Loading />}>
             <PortfolioRiskMetricsPanel
@@ -1743,14 +1784,14 @@ const PortfolioWorkspace: React.FC = () => {
               <Select
                 label={text.type}
                 value={eventType}
-                onChange={(value) => setEventType(value as PortfolioEventType)}
+                onChange={(value) => handleEventTypeChange(value as PortfolioEventType)}
                 options={[
                   { value: 'trade', label: text.tradeLedger },
                   { value: 'cash', label: text.cashLedger },
                   { value: 'corporate', label: text.corporateAction },
                 ]}
               />
-              <Button type="button" variant="secondary" size="comfortable" onClick={applyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
+              <Button type="button" variant="secondary" size="comfortable" onClick={handleApplyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
                 {text.refreshLedger}
               </Button>
             </div>
@@ -1817,7 +1858,7 @@ const PortfolioWorkspace: React.FC = () => {
               <ApiErrorAlert
                 error={eventError}
                 actionLabel={t('common.retry')}
-                onAction={applyEventFilters}
+                onAction={handleApplyEventFilters}
                 onDismiss={() => setEventError(null)}
               />
             ) : null}

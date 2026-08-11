@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Fixed] Complete Simplified Chinese settings-help source parity for RSS feeds and multi-strategy deliberation, refresh locale bundles, and re-freeze identical-to-English baseline so web-gate `test:i18n` can pass after the previously blocked resource extract.
 - [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
 - [Fixed] Lazy-load report Playground stories so Risk Manager evidence does not expand the shared Playground render budget.
 - [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
