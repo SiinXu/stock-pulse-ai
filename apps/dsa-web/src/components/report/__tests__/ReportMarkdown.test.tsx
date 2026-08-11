@@ -50,10 +50,12 @@ describe('ReportMarkdown', () => {
 
     const copyButton = await screen.findByRole('button', { name: '复制 Markdown 源码' });
     expect(copyButton).toBeDisabled();
-    const closeButtons = screen.getAllByRole('button', { name: '关闭' });
-    const primaryClose = closeButtons.find((button) => button.getAttribute('data-control') === 'button');
-    expect(primaryClose).toBeDefined();
-    expect(primaryClose).toHaveClass('control-hit-target');
+    const shareButton = screen.getByRole('button', { name: '分享' });
+    expect(shareButton.parentElement?.parentElement?.parentElement).toHaveClass(
+      '[&_.home-surface-button]:!shadow-none',
+    );
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveAttribute('data-control', 'button');
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('control-hit-target');
     markdown.resolve('# 中文报告');
     expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
     expect(document.querySelector('.report-markdown-prose')).toHaveClass(

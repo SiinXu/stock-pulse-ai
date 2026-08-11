@@ -27,6 +27,7 @@ import { AiOverviewMatrix } from './AiOverviewMatrix';
 import type { ModelReferenceReplacement } from './llmChannelEditorModel';
 import type { ModelAccessFieldFocusRequest } from '../../utils/modelAccessFieldKey';
 import { TASK_MODEL_KEYS } from './aiModelsViewModel';
+import { CLI_AGENT_CAPABILITY_NOTE, isGenerationOnlyBackend } from './aiTaskMatrix';
 // Barrel imports so SettingsPage.testHarness mocks apply to nested cards.
 import {
   LLMChannelEditor,
@@ -132,12 +133,35 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
 }) => {
   const { language: uiLanguage } = useUiLanguage();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
+  const generationBackend = (allValuesByKey.GENERATION_BACKEND || 'litellm').trim();
+  const usesGenerationOnlyBackend = isGenerationOnlyBackend(generationBackend);
+  const generationBackendItem = taskRoutingItems.find((item) => item.key === 'GENERATION_BACKEND');
+  const modelRoutingItems = taskRoutingItems.filter((item) => item.key !== 'GENERATION_BACKEND');
 
   return (
     <SettingsSectionCard
       title={settingsText.taskRouting}
       description={settingsText.taskRoutingDescription}
     >
+      {generationBackendItem ? (
+        <div className="mb-3 overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+          <SettingsField
+            item={generationBackendItem}
+            value={generationBackendItem.value}
+            disabled={isSaving}
+            onChange={setDraftValue}
+            issues={issueByKey.GENERATION_BACKEND || []}
+            requirement={resolveFieldRequirement(generationBackendItem.schema?.contract, allValuesByKey)}
+            dependencyLocked={!isFieldEnabledByContract(generationBackendItem.schema?.contract, allValuesByKey)}
+            readOnlyDiagnostic={readOnlyDiagnosticForItem(generationBackendItem, 'ai_model')}
+          />
+        </div>
+      ) : null}
+      {usesGenerationOnlyBackend ? (
+        <p className="mb-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
+          {CLI_AGENT_CAPABILITY_NOTE[uiLanguage]}
+        </p>
+      ) : null}
       {availableModelsError ? (
         <SettingsAlert
           variant="error"
@@ -182,9 +206,9 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
       ) : null}
       {!availableModelsError && !availableModelsLoading && availableModels.length > 0 ? (
         <>
-          {taskRoutingItems.length > 0 ? (
+          {modelRoutingItems.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-              {taskRoutingItems.map((item) => (
+              {modelRoutingItems.map((item) => (
                 TASK_MODEL_KEYS.has(item.key) ? (
                   <div key={item.key} className="grid gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_260px] md:items-center md:gap-6">
                     <label htmlFor={`setting-${item.key}`} className="text-sm text-foreground">
@@ -207,6 +231,7 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
                           .join(' ') || undefined}
                         emptyText={settingsText.noModelOptions}
                         searchPlaceholder={settingsText.searchModels}
+                        showSublabelInTrigger={false}
                         staleValueText={formatConfiguredModel(item.value)}
                         staleValueLabel={formatUiText(settingsText.staleValue, {
                           value: formatConfiguredModel(item.value),

@@ -70,7 +70,10 @@ describe('ReportStructuredInsights', () => {
   it('renders phase, attribution, conflict, support, and opposition as first-class sections', () => {
     render(<ReportStructuredInsights insights={completeInsights} language="en" />);
 
-    expect(screen.getByTestId('report-phase-decision')).toHaveTextContent('Wait for confirmation');
+    const phaseDecision = screen.getByTestId('report-phase-decision');
+    expect(phaseDecision).toHaveTextContent('Wait for confirmation');
+    expect(within(phaseDecision).getByText('Market Phase').parentElement)
+      .toHaveClass('sm:grid-cols-[6rem_minmax(0,1fr)]');
     const attribution = screen.getByTestId('report-signal-attribution');
     expect(within(attribution).getByText('Technical Indicators')).toBeInTheDocument();
     expect(within(attribution).getByRole('progressbar', { name: 'Technical Indicators' }))

@@ -109,7 +109,7 @@ export function ChatSessionSidebar({
         ) : (
           <div className="space-y-2">
             {filteredSessions.map((s) => (
-              <div key={s.session_id} className="session-item-row">
+              <div key={s.session_id} className="session-item-row relative">
                 <Pressable
                   onClick={() => onSwitchSession(s.session_id)}
                   disabled={sessionLoading}
@@ -139,9 +139,9 @@ export function ChatSessionSidebar({
                 </Pressable>
                 <IconButton
                   variant="danger"
-                  size="navigation"
+                  size="compact"
                   tooltip={false}
-                  className="delete-btn"
+                  className="delete-btn absolute right-1 top-1 z-10 !h-7 !w-7 !rounded-md hover:!border-transparent hover:!bg-transparent focus-visible:!border-transparent focus-visible:!bg-transparent"
                   onClick={() => onRequestDelete(s.session_id)}
                   disabled={sessionLoading}
                   aria-label={t('chat.deleteSession', { title: s.title })}

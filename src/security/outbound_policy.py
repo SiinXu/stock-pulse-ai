@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Deque, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
 from urllib.parse import urljoin, urlsplit
+from urllib.request import getproxies
 
 import requests
 import tldextract
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 OUTBOUND_HTTP_ALLOWLIST_ENV = "OUTBOUND_HTTP_ALLOWLIST"
 LOCAL_ONLY_MODE_ENV = "LOCAL_ONLY_MODE"
+OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP_ENV = "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP"
 DEFAULT_OUTBOUND_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 OUTBOUND_ACTIVITY_MAX_RECORDS = 100
@@ -51,6 +53,10 @@ _METADATA_IPS = frozenset(
         ipaddress.ip_address("169.254.169.254"),
         ipaddress.ip_address("fd00:ec2::254"),
     }
+)
+_PROXY_FAKE_IP_NETWORKS = (
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("fdfe:dcba:9876::/48"),
 )
 _NO_PROXIES = {"http": "", "https": "", "all": ""}
 _CROSS_ORIGIN_CREDENTIAL_HEADERS = frozenset(
@@ -410,6 +416,36 @@ def _is_loopback_ip(address: ipaddress._BaseAddress) -> bool:
     return any(candidate.is_loopback for candidate in candidates)
 
 
+def _is_proxy_fake_ip(address: ipaddress._BaseAddress) -> bool:
+    candidates = [address]
+    mapped = getattr(address, "ipv4_mapped", None)
+    if mapped is not None:
+        candidates.append(mapped)
+    return any(
+        candidate.version == network.version and candidate in network
+        for candidate in candidates
+        for network in _PROXY_FAKE_IP_NETWORKS
+    )
+
+
+def _proxy_fake_ip_enabled() -> bool:
+    return (
+        not is_local_only_mode()
+        and os.getenv(OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP_ENV, "").strip().lower()
+        in _TRUE_ENV_VALUES
+    )
+
+
+def _allows_proxy_fake_ip(target: OutboundTarget, address: ipaddress._BaseAddress) -> bool:
+    return (
+        _proxy_fake_ip_enabled()
+        and target.literal_ip is None
+        and _is_proxy_fake_ip(address)
+        and _has_public_reference_hostname_syntax(target.hostname)
+        and _has_public_reference_suffix(target.hostname)
+    )
+
+
 def _is_admin_loopback_hostname(hostname: str, literal_ip: Optional[ipaddress._BaseAddress]) -> bool:
     """Return whether a host is pure loopback (not private LAN or .local mDNS)."""
     if literal_ip is not None:
@@ -500,9 +536,10 @@ def _validate_addrinfos(addr_infos: Iterable[Any], target: OutboundTarget) -> No
         usable_addresses.append(address)
         if local_only and not _is_loopback_ip(address):
             _reject_target("local_only_mode_blocked", target)
-        if _is_hard_blocked_ip(address):
+        proxy_fake_ip_allowed = _allows_proxy_fake_ip(target, address)
+        if _is_hard_blocked_ip(address) and not proxy_fake_ip_allowed:
             _reject_target("restricted_dns_address", target)
-        if _is_private_ip(address) and not target.allowlisted:
+        if _is_private_ip(address) and not target.allowlisted and not proxy_fake_ip_allowed:
             _reject_target("private_dns_address", target)
     if not usable_addresses:
         _reject_target("dns_no_usable_address", target)
@@ -614,6 +651,64 @@ def _matching_dns_target(
     )
 
 
+def _matching_configured_loopback_proxy(
+    host: Any,
+    port: Any,
+    context: _DNSGuardContext,
+) -> Optional[OutboundTarget]:
+    if not _proxy_fake_ip_enabled() or not all(
+        target.literal_ip is None
+        and _has_public_reference_hostname_syntax(target.hostname)
+        and _has_public_reference_suffix(target.hostname)
+        for target in context.targets
+    ):
+        return None
+
+    normalized_host = _normalize_hostname(host)
+    dns_port = _normalized_dns_port(port)
+    if not normalized_host or dns_port is None:
+        return None
+
+    for raw_url in dict.fromkeys(
+        str(value or "").strip()
+        for key, value in getproxies().items()
+        if str(key).lower() in {"http", "https", "all"}
+    ):
+        try:
+            parsed = urlsplit(raw_url)
+            scheme = parsed.scheme.lower()
+            proxy_hostname = _normalize_hostname(parsed.hostname)
+            proxy_port = parsed.port
+        except ValueError:
+            continue
+        if (
+            scheme not in _ALLOWED_SCHEMES
+            or not proxy_hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            continue
+        literal_ip = _literal_ip(proxy_hostname)
+        if not _is_admin_loopback_hostname(proxy_hostname, literal_ip):
+            continue
+        effective_proxy_port = (
+            proxy_port
+            if proxy_port is not None
+            else 443 if scheme == "https" else 80
+        )
+        normalized_proxy_host = str(literal_ip) if literal_ip is not None else proxy_hostname
+        if normalized_host != normalized_proxy_host or dns_port != effective_proxy_port:
+            continue
+        return OutboundTarget(
+            scheme=scheme,
+            hostname=normalized_proxy_host,
+            port=proxy_port,
+            allowlisted=True,
+            literal_ip=literal_ip,
+        )
+    return None
+
+
 def _resolve_with_dns_guard(
     resolver: Any,
     host: Any,
@@ -628,6 +723,8 @@ def _resolve_with_dns_guard(
         if context is not None
         else None
     )
+    if context is not None and matching_target is None:
+        matching_target = _matching_configured_loopback_proxy(host, port, context)
     if context is not None and matching_target is None and context.strict:
         _reject("unexpected_dns_target")
 
