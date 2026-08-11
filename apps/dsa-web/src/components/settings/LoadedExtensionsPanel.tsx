@@ -2,13 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Settings2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { pluginsApi, type PluginInfo, type PluginLifecycleState } from '../../api/plugins';
+import {
+  pluginsApi,
+  type PluginInfo,
+  type PluginLifecycleState,
+  type PluginSettingValue,
+  type PluginSettingsResponse,
+} from '../../api/plugins';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import {
   ApiErrorAlert,
   Badge,
+  Button,
   DataTable,
   type DataTableColumn,
   EmptyState,
@@ -16,6 +23,8 @@ import {
   InlineAlert,
   StatePanel,
 } from '../common';
+import PluginSettingsModal from './PluginSettingsModal';
+import { SettingsSwitch } from './SettingsSwitch';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
 type LoadedExtensionsPanelProps = {
@@ -67,14 +76,19 @@ function failureReason(plugin: PluginInfo, t: LoadedExtensionsPanelProps['t']): 
 const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
   disabled = false,
   t,
-  language: _language,
+  language,
 }) => {
-  void _language;
   const [items, setItems] = useState<PluginInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingPluginId, setPendingPluginId] = useState<string | null>(null);
+  const [selectedSettings, setSelectedSettings] = useState<PluginSettingsResponse | null>(null);
+  const [settingsPluginName, setSettingsPluginName] = useState('');
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
+  const [restartRequired, setRestartRequired] = useState(false);
 
   const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     setLoadError(null);
@@ -97,6 +111,64 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
   useEffect(() => {
     void load('initial');
   }, [load]);
+
+  const updateLifecycle = useCallback(async (plugin: PluginInfo, enabled: boolean) => {
+    setPendingPluginId(plugin.id);
+    setActionError(null);
+    try {
+      const result = await pluginsApi.updateLifecycle(plugin.id, enabled ? 'enable' : 'disable');
+      if (!result.success) {
+        setActionError(result.message || result.errorCode || t('settings.pluginActionFailed'));
+        return;
+      }
+      setRestartRequired((current) => current || result.restartRequired);
+      setItems((current) => current.map((item) => {
+        if (item.id !== plugin.id) return item;
+        if (result.plugin) return result.plugin;
+        return {
+          ...item,
+          state: result.state,
+          desiredEnabled: enabled,
+        };
+      }));
+    } catch (error: unknown) {
+      setActionError(getParsedApiError(error, language).message);
+    } finally {
+      setPendingPluginId(null);
+    }
+  }, [language, t]);
+
+  const openSettings = useCallback(async (plugin: PluginInfo) => {
+    setPendingPluginId(plugin.id);
+    setActionError(null);
+    setSettingsSaveError(null);
+    try {
+      const response = await pluginsApi.getSettings(plugin.id);
+      setSettingsPluginName(plugin.name || plugin.id);
+      setSelectedSettings(response);
+    } catch (error: unknown) {
+      setActionError(getParsedApiError(error, language).message);
+    } finally {
+      setPendingPluginId(null);
+    }
+  }, [language]);
+
+  const saveSettings = useCallback(async (values: Record<string, PluginSettingValue>) => {
+    if (!selectedSettings) return;
+    setSettingsSaveError(null);
+    try {
+      const response = await pluginsApi.updateSettings(
+        selectedSettings.pluginId,
+        values,
+        selectedSettings.maskToken,
+      );
+      setRestartRequired((current) => current || response.restartRequired);
+      setSelectedSettings(null);
+    } catch (error: unknown) {
+      setSettingsSaveError(getParsedApiError(error, language).message);
+      throw error;
+    }
+  }, [language, selectedSettings]);
 
   const columns = useMemo<DataTableColumn<PluginInfo>[]>(() => [
     {
@@ -169,21 +241,45 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
       ),
     },
     {
-      id: 'notes',
-      header: t('settings.loadedExtensionsColNotes'),
+      id: 'management',
+      header: t('settings.loadedExtensionsColManagement'),
       cell: (plugin) => {
         const reason = failureReason(plugin, t);
-        if (!reason) {
-          return <span className="text-xs text-muted-text">—</span>;
-        }
         return (
-          <p className="text-xs leading-5 text-warning" data-testid={`loaded-extension-failure-${plugin.id}`}>
-            {reason}
-          </p>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <SettingsSwitch
+                checked={plugin.desiredEnabled}
+                disabled={disabled || pendingPluginId === plugin.id}
+                onCheckedChange={(next) => { void updateLifecycle(plugin, next); }}
+                aria-label={t('settings.pluginToggleLabel', { name: plugin.name || plugin.id })}
+                testId={`plugin-toggle-${plugin.id}`}
+              />
+              {plugin.settingsCount > 0 ? (
+                <Button
+                  variant="outline"
+                  size="default"
+                  disabled={disabled || pendingPluginId === plugin.id}
+                  onClick={() => { void openSettings(plugin); }}
+                  aria-label={t('settings.pluginConfigureLabel', { name: plugin.name || plugin.id })}
+                >
+                  <Settings2 aria-hidden="true" className="h-3.5 w-3.5" />
+                  {t('settings.pluginConfigure')}
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-text">{t('settings.pluginNoSettings')}</span>
+              )}
+            </div>
+            {reason ? (
+              <p className="text-xs leading-5 text-warning" data-testid={`loaded-extension-failure-${plugin.id}`}>
+                {reason}
+              </p>
+            ) : null}
+          </div>
         );
       },
     },
-  ], [t]);
+  ], [disabled, openSettings, pendingPluginId, t, updateLifecycle]);
 
   return (
     <SettingsSectionCard
@@ -207,11 +303,27 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
         />
       </div>
 
-      <p className="text-xs leading-5 text-muted-text" data-testid="settings-loaded-extensions-readonly">
-        {t('settings.loadedExtensionsReadOnlyNote')}
+      <p className="text-xs leading-5 text-muted-text" data-testid="settings-loaded-extensions-management-note">
+        {t('settings.loadedExtensionsManagementNote')}
       </p>
 
       {loadError ? <ApiErrorAlert error={loadError} className="mb-3" /> : null}
+      {actionError ? (
+        <InlineAlert
+          className="mb-3"
+          variant="danger"
+          title={t('settings.pluginActionFailed')}
+          message={actionError}
+        />
+      ) : null}
+      {restartRequired ? (
+        <InlineAlert
+          className="mb-3"
+          variant="warning"
+          title={t('settings.pluginRestartRequiredTitle')}
+          message={t('settings.pluginRestartRequiredBody')}
+        />
+      ) : null}
 
       {isLoading ? (
         <StatePanel state="loading" title={t('common.loading')} />
@@ -241,6 +353,18 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
           />
         </div>
       )}
+
+      {selectedSettings ? (
+        <PluginSettingsModal
+          pluginName={settingsPluginName}
+          settings={selectedSettings}
+          disabled={disabled}
+          saveError={settingsSaveError}
+          onClose={() => setSelectedSettings(null)}
+          onSave={saveSettings}
+          t={t}
+        />
+      ) : null}
     </SettingsSectionCard>
   );
 };
