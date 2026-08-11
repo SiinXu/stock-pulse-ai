@@ -1667,6 +1667,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响通知报告中的模型信息可见性。'],
     notes: ['用于排查模型切换问题时可以临时开启。'],
   },
+  'settings.report.NOTIFICATION_DELTA_FIRST': {
+    title: '分析变化优先',
+    summary: '默认关闭；不调用模型，在完整报告前显示变化，失败仍保留报告。',
+  },
   'settings.report.REPORT_TEMPLATES_DIR': {
     title: '报告模板目录',
     summary: 'Jinja2 报告模板的存放目录。',
