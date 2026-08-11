@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
 - [Added] Declarative per-plugin settings schemas, atomic local persistence, immutable runtime projection, audited settings API, and a generated Web Settings form with persistent enable/disable controls (Fixes #277).
+- [Fixed] Alerts primary filters (status / rule type) stay inline above the 48rem breakpoint; AdvancedFilterSheet fold remains mobile-only (#909 follow-up).
 - [Fixed] Token Usage period selection is owned by the URL (`?period=`) so refresh/share under Settings keeps the time range (#879 A1).
 - [Fixed] Overflowing pagination controls use safe centering so the leading prev control remains reachable under horizontal scroll (follow-up to #910 / #879 B4).
 - [Fixed] Keep Backtest strategy run options (`minAge`/`limit`) in shareable URLs while preserving stable research-route wire keys (#879 A1).
