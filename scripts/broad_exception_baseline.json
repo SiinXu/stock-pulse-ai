@@ -283,8 +283,6 @@
     {"path":"src/llm/local_cli_backend.py","scope":"<module>.LocalCliGenerationBackend._terminate_process_group","caught":["Exception"],"digest":"76e90e05716ca23a31d76393c35373a763aed0bfa5f7284e400515c01b4da9a9"},
     {"path":"src/llm/local_cli_backend.py","scope":"<module>.LocalCliGenerationBackend._terminate_process_group","caught":["Exception"],"digest":"a40bf702c0a7bd3c814e2d8a1ed5d97b206a801c0f3f5fd9a2185390a3518415"},
     {"path":"src/llm/local_cli_backend.py","scope":"<module>.LocalCliGenerationBackend._terminate_process_group","caught":["Exception"],"digest":"f16a74cdbd69655c19bafe028baa7b08254c44afb515cac9c8e2f03004ff6456"},
-    {"path":"src/llm/local_cli_backend.py","scope":"<module>.LocalCliGenerationBackend.generate","caught":["Exception"],"digest":"1cda369f98130d97bfe04b3763997d78cc810ca8327eafb7027893e3bfaf0578"},
-    {"path":"src/llm/local_cli_backend.py","scope":"<module>.LocalCliGenerationBackend.generate","caught":["Exception"],"digest":"77c744ea1e757d3a26951f88c35c445ae1c8afc43fa5d7b51ff67584a502634e"},
     {"path":"src/llm/usage.py","scope":"<module>._infer_provider","caught":["Exception"],"digest":"8aa209bf399109e60296c1527d74245d7cfb721061989197500ca5729a0a9e13"},
     {"path":"src/llm/usage.py","scope":"<module>._plain_value","caught":["Exception"],"digest":"1e9533d28d350ea1d92a85f2cc55295c3ec736374d6c384916ddf15700ac0e8a"},
     {"path":"src/llm/usage.py","scope":"<module>._to_plain","caught":["Exception"],"digest":"d1a333480df2acfb6899b6850a06bd9f51c245e3629ca57576c5ba3d4cd28a95"},
