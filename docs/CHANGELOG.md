@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
 - [Tests] Align the application-shell Playwright fixture with the server-authoritative notification inbox contract so auth redirects cannot mask shell regressions.
 - [Fixed] Harden shared sensitive-config key detection so token-count / public-key / key-version and response-metadata names stay visible, bare credential `*_KEY` names are redacted in logs and diagnostics, and config read/save paths preserve registered and inferred secrets when a mask token is submitted (Refs #1023).
 - [Tests] Align Playwright analysis, history, and scheduled-task fixtures with required OpenAPI fields so runtime validation exercises successful real-contract paths.
