@@ -137,10 +137,10 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('alerts', 'alerts-workspace', 'AlertsWorkspace', 'components/alerts/AlertsWorkspace.tsx', ['default'], 'full'),
   entry('history', 'history-list', 'HistoryList', 'components/history/HistoryList.tsx', ['default', 'loading', 'empty']),
   entry('history', 'history-list-item', 'HistoryListItem', 'components/history/HistoryListItem.tsx', ['default', 'states']),
+  entry('history', 'workbench-history-popover', 'WorkbenchHistoryPopover', 'components/history/WorkbenchHistoryPopover.tsx', ['interactive', 'loading', 'empty']),
   entry('history', 'stock-bar', 'StockBar', 'components/history/StockBar.tsx', ['default', 'loading', 'empty']),
   entry('history', 'stock-bar-item', 'StockBarItemComponent', 'components/history/StockBarItem.tsx', ['default', 'states']),
   entry('history', 'stock-history-trend-drawer', 'StockHistoryTrendDrawer', 'components/history/StockHistoryTrendDrawer.tsx', ['default', 'loading', 'empty', 'error']),
-
   entry('signals', 'decision-signal-card', 'DecisionSignalCard', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'interactive', 'states']),
   entry('signals', 'decision-signal-details', 'DecisionSignalDetails', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'loading', 'empty', 'error']),
   entry('signals', 'decision-signal-memory-controls', 'DecisionSignalMemoryControls', 'components/decision-signals/DecisionSignalMemoryControls.tsx', ['default', 'error']),

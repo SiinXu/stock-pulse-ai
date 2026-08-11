@@ -453,6 +453,28 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     await waitFor(() => expect(screen.queryByTestId('analysis-history-popover')).not.toBeInTheDocument());
   });
 
+  it('keeps the history selector reachable while the selected report is loading', async () => {
+    const pendingReport = createDeferred<AnalysisReport>();
+    vi.mocked(historyApi.getDetail).mockReturnValueOnce(pendingReport.promise);
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
+
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('12');
+    });
+    fireEvent.click(screen.getByRole('button', { name: '历史与对比' }));
+
+    const historyPopover = await screen.findByTestId('analysis-history-popover');
+    expect(within(historyPopover).getByRole('button', { name: /Apple AAPL/u }))
+      .toBeInTheDocument();
+
+    await act(async () => pendingReport.resolve(report));
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    expect(historyApi.getDetail).toHaveBeenCalledWith(12);
+  });
+
   it('reuses the history trend comparison and returns to the selected report', async () => {
     useStockPoolStore.setState({ historyItems: [historyItem] });
     renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
