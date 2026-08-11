@@ -122,6 +122,7 @@ function runFlowSnapshot(taskId: string, stockCode: string, stockName: string) {
     stock_name: stockName,
     status: 'success',
     generated_at: '2026-07-15T08:01:00Z',
+    schema_version: 'run-flow-v1',
     summary: {
       elapsed_ms: 100,
       failed_attempts: 0,
@@ -1141,6 +1142,8 @@ test.describe('Analysis Workbench interaction contract', () => {
       await fulfillJson(route, {
         task_id: 'workbench-e2e-task',
         status: 'pending',
+        message_code: 'task_pending',
+        analysis_phase: 'auto',
       }, 202);
     });
 
@@ -1170,7 +1173,13 @@ test.describe('Analysis Workbench interaction contract', () => {
     await page.route('**/api/v1/analysis/analyze', async (route) => {
       submitted = route.request().postDataJSON() as Record<string, unknown>;
       await fulfillJson(route, {
-        accepted: [{ task_id: 'workbench-pending-task', stock_code: 'AAPL', status: 'pending' }],
+        accepted: [{
+          task_id: 'workbench-pending-task',
+          stock_code: 'AAPL',
+          status: 'pending',
+          message_code: 'task_pending',
+          analysis_phase: 'auto',
+        }],
         duplicates: [],
         message: 'Accepted',
       }, 202);

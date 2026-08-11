@@ -34,6 +34,7 @@ _ACTION_BY_OPERATION: Mapping[str, str] = {
     "enable": "plugin.enable",
     "disable": "plugin.disable",
     "reload": "plugin.reload",
+    "settings_update": "plugin.settings.update",
 }
 
 

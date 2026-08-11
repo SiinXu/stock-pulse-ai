@@ -6,7 +6,7 @@ import { pluginsApi } from '../plugins';
 
 vi.mock('../index', () => ({
   __esModule: true,
-  default: { get: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
   locallyRecoverableResourceConfig: () => ({ handleUnauthorizedLocally: true }),
 }));
 
@@ -28,6 +28,7 @@ describe('pluginsApi', () => {
           package_root: '/opt/plugins/acme',
           extension_points: ['agent_tool'],
           last_error_code: 'manifest_permissions_undeclared',
+          settings_count: 3,
         }],
       },
     });
@@ -44,6 +45,78 @@ describe('pluginsApi', () => {
       packageRoot: '/opt/plugins/acme',
       extensionPoints: ['agent_tool'],
       lastErrorCode: 'manifest_permissions_undeclared',
+      settingsCount: 3,
     });
+  });
+
+  it('parses generated settings and sends a full typed replacement', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        plugin_id: 'acme-plugin',
+        schema: [{
+          key: 'threshold',
+          title: 'Threshold',
+          data_type: 'number',
+          ui_control: 'number',
+          is_sensitive: false,
+          is_required: true,
+          default_value: 0.5,
+          options: [],
+          validation: { minimum: 0, maximum: 1 },
+          display_order: 10,
+        }],
+        values: { threshold: 0.5 },
+        masked_keys: [],
+        mask_token: '******',
+      },
+    });
+
+    const settings = await pluginsApi.getSettings('acme/plugin');
+    expect(settings.schema[0]).toMatchObject({
+      key: 'threshold',
+      dataType: 'number',
+      validation: { minimum: 0, maximum: 1 },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/api/v1/plugins/acme%2Fplugin/settings',
+      expect.objectContaining({ handleUnauthorizedLocally: true }),
+    );
+
+    vi.mocked(apiClient.put).mockResolvedValueOnce({
+      data: {
+        plugin_id: 'acme-plugin',
+        schema: [],
+        values: { threshold: 0.75 },
+        masked_keys: [],
+        mask_token: '******',
+        changed_keys: ['threshold'],
+        restart_required: true,
+      },
+    });
+    const updated = await pluginsApi.updateSettings(
+      'acme-plugin',
+      { threshold: 0.75 },
+      '******',
+    );
+    expect(apiClient.put).toHaveBeenCalledWith(
+      '/api/v1/plugins/acme-plugin/settings',
+      { values: { threshold: 0.75 }, mask_token: '******' },
+      expect.objectContaining({ handleUnauthorizedLocally: true }),
+    );
+    expect(updated).toMatchObject({ changedKeys: ['threshold'], restartRequired: true });
+  });
+
+  it('rejects non-finite settings responses at the client boundary', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        plugin_id: 'acme-plugin',
+        schema: [],
+        values: { threshold: Number.POSITIVE_INFINITY },
+        masked_keys: [],
+        mask_token: '******',
+      },
+    });
+
+    await expect(pluginsApi.getSettings('acme-plugin')).rejects.toBeDefined();
   });
 });

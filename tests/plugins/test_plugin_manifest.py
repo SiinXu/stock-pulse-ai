@@ -35,6 +35,7 @@ def test_manifest_aliases_defaults_and_json_serialization() -> None:
         **_payload(),
         "apiVersion": "1",
         "entrypoint": "plugin.py:Plugin",
+        "settings": [],
     }
 
     with pytest.raises(ValidationError):
@@ -100,3 +101,75 @@ def test_manifest_accepts_toolsurface_capability_permissions() -> None:
         _payload(permissions=["market_data:read", "local_model:execute"])
     )
     assert manifest.permissions == ("market_data:read", "local_model:execute")
+
+
+def test_manifest_accepts_strict_declarative_settings_schema() -> None:
+    manifest = PluginManifest.model_validate(
+        _payload(
+            settings=[
+                {
+                    "key": "risk.limit",
+                    "title": "Risk limit",
+                    "description": "Maximum accepted risk score.",
+                    "dataType": "number",
+                    "uiControl": "number",
+                    "defaultValue": 0.5,
+                    "validation": {"minimum": 0.0, "maximum": 1.0},
+                    "displayOrder": 10,
+                },
+                {
+                    "key": "mode",
+                    "title": "Mode",
+                    "dataType": "string",
+                    "uiControl": "select",
+                    "defaultValue": "safe",
+                    "options": [
+                        {"label": "Safe", "value": "safe"},
+                        {"label": "Fast", "value": "fast"},
+                    ],
+                },
+            ]
+        )
+    )
+
+    assert [field.key for field in manifest.settings] == ["risk.limit", "mode"]
+    assert manifest.settings[0].validation.maximum == 1.0
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        [
+            {"key": "UPPER", "title": "Bad", "dataType": "string", "uiControl": "text"}
+        ],
+        [
+            {"key": "flag", "title": "Flag", "dataType": "boolean", "uiControl": "text"}
+        ],
+        [
+            {
+                "key": "secret",
+                "title": "Secret",
+                "dataType": "string",
+                "uiControl": "password",
+                "isSensitive": True,
+                "defaultValue": "must-not-ship",
+            }
+        ],
+        [
+            {"key": "mode", "title": "Mode", "dataType": "string", "uiControl": "select"}
+        ],
+        [
+            {"key": "count", "title": "Count", "dataType": "integer", "uiControl": "number", "defaultValue": True}
+        ],
+        [
+            {"key": "ratio", "title": "Ratio", "dataType": "number", "uiControl": "number", "defaultValue": float("nan")}
+        ],
+        [
+            {"key": "same", "title": "One", "dataType": "string", "uiControl": "text"},
+            {"key": "same", "title": "Two", "dataType": "string", "uiControl": "text"},
+        ],
+    ],
+)
+def test_manifest_rejects_invalid_settings_contract(settings: object) -> None:
+    with pytest.raises(ValidationError):
+        PluginManifest.model_validate(_payload(settings=settings))

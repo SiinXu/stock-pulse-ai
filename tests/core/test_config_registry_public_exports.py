@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "5eb5eabc3ba504eb6e4651dda7bf389b1073b6c00254a00d3613fa533bdba1ee"
+    "9131f9ddbc9b57f07542d8ceec442ba5128978e1be86a5c76e54b1bf2a4f18a5"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "4a66e738ecd6bb01635c3670da81dfc9f5153ff29c0d501fce2d844900e1914c"
+    "0dde56b64aeddde12639203f5ec16c6a0b07487d934e2a764e02e0b6bd32cf00"
 )
 
 
@@ -104,7 +104,7 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # snapshot refresh for data-source registration
+    # Snapshot refresh for converged registry registrations.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256
