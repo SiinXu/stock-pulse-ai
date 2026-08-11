@@ -33,6 +33,7 @@ _REGISTRY_PART_MODULES = (
     "src.core.config_registry_parts.backtest",
     "src.core.config_registry_parts.indicators",
     "src.core.config_registry_parts.agent",
+    "src.core.config_registry_parts.mcp",
     "src.core.config_registry_parts.help_metadata",
 )
 for _registry_part_name in _REGISTRY_PART_MODULES:
@@ -75,6 +76,9 @@ from src.core.config_registry_parts.indicators import (
 from src.core.config_registry_parts.agent import (
     AGENT_FIELD_DEFINITIONS as _AGENT_FIELD_DEFINITIONS,
 )
+from src.core.config_registry_parts.mcp import (
+    MCP_FIELD_DEFINITIONS as _MCP_FIELD_DEFINITIONS,
+)
 from src.core.config_registry_parts.help_metadata import (
     _DOC_CUSTOM_WEBHOOK,
     _DOC_FULL_GUIDE_DATA_SOURCE,
@@ -95,6 +99,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     **_BACKTEST_FIELD_DEFINITIONS,
     **_INDICATOR_FIELD_DEFINITIONS,
     **_AGENT_FIELD_DEFINITIONS,
+    **_MCP_FIELD_DEFINITIONS,
 }
 _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]]
 
@@ -107,6 +112,7 @@ del _SYSTEM_FIELD_DEFINITIONS
 del _BACKTEST_FIELD_DEFINITIONS
 del _INDICATOR_FIELD_DEFINITIONS
 del _AGENT_FIELD_DEFINITIONS
+del _MCP_FIELD_DEFINITIONS
 del _REGISTRY_PART_MODULES
 del _importlib
 del _sys
