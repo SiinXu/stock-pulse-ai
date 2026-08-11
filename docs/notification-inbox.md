@@ -38,7 +38,7 @@ Prefix: `/api/v1/notification-inbox`
 
 Item IDs bind the source kind, durable source ID, and occurrence timestamp. Mark-read accepts at most 100 IDs, validates every ID against an authoritative current occurrence, and never persists unknown/orphan IDs. Mark-all-read fails closed if a selected source is unavailable.
 
-Each source query is bounded to the configured aggregation maximum before a deterministic global top-N merge. `page_size` is limited to 1-100. `next_cursor` and `has_more` expose reachable overflow rows without page-shift duplication when newer events arrive.
+Each source query is bounded to the inbox aggregation maximum before a deterministic global top-N merge. `page_size` is limited to 1-100. `next_cursor` and `has_more` expose reachable overflow rows without page-shift duplication when newer events arrive.
 
 ## Web
 
@@ -48,16 +48,9 @@ Each source query is bounded to the configured aggregation maximum before a dete
 - Header bell “View all” links to `/notifications`
 - The header bell uses the inbox list, unread-count, and mark-all-read endpoints. It does not maintain localStorage read timestamps or query alert/signal APIs separately.
 
-## Configuration
+## Operational bounds
 
-Optional. Defaults keep the feature on with conservative retention.
-
-```bash
-# NOTIFICATION_INBOX_RETENTION_DAYS=90
-# NOTIFICATION_INBOX_MAX_ITEMS=500
-```
-
-`NOTIFICATION_INBOX_RETENTION_DAYS` is clamped to 1-3650 and `NOTIFICATION_INBOX_MAX_ITEMS` to 10-5000. A non-integer value logs the key name without its raw value and uses the documented default. No setting disables the inbox.
+The inbox read model uses a 90-day retention window and a newest-first aggregation cap of 500 occurrences. These are service bounds rather than notification-channel settings; the inbox does not add a second channel configuration surface. Tests and internal callers may inject smaller bounded values for deterministic projections.
 
 Time-based read-marker retention runs on normal list/count lifecycle paths. Orphan cleanup runs only with a complete source window, so an unavailable source cannot cause valid markers to be deleted. Source event tables keep their own lifecycle.
 

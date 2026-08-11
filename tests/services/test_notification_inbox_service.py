@@ -176,8 +176,8 @@ def _service(
     alert_error: Optional[Exception] = None,
     scheduled_error: Optional[Exception] = None,
     signal_error: Optional[Exception] = None,
-    retention_days: int = 90,
-    max_items: int = 100,
+    retention_days: Optional[int] = 90,
+    max_items: Optional[int] = 100,
     read_repo: Optional[_FakeReadRepo] = None,
     local_timezone: ZoneInfo = ZoneInfo("Asia/Shanghai"),
 ) -> NotificationInboxService:
@@ -196,6 +196,18 @@ def _service(
 
 def _failure(source: str) -> RepositoryError:
     return RepositoryError("unavailable", error_code=f"{source}_unavailable")
+
+
+def test_operational_bounds_do_not_create_shadow_env_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NOTIFICATION_INBOX_RETENTION_DAYS", "1")
+    monkeypatch.setenv("NOTIFICATION_INBOX_MAX_ITEMS", "10")
+
+    service = _service(retention_days=None, max_items=None)
+
+    assert service.retention_days == 90
+    assert service.max_items == 500
 
 
 def test_aggregates_all_sources_with_structured_titles_and_descending_order() -> None:

@@ -8,7 +8,6 @@ import base64
 import binascii
 import json
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any, Callable, Dict, List, Optional, Sequence
@@ -119,16 +118,14 @@ class NotificationInboxService:
         self.decision_signal_repository = (
             decision_signal_repository or DecisionSignalRepository(self.db)
         )
-        self.retention_days = self._resolve_positive_int(
+        self.retention_days = self._resolve_bounded_int(
             retention_days,
-            env_key="NOTIFICATION_INBOX_RETENTION_DAYS",
             default=NOTIFICATION_INBOX_RETENTION_DAYS_DEFAULT,
             minimum=1,
             maximum=3650,
         )
-        self.max_items = self._resolve_positive_int(
+        self.max_items = self._resolve_bounded_int(
             max_items,
-            env_key="NOTIFICATION_INBOX_MAX_ITEMS",
             default=NOTIFICATION_INBOX_MAX_ITEMS_DEFAULT,
             minimum=10,
             maximum=5000,
@@ -669,28 +666,12 @@ class NotificationInboxService:
         return normalized
 
     @staticmethod
-    def _resolve_positive_int(
+    def _resolve_bounded_int(
         explicit: Optional[int],
         *,
-        env_key: str,
         default: int,
         minimum: int,
         maximum: int,
     ) -> int:
-        if explicit is not None:
-            value = int(explicit)
-        else:
-            raw = os.getenv(env_key, "").strip()
-            if not raw:
-                value = default
-            else:
-                try:
-                    value = int(raw)
-                except ValueError:
-                    logger.warning(
-                        "Invalid %s value; using default %s",
-                        env_key,
-                        default,
-                    )
-                    value = default
+        value = default if explicit is None else int(explicit)
         return max(minimum, min(value, maximum))
