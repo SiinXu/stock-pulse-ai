@@ -18,6 +18,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_TEXT } from '../../locales/portfolio';
+import type { PortfolioAnalysisTaskPanelController } from './PortfolioAnalysisTaskPanel';
 import {
   formatBrokerLabel,
   formatCashDirectionLabel,
@@ -78,6 +79,7 @@ import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells
 const PortfolioRiskMetricsPanel = lazy(
   () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
 );
+const PortfolioAnalysisTaskPanel = lazy(() => import('./PortfolioAnalysisTaskPanel'));
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -125,7 +127,25 @@ const PortfolioWorkspace: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
   const [positionAnalysisLoadingKey, setPositionAnalysisLoadingKey] = useState<string | null>(null);
-  const [positionAnalysisMessage, setPositionAnalysisMessage] = useState<string | null>(null);
+  const portfolioAnalysisTaskControllerRef = useRef<PortfolioAnalysisTaskPanelController | null>(null);
+  const queuedPortfolioAnalysisTaskActionsRef = useRef<Array<(
+    controller: PortfolioAnalysisTaskPanelController,
+  ) => void>>([]);
+  const handlePortfolioAnalysisTaskControllerReady = useCallback((
+    controller: PortfolioAnalysisTaskPanelController | null,
+  ) => {
+    portfolioAnalysisTaskControllerRef.current = controller;
+    if (!controller) return;
+    const queued = queuedPortfolioAnalysisTaskActionsRef.current.splice(0);
+    queued.forEach((action) => action(controller));
+  }, []);
+  const dispatchPortfolioAnalysisTaskAction = useCallback((
+    action: (controller: PortfolioAnalysisTaskPanelController) => void,
+  ) => {
+    const controller = portfolioAnalysisTaskControllerRef.current;
+    if (controller) action(controller);
+    else queuedPortfolioAnalysisTaskActionsRef.current.push(action);
+  }, []);
 
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -376,7 +396,6 @@ const PortfolioWorkspace: React.FC = () => {
   const handleAnalyzePosition = async (row: FlatPosition) => {
     const key = `${row.accountId}-${row.symbol}-${row.market}`;
     setPositionAnalysisLoadingKey(key);
-    setPositionAnalysisMessage(null);
     setError(null);
     try {
       const task = await portfolioApi.analyzePosition(row.symbol, {
@@ -384,9 +403,24 @@ const PortfolioWorkspace: React.FC = () => {
         analysisPhase: positionAnalysisPhase,
         force: false,
       });
-      setPositionAnalysisMessage(formatUiText(text.analysisSubmitted, { symbol: row.symbol, taskId: task.taskId }));
+      dispatchPortfolioAnalysisTaskAction((controller) => {
+        controller.acceptTask(task, row.symbol, positionAnalysisPhase);
+      });
     } catch (err) {
-      setError(getParsedApiError(err));
+      const parsed = getParsedApiError(err);
+      const existingTaskId = String(
+        parsed.params?.existing_task_id
+          ?? parsed.params?.existingTaskId
+          ?? '',
+      ).trim();
+      // Reattach an in-flight duplicate instead of leaving the user with only an error toast.
+      if (parsed.code === 'duplicate_task' && existingTaskId) {
+        dispatchPortfolioAnalysisTaskAction((controller) => {
+          void controller.attachExistingTask(existingTaskId, row.symbol, positionAnalysisPhase);
+        });
+      } else {
+        setError(parsed);
+      }
     } finally {
       setPositionAnalysisLoadingKey(null);
     }
@@ -820,13 +854,14 @@ const PortfolioWorkspace: React.FC = () => {
           message={writeWarning}
         />
       ) : null}
-      {hasAccounts && positionAnalysisMessage ? (
-        <InlineAlert
-          variant="success"
-          title={text.analysisTask}
-          message={positionAnalysisMessage}
+      <Suspense fallback={null}>
+        <PortfolioAnalysisTaskPanel
+          searchParams={searchParams}
+          setSearchParams={setSearchParams}
+          visible={hasAccounts}
+          onControllerReady={handlePortfolioAnalysisTaskControllerReady}
         />
-      ) : null}
+      </Suspense>
 
       <Modal
         isOpen={showCreateAccount}
