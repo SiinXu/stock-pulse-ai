@@ -93,3 +93,10 @@ def test_manifest_requires_permissions_and_rejects_extras() -> None:
 def test_manifest_rejects_blank_required_text(field: str) -> None:
     with pytest.raises(ValidationError):
         PluginManifest.model_validate(_payload(**{field: "   "}))
+
+
+def test_manifest_accepts_toolsurface_capability_permissions() -> None:
+    manifest = PluginManifest.model_validate(
+        _payload(permissions=["market_data:read", "local_model:execute"])
+    )
+    assert manifest.permissions == ("market_data:read", "local_model:execute")

@@ -47,6 +47,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("src.agent.runner")
 
+# Defense-in-depth for every native tool result before it becomes the next
+# model message. Transcript parsing keeps its own valid-JSON result below 96 KiB.
+_NATIVE_TOOL_RESULT_MAX_BYTES = 128 * 1024
+
 
 def run_agent_loop(
     *,
@@ -133,6 +137,7 @@ def run_agent_loop(
             and tool_call_timeout_seconds > 0
             else None
         ),
+        max_result_bytes=_NATIVE_TOOL_RESULT_MAX_BYTES,
         deadline_monotonic=session_deadline_monotonic,
         cancelled_check=cancelled_check,
         backend="native",

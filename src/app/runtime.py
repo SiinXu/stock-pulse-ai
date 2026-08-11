@@ -472,7 +472,7 @@ def _run_schedule_mode(
 
     def scheduled_task():
         runtime_config = _reload_runtime_config()
-        run_full_analysis(runtime_config, args, scheduled_stock_codes)
+        run_scheduled_analysis(runtime_config, args, scheduled_stock_codes)
 
     background_tasks = []
     from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS

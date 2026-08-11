@@ -239,10 +239,10 @@ describe('actionable error remediation', () => {
       },
     }), 'en');
     const remediation = resolveErrorRemediation(llm, 'en');
-    expect(remediation?.actionLabel).toMatch(/model settings/i);
+    expect(remediation?.actionLabel).toBe('Open Settings');
     expect(remediation?.href).toContain('/settings');
     expect(remediation?.href).toContain('section=ai_models');
-    expect(remediation?.hint).toMatch(/Model Access/i);
+    expect(remediation?.hint).toBeUndefined();
   });
 
   it('falls back to category remediation when code is absent', async () => {
@@ -253,9 +253,9 @@ describe('actionable error remediation', () => {
       category: 'local_connection_failed',
     });
     const remediation = resolveErrorRemediation(error, 'en');
-    expect(remediation?.actionLabel).toMatch(/local service/i);
+    expect(remediation?.actionLabel).toBe('Retry');
     expect(remediation?.href).toBeUndefined();
-    expect(remediation?.hint).toMatch(/Web service/i);
+    expect(remediation?.hint).toBeUndefined();
   });
 
   it('keeps export surface including resolveErrorRemediation', async () => {

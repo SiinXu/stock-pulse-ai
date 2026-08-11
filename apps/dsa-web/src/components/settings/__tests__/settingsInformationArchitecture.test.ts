@@ -88,7 +88,9 @@ describe('settingsInformationArchitecture', () => {
       'investment_framework',
     ]);
     expect(getDefaultView('agent_behavior')).toBe('execution');
-    expect(getSectionViews('system_security').map((view) => view.id)).toEqual(['runtime', 'general', 'service', 'security', 'about']);
+    expect(getSectionViews('system_security').map((view) => view.id)).toEqual(['runtime', 'general', 'service', 'security', 'about', 'extensions']);
+    expect(viewLabel('system_security', 'extensions', 'en')).toBe('Extensions');
+    expect(viewLabel('system_security', 'extensions', 'zh')).toBe('已加载扩展');
     expect(getDefaultView('system_security')).toBe('runtime');
     expect(getSectionViews('advanced').map((view) => view.id)).toEqual(['raw_config', 'diagnostics', 'backup']);
     expect(getDefaultView('advanced')).toBe('raw_config');
@@ -142,7 +144,7 @@ describe('settingsInformationArchitecture', () => {
     for (const view of ['routing', 'behavior', 'events']) {
       expect(sectionViewToLegacy('alerts', view)).toEqual({ category: 'notification', sub: 'rules' });
     }
-    for (const view of ['runtime', 'general', 'service', 'security', 'about']) {
+    for (const view of ['runtime', 'general', 'service', 'security', 'about', 'extensions']) {
       expect(sectionViewToLegacy('system_security', view)).toEqual({ category: 'system', sub: null });
     }
     expect(sectionViewToLegacy('data_sources', 'providers')).toEqual({ category: 'data_source', sub: 'providers' });

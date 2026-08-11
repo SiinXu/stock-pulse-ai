@@ -34,7 +34,10 @@ describe('normalizeStockCode', () => {
     expect(normalizeStockCode('hk1810')).toBe('HK01810');
   });
 
-  it('normalizes pure 5-digit HK codes to canonical prefix form', () => {
+  it('normalizes pure 4-5 digit HK codes to canonical prefix form', () => {
+    expect(normalizeStockCode('0001')).toBe('HK00001');
+    expect(normalizeStockCode('0941')).toBe('HK00941');
+    expect(normalizeStockCode('1810')).toBe('HK01810');
     expect(normalizeStockCode('00700')).toBe('HK00700');
     expect(normalizeStockCode('01810')).toBe('HK01810');
   });
@@ -65,7 +68,9 @@ describe('normalizeStockCode', () => {
     expect(normalizeStockCode('0050.TW')).toBe('0050.TW');
     expect(normalizeStockCode('006208.tw')).toBe('006208.TW');
     expect(normalizeStockCode('6505.two')).toBe('6505.TWO');
-    expect(normalizeStockCode('2330')).toBe('2330');
+    // Bare 4-digit numerics are HK by the shared code contract; TW requires
+    // an explicit .TW/.TWO suffix (mirrors data_provider._is_tw_market).
+    expect(normalizeStockCode('2330')).toBe('HK02330');
   });
 
   it('is case-insensitive for prefixes', () => {
@@ -90,6 +95,8 @@ describe('normalizeStockCode', () => {
   it('compares stock-code variants with both sides normalized', () => {
     expect(areStockCodesEquivalent('00700', 'HK00700')).toBe(true);
     expect(areStockCodesEquivalent('01810', '1810.HK')).toBe(true);
+    expect(areStockCodesEquivalent('0941', 'HK00941')).toBe(true);
+    expect(areStockCodesEquivalent('0001', 'HK00001')).toBe(true);
     expect(areStockCodesEquivalent('aapl', 'AAPL')).toBe(true);
     expect(areStockCodesEquivalent('7203.t', '7203.T')).toBe(true);
     expect(areStockCodesEquivalent('005930.ks', '005930.KS')).toBe(true);

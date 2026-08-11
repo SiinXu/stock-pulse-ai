@@ -33,7 +33,8 @@ describe('ReportOverview', () => {
       />,
     );
 
-    expect(screen.getByText('买入')).toBeVisible();
+    // Decision Card + action-advice card both surface the canonical action.
+    expect(screen.getAllByText('买入').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Sell')).not.toBeInTheDocument();
   });
 
@@ -52,7 +53,7 @@ describe('ReportOverview', () => {
       </UiLanguageProvider>,
     );
 
-    expect(screen.getByText('Buy')).toBeVisible();
+    expect(screen.getAllByText('Buy').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Sell')).not.toBeInTheDocument();
   });
 
@@ -64,7 +65,7 @@ describe('ReportOverview', () => {
       />,
     );
 
-    expect(screen.getByText('继续观察买点')).toBeVisible();
+    expect(screen.getAllByText('继续观察买点').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders final market phase and partial-bar labels from report metadata', () => {

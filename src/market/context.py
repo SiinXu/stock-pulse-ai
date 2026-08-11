@@ -26,6 +26,9 @@ def detect_market(stock_code: Optional[str]) -> str:
 
     code = stock_code.strip().upper()
 
+    if code.startswith("CRYPTO:") and len(code) > len("CRYPTO:"):
+        return "crypto"
+
     # HK stocks: HK00700, 00700.HK, or 5-digit pure numbers
     if re.fullmatch(r"HK\.?\d{1,5}", code) or code.endswith(".HK"):
         return "hk"
@@ -77,6 +80,10 @@ _MARKET_ROLES = {
     "tw": {
         "zh": "台股",
         "en": "Taiwan stock",
+    },
+    "crypto": {
+        "zh": "加密资产",
+        "en": "crypto asset",
     },
 }
 
@@ -144,6 +151,18 @@ _MARKET_GUIDELINES = {
             "electronics-foundry supply chain, the three institutional investor groups (foreign / "
             "investment-trust / dealer), margin trading and day trading, and the TWSE/TPEx ±10% daily "
             "price limit; do not apply China A-share-specific concepts such as Northbound flows or Dragon Tiger lists."
+        ),
+    },
+    "crypto": {
+        "zh": (
+            "- 本次分析对象为 **加密资产**，使用 24×7 UTC 日界线。\n"
+            "- 不适用 A 股交易日、涨跌停、T+1、PE/PB、财报、筹码、龙虎榜或北向资金语义；"
+            "仅基于实际返回的价格、成交额与来源证据分析。"
+        ),
+        "en": (
+            "- This analysis covers a **crypto asset** using 24x7 UTC calendar-day boundaries.\n"
+            "- Equity calendars, price limits, T+1, PE/PB, earnings, chip distribution, Dragon Tiger lists, "
+            "and Northbound-flow semantics do not apply; use only returned price, trading-value, and source evidence."
         ),
     },
 }

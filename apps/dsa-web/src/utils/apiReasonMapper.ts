@@ -8,8 +8,8 @@
  * Converge `code` / `details.reason` / envelope params into a single
  * `{ class, titleKey, messageKey, cta? }` contract so Settings, analysis,
  * run-now, notification tests, and security denials can share one renderer
- * in a later adoption phase. This module is intentionally **adoption-free**:
- * it does not wire pages, toasts, or `ApiErrorAlert`.
+ * in a later adoption phase. Analysis Workbench is the first adopter
+ * (`ActionableApiErrorInline` + launch/batch paths); other surfaces may follow.
  *
  * ## Relationship to the error catalog
  * Reuses `ParsedApiError` from `apps/dsa-web/src/api/error.ts` as the sole
@@ -60,8 +60,13 @@
  * code retained on the mapping for disclosure.
  */
 
-import type { ParsedApiError } from '../api/error';
-import { APP_ROUTE_PATHS } from '../routing/routes';
+import type { ApiErrorCategory, ParsedApiError } from '../api/error';
+import {
+  APP_ROUTE_PATHS,
+  SETTINGS_SECTION_IDS,
+  SETTINGS_VIEW_IDS,
+  buildSettingsHref,
+} from '../routing/routes';
 
 /** UX failure classes aligned with #885 and #876 taxonomies. */
 export type ActionableErrorClass =
@@ -347,7 +352,14 @@ export function mapApiErrorToActionable(error: ParsedApiError): ActionableErrorM
     return {
       class: 'llm_not_configured',
       ...stableKeys('llm_not_configured'),
-      cta: { kind: 'navigate', target: APP_ROUTE_PATHS.settings },
+      // Deep-link into Model Sources so operators land on the fix surface.
+      cta: {
+        kind: 'navigate',
+        target: buildSettingsHref({
+          section: SETTINGS_SECTION_IDS.aiModels,
+          view: SETTINGS_VIEW_IDS.aiModels.connections,
+        }),
+      },
       ...technical,
     };
   }
@@ -603,3 +615,63 @@ export const ACTIONABLE_ERROR_CLASSES: readonly ActionableErrorClass[] = [
   'not_found',
   'generic',
 ] as const;
+
+const STABLE_TITLE_KEY_RE = /^api\.error\.STABLE_ERROR_TEXT\.([^.]+)\.title$/;
+const GENERIC_TITLE_KEY_RE = /^api\.error\.GENERIC_ERROR_TEXT\.([^.]+)\.title$/;
+const UI_TEXT_KEY_RE = /^i18n\.uiText\.UI_TEXT\.(.+)$/;
+
+/**
+ * Align a ParsedApiError with the catalog code/category the mapper selected so
+ * adopters can call `localizeParsedApiError` without inventing a second catalog.
+ * UI_TEXT-backed mappings leave code/category unchanged (callers resolve via t()).
+ */
+export function alignParsedApiErrorWithMapping(
+  error: ParsedApiError,
+  mapping: ActionableErrorMapping = mapApiErrorToActionable(error),
+): ParsedApiError {
+  const stableMatch = mapping.titleKey.match(STABLE_TITLE_KEY_RE);
+  if (stableMatch) {
+    const alignedCode = stableMatch[1];
+    if (alignedCode && alignedCode !== error.code) {
+      return { ...error, code: alignedCode };
+    }
+    if (!error.code && alignedCode) {
+      return { ...error, code: alignedCode };
+    }
+    return error;
+  }
+
+  const genericMatch = mapping.titleKey.match(GENERIC_TITLE_KEY_RE);
+  if (genericMatch) {
+    const category = genericMatch[1] as ApiErrorCategory;
+    if (category && category !== error.category) {
+      return { ...error, category };
+    }
+  }
+
+  return error;
+}
+
+/** True when titleKey/messageKey come from `UI_TEXT` rather than the error catalog. */
+export function isUiTextActionableKey(resourceKey: string): boolean {
+  return UI_TEXT_KEY_RE.test(resourceKey);
+}
+
+/**
+ * Strip the `i18n.uiText.UI_TEXT.` prefix to a short `useUiLanguage().t()` key.
+ * Returns null when the resource key is not a UI_TEXT path.
+ */
+export function toUiTextKey(resourceKey: string): string | null {
+  const match = resourceKey.match(UI_TEXT_KEY_RE);
+  return match?.[1] ?? null;
+}
+
+/** Classes that should block duplicate analysis submission while the alert is visible. */
+export function isBusyActionableErrorClass(errorClass: ActionableErrorClass): boolean {
+  return errorClass === 'busy' || errorClass === 'config_conflict';
+}
+
+/** True when a parsed error maps to a busy/conflict class that should block re-submit. */
+export function isBusyParsedApiError(error: ParsedApiError | null | undefined): boolean {
+  return Boolean(error && isBusyActionableErrorClass(mapApiErrorToActionable(error).class));
+}

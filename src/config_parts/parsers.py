@@ -1,5 +1,6 @@
 """Pure value parsers and LLM route helpers for :mod:`src.config`."""
 
+import math as _math
 import os
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
@@ -31,6 +32,16 @@ def parse_env_bool(value: Optional[str], default: bool = False) -> bool:
     if not normalized:
         return default
     return normalized not in _FALSEY_ENV_VALUES
+
+
+def parse_risk_gate_profile(value: Optional[str]) -> str:
+    """Parse the mandatory risk profile and reject unsafe configuration drift."""
+    normalized = str(value or "balanced").strip().lower()
+    if normalized not in {"conservative", "balanced", "aggressive"}:
+        raise ValueError(
+            "RISK_GATE_PROFILE must be one of: conservative, balanced, aggressive"
+        )
+    return normalized
 
 
 def parse_env_int(
@@ -120,6 +131,29 @@ def parse_env_float(
             maximum,
         )
         parsed = maximum
+    return parsed
+
+
+def parse_env_finite_float(
+    value: Optional[str],
+    default: float,
+    *,
+    field_name: str,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+) -> float:
+    """Parse a finite bounded float without silent fallback or clamping."""
+    raw_value = default if value is None or not str(value).strip() else value
+    try:
+        parsed = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a finite number") from exc
+    if not _math.isfinite(parsed):
+        raise ValueError(f"{field_name} must be a finite number")
+    if minimum is not None and parsed < minimum:
+        raise ValueError(f"{field_name} must be >= {minimum}")
+    if maximum is not None and parsed > maximum:
+        raise ValueError(f"{field_name} must be <= {maximum}")
     return parsed
 
 

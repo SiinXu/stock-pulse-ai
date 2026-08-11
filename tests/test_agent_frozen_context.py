@@ -153,9 +153,10 @@ class DesktopBackendPackagingAssetsTestCase(unittest.TestCase):
             path.stem for path in (strategies_dir / "personas").glob("*.yaml")
         )
 
-        self.assertEqual(len(strategy_names), 15)
+        self.assertEqual(len(strategy_names), 16)
         self.assertIn("bottom_volume", strategy_names)
         self.assertIn("chan_theory", strategy_names)
+        self.assertIn("crypto_market_structure", strategy_names)
         self.assertIn("ma_golden_cross", strategy_names)
         self.assertIn("wave_theory", strategy_names)
         self.assertEqual(

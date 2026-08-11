@@ -1,4 +1,6 @@
 import type React from 'react';
+import { useId, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type {
   ReportDetails as ReportDetailsType,
   ReportLanguage,
@@ -13,8 +15,8 @@ import { resolveReportStrataFromDetails } from './reportStrataUtils';
 interface ReportStrataProps {
   details?: ReportDetailsType;
   language?: ReportLanguage;
-  /** When true, always render the disclaimer even if strata payload is absent. */
   alwaysShowDisclaimer?: boolean;
+  defaultCollapsed?: boolean;
 }
 
 const asStringList = (value: unknown): string[] => {
@@ -77,10 +79,13 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
   details,
   language = 'zh',
   alwaysShowDisclaimer = true,
+  defaultCollapsed = true,
 }) => {
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
   const strata = resolveReportStrataFromDetails(details);
+  const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
+  const bodyId = useId();
 
   const facts = (strata?.verifiedFacts ?? [])
     .map(normalizeFact)
@@ -102,109 +107,135 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
     return null;
   }
 
+  const hasExpandableBody = Boolean(strata);
+  const showBody = !hasExpandableBody || isExpanded;
+
   return (
     <Card
       variant="bordered"
       padding="md"
       className="text-left"
       data-testid="report-strata"
+      data-collapsed={hasExpandableBody && !isExpanded ? 'true' : 'false'}
     >
       <DashboardPanelHeader
         eyebrow={text.transparency}
         title={text.evidenceStrata}
         className="mb-3"
+        actions={hasExpandableBody ? (
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+            aria-expanded={isExpanded}
+            aria-controls={bodyId}
+            data-testid="report-strata-toggle"
+            onClick={() => setIsExpanded((prev) => !prev)}
+          >
+            {isExpanded ? text.evidenceDetailsCollapse : text.evidenceDetails}
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </button>
+        ) : undefined}
       />
 
-      {strata ? (
-        <div className="space-y-4 text-sm text-foreground">
-          <section data-testid="report-strata-facts">
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
-              1. {text.verifiedFacts}
-            </h3>
-            {facts.length > 0 ? (
-              <ul className="list-disc space-y-1 pl-5">
-                {facts.map((fact) => (
-                  <li key={`${fact.statement}-${fact.sourceId ?? ''}-${fact.asOf ?? ''}`}>
-                    <span>{fact.statement}</span>
-                    <span className="ml-1 text-xs text-muted-text">
-                      ({text.factSource}: {fact.sourceId?.trim() || text.sourceUnknown}
-                      {' · '}
-                      {text.factAsOf}: {fact.asOf?.trim() || text.asOfUnknown})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-text">—</p>
-            )}
-          </section>
-
-          <section data-testid="report-strata-gaps">
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
-              2. {text.missingOrConflicts}
-            </h3>
-            {gaps.length > 0 ? (
-              <ul className="list-disc space-y-1 pl-5">
-                {gaps.map((gap) => (
-                  <li key={`${gap.kind}-${gap.description}`}>
-                    <span className="mr-1 font-medium">
-                      [{gap.kind === 'conflict' ? text.gapConflict : text.gapMissing}]
-                    </span>
-                    {gap.description}
-                    {gap.sourceIds && gap.sourceIds.length > 0 ? (
+      {hasExpandableBody ? (
+        <div
+          id={bodyId}
+          hidden={!showBody}
+          data-testid="report-strata-body"
+        >
+          <div className="space-y-4 text-sm text-foreground">
+            <section data-testid="report-strata-facts">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
+                1. {text.verifiedFacts}
+              </h3>
+              {facts.length > 0 ? (
+                <ul className="list-disc space-y-1 pl-5">
+                  {facts.map((fact) => (
+                    <li key={`${fact.statement}-${fact.sourceId ?? ''}-${fact.asOf ?? ''}`}>
+                      <span>{fact.statement}</span>
                       <span className="ml-1 text-xs text-muted-text">
-                        ({gap.sourceIds.join(', ')})
+                        ({text.factSource}: {fact.sourceId?.trim() || text.sourceUnknown}
+                        {' · '}
+                        {text.factAsOf}: {fact.asOf?.trim() || text.asOfUnknown})
                       </span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-text">—</p>
-            )}
-          </section>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-text">—</p>
+              )}
+            </section>
 
-          <section data-testid="report-strata-inference">
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
-              3. {text.modelInference}
-            </h3>
-            {inference.length > 0 ? (
-              <ul className="list-disc space-y-1 pl-5">
-                {inference.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-text">—</p>
-            )}
-          </section>
+            <section data-testid="report-strata-gaps">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
+                2. {text.missingOrConflicts}
+              </h3>
+              {gaps.length > 0 ? (
+                <ul className="list-disc space-y-1 pl-5">
+                  {gaps.map((gap) => (
+                    <li key={`${gap.kind}-${gap.description}`}>
+                      <span className="mr-1 font-medium">
+                        [{gap.kind === 'conflict' ? text.gapConflict : text.gapMissing}]
+                      </span>
+                      {gap.description}
+                      {gap.sourceIds && gap.sourceIds.length > 0 ? (
+                        <span className="ml-1 text-xs text-muted-text">
+                          ({gap.sourceIds.join(', ')})
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-text">—</p>
+              )}
+            </section>
 
-          <section data-testid="report-strata-risks">
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
-              4. {text.risksCounterEvidence}
-            </h3>
-            {risks.length > 0 ? (
-              <ul className="list-disc space-y-1 pl-5">
-                {risks.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-text">—</p>
-            )}
-          </section>
+            <section data-testid="report-strata-inference">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
+                3. {text.modelInference}
+              </h3>
+              {inference.length > 0 ? (
+                <ul className="list-disc space-y-1 pl-5">
+                  {inference.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-text">—</p>
+              )}
+            </section>
 
-          <section data-testid="report-strata-framework">
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
-              5. {text.frameworkAlignment}
-            </h3>
-            <p>
-              {frameworkSummary}
-              {framework?.status ? (
-                <span className="ml-1 text-xs text-muted-text">({framework.status})</span>
-              ) : null}
-            </p>
-          </section>
+            <section data-testid="report-strata-risks">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
+                4. {text.risksCounterEvidence}
+              </h3>
+              {risks.length > 0 ? (
+                <ul className="list-disc space-y-1 pl-5">
+                  {risks.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-text">—</p>
+              )}
+            </section>
+
+            <section data-testid="report-strata-framework">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
+                5. {text.frameworkAlignment}
+              </h3>
+              <p>
+                {frameworkSummary}
+                {framework?.status ? (
+                  <span className="ml-1 text-xs text-muted-text">({framework.status})</span>
+                ) : null}
+              </p>
+            </section>
+          </div>
         </div>
       ) : null}
 

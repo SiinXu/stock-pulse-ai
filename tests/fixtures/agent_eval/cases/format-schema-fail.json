@@ -1,0 +1,21 @@
+{
+  "id": "format-schema-fail",
+  "title": "Missing risk_warning and forbidden hype language",
+  "tags": ["language_format", "fail"],
+  "dimensions": ["language_format"],
+  "context": {
+    "stock_code": "600519"
+  },
+  "agent_output": {
+    "signal": "buy",
+    "confidence": "high",
+    "analysis_summary": "GUARANTEED PROFIT this week."
+  },
+  "evaluation": {
+    "language_format": {
+      "expect_json_object": true,
+      "required_fields": ["signal", "risk_warning", "analysis_summary"],
+      "forbidden_substrings": ["GUARANTEED PROFIT"]
+    }
+  }
+}

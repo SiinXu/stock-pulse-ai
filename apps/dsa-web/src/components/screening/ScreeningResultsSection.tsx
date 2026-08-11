@@ -1,23 +1,22 @@
 import type React from 'react';
 import { useCallback, useMemo } from 'react';
-import { Play, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { AlphaSiftCandidate } from '../../api/alphasift';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import { getUiListSeparator } from '../../utils/uiLocale';
 import { Button, DataTable, type DataTableColumn, Surface } from '../common';
 import {
-  formatAmount,
-  formatNumber,
-  formatPercent,
-  formatScore,
-  getCandidateDetailId,
-  getCandidateReason,
-  getFactorEntries,
-  getSignal,
-  hasLlmInsight,
+  formatAmount, formatNumber, formatPercent, formatScore, getCandidateDetailId,
+  getCandidateReason, getFactorEntries, getSignal, hasLlmInsight,
 } from './screeningCandidateModel';
 import { summarizeAlphaSiftDiagnostic } from './screeningMessages';
 import type { ScreeningText } from './screeningText';
+
+export type ScreeningResultsEmptyState = {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+};
 
 export type ScreeningResultsSectionProps = {
   text: ScreeningText;
@@ -25,9 +24,8 @@ export type ScreeningResultsSectionProps = {
   candidates: AlphaSiftCandidate[];
   expandedCode: string | null;
   llmDegraded: boolean;
-  loading: boolean;
+  emptyState?: ScreeningResultsEmptyState;
   onExpandedCodeChange: (code: string | null) => void;
-  onOpenConfiguration: () => void;
 };
 
 export const ScreeningResultsSection: React.FC<ScreeningResultsSectionProps> = ({
@@ -36,9 +34,8 @@ export const ScreeningResultsSection: React.FC<ScreeningResultsSectionProps> = (
   candidates,
   expandedCode,
   llmDegraded,
-  loading,
+  emptyState,
   onExpandedCodeChange,
-  onOpenConfiguration,
 }) => {
   const candidateColumns = useMemo<DataTableColumn<AlphaSiftCandidate>[]>(() => [
     {
@@ -153,7 +150,11 @@ export const ScreeningResultsSection: React.FC<ScreeningResultsSectionProps> = (
             </p>
             {llmInsightAvailable ? (
               <p className="mt-1 text-xs text-secondary-text">
-                {formatUiText(text.sectorThemeConfidence, { sector: item.llmSector || '-', theme: item.llmTheme || '-', confidence: formatPercent(item.llmConfidence) })}
+                {formatUiText(text.sectorThemeConfidence, {
+                  sector: item.llmSector || '-',
+                  theme: item.llmTheme || '-',
+                  confidence: formatPercent(item.llmConfidence),
+                })}
               </p>
             ) : (
               <p className="mt-1 text-xs text-secondary-text">{text.noLlmMetadata}</p>
@@ -191,13 +192,17 @@ export const ScreeningResultsSection: React.FC<ScreeningResultsSectionProps> = (
           <div>
             <p className="text-xs font-semibold text-secondary-text">{text.watchItems}</p>
             <p className="mt-1 text-sm text-foreground">
-              {item.llmWatchItems?.length ? item.llmWatchItems.join(getUiListSeparator(language)) : llmDegraded ? text.degradedNoValue : text.none}
+              {item.llmWatchItems?.length
+                ? item.llmWatchItems.join(getUiListSeparator(language))
+                : llmDegraded ? text.degradedNoValue : text.none}
             </p>
           </div>
           <div>
             <p className="text-xs font-semibold text-secondary-text">{text.catalysts}</p>
             <p className="mt-1 text-sm text-foreground">
-              {item.llmCatalysts?.length ? item.llmCatalysts.join(getUiListSeparator(language)) : llmDegraded ? text.degradedNoValue : text.none}
+              {item.llmCatalysts?.length
+                ? item.llmCatalysts.join(getUiListSeparator(language))
+                : llmDegraded ? text.degradedNoValue : text.none}
             </p>
           </div>
           <div>
@@ -241,30 +246,13 @@ export const ScreeningResultsSection: React.FC<ScreeningResultsSectionProps> = (
           {formatUiText(text.candidateCount, { count: candidates.length })}
         </div>
       </div>
-
       <DataTable
         caption={text.results}
         scrollAreaLabel={text.results}
         columns={candidateColumns}
         rows={candidates}
         getRowKey={(item) => `${item.rank}-${item.code}`}
-        emptyState={{
-          title: text.noResults,
-          description: text.noResultsDescription,
-          action: (
-            <Button
-              type="button"
-              variant="primary"
-              size="default"
-              disabled={loading}
-              aria-label={`${text.run} · ${text.noResults}`}
-              onClick={onOpenConfiguration}
-            >
-              <Play className="h-4 w-4" aria-hidden="true" />
-              {text.run}
-            </Button>
-          ),
-        }}
+        emptyState={emptyState ?? { title: text.noResults, description: text.noResultsDescription }}
         minWidth="wide"
         isRowDetailVisible={(item) => expandedCode === item.code}
         renderRowDetail={renderCandidateDetail}

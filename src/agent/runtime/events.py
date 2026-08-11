@@ -50,6 +50,7 @@ PUBLIC_PROGRESS_EVENT_TYPES = frozenset(
         "generating",
         "pipeline_timeout",
         "pipeline_budget_skipped",
+        "turn_persisted",
     }
 )
 

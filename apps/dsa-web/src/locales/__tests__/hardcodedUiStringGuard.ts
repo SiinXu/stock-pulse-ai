@@ -686,24 +686,41 @@ export function collectHardcodedUiStrings(
   sourceText: string,
 ): HardcodedUiStringCandidate[] {
   const source = ts.createSourceFile(filename, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const sourceFiles = new Map([[filename, source]]);
+  const checker = createSourceChecker(sourceFiles, new Map([[filename, sourceText]]));
+  return collectBoundHardcodedUiStrings(filename, source, checker);
+}
+
+function createSourceChecker(
+  sourceFiles: ReadonlyMap<string, ts.SourceFile>,
+  sourceTexts: ReadonlyMap<string, string>,
+): ts.TypeChecker {
   const compilerOptions: ts.CompilerOptions = {
     jsx: ts.JsxEmit.Preserve,
+    moduleDetection: ts.ModuleDetectionKind.Force,
     noLib: true,
     noResolve: true,
     target: ts.ScriptTarget.Latest,
   };
   const compilerHost: ts.CompilerHost = {
-    fileExists: (requestedFilename) => requestedFilename === filename,
+    fileExists: (requestedFilename) => sourceFiles.has(requestedFilename),
     getCanonicalFileName: (requestedFilename) => requestedFilename,
     getCurrentDirectory: () => '/',
     getDefaultLibFileName: () => 'lib.d.ts',
     getNewLine: () => '\n',
-    getSourceFile: (requestedFilename) => requestedFilename === filename ? source : undefined,
-    readFile: (requestedFilename) => requestedFilename === filename ? sourceText : undefined,
+    getSourceFile: (requestedFilename) => sourceFiles.get(requestedFilename),
+    readFile: (requestedFilename) => sourceTexts.get(requestedFilename),
     useCaseSensitiveFileNames: () => true,
     writeFile: () => undefined,
   };
-  const checker = ts.createProgram([filename], compilerOptions, compilerHost).getTypeChecker();
+  return ts.createProgram(Array.from(sourceFiles.keys()), compilerOptions, compilerHost).getTypeChecker();
+}
+
+function collectBoundHardcodedUiStrings(
+  filename: string,
+  source: ts.SourceFile,
+  checker: ts.TypeChecker,
+): HardcodedUiStringCandidate[] {
   const candidates: HardcodedUiStringCandidate[] = [];
   const seen = new Set<string>();
 
@@ -773,6 +790,30 @@ export function collectHardcodedUiStrings(
 
   visit(source);
   return candidates;
+}
+
+export function collectHardcodedUiStringsFromSources(
+  sources: ReadonlyArray<readonly [filename: string, sourceText: string]>,
+): HardcodedUiStringCandidate[] {
+  const isolatedSources = sources.map(([filename, sourceText]) => [
+    filename,
+    `${sourceText}\nexport {};`,
+  ] as const);
+  const sourceTexts = new Map(isolatedSources);
+  const sourceFiles = new Map(isolatedSources.map(([filename, sourceText]) => [
+    filename,
+    ts.createSourceFile(
+      filename,
+      sourceText,
+      ts.ScriptTarget.Latest,
+      true,
+      filename.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    ),
+  ] as const));
+  const checker = createSourceChecker(sourceFiles, sourceTexts);
+  return Array.from(sourceFiles, ([filename, source]) => (
+    collectBoundHardcodedUiStrings(filename, source, checker)
+  )).flat();
 }
 
 export function findHardcodedUiStrings(

@@ -1,10 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { UI_TEXT } from '../../../i18n/uiText';
 import ScheduledTasksPanel from '../ScheduledTasksPanel';
+
+const HISTORY_ASSERT_TIMEOUT_MS = 5_000;
+const HISTORY_FLOW_TIMEOUT_MS = HISTORY_ASSERT_TIMEOUT_MS * 4;
 
 vi.mock('../../../api/scheduledTasks', () => ({
   scheduledTasksApi: {
@@ -340,8 +343,16 @@ describe('ScheduledTasksPanel', () => {
       'task-1',
       { limit: 10 },
     ));
-    expect(await screen.findByTestId('settings-scheduled-task-run-run-success')).toBeInTheDocument();
-    const failed = await screen.findByTestId('settings-scheduled-task-run-run-failed');
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-success',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
+    const failed = await screen.findByTestId(
+      'settings-scheduled-task-run-run-failed',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    );
     expect(failed).toHaveTextContent('Failed');
     expect(failed).toHaveTextContent('3 attempts · 2 dispatch failures');
     expect(failed).toHaveTextContent('execution-failed');
@@ -351,9 +362,15 @@ describe('ScheduledTasksPanel', () => {
   });
 
   it('shows an empty history and uses the API limit contract for load more and refresh', async () => {
+    let resolveEmptyHistory: () => void = () => undefined;
     vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 1, items: [scheduledTask] });
     vi.mocked(scheduledTasksApi.listRuns)
-      .mockResolvedValueOnce({ total: 0, items: [] })
+      .mockImplementationOnce(async () => {
+        await new Promise<void>((resolve) => {
+          resolveEmptyHistory = resolve;
+        });
+        return { total: 0, items: [] };
+      })
       .mockResolvedValueOnce({ total: 11, items: [buildRun('run-1')] })
       .mockResolvedValueOnce({
         total: 2,
@@ -368,19 +385,37 @@ describe('ScheduledTasksPanel', () => {
 
     await screen.findByText('AAPL risk check');
     fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-1'));
-    expect(await screen.findByText('No run history')).toBeInTheDocument();
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenNthCalledWith(
+      1,
+      'task-1',
+      { limit: 10 },
+    ));
+    await act(async () => resolveEmptyHistory());
+    expect(await screen.findByText(
+      'No run history',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', {
       name: 'Refresh run history for “AAPL risk check”',
     }));
-    expect(await screen.findByTestId('settings-scheduled-task-run-run-1')).toBeInTheDocument();
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-1',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
     await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenNthCalledWith(
       3,
       'task-1',
       { limit: 20 },
     ));
-    expect(await screen.findByTestId('settings-scheduled-task-run-run-2')).toBeInTheDocument();
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-2',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', {
       name: 'Refresh run history for “AAPL risk check”',
@@ -390,5 +425,5 @@ describe('ScheduledTasksPanel', () => {
       'task-1',
       { limit: 20 },
     ));
-  });
+  }, HISTORY_FLOW_TIMEOUT_MS);
 });

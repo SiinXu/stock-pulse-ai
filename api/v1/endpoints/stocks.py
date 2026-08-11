@@ -13,7 +13,6 @@
 
 import logging
 from typing import Optional
-import re
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, Depends
 
@@ -41,7 +40,9 @@ from src.services.import_parser import (
 from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
-from data_provider.base import normalize_stock_code
+from src.services.stock_code_utils import canonicalize_analysis_stock_code
+from data_provider.daily_cache import LocalDataMissingError
+from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -52,15 +53,20 @@ router = APIRouter()
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
 
 
-def _read_watchlist_codes(service: SystemConfigService) -> list:
-    """Read STOCK_LIST codes as-is (no normalization)."""
+def _read_watchlist_snapshot(service: SystemConfigService) -> tuple[list, str]:
+    """Read STOCK_LIST and its optimistic config version from one snapshot."""
     config_data = service.get_config(include_schema=False)
     stock_list_str = ""
     for item in config_data.get("items", []):
         if item.get("key") == "STOCK_LIST":
             stock_list_str = str(item.get("value", ""))
             break
-    return split_stock_list(stock_list_str)
+    return split_stock_list(stock_list_str), str(config_data.get("config_version", ""))
+
+
+def _read_watchlist_codes(service: SystemConfigService) -> list:
+    """Read STOCK_LIST codes as-is (no normalization)."""
+    return _read_watchlist_snapshot(service)[0]
 
 
 def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
@@ -75,20 +81,6 @@ def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
     )
 
 
-# Stock code validation patterns (aligned with frontend validateStockCode)
-_STOCK_CODE_RE = re.compile(
-    r"^(?:\d{6}"                              # A-share 6-digit
-    r"|(?:SH|SZ|BJ)\d{6}"                     # exchange-prefixed A-share
-    r"|\d{6}\.(?:SH|SZ|SS|BJ)"                # exchange-suffixed A-share
-    r"|\d{1,5}\.HK"                           # HK suffix format
-    r"|HK\d{1,5}"                             # HK prefix format
-    r"|\d{5}"                                 # bare 5-digit HK code
-    r"|[A-Z]{1,5}(?:\.(?:US|[A-Z]))?"         # US ticker
-    r")$",
-    re.IGNORECASE,
-)
-
-
 def _validate_and_normalize_stock_code(code: str) -> str:
     """Validate stock code format and return canonical form.
 
@@ -100,7 +92,8 @@ def _validate_and_normalize_stock_code(code: str) -> str:
             status_code=400,
             detail={"error": "invalid_stock_code", "message": "股票代码不能为空"},
         )
-    if not _STOCK_CODE_RE.match(stripped):
+    normalized = canonicalize_analysis_stock_code(stripped)
+    if normalized is None:
         raise HTTPException(
             status_code=400,
             detail={
@@ -108,15 +101,12 @@ def _validate_and_normalize_stock_code(code: str) -> str:
                 "message": f"'{stripped}' 不是合法的股票代码格式",
             },
         )
-    return normalize_stock_code(stripped)
+    return normalized
 
 
 def _watchlist_match_key(code: str) -> str:
     """Return the equivalence key used for watchlist add/remove matching."""
-    normalized = normalize_stock_code(code.strip())
-    if re.fullmatch(r"\d{5}", normalized):
-        return f"HK{normalized}"
-    return normalized.upper()
+    return watchlist_match_key(code)
 
 
 @router.post(
@@ -387,10 +377,11 @@ def add_to_watchlist(
         validated = _validate_and_normalize_stock_code(request.stock_code)
         codes = _read_watchlist_codes(service)
         existing_keys = [_watchlist_match_key(c) for c in codes]
+        display_code = validated
         if _watchlist_match_key(validated) not in existing_keys:
-            codes.append(request.stock_code.strip())
+            codes.append(display_code)
             _write_watchlist_codes(service, codes)
-        return WatchlistResponse(stock_codes=codes, message=f"已加入 {request.stock_code.strip()}")
+        return WatchlistResponse(stock_codes=codes, message=f"已加入 {display_code}")
     except HTTPException:
         raise
     except Exception as e:
@@ -528,6 +519,7 @@ def get_stock_quote(stock_code: str) -> StockQuote:
     response_model=StockHistoryResponse,
     responses={
         200: {"description": "历史行情数据"},
+        409: {"description": "Local-only market data is incomplete", "model": ErrorResponse},
         422: {"description": "不支持的周期参数", "model": ErrorResponse},
         500: {"description": "服务器错误", "model": ErrorResponse},
     },
@@ -584,6 +576,15 @@ def get_stock_history(
             data=data
         )
     
+    except LocalDataMissingError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": exc.error_code,
+                "message": str(exc),
+                "details": exc.to_dict(),
+            },
+        )
     except ValueError as e:
         # period Parameter not supported error(If weekly/monthly)
         raise HTTPException(
