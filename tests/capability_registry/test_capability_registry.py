@@ -438,3 +438,185 @@ def test_optional_tool_construction_failure_keeps_its_provenance() -> None:
     assert record.configured is True
     assert record.dependency_ready is False
     assert record.reason_code == "construction_failed"
+
+
+# ----- Runtime-truth counterexamples (no static catalog / no fail-open) -----
+
+
+def test_extension_source_does_not_install_a_default_composition_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Registry absence must be not_initialized, never a fabricated success."""
+
+    monkeypatch.setattr(
+        "src.application_services.get_installed_application_services",
+        lambda: None,
+    )
+    created = {"count": 0}
+
+    def _forbid_default_root() -> Any:
+        created["count"] += 1
+        raise AssertionError("must not construct a default ApplicationServices")
+
+    monkeypatch.setattr(
+        "src.application_services.get_application_services",
+        _forbid_default_root,
+    )
+    snapshot = _collect(domains=("extension",))
+
+    assert created["count"] == 0
+    assert snapshot.items == ()
+    assert snapshot.partial is True
+    assert snapshot.sources[0].state == "not_initialized"
+    assert snapshot.sources[0].error_code == "application_services_not_initialized"
+
+
+def test_skill_catalog_read_failure_is_explicit_error_not_empty_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.capability_registry import service as capability_service
+
+    def _boom() -> Any:
+        raise capability_service.OwnerReadError("skill_catalog_unavailable")
+
+    monkeypatch.setattr(capability_service, "_resolve_skill_catalog", _boom)
+    snapshot = _collect(domains=("skill",))
+
+    assert snapshot.partial is True
+    assert snapshot.items == ()
+    assert snapshot.sources[0].state == "error"
+    assert snapshot.sources[0].error_code == "skill_catalog_unavailable"
+
+
+def test_skill_config_read_failure_is_explicit_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.capability_registry import service as capability_service
+
+    def _boom() -> Any:
+        raise capability_service.OwnerReadError("skill_config_unavailable")
+
+    monkeypatch.setattr(capability_service, "_resolve_skill_catalog", _boom)
+    snapshot = _collect(domains=("skill",))
+
+    assert snapshot.partial is True
+    assert snapshot.items == ()
+    assert snapshot.sources[0].error_code == "skill_config_unavailable"
+
+
+def test_skill_partial_availability_reports_disabled_and_active_truthfully() -> None:
+    plugin_definition = SimpleNamespace(
+        name="momentum",
+        display_name="Momentum",
+        default_active=True,
+        user_invocable=True,
+        required_tools=("get_realtime_quote",),
+    )
+    plugin_skills = (
+        SimpleNamespace(
+            plugin_id="builtin.analysis-strategy.momentum",
+            definition=plugin_definition,
+        ),
+    )
+    declarative = (
+        SimpleNamespace(
+            name="custom_disabled",
+            display_name="Custom Disabled",
+            enabled=False,
+            source="custom",
+            required_tools=(),
+        ),
+    )
+    snapshot = _collect(
+        skill_catalog=(7, plugin_skills, declarative),
+        domains=("skill",),
+    )
+    records = _by_id(snapshot)
+
+    assert snapshot.partial is False
+    assert snapshot.sources[0].state == "ok"
+    assert snapshot.sources[0].generation == "7"
+    assert records["skill:momentum"].registered is True
+    assert records["skill:momentum"].healthy is True
+    assert records["skill:momentum"].executable is None
+    assert records["skill:momentum"].dependencies == ("get_realtime_quote",)
+    disabled = records["skill:custom_disabled"]
+    assert disabled.registered is True
+    assert disabled.executable is False
+    assert disabled.healthy is False
+    assert disabled.degraded is True
+    assert disabled.reason_code == "skill_disabled"
+
+
+def test_pipeline_stages_come_from_live_owner_not_a_copied_static_list() -> None:
+    snapshot = _collect(
+        pipeline_stages=(
+            "resolve,fetch",
+            ("resolve", "fetch"),
+            frozenset({"resolve", "fetch"}),
+        ),
+        domains=("pipeline",),
+    )
+    records = _by_id(snapshot)
+
+    assert snapshot.partial is False
+    assert snapshot.sources[0].generation == "resolve,fetch"
+    assert records["pipeline.stage:resolve"].registered is True
+    assert records["pipeline.stage:resolve"].healthy is True
+    assert records["pipeline.stage:fetch"].registered is True
+
+
+def test_pipeline_partial_unbound_stage_is_visible_not_masked() -> None:
+    snapshot = _collect(
+        pipeline_stages=(
+            "resolve,ghost",
+            ("resolve", "ghost"),
+            frozenset({"resolve"}),
+        ),
+        domains=("pipeline",),
+    )
+    records = _by_id(snapshot)
+
+    assert records["pipeline.stage:resolve"].registered is True
+    ghost = records["pipeline.stage:ghost"]
+    assert ghost.registered is False
+    assert ghost.executable is False
+    assert ghost.healthy is False
+    assert ghost.degraded is True
+    assert ghost.reason_code == "stage_not_bound"
+
+
+def test_live_pipeline_owner_probe_reports_registered_stages() -> None:
+    snapshot = _collect(domains=("pipeline",))
+
+    assert snapshot.sources[0].state == "ok"
+    assert snapshot.items
+    assert all(item.domain == "pipeline" for item in snapshot.items)
+    assert all(item.registered is True for item in snapshot.items)
+    assert {item.capability_id for item in snapshot.items} == {
+        f"pipeline.stage:{name}"
+        for name in (
+            "resolve",
+            "fetch",
+            "intelligence",
+            "context",
+            "analyze",
+            "persist",
+            "render",
+            "dispatch",
+        )
+    }
+
+
+def test_failed_plugin_lifecycle_exposes_health_not_silent_success() -> None:
+    manager = _PluginManager(
+        lifecycle=(
+            _PluginSnapshot(_Manifest("demo.plugin", "Demo"), state="failed"),
+        ),
+    )
+    record = _collect(plugin_manager=manager, domains=("extension",)).items[0]
+
+    assert record.healthy is False
+    assert record.degraded is True
+    assert record.executable is False
+    assert record.reason_code == "plugin_failed"

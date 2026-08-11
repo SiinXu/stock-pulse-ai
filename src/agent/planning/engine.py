@@ -4,9 +4,9 @@
 Role relative to existing orchestration
 ---------------------------------------
 This module produces a typed proposal. Step execution, observation recording,
-and observation-driven replan live in ``src/agent/planning/loop.py`` and are
-also opt-in: nothing here hooks ``AgentExecutor``, Chat, Research, or daily
-product modes by default.
+and observation-driven replan live in ``src/agent/planning/loop.py``.
+Production RUN integration lives in ``src/agent/planning/product.py`` and is
+default-off behind ``AGENT_PLANNING_ENABLED``.
 
 Related but separate orchestration owners:
 
@@ -14,8 +14,8 @@ Related but separate orchestration owners:
 - multi-strategy deliberation scheduling
 - deep-research query decomposition in ``research.py``
 
-Callers must supply settings explicitly. The repository has no environment
-gate or implicit runtime consumer for the planning library.
+Product knobs are owned by shared Config; library callers may still supply
+``PlanningSettings`` explicitly.
 """
 
 from __future__ import annotations

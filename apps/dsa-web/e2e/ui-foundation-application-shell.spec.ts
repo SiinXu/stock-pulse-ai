@@ -4,8 +4,38 @@ const FIXTURE_PATH = '/e2e/application-shell-fixture.html';
 
 test.beforeEach(async ({ page }) => {
   const emptyPage = { items: [], total: 0, page: 1, page_size: 20 };
+  const sourceStatuses = [
+    { source: 'analysis', available: true, item_count: 0 },
+    { source: 'alerts', available: true, item_count: 0 },
+    { source: 'scheduled_tasks', available: true, item_count: 0 },
+    { source: 'decision_signals', available: true, item_count: 0 },
+  ];
   await page.route('**/api/v1/decision-signals**', (route) => route.fulfill({ json: emptyPage }));
   await page.route('**/api/v1/alerts/triggers**', (route) => route.fulfill({ json: emptyPage }));
+  await page.route(/\/api\/v1\/notification-inbox\/items(?:\?.*)?$/, (route) => route.fulfill({
+    json: {
+      items: [],
+      page: 1,
+      page_size: 10,
+      total: 0,
+      unread_total: 0,
+      has_more: false,
+      source_statuses: sourceStatuses,
+      retention_days: 90,
+      max_items: 500,
+    },
+  }));
+  await page.route(/\/api\/v1\/notification-inbox\/unread-count(?:\?.*)?$/, (route) => route.fulfill({
+    json: {
+      unread_total: 0,
+      source_statuses: sourceStatuses,
+      retention_days: 90,
+      max_items: 500,
+    },
+  }));
+  await page.route('**/api/v1/notification-inbox/items/mark-all-read', (route) => route.fulfill({
+    json: { marked_count: 0, unread_total: 0 },
+  }));
 });
 
 async function openFixture(page: Page, width: number, height = 800) {

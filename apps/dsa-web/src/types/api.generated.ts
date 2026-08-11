@@ -902,7 +902,7 @@ export interface paths {
         };
         /**
          * List the runtime capability inventory (read-only)
-         * @description Capture a versioned read-only inventory from the live data-provider, tool, and plugin owners. Unknown readiness remains null. Source read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or health-check capabilities.
+         * @description Capture a versioned read-only inventory from the live data-provider, tool, plugin, skill, and pipeline owners. Availability comes only from runtime registration and owner health state, never from a static catalog. Unknown readiness remains null. Source or config read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or perform side-effecting health checks.
          */
         get: operations["listCapabilities"];
         put?: never;
@@ -1986,6 +1986,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notification-inbox/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List in-app notification inbox items */
+        get: operations["list_inbox_items_api_v1_notification_inbox_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/items/mark-all-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark the current notification inbox window as read */
+        post: operations["mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/items/mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark specific notification inbox items as read */
+        post: operations["mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get unread notification inbox count */
+        get: operations["get_inbox_unread_count_api_v1_notification_inbox_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/apply": {
         parameters: {
             query?: never;
@@ -2138,6 +2206,30 @@ export interface paths {
          * @description Toggle persisted enable/disable intent and apply it immediately, or attempt in-process hot-reload for an external plugin. Built-in plugins return restart_required=true for reload. Disabled plugins are never loaded or invoked.
          */
         post: operations["updatePluginLifecycle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{plugin_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one plugin's generated settings contract
+         * @description Return the strict manifest-declared settings schema and effective values. Sensitive values are represented only by mask_token.
+         */
+        get: operations["getPluginSettings"];
+        /**
+         * Validate and persist one plugin's settings
+         * @description Replace explicit per-plugin settings after strict manifest validation. Omitted keys reset to defaults; masked sensitive values preserve the stored secret.
+         */
+        put: operations["updatePluginSettings"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3758,6 +3850,84 @@ export interface components {
             /** Deleted */
             deleted: number;
         };
+        /** AlertEventAffectedContext */
+        AlertEventAffectedContext: {
+            /**
+             * In Portfolio
+             * @default false
+             */
+            in_portfolio: boolean;
+            /**
+             * In Watchlist
+             * @default false
+             */
+            in_watchlist: boolean;
+            /** Symbol */
+            symbol?: string | null;
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /** AlertEventContext */
+        AlertEventContext: {
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactContext */
+        AlertImpactContext: {
+            affected?: components["schemas"]["AlertEventAffectedContext"] | null;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Related Analysis */
+            related_analysis?: string | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactResult */
+        AlertImpactResult: {
+            /**
+             * Grade
+             * @enum {string}
+             */
+            grade: "major" | "routine" | "unclassified";
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "rule_severity" | "unavailable";
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
+        };
         /** AlertNotificationItem */
         AlertNotificationItem: {
             /** Attempt */
@@ -3973,6 +4143,8 @@ export interface components {
         };
         /** AlertTriggerItem */
         AlertTriggerItem: {
+            /** Alert Type */
+            alert_type?: string | null;
             analysis_context_pack_overview?: components["schemas"]["AnalysisContextPackOverview"] | null;
             /**
              * Analysis Visibility Source
@@ -3989,8 +4161,11 @@ export interface components {
             } | null;
             /** Diagnostics */
             diagnostics?: string | null;
+            event_context?: components["schemas"]["AlertEventContext"] | null;
             /** Id */
             id: number;
+            impact_context?: components["schemas"]["AlertImpactContext"] | null;
+            impact_result?: components["schemas"]["AlertImpactResult"] | null;
             market_phase_summary?: components["schemas"]["MarketPhaseSummary"] | null;
             /** Observed Value */
             observed_value?: number | null;
@@ -3998,6 +4173,8 @@ export interface components {
             reason?: string | null;
             /** Rule Id */
             rule_id?: number | null;
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
             /** Status */
             status: string;
             /** Target */
@@ -4011,6 +4188,8 @@ export interface components {
         AlertTriggerListResponse: {
             /** Items */
             items?: components["schemas"]["AlertTriggerItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
             /** Page */
             page: number;
             /** Page Size */
@@ -5554,7 +5733,7 @@ export interface components {
             /** Executable Count */
             executable_count: number;
             /** Items */
-            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"])[];
+            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"] | components["schemas"]["SkillCapabilityItem"] | components["schemas"]["PipelineCapabilityItem"])[];
             /** Non Executable Count */
             non_executable_count: number;
             /** Partial */
@@ -5586,7 +5765,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "data" | "tool" | "extension";
+            source: "data" | "tool" | "extension" | "skill" | "pipeline";
             /**
              * State
              * @enum {string}
@@ -9066,6 +9245,164 @@ export interface components {
             total: number;
         };
         /**
+         * NotificationInboxItem
+         * @description One aggregated inbox row projected from durable event sources.
+         */
+        NotificationInboxItem: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Href
+             * @description In-app deep link path with query string
+             */
+            href: string;
+            /**
+             * Id
+             * @description Versioned stable occurrence key
+             */
+            id: string;
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "analysis_complete" | "alert_triggered" | "scheduled_task_result" | "decision_signal";
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Severity
+             * @default info
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "error";
+            /** Source Id */
+            source_id: string;
+            /** Summary */
+            summary: string;
+            /**
+             * Title Key
+             * @enum {string}
+             */
+            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle";
+            /** Title Params */
+            title_params?: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * NotificationInboxListResponse
+         * @description GET /notification-inbox/items response body.
+         */
+        NotificationInboxListResponse: {
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["NotificationInboxItem"][];
+            /** Max Items */
+            max_items: number;
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Retention Days */
+            retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
+            /** Total */
+            total: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxMarkAllReadRequest
+         * @description POST /notification-inbox/items/mark-all-read request body.
+         */
+        NotificationInboxMarkAllReadRequest: {
+            /**
+             * Kind
+             * @description Optional kind filter when marking the current window
+             */
+            kind?: string | null;
+        };
+        /**
+         * NotificationInboxMarkAllReadResponse
+         * @description POST /notification-inbox/items/mark-all-read response body.
+         */
+        NotificationInboxMarkAllReadResponse: {
+            /** Marked Count */
+            marked_count: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxMarkReadRequest
+         * @description POST /notification-inbox/items/mark-read request body.
+         */
+        NotificationInboxMarkReadRequest: {
+            /**
+             * Item Ids
+             * @description Versioned stable inbox occurrence ids
+             */
+            item_ids: string[];
+        };
+        /**
+         * NotificationInboxMarkReadResponse
+         * @description POST /notification-inbox/items/mark-read response body.
+         */
+        NotificationInboxMarkReadResponse: {
+            /** Marked Count */
+            marked_count: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxSourceStatus
+         * @description Availability and bounded provenance for one selected inbox source.
+         */
+        NotificationInboxSourceStatus: {
+            /** Available */
+            available: boolean;
+            /** Error Code */
+            error_code?: string | null;
+            /** Item Count */
+            item_count: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals";
+        };
+        /**
+         * NotificationInboxUnreadCountResponse
+         * @description GET /notification-inbox/unread-count response body.
+         */
+        NotificationInboxUnreadCountResponse: {
+            /** Max Items */
+            max_items: number;
+            /** Retention Days */
+            retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
          * NotificationTestAttempt
          * @description One notification delivery attempt result.
          */
@@ -9438,6 +9775,74 @@ export interface components {
             win_rate_pct?: number | null;
         };
         /**
+         * PipelineCapabilityItem
+         * @description Live pipeline-stage observation from the shared execution contract.
+         */
+        PipelineCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "pipeline";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "pipeline_stage";
+            /** Version */
+            version: string;
+        };
+        /**
          * PluginHealthEntryResponse
          * @description One plugin health row for operator diagnostics consumers.
          */
@@ -9532,6 +9937,12 @@ export interface components {
              */
             reloadable: boolean;
             /**
+             * Settings Count
+             * @description Number of declarative settings fields in the plugin manifest
+             * @default 0
+             */
+            settings_count: number;
+            /**
              * Source
              * @enum {string}
              */
@@ -9600,6 +10011,128 @@ export interface components {
             items?: components["schemas"]["PluginInfo"][];
             /** Total */
             total: number;
+        };
+        /**
+         * PluginSettingFieldResponse
+         * @description One strict manifest-declared plugin settings field.
+         */
+        PluginSettingFieldResponse: {
+            /**
+             * Data Type
+             * @enum {string}
+             */
+            data_type: "string" | "integer" | "number" | "boolean";
+            /** Default Value */
+            default_value?: string | number | boolean | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Display Order
+             * @default 100
+             */
+            display_order: number;
+            /**
+             * Is Required
+             * @default false
+             */
+            is_required: boolean;
+            /**
+             * Is Sensitive
+             * @default false
+             */
+            is_sensitive: boolean;
+            /** Key */
+            key: string;
+            /** Options */
+            options?: components["schemas"]["PluginSettingOptionResponse"][];
+            /** Title */
+            title: string;
+            /**
+             * Ui Control
+             * @enum {string}
+             */
+            ui_control: "text" | "password" | "number" | "select" | "textarea" | "switch";
+            /** Validation */
+            validation?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * PluginSettingOptionResponse
+         * @description One finite option for a generated plugin setting control.
+         */
+        PluginSettingOptionResponse: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string | number | boolean | null;
+        };
+        /**
+         * PluginSettingsResponse
+         * @description Generated schema and masked effective values for one plugin.
+         */
+        PluginSettingsResponse: {
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Masked Keys */
+            masked_keys?: string[];
+            /** Plugin Id */
+            plugin_id: string;
+            /** Schema */
+            schema?: components["schemas"]["PluginSettingFieldResponse"][];
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        /**
+         * PluginSettingsUpdateRequest
+         * @description Full replacement of explicit values; omitted keys reset to defaults.
+         */
+        PluginSettingsUpdateRequest: {
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        /**
+         * PluginSettingsUpdateResponse
+         * @description Persisted settings projection plus apply semantics.
+         */
+        PluginSettingsUpdateResponse: {
+            /** Changed Keys */
+            changed_keys?: string[];
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Masked Keys */
+            masked_keys?: string[];
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Restart Required
+             * @default false
+             */
+            restart_required: boolean;
+            /** Schema */
+            schema?: components["schemas"]["PluginSettingFieldResponse"][];
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
         };
         /** PortfolioAccountCreateRequest */
         PortfolioAccountCreateRequest: {
@@ -12657,6 +13190,74 @@ export interface components {
             /** Return Distribution */
             return_distribution: components["schemas"]["ScorecardReturnBand"][];
         };
+        /**
+         * SkillCapabilityItem
+         * @description Live analysis-skill observation from plugin or declarative owners.
+         */
+        SkillCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "skill";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "analysis_skill";
+            /** Version */
+            version: string;
+        };
         /** SkillInfo */
         SkillInfo: {
             /** Description */
@@ -13510,7 +14111,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "uncategorized";
+            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "mcp" | "uncategorized";
             /** @description Authoritative requirement, condition, and connection-test metadata */
             contract?: components["schemas"]["SystemConfigFieldContract"] | null;
             /**
@@ -16081,6 +16682,10 @@ export interface operations {
                 target?: string | null;
                 /** @description Optional status filter */
                 status?: string | null;
+                /** @description Optional typed corporate-event filter */
+                alert_type?: "corporate_event" | null;
+                /** @description Stable continuation cursor */
+                cursor?: string | null;
                 page?: number;
                 page_size?: number;
             };
@@ -16097,6 +16702,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertTriggerListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -17545,7 +18159,7 @@ export interface operations {
     listCapabilities: {
         parameters: {
             query?: {
-                /** @description Optional domain filter. Allowed values: data, tool, extension. */
+                /** @description Optional domain filter. Allowed values: data, tool, extension, skill, pipeline. */
                 domain?: string[] | null;
             };
             header?: never;
@@ -20785,6 +21399,246 @@ export interface operations {
             };
         };
     };
+    list_inbox_items_api_v1_notification_inbox_items_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                cursor?: string | null;
+                kind?: string | null;
+                unread_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NotificationInboxMarkAllReadRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxMarkAllReadResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationInboxMarkReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxMarkReadResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_inbox_unread_count_api_v1_notification_inbox_unread_count_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxUnreadCountResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     apply_onboarding_plan_api_v1_onboarding_apply_post: {
         parameters: {
             query?: never;
@@ -21160,6 +22014,135 @@ export interface operations {
                 };
             };
             /** @description Security audit storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPluginSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettingsResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    updatePluginSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettingsUpdateResponse"];
+                };
+            };
+            /** @description Settings validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Settings persistence failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

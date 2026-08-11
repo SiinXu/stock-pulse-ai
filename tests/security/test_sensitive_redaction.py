@@ -1326,6 +1326,7 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
 
     class RecordingSession:
         execution_id = "native-redaction-test"
+        deadline_monotonic = None
 
         @staticmethod
         def is_non_retriable_cached(_cache_key: str) -> bool:

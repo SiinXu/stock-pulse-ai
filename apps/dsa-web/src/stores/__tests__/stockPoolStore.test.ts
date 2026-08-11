@@ -632,6 +632,27 @@ describe('stockPoolStore', () => {
     }));
   });
 
+  it('submits bare 4-digit HK input as canonical HKxxxxx, not the raw digits', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-hk-4digit',
+      stockCode: 'HK00941',
+      status: 'pending',
+      message: 'accepted',
+    } as never);
+
+    useStockPoolStore.getState().setQuery('0941');
+    await useStockPoolStore.getState().submitAnalysis();
+
+    expect(useStockPoolStore.getState().inputError).toBeUndefined();
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+      stockCode: 'HK00941',
+      originalQuery: '0941',
+    }));
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalledWith(expect.objectContaining({
+      stockCode: '0941',
+    }));
+  });
+
   it('merges newly discovered history items during silent refresh', async () => {
     useStockPoolStore.setState({
       historyItems: [historyItem],

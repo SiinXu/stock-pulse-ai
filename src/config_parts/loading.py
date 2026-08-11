@@ -899,6 +899,65 @@ class _ConfigLoadingMethods:
                 minimum=30,
             ),
             agent_memory_enabled=os.getenv('AGENT_MEMORY_ENABLED', 'false').lower() == 'true',
+            agent_planning_enabled=parse_env_bool(
+                os.getenv('AGENT_PLANNING_ENABLED'),
+                False,
+            ),
+            agent_planning_strategy=cls._parse_agent_planning_strategy(
+                os.getenv('AGENT_PLANNING_STRATEGY')
+            ),
+            agent_planning_max_plan_steps=parse_env_int(
+                os.getenv('AGENT_PLANNING_MAX_PLAN_STEPS'),
+                8,
+                field_name='AGENT_PLANNING_MAX_PLAN_STEPS',
+                minimum=1,
+                maximum=16,
+            ),
+            agent_planning_max_replans=parse_env_int(
+                os.getenv('AGENT_PLANNING_MAX_REPLANS'),
+                1,
+                field_name='AGENT_PLANNING_MAX_REPLANS',
+                minimum=0,
+                maximum=3,
+            ),
+            agent_planning_max_tokens=parse_env_int(
+                os.getenv('AGENT_PLANNING_MAX_TOKENS'),
+                1500,
+                field_name='AGENT_PLANNING_MAX_TOKENS',
+                minimum=1,
+                maximum=8192,
+            ),
+            agent_planning_proposal_timeout_seconds=_parse_env_finite_float(
+                os.getenv('AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS'),
+                30.0,
+                field_name='AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS',
+                minimum=0.1,
+                maximum=60.0,
+            ),
+            agent_planning_max_total_tool_calls=parse_env_int(
+                os.getenv('AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS'),
+                16,
+                field_name='AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS',
+                minimum=1,
+                maximum=32,
+            ),
+            agent_planning_max_observation_replans=parse_env_int(
+                os.getenv('AGENT_PLANNING_MAX_OBSERVATION_REPLANS'),
+                1,
+                field_name='AGENT_PLANNING_MAX_OBSERVATION_REPLANS',
+                minimum=0,
+                maximum=3,
+            ),
+            agent_planning_exec_timeout_seconds=_parse_env_finite_float(
+                os.getenv('AGENT_PLANNING_EXEC_TIMEOUT_SECONDS'),
+                60.0,
+                field_name='AGENT_PLANNING_EXEC_TIMEOUT_SECONDS',
+                minimum=0.1,
+                maximum=120.0,
+            ),
+            agent_planning_on_step_failure=cls._parse_agent_planning_on_step_failure(
+                os.getenv('AGENT_PLANNING_ON_STEP_FAILURE')
+            ),
             agent_skill_autoweight=(
                 os.getenv('AGENT_SKILL_AUTOWEIGHT')
                 or os.getenv('AGENT_STRATEGY_AUTOWEIGHT', 'true')
@@ -1138,6 +1197,8 @@ class _ConfigLoadingMethods:
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
+            # SmartMoney money-flow (default off: zero extra network unless opted in)
+            smartmoney_enabled=os.getenv('SMARTMONEY_ENABLED', 'false').lower() == 'true',
             # Eastmoney API patch switch
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # Real-time quote data source priority:
@@ -1350,6 +1411,20 @@ class _ConfigLoadingMethods:
                 minimum=10_000,
                 maximum=2_000_000,
             ),
+            security_audit_retention_days=parse_env_int(
+                os.getenv('SECURITY_AUDIT_RETENTION_DAYS'),
+                90,
+                field_name='SECURITY_AUDIT_RETENTION_DAYS',
+                minimum=1,
+                maximum=3650,
+            ),
+            security_audit_max_events=parse_env_int(
+                os.getenv('SECURITY_AUDIT_MAX_EVENTS'),
+                10_000,
+                field_name='SECURITY_AUDIT_MAX_EVENTS',
+                minimum=100,
+                maximum=1_000_000,
+            ),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False
             ),
@@ -1410,6 +1485,32 @@ class _ConfigLoadingMethods:
             if 'stocks' in g and 'emails' in g and g['stocks'] and g['emails']:
                 result.append((g['stocks'], g['emails']))
         return result
+
+    @classmethod
+    def _parse_agent_planning_strategy(cls, value: Optional[str]) -> str:
+        """Parse AGENT_PLANNING_STRATEGY; invalid values fall back to template."""
+        normalized = (value or "template").strip().lower()
+        if normalized in {"template", "llm"}:
+            return normalized
+        if value and str(value).strip():
+            logger.warning(
+                "AGENT_PLANNING_STRATEGY=%r is invalid; falling back to 'template'",
+                value,
+            )
+        return "template"
+
+    @classmethod
+    def _parse_agent_planning_on_step_failure(cls, value: Optional[str]) -> str:
+        """Parse AGENT_PLANNING_ON_STEP_FAILURE; invalid values fall back to replan."""
+        normalized = (value or "replan").strip().lower()
+        if normalized in {"replan", "terminate"}:
+            return normalized
+        if value and str(value).strip():
+            logger.warning(
+                "AGENT_PLANNING_ON_STEP_FAILURE=%r is invalid; falling back to 'replan'",
+                value,
+            )
+        return "replan"
 
     @classmethod
     def _parse_report_type(cls, value: str) -> str:

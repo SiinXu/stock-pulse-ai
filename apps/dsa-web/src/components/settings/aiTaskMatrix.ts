@@ -60,8 +60,8 @@ export function isGenerationOnlyBackend(backendId: string): boolean {
 export const CLI_AGENT_CAPABILITY_NOTE = createUiLanguageRecord(
   'components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE',
   {
-    zh: 'CLI 后端仅覆盖报告生成；问股 Agent 需要支持工具调用的 API 模型（否则不可用）。',
-    en: 'CLI backends cover report generation only; the Q&A Agent requires a tool-capable API model (or will be unavailable).',
+    zh: 'CLI 后端仅生成报告；问股 Agent 需要支持工具调用的 API 模型。',
+    en: 'CLI backends generate reports only; Q&A Agent needs a tool-capable API model.',
   },
 );
 

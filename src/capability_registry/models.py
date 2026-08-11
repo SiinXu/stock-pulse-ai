@@ -4,30 +4,33 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, Literal, Optional, Tuple
 
 CAPABILITY_SCHEMA_VERSION = "capability-inventory/v1"
-CapabilityDomain = Literal["data", "tool", "extension"]
+CapabilityDomain = Literal["data", "tool", "extension", "skill", "pipeline"]
 CapabilityType = Literal[
     "data_provider", "data_method", "agent_tool",
     "plugin_lifecycle", "extension_registration",
+    "analysis_skill", "pipeline_stage",
 ]
 SourceState = Literal["ok", "error", "generation_drift", "not_initialized"]
 _SOURCE_STATES = frozenset({"ok", "error", "generation_drift", "not_initialized"})
+_CAPABILITY_DOMAINS = frozenset({"data", "tool", "extension", "skill", "pipeline"})
 MAX_RECORD_LIST_LENGTH = 256
+MAX_SOURCE_COUNT = 5
 
 
 @dataclass(frozen=True, slots=True)
 class SourceStatus:
-    source: Literal["data", "tool", "extension"]
+    source: CapabilityDomain
     state: SourceState
     generation: str
     as_of: str
     error_code: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if self.source not in {"data", "tool", "extension"}:
+        if self.source not in _CAPABILITY_DOMAINS:
             raise ValueError("source is invalid")
         if self.state not in _SOURCE_STATES:
             raise ValueError("source state is invalid")
@@ -68,9 +71,6 @@ class CapabilityRecord:
     dependencies: Tuple[str, ...] = ()
     scopes: Tuple[str, ...] = ()
     markets: Tuple[str, ...] = ()
-    # Multi-valued owner identity. A capability supplied by several providers
-    # must never be squeezed into the ``provider`` scalar: joining identities
-    # can exceed the scalar bound and turn a healthy source into a false error.
     providers: Tuple[str, ...] = ()
     provider_count: Optional[int] = None
     reason_code: Optional[str] = None
@@ -81,6 +81,8 @@ class CapabilityRecord:
             "data": {"data_provider", "data_method"},
             "tool": {"agent_tool"},
             "extension": {"plugin_lifecycle", "extension_registration"},
+            "skill": {"analysis_skill"},
+            "pipeline": {"pipeline_stage"},
         }
         if (
             self.domain not in allowed_types
@@ -132,7 +134,7 @@ class CapabilitySnapshot:
         if self.schema_version != CAPABILITY_SCHEMA_VERSION:
             raise ValueError("unsupported capability snapshot schema version")
         if (
-            len(self.sources) > 3
+            len(self.sources) > MAX_SOURCE_COUNT
             or len({source.source for source in self.sources}) != len(self.sources)
         ):
             raise ValueError("capability sources must be unique and bounded")
