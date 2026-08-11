@@ -3,7 +3,7 @@
 // Portfolio route workspace — feature-owned composition for PortfolioPage.
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
 import { BriefcaseBusiness, Inbox, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -74,6 +74,10 @@ import type {
   PortfolioAccountMarket,
 } from '../../hooks/portfolio/types';
 import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells';
+
+const PortfolioRiskMetricsPanel = lazy(
+  () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
+);
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1242,13 +1246,21 @@ const PortfolioWorkspace: React.FC = () => {
       </section>
 
       {hasAccounts ? (
-        <section className="grid grid-cols-1 gap-3">
-          <Card padding="md" data-testid="portfolio-risk-heatmap-card">
-            <h2 className="mb-1 text-sm font-semibold text-foreground">{text.riskHeatmapTitle}</h2>
-            <p className="mb-3 text-xs text-secondary">{text.riskHeatmapDescription}</p>
-            <RiskHeatmap cells={riskHeatmapCells} data-testid="portfolio-risk-heatmap" />
-          </Card>
-        </section>
+        <>
+          <Suspense fallback={<Loading />}>
+            <PortfolioRiskMetricsPanel
+              accountId={queryAccountId}
+              costMethod={costMethod}
+            />
+          </Suspense>
+          <section className="grid grid-cols-1 gap-3">
+            <Card padding="md" data-testid="portfolio-risk-heatmap-card">
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{text.riskHeatmapTitle}</h2>
+              <p className="mb-3 text-xs text-secondary">{text.riskHeatmapDescription}</p>
+              <RiskHeatmap cells={riskHeatmapCells} data-testid="portfolio-risk-heatmap" />
+            </Card>
+          </section>
+        </>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
