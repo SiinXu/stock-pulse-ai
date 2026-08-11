@@ -14,7 +14,7 @@ save path cannot catch that contract drift.
 What this module covers
 -----------------------
 For each settings category (base / data_source / ai_model / notification /
-system / agent / backtest / indicators) a representative registered key is
+system / agent / backtest / indicators / mcp) a representative registered key is
 exercised end-to-end against the **real** FastAPI app, **real**
 ``SystemConfigService`` / ``ConfigManager`` persistence, and **real** runtime
 ``Config`` reload:
@@ -44,7 +44,6 @@ CI execution
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -55,7 +54,12 @@ from fastapi.testclient import TestClient
 import src.auth as auth
 from api.app import create_app
 from src.config import Config
-from src.core.config_registry import WEB_SETTINGS_HIDDEN_FROM_UI, get_category_definitions
+from src.core.config_registry import (
+    WEB_SETTINGS_HIDDEN_FROM_UI,
+    get_category_definitions,
+    get_registered_field_keys,
+)
+from src.mcp_server.config import load_mcp_server_config
 from src.storage import DatabaseManager
 from tests.litellm_stub import ensure_litellm_stub
 
@@ -102,9 +106,11 @@ class CategoryLifecycleCase:
     """Value that must be rejected with a readable validation error."""
     expected_ui_control: str
     effective_attr: str
-    """Attribute on ``Config`` after reload_now activation."""
+    """Attribute on the owning runtime config after reload_now activation."""
     expected_effective: Any
     """Expected runtime value after a successful update."""
+    runtime_owner: str = "app"
+    """Runtime configuration object that owns ``effective_attr``."""
 
 
 # Representative keys are intentionally non-sensitive for the happy path so
@@ -193,6 +199,17 @@ CATEGORY_CASES: tuple[CategoryLifecycleCase, ...] = (
         effective_attr="indicator_macd_fast",
         expected_effective=10,
     ),
+    CategoryLifecycleCase(
+        category="mcp",
+        key="MCP_SERVER_PORT",
+        initial_value="8765",
+        updated_value="8766",
+        invalid_value="0",
+        expected_ui_control="number",
+        effective_attr="port",
+        expected_effective=8766,
+        runtime_owner="mcp",
+    ),
 )
 
 
@@ -216,8 +233,8 @@ def _seed_env_lines(cases: tuple[CategoryLifecycleCase, ...], database_path: Pat
 
 
 @pytest.fixture
-def settings_client(tmp_path: Path):
-    """Real FastAPI app + isolated ENV_FILE / DATABASE_PATH (no save-path mocks)."""
+def settings_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Real FastAPI app + isolated config environment (no save-path mocks)."""
     _reset_auth_globals()
     env_path = tmp_path / ".env"
     database_path = tmp_path / "settings_category_lifecycle.sqlite"
@@ -226,10 +243,14 @@ def settings_client(tmp_path: Path):
         encoding="utf-8",
     )
 
-    previous_env_file = os.environ.get("ENV_FILE")
-    previous_database_path = os.environ.get("DATABASE_PATH")
-    os.environ["ENV_FILE"] = str(env_path)
-    os.environ["DATABASE_PATH"] = str(database_path)
+    # Process environment takes precedence over ENV_FILE on initial load. Clear
+    # every registered setting so earlier API tests or CI runner variables
+    # cannot override this fixture's isolated persistence source. MonkeyPatch
+    # restores the complete ambient environment after fixture teardown.
+    for key in get_registered_field_keys():
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("ENV_FILE", str(env_path))
+    monkeypatch.setenv("DATABASE_PATH", str(database_path))
 
     Config.reset_instance()
     DatabaseManager.reset_instance()
@@ -239,15 +260,17 @@ def settings_client(tmp_path: Path):
 
     DatabaseManager.reset_instance()
     Config.reset_instance()
-    if previous_env_file is None:
-        os.environ.pop("ENV_FILE", None)
-    else:
-        os.environ["ENV_FILE"] = previous_env_file
-    if previous_database_path is None:
-        os.environ.pop("DATABASE_PATH", None)
-    else:
-        os.environ["DATABASE_PATH"] = previous_database_path
     _reset_auth_globals()
+
+
+def _runtime_effective_value(case: CategoryLifecycleCase) -> Any:
+    """Read the effective value from the runtime that owns the setting."""
+    runtime = (
+        load_mcp_server_config()
+        if case.runtime_owner == "mcp"
+        else Config.get_instance()
+    )
+    return getattr(runtime, case.effective_attr, "MISSING_ATTR")
 
 
 def _get_config(client: TestClient) -> dict[str, Any]:
@@ -363,10 +386,10 @@ def test_settings_category_key_visible_editable_savable_effective(
         f"{case.key} was not persisted to ENV_FILE after PUT"
     )
 
-    runtime = Config.get_instance()
-    effective = getattr(runtime, case.effective_attr, "MISSING_ATTR")
+    effective = _runtime_effective_value(case)
     assert effective != "MISSING_ATTR", (
-        f"Config has no attribute {case.effective_attr!r} for {case.key}"
+        f"{case.runtime_owner} runtime has no attribute "
+        f"{case.effective_attr!r} for {case.key}"
     )
     assert effective == case.expected_effective, (
         f"Runtime effective value mismatch for {case.key}: "
@@ -386,7 +409,7 @@ def test_settings_category_key_rejects_illegal_value_with_readable_error(
     before_item = _items_by_key(before)[case.key]
     before_value = str(before_item["value"])
     before_env = env_path.read_text(encoding="utf-8")
-    before_effective = getattr(Config.get_instance(), case.effective_attr)
+    before_effective = _runtime_effective_value(case)
 
     response = client.put(
         CONFIG_PATH,
@@ -414,7 +437,7 @@ def test_settings_category_key_rejects_illegal_value_with_readable_error(
     after_item = _items_by_key(after)[case.key]
     assert str(after_item["value"]) == before_value
     assert env_path.read_text(encoding="utf-8") == before_env
-    assert getattr(Config.get_instance(), case.effective_attr) == before_effective
+    assert _runtime_effective_value(case) == before_effective
     assert after["config_version"] == before["config_version"]
 
 
@@ -492,4 +515,3 @@ def test_all_declared_settings_categories_have_lifecycle_coverage() -> None:
         by_category.setdefault(case.category, []).append(case.key)
     for category, keys in by_category.items():
         assert len(keys) == 1, f"{category} has multiple representatives: {keys}"
-
