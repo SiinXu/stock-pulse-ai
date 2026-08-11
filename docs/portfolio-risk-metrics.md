@@ -155,6 +155,8 @@ N_{\mathrm{eff}} = \frac{1}{\mathrm{HHI}}
 - 集中度 / 分散化卡片（HHI、有效持仓数、评分、权重）
 - 始终展示 `assumptions`
 - 顶层 `empty_portfolio` / `insufficient_history` / `partial` 诚实状态
+- 账户切换按 TanStack Query key 隔离，旧账户的迟到响应不会覆盖当前作用域
+- 面板提供可访问区域名称；加载与错误状态使用 live region，相关性表格保留 caption 和键盘滚动区域
 
 报告嵌入、参数法 VaR、压力测试集成仍不在范围内。
 

@@ -11,19 +11,22 @@ import type { UiLanguage } from '../../i18n/uiText';
 import { PORTFOLIO_RISK_METRICS_TEXT } from '../../locales/portfolioRiskMetrics';
 import { usePortfolioRiskMetricsQuery } from '../../hooks/portfolio/usePortfolioRiskMetricsQuery';
 import type {
+  PortfolioRiskBlockStatus,
   PortfolioConcentrationBlock,
   PortfolioCorrelationBlock,
   PortfolioHistoricalVaRBlock,
   PortfolioRiskAssumptions,
   PortfolioRiskMetricsResponse,
+  PortfolioRiskMetricsStatus,
 } from '../../types/portfolioRiskMetrics';
+import type { PortfolioCostMethod } from '../../types/portfolio';
 import { formatMoney, formatPct } from '../../utils/portfolioFormat';
 import { formatUiNumber } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
 
 type PortfolioRiskMetricsPanelProps = {
   accountId?: number;
-  costMethod?: string;
+  costMethod?: PortfolioCostMethod;
   asOf?: string;
   enabled?: boolean;
   className?: string;
@@ -31,7 +34,7 @@ type PortfolioRiskMetricsPanelProps = {
 };
 
 function statusBadgeVariant(
-  status: string,
+  status: PortfolioRiskMetricsStatus | PortfolioRiskBlockStatus,
 ): 'success' | 'warning' | 'danger' | 'default' | 'info' {
   switch (status) {
     case 'ok':
@@ -49,7 +52,10 @@ function statusBadgeVariant(
   }
 }
 
-function statusLabel(status: string, text: (typeof PORTFOLIO_RISK_METRICS_TEXT)['en']): string {
+function statusLabel(
+  status: PortfolioRiskMetricsStatus | PortfolioRiskBlockStatus,
+  text: (typeof PORTFOLIO_RISK_METRICS_TEXT)['en'],
+): string {
   switch (status) {
     case 'ok':
       return text.statusOk;
@@ -454,6 +460,7 @@ const PortfolioRiskMetricsPanel: React.FC<PortfolioRiskMetricsPanelProps> = ({
       className={cn('space-y-3', className)}
       data-testid={testId}
       aria-label={text.title}
+      aria-busy={query.isFetching || undefined}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>

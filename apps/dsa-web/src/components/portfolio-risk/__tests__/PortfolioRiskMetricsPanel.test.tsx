@@ -97,6 +97,14 @@ function renderPanel(props: { accountId?: number } = {}) {
   );
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('PortfolioRiskMetricsPanel', () => {
   beforeEach(() => {
     getRiskMetrics.mockReset();
@@ -186,6 +194,64 @@ describe('PortfolioRiskMetricsPanel', () => {
     });
     expect(screen.getByTestId('portfolio-risk-var-pct')).toHaveTextContent('—');
     expect(screen.getByTestId('portfolio-risk-assumptions-card')).toBeInTheDocument();
+  });
+
+  it('renders an honest partial state while preserving available blocks', async () => {
+    const payload = okPayload();
+    payload.status = 'partial';
+    payload.statusMessage = 'VaR is unavailable; correlation and concentration are current.';
+    payload.var = {
+      status: 'insufficient_history',
+      statusMessage: 'Need at least 60 observations',
+      varPct: null,
+      varValue: null,
+      observationCount: 20,
+    };
+    getRiskMetrics.mockResolvedValue(payload);
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('portfolio-risk-partial-banner')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('portfolio-risk-var-pct')).toHaveTextContent('—');
+    expect(screen.getByTestId('portfolio-risk-correlation-matrix')).toBeInTheDocument();
+    expect(screen.getByTestId('portfolio-risk-assumptions-card')).toBeInTheDocument();
+  });
+
+  it('keeps late responses isolated to their original account query key', async () => {
+    const accountOne = deferred<PortfolioRiskMetricsResponse>();
+    const accountTwo = deferred<PortfolioRiskMetricsResponse>();
+    getRiskMetrics.mockImplementation(({ accountId }: { accountId?: number }) => (
+      accountId === 1 ? accountOne.promise : accountTwo.promise
+    ));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const renderForAccount = (accountId: number) => (
+      <QueryClientProvider client={client}>
+        <UiLanguageProvider initialLanguage="en">
+          <PortfolioRiskMetricsPanel accountId={accountId} costMethod="fifo" />
+        </UiLanguageProvider>
+      </QueryClientProvider>
+    );
+    const view = render(renderForAccount(1));
+    view.rerender(renderForAccount(2));
+
+    const secondPayload = okPayload();
+    secondPayload.accountId = 2;
+    secondPayload.portfolioValue = 22222;
+    accountTwo.resolve(secondPayload);
+    await waitFor(() => {
+      expect(screen.getByTestId('portfolio-risk-summary')).toHaveTextContent('22,222');
+    });
+
+    const firstPayload = okPayload();
+    firstPayload.accountId = 1;
+    firstPayload.portfolioValue = 11111;
+    accountOne.resolve(firstPayload);
+    await waitFor(() => expect(getRiskMetrics).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('portfolio-risk-summary')).toHaveTextContent('22,222');
+    expect(screen.getByTestId('portfolio-risk-summary')).not.toHaveTextContent('11,111');
   });
 
   it('surfaces load failures with retry and never fills zeros', async () => {

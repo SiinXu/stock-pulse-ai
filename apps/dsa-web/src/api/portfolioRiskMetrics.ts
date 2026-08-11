@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
+import { createApiError, createParsedApiError } from './error';
 import type {
   PortfolioRiskMetricsQuery,
   PortfolioRiskMetricsResponse,
@@ -16,6 +17,14 @@ const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
 });
 
 const optionalFinite = finiteNumber.nullable().optional();
+const portfolioRiskMetricsStatusSchema = z.enum([
+  'ok',
+  'empty_portfolio',
+  'insufficient_history',
+  'partial',
+]);
+const portfolioVaRStatusSchema = z.enum(['ok', 'insufficient_history', 'unavailable']);
+const portfolioConcentrationStatusSchema = z.enum(['ok', 'empty_portfolio']);
 
 const portfolioRiskWeightItemSchema = z
   .object({
@@ -47,7 +56,7 @@ const portfolioRiskAssumptionsSchema = z
 
 const portfolioHistoricalVaRBlockSchema = z
   .object({
-    status: z.string(),
+    status: portfolioVaRStatusSchema,
     statusMessage: z.string().nullable().optional(),
     confidence: optionalFinite,
     horizonDays: z.number().int().nullable().optional(),
@@ -61,7 +70,7 @@ const portfolioHistoricalVaRBlockSchema = z
 
 const portfolioCorrelationBlockSchema = z
   .object({
-    status: z.string(),
+    status: portfolioVaRStatusSchema,
     statusMessage: z.string().nullable().optional(),
     symbols: z.array(z.string()).optional(),
     matrix: z
@@ -69,11 +78,27 @@ const portfolioCorrelationBlockSchema = z
       .optional(),
     observationCount: z.number().int(),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((block, context) => {
+    if (block.status !== 'ok') return;
+    const symbols = block.symbols ?? [];
+    const matrix = block.matrix ?? [];
+    if (
+      symbols.length === 0
+      || matrix.length !== symbols.length
+      || matrix.some((row) => row.length !== symbols.length)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['matrix'],
+        message: 'ok correlation matrix must be square and match symbols',
+      });
+    }
+  });
 
 const portfolioConcentrationBlockSchema = z
   .object({
-    status: z.string(),
+    status: portfolioConcentrationStatusSchema,
     hhi: optionalFinite,
     effectiveN: optionalFinite,
     diversificationScore: optionalFinite,
@@ -97,9 +122,9 @@ const portfolioRiskMetricsResponseSchema = z
   .object({
     asOf: z.string(),
     accountId: z.number().int().nullable().optional(),
-    costMethod: z.string(),
+    costMethod: z.enum(['fifo', 'avg']),
     currency: z.string(),
-    status: z.string(),
+    status: portfolioRiskMetricsStatusSchema,
     statusMessage: z.string().nullable().optional(),
     portfolioValue: finiteNumber,
     positionsUsed: z.number().int(),
@@ -110,6 +135,42 @@ const portfolioRiskMetricsResponseSchema = z
     history: portfolioRiskHistoryMetaSchema.nullable().optional(),
   })
   .passthrough();
+
+const portfolioRiskMetricsQuerySchema = z
+  .object({
+    accountId: z.number().int().positive().optional(),
+    asOf: z.string().min(1).optional(),
+    costMethod: z.enum(['fifo', 'avg']).optional(),
+    confidence: finiteNumber
+      .refine((value) => value > 0.5 && value < 1, {
+        message: 'confidence must be greater than 0.5 and less than 1',
+      })
+      .optional(),
+    horizonDays: z.number().int().positive().optional(),
+    lookbackTradingDays: z.number().int().positive().optional(),
+  })
+  .strict();
+
+function validateRiskMetricsQuery(
+  query: PortfolioRiskMetricsQuery,
+): PortfolioRiskMetricsQuery {
+  const result = portfolioRiskMetricsQuerySchema.safeParse(query);
+  if (result.success) return result.data;
+  const issues = result.error.issues
+    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+    .join('; ');
+  throw createApiError(
+    createParsedApiError({
+      title: '请求参数无效',
+      message: `Portfolio risk metrics query failed validation. ${issues}`,
+      rawMessage: result.error.message,
+      category: 'missing_params',
+      code: 'invalid_params',
+      params: { issues },
+      details: result.error.issues,
+    }),
+  );
+}
 
 function buildRiskMetricsParams(
   query: PortfolioRiskMetricsQuery,
@@ -124,13 +185,13 @@ function buildRiskMetricsParams(
   if (query.costMethod) {
     params.cost_method = query.costMethod;
   }
-  if (query.confidence != null && Number.isFinite(query.confidence)) {
+  if (query.confidence != null) {
     params.confidence = query.confidence;
   }
-  if (query.horizonDays != null && Number.isFinite(query.horizonDays)) {
+  if (query.horizonDays != null) {
     params.horizon_days = query.horizonDays;
   }
-  if (query.lookbackTradingDays != null && Number.isFinite(query.lookbackTradingDays)) {
+  if (query.lookbackTradingDays != null) {
     params.lookback_trading_days = query.lookbackTradingDays;
   }
   return params;
@@ -168,9 +229,10 @@ function normalizeRiskMetrics(
 export async function getPortfolioRiskMetrics(
   query: PortfolioRiskMetricsQuery = {},
 ): Promise<PortfolioRiskMetricsResponse> {
+  const validatedQuery = validateRiskMetricsQuery(query);
   const response = await apiClient.get<Record<string, unknown>>(
     '/api/v1/portfolio/risk-metrics',
-    { params: buildRiskMetricsParams(query) },
+    { params: buildRiskMetricsParams(validatedQuery) },
   );
   const parsed = parseCamelCasePayload<PortfolioRiskMetricsResponse>(
     response.data,
@@ -187,5 +249,6 @@ export const portfolioRiskMetricsApi = {
 
 export {
   portfolioRiskMetricsResponseSchema,
+  portfolioRiskMetricsQuerySchema,
   finiteNumber as portfolioRiskFiniteNumberSchema,
 };

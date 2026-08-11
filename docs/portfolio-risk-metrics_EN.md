@@ -165,6 +165,8 @@ The Portfolio page mounts a risk-metrics panel that consumes this endpoint only:
 - Concentration / diversification card (HHI, effective N, score, top weights)
 - Always-visible `assumptions` block
 - Honest top-level `empty_portfolio` / `insufficient_history` / `partial` banners
+- Account changes are isolated by TanStack Query key, so a late response for an old account cannot overwrite the active scope
+- The panel has an accessible region name; loading and error states use live regions, and the correlation table retains its caption and keyboard-scrollable region
 
 Report embedding, parametric VaR, and stress-test integration remain out of scope.
 

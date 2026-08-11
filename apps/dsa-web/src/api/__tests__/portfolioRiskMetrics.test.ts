@@ -191,4 +191,16 @@ describe('getPortfolioRiskMetrics', () => {
       return true;
     });
   });
+
+  it('rejects non-finite query parameters instead of silently using server defaults', async () => {
+    await expect(
+      getPortfolioRiskMetrics({ confidence: Number.POSITIVE_INFINITY }),
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('invalid_params');
+      return true;
+    });
+    expect(get).not.toHaveBeenCalled();
+  });
 });
