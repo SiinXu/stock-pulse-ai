@@ -3,7 +3,7 @@
 // Portfolio route workspace — feature-owned composition for PortfolioPage.
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
 import { BriefcaseBusiness, Inbox, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -14,7 +14,6 @@ import { AnalysisPhaseSelect } from '../analysis';
 import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
-import { PortfolioRiskMetricsPanel } from '../portfolio-risk';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
@@ -75,6 +74,10 @@ import type {
   PortfolioAccountMarket,
 } from '../../hooks/portfolio/types';
 import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells';
+
+const PortfolioRiskMetricsPanel = lazy(
+  () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
+);
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1244,10 +1247,12 @@ const PortfolioWorkspace: React.FC = () => {
 
       {hasAccounts ? (
         <>
-          <PortfolioRiskMetricsPanel
-            accountId={queryAccountId}
-            costMethod={costMethod}
-          />
+          <Suspense fallback={<Loading />}>
+            <PortfolioRiskMetricsPanel
+              accountId={queryAccountId}
+              costMethod={costMethod}
+            />
+          </Suspense>
           <section className="grid grid-cols-1 gap-3">
             <Card padding="md" data-testid="portfolio-risk-heatmap-card">
               <h2 className="mb-1 text-sm font-semibold text-foreground">{text.riskHeatmapTitle}</h2>
