@@ -497,7 +497,7 @@ describe('ReportSummary analysis context placement', () => {
     );
     expect(strategySurface?.querySelector('[style*="linear-gradient"]')).toBeNull();
     const news = screen.getByText('相关资讯');
-    const diagnostics = screen.getByTestId('run-diagnostics');
+    const diagnostics = await screen.findByTestId('run-diagnostics');
     const contextSummary = screen.getByTestId('analysis-context-summary');
     expect(contextSummary).not.toHaveAttribute('open');
     expect(diagnostics).not.toHaveAttribute('open');
