@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #938 adds 27 translated Portfolio wizard keys across all eight additional locales. Locale chunks were remeasured from the merged production build with 200 B headroom and no identical-to-English baseline expansion.",
+  "baselineNote": "PR #938 adds the Portfolio URL contract and 27 translated wizard keys across all eight additional locales. Affected chunks were remeasured after lazy-loading the wizard and workspace-tab surfaces, with 200 B headroom and no identical-to-English baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -158,9 +158,9 @@
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 25543,
-      "measuredGzipBytes": 24263,
-      "note": "PR #841 code-splits the risk panel; the route remains below the unchanged 25543 B cap."
+      "maxGzipBytes": 26394,
+      "measuredGzipBytes": 26194,
+      "note": "Remeasured for PR #938 after lazy-loading the import wizard and workspace-tab surfaces; the remaining route growth implements the reactive Portfolio URL contract. Measured 26194 B + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",
