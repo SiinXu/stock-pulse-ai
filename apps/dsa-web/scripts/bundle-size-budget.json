@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #841 adds 67 translated portfolio-risk keys without expanding the i18n baseline; PR #953 adds genuine notification-inbox translations and a Playground scenario. Changed locale and Playground rules use production gzip measurements plus 200 B headroom.",
+  "baselineNote": "PR #1010 adds localized SECURITY_AUDIT_* registry help on post-#841 main. Affected settings and locale chunks were remeasured with 200 B headroom; the identical-to-English baseline is unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 220606,
-      "measuredGzipBytes": 220406,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 220406 B + 200 B headroom."
+      "maxGzipBytes": 221923,
+      "measuredGzipBytes": 221723,
+      "note": "Rebaselined after adding security-audit registry help (PR #1010); measured 221723 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 142581,
-      "measuredGzipBytes": 142381,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 142381 B + 200 B headroom."
+      "maxGzipBytes": 143009,
+      "measuredGzipBytes": 142809,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 142809 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 136459,
-      "measuredGzipBytes": 136259,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 136259 B + 200 B headroom."
+      "maxGzipBytes": 137033,
+      "measuredGzipBytes": 136833,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 136833 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 136570,
-      "measuredGzipBytes": 136370,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 136370 B + 200 B headroom."
+      "maxGzipBytes": 137029,
+      "measuredGzipBytes": 136829,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 136829 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 137007,
-      "measuredGzipBytes": 136807,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 136807 B + 200 B headroom."
+      "maxGzipBytes": 137382,
+      "measuredGzipBytes": 137182,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 137182 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 132934,
-      "measuredGzipBytes": 132734,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 132734 B + 200 B headroom."
+      "maxGzipBytes": 133277,
+      "measuredGzipBytes": 133077,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 133077 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 129634,
-      "measuredGzipBytes": 129434,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 129434 B + 200 B headroom."
+      "maxGzipBytes": 129892,
+      "measuredGzipBytes": 129692,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 129692 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 123346,
-      "measuredGzipBytes": 123146,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 123146 B + 200 B headroom."
+      "maxGzipBytes": 123703,
+      "measuredGzipBytes": 123503,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 123503 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 123497,
-      "measuredGzipBytes": 123297,
-      "note": "Remeasured after combining the complete portfolio-risk and notification-inbox locale inventories (PRs #841 and #953); measured 123297 B + 200 B headroom."
+      "maxGzipBytes": 123835,
+      "measuredGzipBytes": 123635,
+      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 123635 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
