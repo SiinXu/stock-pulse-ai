@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 /**
- * Dual-mode state for AlertsWorkspace:
- * - Standalone (`urlOwned`): URL is the source of truth via alertsUrlSchema.
- * - Embedded: local React state only (Signal Center owns the route).
+ * Router-owned state for AlertsWorkspace. Signal Center owns the outer tab,
+ * history subtab, scope, and trigger selection; this hook owns the embedded
+ * Alerts filters, pagination, and selected rule without colliding with them.
  */
 import { useCallback, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { readParams, writeParams } from '../../utils/urlState';
+import { useSearchParams } from 'react-router-dom';
+import { readParams, resolveHistoryMode, writeParams } from '../../utils/urlState';
 import type { AlertRuleEnabledFilter, AlertTypeFilter } from './AlertRuleList';
 import {
   alertsUrlSchema,
@@ -18,8 +18,6 @@ import {
 } from './alertsUrlState';
 
 export type UseAlertsWorkspaceUrlStateOptions = {
-  /** When false (standalone), URL owns filters/tabs/selection. */
-  embedded: boolean;
   controlledActiveView?: AlertsUrlView;
   onActiveViewChange?: (view: AlertsUrlView) => void;
   selectedTriggerIdProp?: number | null;
@@ -27,136 +25,81 @@ export type UseAlertsWorkspaceUrlStateOptions = {
 
 export function useAlertsWorkspaceUrlState(options: UseAlertsWorkspaceUrlStateOptions) {
   const {
-    embedded,
     controlledActiveView,
     onActiveViewChange,
     selectedTriggerIdProp = null,
   } = options;
-  const location = useLocation();
-  const navigate = useNavigate();
-  const urlOwned = !embedded;
-
+  const [searchParams, setSearchParams] = useSearchParams();
+  const serializedSearch = searchParams.toString();
   const urlState = useMemo(
-    () => (urlOwned ? readParams(alertsUrlSchema, location.search) : null),
-    [location.search, urlOwned],
+    () => readParams(alertsUrlSchema, serializedSearch),
+    [serializedSearch],
   );
 
   const patchUrl = useCallback((patch: AlertsUrlPatch) => {
-    if (!urlOwned) return;
-    const next = writeParams(alertsUrlSchema, patch, { search: location.search });
-    navigate(
-      { pathname: location.pathname, search: next.search, hash: location.hash },
-      { replace: next.history === 'replace' },
+    const patchedKeys = Object.keys(patch) as Array<keyof typeof alertsUrlSchema>;
+    const history = resolveHistoryMode(alertsUrlSchema, patchedKeys);
+    setSearchParams(
+      (current) => writeParams(alertsUrlSchema, patch, { search: current }).params,
+      { replace: history === 'replace' },
     );
-  }, [location.hash, location.pathname, location.search, navigate, urlOwned]);
+  }, [setSearchParams]);
 
   const [localView, setLocalView] = useState<AlertsUrlView>('rules');
-  const [localEnabledFilter, setLocalEnabledFilter] = useState<AlertRuleEnabledFilter>('all');
-  const [localAlertTypeFilter, setLocalAlertTypeFilter] = useState<AlertTypeFilter>('all');
-  const [localRulesPage, setLocalRulesPage] = useState(1);
-  const [localTriggersPage, setLocalTriggersPage] = useState(1);
-  const [localNotificationsPage, setLocalNotificationsPage] = useState(1);
-  const [localChannelFilter, setLocalChannelFilter] = useState('all');
-  const [localSuccessFilter, setLocalSuccessFilter] = useState<NotificationSuccessFilter>('all');
 
   const activeView: AlertsUrlView = controlledActiveView
-    ?? (urlOwned && urlState ? (urlState.view as AlertsUrlView) : localView);
+    ?? localView;
 
   const setActiveView = useCallback((view: AlertsUrlView) => {
     if (controlledActiveView === undefined) {
-      if (urlOwned) patchUrl({ view });
-      else setLocalView(view);
+      setLocalView(view);
     }
     onActiveViewChange?.(view);
-  }, [controlledActiveView, onActiveViewChange, patchUrl, urlOwned]);
+  }, [controlledActiveView, onActiveViewChange]);
 
-  const enabledFilter: AlertRuleEnabledFilter = urlOwned && urlState
-    ? (urlState.enabled as AlertRuleEnabledFilter)
-    : localEnabledFilter;
-  const alertTypeFilter: AlertTypeFilter = urlOwned && urlState
-    ? (urlState.type as AlertTypeFilter)
-    : localAlertTypeFilter;
-  const rulesPage = urlOwned && urlState ? (urlState.page ?? 1) : localRulesPage;
-  const triggersPage = urlOwned && urlState ? (urlState.historyPage ?? 1) : localTriggersPage;
-  const notificationsPage = urlOwned && urlState
-    ? (urlState.notificationsPage ?? 1)
-    : localNotificationsPage;
-  const notificationChannelFilter = urlOwned && urlState
-    ? urlState.channel
-    : localChannelFilter;
-  const notificationSuccessFilter: NotificationSuccessFilter = urlOwned && urlState
-    ? (urlState.success as NotificationSuccessFilter)
-    : localSuccessFilter;
-  const selectedAlertId = urlOwned && urlState ? urlState.alert : null;
-  const selectedTriggerId = selectedTriggerIdProp
-    ?? (urlOwned && urlState ? urlState.trigger : null)
-    ?? null;
+  const enabledFilter = urlState.enabled as AlertRuleEnabledFilter;
+  const alertTypeFilter = urlState.type as AlertTypeFilter;
+  const rulesPage = urlState.page ?? 1;
+  const triggersPage = urlState.historyPage ?? 1;
+  const notificationsPage = urlState.notificationsPage ?? 1;
+  const notificationChannelFilter = urlState.channel;
+  const notificationSuccessFilter = urlState.success as NotificationSuccessFilter;
+  const selectedAlertId = urlState.alert;
+  const selectedTriggerId = selectedTriggerIdProp;
 
   const setEnabledFilter = useCallback((value: AlertRuleEnabledFilter) => {
-    if (urlOwned) {
-      patchUrl({ enabled: value, page: 1 });
-      return;
-    }
-    setLocalEnabledFilter(value);
-  }, [patchUrl, urlOwned]);
+    patchUrl({ enabled: value, page: 1 });
+  }, [patchUrl]);
 
   const setAlertTypeFilter = useCallback((value: AlertTypeFilter) => {
-    if (urlOwned) {
-      patchUrl({ type: value, page: 1 });
-      return;
-    }
-    setLocalAlertTypeFilter(value);
-  }, [patchUrl, urlOwned]);
+    patchUrl({ type: value, page: 1 });
+  }, [patchUrl]);
 
   const setRulesPage = useCallback((page: number) => {
-    if (urlOwned) {
-      patchUrl({ page });
-      return;
-    }
-    setLocalRulesPage(page);
-  }, [patchUrl, urlOwned]);
+    patchUrl({ page });
+  }, [patchUrl]);
 
   const setTriggersPage = useCallback((page: number) => {
-    if (urlOwned) {
-      patchUrl({ historyPage: page });
-      return;
-    }
-    setLocalTriggersPage(page);
-  }, [patchUrl, urlOwned]);
+    patchUrl({ historyPage: page });
+  }, [patchUrl]);
 
   const setNotificationsPage = useCallback((page: number) => {
-    if (urlOwned) {
-      patchUrl({ notificationsPage: page });
-      return;
-    }
-    setLocalNotificationsPage(page);
-  }, [patchUrl, urlOwned]);
+    patchUrl({ notificationsPage: page });
+  }, [patchUrl]);
 
   const setNotificationChannelFilter = useCallback((value: string) => {
-    if (urlOwned) {
-      patchUrl({ channel: value, notificationsPage: 1 });
-      return;
-    }
-    setLocalChannelFilter(value);
-  }, [patchUrl, urlOwned]);
+    patchUrl({ channel: value, notificationsPage: 1 });
+  }, [patchUrl]);
 
   const setNotificationSuccessFilter = useCallback((value: NotificationSuccessFilter) => {
-    if (urlOwned) {
-      patchUrl({ success: value, notificationsPage: 1 });
-      return;
-    }
-    setLocalSuccessFilter(value);
-  }, [patchUrl, urlOwned]);
+    patchUrl({ success: value, notificationsPage: 1 });
+  }, [patchUrl]);
 
   const setSelectedAlertId = useCallback((alertId: number | null) => {
-    if (urlOwned) {
-      patchUrl({ alert: alertId });
-    }
-  }, [patchUrl, urlOwned]);
+    patchUrl({ alert: alertId });
+  }, [patchUrl]);
 
   return {
-    urlOwned,
-    patchUrl,
     activeView,
     setActiveView,
     enabledFilter,

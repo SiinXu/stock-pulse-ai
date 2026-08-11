@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Restore Popover focus during the closing commit so stale animation-frame callbacks cannot steal focus after nested-overlay keyboard navigation.
 - [Added] Wire opt-in plan→act→observe into AgentExecutor.run with Config/registry knobs, BoundToolSession tool dispatch, hard budgets, and production-path regression coverage (Refs #199).
 - [Fixed] Settings fields resolve controls from `dataType` / options / sensitivity even when `uiControl` is missing or wrong, so uncategorized booleans, enums, numbers, and secrets no longer render as free-text inputs; contract tests lock the schema→control mapping and the change/save display loop.
 - [Docs] Document the shipped Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 security stack, advisory matrix, migration notes, and rollback steps for #615 in bilingual desktop packaging guides.
@@ -34,8 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
-- [Changed] Notifications hub: channel cards show config + last-test status, read-only event routing map, and actionable test-to-bind guidance (#866).
-- [Added] Alerts workspace URL contract: standalone filters/tabs/pagination and `?alert=` edit deep links restore from the query string with replace/push history, and missing deep links clear the param without a blank page (#879 A1).
+- [Added] Signal Center Alerts filters, pagination, and `?alert=` edit deep links restore from namespaced query parameters with replace/push history, while the existing Signal Center route remains the production owner (#879 A1).
 - [Added] Declarative per-plugin settings schemas, atomic local persistence, immutable runtime projection, audited settings API, and a generated Web Settings form with persistent enable/disable controls (Fixes #277).
 - [Fixed] Alerts primary filters (status / rule type) stay inline above the 48rem breakpoint; AdvancedFilterSheet fold remains mobile-only (#909 follow-up).
 - [Fixed] Token Usage period selection is owned by the URL (`?period=`) so refresh/share under Settings keeps the time range (#879 A1).

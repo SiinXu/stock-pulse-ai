@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsPage from '../AlertsPage';
 import { createDeferred, chooseOption } from '../../test-utils';
 import { createParsedApiError, createApiError } from '../../api/error';
+import { SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS } from '../../routing/routes';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -454,7 +455,7 @@ describe('AlertsPage URL contract', () => {
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
-      expect(params.get('enabled')).toBe('disabled');
+      expect(params.get(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled)).toBe('disabled');
     });
 
     // Simulate hard refresh by remounting with the same URL.
@@ -466,16 +467,23 @@ describe('AlertsPage URL contract', () => {
       page: 1,
       pageSize: 20,
     })));
-    expect(new URLSearchParams(window.location.search).get('enabled')).toBe('disabled');
+    expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled,
+    )).toBe('disabled');
   });
 
   it('opens a deep-linked alert rule edit modal by id', async () => {
-    renderAlertsPage(<AlertsPage />, '/alerts?alert=1');
+    renderAlertsPage(
+      <AlertsPage />,
+      `/alerts?${SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert}=1`,
+    );
 
     await waitFor(() => expect(getRule).toHaveBeenCalledWith(1));
     expect(await screen.findByRole('dialog', { name: '编辑告警规则' })).toBeInTheDocument();
     expect(await screen.findByDisplayValue('1800')).toBeInTheDocument();
-    expect(new URLSearchParams(window.location.search).get('alert')).toBe('1');
+    expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert,
+    )).toBe('1');
   });
 
   it('clears a 404 deep-link alert param without blanking the page', async () => {
@@ -491,12 +499,43 @@ describe('AlertsPage URL contract', () => {
       ),
     );
 
-    renderAlertsPage(<AlertsPage />, '/alerts?alert=40404');
+    renderAlertsPage(
+      <AlertsPage />,
+      `/alerts?${SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert}=40404`,
+    );
 
     await waitFor(() => expect(getRule).toHaveBeenCalledWith(40404));
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get('alert')).toBeNull());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert,
+    )).toBeNull());
     expect(screen.queryByRole('dialog', { name: '编辑告警规则' })).not.toBeInTheDocument();
     expect(await screen.findByText('未找到请求的内容')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '告警中心' })).toBeInTheDocument();
+  });
+
+  it('keeps a transiently unavailable deep-link identity for retry or refresh', async () => {
+    getRule.mockRejectedValue(
+      createApiError(
+        createParsedApiError({
+          title: '服务暂时不可用',
+          message: '请稍后重试。',
+          status: 503,
+          category: 'http_error',
+          code: 'service_unavailable',
+        }),
+      ),
+    );
+
+    renderAlertsPage(
+      <AlertsPage />,
+      `/alerts?${SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert}=1`,
+    );
+
+    await waitFor(() => expect(getRule).toHaveBeenCalledWith(1));
+    expect(await screen.findByText('服务暂时不可用')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert,
+    )).toBe('1');
+    expect(screen.getByRole('dialog', { name: '编辑告警规则' })).toBeInTheDocument();
   });
 });

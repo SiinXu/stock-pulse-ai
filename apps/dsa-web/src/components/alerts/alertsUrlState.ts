@@ -4,15 +4,13 @@
 /**
  * Alerts workspace URL schema (UI-03A / issue #879 A1).
  *
- * Owns shareable filter, tab, pagination, and selection state for the
- * standalone Alerts surface (AlertsPage / non-embedded AlertsWorkspace).
+ * Owns shareable filter, pagination, and rule-selection state for the Alerts
+ * workspace embedded in Signal Center. Signal Center itself owns the primary
+ * `tab`, history subtab, scope, and trigger-selection keys.
  *
  * History policy:
- * - Filters, tabs, pagination → replace
- * - Selected rule (`alert`) / selected trigger (`trigger`) → push (Back closes)
- *
- * Embedded Signal Center mounts keep local React state for these fields so
- * Alerts does not fight Signal Center keys (`view` / `page` / `trigger` / `tab`).
+ * - Filters and pagination → replace
+ * - Selected rule (`alert`) → push (Back closes)
  */
 import type { AlertType } from '../../types/alerts';
 import {
@@ -23,9 +21,9 @@ import {
   type InferUrlState,
   type UrlStatePatch,
 } from '../../utils/urlState';
+import { SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS } from '../../routing/routes';
 
-export const ALERT_VIEWS = ['rules', 'history', 'notifications'] as const;
-export type AlertsUrlView = (typeof ALERT_VIEWS)[number];
+export type AlertsUrlView = 'rules' | 'history' | 'notifications';
 
 const ENABLED_FILTERS = ['all', 'enabled', 'disabled'] as const;
 
@@ -51,64 +49,51 @@ const ALERT_TYPE_FILTERS = ['all', ...ALERT_TYPES] as const;
 const NOTIFICATION_SUCCESS_FILTERS = ['all', 'success', 'failure'] as const;
 
 export const alertsUrlSchema = defineUrlStateSchema({
-  view: enumParam({
-    name: 'view',
-    values: ALERT_VIEWS,
-    default: 'rules',
-    history: 'replace',
-  }),
   enabled: enumParam({
-    name: 'enabled',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled,
     values: ENABLED_FILTERS,
     default: 'all',
     history: 'replace',
   }),
   type: enumParam({
-    name: 'type',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesType,
     values: ALERT_TYPE_FILTERS,
     default: 'all',
     history: 'replace',
   }),
   page: numberParam({
-    name: 'page',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesPage,
     default: 1,
     history: 'replace',
     min: 1,
   }),
   historyPage: numberParam({
-    name: 'historyPage',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.triggerPage,
     default: 1,
     history: 'replace',
     min: 1,
   }),
   notificationsPage: numberParam({
-    name: 'notificationsPage',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationPage,
     default: 1,
     history: 'replace',
     min: 1,
   }),
   channel: stringParam({
-    name: 'channel',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationChannel,
     default: 'all',
     history: 'replace',
     omitEmpty: false,
   }),
   success: enumParam({
-    name: 'success',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationSuccess,
     values: NOTIFICATION_SUCCESS_FILTERS,
     default: 'all',
     history: 'replace',
   }),
   /** Selected rule id for the edit modal (push so Back closes). */
   alert: numberParam({
-    name: 'alert',
-    default: null,
-    history: 'push',
-    min: 1,
-  }),
-  /** Selected trigger highlight on the history tab (push so Back clears). */
-  trigger: numberParam({
-    name: 'trigger',
+    name: SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert,
     default: null,
     history: 'push',
     min: 1,
