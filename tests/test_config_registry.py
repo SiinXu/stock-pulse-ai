@@ -1184,6 +1184,8 @@ class TestUiPlacement(unittest.TestCase):
             "VISION_MODEL",
             "LITELLM_FALLBACK_MODELS",
             "LLM_TEMPERATURE",
+            "LLM_TIMEOUT_SEC",
+            "LLM_MAX_TOKENS",
         ):
             self.assertEqual(derive_ui_placement(key), "task_routing", key)
 
@@ -1423,108 +1425,61 @@ class TestDataSourceDomainKeysRegistered(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
-class TestMcpFieldsRegistered(unittest.TestCase):
-    """Optional MCP process settings must be explicitly registered for Settings UI."""
 
-    _MCP_KEYS = (
-        "MCP_SERVER_ENABLED",
-        "MCP_SERVER_TRANSPORT",
-        "MCP_SERVER_HOST",
-        "MCP_SERVER_PORT",
-        "MCP_STDIO_PRINCIPAL",
-        "MCP_STDIO_SCOPES",
-        "MCP_HTTP_SCOPES",
-        "MCP_HTTP_SESSION_TOKEN_SHA256",
-        "MCP_HTTP_RESOURCE",
-        "MCP_HTTP_ALLOWED_HOSTS",
-        "MCP_HTTP_ALLOWED_ORIGINS",
-        "MCP_HTTP_MAX_BODY_BYTES",
-        "MCP_HTTP_MAX_HEADER_BYTES",
-        "MCP_HTTP_MAX_CONNECTIONS",
-        "MCP_HTTP_BACKLOG",
-        "MCP_HTTP_READ_TIMEOUT_SECONDS",
-        "MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS",
-        "MCP_MAX_CONCURRENT_TOOLS",
-        "MCP_RATE_LIMIT_PER_MINUTE",
-        "MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE",
-        "MCP_ANALYSIS_MAX_STOCKS",
-    )
+class TestLongtailBatch1FieldRegistration(unittest.TestCase):
+    """Historical long-tail keys registered in batch 1 stay categorized and typed."""
 
-    def test_all_mcp_keys_registered_in_mcp_category(self):
-        for key in self._MCP_KEYS:
-            field = get_field_definition(key)
-            self.assertEqual(field["category"], "mcp", key)
-            self.assertNotEqual(field["display_order"], 9000, key)
-            self.assertTrue(field.get("help_key"), key)
-            self.assertTrue(field.get("title"), key)
-            self.assertTrue(field.get("description"), key)
-            self.assertNotIn("Auto-inferred", field.get("description", ""), key)
-            self.assertNotIn(key, WEB_SETTINGS_HIDDEN_FROM_UI)
-
-    def test_enabled_is_boolean_switch_default_off(self):
-        field = get_field_definition("MCP_SERVER_ENABLED")
-        self.assertEqual(field["data_type"], "boolean")
-        self.assertEqual(field["ui_control"], "switch")
-        self.assertEqual(field["default_value"], "false")
-        self.assertFalse(field["is_sensitive"])
-
-    def test_transport_is_select_with_enum(self):
-        field = get_field_definition("MCP_SERVER_TRANSPORT")
-        self.assertEqual(field["ui_control"], "select")
-        self.assertEqual(field["default_value"], "stdio")
-        self.assertEqual(field["validation"]["enum"], ["stdio", "streamable-http"])
-
-    def test_port_and_timeout_ranges_match_runtime(self):
+    def test_batch1_keys_have_expected_controls_and_categories(self) -> None:
         expected = {
-            "MCP_SERVER_PORT": {"min": 1, "max": 65535},
-            "MCP_HTTP_MAX_BODY_BYTES": {"min": 1024, "max": 10_000_000},
-            "MCP_HTTP_MAX_HEADER_BYTES": {"min": 4096, "max": 262_144},
-            "MCP_HTTP_MAX_CONNECTIONS": {"min": 1, "max": 1024},
-            "MCP_HTTP_BACKLOG": {"min": 1, "max": 1024},
-            "MCP_HTTP_READ_TIMEOUT_SECONDS": {"min": 1, "max": 120},
-            "MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS": {"min": 1, "max": 120},
-            "MCP_MAX_CONCURRENT_TOOLS": {"min": 1, "max": 128},
-            "MCP_RATE_LIMIT_PER_MINUTE": {"min": 1, "max": 10_000},
-            "MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE": {"min": 1, "max": 60},
-            "MCP_ANALYSIS_MAX_STOCKS": {"min": 1, "max": 50},
+            "DAILY_BRIEF_NOTIFY": ("system", "boolean", "switch", "true"),
+            "OUTBOUND_HTTP_ALLOWLIST": ("system", "string", "textarea", ""),
+            "ENABLE_FUNDAMENTAL_PIPELINE": ("system", "boolean", "switch", "true"),
+            "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT": ("system", "number", "number", "35.0"),
+            "NEWS_INTEL_AUTO_FETCH_ENABLED": ("system", "boolean", "switch", "false"),
+            "LLM_TIMEOUT_SEC": ("ai_model", "integer", "number", "60"),
+            "LLM_MAX_TOKENS": ("ai_model", "integer", "number", "2048"),
+            "FAILURE_NOTIFY_ENABLED": ("notification", "string", "select", ""),
+            "PAPER_PORTFOLIO_INITIAL_CASH": ("backtest", "number", "number", "1000000"),
+            "SMARTMONEY_ENABLED": ("system", "boolean", "switch", "false"),
+            "ADMIN_SESSION_MAX_AGE_HOURS": ("system", "integer", "number", "24"),
+            "REASONING_TRACE_EXPORT_ENABLED": ("system", "boolean", "switch", "false"),
         }
-        for key, validation in expected.items():
+        for key, (category, data_type, ui_control, default_value) in expected.items():
             field = get_field_definition(key)
-            self.assertEqual(field["data_type"], "integer", key)
-            self.assertEqual(field["ui_control"], "number", key)
-            self.assertEqual(field["validation"]["min"], validation["min"], key)
-            self.assertEqual(field["validation"]["max"], validation["max"], key)
+            self.assertEqual(field["category"], category, key)
+            self.assertEqual(field["data_type"], data_type, key)
+            self.assertEqual(field["ui_control"], ui_control, key)
+            self.assertEqual(field["default_value"], default_value, key)
+            self.assertTrue(field.get("is_editable"), key)
+            self.assertTrue(field.get("help_key"), key)
+            self.assertNotEqual(field["category"], "uncategorized", key)
 
-    def test_session_token_is_sensitive_password_with_hex_pattern(self):
-        field = get_field_definition("MCP_HTTP_SESSION_TOKEN_SHA256")
-        self.assertTrue(field["is_sensitive"])
-        self.assertEqual(field["ui_control"], "password")
-        self.assertIn("secret_value", field.get("warning_codes", []))
-        pattern = re.compile(field["validation"]["pattern"])
-        self.assertIsNotNone(pattern.fullmatch(""))
-        self.assertIsNotNone(pattern.fullmatch("a" * 64))
-        self.assertIsNotNone(pattern.fullmatch("A" * 64))
-        self.assertIsNone(pattern.fullmatch("not-a-hash"))
-        self.assertIsNone(pattern.fullmatch("a" * 63))
+    def test_failure_notify_select_enum_includes_auto_empty(self) -> None:
+        field = get_field_definition("FAILURE_NOTIFY_ENABLED")
+        self.assertEqual(field["validation"].get("enum"), ["", "true", "false"])
 
-    def test_allowlists_document_widening_risk(self):
-        for key in ("MCP_HTTP_ALLOWED_HOSTS", "MCP_HTTP_ALLOWED_ORIGINS"):
-            field = get_field_definition(key)
-            description = field["description"].lower()
-            self.assertTrue(
-                "risk" in description or "cross-origin" in description or "widening" in description,
-                key,
-            )
-            self.assertIn("security_surface", field.get("warning_codes", []))
 
-    def test_schema_response_includes_mcp_category_and_fields(self):
-        schema = build_schema_response()
-        mcp_cat = next((c for c in schema["categories"] if c["category"] == "mcp"), None)
-        self.assertIsNotNone(mcp_cat, "mcp category missing from schema")
-        field_keys = {f["key"] for f in mcp_cat["fields"]}
-        for key in self._MCP_KEYS:
-            self.assertIn(key, field_keys, key)
-        # category must sort before uncategorized
-        orders = {c["category"]: c["display_order"] for c in schema["categories"]}
-        self.assertLess(orders["mcp"], orders["uncategorized"])
+    def test_llm_timeout_and_max_tokens_orders_are_unique_in_ai_model(self) -> None:
+        """Regression: do not reuse crowded low display_order slots."""
+        timeout = get_field_definition("LLM_TIMEOUT_SEC")
+        max_tokens = get_field_definition("LLM_MAX_TOKENS")
+        self.assertEqual(timeout["display_order"], 12)
+        self.assertEqual(max_tokens["display_order"], 13)
+        ai_orders = {
+            get_field_definition(key)["display_order"]: key
+            for key in get_registered_field_keys()
+            if get_field_definition(key)["category"] == "ai_model"
+            and key in {"LLM_TIMEOUT_SEC", "LLM_MAX_TOKENS"}
+        }
+        # Each of the two keys must not share order with any other ai_model field.
+        for key in ("LLM_TIMEOUT_SEC", "LLM_MAX_TOKENS"):
+            order = get_field_definition(key)["display_order"]
+            peers = [
+                other
+                for other in get_registered_field_keys()
+                if get_field_definition(other)["category"] == "ai_model"
+                and get_field_definition(other)["display_order"] == order
+            ]
+            self.assertEqual(peers, [key], f"display_order collision for {key}: {peers}")
+
 

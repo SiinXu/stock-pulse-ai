@@ -133,4 +133,34 @@ BACKTEST_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PAPER_PORTFOLIO_INITIAL_CASH": {
+        "title": "Paper Portfolio Initial Cash",
+        "description": (
+            "Starting cash for a newly created paper portfolio. Fees and slippage are ignored "
+            "in the MVP paper engine. Default 1000000."
+        ),
+        "category": "backtest",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1000000",
+        "options": [],
+        "validation": {"min": 0.0},
+        "display_order": 60,
+        "help_key": "settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH",
+        "examples": [
+            "PAPER_PORTFOLIO_INITIAL_CASH=1000000",
+            "PAPER_PORTFOLIO_INITIAL_CASH=100000",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
 }
+
