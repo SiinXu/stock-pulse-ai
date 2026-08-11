@@ -108,9 +108,27 @@ Steps:
 If the gate fails: regenerate locally, commit both files, and push. Do not hand-
 edit `api.generated.ts`.
 
+## Web error contract
+
+`apps/dsa-web/src/api/error.ts` is the compatibility facade for existing Web
+imports. Parsing, heuristic categorization, stable display copy, formatting,
+and public exports live under `apps/dsa-web/src/api/error/`; callers should not
+import those implementation modules directly.
+
+`ApiErrorAlert` presents errors through the shared persistent Toast. A caller
+action is rendered only when it has both a label and a handler. The remediation
+catalog may supply an existing localized label for a caller-provided handler,
+or a localized label plus an in-app destination; entries without either a
+handler or destination remain guidance-only and never render a dead button.
+Raw diagnostic messages are intentionally not rendered in the Toast.
+
+This is the Web V0 contract. CLI and desktop-native error presentation are not
+covered by the catalog or Toast remediation in this phase.
+
 ## Related documents
 
 - Historical OpenAPI snapshot: [`architecture/api_spec.json`](architecture/api_spec.json)
   (not the CI-gated artifact; prefer `apps/dsa-web/openapi.json` for typegen).
 - Web API modules: `apps/dsa-web/src/api/`
-- Error contract: `apps/dsa-web/src/api/error.ts`
+- Error compatibility facade: `apps/dsa-web/src/api/error.ts`
+- Error implementation modules: `apps/dsa-web/src/api/error/`
