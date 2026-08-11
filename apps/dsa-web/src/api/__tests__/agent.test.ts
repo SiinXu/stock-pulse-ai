@@ -212,22 +212,45 @@ describe('agentApi.getSkills / sessions', () => {
           role: 'user',
           content: 'hello',
           created_at: null,
+          turn_id: 'turn-1',
         }],
+        session_state: { selected_skill_ids: ['technical'] },
+        turn_identity_supported: true,
       },
     });
-    const messages = await agentApi.getChatSessionMessages('s1');
-    expect(messages[0].content).toBe('hello');
+    const detail = await agentApi.getChatSessionMessages('s1');
+    expect(detail.messages[0]).toMatchObject({ content: 'hello', turn_id: 'turn-1' });
+    expect(detail.session_state.selected_skill_ids).toEqual(['technical']);
+    expect(detail.turn_identity_supported).toBe(true);
 
     mockGet.mockResolvedValueOnce({
       data: {
         session_id: 's1',
         messages: [{ role: 'user', content: 'no id' }],
+        session_state: { selected_skill_ids: null },
       },
     });
     await expect(agentApi.getChatSessionMessages('s1')).rejects.toSatisfy((error: unknown) => {
       const parsed = getParsedApiError(error);
       expect(parsed.code).toBe('api_response_validation_failed');
       expect(parsed.params).toMatchObject({ label: 'SessionMessagesResponse' });
+      return true;
+    });
+  });
+
+  it('rejects a session envelope that drops persisted session state', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        session_id: 's1',
+        messages: [],
+      },
+    });
+
+    await expect(agentApi.getChatSessionMessages('s1')).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'SessionMessagesResponse' });
+      expect(parsed.message).toContain('session_state');
       return true;
     });
   });

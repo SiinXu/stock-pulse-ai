@@ -27,11 +27,13 @@ const _researchFieldAnchor: _AssertResearchFields = 'token_usage';
 const _skillsFieldAnchor: _AssertSkillsFields = 'default_skill_id';
 const _sessionsFieldAnchor: _AssertSessionsFields = 'sessions';
 const _messagesFieldAnchor: _AssertMessagesFields = 'messages';
+const _messagesStateFieldAnchor: _AssertMessagesFields = 'session_state';
 void _chatFieldAnchor;
 void _researchFieldAnchor;
 void _skillsFieldAnchor;
 void _sessionsFieldAnchor;
 void _messagesFieldAnchor;
+void _messagesStateFieldAnchor;
 
 export interface ChatStreamOptions {
   signal?: AbortSignal;
