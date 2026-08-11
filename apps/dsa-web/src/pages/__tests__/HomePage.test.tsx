@@ -9,7 +9,9 @@ import { historyApi } from '../../api/history';
 import { onboardingApi } from '../../api/onboarding';
 import { scheduledTasksApi } from '../../api/scheduledTasks';
 import { systemConfigApi } from '../../api/systemConfig';
+import { getTodaysFocus } from '../../api/todaysFocus';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import type { TodaysFocusResponse } from '../../types/todaysFocus';
 import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
@@ -62,6 +64,55 @@ vi.mock('../../api/onboarding', () => ({
     getDemoAnalysis: vi.fn(),
   },
 }));
+
+vi.mock('../../api/todaysFocus', () => ({
+  getTodaysFocus: vi.fn(),
+}));
+
+const emptyTodaysFocus: TodaysFocusResponse = {
+  packVersion: 'todays_focus/2.0',
+  generatedAt: '2026-08-09T00:00:00Z',
+  status: 'empty',
+  maxItems: 5,
+  itemCount: 0,
+  items: [],
+  emptyReason: 'no_fresh_deterministic_signals',
+  emptyMessage: 'No symbols need special attention today.',
+  sourcesUsed: [],
+  degradedSources: [],
+  temporalPolicy: {
+    semantics: 'local_calendar_day',
+    timezone: 'UTC',
+    localDate: '2026-08-09',
+    windowStart: '2026-08-08T16:00:00Z',
+    windowEnd: '2026-08-09T00:00:00Z',
+    naiveTimestampPolicy: 'assume_utc',
+    missingTimestampPolicy: 'exclude',
+    nonTradingDayPolicy: 'same_local_day_only',
+  },
+  universeContract: {
+    symbolCount: 0,
+    hardCap: 1000,
+    truncated: false,
+    sources: ['watchlist_config'],
+  },
+  costContract: {
+    alertRepositoryCalls: 1,
+    portfolioRepositoryCalls: 1,
+    analysisHistoryRepositoryCalls: 1,
+    eventRepositoryCalls: 0,
+    databaseWrites: 0,
+    providerCalls: 0,
+    analysisRunsTriggered: 0,
+    zeroExtraFetch: true,
+    readOnly: true,
+  },
+  presentationBoundary: {
+    alertsOwnedBy: 'signal_center',
+    focusShows: 'prioritized_symbols_with_evidence_links',
+    duplicateAlertUi: false,
+  },
+};
 
 const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   void target;
@@ -252,6 +303,7 @@ describe('HomePage attention hub', () => {
       items: [scheduledRiskCheck],
       total: 1,
     });
+    vi.mocked(getTodaysFocus).mockResolvedValue(emptyTodaysFocus);
   });
 
   it('renders exactly the three default attention blocks and keeps configuration collapsed', async () => {
@@ -263,6 +315,12 @@ describe('HomePage attention hub', () => {
     expect(within(core).getByRole('heading', { name: "Today's Focus" })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'To-dos' })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'Signal summary' })).toBeInTheDocument();
+    // Production reachability: deterministic focus panel is mounted on Home (not Playground-only).
+    expect(within(core).getByTestId('todays-focus-panel')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(getTodaysFocus).toHaveBeenCalled();
+    });
+    expect(await within(core).findByTestId('todays-focus-empty')).toBeInTheDocument();
     const todos = within(core).getByRole('region', { name: 'To-dos' });
     const signalSummary = within(core).getByRole('region', { name: 'Signal summary' });
     const approvals = within(core).getByRole('button', { name: 'Review human approvals' });
@@ -278,6 +336,8 @@ describe('HomePage attention hub', () => {
     expect(signalSummary).toHaveClass('rounded-xl', 'border', 'border-border');
     expect(within(core).getByRole('region', { name: "Today's Focus" }))
       .toHaveAttribute('data-surface-level', 'interactive');
+    expect(within(core).getByTestId('todays-focus-panel'))
+      .toHaveAttribute('data-surface-level', 'interactive');
     expect(todos).toHaveAttribute('data-surface-level', 'interactive');
     expect(signalSummary).toHaveAttribute('data-surface-level', 'interactive');
     const startAnalysis = screen.getByRole('button', { name: 'Start analysis' });
@@ -291,7 +351,8 @@ describe('HomePage attention hub', () => {
     expect(configurable).toHaveAttribute('aria-expanded', 'false');
     expect(document.getElementById('home-configurable-content')).not.toBeVisible();
     expect(window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY)).toBeNull();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    // Watchlist groups may expose a name field on Home; configurable area must stay collapsed.
+    expect(document.getElementById('home-configurable-content')?.querySelector('input')).toBeNull();
   });
 
   it('keeps the configurable area usable when browser preference storage fails', async () => {
@@ -458,7 +519,8 @@ describe('HomePage attention hub', () => {
     renderHome();
 
     const core = screen.getByTestId('home-core-blocks');
-    await within(core).findByText('Apple');
+    expect(await within(core).findByTestId('todays-focus-panel')).toBeInTheDocument();
+    await waitFor(() => expect(getTodaysFocus).toHaveBeenCalled());
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('Due for reassessment: 1')).toBeInTheDocument();
@@ -501,8 +563,10 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText('No signals need attention')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Start analysis' })).toHaveLength(2);
+    expect(await screen.findByTestId('todays-focus-empty')).toBeInTheDocument();
+    expect(screen.getByText('Nothing special today')).toBeInTheDocument();
+    // Header Start analysis remains; to-do empty state still offers Review signals.
+    expect(screen.getByRole('button', { name: 'Start analysis' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Review signals' })).toBeInTheDocument();
   });
 

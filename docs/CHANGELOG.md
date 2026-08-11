@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).
 - [Added] Optional delta-first outbound notifications distinguish first analysis, no material change, and unavailable comparison without affecting report persistence or delivery fallback.
 - [Docs] Document the shipped Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 security stack, advisory matrix, migration notes, and rollback steps for #615 in bilingual desktop packaging guides.
+- [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).
 - [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
 - [Fixed] Treat non-finite quote, change, and history metrics as missing values without financial direction or color semantics.
 - [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).
