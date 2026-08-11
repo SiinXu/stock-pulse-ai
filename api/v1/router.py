@@ -36,7 +36,6 @@ from api.v1.endpoints import (
     portfolio,
     portfolio_health,
     portfolio_risk_metrics,
-    portfolio_stress_test,
     reasoning_trace,
     report_export,
     report_version_compare,
