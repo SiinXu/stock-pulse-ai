@@ -11,7 +11,6 @@ import {
   MessageCircle,
   RefreshCw,
   Workflow,
-  X,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { agentApi, type SkillInfo } from '../api/agent';
@@ -30,10 +29,8 @@ import {
   Button,
   ConfirmDialog,
   EmptyState,
-  IconButton,
   Modal,
   PageHeader,
-  Popover,
   SegmentedControl,
   TabPanel,
   Tooltip,
@@ -44,7 +41,7 @@ import { AnalysisPhaseSelect } from '../components/analysis';
 import type { WorkbenchBatchNotice } from '../components/analysis/AnalysisWorkbenchErrorStack';
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
-import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
+import { StockHistoryTrendDrawer, WorkbenchHistoryPopover } from '../components/history';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { useRouteFocusTarget } from '../components/routing';
@@ -1199,42 +1196,24 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         ) : (
           <WorkspaceLayout>
             <section className="relative min-w-0" aria-label={t('analysisWorkbench.history')}>
-              {isLoadingReport ? (
-                <DashboardStateBlock title={t('home.loadingReport')} loading />
-              ) : selectedAnalysisReport ? (
-                <>
-                  {!isHistoryTrendOpen ? (
-                    <div className="mb-3 flex flex-nowrap items-end justify-end gap-2 overflow-x-auto pb-1">
-                      <Popover
-                        rootClassName="ml-2 shrink-0"
-                        contentRole="dialog"
-                        contentId="analysis-workbench-history-panel"
-                        ariaLabel={t('analysisWorkbench.history')}
-                        placement="bottom"
-                        align="start"
-                        contentClassName="w-80 max-w-[calc(100vw-2rem)] rounded-2xl border-border/80 shadow-2xl shadow-black/30"
-                        trigger={({ open, toggle }) => (
-                          <IconButton
-                            type="button"
-                            variant="outline"
-                            size="default"
-                            onClick={toggle}
-                            aria-label={t('analysisWorkbench.history')}
-                            aria-haspopup="dialog"
-                            aria-expanded={open}
-                            aria-controls={open ? 'analysis-workbench-history-panel' : undefined}
-                          >
-                            <History aria-hidden="true" />
-                          </IconButton>
-                        )}
-                      >
-                        {({ close }) => (
-                          <div data-testid="analysis-history-popover">
-                            <IconButton type="button" variant="bare" size="compact" tooltip={false} onClick={close} aria-label={t('common.close')} className="absolute right-3 top-3 z-10"><X aria-hidden="true" /></IconButton>
-                            <HistoryList className="[&>aside]:max-h-[min(22rem,calc(100dvh-14rem))] [&>aside]:rounded-2xl [&>aside]:border-0 [&>aside]:bg-transparent [&_[data-testid=home-history-list-scroll]]:!p-3 [&_[data-testid=home-history-list-scroll]_.text-center.py-5]:hidden [&_[data-testid=history-card-meta]]:flex-nowrap [&_[data-testid=history-card-meta]]:gap-1 [&_[data-testid=history-card-meta]>span]:whitespace-nowrap" items={analysisHistoryItems} isLoading={isLoadingHistory} isLoadingMore={isLoadingMore} hasMore={hasMore} selectedId={routeState.recordId ?? undefined} selectedIds={new Set(selectedHistoryIds)} isDeleting={isDeletingHistory} onItemClick={(recordId) => { navigateToRecord(recordId); close(); }} onLoadMore={() => void loadMoreHistory()} onToggleItemSelection={toggleHistorySelection} onToggleSelectAll={toggleAllHistory} onDeleteSelected={requestDeleteSelectedHistory} />
-                          </div>
-                        )}
-                      </Popover>
+              {!isHistoryTrendOpen ? (
+                <div className="mb-3 flex flex-nowrap items-end justify-end gap-2 overflow-x-auto pb-1">
+                  <WorkbenchHistoryPopover
+                    items={analysisHistoryItems}
+                    isLoading={isLoadingHistory}
+                    isLoadingMore={isLoadingMore}
+                    hasMore={hasMore}
+                    selectedId={routeState.recordId ?? undefined}
+                    selectedIds={selectedHistoryIds}
+                    isDeleting={isDeletingHistory}
+                    onItemClick={navigateToRecord}
+                    onLoadMore={() => void loadMoreHistory()}
+                    onToggleItemSelection={toggleHistorySelection}
+                    onToggleSelectAll={toggleAllHistory}
+                    onDeleteSelected={requestDeleteSelectedHistory}
+                  />
+                  {selectedAnalysisReport ? (
+                    <>
                       <AnalysisPhaseSelect
                         id="analysis-workbench-reanalysis-phase"
                         value={analysisPhase}
@@ -1287,8 +1266,14 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                         <FileText className="h-4 w-4" aria-hidden="true" />
                         {t('home.fullReport')}
                       </Button>
-                    </div>
+                    </>
                   ) : null}
+                </div>
+              ) : null}
+              {isLoadingReport ? (
+                <DashboardStateBlock title={t('home.loadingReport')} loading />
+              ) : selectedAnalysisReport ? (
+                <>
                   {isHistoryTrendOpen ? (
                     <StockHistoryTrendDrawer
                       key={`workbench-stock-history-${selectedAnalysisReport.meta.id}`}

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Keep Workbench history reachable through its compact Popover before a report is selected, and align end-to-end journeys with the explicit history and fallback-model selectors.
 - [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and localized full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
 - [Added] Web report and run-diagnostics surfaces expose reasoning-trace export (JSON/Markdown) with Settings enable guidance when the default-off gate is closed, truncation notice from response headers, and registry-backed `REASONING_TRACE_EXPORT_*` Settings controls (Issue #135, Refs #212).
 - [Fixed] Lazy-load report Playground stories so Risk Manager evidence does not expand the shared Playground render budget.
