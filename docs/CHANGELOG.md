@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).
 - [Added] Report export delivers office-friendly HTML plus full representative-fixture roundtrips, fail-closed Chinese glyph coverage, and hard page/output/timeout bounds for large PDF reports (Refs #163).
 - [Changed] Today's Focus uses an executable per-market “today” contract (A-share/HK/US timezones), full-set alert and position reads, and finite-only amount/weight/change validation without zero padding (Refs #157).
+- [Added] Settings Model Sources hub unifies cloud, local model server, and local CLI with a route-backed setup flow (add → test → enable → assign), deep-link restore, explicit failed-test auto-disable notices, and honest availability badges (Refs #865).
 - [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
 - [Fixed] Treat non-finite quote, change, and history metrics as missing values without financial direction or color semantics.
 - [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).

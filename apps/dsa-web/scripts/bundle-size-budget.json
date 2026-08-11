@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-11",
-  "baselineNote": "PR #1010 adds localized SECURITY_AUDIT_* registry help on post-#841 main. Affected settings and locale chunks were remeasured with 200 B headroom; the identical-to-English baseline is unchanged.",
+  "measuredAt": "2026-08-10",
+  "baselineNote": "Post-#1031 Model Sources lifecycle (PR #1020 / Refs #865) on main. Locales retain 200B headroom; IntelligenceSourcesPanel uses 10% headroom after remeasure.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 221923,
-      "measuredGzipBytes": 221723,
-      "note": "Rebaselined after adding security-audit registry help (PR #1010); measured 221723 B + 200 B headroom."
+      "maxGzipBytes": 240517,
+      "measuredGzipBytes": 218651,
+      "note": "Rebaselined after Model Sources lifecycle + hub status merge (PR #1020 / Refs #865); 10% headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 143009,
-      "measuredGzipBytes": 142809,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 142809 B + 200 B headroom."
+      "maxGzipBytes": 138510,
+      "measuredGzipBytes": 138310,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 137033,
-      "measuredGzipBytes": 136833,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 136833 B + 200 B headroom."
+      "maxGzipBytes": 133277,
+      "measuredGzipBytes": 133077,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 137029,
-      "measuredGzipBytes": 136829,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 136829 B + 200 B headroom."
+      "maxGzipBytes": 132700,
+      "measuredGzipBytes": 132500,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 137382,
-      "measuredGzipBytes": 137182,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 137182 B + 200 B headroom."
+      "maxGzipBytes": 133459,
+      "measuredGzipBytes": 133259,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 133277,
-      "measuredGzipBytes": 133077,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 133077 B + 200 B headroom."
+      "maxGzipBytes": 129451,
+      "measuredGzipBytes": 129251,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 129892,
-      "measuredGzipBytes": 129692,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 129692 B + 200 B headroom."
+      "maxGzipBytes": 125471,
+      "measuredGzipBytes": 125271,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 123703,
-      "measuredGzipBytes": 123503,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 123503 B + 200 B headroom."
+      "maxGzipBytes": 120003,
+      "measuredGzipBytes": 119803,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 123835,
-      "measuredGzipBytes": 123635,
-      "note": "Rebaselined after adding localized security-audit settings (PR #1010); measured 123635 B + 200 B headroom."
+      "maxGzipBytes": 120156,
+      "measuredGzipBytes": 119956,
+      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
     },
     {
       "id": "vendor-charts",

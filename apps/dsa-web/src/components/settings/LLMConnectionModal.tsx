@@ -63,6 +63,7 @@ import {
   type ModelReferenceReplacement,
   type TaskModelReference,
 } from './llmChannelEditorModel';
+import { canEnableModelSource } from './modelSourceAvailability';
 
 interface ConnectionModalProps {
   mode: 'add' | 'edit';
@@ -86,6 +87,8 @@ interface ConnectionModalProps {
   canReplaceModelReferences: boolean;
   onSubmit: (channel: ChannelConfig, replacements: ModelReferenceReplacement[]) => void;
   onClose: () => void;
+  /** `page` = route-backed full-page setup; `modal` keeps the legacy overlay. */
+  presentation?: 'modal' | 'page';
 }
 
 // Two-step connection dialog: pick a provider from the catalog, then fill in
@@ -112,9 +115,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   canReplaceModelReferences,
   onSubmit,
   onClose,
+  presentation = 'modal',
 }) => {
   const { language } = useUiLanguage();
   const text = MODEL_ACCESS_TEXT[language];
+  const isPagePresentation = presentation === 'page';
   const hasConnectionSchema = connectionFields !== undefined;
   const connectionSchemaFields = connectionFields ?? [];
   const [draft, setDraft] = useState<ChannelConfig | null>(initialChannel);
@@ -625,6 +630,12 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const modelsAreReadOnly = fieldIsReadOnly('models');
   const baseUrlIsReadOnly = fieldIsReadOnly('base_url');
   const showEnabledField = fieldIsVisible('enabled');
+  // Failed tests never stay "available": block save while enabled after a failed check.
+  // Untested drafts may still save (shown as untested, not available).
+  const enableBlockedByTest = Boolean(
+    draft?.enabled
+    && test?.status === 'error',
+  );
   const supportsDiscovery = provider?.supportsDiscovery === true;
   const discoveryEnabledByContract = hasConnectionSchema
     ? Boolean(connectionContractValues && isConnectionModelDiscoveryEnabled(
@@ -721,8 +732,8 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     document.getElementById(targetId)?.focus();
   }, [focusField, focusModels, focusStep, showManualModelInput, supportsDiscovery]);
 
-  return (
-    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} size="wide">
+  const formBody = (
+      <>
       {!draft ? (
         <div className="space-y-3">
           <p className="text-sm text-secondary-text">{text.chooseProviderDescription}</p>
@@ -1179,11 +1190,28 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               id={enabledSwitchId}
               checked={draft.enabled}
               disabled={fieldIsReadOnly('enabled')}
-              onCheckedChange={(next) => updateDraft('enabled', next)}
+              onCheckedChange={(next) => {
+                if (next && !canEnableModelSource({
+                  testState: test,
+                  requireSuccessfulTest: true,
+                })) {
+                  return;
+                }
+                updateDraft('enabled', next);
+              }}
               aria-label={text.enableAria}
               visualTestId="connection-enabled-switch-visual"
             />
           </div>
+          ) : null}
+
+          {enableBlockedByTest ? (
+            <InlineAlert
+              variant="warning"
+              size="compact"
+              title={text.enableRequiresTest}
+              message={text.setupLifecycleHint}
+            />
           ) : null}
 
           {blockingIssues.length > 0 ? (
@@ -1220,12 +1248,14 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 {text.back}
               </Button>
             ) : null}
-            <Button type="button" variant="ghost" size="default" onClick={onClose}>{text.cancel}</Button>
+            <Button type="button" variant="ghost" size="default" onClick={onClose}>
+              {isPagePresentation ? text.closeSetup : text.cancel}
+            </Button>
             <Button
               type="button"
               variant="primary"
               size="default"
-              disabled={disabled || !connectionContractKnown || (
+              disabled={disabled || !connectionContractKnown || enableBlockedByTest || (
                 mode === 'add'
                 && !channelIdentityCanWrite(
                   draft,
@@ -1238,6 +1268,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 if (
                   disabled
                   || !connectionContractKnown
+                  || enableBlockedByTest
                   || (
                     mode === 'add'
                     && !channelIdentityCanWrite(
@@ -1265,6 +1296,30 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           </div>
         </form>
       )}
+      </>
+  );
+
+  if (isPagePresentation) {
+    return (
+      <section
+        className="space-y-4 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 sm:p-5"
+        data-testid="model-source-setup-page"
+        aria-labelledby="model-source-setup-heading"
+      >
+        <div className="space-y-1 border-b border-[var(--settings-border)] pb-3">
+          <h2 id="model-source-setup-heading" className="text-base font-semibold text-foreground">
+            {mode === 'edit' ? text.editService : text.addService}
+          </h2>
+          <p className="text-xs text-muted-text">{text.setupLifecycleHint}</p>
+        </div>
+        {formBody}
+      </section>
+    );
+  }
+
+  return (
+    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} size="wide">
+      {formBody}
     </Modal>
   );
 };
