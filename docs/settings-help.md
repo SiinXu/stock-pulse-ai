@@ -77,10 +77,20 @@ Issue #1512 收口后，Web 设置页只展示后端配置注册表中的正式�
 新增或修改帮助文案时，优先从以下位置核对：
 
 1. `.env.example`：配置键名、默认值、样例格式和敏感占位符。
-2. `docs/full-guide.md`：主要配置说明、运行入口和部署上下文。
-3. `docs/LLM_CONFIG_GUIDE.md`、`docs/llm-providers.md`：LLM 优先级、Channels、provider/model、兼容边界和排障说明。
-4. 专题文档：例如 `docs/bot/feishu-bot-config.md`、`docs/deploy-webui-cloud.md`、`docs/desktop-package.md`。
-5. 代码实现和测试：当文档与代码不一致时，先以可执行实现为准，并同步修正文档。
+2. 配置注册表 `src/core/config_registry_parts/`：Web 设置分组、控件类型、校验与 help 元数据。
+3. `docs/environment-variables.md` / `docs/environment-variables_EN.md`：完整键清单与**配置项新增流程**（必须同时更新模板、注册表与文档）。
+4. `docs/full-guide.md`：主要配置说明、运行入口和部署上下文（精选表，不等于完整键集合）。
+5. `docs/LLM_CONFIG_GUIDE.md`、`docs/llm-providers.md`：LLM 优先级、Channels、provider/model、兼容边界和排障说明。
+6. 专题文档：例如 `docs/bot/feishu-bot-config.md`、`docs/deploy-webui-cloud.md`、`docs/desktop-package.md`。
+7. 代码实现和测试：当文档与代码不一致时，先以可执行实现为准，并同步修正文档。
+
+三方一致性检查：
+
+```bash
+python scripts/check_config_doc_consistency.py
+```
+
+注册表缺口默认只报告；登记与呈现守卫由 Task 1 与注册表分区任务负责。
 
 ## 维护边界
 
