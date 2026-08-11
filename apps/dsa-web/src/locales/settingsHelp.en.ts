@@ -1842,6 +1842,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects every fail-closed outbound fetch that targets private or loopback hosts.'],
     notes: ['Restart recommended so long-lived clients reload policy.'],
   },
+  'settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP': {
+    title: 'Allow Trusted Proxy Fake-IP',
+  },
   'settings.system.SMARTMONEY_ENABLED': {
     title: 'SmartMoney Money-Flow Enabled',
     summary: 'Default-off gate for SmartMoney money-flow tracking and optional analysis-context injection.',

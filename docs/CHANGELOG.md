@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Share the Agent session deadline with per-tool completion fences so parallel late tools retain deterministic timeout evidence.
+- [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and localized full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
 - [Added] Web report and run-diagnostics surfaces expose reasoning-trace export (JSON/Markdown) with Settings enable guidance when the default-off gate is closed, truncation notice from response headers, and registry-backed `REASONING_TRACE_EXPORT_*` Settings controls (Issue #135, Refs #212).
 - [Fixed] Lazy-load report Playground stories so Risk Manager evidence does not expand the shared Playground render budget.
 - [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
@@ -164,6 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Decision-profile outcome calibration on decision-signal stats behind default-off DECISION_PROFILE_CALIBRATION_ENABLED, with independent 30-sample buckets and max adverse excursion from persisted prices only.
 - [Added] Agent-guided onboarding: profile intake → rule-based config plan → confirmed non-secret apply via system-config, with Home/FirstRun entry points and honest LLM-optional degradation (#589).
 - [Added] Port Futu OpenD real position import into the shared portfolio trade-import path, un-hide FUTU_* settings in the Web UI, and document OpenD setup. Ported-from: d13721e8.
+- [Fixed] Improve Analysis Workbench report typography, evidence fallbacks, theme-aware chat input text, compact history popover behavior, and report action alignment.
+- [Fixed] Keep task-routing model names visible, expose explicit report-generation backend selection, accept connected Agent ModelRefs in readiness checks, simplify fallback-model additions, and support opt-in Clash/Mihomo TUN Fake-IP DNS for public model endpoints.
 - [Fixed] Restored the Web UI i18n resource contract that a concurrent-merge race had broken: added the missing Simplified Chinese source note for `VALUATION_AGENT_TOOL_ENABLED`, regenerated the duplicated English key inventory, and backfilled 62 drifted proxy / observability / daily-brief / valuation keys across all eight locale bundles.
 - [Fixed] Corrected stale localized Settings copy that no longer matched its English source: `HTTP_PROXY` summary and usage, the restructured `VALUATION_AGENT_TOOL_ENABLED` notes, the zh-TW `LOCAL_ONLY_MODE` allowlist reference, and the untranslated investment-framework preview description.
 - [Fixed] Reduced the screening availability status surface to a compact size.
