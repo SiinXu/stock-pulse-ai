@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -62,7 +63,11 @@ class SecurityAuditTarget(_StrictAuditModel):
 def _bounded_metadata_value(value: Any, *, depth: int = 0) -> Any:
     if depth > 2:
         raise ValueError("security audit metadata nesting is too deep")
-    if value is None or type(value) in {bool, int, float}:
+    if value is None or type(value) in {bool, int}:
+        return value
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("security audit metadata number must be finite")
         return value
     if isinstance(value, str):
         if len(value) > SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH:

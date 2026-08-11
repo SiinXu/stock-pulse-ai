@@ -242,6 +242,23 @@ def test_metadata_contract_rejects_unbounded_or_non_json_values() -> None:
         )
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_metadata_contract_rejects_non_finite_numbers(value: float) -> None:
+    with pytest.raises(ValueError, match="must be finite"):
+        SecurityAuditEventCreate(
+            event_type="auth.login",
+            phase="attempt",
+            actor={"type": "remote_client", "id": "client:test"},
+            execution_id="execution",
+            action="auth.login",
+            target={"type": "admin_session", "id": "primary"},
+            outcome="pending",
+            reason_code="attempt_started",
+            correlation_id="0123456789abcdef0123456789abcdef",
+            metadata={"duration_seconds": value},
+        )
+
+
 def test_metadata_list_contract_accepts_bound_and_rejects_overflow() -> None:
     common = {
         "event_type": "system_config.write",
