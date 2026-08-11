@@ -41,6 +41,47 @@ _SENSITIVE_KEY_PARTS = {
     "token",
     "webhook",
 }
+# Final path segment "key"/"keys" is credential-bearing unless the preceding
+# segment is a structural identifier (cache key, sort key, public key, …).
+_STRUCTURAL_KEY_PREFIX_PARTS = frozenset(
+    {
+        "aria",
+        "cache",
+        "column",
+        "composite",
+        "css",
+        "data",
+        "dict",
+        "env",
+        "field",
+        "foreign",
+        "hash",
+        "id",
+        "index",
+        "json",
+        "label",
+        "lookup",
+        "map",
+        "meta",
+        "name",
+        "object",
+        "option",
+        "param",
+        "partition",
+        "primary",
+        "public",
+        "record",
+        "row",
+        "setting",
+        "shard",
+        "sort",
+        "symbol",
+        "ticker",
+        "type",
+        "xml",
+        "yaml",
+    }
+)
 _SENSITIVE_KEY_PHRASES = {
     "access_token",
     "accesstoken",
@@ -48,10 +89,14 @@ _SENSITIVE_KEY_PHRASES = {
     "apikey",
     "api_token",
     "apitoken",
+    "app_key",
+    "appkey",
     "auth_token",
     "authtoken",
     "authorization_header",
     "authorizationheader",
+    "install_spec",
+    "installspec",
     "license_key",
     "licensekey",
     "private_key",
@@ -72,6 +117,8 @@ _SENSITIVE_KEY_PHRASES = {
     "sessiontoken",
     "send_key",
     "sendkey",
+    "user_key",
+    "userkey",
     "webhook_secret",
     "webhooksecret",
     "webhook_url",
@@ -1598,6 +1645,16 @@ def _is_sensitive_mapping_key_text(key_text: str) -> bool:
             continue
         return True
     if _has_sensitive_phrase("_".join(parts)):
+        return True
+    if parts and parts[-1] in {"key", "keys"}:
+        # Generic {"key": ...} payloads are not credentials.
+        if len(parts) == 1:
+            return False
+        # Public / structural key names (cache_key, public_key, …).
+        if parts[-2] in _STRUCTURAL_KEY_PREFIX_PARTS:
+            return False
+        return True
+    if len(parts) >= 2 and parts[-2:] == ["install", "spec"]:
         return True
     return bool(set(parts) & _SENSITIVE_KEY_PARTS)
 
