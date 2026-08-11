@@ -265,6 +265,7 @@ async function installMockAuth(page: Page, options: {
 }
 
 async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLanguage: 'zh' | 'en') {
+  const detailReady = deferred();
   await page.route('**/api/v1/history/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (!/\/api\/v1\/history\/\d+$/.test(pathname)) {
@@ -282,6 +283,7 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
       context_snapshot: { fixture: 'context-snapshot-value' },
     };
     await route.fulfill({ response, json: body });
+    detailReady.resolve();
   });
   await page.route('**/api/v1/history/*/diagnostics', async (route) => {
     await fulfillJson(route, {
@@ -308,6 +310,7 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
     .first();
   await expect(historyItem).toBeVisible({ timeout: 15_000 });
   await historyItem.click();
+  await detailReady.promise;
   await expect(page.getByText('E2E Fixture', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 }
 
