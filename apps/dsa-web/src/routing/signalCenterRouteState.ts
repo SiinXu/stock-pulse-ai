@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   LEGACY_ALERTS_VIEW_VALUES,
+  SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_CREATE_RULE_VALUES,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
@@ -209,6 +210,22 @@ export function mapLegacyAlertsSearchParams(searchParams: URLSearchParams): void
     ? SIGNAL_CENTER_TAB_VALUES.history
     : SIGNAL_CENTER_TAB_VALUES.rules;
   searchParams.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
+  const legacyAlertsKeys: ReadonlyArray<[string, string]> = [
+    ['enabled', SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled],
+    ['type', SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesType],
+    ['page', SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesPage],
+    ['historyPage', SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.triggerPage],
+    ['notificationsPage', SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationPage],
+    ['channel', SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationChannel],
+    ['success', SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationSuccess],
+  ];
+  legacyAlertsKeys.forEach(([legacyKey, canonicalKey]) => {
+    const value = searchParams.get(legacyKey);
+    if (value !== null && !searchParams.has(canonicalKey)) {
+      searchParams.set(canonicalKey, value);
+    }
+    searchParams.delete(legacyKey);
+  });
   const normalized = setSignalCenterRouteState(searchParams, {
     ...DEFAULT_SIGNAL_CENTER_ROUTE_STATE,
     scope: normalizeLegacyScope(searchParams),

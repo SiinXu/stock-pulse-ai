@@ -25,7 +25,7 @@ This is the entry point for project documentation. The README covers the project
 | Use Bot / IM integrations | [Bot Commands (EN)](bot-command_EN.md) | [Bot Platform Docs](bot/) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
 | Troubleshoot runtime issues | [FAQ (EN)](FAQ_EN.md) | [Changelog](CHANGELOG.md) |
 | Troubleshoot data-source failures | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | [FAQ (EN)](FAQ_EN.md), [Chinese version](data-source-stability.md) |
-| Review log/error/audit/trace secret handling | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | [Durable Security Audit Phase 1](security-audit.md), [Outbound HTTP Policy](security-outbound-policy.md) |
+| Review log/error/audit/trace secret handling | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | [Durable Security Audit](security-audit.md) / [中文](security-audit_zh.md), [Outbound HTTP Policy](security-outbound-policy.md) |
 | Contribute code or docs | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | [Business Architecture](business-architecture.md), [Technical Architecture](architecture-overview.md), [ADR Registry](adr/README.md), [API Spec](architecture/api_spec.json) |
 
 ## Getting Started
@@ -38,12 +38,13 @@ This is the entry point for project documentation. The README covers the project
 | [Agent-guided onboarding (EN)](agent-guided-onboarding_EN.md) | Profile intake, rule-based config plan, non-secret apply, L0–L3 paths; [中文](agent-guided-onboarding.md) |
 | [UI User Manual](ui-manual/README_EN.md) | Modular Web/desktop UI usage (no deployment); [简体中文](ui-manual/README.md) |
 | [Full Guide (EN)](full-guide_EN.md) | Environment setup, run modes, configuration, deployment paths, and common issues |
+| [Environment variable inventory (EN)](environment-variables_EN.md) | Three-way `.env.example` / registry / docs inventory, config addition process, and consistency check |
 | [FAQ (EN)](FAQ_EN.md) | Common configuration, model, notification, deployment, and runtime issues |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Static/realtime priority, health scoring, adaptive ordering, fallback chains, deployment profiles, and troubleshooting |
 | [Futu OpenD Portfolio Import](futu-opend-portfolio-import_EN.md) | OpenD setup, FUTU_* settings, live position import API, degradation, and local-gateway network policy |
 | [Financial reports in fundamental analysis](financial-reports-integration_EN.md) | A-share-first multi-period statement normalization, metric formulas, sufficiency (insufficient fundamentals), and extension of existing fundamental_context |
 | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | Redaction coverage, Agent trace behavior, debug guarantees, limits, incident response, and rollback |
-| [Durable Security Audit Phase 1](security-audit.md) | Event schema, representative privileged paths, administrator query access, retention, failure semantics, and rollback |
+| [Durable Security Audit](security-audit.md) / [中文](security-audit_zh.md) | Event schema, privileged-path coverage, administrator query, retention and capacity, failure semantics, and rollback |
 | [Changelog](CHANGELOG.md) | Release notes, capability changes, and migration notes |
 
 ## Configuration

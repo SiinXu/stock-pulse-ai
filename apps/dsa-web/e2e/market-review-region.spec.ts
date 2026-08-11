@@ -141,6 +141,7 @@ test.describe('Per-market market review', () => {
         task_id: TASK_ID,
         region: body.region ?? 'cn',
         send_notification: body.send_notification ?? true,
+        message_code: 'task.market_review.queued',
       }, 202);
     });
 
@@ -150,6 +151,7 @@ test.describe('Per-market market review', () => {
         task_id: TASK_ID,
         status: 'completed',
         progress: 100,
+        message_code: 'task_completed',
         region: 'hk,us',
         market_review_report: 'RAW_STATUS_MUST_NOT_RENDER',
       });
@@ -190,4 +192,3 @@ test.describe('Per-market market review', () => {
     await expect(page.getByText('RAW_STATUS_MUST_NOT_RENDER', { exact: true })).toHaveCount(0);
   });
 });
-

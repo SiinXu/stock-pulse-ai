@@ -10,14 +10,13 @@
 
 1. **提案基础** — 生成并校验有界 `AgentPlan`（`PlanningEngine`）。
 2. **执行闭环** — 可选的 `execute_plan_loop`，在硬预算下运行 plan → act → observe → replan。
+3. **生产 RUN 路径** — 当 `AGENT_PLANNING_ENABLED=true` 时，`AgentExecutor.run`（Agent 分析编排入口）调用 `try_run_with_planning`，经 `BoundToolSession` 真实执行 plan → act → observe，再做仪表盘综合。
 
-两条路径都**没有**接入 `AgentExecutor`、Chat、Research、日常分析、多 Agent orchestrator、报告、Web Settings 或产品配置。调用方必须显式调用 API。
-
-单独的计划提案不得称为完整的生产规划引擎。执行闭环是首个真实执行切片；产品集成仍开放。
+默认仍为**关闭**：开关为 false 时经典 ReAct RUN 路径不变。Chat、Research、多 Agent orchestrator 与耐久产品 UI 在本切片仍未完全 mode-aware。
 
 ## 提案契约
 
-- 调用方显式构造 `PlanningSettings`；没有 `AGENT_PLANNING_*` 环境变量或第二套配置 owner。
+- 共享 Config 通过 `AGENT_PLANNING_*` 拥有产品开关（已登记 Settings registry）。库调用方仍可显式构造 `PlanningSettings` / `PlanExecutionSettings`。
 - **单一上限 owner。** 所有绝对上限只定义在 `src/agent/planning/config.py`，由 settings 校验、payload 校验、engine、prompt projection 与执行闭环共同导入。
 - 精确有限提案上限：最多 16 步、3 次提案重试、8,192 个 planner token、单次提案 60 秒。非法显式值抛出 `ValueError`，不 clamp。
 - `validate_plan_payload` 的 `max_steps` 只能收紧 16 步权威上限。
@@ -32,7 +31,7 @@
 
 `execute_plan_loop` 是 plan → act → observe → replan 入口。
 
-- 调用方显式构造 `PlanExecutionSettings`（本切片无环境/Config owner）。
+- 产品路径从 Config 构造 `PlanExecutionSettings`；库调用方仍可显式构造。
 - 绝对执行上限：32 次工具调用、3 次 observation-driven replan、120 秒墙钟、500 字符 observation 摘要；settings 只能收紧。
 - 每个步骤通过**调用方提供的 invoker** 调用 `expected_tools`（生产侧通常包装 `ToolSurface.execute_tool`）。闭环不绕过工具授权、capability 或 Tool Surface 安全契约。
 - 工具结果必须包含精确布尔 `ok`。缺失或非布尔 `ok` 视为失败（`invalid_tool_result`）。闭环**永不 fail-open** 把失败或歧义结果当作整体成功。
@@ -81,13 +80,30 @@ print(result.success, result.status, result.to_metadata())
 
 库本身不持久化。observability emit 仅在 emit 边界 fail-open；执行结果永不把失败报成成功。调用方不得持久化私有 task、自由推理、凭据或原始 provider response。返回 metadata 仅限稳定 reason code、有界摘要、plan id 与 observation 状态行。
 
+## 生产 RUN 集成
+
+| 环境变量 / Config 字段 | 默认 | 作用 |
+| --- | --- | --- |
+| `AGENT_PLANNING_ENABLED` | `false` | `AgentExecutor.run` 总开关 |
+| `AGENT_PLANNING_STRATEGY` | `template` | `template` 或 `llm` |
+| `AGENT_PLANNING_MAX_PLAN_STEPS` | `8` | 提案步数上限（1–16） |
+| `AGENT_PLANNING_MAX_REPLANS` | `1` | 提案重试（0–3） |
+| `AGENT_PLANNING_MAX_TOKENS` | `1500` | LLM 提案 token 预算（1–8192） |
+| `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 提案墙钟（0.1–60） |
+| `AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS` | `16` | 执行工具调用上限（1–32） |
+| `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 观察重规划次数（0–3） |
+| `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 执行墙钟（0.1–120） |
+| `AGENT_PLANNING_ON_STEP_FAILURE` | `replan` | `replan` 或 `terminate` |
+
+开启后流程：提案 → `BoundToolSession` 执行闭环 → 成功则注入 observation 证据并综合仪表盘；失败则 `AgentResult(success=False)` 并带 `planning_metadata`，禁止 fail-open。轨迹走既有 agent observability 与 `tool_calls_log`。
+
 ## #199 剩余范围
 
-- RUN/CHAT/RESEARCH/daily 的 mode-aware 产品策略与跨模式共享工具授权/预算；
-- 计划/动作/observation 的耐久审计持久化、tenant identity、脱敏/retention owner 与产品 UI；
-- 规划侧统一的 UsageRecorder / 安全审计 / run diagnostics 配置 owner；
-- 生产工作流内确定性的真实多步骤工具验收证据。
+- Chat / Research / 多 Agent 的 mode-aware 策略（RUN 已接入；Chat/Research 仍为经典路径）；
+- 计划/动作/observation 的耐久审计持久化、tenant identity、脱敏/retention 与更完整产品 UI；
+- 超出 BoundToolSession 安全审计与 observability emit 的统一 UsageRecorder owner；
+- 超出聚焦离线生产路径测试的真实网络多步验收证据。
 
 ## 回滚
 
-回退新增 planning 模块、测试与文档即可；没有 runtime 开关、迁移或生产集成需要回滚。
+设置 `AGENT_PLANNING_ENABLED=false`（默认）或回退本集成 PR。无数据迁移。

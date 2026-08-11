@@ -1011,7 +1011,9 @@ const ChatPage: React.FC = () => {
 
         {chatMode === 'research' ? (
           <Surface level="section" className="z-10 flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
-            <DeepResearchPanel key={sessionId} sessionId={sessionId} />
+            <DeepResearchPanel key={sessionId} sessionId={sessionId}
+              onHistoryChanged={() => void Promise.all([loadSessions(), switchSession(sessionId, true)])}
+              onRunInBackground={() => { void Promise.all([loadSessions(), switchSession(sessionId, true)]); setChatMode('chat'); }} />
           </Surface>
         ) : null}
         <Surface level="canvas" className={chatMode === 'research' ? 'hidden' : 'z-10 flex min-h-0 flex-1 flex-col overflow-hidden'}>

@@ -33,6 +33,7 @@ _REGISTRY_PART_MODULES = (
     "src.core.config_registry_parts.backtest",
     "src.core.config_registry_parts.indicators",
     "src.core.config_registry_parts.agent",
+    "src.core.config_registry_parts.mcp",
     "src.core.config_registry_parts.help_metadata",
 )
 for _registry_part_name in _REGISTRY_PART_MODULES:
@@ -75,6 +76,9 @@ from src.core.config_registry_parts.indicators import (
 from src.core.config_registry_parts.agent import (
     AGENT_FIELD_DEFINITIONS as _AGENT_FIELD_DEFINITIONS,
 )
+from src.core.config_registry_parts.mcp import (
+    MCP_FIELD_DEFINITIONS as _MCP_FIELD_DEFINITIONS,
+)
 from src.core.config_registry_parts.help_metadata import (
     _DOC_CUSTOM_WEBHOOK,
     _DOC_FULL_GUIDE_DATA_SOURCE,
@@ -95,6 +99,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     **_BACKTEST_FIELD_DEFINITIONS,
     **_INDICATOR_FIELD_DEFINITIONS,
     **_AGENT_FIELD_DEFINITIONS,
+    **_MCP_FIELD_DEFINITIONS,
 }
 _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]]
 
@@ -107,6 +112,7 @@ del _SYSTEM_FIELD_DEFINITIONS
 del _BACKTEST_FIELD_DEFINITIONS
 del _INDICATOR_FIELD_DEFINITIONS
 del _AGENT_FIELD_DEFINITIONS
+del _MCP_FIELD_DEFINITIONS
 del _REGISTRY_PART_MODULES
 del _importlib
 del _sys
@@ -140,24 +146,27 @@ def _extract_option_values(options: List[Any]) -> List[str]:
 # field only in the surface its placement declares, instead of maintaining its
 # own provider/field lists:
 #   - model_access: edited exclusively by the model-access connection manager
-#   - task_routing: task model selectors (report / agent / vision) and routing
+#   - task_routing: report-generation backend and task model routing
 #   - developer_diagnostics: advanced diagnostics, collapsed by default
 #   - local_models: optional local finance model keys (Kronos), dedicated panel
 #   - hidden_legacy: legacy provider keys kept for back-compat; readable through
 #     the API but never rendered as a generic editable settings field
 #   - None: regular field, rendered by its category page as usual
 _UI_PLACEMENT_TASK_ROUTING_KEYS = frozenset({
+    "GENERATION_BACKEND",
     "LITELLM_MODEL",
     "AGENT_LITELLM_MODEL",
     "VISION_MODEL",
     "LITELLM_FALLBACK_MODELS",
     "LLM_TEMPERATURE",
+    # AlphaSift stock-selection reordering reuses these DSA LLM bounds.
+    "LLM_TIMEOUT_SEC",
+    "LLM_MAX_TOKENS",
 })
 
 _UI_PLACEMENT_DIAGNOSTICS_KEYS = frozenset({
     "LLM_CONFIG_MODE",
     "LITELLM_CONFIG",
-    "GENERATION_BACKEND",
     "GENERATION_FALLBACK_BACKEND",
     "GENERATION_BACKEND_MAX_CONCURRENCY",
     "GENERATION_BACKEND_MAX_OUTPUT_BYTES",
@@ -186,7 +195,7 @@ _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANS
 # group(1) captures the channel name. Shared with the service layer so "what is
 # a channel field key" has a single definition.
 LLM_CHANNEL_FIELD_KEY_RE = re.compile(
-    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|API_SURFACE|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|API_SURFACE|BASE_URL|API_KEY|API_KEYS|MODELS|MODEL_ID_MODE|EXTRA_HEADERS|ENABLED)$"
 )
 
 
@@ -330,8 +339,10 @@ def build_schema_response() -> Dict[str, Any]:
 
 
 def _is_sensitive_key(key: str) -> bool:
-    markers = ("KEY", "TOKEN", "SECRET", "PASSWORD")
-    return key.endswith("_EXTRA_HEADERS") or any(marker in key for marker in markers)
+    """Infer whether an unregistered config key carries a secret value."""
+    from src.core.config_secret_keys import is_sensitive_config_key_name
+
+    return is_sensitive_config_key_name(key)
 
 
 def _infer_category(key: str) -> str:

@@ -108,6 +108,341 @@
         "title": "AlertDeleteResponse",
         "type": "object"
       },
+      "AlertEventAffectedContext": {
+        "properties": {
+          "in_portfolio": {
+            "default": false,
+            "title": "In Portfolio",
+            "type": "boolean"
+          },
+          "in_watchlist": {
+            "default": false,
+            "title": "In Watchlist",
+            "type": "boolean"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          }
+        },
+        "title": "AlertEventAffectedContext",
+        "type": "object"
+      },
+      "AlertEventContext": {
+        "properties": {
+          "event_categories": {
+            "items": {
+              "enum": [
+                "earnings",
+                "shareholder",
+                "mna",
+                "regulatory",
+                "analyst"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Event Categories",
+            "type": "array"
+          },
+          "event_category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "earnings",
+                  "shareholder",
+                  "mna",
+                  "regulatory",
+                  "analyst"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Category"
+          },
+          "matched_count": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Count"
+          },
+          "source_item_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Id"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "what_happened": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "What Happened"
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why It Matters"
+          }
+        },
+        "title": "AlertEventContext",
+        "type": "object"
+      },
+      "AlertImpactContext": {
+        "properties": {
+          "affected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertEventAffectedContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "event_categories": {
+            "items": {
+              "enum": [
+                "earnings",
+                "shareholder",
+                "mna",
+                "regulatory",
+                "analyst"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Event Categories",
+            "type": "array"
+          },
+          "event_category": {
+            "anyOf": [
+              {
+                "enum": [
+                  "earnings",
+                  "shareholder",
+                  "mna",
+                  "regulatory",
+                  "analyst"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Category"
+          },
+          "matched_count": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Count"
+          },
+          "related_analysis": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Analysis"
+          },
+          "source_item_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Id"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "what_happened": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "What Happened"
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why It Matters"
+          }
+        },
+        "title": "AlertImpactContext",
+        "type": "object"
+      },
+      "AlertImpactResult": {
+        "properties": {
+          "grade": {
+            "enum": [
+              "major",
+              "routine",
+              "unclassified"
+            ],
+            "title": "Grade",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "rule_severity",
+              "unavailable"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          }
+        },
+        "required": [
+          "grade",
+          "provenance"
+        ],
+        "title": "AlertImpactResult",
+        "type": "object"
+      },
       "AlertNotificationItem": {
         "properties": {
           "attempt": {
@@ -764,6 +1099,17 @@
       },
       "AlertTriggerItem": {
         "properties": {
+          "alert_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Type"
+          },
           "analysis_context_pack_overview": {
             "anyOf": [
               {
@@ -831,9 +1177,39 @@
             ],
             "title": "Diagnostics"
           },
+          "event_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertEventContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "impact_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertImpactContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "impact_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertImpactResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "market_phase_summary": {
             "anyOf": [
@@ -877,6 +1253,22 @@
               }
             ],
             "title": "Rule Id"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
           },
           "status": {
             "title": "Status",
@@ -925,6 +1317,17 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           },
           "page": {
             "title": "Page",
@@ -13708,6 +14111,351 @@
         "title": "NewsIntelResponse",
         "type": "object"
       },
+      "NotificationInboxItem": {
+        "additionalProperties": false,
+        "description": "One aggregated inbox row projected from durable event sources.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "href": {
+            "description": "In-app deep link path with query string",
+            "title": "Href",
+            "type": "string"
+          },
+          "id": {
+            "description": "Versioned stable occurrence key",
+            "maxLength": 128,
+            "title": "Id",
+            "type": "string"
+          },
+          "is_read": {
+            "default": false,
+            "title": "Is Read",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "analysis_complete",
+              "alert_triggered",
+              "scheduled_task_result",
+              "decision_signal"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "severity": {
+            "default": "info",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title_key": {
+            "enum": [
+              "analysisCompleteTitle",
+              "alertTriggeredTitle",
+              "scheduledTaskResultTitle",
+              "decisionSignalTitle"
+            ],
+            "title": "Title Key",
+            "type": "string"
+          },
+          "title_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Title Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title_key",
+          "summary",
+          "created_at",
+          "href",
+          "source_id"
+        ],
+        "title": "NotificationInboxItem",
+        "type": "object"
+      },
+      "NotificationInboxListResponse": {
+        "additionalProperties": false,
+        "description": "GET /notification-inbox/items response body.",
+        "properties": {
+          "cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationInboxItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "max_items": {
+            "minimum": 1.0,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "retention_days": {
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "source_statuses": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationInboxSourceStatus"
+            },
+            "title": "Source Statuses",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total",
+          "unread_total",
+          "retention_days",
+          "max_items"
+        ],
+        "title": "NotificationInboxListResponse",
+        "type": "object"
+      },
+      "NotificationInboxMarkAllReadRequest": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-all-read request body.",
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional kind filter when marking the current window",
+            "title": "Kind"
+          }
+        },
+        "title": "NotificationInboxMarkAllReadRequest",
+        "type": "object"
+      },
+      "NotificationInboxMarkAllReadResponse": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-all-read response body.",
+        "properties": {
+          "marked_count": {
+            "minimum": 0.0,
+            "title": "Marked Count",
+            "type": "integer"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marked_count",
+          "unread_total"
+        ],
+        "title": "NotificationInboxMarkAllReadResponse",
+        "type": "object"
+      },
+      "NotificationInboxMarkReadRequest": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-read request body.",
+        "properties": {
+          "item_ids": {
+            "description": "Versioned stable inbox occurrence ids",
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "title": "NotificationInboxMarkReadRequest",
+        "type": "object"
+      },
+      "NotificationInboxMarkReadResponse": {
+        "additionalProperties": false,
+        "description": "POST /notification-inbox/items/mark-read response body.",
+        "properties": {
+          "marked_count": {
+            "minimum": 0.0,
+            "title": "Marked Count",
+            "type": "integer"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marked_count",
+          "unread_total"
+        ],
+        "title": "NotificationInboxMarkReadResponse",
+        "type": "object"
+      },
+      "NotificationInboxSourceStatus": {
+        "additionalProperties": false,
+        "description": "Availability and bounded provenance for one selected inbox source.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "item_count": {
+            "minimum": 0.0,
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "analysis",
+              "alerts",
+              "scheduled_tasks",
+              "decision_signals"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "available",
+          "item_count"
+        ],
+        "title": "NotificationInboxSourceStatus",
+        "type": "object"
+      },
+      "NotificationInboxUnreadCountResponse": {
+        "additionalProperties": false,
+        "description": "GET /notification-inbox/unread-count response body.",
+        "properties": {
+          "max_items": {
+            "minimum": 1.0,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "retention_days": {
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "source_statuses": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationInboxSourceStatus"
+            },
+            "title": "Source Statuses",
+            "type": "array"
+          },
+          "unread_total": {
+            "minimum": 0.0,
+            "title": "Unread Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unread_total",
+          "retention_days",
+          "max_items"
+        ],
+        "title": "NotificationInboxUnreadCountResponse",
+        "type": "object"
+      },
       "NotificationTestAttempt": {
         "description": "One notification delivery attempt result.",
         "properties": {
@@ -15036,6 +15784,13 @@
             "title": "Reloadable",
             "type": "boolean"
           },
+          "settings_count": {
+            "default": 0,
+            "description": "Number of declarative settings fields in the plugin manifest",
+            "minimum": 0.0,
+            "title": "Settings Count",
+            "type": "integer"
+          },
           "source": {
             "enum": [
               "builtin",
@@ -15196,6 +15951,301 @@
           "total"
         ],
         "title": "PluginListResponse",
+        "type": "object"
+      },
+      "PluginSettingFieldResponse": {
+        "additionalProperties": false,
+        "description": "One strict manifest-declared plugin settings field.",
+        "properties": {
+          "data_type": {
+            "enum": [
+              "string",
+              "integer",
+              "number",
+              "boolean"
+            ],
+            "title": "Data Type",
+            "type": "string"
+          },
+          "default_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Value"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "display_order": {
+            "default": 100,
+            "minimum": 0.0,
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "is_required": {
+            "default": false,
+            "title": "Is Required",
+            "type": "boolean"
+          },
+          "is_sensitive": {
+            "default": false,
+            "title": "Is Sensitive",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PluginSettingOptionResponse"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "ui_control": {
+            "enum": [
+              "text",
+              "password",
+              "number",
+              "select",
+              "textarea",
+              "switch"
+            ],
+            "title": "Ui Control",
+            "type": "string"
+          },
+          "validation": {
+            "additionalProperties": true,
+            "title": "Validation",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "data_type",
+          "ui_control"
+        ],
+        "title": "PluginSettingFieldResponse",
+        "type": "object"
+      },
+      "PluginSettingOptionResponse": {
+        "additionalProperties": false,
+        "description": "One finite option for a generated plugin setting control.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "PluginSettingOptionResponse",
+        "type": "object"
+      },
+      "PluginSettingsResponse": {
+        "additionalProperties": false,
+        "description": "Generated schema and masked effective values for one plugin.",
+        "properties": {
+          "mask_token": {
+            "default": "******",
+            "title": "Mask Token",
+            "type": "string"
+          },
+          "masked_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Masked Keys",
+            "type": "array"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "schema": {
+            "items": {
+              "$ref": "#/components/schemas/PluginSettingFieldResponse"
+            },
+            "title": "Schema",
+            "type": "array"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plugin_id"
+        ],
+        "title": "PluginSettingsResponse",
+        "type": "object"
+      },
+      "PluginSettingsUpdateRequest": {
+        "additionalProperties": false,
+        "description": "Full replacement of explicit values; omitted keys reset to defaults.",
+        "properties": {
+          "mask_token": {
+            "default": "******",
+            "title": "Mask Token",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "title": "PluginSettingsUpdateRequest",
+        "type": "object"
+      },
+      "PluginSettingsUpdateResponse": {
+        "additionalProperties": false,
+        "description": "Persisted settings projection plus apply semantics.",
+        "properties": {
+          "changed_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Keys",
+            "type": "array"
+          },
+          "mask_token": {
+            "default": "******",
+            "title": "Mask Token",
+            "type": "string"
+          },
+          "masked_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Masked Keys",
+            "type": "array"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "restart_required": {
+            "default": false,
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "schema": {
+            "items": {
+              "$ref": "#/components/schemas/PluginSettingFieldResponse"
+            },
+            "title": "Schema",
+            "type": "array"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plugin_id"
+        ],
+        "title": "PluginSettingsUpdateResponse",
         "type": "object"
       },
       "PortfolioAccountCreateRequest": {
@@ -19904,7 +20954,7 @@
             "$ref": "#/components/schemas/ReportExportFormats"
           },
           "office_formats_status": {
-            "const": "not_implemented",
+            "const": "html_only",
             "title": "Office Formats Status",
             "type": "string"
           },
@@ -19926,6 +20976,7 @@
             "items": {
               "enum": [
                 "md",
+                "html",
                 "pdf"
               ],
               "type": "string"
@@ -20028,8 +21079,11 @@
         "type": "object"
       },
       "ReportExportFormats": {
-        "description": "Closed format map so generated clients expose both known keys.",
+        "description": "Closed format map so generated clients expose every known key.",
         "properties": {
+          "html": {
+            "$ref": "#/components/schemas/ReportExportFormatCapability"
+          },
           "md": {
             "$ref": "#/components/schemas/ReportExportFormatCapability"
           },
@@ -20039,6 +21093,7 @@
         },
         "required": [
           "md",
+          "html",
           "pdf"
         ],
         "title": "ReportExportFormats",
@@ -21140,6 +22195,19 @@
             "title": "Question",
             "type": "string"
           },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
           "stock_code": {
             "anyOf": [
               {
@@ -21150,6 +22218,20 @@
               }
             ],
             "title": "Stock Code"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S(?:.*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -25858,6 +26940,7 @@
               "agent",
               "backtest",
               "indicators",
+              "mcp",
               "uncategorized"
             ],
             "title": "Category",
@@ -27448,6 +28531,15 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "model_id_mode": {
+            "default": "route",
+            "enum": [
+              "route",
+              "literal"
+            ],
+            "title": "Model Id Mode",
+            "type": "string"
+          },
           "models": {
             "items": {
               "type": "string"
@@ -28048,6 +29140,62 @@
         "title": "TodaysFocusItem",
         "type": "object"
       },
+      "TodaysFocusMarketDayWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "is_trading_day": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Trading Day"
+          },
+          "local_date": {
+            "format": "date",
+            "title": "Local Date",
+            "type": "string"
+          },
+          "market": {
+            "enum": [
+              "cn",
+              "hk",
+              "us",
+              "unknown"
+            ],
+            "title": "Market",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "window_end": {
+            "format": "date-time",
+            "title": "Window End",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "date-time",
+            "title": "Window Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market",
+          "timezone",
+          "local_date",
+          "window_start",
+          "window_end"
+        ],
+        "title": "TodaysFocusMarketDayWindow",
+        "type": "object"
+      },
       "TodaysFocusPresentationBoundary": {
         "additionalProperties": false,
         "properties": {
@@ -28112,7 +29260,8 @@
               {
                 "enum": [
                   "source_unavailable",
-                  "no_fresh_deterministic_signals"
+                  "no_fresh_deterministic_signals",
+                  "insufficient_finite_data"
                 ],
                 "type": "string"
               },
@@ -28148,7 +29297,7 @@
             "type": "integer"
           },
           "pack_version": {
-            "const": "todays_focus/2.0",
+            "const": "todays_focus/2.1",
             "title": "Pack Version",
             "type": "string"
           },
@@ -28207,10 +29356,25 @@
       "TodaysFocusTemporalPolicy": {
         "additionalProperties": false,
         "properties": {
-          "local_date": {
-            "format": "date",
-            "title": "Local Date",
+          "cross_market_rule": {
+            "const": "evidence_uses_target_symbol_market_timezone",
+            "title": "Cross Market Rule",
             "type": "string"
+          },
+          "fallback_timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Fallback Timezone",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "$ref": "#/components/schemas/TodaysFocusMarketDayWindow"
+            },
+            "maxItems": 8,
+            "minItems": 4,
+            "title": "Markets",
+            "type": "array"
           },
           "missing_timestamp_policy": {
             "const": "exclude",
@@ -28228,36 +29392,25 @@
             "type": "string"
           },
           "semantics": {
-            "const": "local_calendar_day",
+            "const": "per_market_local_calendar_day",
             "title": "Semantics",
-            "type": "string"
-          },
-          "timezone": {
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Timezone",
             "type": "string"
           },
           "window_end": {
             "format": "date-time",
             "title": "Window End",
             "type": "string"
-          },
-          "window_start": {
-            "format": "date-time",
-            "title": "Window Start",
-            "type": "string"
           }
         },
         "required": [
           "semantics",
-          "timezone",
-          "local_date",
-          "window_start",
+          "cross_market_rule",
+          "fallback_timezone",
           "window_end",
           "naive_timestamp_policy",
           "missing_timestamp_policy",
-          "non_trading_day_policy"
+          "non_trading_day_policy",
+          "markets"
         ],
         "title": "TodaysFocusTemporalPolicy",
         "type": "object"
@@ -28265,6 +29418,20 @@
       "TodaysFocusUniverseContract": {
         "additionalProperties": false,
         "properties": {
+          "data_notes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Data Notes",
+            "type": "array"
+          },
+          "excluded_non_finite_positions": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Excluded Non Finite Positions",
+            "type": "integer"
+          },
           "hard_cap": {
             "const": 1000,
             "title": "Hard Cap",
@@ -28299,7 +29466,8 @@
           "symbol_count",
           "hard_cap",
           "truncated",
-          "sources"
+          "sources",
+          "excluded_non_finite_positions"
         ],
         "title": "TodaysFocusUniverseContract",
         "type": "object"
@@ -31154,6 +32322,44 @@
             }
           },
           {
+            "description": "Optional typed corporate-event filter",
+            "in": "query",
+            "name": "alert_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "corporate_event",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional typed corporate-event filter",
+              "title": "Alert Type"
+            }
+          },
+          {
+            "description": "Stable continuation cursor",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Stable continuation cursor",
+              "title": "Cursor"
+            }
+          },
+          {
             "in": "query",
             "name": "page",
             "required": false,
@@ -31187,6 +32393,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "422": {
             "content": {
@@ -35466,7 +36682,7 @@
     },
     "/api/v1/focus/today": {
       "get": {
-        "description": "Fresh local-calendar-day evidence from the watchlist and persisted holdings cache. Hard-capped, read-only, and explicit about source degradation; never fetches market data, runs analysis, or replays portfolio state.",
+        "description": "Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.",
         "operationId": "getTodaysFocus",
         "parameters": [
           {
@@ -35870,7 +37086,7 @@
     },
     "/api/v1/history/export/capabilities": {
       "get": {
-        "description": "Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.",
+        "description": "Return which report export formats are available in this process. Markdown is always available. HTML is the office-friendly format and requires markdown-it-py from the optional report-export set. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. DOCX/XLSX are not implemented; office_formats_status is html_only.",
         "operationId": "get_report_export_capabilities_api_v1_history_export_capabilities_get",
         "parameters": [
           {
@@ -36214,7 +37430,7 @@
     },
     "/api/v1/history/{record_id}/export": {
       "get": {
-        "description": "Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.",
+        "description": "Export an analysis history record as Markdown (always), HTML (office-friendly; optional markdown-it-py), or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. HTML and PDF preserve visible wording but drop link destinations and complete image destinations, replace images with an omission note, and enforce explicit byte/table bounds. PDF also enforces page/time/concurrency limits and exact glyph coverage.",
         "operationId": "export_history_report_api_v1_history__record_id__export_get",
         "parameters": [
           {
@@ -36227,15 +37443,16 @@
             }
           },
           {
-            "description": "Export format: md (default) or pdf",
+            "description": "Export format: md (default), html, or pdf",
             "in": "query",
             "name": "format",
             "required": false,
             "schema": {
               "default": "md",
-              "description": "Export format: md (default) or pdf",
+              "description": "Export format: md (default), html, or pdf",
               "enum": [
                 "md",
+                "html",
                 "pdf"
               ],
               "title": "Format",
@@ -36247,6 +37464,12 @@
           "200": {
             "content": {
               "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "text/html": {
                 "schema": {
                   "format": "binary",
                   "type": "string"
@@ -36329,7 +37552,7 @@
                 }
               }
             },
-            "description": "PDF dependency, font, deadline, or render worker unavailable"
+            "description": "PDF/HTML dependency, font, deadline, or render worker unavailable"
           }
         },
         "summary": "Export a history report",
@@ -38256,6 +39479,368 @@
         ]
       }
     },
+    "/api/v1/notification-inbox/items": {
+      "get": {
+        "operationId": "list_inbox_items_api_v1_notification_inbox_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List in-app notification inbox items",
+        "tags": [
+          "NotificationInbox"
+        ]
+      }
+    },
+    "/api/v1/notification-inbox/items/mark-all-read": {
+      "post": {
+        "operationId": "mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationInboxMarkAllReadRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxMarkAllReadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Mark the current notification inbox window as read",
+        "tags": [
+          "NotificationInbox"
+        ]
+      }
+    },
+    "/api/v1/notification-inbox/items/mark-read": {
+      "post": {
+        "operationId": "mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationInboxMarkReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxMarkReadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Mark specific notification inbox items as read",
+        "tags": [
+          "NotificationInbox"
+        ]
+      }
+    },
+    "/api/v1/notification-inbox/unread-count": {
+      "get": {
+        "operationId": "get_inbox_unread_count_api_v1_notification_inbox_unread_count_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationInboxUnreadCountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get unread notification inbox count",
+        "tags": [
+          "NotificationInbox"
+        ]
+      }
+    },
     "/api/v1/onboarding/apply": {
       "post": {
         "description": "Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.",
@@ -38728,6 +40313,180 @@
           }
         ],
         "summary": "Enable, disable, or hot-reload one plugin",
+        "tags": [
+          "Plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/{plugin_id}/settings": {
+      "get": {
+        "description": "Return the strict manifest-declared settings schema and effective values. Sensitive values are represented only by mask_token.",
+        "operationId": "getPluginSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Plugin not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get one plugin's generated settings contract",
+        "tags": [
+          "Plugins"
+        ]
+      },
+      "put": {
+        "description": "Replace explicit per-plugin settings after strict manifest validation. Omitted keys reset to defaults; masked sensitive values preserve the stored secret.",
+        "operationId": "updatePluginSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginSettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSettingsUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Settings validation failed"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Plugin not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Settings persistence failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Validate and persist one plugin's settings",
         "tags": [
           "Plugins"
         ]

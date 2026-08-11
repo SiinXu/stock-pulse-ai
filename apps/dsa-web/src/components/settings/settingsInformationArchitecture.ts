@@ -63,7 +63,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.label", { zh: 'AI 与模型', en: 'AI & Models' }),
     views: [
       { id: SETTINGS_VIEW_IDS.aiModels.overview, label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.views.overview.label", { zh: '总览', en: 'Overview' }) },
-      { id: SETTINGS_VIEW_IDS.aiModels.connections, label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.views.connections.label", { zh: '模型接入', en: 'Model Access' }) },
+      { id: SETTINGS_VIEW_IDS.aiModels.connections, label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.views.connections.label", { zh: '模型来源', en: 'Model Sources' }) },
       { id: SETTINGS_VIEW_IDS.aiModels.localModels, label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.views.local_models.label", { zh: '本地模型', en: 'Local Models' }) },
       { id: SETTINGS_VIEW_IDS.aiModels.taskRouting, label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.views.task_routing.label", { zh: '任务路由', en: 'Task Routing' }) },
       { id: SETTINGS_VIEW_IDS.aiModels.reliability, label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.views.reliability.label", { zh: '可靠性', en: 'Reliability' }) },

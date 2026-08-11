@@ -17,10 +17,43 @@ export const APP_ROUTE_PATHS = {
   researchDiscover: '/research/discover',
   researchBacktest: '/research/backtest',
   researchSkillOutcomes: '/research/skill-outcomes',
+  eventCalendar: '/events',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
+  notifications: '/notifications',
   calculators: '/tools/calculators',
 } as const;
+
+export const REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS = {
+  stock: 'stock',
+  baseRunId: 'baseRunId',
+  targetRunId: 'targetRunId',
+} as const;
+
+export type ReportVersionCompareHrefOptions = {
+  stock?: string | null;
+  baseRunId?: number | null;
+  targetRunId?: number | null;
+};
+
+export function buildReportVersionCompareHref(
+  options: ReportVersionCompareHrefOptions = {},
+): string {
+  const searchParams = new URLSearchParams();
+  if (options.stock?.trim()) {
+    searchParams.set(REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.stock, options.stock.trim());
+  }
+  if (isPositiveRouteInteger(options.baseRunId)) {
+    searchParams.set(REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.baseRunId, String(options.baseRunId));
+  }
+  if (isPositiveRouteInteger(options.targetRunId)) {
+    searchParams.set(REPORT_VERSION_COMPARE_ROUTE_QUERY_KEYS.targetRunId, String(options.targetRunId));
+  }
+  const search = searchParams.toString();
+  return search
+    ? `${APP_ROUTE_PATHS.researchReportCompare}?${search}`
+    : APP_ROUTE_PATHS.researchReportCompare;
+}
 
 export const LEGACY_ROUTE_PATHS = {
   usage: '/usage',
@@ -57,6 +90,18 @@ export const SIGNAL_CENTER_ROUTE_QUERY_KEYS = {
   trigger: 'trigger',
   createRule: 'createRule',
   stock: 'stock',
+} as const;
+
+/** Query keys owned by the Alerts workspace embedded in Signal Center. */
+export const SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS = {
+  rulesEnabled: 'rulesEnabled',
+  rulesType: 'rulesType',
+  rulesPage: 'rulesPage',
+  triggerPage: 'triggerPage',
+  notificationPage: 'notificationPage',
+  notificationChannel: 'notificationChannel',
+  notificationSuccess: 'notificationSuccess',
+  alert: 'alert',
 } as const;
 
 export const SIGNAL_CENTER_CREATE_RULE_VALUES = {
@@ -379,4 +424,3 @@ export function buildInvestmentFrameworkSettingsHref(): string {
     view: 'investment_framework',
   });
 }
-

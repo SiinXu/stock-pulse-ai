@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Check, ChevronDown, Copy, Workflow } from 'lucide-react';
 import { historyApi } from '../../api/history';
 import { formatUiText, UI_TEXT } from '../../i18n/uiText';
@@ -22,6 +22,8 @@ import {
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
+
+const ReasoningTraceExportControls = lazy(() => import('./ReasoningTraceExportControls'));
 
 interface ReportDiagnosticsProps {
   recordId?: number;
@@ -301,6 +303,12 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
 
           {copyError ? <InlineAlert variant="danger" message={copyError} /> : null}
 
+          {recordId != null ? (
+            <Suspense fallback={false}>
+              <ReasoningTraceExportControls recordId={recordId} disabled={isLoading} />
+            </Suspense>
+          ) : null}
+
           <div>
             <span className="label-uppercase">{text.components}</span>
             <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -354,3 +362,5 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
     </Card>
   );
 };
+
+export default ReportDiagnostics;

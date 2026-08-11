@@ -10,6 +10,12 @@ StockPulse 固定使用官方 Python MCP SDK `mcp==2.0.0`，兼容线覆盖 MCP 
 
 MCP 只是既有 service 的薄适配层，`server.py`、`main.py --serve`、Web 和 Desktop 都不会自动启动它。
 
+## Web 设置页注册
+
+全部 `MCP_*` 配置键在 `src/core/config_registry_parts/mcp.py` 中显式登记到 **MCP Server** 分类（`category=mcp`），因此 Settings 页会展示正确的开关/枚举/数值控件、默认值、校验范围与敏感字段掩码（`MCP_HTTP_SESSION_TOKEN_SHA256`）。未登记时这些键会落入「其他 / uncategorized」并被渲染为无说明文本框，或在从未保存过时完全不可见。
+
+放宽 `MCP_HTTP_ALLOWED_HOSTS` / `MCP_HTTP_ALLOWED_ORIGINS` 会扩大 HTTP 攻击面；默认仅 loopback。
+
 ## 传输与生命周期
 
 | 配置值 | 标准传输 | 鉴权 | 状态边界 |

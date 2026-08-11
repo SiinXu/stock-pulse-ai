@@ -841,7 +841,32 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects WebUI login, settings access, and admin operations.'],
     notes: ['Make sure auth data is persisted in the deployment environment. Manual .env edits require a process restart or the auth settings flow to refresh state.'],
   },
+  'settings.system.SECURITY_AUDIT_RETENTION_DAYS': {
+    title: 'Security Audit Retention Days',
+    summary: 'Time window for durable privileged-operation security audit events.',
+    usage: 'Set how many days to keep security-audit-v1 rows. Retention runs on append and query; events older than the window are deleted.',
+    valueNotes: [
+      'Default is 90 days; allowed range is 1–3650.',
+      'Independent of SECURITY_AUDIT_MAX_EVENTS hard capacity.',
+      'Does not store secrets; payloads are redacted before persistence.',
+    ],
+    impact: ['Affects how long privileged auth, config, tool, plugin, MCP, analysis, and local-process audit trails remain queryable.'],
+    notes: ['See docs/security-audit.md. Archive externally before lowering retention if longer hold is required.'],
+  },
+  'settings.system.SECURITY_AUDIT_MAX_EVENTS': {
+    title: 'Security Audit Max Events',
+    summary: 'Hard row capacity for the security-audit-v1 store.',
+    usage: 'Cap the number of retained audit rows. When exceeded, oldest rows are deleted first so recent privileged decisions remain available.',
+    valueNotes: [
+      'Default is 10000; allowed range is 100–1000000.',
+      'Independent of SECURITY_AUDIT_RETENTION_DAYS time retention.',
+      'Capacity enforcement runs after each successful append.',
+    ],
+    impact: ['Bounds audit storage growth and may delete older events under high privileged-operation volume.'],
+    notes: ['See docs/security-audit.md. Raise capacity or export before long high-volume runs if older rows must be kept.'],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
+
     title: 'Trust X-Forwarded-For',
     summary: 'Uses X-Forwarded-For for client IP detection behind a trusted reverse proxy.',
     usage: 'Set true only behind one trusted reverse proxy. Keep false for direct public access.',
@@ -882,6 +907,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Uses market calendars for A-share, HK, US, and other supported markets.'],
     impact: ['Affects scheduled jobs, CLI runs, and GitHub Actions manual runs on holidays; the Web/API market-review button submits directly.'],
     notes: ['Disabling it can produce reports with missing realtime quotes on closed markets.'],
+  },
+  'settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND': {
+    title: 'Plugin Data Provider Auto-Bind',
+    summary: 'Opt-in composition-root binding of PluginManager to the process data-manager plugin registry.',
+    usage: 'Keep PLUGIN_DATA_PROVIDER_AUTO_BIND=false for manual manager behavior. Enable only when registered plugin data providers should route through the default ApplicationServices composition root.',
+    valueNotes: [
+      'Default is off.',
+      'When enabled, incompatible binding fails closed at startup instead of silently falling back.',
+      'A process restart is required after changing this flag.',
+    ],
+    impact: ['Affects whether plugin-registered market-data providers are auto-wired into the stock service and primary analysis pipeline.'],
+    notes: ['See docs/plugin-extension-contract.md and docs/plugin-development-guide.md.'],
+    examples: [
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=false',
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=true',
+    ],
   },
   'settings.system.scorecard': {
     title: 'Public signal scorecard',
@@ -1316,6 +1357,46 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects Agent confidence calibration and long-term analysis quality.'],
     notes: ['Works best when combined with the backtest feature.'],
   },
+  'settings.agent.AGENT_PLANNING_ENABLED': {
+    title: 'Agent Planning Loop',
+    summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',
+  },
+  'settings.agent.AGENT_PLANNING_STRATEGY': {
+    title: 'Agent Planning Strategy',
+    summary: 'Selects the deterministic template planner or the bounded LLM proposal planner.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_PLAN_STEPS': {
+    title: 'Planning Max Plan Steps',
+    summary: 'Caps the number of steps in each accepted plan proposal.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_REPLANS': {
+    title: 'Planning Proposal Retries',
+    summary: 'Caps retries after proposal generation or validation fails.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOKENS': {
+    title: 'Planning Proposal Token Budget',
+    summary: 'Caps planner tokens across an LLM proposal and its retries.',
+  },
+  'settings.agent.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS': {
+    title: 'Planning Proposal Timeout',
+    summary: 'Caps wall-clock time for the proposal phase.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS': {
+    title: 'Planning Max Tool Calls',
+    summary: 'Caps total tool dispatches across the plan execution and observation replans.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_OBSERVATION_REPLANS': {
+    title: 'Planning Observation Replans',
+    summary: 'Caps replans triggered by failed tool-step observations.',
+  },
+  'settings.agent.AGENT_PLANNING_EXEC_TIMEOUT_SECONDS': {
+    title: 'Planning Execution Timeout',
+    summary: 'Caps wall-clock time for the full plan execution loop.',
+  },
+  'settings.agent.AGENT_PLANNING_ON_STEP_FAILURE': {
+    title: 'Planning Step Failure Policy',
+    summary: 'Chooses whether a failed plan step replans within budget or terminates immediately.',
+  },
   'settings.agent.AGENT_SKILL_AUTOWEIGHT': {
     title: 'Auto-Weight Strategies',
     summary: 'Automatically weights strategy opinions by their historical backtest performance.',
@@ -1345,6 +1426,53 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'This feature does not process provider traces, thinking blocks, tool calls, or tool results, and does not change same-turn tool passthrough.',
       'It only affects visible ask-stock history compression; it does not change LLM provider, model, Base URL, save cleanup, or runtime priority semantics.',
     ],
+  },
+  'settings.agent.runtime_guards': {
+    title: 'Agent Runtime Guards',
+    summary: 'Low-sensitivity tool-loop and stage-failure guards for Agent execution.',
+    usage: 'AGENT_TOOL_TIMEOUT_S limits one tool call; AGENT_MAX_IDENTICAL_TOOL_CALLS and AGENT_MAX_STAGE_ENTRIES stop runaway loops; AGENT_STAGE_FAILURE_POLICY chooses isolate vs fail_fast for ordinary stages.',
+    valueNotes: [
+      'Default tool timeout is 120 seconds; set identical-call or stage-entry guards to 0 to disable that guard.',
+      'isolate degrades non-critical stages; fail_fast stops the ordinary pipeline on stage failure.',
+      'Bounded Critic whitelist retry uses a separate one-shot budget and always fail-softs into Decision.',
+    ],
+    impact: ['Affects Agent tool loops, stage re-entry, and pipeline failure behavior without changing public SSE/API contracts.'],
+    notes: ['See the full guide Agent configuration section for the three-layer timeout model.'],
+  },
+  'settings.agent.stage_timeouts': {
+    title: 'Agent Stage Timeouts',
+    summary: 'Optional per-stage timeout budgets for multi-agent pipeline stages.',
+    usage: 'Leave each stage timeout at 0 to follow AGENT_ORCHESTRATOR_TIMEOUT_S only. Set a positive value to cap that stage independently.',
+    valueNotes: [
+      'When multiple budgets apply, the shortest remaining budget wins.',
+      'Late stage state after timeout is fenced and cannot commit into later stages.',
+    ],
+    impact: ['Affects multi-agent stage duration and degradation when a stage overruns.'],
+    notes: ['Does not forcibly kill native threads; only accepts completed stages before the limit.'],
+  },
+  'settings.agent.decision_memory': {
+    title: 'Decision Memory',
+    summary: 'Inject recent evaluated decision outcomes into stock analysis for reflection.',
+    usage: 'DECISION_MEMORY_ENABLED is the global toggle (default on). LOOKBACK, MIN_AGE_DAYS, and MIN_SAMPLES control how many aged outcomes participate.',
+    valueNotes: [
+      'Per-request use_memory can override the global toggle.',
+      'Min age keeps outcomes from being reflected before they exist.',
+      'Min samples suppress noisy hit-rate buckets.',
+    ],
+    impact: ['Affects whether analysis prompts include historical decision reflection context.'],
+    notes: ['See docs/decision-signals.md for the decision-signal lifecycle.'],
+  },
+  'settings.agent.reasoning_trace_export': {
+    title: 'Reasoning Trace Export',
+    summary: 'Opt-in export of redacted reasoning-trace-v1 packages from recorded diagnostics.',
+    usage: 'Keep REASONING_TRACE_EXPORT_ENABLED=false unless operators need the export API. REASONING_TRACE_EXPORT_MAX_CHARS sets the complete-response character budget (10000–2000000).',
+    valueNotes: [
+      'Default is off.',
+      'Exports redact credentials and local paths but remain sensitive operator data.',
+      'The service does not store export files; operators must delete downloaded copies separately.',
+    ],
+    impact: ['Gates GET /api/v1/reasoning-trace/{record_id} and related export service behavior.'],
+    notes: ['See docs/reasoning-trace-export_EN.md for the contract and rollback steps.'],
   },
   'settings.agent.observability': {
     title: 'Agent Observability',
@@ -1510,6 +1638,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects model information visibility in notification reports.'],
     notes: ['Enable temporarily when diagnosing model switching issues.'],
   },
+  'settings.report.NOTIFICATION_DELTA_FIRST': {
+    title: 'Delta First',
+    summary: 'Off by default. Shows changes before the full report without model calls; errors keep the report.',
+  },
   'settings.report.REPORT_TEMPLATES_DIR': {
     title: 'Report Templates Directory',
     summary: 'Directory for Jinja2 report templates.',
@@ -1517,6 +1649,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['REPORT_RENDERER_ENABLED must also be on for templates to take effect.'],
     impact: ['Affects the template source used for report rendering.'],
     notes: ['Custom templates must follow Jinja2 syntax and include required variable placeholders.'],
+  },
+  'settings.report.REPORT_MODE': {
+    title: 'Report Mode',
+    summary: 'Presentation depth for Jinja stock reports when the report renderer is enabled.',
+    usage: 'Choose brief, standard (default), or research. Options come from the runtime report-mode contract. Per-request override: extra_context.report_mode.',
+    valueNotes: [
+      'brief keeps Decision Card plus key risk.',
+      'standard is Decision Card plus main analysis sections.',
+      'research expands detail and strata limits.',
+      'Hard limits never drop the Decision Card block.',
+    ],
+    impact: ['Affects which report sections render and how aggressively content is truncated.'],
+    notes: [
+      'Only takes effect when REPORT_RENDERER_ENABLED=true.',
+      'The hard-coded notification fallback path is unchanged when the renderer is off.',
+    ],
   },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: 'Report Rendering Engine',
@@ -1670,14 +1818,119 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.system.daily_brief': {
     title: 'Daily Brief',
     summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
-    usage: 'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown.',
+    usage:
+      'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown. DAILY_BRIEF_NOTIFY controls channel push after a successful brief. DAILY_BRIEF_PERSIST_HISTORY keeps review history. DAILY_BRIEF_SAVE_REPORT_FILE writes a report file under the report directory.',
     valueNotes: [
       'Default off keeps existing schedules unchanged.',
       'Accuracy review is informational and does not auto-trade.',
+      'Notify/persist/save-file defaults are true once the brief itself is enabled.',
     ],
-    impact: ['Affects scheduled brief generation and accuracy review panels.'],
+    impact: ['Affects scheduled brief generation, push, history, and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
   },
+  'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
+    title: 'Admin Session Max Age (Hours)',
+    summary: 'Maximum lifetime of an authenticated admin web session.',
+    usage: 'Set an integer between 1 and 720 hours. Default is 24. Existing sessions may keep the previous TTL until re-login.',
+    impact: ['Affects how long Settings and admin APIs stay authenticated without re-login.'],
+    notes: ['A process restart is recommended after changing session policy.'],
+  },
+  'settings.system.OUTBOUND_HTTP_ALLOWLIST': {
+    title: 'Outbound HTTP Allowlist',
+    summary: 'Exact host:port entries that fail-closed outbound HTTP may reach for private or loopback targets.',
+    usage: 'Comma-separated host:port list (for example 127.0.0.1:8642,searxng.internal:8080). Public internet hosts do not need entries.',
+    valueNotes: [
+      'Misconfiguration can block local Ollama, Hermes, private SearXNG, or plugin endpoints.',
+      'Loopback Ollama has a separate exemption path in some call sites; prefer an explicit allowlist when unsure.',
+    ],
+    impact: ['Affects every fail-closed outbound fetch that targets private or loopback hosts.'],
+    notes: ['Restart recommended so long-lived clients reload policy.'],
+  },
+  'settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP': {
+    title: 'Allow Trusted Proxy Fake-IP',
+    summary: 'Allows standard Clash/Mihomo Fake-IP answers for public hostnames on a trusted workstation.',
+    usage: 'Keep disabled by default. Enable only when a trusted Clash/Mihomo TUN owns the documented Fake-IP ranges and the configured proxy is loopback-only.',
+    valueNotes: [
+      'Literal Fake-IP URLs, private names, metadata, link-local, and non-loopback proxy targets remain blocked.',
+      'Local Only Mode takes precedence and continues to block every non-loopback target.',
+    ],
+    impact: ['Expands outbound DNS acceptance only for standard Fake-IP ranges and the exact configured loopback proxy.'],
+    notes: ['Disable immediately when the TUN or loopback proxy is no longer trusted.'],
+  },
+  'settings.system.SMARTMONEY_ENABLED': {
+    title: 'SmartMoney Money-Flow Enabled',
+    summary: 'Default-off gate for SmartMoney money-flow tracking and optional analysis-context injection.',
+    usage: 'Enable only when you accept the extra network calls and calibration metadata path.',
+    impact: ['Affects SmartMoney services and optional analysis context fields.'],
+    notes: ['Disabled runs keep the context shape stable without fabricating flow data.'],
+  },
+  'settings.system.fundamental_pipeline': {
+    title: 'Fundamental Pipeline',
+    summary: 'Master switch, timeouts, retries, and cache bounds for fundamental enrichment.',
+    usage:
+      'ENABLE_FUNDAMENTAL_PIPELINE toggles the stage. FUNDAMENTAL_STAGE_TIMEOUT_SECONDS budgets the whole stage. FUNDAMENTAL_FETCH_TIMEOUT_SECONDS limits each provider fetch. FUNDAMENTAL_RETRY_MAX, FUNDAMENTAL_CACHE_TTL_SECONDS, and FUNDAMENTAL_CACHE_MAX_ENTRIES control retry and in-process cache.',
+    valueNotes: [
+      'Default stage/fetch timeouts are 8 seconds; retry default is 1; cache default is 120s / 256 entries.',
+      'Disabling the pipeline skips fundamental enrichment without failing the rest of analysis.',
+    ],
+    impact: ['Affects fundamental blocks in analysis and related agent tools.'],
+  },
+  'settings.system.PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS': {
+    title: 'Portfolio Idempotency Replay Window (Days)',
+    summary: 'How long a portfolio mutation idempotency key remains eligible for safe replay.',
+    usage: 'Integer days from 1 to 3650. Default 7.',
+    impact: ['Affects safe retry of portfolio write APIs after client retries or reconnects.'],
+  },
+  'settings.system.portfolio_risk': {
+    title: 'Portfolio Risk Thresholds',
+    summary: 'Alert thresholds and lookback window for portfolio risk diagnostics.',
+    usage:
+      'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT, PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT, and PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT are percentages. PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO is a fraction of the stop-loss threshold (0–1). PORTFOLIO_RISK_LOOKBACK_DAYS sets the trading-day lookback (default 180).',
+    impact: ['Affects portfolio risk alerts and agent risk snapshots.'],
+  },
+  'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
+    title: 'Portfolio FX Update Enabled',
+    summary: 'Whether portfolio valuation may refresh FX rates for multi-currency holdings.',
+    usage: 'Default true. Disable only when you want valuation to reuse previously stored FX without network refresh.',
+    impact: ['Affects multi-currency portfolio valuation freshness.'],
+  },
+  'settings.system.news_intel': {
+    title: 'Local News Intelligence Pool',
+    summary: 'Retention, timeouts, and auto-fetch controls for the local intelligence pool (NEWS_INTEL_* / NewsNow).',
+    usage:
+      'NEWS_INTEL_RETENTION_DAYS (1–365), NEWS_INTEL_FETCH_TIMEOUT_SEC (1–30), NEWS_INTEL_MAX_ITEMS_PER_SOURCE (1–200), NEWS_INTEL_AUTO_FETCH_ENABLED (default false), and NEWSNOW_BASE_URL configure the pool. Private NewsNow hosts also need OUTBOUND_HTTP_ALLOWLIST.',
+    valueNotes: [
+      'Auto-fetch is opt-in and may also require workflow env-allowlist mapping in GitHub Actions.',
+      'This pool is separate from SearXNG / RSS search-pipeline sources.',
+    ],
+    impact: ['Affects intelligence pool freshness, storage, and scheduled pulls.'],
+  },
+  'settings.ai_model.LLM_TIMEOUT_SEC': {
+    title: 'LLM Request Timeout (Seconds)',
+    summary: 'Per-request LLM timeout reused by AlphaSift stock-selection reordering.',
+    usage: 'Default 60. After timeout AlphaSift falls back to non-LLM ranking instead of retrying blindly.',
+    impact: ['Affects AlphaSift LLM reordering latency and degradation path.'],
+  },
+  'settings.ai_model.LLM_MAX_TOKENS': {
+    title: 'LLM Max Output Tokens',
+    summary: 'Output token cap for AlphaSift LLM reordering requests.',
+    usage: 'Default 2048. Does not replace per-provider max-token keys used by main analysis channels.',
+    impact: ['Affects AlphaSift reordering output length only.'],
+  },
+  'settings.notification.FAILURE_NOTIFY_ENABLED': {
+    title: 'Failure Notify Enabled',
+    summary: 'Controls daily-run failure notifications.',
+    usage:
+      'Leave empty (auto) to notify only when NOTIFICATION_SYSTEM_ERROR_CHANNELS is configured. Set true to force on, false to force off.',
+    impact: ['Affects whether failed daily/Actions runs attempt failure push notifications.'],
+  },
+  'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
+    title: 'Paper Portfolio Initial Cash',
+    summary: 'Starting cash for a newly created paper portfolio.',
+    usage: 'Non-negative number. Default 1000000. Fees and slippage are ignored in the MVP paper engine.',
+    impact: ['Affects only newly created paper portfolios; existing portfolios keep their cash balance.'],
+  },
+
   'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
     title: 'Portfolio Stress Scenario Catalog',
     summary: 'Optional bounded YAML catalog for deterministic portfolio stress scenarios.',
@@ -1783,6 +2036,217 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Changing these values changes the configuration hash and requires an explicit health refresh.'],
   },
 
+
+  'settings.mcp.MCP_SERVER_ENABLED': {
+    title: 'Enable MCP Server',
+    summary: 'Master switch for the optional MCP process. Default off; the main API/Web process never starts MCP automatically.',
+    usage: 'Set true only when you intentionally start `python -m src.mcp_server`. Requires a process restart of the MCP process.',
+    valueNotes: [
+      'false keeps the external tool surface closed.',
+      'true alone is not enough without scopes and transport-specific security settings.',
+    ],
+    impact: [
+      'Controls whether the dedicated MCP process is allowed to start.',
+    ],
+    notes: [
+      'HTTP transport is a security-sensitive external surface.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_TRANSPORT': {
+    title: 'MCP Transport',
+    summary: 'Official SDK transport: stdio (local process) or streamable-http.',
+    usage: 'Prefer stdio for local operators. Use streamable-http only with admin auth, scopes, and a session token digest.',
+    valueNotes: [
+      'stdio is the default local boundary.',
+      'http is accepted as a runtime alias of streamable-http.',
+    ],
+    impact: [
+      'Chooses how MCP clients connect and which security controls apply.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_HOST': {
+    title: 'MCP Bind Host',
+    summary: 'Bind host for streamable-http. Prefer loopback.',
+    usage: 'Keep 127.0.0.1/localhost unless you have trusted network controls.',
+    valueNotes: [
+      'Binding beyond loopback expands the attack surface.',
+    ],
+    impact: [
+      'Affects where the MCP HTTP listener accepts connections.',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_PORT': {
+    title: 'MCP Bind Port',
+    summary: 'TCP port for streamable-http (1–65535).',
+    usage: 'Default 8765. Change if the port is already in use.',
+    impact: [
+      'Affects the MCP HTTP listen address.',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_PRINCIPAL': {
+    title: 'MCP stdio Principal',
+    summary: 'Stable principal name for stdio audit and rate limits.',
+    usage: 'Use a short stable identifier matching the supported character pattern.',
+    impact: [
+      'Labels stdio tool calls in logs and limiters.',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_SCOPES': {
+    title: 'MCP stdio Scopes',
+    summary: 'Comma-separated least-privilege scopes for stdio.',
+    usage: 'Required when enabled with transport=stdio. Allowed: market.read, history.read, portfolio.read, analysis.trigger.',
+    valueNotes: [
+      'Grant only scopes the local operator needs.',
+    ],
+    impact: [
+      'Limits which MCP tools stdio clients can call.',
+    ],
+    notes: [
+      'Widening scopes increases callable capabilities.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SCOPES': {
+    title: 'MCP HTTP Scopes',
+    summary: 'Comma-separated least-privilege scopes for streamable-http.',
+    usage: 'Required when HTTP transport is enabled. Same allowed scope set as stdio.',
+    impact: [
+      'Limits which MCP tools HTTP clients can call.',
+    ],
+    notes: [
+      'Keep scopes minimal for remote-capable transports.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SESSION_TOKEN_SHA256': {
+    title: 'MCP HTTP Session Token SHA-256',
+    summary: 'SHA-256 hex digest of the single accepted admin session token.',
+    usage: 'Required for streamable-http. Store only the digest, never the raw bearer token.',
+    valueNotes: [
+      'Must be 64 hex characters or empty when unused.',
+      'Settings masks this sensitive field.',
+    ],
+    impact: [
+      'Audience-pins the accepted admin session for HTTP MCP.',
+    ],
+    notes: [
+      'Rotate the digest if a bearer token may have leaked.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_RESOURCE': {
+    title: 'MCP HTTP Resource URL',
+    summary: 'Absolute http(s) audience/resource URL for streamable-http.',
+    usage: 'Default is http://127.0.0.1:8765/mcp. Keep it aligned with the public MCP endpoint clients use.',
+    impact: [
+      'Affects resource/audience binding for HTTP MCP.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_HOSTS': {
+    title: 'MCP HTTP Allowed Hosts',
+    summary: 'Comma-separated Host header allowlist for streamable-http.',
+    usage: 'Default is loopback only. Wildcard ports use the official SDK :* form.',
+    valueNotes: [
+      'Widening this list (for example * or a public hostname) increases host-header and cross-site risk.',
+    ],
+    impact: [
+      'Controls which Host values HTTP MCP accepts.',
+    ],
+    notes: [
+      'Treat expansion as a security decision, not convenience.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_ORIGINS': {
+    title: 'MCP HTTP Allowed Origins',
+    summary: 'Comma-separated Origin allowlist for browser clients.',
+    usage: 'Default is loopback HTTP origins only.',
+    valueNotes: [
+      'Expanding origins (especially * or untrusted sites) enables cross-origin browser access to MCP tools.',
+    ],
+    impact: [
+      'Controls browser CORS/Origin acceptance for HTTP MCP.',
+    ],
+    notes: [
+      'Keep the list minimal.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_BODY_BYTES': {
+    title: 'MCP HTTP Max Body Bytes',
+    summary: 'Maximum JSON body size accepted by streamable-http.',
+    usage: 'Default 1000000. Raise only if legitimate tool payloads need more room.',
+    impact: [
+      'Bounds request body memory use.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_HEADER_BYTES': {
+    title: 'MCP HTTP Max Header Bytes',
+    summary: 'Maximum incomplete header block size for streamable-http.',
+    usage: 'Default 32768. Keep unless you have a measured need.',
+    impact: [
+      'Bounds header buffer size.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_CONNECTIONS': {
+    title: 'MCP HTTP Max Connections',
+    summary: 'Maximum concurrent streamable-http connections.',
+    usage: 'Default 32. Lower on small hosts; raise carefully under load tests.',
+    impact: [
+      'Limits concurrent HTTP MCP clients.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_BACKLOG': {
+    title: 'MCP HTTP Listen Backlog',
+    summary: 'OS listen backlog for the streamable-http acceptor.',
+    usage: 'Default 16. Rarely needs changes outside capacity tuning.',
+    impact: [
+      'Affects pending connection queue depth.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_READ_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Read Timeout',
+    summary: 'Per-body-chunk read timeout for streamable-http (seconds).',
+    usage: 'Default 10. Range 1–120.',
+    impact: [
+      'Controls how long slow clients may hold body reads.',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Keep-Alive Timeout',
+    summary: 'Keep-alive idle timeout for streamable-http connections (seconds).',
+    usage: 'Default 5. Range 1–120.',
+    impact: [
+      'Controls idle connection retention.',
+    ],
+  },
+  'settings.mcp.MCP_MAX_CONCURRENT_TOOLS': {
+    title: 'MCP Max Concurrent Tools',
+    summary: 'Maximum concurrent tool workers for one MCP process.',
+    usage: 'Default 8. Range 1–128.',
+    impact: [
+      'Bounds concurrent tool execution cost.',
+    ],
+  },
+  'settings.mcp.MCP_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP Tool Rate Limit',
+    summary: 'Per-principal/tool call rate limit per minute.',
+    usage: 'Default 60. Range 1–10000.',
+    impact: [
+      'Limits general tool spam.',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP Analysis Rate Limit',
+    summary: 'Rate limit for analysis.trigger invocations per minute.',
+    usage: 'Default 2. Keep low to bound LLM/data cost.',
+    impact: [
+      'Protects analysis cost budget.',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_MAX_STOCKS': {
+    title: 'MCP Analysis Max Symbols',
+    summary: 'Maximum symbols accepted in one analysis.trigger call.',
+    usage: 'Default 5. Range 1–50.',
+    impact: [
+      'Bounds per-call analysis cost.',
+    ],
+  },
 };
 
 export default settingsHelpEnUS;

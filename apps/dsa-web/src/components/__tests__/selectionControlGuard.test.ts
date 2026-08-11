@@ -28,6 +28,9 @@ function isProductionSource(filename: string): boolean {
   return !filename.includes('/__tests__/')
     && !filename.includes('/fixtures/')
     && !filename.includes('/generated/')
+    // Pure locale catalogs are data-only and dominate AST cost after Settings
+    // inventory growth; they cannot declare SelectionChip components.
+    && !filename.includes('/i18n/translations/')
     && !/\.(?:test|spec)\.[jt]sx?$/.test(filename);
 }
 
@@ -158,5 +161,5 @@ describe('SelectionChip production guard', () => {
     expect(markers).toEqual([
       expect.objectContaining({ file: SELECTION_CHIP_OWNER, token: 'selection-chip' }),
     ]);
-  });
+  }, 20_000);
 });

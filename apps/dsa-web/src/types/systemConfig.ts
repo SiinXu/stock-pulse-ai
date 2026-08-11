@@ -6,6 +6,8 @@ export type SystemConfigCategory =
   | 'system'
   | 'agent'
   | 'backtest'
+  | 'indicators'
+  | 'mcp'
   | 'uncategorized';
 
 export type SystemConfigDataType =
@@ -115,6 +117,8 @@ export interface SystemConfigSchemaResponse {
 export interface SystemConfigItem {
   key: string;
   value: string;
+  /** Saved server value retained by the Web while `value` may contain an unsaved draft. */
+  persistedValue?: string;
   rawValueExists: boolean;
   isMasked: boolean;
   schema?: SystemConfigFieldSchema;
@@ -431,6 +435,7 @@ export interface TestLLMChannelRequest {
   baseUrl?: string;
   apiKey?: string;
   models: string[];
+  modelIdMode?: 'route' | 'literal';
   enabled?: boolean;
   timeoutSeconds?: number;
   capabilityChecks?: LLMCapabilityCheck[];

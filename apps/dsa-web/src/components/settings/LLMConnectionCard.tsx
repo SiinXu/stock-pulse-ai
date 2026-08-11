@@ -16,6 +16,7 @@ import {
   type ChannelTestState,
   type TaskModelReference,
 } from './llmChannelEditorModel';
+import { resolveModelSourceAvailability } from './modelSourceAvailability';
 
 interface ConnectionCardProps {
   channel: ChannelConfig;
@@ -77,9 +78,33 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
   );
   const isComplete = issues.length === 0;
   const actionName = channel.displayName.trim() || channel.name;
+  const availability = resolveModelSourceAvailability({
+    enabled: channel.enabled,
+    hasModels: selectedModels.length > 0,
+    issueCount: issues.length,
+    testState,
+  });
+  const availabilityBadge = (() => {
+    switch (availability) {
+      case 'available':
+        return <Badge variant="success" data-testid={`source-availability-${channel.name}`}>{text.available}</Badge>;
+      case 'unavailable':
+        return <Badge variant="danger" data-testid={`source-availability-${channel.name}`}>{text.unavailable}</Badge>;
+      case 'testing':
+        return <Badge variant="warning" data-testid={`source-availability-${channel.name}`}>{text.testing}</Badge>;
+      case 'incomplete':
+        return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.untested}</Badge>;
+      case 'disabled':
+        return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.untested}</Badge>;
+      case 'untested':
+      default:
+        return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.untested}</Badge>;
+    }
+  })();
   return (
     <div
       data-testid={`connection-card-${channel.name}`}
+      data-source-availability={availability}
       className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-3 shadow-soft-card transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)]"
     >
       <div className="flex items-start gap-3">
@@ -105,15 +130,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             <Badge variant={channel.enabled ? 'success' : 'default'}>
               {channel.enabled ? text.enabled : text.disabled}
             </Badge>
-            {testState?.status === 'success' ? (
-              <Badge variant="success">{text.testPassed}</Badge>
-            ) : testState?.status === 'error' ? (
-              <Badge variant="danger">{text.testFailed}</Badge>
-            ) : testState?.status === 'loading' ? (
-              <Badge variant="warning">{text.testing}</Badge>
-            ) : (
-              <Badge variant="default">{text.untested}</Badge>
-            )}
+            {availabilityBadge}
           </div>
           {selectedModels.length > 0 ? (
             <button

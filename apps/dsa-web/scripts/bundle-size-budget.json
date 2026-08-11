@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-10",
-  "baselineNote": "Post-merge of Model Access local-runtime/CLI status (PR #1031 / Refs #865) onto main including #952/#1036 registry help inventory. Locales retain 200B headroom; IntelligenceSourcesPanel uses 10% headroom after remeasure.",
+  "measuredAt": "2026-08-11",
+  "baselineNote": "Integration rebuild on current main. Changed chunks use the GitHub Actions Linux gzip measurement from PR #1050 plus 200 B headroom; untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 237240,
-      "measuredGzipBytes": 215672,
-      "note": "Rebaselined after Model Access local-runtime/CLI status on post-#1036 main (PR #1031 / Refs #865); 10% headroom."
+      "maxGzipBytes": 233722,
+      "measuredGzipBytes": 233522,
+      "note": "GitHub Actions Linux measurement after the integrated Settings changes in PR #1050; measured 233522 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 137731,
-      "measuredGzipBytes": 137531,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 152369,
+      "measuredGzipBytes": 152169,
+      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 152169 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 132128,
-      "measuredGzipBytes": 131928,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 146022,
+      "measuredGzipBytes": 145822,
+      "note": "Remeasured after the integration rebuild translation additions; measured 145822 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 131717,
-      "measuredGzipBytes": 131517,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 145723,
+      "measuredGzipBytes": 145523,
+      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 145523 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 132276,
-      "measuredGzipBytes": 132076,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 145994,
+      "measuredGzipBytes": 145794,
+      "note": "Remeasured after the integration rebuild translation additions; measured 145794 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 128196,
-      "measuredGzipBytes": 127996,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 141744,
+      "measuredGzipBytes": 141544,
+      "note": "Remeasured after the integration rebuild translation additions; measured 141544 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 124949,
-      "measuredGzipBytes": 124749,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 138341,
+      "measuredGzipBytes": 138141,
+      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 138141 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 118716,
-      "measuredGzipBytes": 118516,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 131717,
+      "measuredGzipBytes": 131517,
+      "note": "Remeasured after the integration rebuild translation additions; measured 131517 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 118855,
-      "measuredGzipBytes": 118655,
-      "note": "Tight rebaseline for Model Access hub status copy on post-#1036 main (PR #1031 / Refs #865); 200B headroom."
+      "maxGzipBytes": 131772,
+      "measuredGzipBytes": 131572,
+      "note": "Remeasured after the integration rebuild translation additions; measured 131572 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -125,15 +125,16 @@
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
-      "maxGzipBytes": 74967,
-      "measuredGzipBytes": 68151
+      "maxGzipBytes": 73318,
+      "measuredGzipBytes": 73118,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57282,
-      "measuredGzipBytes": 57082,
-      "note": "Rebaselined after data-source Settings registry help inventory on post-#952 main (Refs #1023); retains 200 bytes of headroom."
+      "maxGzipBytes": 57276,
+      "measuredGzipBytes": 57076,
+      "note": "Rebaselined after adding the reasoning-trace export controls Playground story (PR #1040); measured 57076 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",
@@ -148,10 +149,18 @@
       "measuredGzipBytes": 42365
     },
     {
+      "id": "PortfolioRiskMetricsPanel",
+      "match": "assets/PortfolioRiskMetricsPanel-*.js",
+      "maxGzipBytes": 10654,
+      "measuredGzipBytes": 9685,
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
+    },
+    {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 25543,
-      "measuredGzipBytes": 23220
+      "maxGzipBytes": 26363,
+      "measuredGzipBytes": 26163,
+      "note": "GitHub Actions Linux measurement after the integrated portfolio flow; measured 26163 B + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",

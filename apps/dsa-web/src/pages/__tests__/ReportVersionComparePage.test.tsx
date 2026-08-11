@@ -9,7 +9,10 @@ import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
 } from '../../contexts/routeFocusContext';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  buildReportVersionCompareHref,
+} from '../../routing/routes';
 import ReportVersionComparePage from '../ReportVersionComparePage';
 
 vi.mock('../../api/reportVersionCompare', () => ({
@@ -24,11 +27,11 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   return () => {};
 });
 
-function renderPage() {
+function renderPage(initialEntry: string = APP_ROUTE_PATHS.researchReportCompare) {
   return render(
     <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
       <UiLanguageProvider initialLanguage="en">
-        <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchReportCompare]}>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <ReportVersionComparePage />
         </MemoryRouter>
       </UiLanguageProvider>
@@ -195,6 +198,38 @@ describe('ReportVersionComparePage', () => {
       'major',
     );
     expect(screen.getByTestId('report-version-compare-status-engine_pending')).toBeInTheDocument();
+  });
+
+  it('loads and compares route-prefilled history runs', async () => {
+    vi.mocked(reportVersionCompareApi.listRuns).mockResolvedValue({
+      stockCode: '600519',
+      total: 2,
+      page: 1,
+      limit: 50,
+      items: runs,
+    });
+    vi.mocked(reportVersionCompareApi.compare).mockResolvedValue(compareResult);
+
+    renderPage(buildReportVersionCompareHref({
+      stock: '600519',
+      baseRunId: 1,
+      targetRunId: 2,
+    }));
+
+    await waitFor(() => {
+      expect(reportVersionCompareApi.listRuns).toHaveBeenCalledWith({
+        stockCode: '600519',
+        page: 1,
+        limit: 50,
+      });
+    });
+    await screen.findByTestId('report-version-compare-result');
+    expect(screen.getByTestId('report-version-compare-stock-input')).toHaveValue('600519');
+    expect(reportVersionCompareApi.compare).toHaveBeenCalledWith({
+      stockCode: '600519',
+      baseRunId: '1',
+      targetRunId: '2',
+    });
   });
 
   it('retries the failed compare with the same inputs without reloading runs', async () => {
