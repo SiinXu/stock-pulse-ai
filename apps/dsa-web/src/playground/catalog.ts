@@ -135,7 +135,6 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alert-trigger-history', 'AlertTriggerHistory', 'components/alerts/AlertTriggerHistory.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alerts-workspace', 'AlertsWorkspace', 'components/alerts/AlertsWorkspace.tsx', ['default'], 'full'),
-
   entry('history', 'history-list', 'HistoryList', 'components/history/HistoryList.tsx', ['default', 'loading', 'empty']),
   entry('history', 'history-list-item', 'HistoryListItem', 'components/history/HistoryListItem.tsx', ['default', 'states']),
   entry('history', 'stock-bar', 'StockBar', 'components/history/StockBar.tsx', ['default', 'loading', 'empty']),
@@ -161,6 +160,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'analysis-context-summary', 'AnalysisContextSummary', 'components/report/AnalysisContextSummary.tsx', ['default', 'empty']),
   entry('reports', 'market-review-report-view', 'MarketReviewReportView', 'components/report/MarketReviewReportView.tsx', ['default', 'loading', 'error']),
   entry('reports', 'market-structure-card', 'MarketStructureCard', 'components/report/MarketStructureCard.tsx', ['default', 'empty']),
+  entry('reports', 'reasoning-trace-export-controls', 'ReasoningTraceExportControls', 'components/report/ReasoningTraceExportControls.tsx', ['default', 'states']),
   entry('reports', 'report-decision-card', 'ReportDecisionCard', 'components/report/ReportDecisionCard.tsx', ['default', 'empty']),
   entry('reports', 'report-risk-gate-banner', 'ReportRiskGateBanner', 'components/report/ReportRiskGateBanner.tsx', ['default', 'empty']),
   entry('reports', 'report-details', 'ReportDetails', 'components/report/ReportDetails.tsx', ['interactive', 'empty']),

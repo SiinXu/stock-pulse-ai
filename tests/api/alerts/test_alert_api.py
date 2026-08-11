@@ -946,6 +946,116 @@ class AlertApiTestCase(unittest.TestCase):
         self.assertEqual(item["market_phase_summary"]["phase"], "postmarket")
         self.assertEqual(item["analysis_context_pack_overview"]["data_quality"]["level"], "good")
 
+    def test_corporate_trigger_query_filters_server_side_and_uses_stable_cursor(self) -> None:
+        corporate_rule = self._create_rule({
+            "name": "Corporate events",
+            "target": "AAPL",
+            "alert_type": "corporate_event",
+            "parameters": {
+                "event_categories": ["earnings", "regulatory"],
+                "lookback_hours": 48,
+                "min_items": 2,
+            },
+            "severity": "critical",
+        })
+        price_rule = self._create_rule()
+        base_time = datetime(2026, 8, 10, 9, 0)
+        diagnostics = json.dumps({
+            "impact_context": {
+                "what_happened": "Quarterly results were published",
+                "why_it_matters": "Guidance changed",
+                "event_category": "earnings",
+                "affected": {
+                    "symbol": "AAPL",
+                    "in_watchlist": True,
+                    "account_id": 77,
+                    "quantity": 900,
+                },
+                "matched_items": [{"provider_payload": "private"}],
+            },
+        })
+        with self.db.get_session() as session:
+            session.add_all([
+                AlertTriggerRecord(
+                    rule_id=price_rule["id"],
+                    target=f"NOISE{index:03d}",
+                    reason="price noise",
+                    data_source="realtime_quote",
+                    triggered_at=base_time + timedelta(minutes=100 + index),
+                    status="triggered",
+                )
+                for index in range(60)
+            ])
+            session.add_all([
+                AlertTriggerRecord(
+                    rule_id=corporate_rule["id"],
+                    target="AAPL",
+                    reason=f"corporate event {index}",
+                    data_source="intelligence_items",
+                    triggered_at=base_time + timedelta(minutes=index),
+                    status="triggered",
+                    diagnostics=diagnostics,
+                )
+                for index in range(3)
+            ])
+            session.commit()
+
+        first = self.client.get(
+            "/api/v1/alerts/triggers",
+            params={"alert_type": "corporate_event", "status": "triggered", "page_size": 2},
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        first_payload = first.json()
+        self.assertEqual(first_payload["total"], 3)
+        self.assertEqual([item["reason"] for item in first_payload["items"]], ["corporate event 2", "corporate event 1"])
+        self.assertTrue(first_payload["next_cursor"])
+        item = first_payload["items"][0]
+        self.assertEqual(item["alert_type"], "corporate_event")
+        self.assertEqual(item["impact_result"], {
+            "grade": "major",
+            "severity": "critical",
+            "provenance": "rule_severity",
+        })
+        self.assertEqual(item["impact_context"]["affected"], {
+            "symbol": "AAPL",
+            "in_watchlist": True,
+            "in_portfolio": False,
+            "weight_pct": None,
+        })
+        self.assertIsNone(item["diagnostics"])
+        self.assertNotIn("account_id", str(item))
+        self.assertNotIn("provider_payload", str(item))
+
+        with self.db.get_session() as session:
+            session.add(AlertTriggerRecord(
+                rule_id=corporate_rule["id"],
+                target="AAPL",
+                reason="new event after page one",
+                data_source="intelligence_items",
+                triggered_at=base_time + timedelta(hours=9),
+                status="triggered",
+                diagnostics=diagnostics,
+            ))
+            session.commit()
+
+        second = self.client.get(
+            "/api/v1/alerts/triggers",
+            params={
+                "alert_type": "corporate_event",
+                "status": "triggered",
+                "page_size": 2,
+                "cursor": first_payload["next_cursor"],
+            },
+        )
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual([item["reason"] for item in second.json()["items"]], ["corporate event 0"])
+
+        invalid = self.client.get(
+            "/api/v1/alerts/triggers",
+            params={"alert_type": "corporate_event", "cursor": "not-a-cursor"},
+        )
+        self.assertEqual(invalid.status_code, 400, invalid.text)
+
     def test_alert_cooldowns_table_create_all_is_idempotent(self) -> None:
         constraint_names = {constraint.name for constraint in AlertCooldownRecord.__table__.constraints}
         self.assertIn("uix_alert_cooldown_rule_target_severity", constraint_names)

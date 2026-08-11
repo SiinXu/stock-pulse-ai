@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and localized full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
+- [Added] Web report and run-diagnostics surfaces expose reasoning-trace export (JSON/Markdown) with Settings enable guidance when the default-off gate is closed, truncation notice from response headers, and registry-backed `REASONING_TRACE_EXPORT_*` Settings controls (Issue #135, Refs #212).
 - [Fixed] Lazy-load report Playground stories so Risk Manager evidence does not expand the shared Playground render budget.
 - [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
 - [Tests] Align the application-shell Playwright fixture with the server-authoritative notification inbox contract so auth redirects cannot mask shell regressions.
@@ -43,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
+- [Added] Read-only corporate-event calendar at `/events`, backed by the alert trigger contract with bounded pagination, partial-result provenance, and localized impact summaries (#153).
 
+- [Added] Web event-driven corporate alert view with server-filtered stable pagination, rule-severity impact grading, editable event parameters, and bounded public trigger context for issue #241.
 - [Fixed] Portfolio position analysis attaches the shared TaskPanel/RunFlow progress surface, reacts to URL `task` changes, restores stock and result identity from session/status data, preserves task identity across 401/403 responses, and drops confirmed-missing (404/not_found) task ids instead of fabricating a stuck pending card (#879 A6).
 - [Added] In-app notification inbox and header bell share best-effort durable event sources, versioned occurrence identities, server read state, stable cursor pagination, source provenance, and localized Web rendering (Refs #181).
 - [Changed] Migrated analysis-cluster Web API modules (`analysis`, `history`, `scheduledTasks`, `agent` plain JSON) to OpenAPI-generated type anchors with Zod boundary validation via `ParsedApiError` (`api_response_validation_failed`); SSE/streaming agent and analysis task stream surfaces remain documented skips for #721.
