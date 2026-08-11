@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Treat timezone-aware ex-dividend timestamps as calendar dates so the inclusive 365-day TTM window keeps boundary-day events throughout the current day.
 - [Added] Portfolio page surfaces historical VaR, correlation matrix, and concentration/diversification metrics from `GET /api/v1/portfolio/risk-metrics` with always-visible assumptions and honest empty/insufficient/partial states (Refs #239).
 - [Fixed] Shrink config-registry unregistered debt baseline from 243 to 207 after registering MCP server keys and post-#1036 data-source domain keys (Refs #1023, #244).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after merging MCP Settings inventory onto post-#1036/#1031 main (Refs #244).
@@ -193,6 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Ported upstream explicit-suffix stock-list analysis-target parsing (`parse_analysis_target` / IndexRegistry) with reject contract for invalid exchange suffixes.
 
 - [Added] Applied Content-Security-Policy and related security headers (nosniff, frame deny, referrer) on FastAPI responses as defense-in-depth for the served web app.
+- [Changed] Modularized the Web API error catalog behind its existing import path and added paired, localized Toast remediation for high-impact codes.
 - [Chore] Extracted NotificationConfig and ShareImageConfig domain sub-objects behind the flat Config facade (phase 1; attribute access unchanged).
 - [Changed] Migrated portfolio, backtest, decisionSignals, and scorecard Web API modules to OpenAPI-generated types with Zod boundary validation (money-math numeric-string mismatches fail closed).
 - [Tests] Expand Playwright e2e coverage for share-image success/503 UI, per-market market-review region selection, and auth-disable current-password re-confirmation.
