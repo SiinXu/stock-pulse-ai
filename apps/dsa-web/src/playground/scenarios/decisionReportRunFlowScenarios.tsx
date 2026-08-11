@@ -44,7 +44,7 @@ import { MarketReviewReportView } from '../../components/report/MarketReviewRepo
 import { MarketStructureCard } from '../../components/report/MarketStructureCard';
 import { ReportDecisionCard } from '../../components/report/ReportDecisionCard';
 import { ReportRiskGateBanner } from '../../components/report/ReportRiskGateBanner';
-import { buildRiskGatePresentation, parseRiskGateResult } from '../../components/report/reportRiskGateUtils';
+import { parseRiskGateResult } from '../../components/report/reportRiskGateUtils';
 import { ReportDetails } from '../../components/report/ReportDetails';
 import { ReportDiagnostics } from '../../components/report/ReportDiagnostics';
 import { ReportMarkdown } from '../../components/report/ReportMarkdown';
@@ -656,12 +656,6 @@ const ReportDecisionCardStory = () => {
 
 const ReportRiskGateBannerStory = () => {
   const { scenario } = usePlaygroundScenario();
-  if (scenario === 'loading') {
-    return <ReportRiskGateBanner presentation={buildRiskGatePresentation({ loading: true })} language="en" />;
-  }
-  if (scenario === 'error') {
-    return <ReportRiskGateBanner presentation={buildRiskGatePresentation({ error: true })} language="en" />;
-  }
   if (scenario === 'empty') {
     return <ReportRiskGateBanner presentation={parseRiskGateResult(undefined)} language="en" />;
   }
@@ -670,11 +664,6 @@ const ReportRiskGateBannerStory = () => {
       presentation={parseRiskGateResult({
         schema_version: 'risk-manager-result/v1',
         verdict: 'reject',
-        original_action: 'buy',
-        final_action: 'hold',
-        reason_codes: ['portfolio_exposure_limit'],
-        evidence_codes: ['portfolio_exposure'],
-        profile: 'balanced',
       })}
       language="en"
     />
