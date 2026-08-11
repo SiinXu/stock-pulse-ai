@@ -50,39 +50,39 @@ void _runListFieldAnchor;
  */
 const scheduledPayloadSchema = z.object({
   stockCode: z.string(),
-  reportType: z.string().optional(),
-  notify: z.boolean().optional(),
+  reportType: z.enum(['brief', 'simple', 'detailed', 'full']).optional(),
+  notify: z.boolean(),
 }).passthrough();
 
 const scheduledScheduleSchema = z.object({
   kind: z.literal('daily'),
   time: z.string(),
   timezone: z.string(),
-  calendarMarket: z.string(),
-  nonTradingDayPolicy: z.string(),
+  calendarMarket: z.enum(['cn', 'hk', 'us', 'jp', 'kr', 'tw']),
+  nonTradingDayPolicy: z.enum(['skip', 'run']),
 }).passthrough();
 
-// List/today projections historically omit payload/schedule; OpenAPI full items
-// include them. Validate shared summary fields and accept full items when present.
+// All supported definitions use the complete OpenAPI ScheduledTaskItem contract,
+// including when nested in list, today, and status responses.
 const supportedTaskItemSchema = z.object({
   compatibility: z.literal('supported'),
   id: z.string(),
-  schemaVersion: z.number(),
+  schemaVersion: z.number().int().finite(),
   name: z.string(),
-  taskType: z.string().optional(),
+  taskType: z.string(),
   enabled: z.boolean(),
   nextRunAt: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  maxAttempts: z.number().optional(),
-  payload: scheduledPayloadSchema.optional(),
-  schedule: scheduledScheduleSchema.optional(),
+  maxAttempts: z.number().int().finite(),
+  payload: scheduledPayloadSchema,
+  schedule: scheduledScheduleSchema,
 }).passthrough();
 
 const unsupportedTaskItemSchema = z.object({
   compatibility: z.literal('unsupported_schema'),
   id: z.string(),
-  schemaVersion: z.number(),
+  schemaVersion: z.number().int().finite(),
   name: z.string(),
   enabled: z.boolean(),
   nextRunAt: z.string().nullable().optional(),
@@ -90,15 +90,26 @@ const unsupportedTaskItemSchema = z.object({
   updatedAt: z.string(),
 }).passthrough();
 
-const definitionSummarySchema = z.union([supportedTaskItemSchema, unsupportedTaskItemSchema]);
+const definitionSummarySchema = z.discriminatedUnion('compatibility', [
+  supportedTaskItemSchema,
+  unsupportedTaskItemSchema,
+]);
 
 const scheduledTaskRunItemSchema = z.object({
   id: z.string(),
   taskId: z.string(),
   scheduledFor: z.string(),
-  status: z.string(),
-  attemptCount: z.number(),
-  dispatchFailureCount: z.number(),
+  status: z.enum([
+    'dispatching',
+    'running',
+    'retry_wait',
+    'succeeded',
+    'failed',
+    'skipped',
+    'interrupted',
+  ]),
+  attemptCount: z.number().int().finite(),
+  dispatchFailureCount: z.number().int().finite(),
   executionTaskIds: z.array(z.string()).optional(),
   resultRefs: z.array(z.string()).optional(),
   notificationStatus: z.string().nullable().optional(),
@@ -113,14 +124,23 @@ const scheduledTaskRunItemSchema = z.object({
 }).passthrough();
 
 const scheduledTaskListResponseSchema = z.object({
-  total: z.number(),
+  total: z.number().int().finite(),
   items: z.array(definitionSummarySchema).optional(),
 }).passthrough();
 
 const scheduledTaskTodayItemSchema = z.object({
   task: definitionSummarySchema,
   scheduledFor: z.string(),
-  status: z.string(),
+  status: z.enum([
+    'scheduled',
+    'dispatching',
+    'running',
+    'retry_wait',
+    'succeeded',
+    'failed',
+    'skipped',
+    'interrupted',
+  ]),
   run: scheduledTaskRunItemSchema.nullable().optional(),
 }).passthrough();
 
@@ -128,7 +148,7 @@ const scheduledTaskTodayResponseSchema = z.object({
   date: z.string(),
   timezone: z.string(),
   generatedAt: z.string(),
-  total: z.number(),
+  total: z.number().int().finite(),
   items: z.array(scheduledTaskTodayItemSchema).optional(),
 }).passthrough();
 
@@ -138,7 +158,7 @@ const scheduledTaskStatusResponseSchema = z.object({
 }).passthrough();
 
 const scheduledTaskRunListResponseSchema = z.object({
-  total: z.number(),
+  total: z.number().int().finite(),
   items: z.array(scheduledTaskRunItemSchema).optional(),
 }).passthrough();
 
@@ -289,7 +309,7 @@ export const scheduledTasksApi = {
     );
     return parseCamelCasePayload<ScheduledTaskDefinitionSummary>(
       response.data,
-      definitionSummarySchema,
+      supportedTaskItemSchema,
       'ScheduledTaskItem',
     );
   },
@@ -300,7 +320,7 @@ export const scheduledTasksApi = {
     );
     return parseCamelCasePayload<ScheduledTaskDefinitionSummary>(
       response.data,
-      definitionSummarySchema,
+      supportedTaskItemSchema,
       'ScheduledTaskItem',
     );
   },

@@ -141,6 +141,35 @@ describe('scheduledTasksApi', () => {
     });
   });
 
+  it('rejects supported list items that omit required OpenAPI definition fields', async () => {
+    const { payload: _payload, ...missingPayload } = supportedTaskWire();
+    get.mockResolvedValueOnce({
+      data: { total: 1, items: [missingPayload] },
+    });
+
+    await expect(scheduledTasksApi.list()).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'ScheduledTaskListResponse' });
+      expect(parsed.message).toContain('items.0.payload');
+      return true;
+    });
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'rejects non-finite scheduled-task numbers (%s)',
+    async (maxAttempts) => {
+      get.mockResolvedValueOnce({
+        data: { total: 1, items: [supportedTaskWire({ max_attempts: maxAttempts })] },
+      });
+
+      await expect(scheduledTasksApi.list()).rejects.toSatisfy((error: unknown) => {
+        expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+        return true;
+      });
+    },
+  );
+
   it('lists definitions and posts enable/disable mutations', async () => {
     get.mockResolvedValueOnce({
       data: {
