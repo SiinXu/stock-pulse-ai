@@ -695,6 +695,91 @@ def test_skill_generation_advances_when_equal_count_catalog_swaps(
     assert "skill:beta" in _by_id(second_snapshot)
 
 
+def test_skill_generation_tracks_same_name_declarative_record_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Record-visible declarative changes must advance the source generation."""
+
+    class _Services:
+        config = SimpleNamespace(agent_skill_dir=None)
+
+        @staticmethod
+        def analysis_strategy_snapshot() -> Any:
+            return SimpleNamespace(generation=3, registrations=())
+
+    skill_state = {"value": SimpleNamespace()}
+    base_fields = {
+        "name": "alpha",
+        "source": "builtin",
+        "display_name": "Alpha",
+        "enabled": True,
+        "required_tools": ("quote",),
+    }
+
+    class _SkillManager:
+        @staticmethod
+        def list_skills() -> list[Any]:
+            return [skill_state["value"]]
+
+        @staticmethod
+        def load_custom_skills(_custom_dir: str) -> None:
+            raise AssertionError("custom skill loading is not expected")
+
+    monkeypatch.setattr(
+        "src.application_services.get_installed_application_services",
+        lambda: _Services(),
+    )
+    monkeypatch.setattr("src.agent.skills.base.SkillManager", _SkillManager)
+
+    def _snapshot(**overrides: Any) -> Any:
+        skill_state["value"] = SimpleNamespace(**(base_fields | overrides))
+        return collect_capability_records(
+            clock=lambda: NOW,
+            domains=("skill",),
+        )
+
+    enabled_snapshot = _snapshot()
+    disabled_snapshot = _snapshot(enabled=False)
+    source_snapshot = _snapshot(enabled=False, source="custom")
+    display_snapshot = _snapshot(
+        enabled=False,
+        source="custom",
+        display_name="Custom Alpha",
+    )
+    dependency_snapshot = _snapshot(
+        enabled=False,
+        source="custom",
+        display_name="Custom Alpha",
+        required_tools=("quote", "news"),
+    )
+    renamed_snapshot = _snapshot(
+        name="beta",
+        enabled=False,
+        source="custom",
+        display_name="Custom Alpha",
+        required_tools=("quote", "news"),
+    )
+
+    generations = {
+        enabled_snapshot.sources[0].generation,
+        disabled_snapshot.sources[0].generation,
+        source_snapshot.sources[0].generation,
+        display_snapshot.sources[0].generation,
+        dependency_snapshot.sources[0].generation,
+        renamed_snapshot.sources[0].generation,
+    }
+    assert len(generations) == 6
+    assert _by_id(disabled_snapshot)["skill:alpha"].executable is False
+    assert _by_id(disabled_snapshot)["skill:alpha"].reason_code == "skill_disabled"
+    assert _by_id(source_snapshot)["skill:alpha"].provider == "custom"
+    assert _by_id(display_snapshot)["skill:alpha"].display_name == "Custom Alpha"
+    assert _by_id(dependency_snapshot)["skill:alpha"].dependencies == (
+        "quote",
+        "news",
+    )
+    assert "skill:beta" in _by_id(renamed_snapshot)
+
+
 def test_live_pipeline_binding_requires_stage_runner_and_method_refs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
