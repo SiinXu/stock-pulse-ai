@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #1032 agent/report Settings inventory combined with PR #785 stable validation-error keys and PR #841 portfolio-risk locales. Affected chunks were remeasured locally with a production build and 200 B headroom, with no i18n baseline expansion.",
+  "baselineNote": "PR #1039 planning settings combined with PR #1032 agent/report Settings inventory, PR #785 stable validation errors, and PR #841 portfolio-risk locales. Affected chunks were remeasured from the merged production build with 200 B headroom and no i18n baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 225156,
-      "measuredGzipBytes": 224956,
-      "note": "Rebaselined after agent/report Settings inventory merge onto post-#1036/#1033 main (PR #1032); measured 224956 B + 200 B headroom."
+      "maxGzipBytes": 226652,
+      "measuredGzipBytes": 226452,
+      "note": "Remeasured after combining planning and agent/report Settings inventories (PR #1039); measured 226452 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 145100,
-      "measuredGzipBytes": 144900,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 144900 B + 200 B headroom."
+      "maxGzipBytes": 145788,
+      "measuredGzipBytes": 145588,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 145588 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 138435,
-      "measuredGzipBytes": 138235,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 138235 B + 200 B headroom."
+      "maxGzipBytes": 139144,
+      "measuredGzipBytes": 138944,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 138944 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 138975,
-      "measuredGzipBytes": 138775,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 138775 B + 200 B headroom."
+      "maxGzipBytes": 139584,
+      "measuredGzipBytes": 139384,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 139384 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 139182,
-      "measuredGzipBytes": 138982,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 138982 B + 200 B headroom."
+      "maxGzipBytes": 139757,
+      "measuredGzipBytes": 139557,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 139557 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 135129,
-      "measuredGzipBytes": 134929,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 134929 B + 200 B headroom."
+      "maxGzipBytes": 135757,
+      "measuredGzipBytes": 135557,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 135557 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 131999,
-      "measuredGzipBytes": 131799,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 131799 B + 200 B headroom."
+      "maxGzipBytes": 132663,
+      "measuredGzipBytes": 132463,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 132463 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 125524,
-      "measuredGzipBytes": 125324,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 125324 B + 200 B headroom."
+      "maxGzipBytes": 126166,
+      "measuredGzipBytes": 125966,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 125966 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 125545,
-      "measuredGzipBytes": 125345,
-      "note": "Remeasured after combining agent/report Settings inventory (PR #1032), stable validation errors (PR #785), and portfolio-risk locales (PR #841); measured 125345 B + 200 B headroom."
+      "maxGzipBytes": 126192,
+      "measuredGzipBytes": 125992,
+      "note": "Remeasured after combining planning and agent/report Settings inventories, stable validation errors, and portfolio-risk locales (PR #1039); measured 125992 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",

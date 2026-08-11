@@ -1332,6 +1332,46 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects Agent confidence calibration and long-term analysis quality.'],
     notes: ['Works best when combined with the backtest feature.'],
   },
+  'settings.agent.AGENT_PLANNING_ENABLED': {
+    title: 'Agent Planning Loop',
+    summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',
+  },
+  'settings.agent.AGENT_PLANNING_STRATEGY': {
+    title: 'Agent Planning Strategy',
+    summary: 'Selects the deterministic template planner or the bounded LLM proposal planner.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_PLAN_STEPS': {
+    title: 'Planning Max Plan Steps',
+    summary: 'Caps the number of steps in each accepted plan proposal.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_REPLANS': {
+    title: 'Planning Proposal Retries',
+    summary: 'Caps retries after proposal generation or validation fails.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOKENS': {
+    title: 'Planning Proposal Token Budget',
+    summary: 'Caps planner tokens across an LLM proposal and its retries.',
+  },
+  'settings.agent.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS': {
+    title: 'Planning Proposal Timeout',
+    summary: 'Caps wall-clock time for the proposal phase.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS': {
+    title: 'Planning Max Tool Calls',
+    summary: 'Caps total tool dispatches across the plan execution and observation replans.',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_OBSERVATION_REPLANS': {
+    title: 'Planning Observation Replans',
+    summary: 'Caps replans triggered by failed tool-step observations.',
+  },
+  'settings.agent.AGENT_PLANNING_EXEC_TIMEOUT_SECONDS': {
+    title: 'Planning Execution Timeout',
+    summary: 'Caps wall-clock time for the full plan execution loop.',
+  },
+  'settings.agent.AGENT_PLANNING_ON_STEP_FAILURE': {
+    title: 'Planning Step Failure Policy',
+    summary: 'Chooses whether a failed plan step replans within budget or terminates immediately.',
+  },
   'settings.agent.AGENT_SKILL_AUTOWEIGHT': {
     title: 'Auto-Weight Strategies',
     summary: 'Automatically weights strategy opinions by their historical backtest performance.',

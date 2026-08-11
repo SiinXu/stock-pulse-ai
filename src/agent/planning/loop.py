@@ -6,9 +6,10 @@ caller-supplied invoker (typically wrapping ``ToolSurface.execute_tool``).
 Failures are explicit: the loop either replans within budget or terminates with
 a stable reason. It never treats a failed tool call as overall success.
 
-It still does **not** wire itself into ``AgentExecutor``, Chat, Research, or
-daily product modes — those remain separate #199 integration work. Callers must
-invoke ``execute_plan_loop`` explicitly.
+The library loop remains explicit: product wiring is in
+``src/agent/planning/product.py`` (``AgentExecutor.run`` when
+``AGENT_PLANNING_ENABLED``). Callers may still invoke ``execute_plan_loop``
+directly for offline/tests.
 """
 
 from __future__ import annotations
