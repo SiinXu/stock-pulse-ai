@@ -428,4 +428,3 @@ export const EVENT_ALERT_TRANSLATIONS = {
     },
   },
 } as const;
-
