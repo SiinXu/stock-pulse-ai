@@ -123,6 +123,12 @@ export interface ReportSummary {
   trendPrediction: string;
   sentimentScore: number;
   sentimentLabel?: SentimentLabel;
+  /**
+   * Canonical Risk Manager gate payload (`risk-manager-result/v1`) projected by
+   * the backend analysis service. Missing must present as not-evaluated on Web —
+   * never implied pass.
+   */
+  riskManager?: Record<string, unknown> | null;
 }
 
 /** Strategy section */
