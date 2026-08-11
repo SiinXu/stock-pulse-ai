@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Settings fields resolve controls from `dataType` / options / sensitivity even when `uiControl` is missing or wrong, so uncategorized booleans, enums, numbers, and secrets no longer render as free-text inputs; contract tests lock the schema→control mapping and the change/save display loop.
 - [Docs] Document the shipped Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 security stack, advisory matrix, migration notes, and rollback steps for #615 in bilingual desktop packaging guides.
 - [Fixed] Treat timezone-aware ex-dividend timestamps as calendar dates so the inclusive 365-day TTM window keeps boundary-day events throughout the current day.
 - [Added] Portfolio page surfaces historical VaR, correlation matrix, and concentration/diversification metrics from `GET /api/v1/portfolio/risk-metrics` with always-visible assumptions and honest empty/insufficient/partial states (Refs #239).
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Report Markdown panel download actions call history export for Markdown/PDF so archive export #163 is user-reachable (Refs #163, #1008).
 - [Added] Model Access hub surfaces local model runtime and local CLI detection status (available/unavailable/not configured, last checked, honest probe failures) alongside cloud connections (Refs #865).
 - [Fixed] Config registry type inference treats boolean-named keys and inline-comment value hints as boolean/switch, and select when options are present; CI guard freezes unregistered `.env.example` keys as shrink-only temporary debt (Refs #1023).
+- [Fixed] Register agent runtime guards, decision memory, reasoning-trace export, report mode, and plugin data-provider auto-bind in the config registry so Settings uses correct categories, controls, defaults, and validation instead of uncategorized text fields (Refs #1023).
 - [Fixed] Register crypto, data-validation, and local-first daily-cache Settings fields in the config registry with correct controls, enums, defaults, and bilingual help so they no longer land as uncategorized free-text (Refs #1023).
 - [Chore] Rebaseline Web locale bundle gzip budgets after data-source Settings help inventory growth (Refs #1023).
 - [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
