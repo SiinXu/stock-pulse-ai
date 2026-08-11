@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-10",
-  "baselineNote": "Post-#1031 Model Sources lifecycle (PR #1020 / Refs #865) on main. Locales retain 200B headroom; IntelligenceSourcesPanel uses 10% headroom after remeasure.",
+  "measuredAt": "2026-08-11",
+  "baselineNote": "PR #1032 agent/report registry inventory merged with PR #841 portfolio-risk locale inventory. Affected Settings and locale chunks were remeasured locally with a production build; 200 B headroom, with no i18n baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 240517,
-      "measuredGzipBytes": 218651,
-      "note": "Rebaselined after Model Sources lifecycle + hub status merge (PR #1020 / Refs #865); 10% headroom."
+      "maxGzipBytes": 225152,
+      "measuredGzipBytes": 224952,
+      "note": "Rebaselined after agent/report Settings inventory merge onto post-#1036/#1033 main (PR #1032); measured 224952 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 138510,
-      "measuredGzipBytes": 138310,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 144551,
+      "measuredGzipBytes": 144351,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 144351 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 133277,
-      "measuredGzipBytes": 133077,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 137891,
+      "measuredGzipBytes": 137691,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 137691 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 132700,
-      "measuredGzipBytes": 132500,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 138497,
+      "measuredGzipBytes": 138297,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 138297 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 133459,
-      "measuredGzipBytes": 133259,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 138698,
+      "measuredGzipBytes": 138498,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 138498 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 129451,
-      "measuredGzipBytes": 129251,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 134624,
+      "measuredGzipBytes": 134424,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 134424 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 125471,
-      "measuredGzipBytes": 125271,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 131513,
+      "measuredGzipBytes": 131313,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 131313 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 120003,
-      "measuredGzipBytes": 119803,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 125036,
+      "measuredGzipBytes": 124836,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 124836 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 120156,
-      "measuredGzipBytes": 119956,
-      "note": "Tight rebaseline for Model Sources lifecycle copy on post-#1031 main (PR #1020 / Refs #865); 200B headroom."
+      "maxGzipBytes": 125078,
+      "measuredGzipBytes": 124878,
+      "note": "Remeasured after combining agent/report Settings inventory (PR #1032) with portfolio-risk locale inventory (PR #841); measured 124878 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
