@@ -1138,6 +1138,8 @@ class _ConfigLoadingMethods:
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
+            # SmartMoney money-flow (default off: zero extra network unless opted in)
+            smartmoney_enabled=os.getenv('SMARTMONEY_ENABLED', 'false').lower() == 'true',
             # Eastmoney API patch switch
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # Real-time quote data source priority:

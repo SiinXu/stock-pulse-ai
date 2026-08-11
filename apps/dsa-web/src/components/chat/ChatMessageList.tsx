@@ -9,6 +9,7 @@ import {
   ChatThinkingToggle,
 } from './ChatThinkingDetails';
 import { getCurrentStageLabel, getMessageSkillLabel } from './chatMessageMeta';
+import { contentHasHypotheticalMarker } from './whatIfScenario';
 import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import { cn } from '../../utils/cn';
 import { getChatMessageDisplayContent } from '../../utils/chatMessage';
@@ -81,6 +82,8 @@ export function ChatMessageList({
         messages.map((msg) => {
           const skillLabel = getMessageSkillLabel(msg);
           const displayContent = getChatMessageDisplayContent(msg, language);
+          const isHypothetical = contentHasHypotheticalMarker(displayContent)
+            || contentHasHypotheticalMarker(msg.content);
           const isExpanded = expandedThinking.has(msg.id);
           const toolSteps = (msg.thinkingSteps || []).filter((s) => s.type === 'tool_done');
           const totalDuration = toolSteps.reduce((sum, s) => sum + (s.duration || 0), 0);
@@ -105,8 +108,21 @@ export function ChatMessageList({
                 className={cn(
                   'group/message min-w-0 w-fit max-w-[min(100%,48rem)] overflow-hidden px-5 py-3.5 transition-colors',
                   msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai',
+                  isHypothetical && 'ring-1 ring-warning/40',
                 )}
+                data-what-if={isHypothetical ? 'true' : undefined}
               >
+                {isHypothetical ? (
+                  <div className="mb-2" data-testid="chat-what-if-result-badge">
+                    <Badge
+                      variant="warning"
+                      className="shadow-none"
+                      aria-label={t('chat.whatIf.resultBadge')}
+                    >
+                      {t('chat.whatIf.resultBadge')}
+                    </Badge>
+                  </div>
+                ) : null}
                 {msg.role === 'assistant' && skillLabel && (
                   <div className="mb-2">
                     <Badge

@@ -76,7 +76,6 @@
     {"path":"bot/commands/market.py","scope":"<module>.MarketCommand._run_market_review","caught":["Exception"],"digest":"b4de3fbd215da40ece4ae7f1c4f22211e44c4c530024220ef5f930aa08e4bc31"},
     {"path":"bot/commands/market.py","scope":"<module>.MarketCommand.execute","caught":["Exception"],"digest":"326de47156644fe911c7f16b9f5b559c9e54a97ed96e3f460fdb6e0053dc1c64"},
     {"path":"bot/commands/market.py","scope":"<module>.MarketCommand.execute","caught":["Exception"],"digest":"9624090ac23a2940e7a65a34871352359844a1652238db4e9eda69915fb89e14"},
-    {"path":"bot/commands/research.py","scope":"<module>.ResearchCommand.execute","caught":["Exception"],"digest":"1597f8cb0af0d96605e54bfdafe67d12e96941e7a442cd4a9f82d67c6d967f13"},
     {"path":"bot/commands/strategies.py","scope":"<module>.StrategiesCommand.execute","caught":["Exception"],"digest":"92e892fe36baab49cad2741de8febb84aedbc1b679fbd7fad3450b57c3bcfba9"},
     {"path":"bot/dispatcher.py","scope":"<module>.CommandDispatcher._dispatch_sync","caught":["Exception"],"digest":"f1ff1bafd4c3b191092ff1bd155453905835fe494e32357ad7755c22c3a75c3d"},
     {"path":"bot/dispatcher.py","scope":"<module>.CommandDispatcher._parse_intent_via_llm","caught":["Exception"],"digest":"8456c33fa38af1e571c6fb951b21949dc14e364669bfadd78d27a346f466d102"},

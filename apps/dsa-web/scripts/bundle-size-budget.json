@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting the zero-config first-run and Today's Focus stories, and locale chunks enlarged by the Notifications hub plus screening-state translations. Locale caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "measuredAt": "2026-08-11",
+  "baselineNote": "PR #841 adds 67 translated portfolio-risk keys without expanding the i18n baseline. Locale chunks were remeasured with 200 B headroom; the risk panel is code-split so the PortfolioPage route remains within its existing cap.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,8 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206424,
-      "measuredGzipBytes": 187658
+      "maxGzipBytes": 220606,
+      "measuredGzipBytes": 220406,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 220406 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -25,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 132340,
-      "measuredGzipBytes": 132140,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 142181,
+      "measuredGzipBytes": 141981,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 141981 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 126652,
-      "measuredGzipBytes": 126452,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 136138,
+      "measuredGzipBytes": 135938,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 135938 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 126247,
-      "measuredGzipBytes": 126047,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 136172,
+      "measuredGzipBytes": 135972,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 135972 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 126528,
-      "measuredGzipBytes": 126328,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 136598,
+      "measuredGzipBytes": 136398,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 136398 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 122506,
-      "measuredGzipBytes": 122306,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 132548,
+      "measuredGzipBytes": 132348,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 132348 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 119940,
-      "measuredGzipBytes": 119740,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 129253,
+      "measuredGzipBytes": 129053,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 129053 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 113297,
-      "measuredGzipBytes": 113097,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 122990,
+      "measuredGzipBytes": 122790,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 122790 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 113446,
-      "measuredGzipBytes": 113246,
-      "note": "Tight rebaseline for Notifications hub and screening-state translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 123139,
+      "measuredGzipBytes": 122939,
+      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 122939 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -124,15 +125,16 @@
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
-      "maxGzipBytes": 74967,
-      "measuredGzipBytes": 68151
+      "maxGzipBytes": 73318,
+      "measuredGzipBytes": 73118,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57000,
-      "measuredGzipBytes": 56827,
-      "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks; the 57,000-byte cap retains a narrow bound on Playground registration overhead."
+      "maxGzipBytes": 57281,
+      "measuredGzipBytes": 57081,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 57081 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",
@@ -147,10 +149,18 @@
       "measuredGzipBytes": 42365
     },
     {
+      "id": "PortfolioRiskMetricsPanel",
+      "match": "assets/PortfolioRiskMetricsPanel-*.js",
+      "maxGzipBytes": 10654,
+      "measuredGzipBytes": 9685,
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
+    },
+    {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 25543,
-      "measuredGzipBytes": 23220
+      "measuredGzipBytes": 24263,
+      "note": "PR #841 code-splits the risk panel; the route remains below the unchanged 25543 B cap."
     },
     {
       "id": "DecisionSignalsPage",

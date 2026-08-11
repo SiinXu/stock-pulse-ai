@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Docs] Document the shipped Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 security stack, advisory matrix, migration notes, and rollback steps for #615 in bilingual desktop packaging guides.
+- [Added] Portfolio page surfaces historical VaR, correlation matrix, and concentration/diversification metrics from `GET /api/v1/portfolio/risk-metrics` with always-visible assumptions and honest empty/insufficient/partial states (Refs #239).
+- [Fixed] Shrink config-registry unregistered debt baseline from 243 to 207 after registering MCP server keys and post-#1036 data-source domain keys (Refs #1023, #244).
+- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after merging MCP Settings inventory onto post-#1036/#1031 main (Refs #244).
+- [Added] Register all optional MCP server env keys in config registry category `mcp` with typed controls, validation ranges, sensitive masking, and bilingual Settings titles (Refs #244).
+- [Added] Report Markdown panel download actions call history export for Markdown/PDF so archive export #163 is user-reachable (Refs #163, #1008).
+- [Added] Model Access hub surfaces local model runtime and local CLI detection status (available/unavailable/not configured, last checked, honest probe failures) alongside cloud connections (Refs #865).
+- [Fixed] Config registry type inference treats boolean-named keys and inline-comment value hints as boolean/switch, and select when options are present; CI guard freezes unregistered `.env.example` keys as shrink-only temporary debt (Refs #1023).
+- [Fixed] Register crypto, data-validation, and local-first daily-cache Settings fields in the config registry with correct controls, enums, defaults, and bilingual help so they no longer land as uncategorized free-text (Refs #1023).
+- [Chore] Rebaseline Web locale bundle gzip budgets after data-source Settings help inventory growth (Refs #1023).
+- [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
+- [Added] Wire shared financial charts into product pages: Stock Details KlineChart (history API candles) and Portfolio RiskHeatmap (existing risk API weight/stop-loss/drawdown scores) with loading, empty, and invalid-value guards (Refs #142).
+- [Fixed] Capability inventory availability is projected only from live tool/skill/pipeline/plugin/data owners; registry and config read failures return explicit partial source errors instead of fail-open success snapshots (Refs #221).
+- [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).
 - [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
 - [Fixed] Treat non-finite quote, change, and history metrics as missing values without financial direction or color semantics.
 - [Added] Global command palette search groups bounded stock, report-history, page, and action matches with indexed report lookup, keyboard navigation, exact-record deep links, and failure-isolated loading and empty states (Refs #190, #886).
@@ -17,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Fixed] Keep Backtest strategy run options (`minAge`/`limit`) in shareable URLs while preserving stable research-route wire keys (#879 A1).
+- [Added] Agent Chat what-if scenario mode with structured assumptions, hypothetical markers, turn limits, and hard isolation from AnalysisHistory / DecisionSignal / Agent memory (#130).
+- [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) across CLI, Web, analysis/watchlist APIs, imports, providers, and Bot flows, while preserving indexed Japanese codes and explicit market hints or suffixes.
+- [Added] SmartMoney money-flow tracking with a default-off composition gate, typed provider outcomes, cancellable AkShare deadlines, bounded cache/circuit fallback, strict calibration and freshness metadata, and optional analysis-context injection (#862).
 - [Fixed] Screening/Discover URL contract: persist candidate/hotspot view via urlState, keep filter params shareable on refresh, and hand off hotspot analyze intent through Home `?stock=` query instead of location.state (#879 A1/A4).
 - [Fixed] Preserve the last successful screening result across failed attempts, distinguish capability/status/empty/degradation states, and provide exact-parameter retry and data-source recovery actions (Refs #871).
 - [Added] Analysis Workbench failures adopt operation-owned recovery: transient retries preserve request/source identity, busy work routes to tasks, partial batches retry only unconfirmed symbols, delete retry stays in its dialog, and sanitized technical codes remain collapsed (#885 Phase 2).

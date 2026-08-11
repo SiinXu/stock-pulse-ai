@@ -295,12 +295,12 @@ class AnalysisApiService:
             return ""
 
         if is_code_like(text):
+            if text.isdigit() and len(text) == 4:
+                resolved = self.resolve_index_stock_code_for_analysis(text)
+                if resolved and resolved != canonical_stock_code(text):
+                    return resolved
+                return f"HK{text.zfill(5)}"
             return self.resolve_index_stock_code_for_analysis(text)
-
-        if text.isdigit() and len(text) == 4:
-            resolved_index_code = self.resolve_index_stock_code_for_analysis(text)
-            if resolved_index_code != canonical_stock_code(text):
-                return resolved_index_code
 
         if self.is_obviously_invalid_analysis_input(text):
             raise self.invalid_analysis_input_error()
