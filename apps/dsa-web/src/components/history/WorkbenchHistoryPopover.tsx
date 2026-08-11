@@ -20,6 +20,7 @@ interface WorkbenchHistoryPopoverProps {
   onToggleItemSelection: (recordId: number) => void;
   onToggleSelectAll: () => void;
   onDeleteSelected: () => void;
+  onCompareSelected?: (items: readonly [HistoryItem, HistoryItem]) => void;
 }
 
 /** Compact, focus-managed history selector for the Analysis Workbench. */
@@ -36,6 +37,7 @@ export const WorkbenchHistoryPopover: React.FC<WorkbenchHistoryPopoverProps> = (
   onToggleItemSelection,
   onToggleSelectAll,
   onDeleteSelected,
+  onCompareSelected,
 }) => {
   const { t } = useUiLanguage();
 
@@ -93,6 +95,7 @@ export const WorkbenchHistoryPopover: React.FC<WorkbenchHistoryPopoverProps> = (
             onToggleItemSelection={onToggleItemSelection}
             onToggleSelectAll={onToggleSelectAll}
             onDeleteSelected={onDeleteSelected}
+            onCompareSelected={onCompareSelected}
           />
         </div>
       )}

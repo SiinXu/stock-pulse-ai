@@ -57,6 +57,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 
 from src.agent.provider_trace import PROVIDER_TRACE_RETENTION_LIMIT
 from src.agent.public_contract import (
+    agent_history_public_params,
     agent_history_public_fields,
     sanitize_agent_history_content,
 )
@@ -116,6 +117,7 @@ _STORAGE_FACADE_COMPAT_GLOBALS = (
     IntegrityError,
     OperationalError,
     PROVIDER_TRACE_RETENTION_LIMIT,
+    agent_history_public_params,
     agent_history_public_fields,
     sanitize_agent_history_content,
     get_config,

@@ -37,7 +37,10 @@ if TYPE_CHECKING:
         normalize_llm_channel_model,
         os,
         parse_env_bool,
+        re,
         sanitize_exception_chain,
+        urlparse,
+        urlunparse,
     )
 
 
@@ -690,36 +693,123 @@ class _SystemConfigCoreMethods:
             reload_now=reload_now,
         )
 
-    def _resolve_hermes_saved_secret(
+    def _resolve_saved_connection_secret(
         self,
         *,
         channel_name: str,
+        provider_id: str,
         protocol: str,
         base_url: str,
         submitted_api_key: str,
         use_saved_secret: bool,
         stage: str,
     ) -> Tuple[Optional[str], Dict[str, Any], Set[str]]:
-        """Resolve a saved Hermes key only when the submitted endpoint is unchanged."""
+        """Resolve a saved connection key only when its identity and endpoint are unchanged."""
 
         redaction_values = self._build_redaction_values(submitted_api_key)
         if not use_saved_secret:
             return submitted_api_key, {}, redaction_values
 
         if not is_reserved_hermes_name(channel_name):
-            return None, self._build_llm_channel_result(
-                success=False,
-                message="Saved secret scope mismatch",
-                error="Saved Hermes secret can only be used with the reserved hermes channel",
-                stage=stage,
-                error_code="saved_secret_scope_mismatch",
-                retryable=False,
-                details={"reason": "channel_identity_mismatch"},
-                resolved_protocol=None,
-                models=[] if stage == "model_discovery" else None,
-                latency_ms=None,
-                redaction_values=redaction_values,
-            ), redaction_values
+            normalized_name = channel_name.strip().lower()
+            if not normalized_name or re.fullmatch(r"[a-z0-9_]+", normalized_name) is None:
+                return None, self._build_llm_channel_result(
+                    success=False,
+                    message="Saved secret scope mismatch",
+                    error="The saved connection identity is invalid",
+                    stage=stage,
+                    error_code="saved_secret_scope_mismatch",
+                    retryable=False,
+                    details={"reason": "channel_identity_mismatch"},
+                    resolved_protocol=None,
+                    models=[] if stage == "model_discovery" else None,
+                    latency_ms=None,
+                    redaction_values=redaction_values,
+                ), redaction_values
+
+            saved_map = self._manager.read_config_map()
+            prefix = f"LLM_{normalized_name.upper()}"
+            saved_provider_id = (saved_map.get(f"{prefix}_PROVIDER") or "").strip().lower()
+            submitted_provider_id = (provider_id or "").strip().lower()
+            saved_provider, saved_protocol, saved_base_url, saved_provider_issue = (
+                self._resolve_request_provider(
+                    provider_id=saved_provider_id,
+                    protocol=(saved_map.get(f"{prefix}_PROTOCOL") or "").strip(),
+                    base_url=(saved_map.get(f"{prefix}_BASE_URL") or "").strip(),
+                )
+            )
+            del saved_provider
+
+            def canonical_endpoint(value: str) -> str:
+                parsed = urlparse((value or "").strip())
+                return urlunparse((
+                    parsed.scheme.lower(),
+                    parsed.netloc.lower(),
+                    parsed.path.rstrip("/"),
+                    "",
+                    parsed.query,
+                    "",
+                ))
+
+            endpoint_matches = (
+                saved_provider_issue is None
+                and (not saved_provider_id or saved_provider_id == submitted_provider_id)
+                and (saved_protocol or "").strip().lower() == (protocol or "").strip().lower()
+                and canonical_endpoint(saved_base_url) == canonical_endpoint(base_url)
+            )
+            if not endpoint_matches:
+                return None, self._build_llm_channel_result(
+                    success=False,
+                    message="Saved secret scope mismatch",
+                    error="Connection endpoint changed; re-enter the API key before testing",
+                    stage=stage,
+                    error_code="saved_secret_scope_mismatch",
+                    retryable=False,
+                    details={"reason": "endpoint_mismatch"},
+                    resolved_protocol=(protocol or "").strip().lower() or None,
+                    models=[] if stage == "model_discovery" else None,
+                    latency_ms=None,
+                    redaction_values=redaction_values,
+                ), redaction_values
+
+            saved_key = (
+                (saved_map.get(f"{prefix}_API_KEYS") or "").strip()
+                or (saved_map.get(f"{prefix}_API_KEY") or "").strip()
+            )
+            runtime_key = (
+                (os.environ.get(f"{prefix}_API_KEYS") or "").strip()
+                or (os.environ.get(f"{prefix}_API_KEY") or "").strip()
+            )
+            if not saved_key or is_masked_secret_placeholder(saved_key):
+                error_code = (
+                    "runtime_secret_not_reusable"
+                    if is_masked_secret_placeholder(saved_key) or runtime_key
+                    else "missing_saved_secret"
+                )
+                return None, self._build_llm_channel_result(
+                    success=False,
+                    message=(
+                        "Runtime connection secret is not reusable"
+                        if error_code == "runtime_secret_not_reusable"
+                        else "Missing saved connection secret"
+                    ),
+                    error=(
+                        "Runtime-injected connection credentials cannot be reused from settings"
+                        if error_code == "runtime_secret_not_reusable"
+                        else "No saved connection credential is available for this endpoint"
+                    ),
+                    stage=stage,
+                    error_code=error_code,
+                    retryable=False,
+                    details={"reason": error_code},
+                    resolved_protocol=(protocol or "").strip().lower() or None,
+                    models=[] if stage == "model_discovery" else None,
+                    latency_ms=None,
+                    redaction_values=redaction_values,
+                ), redaction_values
+
+            redaction_values.update(self._build_redaction_values(saved_key))
+            return saved_key, {}, redaction_values
 
         saved_map = self._manager.read_config_map()
         saved_key = (saved_map.get("LLM_HERMES_API_KEY") or "").strip()

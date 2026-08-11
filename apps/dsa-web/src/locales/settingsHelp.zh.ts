@@ -1873,6 +1873,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP': {
     title: '允许可信代理 Fake-IP',
+    summary: '在可信工作站上允许公网域名使用 Clash/Mihomo 标准 Fake-IP 解析结果。',
+    usage: '默认保持关闭。仅当可信 Clash/Mihomo TUN 接管文档所列 Fake-IP 网段，且系统代理严格绑定回环地址时开启。',
+    valueNotes: [
+      '字面 Fake-IP URL、私网域名、metadata、链路本地地址和非回环代理仍会被拒绝。',
+      'Local Only Mode 优先级更高，仍会阻断所有非回环目标。',
+    ],
+    impact: ['仅为标准 Fake-IP 网段和精确配置的回环代理扩展出站 DNS 接受范围。'],
+    notes: ['不再信任 TUN 或回环代理时应立即关闭。'],
   },
   'settings.system.SMARTMONEY_ENABLED': {
     title: '启用 SmartMoney 资金流',

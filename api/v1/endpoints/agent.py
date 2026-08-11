@@ -290,7 +290,7 @@ async def agent_chat(
             turn_id=request.turn_id,
         )
             
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - map research failures to the stable API error after recording terminal history
         logger.error(
             "Agent chat API failed: session_id=%s exception_type=%s diagnostic=%s",
             session_id,
@@ -450,6 +450,17 @@ async def _run_research_in_background(
     )
 
 
+def _research_result_has_report(result: Any) -> bool:
+    """Return whether a research result contains a usable final report."""
+    report = getattr(result, "report", "")
+    return bool(
+        getattr(result, "success", False)
+        and not getattr(result, "timed_out", False)
+        and isinstance(report, str)
+        and report.strip()
+    )
+
+
 # ============================================================
 # Deep research endpoint
 # ============================================================
@@ -457,6 +468,13 @@ async def _run_research_in_background(
 class ResearchRequest(BaseModel):
     question: str
     stock_code: Optional[str] = None
+    session_id: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    turn_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^\S(?:.*\S)?$",
+    )
 
 class ResearchResponse(BaseModel):
     success: bool
@@ -467,7 +485,10 @@ class ResearchResponse(BaseModel):
 
 
 @router.post("/research", response_model=ResearchResponse)
-async def agent_research(request: ResearchRequest):
+async def agent_research(
+    request: ResearchRequest,
+    session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
+):
     """Run a deep-research query via the ResearchAgent.
 
     Similar to the ``/research`` bot command but exposed as a REST endpoint.
@@ -478,11 +499,22 @@ async def agent_research(request: ResearchRequest):
 
     question = request.question
     context: Optional[Dict[str, Any]] = None
+    research_started = False
+    research_terminal_recorded = False
     if request.stock_code:
         question = f"[Stock: {request.stock_code}] {question}"
         context = {"stock_code": request.stock_code}
 
     try:
+        if request.session_id:
+            session_service.record_research_start(
+                session_id=request.session_id,
+                question=request.question,
+                stock_code=request.stock_code,
+                turn_id=request.turn_id,
+            )
+            research_started = True
+
         from src.agent.research import ResearchAgent
         from src.agent.factory import get_tool_registry
         from src.agent.llm_adapter import LLMToolAdapter
@@ -499,18 +531,54 @@ async def agent_research(request: ResearchRequest):
 
         research_timeout = getattr(config, "agent_deep_research_timeout", 180)
 
-        result = await _run_research_in_background(
-            agent,
-            question,
-            context,
-            timeout=research_timeout,
+        research_task = asyncio.create_task(
+            _run_research_in_background(
+                agent,
+                question,
+                context,
+                timeout=research_timeout,
+            )
         )
+        try:
+            result = await asyncio.wait_for(
+                asyncio.shield(research_task),
+                timeout=research_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Agent research API reached its hard deadline after %ss",
+                research_timeout,
+            )
+            research_task.add_done_callback(_consume_detached_research_result)
+            if request.session_id:
+                session_service.record_research_failure(session_id=request.session_id)
+                research_terminal_recorded = True
+            return ResearchResponse(
+                success=False,
+                content="",
+                sources=[],
+                token_usage=0,
+                error=AGENT_RESEARCH_FAILED,
+            )
+        except asyncio.CancelledError:
+            if request.session_id:
+                research_task.add_done_callback(
+                    lambda task: _record_detached_research_result(
+                        task,
+                        session_service=session_service,
+                        session_id=request.session_id or "",
+                    )
+                )
+            raise
         if getattr(result, "timed_out", False):
             logger.warning(
                 "Agent research API timed out after %ss: diagnostic=%s",
                 research_timeout,
                 sanitize_agent_diagnostic(result.error),
             )
+            if request.session_id:
+                session_service.record_research_failure(session_id=request.session_id)
+                research_terminal_recorded = True
             return ResearchResponse(
                 success=False,
                 content="",
@@ -519,11 +587,16 @@ async def agent_research(request: ResearchRequest):
                 error=AGENT_RESEARCH_FAILED,
             )
 
-        if not result.success:
+        if not _research_result_has_report(result):
             logger.error(
                 "Agent research API failed: diagnostic=%s",
-                sanitize_agent_diagnostic(result.error),
+                sanitize_agent_diagnostic(
+                    result.error or "Research completed without a final report"
+                ),
             )
+            if request.session_id:
+                session_service.record_research_failure(session_id=request.session_id)
+                research_terminal_recorded = True
             return ResearchResponse(
                 success=False,
                 content="",
@@ -532,6 +605,12 @@ async def agent_research(request: ResearchRequest):
                 error=AGENT_RESEARCH_FAILED,
             )
 
+        if request.session_id:
+            session_service.record_research_success(
+                session_id=request.session_id,
+                content=result.report,
+            )
+            research_terminal_recorded = True
         return ResearchResponse(
             success=True,
             content=result.report,
@@ -539,13 +618,66 @@ async def agent_research(request: ResearchRequest):
             token_usage=result.total_tokens,
             error=None,
         )
+    except asyncio.CancelledError:
+        raise
     except Exception as exc:
+        if request.session_id and research_started and not research_terminal_recorded:
+            try:
+                session_service.record_research_failure(session_id=request.session_id)
+            except Exception as persist_exc:  # broad-exception: fallback_recorded - history failure is logged while the original API failure remains authoritative
+                logger.error(
+                    "Agent research failure history persistence failed: exception_type=%s diagnostic=%s",
+                    type(persist_exc).__name__,
+                    sanitize_agent_diagnostic(persist_exc),
+                )
         logger.error(
             "Agent research API failed: exception_type=%s diagnostic=%s",
             type(exc).__name__,
             sanitize_agent_diagnostic(exc),
         )
         raise api_error(500, AGENT_RESEARCH_FAILED, AGENT_RESEARCH_FAILURE_MESSAGE)
+
+
+def _consume_detached_research_result(task: asyncio.Task) -> None:
+    """Retrieve a late research result without persisting it after an API timeout."""
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        return
+    except Exception as exc:  # broad-exception: cleanup - detached task exceptions must be consumed and logged
+        logger.warning(
+            "Detached timed-out research task failed: exception_type=%s diagnostic=%s",
+            type(exc).__name__,
+            sanitize_agent_diagnostic(exc),
+        )
+
+
+def _record_detached_research_result(
+    task: asyncio.Task,
+    *,
+    session_service: AgentChatSessionService,
+    session_id: str,
+) -> None:
+    """Persist a research task that outlived its disconnected HTTP request."""
+    try:
+        result = task.result()
+        if _research_result_has_report(result):
+            session_service.record_research_success(
+                session_id=session_id,
+                content=result.report,
+            )
+        else:
+            session_service.record_research_failure(session_id=session_id)
+    except (asyncio.CancelledError, Exception) as exc:  # broad-exception: fallback_recorded - detached research must persist or log a terminal failure
+        try:
+            session_service.record_research_failure(session_id=session_id)
+        except Exception:  # broad-exception: cleanup - terminal persistence is best-effort and the outer handler records the task failure
+            pass
+        logger.error(
+            "Detached Agent research failed: exception_type=%s diagnostic=%s",
+            type(exc).__name__,
+            sanitize_agent_diagnostic(exc),
+        )
 
 
 @router.post("/chat/stream")

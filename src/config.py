@@ -16,6 +16,7 @@ import logging
 import math as _math
 import os
 import re
+import shutil as _shutil
 import sys as _sys
 import types as _types
 from pathlib import Path
@@ -51,7 +52,9 @@ from src.llm.backend_registry import (
     SUPPORTED_AGENT_GENERATION_BACKENDS,
     SUPPORTED_AGENT_UI_BACKENDS,
     SUPPORTED_GENERATION_BACKENDS,
+    resolve_agent_generation_backend_id as _resolve_agent_generation_backend_id,
 )
+from src.llm.generation_backend import GenerationError as _GenerationError
 from src.llm.local_cli_backend import (
     DEFAULT_GENERATION_BACKEND_MAX_CONCURRENCY,
     DEFAULT_LOCAL_CLI_BACKEND_MAX_CONCURRENCY,
@@ -61,6 +64,7 @@ from src.llm.local_cli_backend import (
     MAX_LOCAL_CLI_BACKEND_MAX_CONCURRENCY,
     MAX_LOCAL_CLI_OUTPUT_BYTES,
     MAX_LOCAL_CLI_TIMEOUT_SECONDS,
+    resolve_local_cli_preset as _resolve_local_cli_preset,
 )
 from src.llm import generation_params as llm_generation_params
 from src.llm.provider_catalog_data import get_provider_ids, get_static_provider

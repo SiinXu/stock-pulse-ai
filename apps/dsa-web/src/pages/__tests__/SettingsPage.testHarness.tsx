@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, vi } from 'vitest';
+import type { ParsedApiError } from '../../api/error';
 import type { LlmConnectionFieldSchema } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
@@ -547,13 +548,18 @@ vi.mock('../../components/settings', async () => {
   SettingsErrorSummary: ({
     entries,
     onJump,
+    dismissLabel,
+    onDismiss,
   }: {
     entries: Array<{ key: string; label: string; message: string; section: string; view: string }>;
     onJump: (entry: { key: string; label: string; message: string; section: string; view: string }) => void;
+    dismissLabel?: string;
+    onDismiss?: () => void;
   }) => (
     entries.length ? (
       <div role="alert">
         <p>{`有 ${entries.length} 项配置需要修正`}</p>
+        {onDismiss ? <button type="button" onClick={onDismiss}>{dismissLabel}</button> : null}
         <ul>
           {entries.map((entry) => (
             <li key={entry.key}>
@@ -606,8 +612,8 @@ type ConfigState = {
   clearToast: typeof clearToast;
   isLoading: boolean;
   isSaving: boolean;
-  loadError: null;
-  saveError: null;
+  loadError: ParsedApiError | null;
+  saveError: ParsedApiError | null;
   retryAction: null;
   conflictState?: {
     fields: Array<{

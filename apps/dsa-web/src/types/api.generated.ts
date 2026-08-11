@@ -12239,8 +12239,12 @@ export interface components {
         ResearchRequest: {
             /** Question */
             question: string;
+            /** Session Id */
+            session_id?: string | null;
             /** Stock Code */
             stock_code?: string | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ResearchResponse */
         ResearchResponse: {
@@ -14909,6 +14913,12 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+            /**
+             * Model Id Mode
+             * @default route
+             * @enum {string}
+             */
+            model_id_mode: "route" | "literal";
             /** Models */
             models?: string[];
             /**

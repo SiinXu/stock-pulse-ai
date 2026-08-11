@@ -22195,6 +22195,19 @@
             "title": "Question",
             "type": "string"
           },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
           "stock_code": {
             "anyOf": [
               {
@@ -22205,6 +22218,20 @@
               }
             ],
             "title": "Stock Code"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S(?:.*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -28503,6 +28530,15 @@
             "default": true,
             "title": "Enabled",
             "type": "boolean"
+          },
+          "model_id_mode": {
+            "default": "route",
+            "enum": [
+              "route",
+              "literal"
+            ],
+            "title": "Model Id Mode",
+            "type": "string"
           },
           "models": {
             "items": {

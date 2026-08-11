@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { BellPlus, LineChart as LineChartIcon, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { BellPlus, GitCompareArrows, LineChart as LineChartIcon, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { stocksApi } from '../api/stocks';
 import { systemConfigApi } from '../api/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
@@ -21,6 +21,8 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
+import { DcfSensitivityPanel } from '../components/valuation';
+import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   buildStockDetailsHistoryQueryKey,
@@ -29,6 +31,7 @@ import {
   useStockDetailsQuoteQuery,
 } from '../hooks';
 import type { UiTextKey } from '../i18n/uiText';
+import { REPORT_VERSION_COMPARE_TEXT } from '../locales/reportVersionCompare';
 import type {
   StockHistoryCandle,
   StockHistoryPeriod,
@@ -38,6 +41,7 @@ import { aggregateCandles, summarizeCandles } from '../utils/klineAggregate';
 import {
   SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
+  buildReportVersionCompareHref,
   buildSignalCenterHref,
 } from '../routing/routes';
 import { normalizeStockCode } from '../utils/stockCode';
@@ -351,6 +355,8 @@ const StockDetailsPage: React.FC = () => {
     { id: 'volume', header: t('stocks.workspace.volume'), cell: (candle) => formatQuantity(candle.volume, language) },
   ];
 
+  const valuationText = VALUATION_TEXT[language] ?? VALUATION_TEXT.en;
+
   return (
     <AppPage className="max-w-none">
       <div className="space-y-5">
@@ -383,6 +389,15 @@ const StockDetailsPage: React.FC = () => {
           <Button type="button" variant="secondary" size="comfortable" onClick={() => navigate(buildAnalysisWorkbenchHref({ stock: canonicalCode }))}>
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             {t('stocks.workspace.analyze')}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="comfortable"
+            onClick={() => navigate(buildReportVersionCompareHref({ stock: canonicalCode }))}
+          >
+            <GitCompareArrows className="h-4 w-4" aria-hidden="true" />
+            {REPORT_VERSION_COMPARE_TEXT[language].title}
           </Button>
           <Button
             type="button"
@@ -545,6 +560,10 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
+          <DcfSensitivityPanel stockCode={canonicalCode} />
+        </section>
       </div>
     </AppPage>
   );

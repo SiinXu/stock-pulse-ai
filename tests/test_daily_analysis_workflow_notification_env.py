@@ -68,6 +68,15 @@ def test_daily_analysis_maps_p6_channel_env_keys() -> None:
         assert key in env
 
 
+def test_daily_analysis_maps_delta_first_as_an_opt_in_switch() -> None:
+    env = _load_daily_analysis_env()
+
+    expression = str(env["NOTIFICATION_DELTA_FIRST"])
+    assert "vars.NOTIFICATION_DELTA_FIRST" in expression
+    assert "secrets.NOTIFICATION_DELTA_FIRST" in expression
+    assert "'false'" in expression
+
+
 def test_daily_analysis_feishu_status_accepts_webhook_or_app_bot_triad() -> None:
     status_line = next(
         line

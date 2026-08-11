@@ -51,6 +51,7 @@ import { TaskPanel } from '../components/tasks';
 import type { WatchlistAnalyzeMode } from '../components/watchlist/HomeStockWorkspace';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { useAnalysisWorkbenchErrorContract } from '../hooks/useAnalysisWorkbenchErrorContract';
+import { useAnalysisErrorToast } from '../hooks/useAnalysisErrorToast';
 import { useAnalysisWorkbenchState } from '../hooks/useAnalysisWorkbenchState';
 import { useDashboardLifecycle } from '../hooks/useDashboardLifecycle';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -62,6 +63,7 @@ import {
   HOME_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
   type AnalysisWorkbenchSegment,
+  buildReportVersionCompareHref,
 } from '../routing/routes';
 import {
   DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
@@ -70,7 +72,7 @@ import {
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
 import { useStockPoolStore, type SubmitAnalysisOptions } from '../stores/stockPoolStore';
-import type { AnalysisPhase, StockReportType, TaskInfo } from '../types/analysis';
+import type { AnalysisPhase, HistoryItem, StockReportType, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { buildDeepLink } from '../utils/deepLink';
@@ -775,6 +777,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       return new Set(visibleIds);
     });
   }, [analysisHistoryItems]);
+  const compareSelectedHistory = useCallback((items: readonly [HistoryItem, HistoryItem]) => navigate(
+    buildReportVersionCompareHref({ stock: items[0].stockCode, baseRunId: items[0].id, targetRunId: items[1].id }),
+  ), [navigate]);
   const requestDeleteSelectedHistory = useCallback(() => {
     if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
     setDeleteError(null);
@@ -1036,13 +1041,10 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     lastBatchIntentRef.current = null;
     setBatchNotice(null);
   }, []);
+  const analysisErrorIsToastOnly = useAnalysisErrorToast(error, clearError);
   const hasWorkbenchErrorNotice = Boolean(
-    inputError
-    || duplicateError
-    || error
-    || reportDetailError
-    || runFlowError
-    || batchNotice,
+    inputError || duplicateError || (error && !analysisErrorIsToastOnly)
+    || reportDetailError || runFlowError || batchNotice,
   );
   return (
     <AppPage data-testid="analysis-workbench-page">
@@ -1087,7 +1089,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             inputError={inputError}
             duplicateError={duplicateError}
             duplicateTask={duplicateTask}
-            analysisError={error}
+            analysisError={analysisErrorIsToastOnly ? null : error}
             reportDetailError={reportDetailError}
             runFlowError={runFlowError}
             batchNotice={batchNotice}
@@ -1212,6 +1214,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                     onToggleItemSelection={toggleHistorySelection}
                     onToggleSelectAll={toggleAllHistory}
                     onDeleteSelected={requestDeleteSelectedHistory}
+                    onCompareSelected={compareSelectedHistory}
                   />
                   {selectedAnalysisReport ? (
                     <>

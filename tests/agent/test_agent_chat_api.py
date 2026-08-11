@@ -165,6 +165,57 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     assert "tool_calls" not in response.text
 
 
+def test_chat_session_messages_api_restores_public_tool_details(tmp_path: Path) -> None:
+    DatabaseManager.reset_instance()
+    Config.reset_instance()
+    db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'tool-details.db'}")
+    session_id = "api-tool-details"
+    db.save_conversation_message(session_id, "user", "show the history")
+    db.save_conversation_message(
+        session_id,
+        "assistant",
+        "visible answer",
+        context={
+            "thinking_steps": [{
+                "type": "tool_done",
+                "step": 1,
+                "tool": "get_daily_history",
+                "success": True,
+                "duration": 0.5,
+                "meta": {
+                    "arguments": {
+                        "stock_code": "600519",
+                        "api_key": "sk-private-tool-key",
+                    },
+                    "result_preview": json.dumps({
+                        "authorization": "Bearer private-result-token",
+                        "rows": "x" * 2000,
+                    }),
+                    "result_length": 2100,
+                    "cached": False,
+                },
+            }],
+        },
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        client = TestClient(create_app(static_dir=tmp_path / "static"))
+        response = client.get(f"/api/v1/agent/chat/sessions/{session_id}")
+
+    assert response.status_code == 200
+    params = response.json()["messages"][1]["params"]
+    assert params["thinking_steps"][0]["tool"] == "get_daily_history"
+    assert params["thinking_steps"][0]["meta"]["arguments"] == {
+        "stock_code": "600519",
+        "api_key": "[REDACTED]",
+    }
+    result_preview = params["thinking_steps"][0]["meta"]["result_preview"]
+    assert len(result_preview) <= 1200
+    assert "private-result-token" not in result_preview
+    assert "[REDACTED]" in result_preview
+    assert "sk-private-tool-key" not in response.text
+
+
 def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
     executor = MagicMock()
     executor.chat.return_value = SimpleNamespace(
@@ -500,6 +551,97 @@ def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) 
     }
     assert "super-secret" not in response.text
     assert "private.example" not in response.text
+
+
+def test_agent_research_rejects_a_successful_result_with_an_empty_report(
+    tmp_path: Path,
+) -> None:
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="zh",
+        agent_deep_research_budget=30000,
+        agent_deep_research_timeout=180,
+    )
+    research_result = SimpleNamespace(
+        success=True,
+        report="   ",
+        sub_questions=["What is the conclusion?"],
+        total_tokens=42,
+        error=None,
+        timed_out=False,
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch(
+                "api.v1.endpoints.agent._run_research_in_background",
+                new=AsyncMock(return_value=research_result),
+            ):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/research",
+                    json={"question": "研究空结论场景"},
+                )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": False,
+        "content": "",
+        "sources": [],
+        "token_usage": 0,
+        "error": "agent_research_failed",
+    }
+
+
+def test_agent_research_persists_the_current_chat_session(tmp_path: Path) -> None:
+    from api.deps import get_agent_chat_session_service
+
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        report_language="en",
+        agent_deep_research_budget=30000,
+        agent_deep_research_timeout=180,
+    )
+    research_result = SimpleNamespace(
+        success=True,
+        report="Persisted research report.",
+        sub_questions=["What is the moat?"],
+        total_tokens=42,
+        error=None,
+        timed_out=False,
+    )
+    session_service = MagicMock()
+    app = create_app(static_dir=tmp_path / "static")
+    app.dependency_overrides[get_agent_chat_session_service] = lambda: session_service
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch(
+                "api.v1.endpoints.agent._run_research_in_background",
+                new=AsyncMock(return_value=research_result),
+            ):
+                client = TestClient(app)
+                response = client.post(
+                    "/api/v1/agent/research",
+                    json={
+                        "question": "What is the moat?",
+                        "stock_code": "AAPL",
+                        "session_id": "research-session",
+                        "turn_id": "research-turn-1",
+                    },
+                )
+
+    assert response.status_code == 200
+    session_service.record_research_start.assert_called_once_with(
+        session_id="research-session",
+        question="What is the moat?",
+        stock_code="AAPL",
+        turn_id="research-turn-1",
+    )
+    session_service.record_research_success.assert_called_once_with(
+        session_id="research-session",
+        content="Persisted research report.",
+    )
 
 
 def test_agent_research_timeout_does_not_expose_internal_result(tmp_path: Path) -> None:

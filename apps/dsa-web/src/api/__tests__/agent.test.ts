@@ -16,19 +16,27 @@ describe('agentApi.research', () => {
     mockGet.mockReset();
   });
 
-  it('POSTs the question with snake_case stock_code, a long timeout, and the abort signal', async () => {
+  it('POSTs the question with session identity and a long timeout', async () => {
     mockPost.mockResolvedValue({
       data: { success: true, content: '# Findings', sources: ['q1', 'q2'], token_usage: 100 },
     });
-    const controller = new AbortController();
     const result = await agentApi.research(
-      { question: 'Why?', stockCode: '600519' },
-      { signal: controller.signal },
+      {
+        question: 'Why?',
+        stockCode: '600519',
+        sessionId: 'session-1',
+        turnId: 'turn-1',
+      },
     );
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v1/agent/research',
-      { question: 'Why?', stock_code: '600519' },
-      expect.objectContaining({ timeout: 200000, signal: controller.signal }),
+      {
+        question: 'Why?',
+        stock_code: '600519',
+        session_id: 'session-1',
+        turn_id: 'turn-1',
+      },
+      expect.objectContaining({ timeout: 200000 }),
     );
     expect(result.success).toBe(true);
     expect(result.sources).toEqual(['q1', 'q2']);
@@ -41,7 +49,12 @@ describe('agentApi.research', () => {
     const result = await agentApi.research({ question: 'Q' });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v1/agent/research',
-      { question: 'Q', stock_code: undefined },
+      {
+        question: 'Q',
+        stock_code: undefined,
+        session_id: undefined,
+        turn_id: undefined,
+      },
       expect.any(Object),
     );
     expect(result.error).toBe('timed out');

@@ -118,10 +118,15 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
   }]],
   ['../common/InlineAlert.tsx', [{
-    line: 26,
+    line: 52,
     owner: 'UIUX-HARNESS',
-    removeWhen: 'InlineAlert callers no longer need layout className or native style pass-through after wrapper migration.',
-    tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
+    removeWhen: 'InlineAlert callers no longer need native attribute pass-through after wrapper migration.',
+    tokens: [
+      'dynamic:className spread:sharedProps',
+      'dynamic:className spread:dismissProps',
+      'style:dynamic:style spread:sharedProps',
+      'style:dynamic:style spread:dismissProps',
+    ],
   }]],
   ['../common/Loading.tsx', [{
     line: 14,

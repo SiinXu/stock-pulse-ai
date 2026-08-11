@@ -425,7 +425,7 @@ class TodaysFocusService:
             elif excluded_non_finite_positions > 0 and universe_count == 0:
                 empty_reason = "insufficient_finite_data"
                 empty_message = (
-                    "Position amount/weight/change values were non-finite; "
+                    "Position amount/weight/change values were non-finite or missing; "
                     "no trustworthy focus conclusion is available."
                 )
             else:

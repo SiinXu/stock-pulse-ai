@@ -104,6 +104,8 @@ export interface ChatSessionDetail {
 export interface ResearchRequest {
   question: string;
   stockCode?: string;
+  sessionId?: string;
+  turnId?: string;
 }
 
 export interface ResearchResponse {
@@ -165,7 +167,7 @@ const sessionsResponseSchema = z.object({
 
 const sessionMessageSchema = z.object({
   id: z.string(),
-  role: z.string(),
+  role: z.enum(['user', 'assistant']),
   content: z.string(),
   created_at: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
@@ -217,16 +219,18 @@ function parseSnakeCasePayload<T>(
 }
 
 export const agentApi = {
-  // Deep Research is synchronous (no task id / SSE); it can take up to ~180s,
-  // so allow a long timeout and support cancellation via an AbortSignal.
-  async research(
-    payload: ResearchRequest,
-    options?: { signal?: AbortSignal },
-  ): Promise<ResearchResponse> {
+  // Deep Research can take up to ~180s. The server persists session-bound
+  // runs, including when the page stops waiting for the HTTP response.
+  async research(payload: ResearchRequest): Promise<ResearchResponse> {
     const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/agent/research',
-      { question: payload.question, stock_code: payload.stockCode },
-      { timeout: 200000, signal: options?.signal },
+      {
+        question: payload.question,
+        stock_code: payload.stockCode,
+        session_id: payload.sessionId,
+        turn_id: payload.turnId,
+      },
+      { timeout: 200000 },
     );
     const parsed = parseSnakeCasePayload<ResearchResponse>(
       response.data,

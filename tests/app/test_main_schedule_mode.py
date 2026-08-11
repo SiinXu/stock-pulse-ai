@@ -1231,6 +1231,50 @@ class MainScheduleModeTestCase(unittest.TestCase):
         pipeline.run.assert_called_once()
         run_market_review.assert_not_called()
 
+    def test_run_full_analysis_applies_delta_prefix_to_combined_stock_notification(self) -> None:
+        args = self._make_args()
+        config = self._make_config(
+            trading_day_check_enabled=False,
+            market_review_enabled=True,
+            daily_market_context_enabled=False,
+            single_stock_notify=False,
+            merge_email_notification=True,
+            analysis_delay=0,
+            report_type="simple",
+            database_path=str(Path(self.temp_dir.name) / "stock_analysis.db"),
+        )
+        result = SimpleNamespace(
+            code="600519",
+            name="Kweichow Moutai",
+            sentiment_score=72,
+            operation_advice="Hold",
+            trend_prediction="Bullish",
+            get_emoji=lambda: "ok",
+        )
+        pipeline = MagicMock()
+        pipeline.run.return_value = [result]
+        pipeline.notifier.generate_aggregate_report.return_value = "stock report"
+        pipeline._format_delta_first_notification.return_value = "delta stock report"
+        pipeline.notifier.is_available.return_value = True
+        pipeline.notifier.send.return_value = True
+
+        with (
+            patch.object(main, "_refresh_stock_index_cache_for_analysis"),
+            patch("main._compute_trading_day_filter", return_value=(["600519"], "cn", False)),
+            patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline),
+            patch("main._run_market_review_with_shared_lock", return_value=None),
+        ):
+            main.run_full_analysis(config, args, ["600519"])
+
+        pipeline._format_delta_first_notification.assert_called_once_with(
+            "stock report",
+            [result],
+            "simple",
+        )
+        sent_content = pipeline.notifier.send.call_args.args[0]
+        self.assertIn("delta stock report", sent_content)
+        self.assertNotIn("\n\nstock report", sent_content)
+
     def test_run_full_analysis_disables_generation_when_no_market_review_flag_set(self) -> None:
         args = self._make_args(no_market_review=True)
         config = self._make_config(

@@ -99,8 +99,8 @@ describe('settingsInformationArchitecture', () => {
   it('exposes bilingual section and view labels', () => {
     expect(sectionLabel('ai_models', 'zh')).toBe('AI 与模型');
     expect(sectionLabel('ai_models', 'en')).toBe('AI & Models');
-    expect(viewLabel('ai_models', 'connections', 'zh')).toBe('模型接入');
-    expect(viewLabel('ai_models', 'connections', 'en')).toBe('Model Access');
+    expect(viewLabel('ai_models', 'connections', 'zh')).toBe('模型来源');
+    expect(viewLabel('ai_models', 'connections', 'en')).toBe('Model Sources');
     expect(viewLabel('ai_models', SETTINGS_VIEW_IDS.aiModels.localModels, 'zh')).toBe('本地模型');
     expect(viewLabel('ai_models', SETTINGS_VIEW_IDS.aiModels.localModels, 'en')).toBe('Local Models');
     expect(viewLabel('ai_models', 'task_routing', 'zh')).toBe('任务路由');

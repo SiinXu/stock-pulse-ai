@@ -1488,6 +1488,30 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["reserved_flag"],
     },
+    "NOTIFICATION_DELTA_FIRST": {
+        "title": "Notification Delta First",
+        "description": "Prefer a concise change summary before the full notification payload when prior comparable state exists.",
+        "category": "notification",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 71,
+        "help_key": "settings.notification.DAILY_DIGEST_ENABLED",
+        "examples": [
+            "NOTIFICATION_DELTA_FIRST=false",
+            "NOTIFICATION_DELTA_FIRST=true",
+        ],
+        "docs": [{
+            "label": "Notification guide",
+            "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/notifications.md",
+        }],
+        "warning_codes": [],
+    },
     "SHARE_IMAGE_MAX_CHARS": {
         "title": "Share Image Max Characters",
         "description": (

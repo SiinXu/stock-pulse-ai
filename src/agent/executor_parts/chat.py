@@ -18,6 +18,7 @@ from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
+    build_agent_tool_history_context,
     sanitize_agent_diagnostic,
 )
 from src.agent.runtime.contract import ExecutionState
@@ -238,7 +239,17 @@ class _ChatMethods:
         # message and no late partial trace behind.
         terminal_state = classify_result_terminal_state(result)
         if terminal_state is ExecutionState.SUCCEEDED:
-            assistant_message_id = conversation_manager.add_message(session_id, "assistant", result.content)
+            history_context = build_agent_tool_history_context(result.tool_calls_log)
+            assistant_message_id = (
+                conversation_manager.add_message(
+                    session_id,
+                    "assistant",
+                    result.content,
+                    context=history_context,
+                )
+                if history_context
+                else conversation_manager.add_message(session_id, "assistant", result.content)
+            )
             self._persist_provider_trace(
                 session_id=session_id,
                 run_id=run_id,

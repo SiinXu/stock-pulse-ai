@@ -362,6 +362,7 @@ function toSnakeTestChannelPayload(payload: TestLLMChannelRequest): Record<strin
     base_url: payload.baseUrl ?? '',
     api_key: payload.apiKey ?? '',
     models: payload.models,
+    model_id_mode: payload.modelIdMode ?? 'route',
     enabled: payload.enabled ?? true,
     timeout_seconds: payload.timeoutSeconds ?? 20,
     use_saved_secret: payload.useSavedSecret ?? false,
