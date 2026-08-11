@@ -42,10 +42,6 @@ import {
 import { AnalysisContextSummary } from '../../components/report/AnalysisContextSummary';
 import { MarketReviewReportView } from '../../components/report/MarketReviewReportView';
 import { MarketStructureCard } from '../../components/report/MarketStructureCard';
-import { ReportMarkdown } from '../../components/report/ReportMarkdown';
-import { ReportMarkdownBody } from '../../components/report/ReportMarkdownBody';
-import { ReportMarkdownDrawer } from '../../components/report/ReportMarkdownDrawer';
-import { ReportMarkdownPanel } from '../../components/report/ReportMarkdownPanel';
 import { ReportNews } from '../../components/report/ReportNews';
 import { ReportOverview } from '../../components/report/ReportOverview';
 import { ReportStrata } from '../../components/report/ReportStrata';
@@ -627,42 +623,6 @@ const MarketStructureCardStory = () => {
   return <MarketStructureCard context={scenario === 'empty' ? null : fixtureMarketStructure} language="en" />;
 };
 
-const ReportMarkdownStory = () => (
-  <ReportMarkdown
-    recordId={FIXTURE_RECORD_ID}
-    stockName={fixtureReport.meta.stockName || fixtureReport.meta.stockCode}
-    stockCode={fixtureReport.meta.stockCode}
-    reportLanguage="en"
-    onClose={() => undefined}
-  />
-);
-
-const ReportMarkdownBodyStory = () => (
-  <div className="rounded-lg border border-border bg-card p-5">
-    <ReportMarkdownBody content={fixtureMarketReviewPayload.markdownReport || ''} />
-  </div>
-);
-
-const ReportMarkdownDrawerStory = () => (
-  <ReportMarkdownDrawer
-    recordId={FIXTURE_RECORD_ID}
-    stockName={fixtureReport.meta.stockName || fixtureReport.meta.stockCode}
-    stockCode={fixtureReport.meta.stockCode}
-    reportLanguage="en"
-    onClose={() => undefined}
-  />
-);
-
-const ReportMarkdownPanelStory = () => (
-  <ReportMarkdownPanel
-    recordId={FIXTURE_RECORD_ID}
-    stockName={fixtureReport.meta.stockName || fixtureReport.meta.stockCode}
-    stockCode={fixtureReport.meta.stockCode}
-    reportLanguage="en"
-    onRequestClose={() => undefined}
-  />
-);
-
 const ReportNewsStory = () => <ReportNews recordId={fixtureReport.meta.id} limit={8} language="en" />;
 
 const ReportOverviewStory = () => {
@@ -826,10 +786,6 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
   'market-structure-card': MarketStructureCardStory,
-  'report-markdown': ReportMarkdownStory,
-  'report-markdown-body': ReportMarkdownBodyStory,
-  'report-markdown-drawer': ReportMarkdownDrawerStory,
-  'report-markdown-panel': ReportMarkdownPanelStory,
   'report-news': ReportNewsStory,
   'report-overview': ReportOverviewStory,
   'share-image-button': ShareImageButtonStory,

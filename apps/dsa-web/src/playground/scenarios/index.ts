@@ -51,6 +51,21 @@ const LAZY_RISK_GATE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   )),
 };
 
+const LAZY_REPORT_MARKDOWN_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'report-markdown': createLazyScenario(async () => (
+    (await import('./reportMarkdown')).default[0]
+  )),
+  'report-markdown-body': createLazyScenario(async () => (
+    (await import('./reportMarkdown')).default[1]
+  )),
+  'report-markdown-drawer': createLazyScenario(async () => (
+    (await import('./reportMarkdown')).default[2]
+  )),
+  'report-markdown-panel': createLazyScenario(async () => (
+    (await import('./reportMarkdown')).default[3]
+  )),
+};
+
 const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRenderer> = {
   'dcf-sensitivity-panel': createLazyScenario(async () => (
     (await import('./valuationScenarios')).VALUATION_SCENARIOS['dcf-sensitivity-panel']
@@ -66,6 +81,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...ALERT_HISTORY_SCENARIOS,
   ...DECISION_REPORT_RUN_FLOW_SCENARIOS,
   ...LAZY_RISK_GATE_SCENARIOS,
+  ...LAZY_REPORT_MARKDOWN_SCENARIOS,
   ...SKILL_OUTCOME_SCENARIOS,
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
