@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #957 adds the complete event-alert locale inventory without expanding the i18n baseline. Locale chunks were remeasured with 200 B headroom; playground scenarios are code-split so the PlaygroundRenderPage route remains within its existing cap.",
+  "baselineNote": "PR #1010 security-audit settings combined with PR #1030 historical long-tail Settings inventory and current main. Affected chunks were remeasured from the merged production build with 200 B headroom and no i18n baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 220606,
-      "measuredGzipBytes": 220406,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 220406 B + 200 B headroom."
+      "maxGzipBytes": 231908,
+      "measuredGzipBytes": 231708,
+      "note": "Remeasured after combining PR #1010 security-audit Settings with PR #1030 historical long-tail Settings inventory; measured 231708 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 143131,
-      "measuredGzipBytes": 142931,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 142931 B + 200 B headroom."
+      "maxGzipBytes": 150213,
+      "measuredGzipBytes": 150013,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 150013 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 136839,
-      "measuredGzipBytes": 136639,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 136639 B + 200 B headroom."
+      "maxGzipBytes": 143593,
+      "measuredGzipBytes": 143393,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 143393 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 137098,
-      "measuredGzipBytes": 136898,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 136898 B + 200 B headroom."
+      "maxGzipBytes": 143735,
+      "measuredGzipBytes": 143535,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 143535 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 137486,
-      "measuredGzipBytes": 137286,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 137286 B + 200 B headroom."
+      "maxGzipBytes": 144108,
+      "measuredGzipBytes": 143908,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 143908 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 133427,
-      "measuredGzipBytes": 133227,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 133227 B + 200 B headroom."
+      "maxGzipBytes": 139755,
+      "measuredGzipBytes": 139555,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 139555 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 130155,
-      "measuredGzipBytes": 129955,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 129955 B + 200 B headroom."
+      "maxGzipBytes": 136351,
+      "measuredGzipBytes": 136151,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 136151 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 123852,
-      "measuredGzipBytes": 123652,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 123652 B + 200 B headroom."
+      "maxGzipBytes": 129935,
+      "measuredGzipBytes": 129735,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 129735 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 123994,
-      "measuredGzipBytes": 123794,
-      "note": "Remeasured after adding the complete event-alert locale inventory (PR #957); measured 123794 B + 200 B headroom."
+      "maxGzipBytes": 129986,
+      "measuredGzipBytes": 129786,
+      "note": "Remeasured after combining PR #1010 security-audit translations with current main; measured 129786 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",

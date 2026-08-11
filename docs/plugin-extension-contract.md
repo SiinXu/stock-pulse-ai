@@ -333,7 +333,8 @@ Example `manifest.json`:
   "author": "Example Maintainer",
   "permissions": ["network", "environment"],
   "apiVersion": "1",
-  "entrypoint": "plugin.py:Plugin"
+  "entrypoint": "plugin.py:Plugin",
+  "settings": []
 }
 ```
 
@@ -348,6 +349,15 @@ Example `manifest.json`:
 | `permissions` | Required list of permission IDs using plugin-id syntax or ToolSurface `name:action` capability form. Visible in startup logs, health snapshots, and lifecycle audit metadata. For `agent_tool` plugins, every `ToolPolicy.permissions` entry must be a subset of this list at load time (stable error `manifest_permissions_undeclared`); extra declarations are allowed. **Not a sandbox** — declaration does not isolate process privileges. |
 | `apiVersion` | Optional plugin API major; defaults to `"1"`. |
 | `entrypoint` | Optional external entrypoint; defaults to `plugin.py:Plugin`. It must remain relative to the plugin directory. |
+| `settings` | Optional host-rendered scalar settings schema. Keys are unique lowercase plugin-setting IDs; types/controls, options, defaults, validation bounds, regexes, and finite numeric values are validated strictly. Sensitive fields must use `string`/`password` and cannot declare plaintext defaults. Plugin frontend code is not accepted. |
+
+Effective settings are projected into the immutable `PluginContext.settings`
+mapping on each load/enable. The host persists explicit overrides per plugin,
+masks sensitive response values, and validates a full replacement before an
+atomic write. An enabled plugin is not mutated in place: after a settings update,
+operators must re-enable it or restart the process before relying on the new
+values. The persistence file is local plaintext protected by OS file permissions,
+not an encrypted secret store.
 
 `version`, `minAppVersion`, and `apiVersion` have different meanings. A plugin
 release does not change the extension contract version, and an extension

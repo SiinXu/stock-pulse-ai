@@ -755,6 +755,41 @@ class ScheduledTaskRepository:
                 session.expunge(row)
             return list(rows)
 
+    def list_recent_runs_between(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        statuses: Sequence[str],
+        limit: int = 500,
+    ) -> List[ScheduledTaskRunRecord]:
+        """List the newest bounded run occurrences by terminal event time."""
+        normalized_statuses = tuple(
+            sorted({str(status).strip() for status in statuses if str(status).strip()})
+        )
+        if not normalized_statuses:
+            return []
+        occurred_at = func.coalesce(
+            ScheduledTaskRunRecord.finished_at,
+            ScheduledTaskRunRecord.updated_at,
+            ScheduledTaskRunRecord.created_at,
+            ScheduledTaskRunRecord.scheduled_for,
+        )
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(ScheduledTaskRunRecord)
+                .where(
+                    ScheduledTaskRunRecord.status.in_(normalized_statuses),
+                    occurred_at >= start,
+                    occurred_at < end,
+                )
+                .order_by(desc(occurred_at), desc(ScheduledTaskRunRecord.id))
+                .limit(max(1, min(int(limit), 5000)))
+            ).scalars().all()
+            for row in rows:
+                session.expunge(row)
+            return list(rows)
+
     def count_runs(self, task_id: str) -> int:
         """Count occurrence records for one definition."""
         with self.db.get_session() as session:
