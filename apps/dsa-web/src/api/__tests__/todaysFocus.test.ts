@@ -112,7 +112,7 @@ describe('getTodaysFocus', () => {
   it('validates and camel-cases typed evidence', async () => {
     get.mockResolvedValueOnce({ data: validPayload() });
     const result = await getTodaysFocus({ maxItems: 5, accountId: 2, language: 'en' });
-    expect(get).toHaveBeenCalledWith('/focus/today', {
+    expect(get).toHaveBeenCalledWith('/api/v1/focus/today', {
       params: { max_items: 5, account_id: 2, language: 'en' },
     });
     expect(result.items[0].evidence).toMatchObject({

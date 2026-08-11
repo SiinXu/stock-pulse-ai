@@ -205,7 +205,13 @@ test.describe('web smoke', () => {
       });
     });
     await mockCompletedSetupStatus(page);
+    const focusResponse = page.waitForResponse((response) => (
+      response.url().includes('/api/v1/focus/today')
+      && response.request().method() === 'GET'
+    ));
     await login(page);
+
+    expect((await focusResponse).status()).toBe(200);
 
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();
