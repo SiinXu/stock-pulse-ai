@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #841 adds 67 translated portfolio-risk keys without expanding the i18n baseline. Locale chunks were remeasured with 200 B headroom; the risk panel is code-split so the PortfolioPage route remains within its existing cap.",
+  "baselineNote": "PR #785 adds 22 localized stable validation-error keys without expanding the i18n baseline or an allowlist. The eight affected locale chunks were remeasured with 200 B headroom; all other caps remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 142181,
-      "measuredGzipBytes": 141981,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 141981 B + 200 B headroom."
+      "maxGzipBytes": 142728,
+      "measuredGzipBytes": 142528,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 142528 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 136138,
-      "measuredGzipBytes": 135938,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 135938 B + 200 B headroom."
+      "maxGzipBytes": 136560,
+      "measuredGzipBytes": 136360,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 136360 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 136172,
-      "measuredGzipBytes": 135972,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 135972 B + 200 B headroom."
+      "maxGzipBytes": 136670,
+      "measuredGzipBytes": 136470,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 136470 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 136598,
-      "measuredGzipBytes": 136398,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 136398 B + 200 B headroom."
+      "maxGzipBytes": 137116,
+      "measuredGzipBytes": 136916,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 136916 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 132548,
-      "measuredGzipBytes": 132348,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 132348 B + 200 B headroom."
+      "maxGzipBytes": 133055,
+      "measuredGzipBytes": 132855,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 132855 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 129253,
-      "measuredGzipBytes": 129053,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 129053 B + 200 B headroom."
+      "maxGzipBytes": 129740,
+      "measuredGzipBytes": 129540,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 129540 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 122990,
-      "measuredGzipBytes": 122790,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 122790 B + 200 B headroom."
+      "maxGzipBytes": 123479,
+      "measuredGzipBytes": 123279,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 123279 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 123139,
-      "measuredGzipBytes": 122939,
-      "note": "Remeasured after adding the complete portfolio-risk locale inventory (PR #841); measured 122939 B + 200 B headroom."
+      "maxGzipBytes": 123608,
+      "measuredGzipBytes": 123408,
+      "note": "Remeasured after adding 22 stable validation-error locale keys (PR #785); measured 123408 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
