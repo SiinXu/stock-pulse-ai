@@ -91,6 +91,21 @@ describe('agentApi.research', () => {
       return true;
     });
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'rejects non-finite token usage (%s)',
+    async (tokenUsage) => {
+      mockPost.mockResolvedValue({
+        data: { success: true, content: 'ok', sources: [], token_usage: tokenUsage },
+      });
+      await expect(agentApi.research({ question: 'Q' })).rejects.toSatisfy(
+        (error: unknown) => {
+          expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+          return true;
+        },
+      );
+    },
+  );
 });
 
 describe('agentApi.chat', () => {

@@ -136,7 +136,7 @@ const researchResponseSchema = z.object({
   success: z.boolean(),
   content: z.string(),
   sources: z.array(z.string()).optional(),
-  token_usage: z.number(),
+  token_usage: z.number().finite(),
   error: z.string().nullable().optional(),
 }).passthrough();
 
@@ -154,7 +154,7 @@ const skillsResponseSchema = z.object({
 const sessionItemSchema = z.object({
   session_id: z.string(),
   title: z.string(),
-  message_count: z.number(),
+  message_count: z.number().int().finite(),
   created_at: z.string().nullable().optional(),
   last_active: z.string().nullable().optional(),
 }).passthrough();
@@ -181,8 +181,8 @@ const sessionMessagesResponseSchema = z.object({
   session_id: z.string(),
   messages: z.array(sessionMessageSchema),
   session_state: sessionStateSchema,
-  // FastAPI supplies the generated default when the field is omitted by the
-  // handler, so older compliant fixtures may omit it at this boundary.
+  // The current backend always emits this generated default, while omission
+  // remains meaningful for rolling upgrades that predate turn identities.
   turn_identity_supported: z.boolean().optional(),
 }).passthrough();
 

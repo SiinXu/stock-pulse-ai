@@ -142,7 +142,8 @@ describe('scheduledTasksApi', () => {
   });
 
   it('rejects supported list items that omit required OpenAPI definition fields', async () => {
-    const { payload: _payload, ...missingPayload } = supportedTaskWire();
+    const missingPayload: Record<string, unknown> = supportedTaskWire();
+    delete missingPayload.payload;
     get.mockResolvedValueOnce({
       data: { total: 1, items: [missingPayload] },
     });
