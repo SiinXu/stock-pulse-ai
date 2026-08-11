@@ -178,6 +178,7 @@
       "decision_type",
       "key_points",
       "operation_advice",
+      "risk_manager",
       "risk_warning",
       "sentiment_score",
       "stock_name",
@@ -250,9 +251,36 @@
         "监管不确定性构成中等风险，但未见实质利空落地。",
         "技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。"
       ],
-      "risk_warning": "监管政策落地前波动可能加大"
+      "risk_warning": "监管政策落地前波动可能加大",
+      "risk_manager": {
+        "schema_version": "risk-manager-result/v1",
+        "verdict": "pass",
+        "original_action": "hold",
+        "final_action": "hold",
+        "reason_codes": [
+          "no_risk_evidence"
+        ],
+        "reason_params": {
+          "signal_adjustment": "downgrade",
+          "risk_signal": "sell"
+        },
+        "adjustment": null,
+        "evidence_codes": [],
+        "evidence_provenance": [
+          "risk_agent_opinion",
+          "risk_flags"
+        ],
+        "profile": "balanced",
+        "override_enabled": true,
+        "override_would_apply": false,
+        "exit_id": "orchestrator_multi_agent",
+        "evaluation_id": "<runtime-generated>",
+        "evaluated_at": "<runtime-evaluated-at>",
+        "authorized_bypass_id": null,
+        "fail_closed": false
+      }
     },
-    "content": "{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 58,\n  \"trend_prediction\": \"震荡整理\",\n  \"operation_advice\": \"持有观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势偏多但监管风险压制，持有观望\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"等待监管风险明朗后再介入\",\n        \"has_position\": \"持有，跌破95减仓\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"控制仓位\",\n        \"entry_plan\": \"等待监管风险明朗后再介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"监管消息落地或缩量回踩98\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"三阶段数据完整，但风险面存在压制\",\n      \"data_limitations\": \"无\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": [\n        \"行业监管政策存在不确定性\",\n        \"行业监管政策不确定性\"\n      ],\n      \"positive_catalysts\": [\n        \"主力资金净流入\"\n      ]\n    }\n  },\n  \"analysis_summary\": \"技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。\",\n  \"key_points\": [\n    \"港股均线多头排列，趋势延续。\",\n    \"资金净流入但监管消息面存在不确定性。\",\n    \"监管不确定性构成中等风险，但未见实质利空落地。\",\n    \"技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。\"\n  ],\n  \"risk_warning\": \"监管政策落地前波动可能加大\"\n}",
+    "content": "{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 58,\n  \"trend_prediction\": \"震荡整理\",\n  \"operation_advice\": \"持有观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势偏多但监管风险压制，持有观望\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"等待监管风险明朗后再介入\",\n        \"has_position\": \"持有，跌破95减仓\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"控制仓位\",\n        \"entry_plan\": \"等待监管风险明朗后再介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"监管消息落地或缩量回踩98\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"三阶段数据完整，但风险面存在压制\",\n      \"data_limitations\": \"无\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": [\n        \"行业监管政策存在不确定性\",\n        \"行业监管政策不确定性\"\n      ],\n      \"positive_catalysts\": [\n        \"主力资金净流入\"\n      ]\n    }\n  },\n  \"analysis_summary\": \"技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。\",\n  \"key_points\": [\n    \"港股均线多头排列，趋势延续。\",\n    \"资金净流入但监管消息面存在不确定性。\",\n    \"监管不确定性构成中等风险，但未见实质利空落地。\",\n    \"技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。\"\n  ],\n  \"risk_warning\": \"监管政策落地前波动可能加大\",\n  \"risk_manager\": {\n    \"schema_version\": \"risk-manager-result/v1\",\n    \"verdict\": \"pass\",\n    \"original_action\": \"hold\",\n    \"final_action\": \"hold\",\n    \"reason_codes\": [\n      \"no_risk_evidence\"\n    ],\n    \"reason_params\": {\n      \"signal_adjustment\": \"downgrade\",\n      \"risk_signal\": \"sell\"\n    },\n    \"adjustment\": null,\n    \"evidence_codes\": [],\n    \"evidence_provenance\": [\n      \"risk_agent_opinion\",\n      \"risk_flags\"\n    ],\n    \"profile\": \"balanced\",\n    \"override_enabled\": true,\n    \"override_would_apply\": false,\n    \"exit_id\": \"orchestrator_multi_agent\",\n    \"evaluation_id\": \"<runtime-generated>\",\n    \"evaluated_at\": \"<runtime-evaluated-at>\",\n    \"authorized_bypass_id\": null,\n    \"fail_closed\": false\n  }\n}",
     "error": null
   }
 }

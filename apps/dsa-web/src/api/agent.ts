@@ -14,6 +14,7 @@ export interface ChatRequest {
 export interface ChatStreamRequest extends ChatRequest {
   session_id?: string;
   context?: unknown;
+  turn_id?: string;
 }
 
 export interface ChatResponse {
@@ -21,6 +22,7 @@ export interface ChatResponse {
   content: string;
   session_id: string;
   error?: string;
+  turn_id?: string;
   agent_runtime?: {
     soul_version: string;
     soul_hash: string;
@@ -53,11 +55,13 @@ export interface ChatSessionMessage {
   created_at: string | null;
   error?: string;
   params?: Record<string, unknown>;
+  turn_id?: string;
 }
 
 export interface ChatSessionDetail {
   session_id: string;
   messages: ChatSessionMessage[];
+  turn_identity_supported?: boolean;
   session_state: {
     selected_skill_ids: string[] | null;
   };

@@ -154,13 +154,14 @@ class BotCommand(ABC):
 |---------|-------------|---------|
 | `/analyze` | Analyze an A-share, Hong Kong, or US stock | `/analyze 600519`, `/analyze HK00700`, or `/analyze AAPL` |
 | `/ask` | Analyze one or more stocks with Agent skills | `/ask HK00700` or `/ask 600519,AAPL trend` |
+| `/research` | Deep-research a stock or market topic | `/research 0941` or `/research 7203.T` |
 | `/batch` | Batch-analyze your configured watchlist | `/batch` |
 | `/chat` | Multi-turn strategy chat (maintains conversation context) | `/chat` |
 | `/market` | Market review (A-shares / US stocks) | `/market` |
 | `/help` | Show help text | `/help` |
 | `/status` | Show system status | `/status` |
 
-> **Stock code formats:** A-shares accept 6-digit codes and common exchange forms (for example `600519` or `SH600519`). Hong Kong stocks accept a 5-digit code, an `HK` prefix, or a `.HK` suffix (for example `00700`, `HK00700`, or `00700.HK`) and are routed as canonical `HK00700`. US stocks use ticker symbols such as `AAPL` or `BRK.B`. `/analyze` and `/ask` return bilingual, actionable format guidance when a symbol is invalid or belongs to a market that these Bot commands do not currently support.
+> **Stock code formats:** A-shares accept 6-digit codes and common exchange forms (for example `600519` or `SH600519`). Hong Kong stocks accept a bare 4- or 5-digit code, an `HK` prefix, or a `.HK` suffix (for example `0941`, `00700`, `HK00700`, or `00700.HK`) and are routed as an explicit `HKxxxxx` identity. A bare four-digit value is checked against the stock index first: indexed `7203` remains Japanese `7203.T`, while unresolved `0941` becomes `HK00941`; an explicit market suffix always wins. US stocks use ticker symbols such as `AAPL` or `BRK.B`. `/analyze`, `/ask`, and `/research` return actionable format guidance when a symbol is invalid or unsupported by the command.
 
 `/analyze` continues to submit through the shared `AnalysisTaskQueue`; market normalization does not create a separate Bot task lifecycle or change Task IDs, in-flight deduplication, statuses, or notification reply targets.
 

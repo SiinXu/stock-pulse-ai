@@ -30,6 +30,7 @@ from src.agent.provider_trace import (
 from src.agent.runtime.lifecycle import get_default_usage_recorder
 from src.market_context import detect_market, get_market_guidelines, get_market_role
 from src.report_language import normalize_report_language
+from src.agent.what_if_scenario import build_what_if_prompt_section_from_context
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 from src.storage import get_db
 from src.utils.sanitize import log_safe_exception
@@ -145,6 +146,12 @@ _CHAT_MARKET_FACTS: Dict[str, _MarketPromptFacts] = {
         "新台币汇率、三大法人、融资融券、当冲与 TWSE/TPEx 公告",
         "TWD FX, institutional flows, margin/day trading, and TWSE/TPEx filings",
     ),
+    "crypto": _MarketPromptFacts(
+        "USD",
+        "UTC (24x7)",
+        "UTC 日界线、滚动 24 小时成交额、流动性、托管与监管风险",
+        "UTC day boundaries, rolling-24h trading value, liquidity, custody, and regulatory risk",
+    ),
 }
 
 
@@ -170,12 +177,18 @@ def build_agent_chat_market_context(
         append_code(code)
 
     if not stock_codes:
+        language = normalize_report_language(report_language)
+        language_key = "en" if language in {"en", "ko"} else "zh"
+        what_if_only = build_what_if_prompt_section_from_context(
+            context,
+            language_key,
+        )
         return AgentChatMarketContext(
             stock_codes=(),
             markets=(),
             market_role=get_market_role(None, report_language),
             market_guidelines=get_market_guidelines(None, report_language),
-            prompt_section="",
+            prompt_section=what_if_only,
             disabled_tool_names=(),
         )
 
@@ -199,16 +212,27 @@ def build_agent_chat_market_context(
             language_key=language_key,
         )
 
+    market_section = _build_market_prompt_section(
+        stock_codes,
+        language_key,
+        disabled_tool_names,
+    )
+    # What-if assumptions ride the existing market-context injection path so
+    # executor/orchestrator stay frozen; markers keep them non-factual.
+    what_if_section = build_what_if_prompt_section_from_context(
+        context,
+        language_key,
+    )
+    prompt_section = "\n\n".join(
+        part for part in (market_section, what_if_section) if part
+    )
+
     return AgentChatMarketContext(
         stock_codes=tuple(stock_codes),
         markets=markets,
         market_role=market_role,
         market_guidelines=market_guidelines,
-        prompt_section=_build_market_prompt_section(
-            stock_codes,
-            language_key,
-            disabled_tool_names,
-        ),
+        prompt_section=prompt_section,
         disabled_tool_names=disabled_tool_names,
     )
 

@@ -9,9 +9,27 @@
   "refresh_script": "scripts/refresh_provider_fixtures.py",
   "offline_tests": "tests/data_provider/test_provider_contracts.py",
   "consumer_contract": {
-    "daily_columns": ["date", "open", "high", "low", "close", "volume", "amount", "pct_chg"],
+    "daily_columns": [
+      "date",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "amount",
+      "pct_chg"
+    ],
     "daily_why": "src/stock_analyzer.py reads close/volume for MA, MACD, volume_ratio_5d; STANDARD_COLUMNS is the manager contract",
-    "realtime_required": ["code", "price", "change_pct", "volume", "open_price", "high", "low", "pre_close"],
+    "realtime_required": [
+      "code",
+      "price",
+      "change_pct",
+      "volume",
+      "open_price",
+      "high",
+      "low",
+      "pre_close"
+    ],
     "realtime_why": "DataFetcherManager.get_realtime_quote consumers and report snapshot fields need has_basic_data() plus OHLC"
   },
   "fixtures": [
@@ -78,6 +96,64 @@
       "path": "tencent_realtime",
       "symbol": "600519",
       "market": "cn"
+    },
+    {
+      "id": "akshare_em_daily_empty",
+      "file": "failures/akshare_em_daily_empty.json",
+      "provider": "akshare",
+      "path": "em_daily",
+      "failure_mode": "empty",
+      "market": "cn"
+    },
+    {
+      "id": "akshare_em_daily_missing_close",
+      "file": "failures/akshare_em_daily_missing_close.json",
+      "provider": "akshare",
+      "path": "em_daily",
+      "failure_mode": "missing_field",
+      "market": "cn"
+    },
+    {
+      "id": "tencent_daily_kline_empty",
+      "file": "failures/tencent_daily_kline_empty.json",
+      "provider": "tencent",
+      "path": "daily_kline",
+      "failure_mode": "empty",
+      "market": "cn"
+    },
+    {
+      "id": "tencent_daily_kline_malformed",
+      "file": "failures/tencent_daily_kline_malformed.json",
+      "provider": "tencent",
+      "path": "daily_kline",
+      "failure_mode": "format_error",
+      "market": "cn"
+    },
+    {
+      "id": "tushare_daily_pro_empty_items",
+      "file": "failures/tushare_daily_pro_empty_items.json",
+      "provider": "tushare",
+      "path": "daily",
+      "failure_mode": "empty",
+      "market": "cn"
+    },
+    {
+      "id": "tushare_daily_pro_rate_limit",
+      "file": "failures/tushare_daily_pro_rate_limit.json",
+      "provider": "tushare",
+      "path": "daily",
+      "failure_mode": "rate_limit",
+      "market": "cn"
+    },
+    {
+      "id": "yfinance_daily_missing_volume",
+      "file": "failures/yfinance_daily_missing_volume.json",
+      "provider": "yfinance",
+      "path": "daily",
+      "failure_mode": "missing_field",
+      "market": "us"
     }
-  ]
+  ],
+  "offline_fallback_tests": "tests/data_provider/test_provider_fallback_contract.py",
+  "failure_fixture_dir": "failures/"
 }

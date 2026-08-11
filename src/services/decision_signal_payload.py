@@ -73,15 +73,26 @@ def build_decision_signal_payload_from_report(
         score_calibration,
     )
     raw_action = _raw_action_from_report(result)
+    risk_gate_result = _as_mapping(getattr(result, "risk_gate_result", None))
+    has_canonical_risk_result = (
+        risk_gate_result.get("schema_version") == "risk-manager-result/v1"
+    )
+    risk_final_action = (
+        normalize_decision_action(risk_gate_result.get("final_action"))
+        if has_canonical_risk_result
+        else None
+    )
     guardrail_reason = _extract_guardrail_reason(result, dashboard, score=score, raw_action=raw_action)
     action_fields = build_action_fields(
         operation_advice=getattr(result, "operation_advice", None),
-        explicit_action=getattr(result, "action", None),
+        explicit_action=risk_final_action or getattr(result, "action", None),
         report_type=report_type,
         report_language=getattr(result, "report_language", None),
         sentiment_score=score,
         guardrail_reason=guardrail_reason,
-        align_with_score=True,
+        # The Risk Manager is the final-action authority. Score alignment is
+        # only valid before its canonical result has been committed.
+        align_with_score=not has_canonical_risk_result,
     )
     action = action_fields.get("action")
     if not action:
@@ -122,6 +133,8 @@ def build_decision_signal_payload_from_report(
         "decision_signal_metadata_version": "decision-signal-metadata-v1",
         "canonical_decision_scale_version": CANONICAL_DECISION_SCALE_VERSION,
     }
+    if has_canonical_risk_result:
+        metadata["risk_manager"] = risk_gate_result
     score_metadata = score_band_metadata(score)
     if score_metadata:
         metadata["score_scale"] = score_metadata
@@ -136,10 +149,19 @@ def build_decision_signal_payload_from_report(
             fallback=score_metadata["score"],
         )
         metadata["final_action"] = action
-        if raw_action:
-            metadata["raw_action"] = raw_action
-        if raw_action and raw_action != action:
-            metadata["action_adjustment_reason"] = "canonical_score_alignment"
+        pre_gate_action = (
+            normalize_decision_action(risk_gate_result.get("original_action"))
+            if has_canonical_risk_result
+            else raw_action
+        )
+        if pre_gate_action:
+            metadata["raw_action"] = pre_gate_action
+        if pre_gate_action and pre_gate_action != action:
+            metadata["action_adjustment_reason"] = (
+                "risk_manager_final_action"
+                if has_canonical_risk_result
+                else "canonical_score_alignment"
+            )
     if guardrail_reason:
         metadata["guardrail_reason"] = guardrail_reason
     market_phase_summary = _extract_market_phase_summary(context_snapshot, result)

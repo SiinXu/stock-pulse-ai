@@ -86,6 +86,7 @@ class _ChatMethods:
         context: Optional[Dict[str, Any]] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
         selected_skill_ids: Optional[List[str]] = None,
+        turn_id: Optional[str] = None,
     ) -> "AgentResult":
         """Run the pipeline in chat mode (free-form answer, no dashboard parse)."""
         from src.agent.executor import AgentResult
@@ -97,7 +98,15 @@ class _ChatMethods:
         resolution_context.update(context or {})
         scope_resolution = resolve_stock_scope(message, resolution_context)
 
-        config = self.config or getattr(self.llm_adapter, "_config", None) or get_config()
+        config = self.config
+        if config is None:
+            adapter_config = getattr(self.llm_adapter, "_config", None)
+            adapter_profile = getattr(adapter_config, "risk_gate_profile", None)
+            config = (
+                adapter_config
+                if isinstance(adapter_profile, str)
+                else get_config()
+            )
         history = build_visible_chat_history(session_id, self.llm_adapter, config)
         report_language = normalize_report_language(
             scope_resolution.effective_context.get("report_language", "zh")
@@ -117,11 +126,19 @@ class _ChatMethods:
             session_id,
             message,
             selected_skill_ids,
+            turn_id=turn_id,
+            context=scope_resolution.effective_context,
         )
         session.update_market_context(
             scope_resolution.effective_context,
             anchor_user_message_id=user_message_id,
         )
+        if progress_callback is not None and turn_id:
+            progress_callback({
+                "type": "turn_persisted",
+                "turn_id": turn_id,
+                "message_id": str(user_message_id),
+            })
 
         try:
             stock_scope = scope_resolution.stock_scope
@@ -174,6 +191,53 @@ class _ChatMethods:
                 content="",
                 error=AGENT_CHAT_FAILURE_MESSAGE,
             )
+
+        # Final-action authority runs before response/history publication.
+        from src.agent.risk_override import (
+            EXIT_AGENT_CHAT,
+            RiskGateOutcome,
+            apply_risk_manager_gate_from_config,
+            build_risk_context_for_exit,
+            render_risk_gate_notice,
+        )
+        from src.agent.runtime_facts import (
+            attach_risk_gate_result,
+            build_agent_runtime_facts,
+        )
+
+        chat_dashboard = (
+            orch_result.dashboard if isinstance(orch_result.dashboard, dict) else None
+        )
+        signal = (
+            chat_dashboard.get("decision_type", "hold")
+            if chat_dashboard is not None
+            else "hold"
+        )
+        gate_ctx = build_risk_context_for_exit(
+            stock_code=str(
+                (scope_resolution.effective_context or {}).get("stock_code") or ""
+            ),
+            current_signal=signal,
+            dashboard=chat_dashboard,
+            runtime_facts=orch_result.runtime_facts,
+        )
+        gate_result = apply_risk_manager_gate_from_config(
+            gate_ctx,
+            current_signal=signal,
+            exit_id=EXIT_AGENT_CHAT,
+            config=config,
+            dashboard=chat_dashboard,
+        )
+        orch_result.runtime_facts = attach_risk_gate_result(
+            orch_result.runtime_facts,
+            gate_result,
+            evidence=build_agent_runtime_facts(gate_ctx).risk_evidence,
+        )
+        if chat_dashboard is not None:
+            orch_result.dashboard = chat_dashboard
+        if gate_result.verdict is not RiskGateOutcome.PASS:
+            notice = render_risk_gate_notice(gate_result, report_language)
+            orch_result.content = f"{notice}\n\n{orch_result.content}".strip()
 
         terminal_state = classify_result_terminal_state(orch_result)
         if terminal_state is ExecutionState.SUCCEEDED:

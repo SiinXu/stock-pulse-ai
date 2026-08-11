@@ -1,10 +1,10 @@
 # StockPulse universal Python dependency constraints
 # Generated file; do not edit by hand.
 # Resolver: uv==0.11.31
-# Source-SHA256: 75ec0f3aa420188704390c2c1d188a2294fd3c62e3c09522cdf5a5a40189e01a
+# Source-SHA256: a02eed0c3de7bab47286e49d77d05da99c8cac5b9e3dbdfa4a41eb778c02b08a
 # Python-Minimum: 3.10
 # Exclude-Newer: 2026-07-27T04:06:13Z
-# Exclude-Newer-Packages: cryptography=2026-07-31T14:25:11Z
+# Exclude-Newer-Packages: cryptography=2026-07-31T14:25:11Z,mcp=2026-07-29T00:00:00Z,mcp-types=2026-07-29T00:00:00Z
 # Platforms: universal (Linux, macOS, Windows)
 # Regenerate: python scripts/check_dependency_locks.py --update
 aiohappyeyeballs==2.7.1
@@ -100,6 +100,8 @@ markdown-it-py==4.2.0
 markdown2==2.5.5
 markupsafe==3.0.3
 mccabe==0.7.0
+mcp==2.0.0
+mcp-types==2.0.0
 mdurl==0.1.2
 mini-racer==0.14.1 ; sys_platform != 'linux'
 mpmath==1.3.0
@@ -165,6 +167,7 @@ pyflakes==3.4.0
 pygments==2.20.0
 pyinstaller==6.21.0
 pyinstaller-hooks-contrib==2026.6
+pyjwt==2.13.0
 pyluach==2.3.0
 pynacl==1.6.2
 pyparsing==3.3.2
@@ -177,6 +180,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-multipart==0.0.32
 pytz==2026.3.post1
+pywin32==312 ; sys_platform == 'win32'
 pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
 pyyaml==6.0.3
 referencing==0.37.0
@@ -199,6 +203,7 @@ socksio==1.0.0
 sortedcontainers==2.4.0
 soupsieve==2.9.1
 sqlalchemy==2.0.51
+sse-starlette==3.4.6
 starlette==1.3.1
 sympy==1.14.0
 tabulate==0.10.0

@@ -341,7 +341,7 @@ async def app_lifespan(app: FastAPI):
         personalized_schedule_enabled=(
             runtime_owns_schedule and scheduled_task_owner
         ),
-        legacy_schedule_enabled=True,
+        legacy_schedule_enabled=not runtime_suppress_start,
     )
     app.state.runtime_scheduler_service = runtime_scheduler_service
     if runtime_suppress_start:
