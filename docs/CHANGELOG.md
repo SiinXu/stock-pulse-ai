@@ -192,6 +192,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Ported upstream explicit-suffix stock-list analysis-target parsing (`parse_analysis_target` / IndexRegistry) with reject contract for invalid exchange suffixes.
 
 - [Added] Applied Content-Security-Policy and related security headers (nosniff, frame deny, referrer) on FastAPI responses as defense-in-depth for the served web app.
+- [Changed] Modularized the web API error catalog into parse/categorize/catalog/format modules with import-path parity and actionable remediation for high-impact codes.
 - [Chore] Extracted NotificationConfig and ShareImageConfig domain sub-objects behind the flat Config facade (phase 1; attribute access unchanged).
 - [Changed] Migrated portfolio, backtest, decisionSignals, and scorecard Web API modules to OpenAPI-generated types with Zod boundary validation (money-math numeric-string mismatches fail closed).
 - [Tests] Expand Playwright e2e coverage for share-image success/503 UI, per-market market-review region selection, and auth-disable current-password re-confirmation.
