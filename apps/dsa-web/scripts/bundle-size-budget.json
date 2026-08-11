@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #1040 adds localized reasoning-trace export controls without expanding the i18n baseline. Locale and shared settings chunks were remeasured with 200 B headroom; the export controls are code-split so report routes remain within their existing caps.",
+  "baselineNote": "PR #1040 reasoning-trace export controls combined with current main Settings and locale inventories. Affected chunks are remeasured from the merged production build with 200 B headroom and no i18n baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 221373,
-      "measuredGzipBytes": 221173,
-      "note": "Remeasured after adding the localized reasoning-trace export settings inventory (PR #1040); measured 221173 B + 200 B headroom."
+      "maxGzipBytes": 231961,
+      "measuredGzipBytes": 231761,
+      "note": "Rebaselined after adding reasoning-trace export controls (PR #1040); measured 231761 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 143024,
-      "measuredGzipBytes": 142824,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 142824 B + 200 B headroom."
+      "maxGzipBytes": 150677,
+      "measuredGzipBytes": 150477,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 150477 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 136759,
-      "measuredGzipBytes": 136559,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 136559 B + 200 B headroom."
+      "maxGzipBytes": 144030,
+      "measuredGzipBytes": 143830,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 143830 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 136987,
-      "measuredGzipBytes": 136787,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 136787 B + 200 B headroom."
+      "maxGzipBytes": 144172,
+      "measuredGzipBytes": 143972,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 143972 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 137376,
-      "measuredGzipBytes": 137176,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 137176 B + 200 B headroom."
+      "maxGzipBytes": 144503,
+      "measuredGzipBytes": 144303,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 144303 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 133309,
-      "measuredGzipBytes": 133109,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 133109 B + 200 B headroom."
+      "maxGzipBytes": 140197,
+      "measuredGzipBytes": 139997,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 139997 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 129998,
-      "measuredGzipBytes": 129798,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 129798 B + 200 B headroom."
+      "maxGzipBytes": 136775,
+      "measuredGzipBytes": 136575,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 136575 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 123736,
-      "measuredGzipBytes": 123536,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 123536 B + 200 B headroom."
+      "maxGzipBytes": 130348,
+      "measuredGzipBytes": 130148,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 130148 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 123885,
-      "measuredGzipBytes": 123685,
-      "note": "Remeasured after adding the complete reasoning-trace export locale inventory (PR #1040); measured 123685 B + 200 B headroom."
+      "maxGzipBytes": 130413,
+      "measuredGzipBytes": 130213,
+      "note": "Rebaselined after adding reasoning-trace export UI copy (PR #1040); measured 130213 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -132,9 +132,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57281,
-      "measuredGzipBytes": 57081,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 57081 B + 200 B headroom."
+      "maxGzipBytes": 57276,
+      "measuredGzipBytes": 57076,
+      "note": "Rebaselined after adding the reasoning-trace export controls Playground story (PR #1040); measured 57076 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",

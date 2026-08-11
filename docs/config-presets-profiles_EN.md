@@ -53,7 +53,7 @@ Example files live under `docs/examples/profiles/`.
 
 **Profiles NEVER export secret values.**
 
-- Export excludes keys matching secret markers (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `*_EXTRA_HEADERS`, and `LITELLM_CONFIG`).
+- Export and import share the sensitive-config key classifier: `SECRET`, `PASSWORD`, `PASSWD`, and `CREDENTIAL` are always sensitive; `KEY` / `TOKEN` exclude structural token counts, public keys, and key version/name/ID labels; known secret containers (including `*_EXTRA_HEADERS`, `*_INSTALL_SPEC`, `LITELLM_CONFIG`, `DINGTALK_WEBHOOK_URL`, and `PROXY_HOST`) are also sensitive.
 - Import **rejects** any secret-shaped key with `config_profile_secret_rejected`.
 - Apply paths never invent API keys.
 - This rule is encoded in service code, API contracts, automated tests, and this document.

@@ -158,6 +158,9 @@ _UI_PLACEMENT_TASK_ROUTING_KEYS = frozenset({
     "VISION_MODEL",
     "LITELLM_FALLBACK_MODELS",
     "LLM_TEMPERATURE",
+    # AlphaSift stock-selection reordering reuses these DSA LLM bounds.
+    "LLM_TIMEOUT_SEC",
+    "LLM_MAX_TOKENS",
 })
 
 _UI_PLACEMENT_DIAGNOSTICS_KEYS = frozenset({
@@ -336,8 +339,10 @@ def build_schema_response() -> Dict[str, Any]:
 
 
 def _is_sensitive_key(key: str) -> bool:
-    markers = ("KEY", "TOKEN", "SECRET", "PASSWORD")
-    return key.endswith("_EXTRA_HEADERS") or any(marker in key for marker in markers)
+    """Infer whether an unregistered config key carries a secret value."""
+    from src.core.config_secret_keys import is_sensitive_config_key_name
+
+    return is_sensitive_config_key_name(key)
 
 
 def _infer_category(key: str) -> str:

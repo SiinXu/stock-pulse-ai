@@ -2033,6 +2033,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         status: 'pending',
         message_code: 'task_pending',
         message_params: {},
+        analysis_phase: 'auto',
       });
     });
     await page.route('**/api/v1/analysis/status/poll-fallback-task', async (route) => {
@@ -2055,6 +2056,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         stock_name: 'Polling Complete',
         status: 'degraded',
         generated_at: '2026-07-15T10:00:00Z',
+        schema_version: 'run-flow-v1',
         summary: {
           elapsed_ms: 1200,
           failed_attempts: 1,
@@ -2255,6 +2257,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         message: 'accepted',
         task_id: submissions === 1 ? 'old-review-task' : 'new-review-task',
         send_notification: false,
+        region: 'cn',
+        message_code: 'task.market_review.queued',
       }, 202);
     });
     await page.route('**/api/v1/analysis/status/old-review-task', async (route) => {
@@ -2262,6 +2266,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await oldPoll.promise;
       await fulfillJson(route, {
         task_id: 'old-review-task', status: 'completed', progress: 100,
+        message_code: 'task_completed',
         market_review_report: 'OLD_GENERATION_SHOULD_NOT_RENDER',
       });
     });
@@ -2269,6 +2274,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       newReviewCompleted = true;
       await fulfillJson(route, {
         task_id: 'new-review-task', status: 'completed', progress: 100,
+        message_code: 'task_completed',
         market_review_report: 'NEW_RAW_STATUS_SHOULD_NOT_RENDER',
       });
     });
