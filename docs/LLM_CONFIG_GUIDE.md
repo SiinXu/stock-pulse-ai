@@ -146,6 +146,8 @@ LITELLM_MODEL=ollama/qwen3:8b
 > **重要**：Ollama 必须使用 `OLLAMA_API_BASE` 配置，**不要**使用 `OPENAI_BASE_URL`，否则系统会错误拼接 URL（如 404、`api/generate/api/show`）。远程 Ollama 时，将 `OLLAMA_API_BASE` 设为实际地址（如 `http://192.168.1.100:11434`）。当前依赖约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（与 requirements.txt 一致）。
 >
 > **出站安全**：管理员配置的 loopback Ollama（`LLM_OLLAMA_BASE_URL` 指向 `127.0.0.0/8`、`::1` 或 `localhost`）默认允许，无需手写 `OUTBOUND_HTTP_ALLOWLIST`；非 loopback 目标仍需精确 allowlist。Hermes 仍建议显式 allowlist（例如 `127.0.0.1:8642`）。规则与限制见 [出站 HTTP 安全策略](security-outbound-policy.md)。
+>
+> 如果 Clash/Mihomo TUN 的 Fake-IP DNS 使公网模型域名解析到 `198.18.0.0/15` 或 `fdfe:dcba:9876::/48`，可在可信本机设置 `OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP=true`。该开关只允许操作系统明确配置的回环代理和具有公共后缀的域名；私网域名、字面 Fake-IP 和 metadata 地址仍会拒绝。
 
 #### 设置页本地模型中心（推荐且唯一下载入口）
 
@@ -166,7 +168,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 **网页端可以直接配：** 你可以启动程序后，在 **Web UI 的“系统设置 -> AI 与模型 -> 模型接入”** 中非常直观地进行可视化配置！
 
-> **新版编辑体验补充**：模型接入按“模型服务商 / 模型连接 / 可用模型 / 任务模型”组织。动态 `connection_fields` Schema 决定字段的必填、显隐与启用状态；Provider Catalog 的权威职责仅限于 Provider 身份、双语标签、默认 Base URL、协议、发现能力、本地/自定义属性和相关链接，其中 `supports_discovery` 决定是否显示“获取模型”。OpenAI-compatible 使用模型列表接口，Ollama 使用 `/api/tags`，不支持发现或发现失败时可逐个手动添加。发现结果不会自动全选。每个模型是独立 token，底层仍保存为 `LLM_{CONNECTION}_MODELS=model1,model2`；Provider 身份另存为 `LLM_{CONNECTION}_PROVIDER=<provider_id>`，不会再从可重命名的 Connection 名称猜测。任务路由中的报告 / Agent / Vision / 备用模型只能从可用模型目录选择，不支持任意输入；历史失效值会保留并标记“当前配置不可用”，保存不会静默清理。
+> **新版编辑体验补充**：模型接入按“模型服务商 / 模型连接 / 可用模型 / 任务模型”组织。动态 `connection_fields` Schema 决定字段的必填、显隐与启用状态；Provider Catalog 的权威职责仅限于 Provider 身份、双语标签、默认 Base URL、协议、发现能力、本地/自定义属性和相关链接，其中 `supports_discovery` 决定是否显示“获取模型”。OpenAI-compatible 使用模型列表接口，Ollama 使用 `/api/tags`，不支持发现或发现失败时可逐个手动添加。发现结果不会自动全选。每个模型是独立 token，底层仍保存为 `LLM_{CONNECTION}_MODELS=model1,model2`；Provider 身份另存为 `LLM_{CONNECTION}_PROVIDER=<provider_id>`，不会再从可重命名的 Connection 名称猜测。任务路由同时提供显式的报告生成方式选择；Codex / Claude Code / OpenCode CLI 是报告生成 backend，不是模型连接，因此不会出现在模型下拉中。报告 / Agent / Vision / 备用模型只能从可用模型目录选择，不支持任意输入；历史失效值会保留并标记“当前配置不可用”，保存不会静默清理。
 
 可用模型目录使用 connection-aware `ModelRef` 作为任务模型身份，唯一性由 `connection_id + runtime_route` 决定。两条 OpenAI Connection 都提供同名模型时会显示为两个独立选项，任务路由保存具体 Connection 的 `ModelRef`，执行前再解析到该 Connection 的凭据、端点和 runtime route。旧配置中的裸 route 只有唯一 Connection 匹配时才兼容；多连接同 route 会返回 `ambiguous_model_route` 并要求用户明确选择，不会静默选第一条。YAML alias 没有 Connection 身份时继续按 legacy route 兼容。
 

@@ -130,6 +130,7 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `SINGLE_STOCK_NOTIFY` | Single stock push mode: set to `true` to push immediately after each stock analysis | Optional |
 | `REPORT_TYPE` | Report type: `simple` (concise), `full` (complete), `brief` (3-5 sentences), Docker recommended: `full` | Optional |
 | `REPORT_LANGUAGE` | Default output language for reports and Agent Chat: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, fixed copy in the Web report view, and Agent Chat replies that do not set `context.report_language`. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
+| `REPORT_MODE` | Jinja report presentation mode (`brief` / `standard` / `research`, default `standard`). `brief` keeps Decision Card + key risk; `standard` is Decision Card + main analysis; `research` is full detail with expanded strata limits. Hard limits apply; Decision Card is never dropped. Per-request override: `extra_context.report_mode`. Presentation only when `REPORT_RENDERER_ENABLED=true`. | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
 | `REPORT_RENDERER_ENABLED` | Enable Jinja2 template rendering (default `false`, zero regression) | Optional |
@@ -363,6 +364,11 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `ENABLE_CHIP_DISTRIBUTION` | Enable chip distribution analysis (this API is unstable, recommended to disable for cloud deployment). GitHub Actions users must set `ENABLE_CHIP_DISTRIBUTION=true` in Repository Variables to enable; disabled by default in workflows. | `true` | Optional |
 | `ENABLE_EASTMONEY_PATCH` | Eastmoney API patch: Recommended to set to `true` when Eastmoney APIs fail frequently (e.g., RemoteDisconnected, connection closed). Injects NID tokens and random User-Agents to reduce rate limiting probability. | `false` | Optional |
 | `REALTIME_SOURCE_PRIORITY` | Real-time quote source priority (comma-separated), e.g., `tencent,akshare_sina,efinance,akshare_em`; add `tickflow` explicitly to use TickFlow realtime quotes | See .env.example | Optional |
+| `DATA_VALIDATION_ENABLED` | Enable the unified numeric contract for daily, realtime, fundamental, and selected technical fields, with versioned diagnostic evidence. | `true` | Optional |
+| `DATA_VALIDATION_STRICT` | Reject invalid provider candidates before acceptance/cache so the existing bounded fallback loop can try the next source. | `false` | Optional |
+| `DATA_VALIDATION_STRICT_SCOPES` | Comma-separated `market/instrument` strict-mode selectors such as `cn/equity,hk/etf,us/index`; `*` is a wildcard. | `*/*` | Optional |
+| `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | Authoritative comma-separated `SYMBOL=instrument` identities for offshore symbols whose ETF/index type cannot be inferred safely from code alone. | - | Optional |
+| `DATA_VALIDATION_UPPER_LAYER_MODE` | Final aggregated-fundamental policy: `warn` preserves data with evidence; `reject` raises explicitly and is not provider failover. | `warn` | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `8.0` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call; market-structure industry/concept rankings share this budget | `8.0` | Optional |
@@ -912,6 +918,18 @@ P5 adds a phase-aware decision block under `dashboard.phase_decision` for indivi
 
 Regular analysis and Agent analysis now apply lightweight guardrails before history is saved, using the current `market_phase_summary` and `analysis_context_pack_overview.data_quality`. If core quote / daily_bars / technical data is stale, fallback, missing, fetch_failed, partial, or estimated, high-confidence conclusions are capped. Pre-market, non-trading, or unknown phases must not emit high-confidence intraday buy/sell actions. Intraday, lunch-break, and near-close outputs are scanned for post-market recap wording such as "after today's close" or "focus tomorrow" in the main conclusion and action fields, and obvious violations are replaced with phase-safe wait/watch wording. The guardrail only fills low-sensitivity `phase_context` and data limitations; it does not invent watch conditions or next-check times. Notification summaries, alerts, holdings, and backtest linkage remain later P6 work.
 
+### Report Modes And Decision Card (Issue #861)
+
+When `REPORT_RENDERER_ENABLED=true`, Jinja stock reports support three presentation modes via `REPORT_MODE` (or per-request `extra_context.report_mode`):
+
+| Mode | Content | Typical use |
+|------|---------|-------------|
+| `brief` | Decision Card + key risk + disclaimer; detail sections omitted with explicit truncation notice | Push / mobile |
+| `standard` (default) | Decision Card pinned first, then main analysis sections; compact strata; hard list/char limits | Daily default |
+| `research` | Full sections with expanded list and character limits | Deep review |
+
+The existing Decision Card template continues to use dashboard/result fields, and missing fields omit their rows. Hard limits never drop the Decision Card block; omitted lower-priority items are annotated. Unconfigured `REPORT_MODE` keeps `standard` on every report platform. The hard-coded notification fallback path (`REPORT_RENDERER_ENABLED=false`) is unchanged.
+
 ### Signal Attribution Analysis (Issue #1742)
 
 Issue #1742 adds a signal attribution analysis block under `dashboard.signal_attribution` for individual stock analysis reports: `technical_indicators`, `news_sentiment`, `fundamentals`, `market_conditions` (four contribution values; valid non-zero values are normalized to 100; all-zero means no effective signal), `strongest_bullish_signal`, and `strongest_bearish_signal`. This field explains the composition of recommendation reasons, helping users understand the attribution weights of AI decisions.
@@ -921,6 +939,27 @@ Signal attribution analysis is rendered in all report paths:
 - `generate_single_stock_report()` (single-stock push report)
 - `templates/report_markdown.j2` (Jinja2 template)
 - `HistoryService._generate_single_stock_markdown()` (Web history drawer)
+
+### Report Decision Card Front-Load (Issue #861 Phase 1)
+
+Phase 1 is presentation-only: each per-stock Jinja report section starts with a Decision Card assembled from **existing** fields (direction/score, one-line conclusion, confidence, key risks, watch/invalidation conditions, stop-loss / take-profit).
+
+| Template | Behavior |
+| --- | --- |
+| `templates/report_markdown.j2` | Full Decision Card immediately under each stock `##` heading; existing sections (Key Updates / Core Conclusion / Phase Guardrail / Battle Plan, etc.) move down but are not removed. |
+| `templates/report_wechat.j2` | Compact Decision Card (~4–5 lines) is the first content inside each stock block; original compact follow-up lines remain. |
+| `templates/report_brief.j2` | Uses the brief-specific length budget form (`decision_card(..., compact='brief')`): **1 primary line + at most 1 supplementary line per stock**. The primary line keeps parity with the origin/main one-liner (signal emoji/text, score, one-sentence conclusion) and marks 🃏; the supplementary line packs at most one risk and one watch condition (hard truncation). It does not emit the 5-line wechat compact card, and does not repeat stop/take levels on brief (those stay on wechat/markdown). |
+| Shared macro | `decision_card` in `templates/_macros.j2`; `compact=false` full card, `compact=true` push compact card, `compact='brief'` budgeted push form; missing fields are omitted (no empty card rows). |
+
+**Brief length budget and size impact** (vs the unbudgeted 5-line compact card):
+- Contract basis: `ReportType.BRIEF` (3–5 sentences, mobile/push) and Pushover `max_length = 1024` (overflow splits on `\n\n`).
+- Goal: a typical 10-stock brief fits in one Pushover message after `markdown_to_plain_text`; regression tests lock ≤2 lines per stock and plain total ≤1024 with a ≥10-stock fixture.
+- WeCom markdown defaults to ~4000 bytes: wechat keeps the full compact card as first screen, so a normal 5–10 stock watchlist may use one extra chunk vs pre-card — an intentional trade-off documented with byte/chunk evidence in the PR.
+
+Boundary and compatibility:
+- Does not change extractors, prompts, schemas, or the notification send chain — templates only.
+- Affects only the Jinja path when `REPORT_RENDERER_ENABLED=true`; the hard-coded fallback in `src/notification_parts/rendering.py` remains the default when disabled.
+- Notification chunking still keys off stock heading blocks (`###` / `---`). Markdown uses `### 🃏`; wechat uses multi-line compact blocks; brief uses the budgeted lines. Data contracts are unchanged.
 
 Normalization functions are explicitly called in `_parse_response()` and `parse_dashboard_json()` to ensure:
 - String percentages are converted to int (e.g., `"35%"` → `35`)
@@ -1252,11 +1291,13 @@ System defaults to AkShare (free), also supports other data sources:
 
 ### Hong Kong Stock Support
 
-Use `hk` prefix for HK stock codes:
+HK stocks accept bare four- or five-digit numbers, an `hk` prefix, or a `.HK` suffix:
 
 ```bash
 STOCK_LIST=600519,hk00700,hk01810
 ```
+
+CLI, Web, analysis/watchlist APIs, CSV/Excel/clipboard smart import, and Bot analysis/research share the same input rule. A bare four-digit code such as `0941` is checked against the stock index and becomes `HK00941` when unresolved; indexed Japanese `7203` remains `7203.T`. Explicit forms such as `1810.HK`, `7203.T`, `2330.TW`, and `005930.KS`, as well as an explicit API market hint, always take precedence and are never reinterpreted as Hong Kong.
 
 HK daily history skips efinance, pytdx, baostock, and other built-in providers that do not support HK daily data, avoiding mismatches between HK symbols and non-HK market data. AkShare/Tushare/YFinance/Longbridge continue to provide HK fallback paths. If Longbridge is inside its connection cooldown window, the route temporarily skips it and continues with the remaining HK-capable fallbacks.
 
@@ -1643,7 +1684,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 |------|------|------|
 | A-shares | 6-digit number | `600519`, `000001`, `300750` |
 | BSE (Beijing) | 8/4/92 prefix, 6-digit; supports `BJ` prefix or `.BJ` suffix | `920748`, `BJ920493`, `920493.BJ` |
-| HK stocks | hk + 5-digit number | `hk00700`, `hk09988` |
+| HK stocks | Bare 4/5 digits, `HK` prefix, or `.HK` suffix | `0941`, `00700`, `hk00700`, `1810.HK` |
 | US stocks | 1-5 letters, optional `.X` suffix | `AAPL`, `TSLA`, `BRK.B` |
 | Japanese stocks | Yahoo `.T` suffix | `7203.T`, `6758.T` |
 | Korean stocks | Yahoo `.KS` / `.KQ` suffix | `005930.KS`, `035720.KQ` |

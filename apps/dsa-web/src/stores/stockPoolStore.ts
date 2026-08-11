@@ -13,7 +13,7 @@ const STOCK_HISTORY_PAGE_SIZE = 20;
 const MARKET_REVIEW_HISTORY_PAGE_SIZE = 10;
 const MARKET_REVIEW_HISTORY_CODE = 'MARKET';
 
-type SelectionSource = 'manual' | 'autocomplete' | 'import' | 'image';
+export type SelectionSource = 'manual' | 'autocomplete' | 'import' | 'image';
 
 type FetchHistoryOptions = {
   reset?: boolean;
@@ -37,7 +37,7 @@ type HistoryRequestHandle = {
   supersededBy: HistoryRequestHandle | null;
 };
 
-type SubmitAnalysisOptions = {
+export type SubmitAnalysisOptions = {
   stockCode?: string;
   stockName?: string;
   originalQuery?: string;

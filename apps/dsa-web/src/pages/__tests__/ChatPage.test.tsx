@@ -243,10 +243,44 @@ beforeEach(() => {
   mockStartNewChat.mockReturnValue('session-new');
   mockSwitchSession.mockResolvedValue(true);
   mockStartStream.mockReset();
-  mockStartStream.mockResolvedValue(undefined);
+  mockStartStream.mockResolvedValue({
+    terminal: 'completed',
+    persistence: 'persisted',
+    turnId: 'turn-default',
+  });
 });
 
 describe('ChatPage', () => {
+  it('links an unavailable Agent directly to task routing', async () => {
+    mockGetSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: true,
+      requiredMissingKeys: ['llm_agent'],
+      nextStepKey: 'llm_agent',
+      checks: [{
+        key: 'llm_agent',
+        title: 'Agent 模型',
+        category: 'agent',
+        required: true,
+        status: 'needs_action',
+        message: 'Agent 模型不可用',
+        nextStep: '选择模型',
+      }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const settingsLink = await screen.findByRole('link', { name: '前往设置' });
+    expect(settingsLink).toHaveAttribute(
+      'href',
+      '/settings?section=ai_models&view=task_routing',
+    );
+  });
+
   it('localizes persisted failure messages and updates them when UI language changes', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
     mockStoreState.messages = [{
@@ -558,8 +592,8 @@ describe('ChatPage', () => {
     });
 
     expect(deleteButton).toHaveAttribute('data-control', 'icon-button');
-    expect(deleteButton).toHaveAttribute('data-size', 'navigation');
-    expect(deleteButton).toHaveClass('h-11', 'w-11');
+    expect(deleteButton).toHaveAttribute('data-size', 'compact');
+    expect(deleteButton).toHaveClass('absolute', 'h-7', 'w-7', 'rounded-md');
     fireEvent.click(deleteButton);
 
     expect(mockSwitchSession).not.toHaveBeenCalled();
@@ -963,7 +997,7 @@ describe('ChatPage', () => {
     const mobileToggle = await screen.findByRole('button', { name: '展开策略选择' });
     const skillPanel = screen.getByTestId('chat-skill-picker-panel');
     expect(mobileToggle).toHaveClass('h-9', '!shadow-none');
-    expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11', 'text-foreground');
     expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
     expect(skillPanel).toHaveClass('hidden');
 
@@ -1102,13 +1136,15 @@ describe('ChatPage', () => {
     const prose = screen.getByText('趋势偏强').closest('.chat-prose');
 
     expect(actionGroup).toHaveClass('chat-message-actions');
+    expect(actionGroup).toHaveClass('absolute', 'left-0', 'top-full', '!mt-1');
     expect(actionGroup?.className).not.toMatch(/pointer-events-none|opacity-0/);
     expect(actionGroup?.querySelectorAll('[data-control="icon-button"]')).toHaveLength(2);
     const actionSlots = actionGroup?.querySelectorAll('[data-slot="chat-message-action"]') ?? [];
     expect(actionSlots).toHaveLength(2);
-    actionSlots.forEach((slot) => expect(slot).toHaveClass('h-11', 'w-11'));
+    actionSlots.forEach((slot) => expect(slot).toHaveClass('h-8', 'w-8'));
     expect(prose).not.toHaveClass('pr-20', 'sm:pr-24');
     expect(prose?.nextElementSibling).toBe(actionGroup);
+    expect(prose?.closest('[class~="group/message"]')).toHaveClass('relative', 'mb-8', 'overflow-visible');
   });
 
   it('sends exported markdown to notification channel and shows success feedback', async () => {
@@ -1420,6 +1456,11 @@ describe('ChatPage', () => {
         rawMessage: 'upstream disconnected',
         category: 'upstream_network',
       });
+      return {
+        terminal: 'failed',
+        persistence: 'not_persisted',
+        turnId: 'turn-failed',
+      };
     });
 
     const router = createMemoryRouter(
@@ -1444,6 +1485,111 @@ describe('ChatPage', () => {
       });
       expect(params.context).toBeUndefined();
     });
+  });
+
+  it('keeps unsent report query params and restores the draft when the user aborts the stream', async () => {
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      meta: {
+        id: 3,
+        queryId: 'q-3',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        createdAt: '2026-03-18T10:00:00Z',
+        currentPrice: 210,
+        changePct: 1.1,
+      },
+      summary: {
+        analysisSummary: 'Stable',
+        operationAdvice: 'Hold',
+        trendPrediction: 'Range',
+        sentimentScore: 70,
+      },
+      strategy: {
+        stopLoss: '200',
+      },
+    });
+
+    // User-abort shape: startStream resolves without lastFailedRequest (retry stays inert).
+    mockStartStream.mockImplementationOnce(async () => ({
+      terminal: 'aborted',
+      persistence: 'not_persisted',
+      turnId: 'turn-aborted',
+    }));
+
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=3'] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toContain('session=session-1'));
+    fireEvent.click(await getReadySendButton());
+
+    await waitFor(() => {
+      expect(mockStartStream).toHaveBeenCalled();
+      expect(screen.getByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+      const params = Object.fromEntries(new URLSearchParams(router.state.location.search));
+      expect(params).toMatchObject({
+        stock: 'AAPL',
+        name: 'Apple',
+        recordId: '3',
+        session: 'session-1',
+      });
+      expect(params.context).toBeUndefined();
+    });
+  });
+
+  it('marks unknown persistence without recreating a resendable draft on refresh', async () => {
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      meta: {
+        id: 3,
+        queryId: 'q-3',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        createdAt: '2026-03-18T10:00:00Z',
+      },
+      summary: {
+        analysisSummary: 'Stable',
+        operationAdvice: 'Hold',
+        trendPrediction: 'Range',
+        sentimentScore: 70,
+      },
+      strategy: {},
+    });
+    mockStartStream.mockResolvedValueOnce({
+      terminal: 'failed',
+      persistence: 'unknown',
+      turnId: 'turn-unknown',
+    });
+
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=3'] },
+    );
+    const firstRender = render(<RouterProvider router={router} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    fireEvent.click(await getReadySendButton());
+    await waitFor(() => {
+      expect(new URLSearchParams(router.state.location.search).get('context'))
+        .toBe('unknown');
+      expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
+    });
+
+    const refreshEntry = `${router.state.location.pathname}${router.state.location.search}`;
+    firstRender.unmount();
+    const refreshedRouter = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: [refreshEntry] },
+    );
+    render(<RouterProvider router={refreshedRouter} />);
+
+    await screen.findByRole('heading', { name: '问股' });
+    expect(screen.queryByDisplayValue('请深入分析 Apple(AAPL)')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
   });
 
   it('finishes report context hydration after StrictMode replays mount effects', async () => {

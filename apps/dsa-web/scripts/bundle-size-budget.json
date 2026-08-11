@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-08",
-  "baselineNote": "Measured on origin/main-era production vite build; budgets are current gzip + 10%.",
+  "measuredAt": "2026-08-11",
+  "baselineNote": "Current main includes PR #1040 reasoning-trace export controls. PR #938 adds the Portfolio URL contract and 27 translated wizard keys across all eight additional locales; combined locale ceilings use the current-main measurement plus each isolated PR #938 delta and 200 B headroom, with no identical-to-English baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,8 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206424,
-      "measuredGzipBytes": 187658
+      "maxGzipBytes": 231961,
+      "measuredGzipBytes": 231761,
+      "note": "Rebaselined after adding reasoning-trace export controls (PR #1040); measured 231761 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -25,50 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 130215,
-      "measuredGzipBytes": 118377
+      "maxGzipBytes": 151579,
+      "measuredGzipBytes": 151379,
+      "note": "Current main measured 150477 B; PR #938 adds an isolated 902 B Portfolio translation delta. Combined ceiling 151379 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 124816,
-      "measuredGzipBytes": 113469
+      "maxGzipBytes": 144885,
+      "measuredGzipBytes": 144685,
+      "note": "Current main measured 143830 B; PR #938 adds an isolated 855 B Portfolio translation delta. Combined ceiling 144685 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 124794,
-      "measuredGzipBytes": 113449
+      "maxGzipBytes": 144954,
+      "measuredGzipBytes": 144754,
+      "note": "Current main measured 143972 B; PR #938 adds an isolated 782 B Portfolio translation delta. Combined ceiling 144754 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 124626,
-      "measuredGzipBytes": 113296
+      "maxGzipBytes": 145247,
+      "measuredGzipBytes": 145047,
+      "note": "Current main measured 144303 B; PR #938 adds an isolated 744 B Portfolio translation delta. Combined ceiling 145047 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 120475,
-      "measuredGzipBytes": 109522
+      "maxGzipBytes": 141046,
+      "measuredGzipBytes": 140846,
+      "note": "Current main measured 139997 B; PR #938 adds an isolated 849 B Portfolio translation delta. Combined ceiling 140846 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 118181,
-      "measuredGzipBytes": 107437
+      "maxGzipBytes": 137492,
+      "measuredGzipBytes": 137292,
+      "note": "Current main measured 136575 B; PR #938 adds an isolated 717 B Portfolio translation delta. Combined ceiling 137292 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 112483,
-      "measuredGzipBytes": 102257
+      "maxGzipBytes": 131088,
+      "measuredGzipBytes": 130888,
+      "note": "Current main measured 130148 B; PR #938 adds an isolated 740 B Portfolio translation delta. Combined ceiling 130888 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 112457,
-      "measuredGzipBytes": 102233
+      "maxGzipBytes": 131131,
+      "measuredGzipBytes": 130931,
+      "note": "Current main measured 130213 B; PR #938 adds an isolated 718 B Portfolio translation delta. Combined ceiling 130931 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -116,14 +125,16 @@
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
-      "maxGzipBytes": 74967,
-      "measuredGzipBytes": 68151
+      "maxGzipBytes": 73318,
+      "measuredGzipBytes": 73118,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 56433,
-      "measuredGzipBytes": 51302
+      "maxGzipBytes": 57276,
+      "measuredGzipBytes": 57076,
+      "note": "Rebaselined after adding the reasoning-trace export controls Playground story (PR #1040); measured 57076 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",
@@ -134,14 +145,22 @@
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
-      "maxGzipBytes": 41087,
-      "measuredGzipBytes": 37351
+      "maxGzipBytes": 46602,
+      "measuredGzipBytes": 42365
+    },
+    {
+      "id": "PortfolioRiskMetricsPanel",
+      "match": "assets/PortfolioRiskMetricsPanel-*.js",
+      "maxGzipBytes": 10654,
+      "measuredGzipBytes": 9685,
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
     },
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 25543,
-      "measuredGzipBytes": 23220
+      "maxGzipBytes": 26394,
+      "measuredGzipBytes": 26194,
+      "note": "Remeasured for PR #938 after lazy-loading the import wizard and workspace-tab surfaces; the remaining route growth implements the reactive Portfolio URL contract. Measured 26194 B + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",

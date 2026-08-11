@@ -53,7 +53,7 @@ spec:
 
 **配置档案永远不会导出密钥值。**
 
-- 导出排除含 `KEY` / `TOKEN` / `SECRET` / `PASSWORD`、`*_EXTRA_HEADERS` 以及 `LITELLM_CONFIG` 的键。
+- 导出与导入共用敏感配置键分类器：`SECRET` / `PASSWORD` / `PASSWD` / `CREDENTIAL` 始终按敏感处理；`KEY` / `TOKEN` 会排除 token 计数、public key、key 版本/名称/ID 等结构字段；已知密钥容器（包括 `*_EXTRA_HEADERS`、`*_INSTALL_SPEC`、`LITELLM_CONFIG`、`DINGTALK_WEBHOOK_URL` 与 `PROXY_HOST`）也按敏感处理。
 - 导入若含密钥形态键，返回 `config_profile_secret_rejected` 并拒绝。
 - 应用路径不会伪造 API key。
 - 规则同时写在代码、测试与本文档中。

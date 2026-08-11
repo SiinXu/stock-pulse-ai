@@ -4,13 +4,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
+from threading import Lock
 from typing import Any, Optional, Protocol, cast
 import uuid
+from weakref import WeakKeyDictionary
 
 from src.repositories.security_audit_repo import SecurityAuditRepository
 from src.schemas.security_audit import (
+    SECURITY_AUDIT_MAX_EVENTS,
     SECURITY_AUDIT_RETENTION_DAYS,
     SecurityAuditEvent,
     SecurityAuditEventCreate,
@@ -56,16 +59,27 @@ def require_security_audit_recorder(value: object) -> SecurityAuditRecorder:
 class SecurityAuditService:
     """Sanitize, validate, retain, append, and query security audit events."""
 
+    _shared_retention_lock = Lock()
+    _retention_by_database: WeakKeyDictionary[object, dict[int, date]] = (
+        WeakKeyDictionary()
+    )
+
     def __init__(
         self,
         repository: Optional[SecurityAuditRepository] = None,
         *,
         retention_days: int = SECURITY_AUDIT_RETENTION_DAYS,
+        max_events: int = SECURITY_AUDIT_MAX_EVENTS,
     ) -> None:
         if retention_days < 1:
             raise ValueError("security audit retention must be at least one day")
+        if max_events < 1:
+            raise ValueError("security audit capacity must be at least one event")
         self._repository = repository
         self._retention_days = int(retention_days)
+        self._max_events = int(max_events)
+        self._retention_applied_on: date | None = None
+        self._retention_lock = Lock()
 
     @staticmethod
     def new_correlation_id() -> str:
@@ -142,7 +156,7 @@ class SecurityAuditService:
     ) -> SecurityAuditEventPage:
         try:
             repository = self._get_repository()
-            repository.apply_retention(cutoff=self._retention_cutoff())
+            self._apply_retention_if_due(repository)
             items, total = repository.list_events(
                 page=page,
                 page_size=page_size,
@@ -200,8 +214,10 @@ class SecurityAuditService:
             )
             event = SecurityAuditEventCreate.model_validate(sanitized)
             repository = self._get_repository()
-            repository.apply_retention(cutoff=self._retention_cutoff())
-            return repository.append(event)
+            self._apply_retention_if_due(repository)
+            persisted = repository.append(event)
+            self._apply_capacity(repository)
+            return persisted
         except Exception as exc:  # broad-exception: fallback_recorded - Normalize validation/redaction/storage failures before a privileged action proceeds.
             log_safe_exception(
                 logger,
@@ -216,10 +232,78 @@ class SecurityAuditService:
             self._repository = SecurityAuditRepository()
         return self._repository
 
-    def _retention_cutoff(self) -> datetime:
-        return datetime.now(timezone.utc) - timedelta(days=self._retention_days)
+    def _apply_capacity(self, repository: SecurityAuditRepository) -> None:
+        """Enforce the hard row-capacity bound after every successful append."""
+        apply = getattr(repository, "apply_capacity", None)
+        if not callable(apply):
+            return
+        apply(max_events=self._max_events)
+
+    def _apply_retention_if_due(self, repository: SecurityAuditRepository) -> None:
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        if self._retention_applied_on == today:
+            return
+        with self._retention_lock:
+            if self._retention_applied_on == today:
+                return
+            if type(repository) is SecurityAuditRepository:
+                with self._shared_retention_lock:
+                    retained = self._retention_by_database.get(repository.db)
+                    if (
+                        retained is not None
+                        and retained.get(self._retention_days) == today
+                    ):
+                        self._retention_applied_on = today
+                        return
+                    repository.apply_retention(
+                        cutoff=now - timedelta(days=self._retention_days)
+                    )
+                    if retained is None:
+                        retained = {}
+                        self._retention_by_database[repository.db] = retained
+                    retained[self._retention_days] = today
+                    self._retention_applied_on = today
+                    return
+            repository.apply_retention(
+                cutoff=now - timedelta(days=self._retention_days)
+            )
+            self._retention_applied_on = today
+
+
+def _limits_from_config() -> tuple[int, int]:
+    """Resolve retention and capacity from shared Config with safe defaults.\n\n    Prefer composition-root config access over bare ``get_config()`` so this\n    module stays outside the config-access growth baseline (see\n    docs/config-access-ratchet.md).\n    """
+    retention = SECURITY_AUDIT_RETENTION_DAYS
+    max_events = SECURITY_AUDIT_MAX_EVENTS
+    try:
+        from src.application_services import get_application_services
+
+        config = get_application_services().config
+        configured_retention = getattr(config, "security_audit_retention_days", None)
+        configured_max = getattr(config, "security_audit_max_events", None)
+        if configured_retention is not None:
+            retention = int(configured_retention)
+        if configured_max is not None:
+            max_events = int(configured_max)
+    except Exception as exc:  # broad-exception: fallback_recorded - Config may be unavailable in early boot/tests
+        log_safe_exception(
+            logger,
+            "security_audit_config_limits_unavailable",
+            exc,
+            error_code="security_audit_config_limits_unavailable",
+            level=logging.WARNING,
+        )
+    if retention < 1:
+        retention = SECURITY_AUDIT_RETENTION_DAYS
+    if max_events < 1:
+        max_events = SECURITY_AUDIT_MAX_EVENTS
+    return retention, max_events
 
 
 def get_security_audit_service() -> SecurityAuditService:
     """FastAPI/runtime dependency factory with lazy database initialization."""
-    return SecurityAuditService()
+    retention_days, max_events = _limits_from_config()
+    return SecurityAuditService(
+        retention_days=retention_days,
+        max_events=max_events,
+    )

@@ -35,6 +35,7 @@ from src.agent.runner_parts import tools as _runner_tools
 parse_dashboard_json = _runner_parsing.parse_dashboard_json
 parse_dashboard_json_result = _runner_parsing.parse_dashboard_json_result
 run_agent_loop = _runner_loop.run_agent_loop
+_NATIVE_TOOL_RESULT_MAX_BYTES = _runner_loop._NATIVE_TOOL_RESULT_MAX_BYTES
 
 from src.agent.dashboard_payload import (
     has_reserved_explanation_field,
@@ -244,12 +245,22 @@ def _try_repair_json(text: str, repair_fn: Callable) -> Optional[Dict[str, Any]]
 class _ToolCompletionFence:
     """Linearize one runner timeout against BoundToolSession completion."""
 
-    def __init__(self, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        timeout_seconds: float,
+        *,
+        deadline_monotonic: Optional[float] = None,
+    ) -> None:
         self._lock = threading.Lock()
         self._timed_out = False
         self._dispatched = False
         self._completed = False
-        self._deadline_monotonic = time.monotonic() + timeout_seconds
+        timeout_deadline = time.monotonic() + timeout_seconds
+        self._deadline_monotonic = (
+            min(timeout_deadline, deadline_monotonic)
+            if deadline_monotonic is not None
+            else timeout_deadline
+        )
 
     def mark_timed_out(self) -> bool:
         """Claim timeout ownership unless completion already won."""
@@ -365,6 +376,7 @@ _RUNNER_COMPAT_EXPORTS = (
     _is_stock_scoped_tool,
     _normalize_guard_stock_code,
     _normalize_tool_stock_code,
+    _NATIVE_TOOL_RESULT_MAX_BYTES,
     _try_parse_json,
     _try_repair_json,
     as_completed,

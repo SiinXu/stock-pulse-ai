@@ -25,19 +25,15 @@ vi.mock('../../../stores/agentChatStore', () => ({
 
 vi.mock('../../../hooks/useUnreadNotifications', () => ({
   useUnreadNotifications: () => ({
-    signalItems: [],
-    alertItems: [],
-    unreadSignalCount: 0,
-    unreadAlertCount: 0,
+    items: [],
     unreadCount: 0,
     isLoading: false,
     hasError: false,
     hasPartialError: false,
-    signalsFailed: false,
-    alertsFailed: false,
-    signalLastSeenAt: 0,
-    alertLastSeenAt: 0,
-    markAllSeen: () => undefined,
+    listFailed: false,
+    countFailed: false,
+    markFailed: false,
+    markAllSeen: async () => undefined,
     refresh: () => undefined,
   }),
 }));
@@ -138,7 +134,7 @@ describe('Shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
     const palette = await screen.findByRole('dialog', { name: '快速前往' });
-    fireEvent.click(within(palette).getByRole('button', { name: '开始分析' }));
+    fireEvent.click(within(palette).getByRole('option', { name: '开始分析' }));
 
     expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent('/research/analysis');
   });

@@ -73,6 +73,12 @@ class ChatRequest(BaseModel):
         validation_alias=AliasChoices("skills", "strategies"),
     )
     context: Optional[Dict[str, Any]] = None  # Previous analysis context for data reuse
+    turn_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^\S(?:.*\S)?$",
+    )
 
     @property
     def effective_skills(self) -> Optional[List[str]]:
@@ -115,6 +121,10 @@ class ChatResponse(BaseModel):
     content: str
     session_id: str
     error: Optional[str] = None
+    turn_id: Optional[str] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     agent_runtime: Optional[AgentRuntimeMetadata] = Field(
         default=None,
         exclude_if=lambda value: value is None,
@@ -242,14 +252,17 @@ async def agent_chat(
 
         # Offload the blocking call to a thread to avoid blocking the event loop.
         loop = asyncio.get_running_loop()
+        chat_kwargs = {
+            "message": request.message,
+            "session_id": session_id,
+            "context": ctx,
+            "selected_skill_ids": selected_skill_ids,
+        }
+        if request.turn_id:
+            chat_kwargs["turn_id"] = request.turn_id
         result = await loop.run_in_executor(
             None,
-            lambda: executor.chat(
-                message=request.message,
-                session_id=session_id,
-                context=ctx,
-                selected_skill_ids=selected_skill_ids,
-            ),
+            lambda: executor.chat(**chat_kwargs),
         )
         agent_runtime = _project_agent_runtime(result)
 
@@ -265,6 +278,7 @@ async def agent_chat(
                 session_id=session_id,
                 error=AGENT_CHAT_FAILED,
                 agent_runtime=agent_runtime,
+                turn_id=request.turn_id,
             )
 
         return ChatResponse(
@@ -273,6 +287,7 @@ async def agent_chat(
             session_id=session_id,
             error=None,
             agent_runtime=agent_runtime,
+            turn_id=request.turn_id,
         )
             
     except Exception as exc:
@@ -303,6 +318,7 @@ class SessionMessage(BaseModel):
     created_at: Optional[str] = None
     error: Optional[str] = None
     params: Optional[Dict[str, Any]] = None
+    turn_id: Optional[str] = None
 
 
 class SessionStateResponse(BaseModel):
@@ -313,6 +329,7 @@ class SessionMessagesResponse(BaseModel):
     session_id: str
     messages: List[SessionMessage]
     session_state: SessionStateResponse
+    turn_identity_supported: bool = True
 
 
 @router.get("/chat/sessions", response_model=SessionsResponse)
@@ -359,10 +376,13 @@ async def get_chat_session_messages(
             payload["error"] = raw["error"]
         if raw.get("params") is not None:
             payload["params"] = raw["params"]
+        if raw.get("turn_id") is not None:
+            payload["turn_id"] = raw["turn_id"]
         messages.append(SessionMessage(**payload))
     return SessionMessagesResponse(
         session_id=session_id,
         messages=messages,
+        turn_identity_supported=True,
         session_state=SessionStateResponse(
             selected_skill_ids=detail.selected_skill_ids,
         ),
@@ -545,6 +565,7 @@ async def agent_chat_stream(
       - pipeline_timeout: analysis stopped because the stage/pipeline budget expired
       - pipeline_budget_skipped: analysis stopped before an unstarted stage
         because the remaining budget was too low for useful work
+      - turn_persisted: the identified user turn and request context are durable
       - done: analysis complete, contains 'content' and 'success'
       - error: error occurred, contains 'message'
     """
@@ -598,14 +619,17 @@ async def agent_chat_stream(
         try:
             lifecycle.start()
             executor = _build_executor(config, skills or None)
-            result = executor.chat(
-                message=request.message,
-                session_id=session_id,
-                progress_callback=progress_callback,
-                context=stream_ctx,
-                cancelled_check=lifecycle.cancelled_check,
-                selected_skill_ids=selected_skill_ids,
-            )
+            chat_kwargs = {
+                "message": request.message,
+                "session_id": session_id,
+                "progress_callback": progress_callback,
+                "context": stream_ctx,
+                "cancelled_check": lifecycle.cancelled_check,
+                "selected_skill_ids": selected_skill_ids,
+            }
+            if request.turn_id:
+                chat_kwargs["turn_id"] = request.turn_id
+            result = executor.chat(**chat_kwargs)
             lifecycle.finish_from_result(result)
             if not result.success and not getattr(result, "cancelled", False):
                 logger.error(

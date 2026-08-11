@@ -4,7 +4,20 @@ import { describe, expect, it } from 'vitest';
 import { getSettingsHelpContent } from '../settingsHelp';
 import { UI_LANGUAGES } from '../../i18n/uiLanguages';
 
+const OVERLAY_FIXTURE_HELP_KEYS = [
+  'settings.data_source.RSS_NEWS_FEED_URLS',
+  'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION',
+] as const;
+
 describe('fallback model settings help', () => {
+  it.each(UI_LANGUAGES)('keeps the overlay fixture help inventory mount-safe for %s', (language) => {
+    for (const key of OVERLAY_FIXTURE_HELP_KEYS) {
+      const content = getSettingsHelpContent(key, undefined, language);
+      expect(content?.title.trim(), `${language}:${key}:title`).not.toBe('');
+      expect(content?.summary?.trim(), `${language}:${key}:summary`).not.toBe('');
+    }
+  });
+
   it.each(UI_LANGUAGES)('returns complete localized settings help for %s', (language) => {
     const content = getSettingsHelpContent('settings.ai_model.GENERATION_BACKEND', undefined, language);
     expect(content?.title.trim()).not.toBe('');

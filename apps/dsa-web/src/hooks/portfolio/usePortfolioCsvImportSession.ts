@@ -64,12 +64,13 @@ export function usePortfolioCsvImportSession({
     }
   }, [text.brokerListEmpty, text.brokerListUnavailable]);
 
-  const handleParseCsv = async () => {
-    if (!csvFile || !selectedBroker) return;
+  const handleParseCsv = async (fileOverride?: File) => {
+    const file = fileOverride ?? csvFile;
+    if (!file || !selectedBroker) return;
     try {
       setCsvParsing(true);
       setCsvError(null);
-      const parsed = await portfolioApi.parseCsvImport(selectedBroker, csvFile);
+      const parsed = await portfolioApi.parseCsvImport(selectedBroker, file);
       setCsvParseResult(parsed);
       setCsvCommitResult(null);
     } catch (err) {

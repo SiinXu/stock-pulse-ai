@@ -6,10 +6,11 @@ import { ReportStructuredInsights } from './ReportStructuredInsights';
 import { ReportStrata } from './ReportStrata';
 import { ReportNews } from './ReportNews';
 import { ReportDetails } from './ReportDetails';
-import { ReportDiagnostics } from './ReportDiagnostics';
 import { AnalysisContextSummary } from './AnalysisContextSummary';
 import { MarketReviewReportView } from './MarketReviewReportView';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+
+const ReportDiagnostics = React.lazy(() => import('./ReportDiagnostics'));
 
 interface ReportSummaryProps {
   data: AnalysisResult | AnalysisReport;
@@ -66,6 +67,7 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
         meta={meta}
         summary={summary}
         details={details}
+        strategy={strategy}
         isHistory={isHistory}
         watchlist={watchlist}
       />
@@ -92,12 +94,14 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
       />
 
       {/* Run diagnostic summary */}
-      <ReportDiagnostics
-        recordId={recordId}
-        summary={diagnosticSummary}
-        language={reportLanguage}
-        onOpenRunFlow={onOpenRunFlow}
-      />
+      <React.Suspense fallback={false}>
+        <ReportDiagnostics
+          recordId={recordId}
+          summary={diagnosticSummary}
+          language={reportLanguage}
+          onOpenRunFlow={onOpenRunFlow}
+        />
+      </React.Suspense>
 
       {/* Transparency and traceability area. */}
       <ReportDetails details={details} recordId={recordId} language={reportLanguage} />

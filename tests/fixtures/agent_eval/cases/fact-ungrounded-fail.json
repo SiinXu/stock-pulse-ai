@@ -1,0 +1,24 @@
+{
+  "id": "fact-ungrounded-fail",
+  "title": "Fabricated price not present in context",
+  "tags": ["factuality", "fail"],
+  "dimensions": ["factuality"],
+  "context": {
+    "stock_code": "600519",
+    "facts": [
+      {"fact_id": "quote-price", "field_path": "quote.price", "value": 1680.5, "unit": "CNY", "as_of": "2026-08-08", "source_id": "frozen-quote"}
+    ]
+  },
+  "agent_output": {
+    "signal": "buy",
+    "summary": "Target price 9999.0 with upside to 12000 based on secret model.",
+    "claims": [
+      {"claim_id": "fabricated-target", "source_fact_id": "quote-price", "field_path": "quote.price", "value": 9999.0, "unit": "CNY", "as_of": "2026-08-08", "source_id": "frozen-quote"}
+    ]
+  },
+  "evaluation": {
+    "factuality": {
+      "required_claim_ids": ["fabricated-target"]
+    }
+  }
+}

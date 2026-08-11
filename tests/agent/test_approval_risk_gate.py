@@ -67,7 +67,14 @@ def test_consumed_approval_preserves_original_signal_at_unique_gate() -> None:
     assert application.bypassed is True
     assert application.approval_id == "a" * 32
     assert application.applied is False
-    assert ctx.get_data("final_dashboard")["decision_type"] == "buy"
+    dashboard = ctx.get_data("final_dashboard")
+    assert dashboard["decision_type"] == "buy"
+    assert "一次性授权保留 buy" in dashboard["risk_warning"]
+    assert "已下调" not in dashboard["risk_warning"]
+    assert dashboard["risk_manager"]["authorized_bypass_id"] == "a" * 32
+    assert dashboard["risk_manager"]["final_action"] == "buy"
+    assert dashboard["risk_manager"]["reason_params"]["approval_owner"] == "local_admin"
+    assert dashboard["risk_manager"]["reason_params"]["approved_at"]
     assert ctx.get_data("risk_override_applied") is None
     service.await_risk_control_bypass.assert_called_once()
 
@@ -119,4 +126,21 @@ def test_gate_failure_keeps_existing_conservative_override() -> None:
     assert application is not None
     assert application.bypassed is False
     assert application.applied is True
+    assert ctx.get_data("final_dashboard")["decision_type"] == "hold"
+
+
+def test_non_approved_terminal_result_keeps_conservative_action() -> None:
+    """ApprovalService normalizes rejected, expired, and timed-out waits to None."""
+    service = MagicMock()
+    service.await_risk_control_bypass.return_value = None
+    ctx = _context()
+
+    with patch(
+        "src.agent.orchestrator_parts.dashboard._ApprovalService",
+        return_value=service,
+    ):
+        application = _harness()._apply_risk_override(ctx)
+
+    assert application is not None and application.applied is True
+    assert application.bypassed is False
     assert ctx.get_data("final_dashboard")["decision_type"] == "hold"

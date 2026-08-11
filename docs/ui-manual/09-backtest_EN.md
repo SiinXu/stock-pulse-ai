@@ -56,7 +56,7 @@ Example query string:
 
 An invalid evaluation window no longer changes the input row height: the field shows its error state while the reason remains available to screen readers without adding a trailing control. Stock, Window days, and Analysis date fields use aligned labels. The “10-day window / Next-day validation” switch distinguishes the modes: the window mode uses the entered day count, while next-day validation fixes it at one trading day and restores the prior count when switched back. Mode switches and result loading keep stable control widths to avoid toolbar shifts.
 
-Backtest run and result API failures, including expandable details, appear in the global Toast instead of adding content above the filters or results table.
+Backtest run and result API failures appear as localized messages in the global Toast instead of adding content above the filters or results table; raw backend diagnostics are not exposed in the interface.
 
 Skipped and insufficient rows stay in the results table. The **Notes** column surfaces backend `resolution_notes` such as legacy analysis-date fallback, prior-session start after a halt/gap, missing daily bars, or insufficient forward-window bars.
 

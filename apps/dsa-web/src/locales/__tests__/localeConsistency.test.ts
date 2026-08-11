@@ -42,6 +42,8 @@ import { SETTINGS_NOTIFICATION_TEXT } from '../settingsNotifications';
 import { SETTINGS_PAGE_TEXT } from '../settingsPage';
 import { SETTINGS_WIZARD_TEXT } from '../settingsWizard';
 import { STOCK_SEARCH_TEXT } from '../stockSearch';
+import { CHARTS_TEXT } from '../charts';
+import { EVENT_ALERT_PAGE_TEXT, EVENT_CATEGORY_LABELS } from '../eventAlerts';
 
 type LocaleMap = Record<UiLanguage, unknown>;
 
@@ -71,6 +73,9 @@ const registries: Record<string, LocaleMap> = {
   settingsPage: SETTINGS_PAGE_TEXT,
   settingsWizard: SETTINGS_WIZARD_TEXT,
   stockSearch: STOCK_SEARCH_TEXT,
+  charts: CHARTS_TEXT,
+  eventAlerts: EVENT_ALERT_PAGE_TEXT,
+  eventAlertCategories: EVENT_CATEGORY_LABELS,
 };
 
 const reportRegistries = {
@@ -242,6 +247,18 @@ describe('locale registries', () => {
       for (const key of zh.keys()) {
         expect(localized.get(key)?.trim(), `empty ${language} translation: ${key}`).not.toBe('');
         expect(placeholders(localized.get(key) ?? ''), `${language} placeholder mismatch: ${key}`).toEqual(placeholders(zh.get(key) ?? ''));
+      }
+    }
+  });
+
+  it('keeps every feature-scoped event-alert translation distinct from English', () => {
+    for (const registry of [EVENT_ALERT_PAGE_TEXT, EVENT_CATEGORY_LABELS]) {
+      const english = flatten(registry.en);
+      for (const language of ADDITIONAL_UI_LANGUAGES) {
+        const localized = flatten(registry[language]);
+        for (const [key, englishText] of english) {
+          expect(localized.get(key), `${language} copied English event-alert text: ${key}`).not.toBe(englishText);
+        }
       }
     }
   });
@@ -1107,8 +1124,13 @@ describe('locale registries', () => {
       }
       expect(translations['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.notification.WEBHOOK_VERIFY_SSL.notes.0'])
         .toContain('SSL');
-      expect(translations['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENCODE_CLI_MODEL.examples.0'])
-        .toBe('OPENCODE_CLI_MODEL=provider/model');
+      // examples are source literals, not locale-bundle keys (Scheme 3).
+      expect(
+        Object.prototype.hasOwnProperty.call(
+          translations,
+          'locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENCODE_CLI_MODEL.examples.0',
+        ),
+      ).toBe(false);
       const openCodeSummary = translations[
         'locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENCODE_CLI_MODEL.summary'
       ];

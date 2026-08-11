@@ -175,6 +175,7 @@ class BoundToolSession:
         self._closed = False
         self._dispatched_calls = 0
         self._dropped_results = 0
+        self._untrusted_document_follow_on_fence = False
         self._audit_trail: List[Dict[str, Any]] = []
         self._non_retriable_results: Dict[str, Dict[str, Any]] = {}
 
@@ -208,6 +209,11 @@ class BoundToolSession:
     def granted_capabilities(self) -> frozenset:
         """Capability-named alias for the retained permission grant field."""
         return self._granted_permissions
+
+    @property
+    def deadline_monotonic(self) -> Optional[float]:
+        """Return the immutable execution deadline shared with runner fences."""
+        return self._deadline_monotonic
 
     @property
     def closed(self) -> bool:
@@ -319,6 +325,7 @@ class BoundToolSession:
             "schema_contract_violation",
             "scope_contract_violation",
             "stock_scope_violation",
+            "untrusted_document_follow_on_denied",
             "unsupported_capability",
         }
         outcome = "success" if result.get("ok") is True else (
@@ -581,6 +588,15 @@ class BoundToolSession:
                 )
             if cache_key is not None and self._is_cacheable_non_retriable(result):
                 self._non_retriable_results[cache_key] = result
+            public_result = result.get("result") if isinstance(result, dict) else None
+            trust = public_result.get("trust") if isinstance(public_result, dict) else None
+            if (
+                tool_name == "parse_earnings_transcript"
+                and result.get("ok") is True
+                and isinstance(trust, dict)
+                and trust.get("classification") == "untrusted_user_document"
+            ):
+                self._untrusted_document_follow_on_fence = True
             self._audit_trail.append(result["audit"])
             return result
 
@@ -706,6 +722,18 @@ class BoundToolSession:
             )
         if self._deadline_exceeded():
             return ("deadline_exceeded", "Session deadline exceeded.", None)
+        if (
+            self._untrusted_document_follow_on_fence
+            and tool_name != "parse_earnings_transcript"
+        ):
+            return (
+                "untrusted_document_follow_on_denied",
+                "A new user turn is required before another tool can run after untrusted document parsing.",
+                {
+                    "reason": "untrusted_document_cannot_trigger_follow_on_tool",
+                    "user_reauthorization_required": True,
+                },
+            )
         if not tool_name.strip():
             return (
                 "invalid_tool_name",

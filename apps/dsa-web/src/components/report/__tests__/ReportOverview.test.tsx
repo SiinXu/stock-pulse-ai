@@ -20,6 +20,28 @@ const baseSummary = {
 };
 
 describe('ReportOverview', () => {
+  it('uses compact typography for the report title and summary', () => {
+    render(<ReportOverview meta={baseMeta} summary={baseSummary} />);
+
+    expect(screen.getByRole('heading', { name: '贵州茅台' })).toHaveClass('text-xl');
+    const summaryText = screen.getAllByText('趋势维持强势').find(
+      (element) => element.classList.contains('whitespace-pre-wrap'),
+    );
+    expect(summaryText).toHaveClass('text-sm', 'leading-6');
+  });
+
+  it('shows the overview share action as an icon-only button', () => {
+    render(<ReportOverview meta={{ ...baseMeta, id: 1 }} summary={baseSummary} />);
+
+    const shareButton = screen.getByRole('button', { name: '分享' });
+    expect(shareButton.parentElement?.parentElement?.parentElement).toHaveClass(
+      '[&_.home-surface-button]:w-10',
+      '[&_.home-surface-button]:gap-0',
+      '[&_.home-surface-button]:px-0',
+      '[&_.home-surface-button>span]:hidden',
+    );
+  });
+
   it('uses canonical action instead of conflicting report advice', () => {
     render(
       <ReportOverview
@@ -33,7 +55,8 @@ describe('ReportOverview', () => {
       />,
     );
 
-    expect(screen.getByText('买入')).toBeVisible();
+    // Decision Card + action-advice card both surface the canonical action.
+    expect(screen.getAllByText('买入').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Sell')).not.toBeInTheDocument();
   });
 
@@ -52,7 +75,7 @@ describe('ReportOverview', () => {
       </UiLanguageProvider>,
     );
 
-    expect(screen.getByText('Buy')).toBeVisible();
+    expect(screen.getAllByText('Buy').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Sell')).not.toBeInTheDocument();
   });
 
@@ -64,7 +87,7 @@ describe('ReportOverview', () => {
       />,
     );
 
-    expect(screen.getByText('继续观察买点')).toBeVisible();
+    expect(screen.getAllByText('继续观察买点').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders final market phase and partial-bar labels from report metadata', () => {

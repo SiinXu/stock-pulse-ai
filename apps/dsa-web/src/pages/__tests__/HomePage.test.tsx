@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alertsApi } from '../../api/alerts';
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { historyApi } from '../../api/history';
+import { onboardingApi } from '../../api/onboarding';
 import { scheduledTasksApi } from '../../api/scheduledTasks';
 import { systemConfigApi } from '../../api/systemConfig';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
@@ -55,6 +56,13 @@ vi.mock('../../api/systemConfig', () => ({
   },
 }));
 
+vi.mock('../../api/onboarding', () => ({
+  onboardingApi: {
+    getFirstRunReadiness: vi.fn(),
+    getDemoAnalysis: vi.fn(),
+  },
+}));
+
 const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   void target;
   return () => {};
@@ -92,6 +100,67 @@ const marketHistory = {
   stockName: 'Market review',
   reportType: 'market_review' as const,
   createdAt: '2026-07-23T12:00:00Z',
+};
+
+const demoReadiness = {
+  schemaVersion: 1 as const,
+  isFreshEnvironment: true,
+  hasPrimaryModel: false,
+  beginnerModeRecommended: true,
+  primaryPath: 'demo' as const,
+  primaryCta: 'view_demo' as const,
+  reasonCode: 'local_runtime_unavailable' as const,
+  reasonParams: {},
+  localRuntime: {
+    reachable: false,
+    modelsAvailable: false,
+    runnable: false,
+    models: [],
+    suggestedProfile: {},
+    reasonCode: 'ollama_unreachable' as const,
+    detectEnabled: true,
+  },
+  suggestedProfile: {},
+  demoAvailable: true as const,
+  configMutated: false as const,
+  existingConfigUntouched: true as const,
+  snapshotId: '0123456789abcdef01234567',
+  generatedAt: '2026-08-09T00:00:00Z',
+};
+
+const demoAnalysis = {
+  schemaVersion: 1 as const,
+  isSample: true as const,
+  sampleBanner: 'Sample data - not a live analysis',
+  sampleDisclaimer: 'Offline fixture only.',
+  queryId: 'demo-sample-analysis-v1' as const,
+  stockCode: '600519' as const,
+  stockName: 'Kweichow Moutai (sample)',
+  createdAt: '2026-08-09T00:00:00Z',
+  report: {
+    meta: {
+      queryId: 'demo-sample-analysis-v1' as const,
+      stockCode: '600519' as const,
+      stockName: 'Kweichow Moutai (sample)',
+      reportType: 'brief' as const,
+      reportLanguage: 'en' as const,
+      createdAt: '2026-08-09T00:00:00Z',
+      currentPrice: null,
+      changePct: null,
+      modelUsed: 'demo-fixture/offline' as const,
+    },
+    summary: {
+      analysisSummary: 'Offline first-success report.',
+      operationAdvice: 'Configure a live model when ready.',
+      action: 'watch' as const,
+      actionLabel: 'Watch (sample)',
+      trendPrediction: 'Sample trend',
+      sentimentScore: 50,
+      sentimentLabel: 'Neutral' as const,
+    },
+    strategy: { idealBuy: null, secondaryBuy: null, stopLoss: null, takeProfit: null },
+    details: { news: [], technical: [] },
+  },
 };
 
 const scheduledRiskCheck = {
@@ -174,6 +243,8 @@ describe('HomePage attention hub', () => {
       nextStepKey: null,
       checks: [],
     });
+    vi.mocked(onboardingApi.getFirstRunReadiness).mockResolvedValue(demoReadiness);
+    vi.mocked(onboardingApi.getDemoAnalysis).mockResolvedValue(demoAnalysis);
     vi.mocked(scheduledTasksApi.getToday).mockResolvedValue({
       date: '2026-07-25',
       timezone: 'UTC',
@@ -466,6 +537,10 @@ describe('HomePage attention hub', () => {
     renderHome();
 
     expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
+    expect(await screen.findByTestId('home-first-run-entry')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'View sample analysis' }));
+    expect(await screen.findByTestId('beginner-report-summary')).toBeInTheDocument();
+    expect(screen.getByText('Offline first-success report.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'System readiness' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Configurable area/ })).toHaveAttribute('aria-expanded', 'true');
     // Single dismiss owner: onboarding incomplete alert (not readiness card).
@@ -473,6 +548,46 @@ describe('HomePage attention hub', () => {
     expect(closeButtons).toHaveLength(1);
     fireEvent.click(closeButtons[0]);
     expect(window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe('true');
+  });
+
+  it('routes a detected local runtime to the canonical Local Models settings view', async () => {
+    vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['llm_primary'],
+      nextStepKey: 'llm_primary',
+      checks: [{
+        key: 'llm_primary',
+        title: 'Primary model',
+        category: 'ai_model',
+        required: true,
+        status: 'needs_action',
+        message: 'Select a local model',
+      }],
+    });
+    vi.mocked(onboardingApi.getFirstRunReadiness).mockResolvedValue({
+      ...demoReadiness,
+      primaryPath: 'local_ollama',
+      primaryCta: 'open_local_setup',
+      reasonCode: 'local_model_ready',
+      recommendedPresetId: 'local-first',
+      localRuntime: {
+        ...demoReadiness.localRuntime,
+        reachable: true,
+        modelsAvailable: true,
+        runnable: true,
+        backend: 'ollama',
+        models: ['qwen3:4b'],
+        reasonCode: 'ollama_ready',
+      },
+    });
+
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open local model setup' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      `${APP_ROUTE_PATHS.settings}?section=ai_models&view=local_models&from=onboarding`,
+    );
   });
 
   it('keeps home core blocks single-column below the xl breakpoint class', async () => {

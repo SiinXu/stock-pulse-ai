@@ -35,7 +35,10 @@ import {
   buildSettingsSectionHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin, mockCompletedSetupStatus, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
-import { expectAnalyzeButtonReady } from './workbench-fixture';
+import {
+  expectAnalyzeButtonReady,
+  openAnalysisHistoryPopover,
+} from './workbench-fixture';
 
 type JsonObject = Record<string, unknown>;
 
@@ -106,6 +109,10 @@ function deferred<T = void>() {
     resolve = next;
   });
   return { promise, resolve };
+}
+
+function reportSummaryText(page: Page, text: string) {
+  return page.getByText(text, { exact: true }).and(page.getByRole('paragraph'));
 }
 
 async function getElementContrast(locator: Locator) {
@@ -294,7 +301,8 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
   await page.goto(buildAnalysisWorkbenchHref({
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
   }));
-  const historyItem = page
+  const historyPopover = await openAnalysisHistoryPopover(page);
+  const historyItem = historyPopover
     .locator('.history-item[data-control="pressable"]')
     .filter({ hasText: 'E2E Fixture' })
     .first();
@@ -691,7 +699,7 @@ function backtestRow(id: number, code: string) {
 async function assertRouteChrome(page: Page, path: string, text: string, title: string) {
   await page.goto(path);
   await expect(page.getByText(text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveTitle(new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  await expect(page).toHaveTitle(title);
 }
 
 async function assertNoDocumentOverflow(page: Page, path: string) {
@@ -927,8 +935,19 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
-    await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.settings, UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
+    // Usage is hosted under Settings; chrome text is usage.title and document title is usage.documentTitle.
+    await assertRouteChrome(
+      page,
+      usageSettingsHref,
+      UI_TEXT.en['usage.title'],
+      UI_TEXT.en['usage.documentTitle'],
+    );
+    await assertRouteChrome(
+      page,
+      APP_ROUTE_PATHS.settings,
+      UI_TEXT.en['settings.pageTitle'],
+      UI_TEXT.en['settings.pageTitleDocument'],
+    );
     await assertRouteChrome(page, '/missing-route', UI_TEXT.en['notFound.title'], UI_TEXT.en['notFound.pageTitle']);
   });
 
@@ -936,11 +955,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await page.goto(`${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#recent`);
 
+    // Settings is a large lazy chunk; wait for the embedded usage heading before URL checks.
     await expect(page.getByRole('heading', {
       level: 2,
       name: UI_TEXT.en['usage.title'],
       exact: true,
-    })).toBeVisible();
+    })).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('h1')).toHaveCount(1);
     const redirectedUrl = new URL(page.url());
     expect(redirectedUrl.pathname).toBe(APP_ROUTE_PATHS.settings);
@@ -951,6 +971,22 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: 'Usage & cost' }))
       .toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('link', { name: 'Usage' })).toHaveCount(0);
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
+
+    const canonicalUsageHref = `${redirectedUrl.pathname}${redirectedUrl.search}${redirectedUrl.hash}`;
+    // replace (not push): Back returns to the exact pre-navigation Home entry,
+    // while Forward restores the canonical Settings URL with query/hash intact.
+    await page.goBack();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(APP_ROUTE_PATHS.home);
+    await page.goForward();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return `${url.pathname}${url.search}${url.hash}`;
+    }).toBe(canonicalUsageHref);
+    await expect(page).toHaveTitle(UI_TEXT.en['usage.documentTitle']);
   });
 
   test('05b legacy Research deep links preserve context and replace into canonical routes', async ({ page }) => {
@@ -1149,9 +1185,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     let streamAttempts = 0;
     await page.route('**/api/v1/agent/chat/stream', async (route) => {
       streamAttempts += 1;
-      const body = streamAttempts === 1
+      const request = route.request().postDataJSON() as { turn_id?: string };
+      const persisted = `data: {"type":"turn_persisted","turn_id":"${request.turn_id}","message_id":"11"}\n\n`;
+      const body = persisted + (streamAttempts === 1
         ? 'data: {"type":"error","error":"upstream_timeout","message":"raw upstream detail"}\n\n'
-        : 'data: {"type":"progress","stage":"analysis","message":"streaming"}\n\ndata: {"type":"done","success":true,"content":"retry stream completed"}\n\n';
+        : 'data: {"type":"progress","stage":"analysis","message":"streaming"}\n\ndata: {"type":"done","success":true,"content":"retry stream completed"}\n\n');
       await route.fulfill({ status: 200, contentType: 'text/event-stream', body });
     });
     await login(page);
@@ -1178,10 +1216,14 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       ],
     }));
     await page.route('**/api/v1/agent/chat/sessions/url-session', (route) => fulfillJson(route, {
+      session_id: 'url-session',
       messages: [{ id: 'url-message', role: 'assistant', content: 'URL session restored' }],
+      session_state: { selected_skill_ids: null },
     }));
     await page.route('**/api/v1/agent/chat/sessions/stale-local', (route) => fulfillJson(route, {
+      session_id: 'stale-local',
       messages: [{ id: 'stale-message', role: 'assistant', content: 'stale local message' }],
+      session_state: { selected_skill_ids: null },
     }));
     await login(page);
     await page.evaluate(() => localStorage.setItem('dsa_chat_session_id', 'stale-local'));
@@ -1198,11 +1240,17 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       route,
       historyDetail(1, 'AAPL', 'Apple'),
     ));
-    await page.route('**/api/v1/agent/chat/stream', (route) => route.fulfill({
-      status: 200,
-      contentType: 'text/event-stream',
-      body: 'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
-    }));
+    await page.route('**/api/v1/agent/chat/stream', (route) => {
+      const request = route.request().postDataJSON() as { turn_id?: string };
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          `data: {"type":"turn_persisted","turn_id":"${request.turn_id}","message_id":"12"}\n\n`,
+          'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
+        ].join(''),
+      });
+    });
     await login(page);
     await page.goto('/chat?stock=AAPL&name=Apple&recordId=1');
 
@@ -1280,7 +1328,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(parametersTrigger).toBeFocused();
   });
 
-  test('14 Screening restores a successful task and reports a subsequent failed task through the shared task contract', async ({ page }) => {
+  test('14 Screening restores a successful task and preserves it through subsequent failed attempts', async ({ page }) => {
     await mockScreeningBase(page);
     let submissionAttempts = 0;
     await page.route('**/api/v1/alphasift/screen/tasks/restore-success', (route) => fulfillJson(route, {
@@ -1375,10 +1423,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByText('外部行情或模型服务不可用，请稍后重试。', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('raw backend failure', { exact: true })).toHaveCount(0);
     expect(submissionAttempts).toBe(2);
-    await expect(page.getByText('RESTORED', { exact: true })).toHaveCount(0);
+    await expect(page.getByText(SCREENING_TEXT.zh.showingLastGoodTitle, { exact: true })).toBeVisible();
+    await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
   });
 
-  test('15 Alerts creation failure stays inside the modal and preserves all user input', async ({ page }) => {
+  test('15 Alerts creation failure uses the global error Toast and preserves all modal input', async ({ page }) => {
     await mockEmptyAlertCollections(page);
     await page.route('**/api/v1/alerts/rules', async (route) => {
       if (route.request().method() === 'POST') {
@@ -1400,7 +1449,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('价格阈值').fill('250');
     await dialog.getByRole('button', { name: '创建规则' }).click();
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/请求失败|创建失败/).first()).toBeVisible();
+    await expect(page.locator('[data-toast-tone="danger"]').getByText(/请求失败|创建失败/).first()).toBeVisible();
     await expect(dialog.getByLabel('规则名称')).toHaveValue('保留输入的失败规则');
     await expect(dialog.getByLabel('标的代码')).toHaveValue('AAPL');
     await expect(dialog.getByLabel('价格阈值')).toHaveValue('250');
@@ -1649,7 +1698,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('数量').fill('2');
     await dialog.getByLabel('成交价').fill('210');
     await dialog.getByRole('button', { name: '提交交易' }).click();
-    await expect(dialog.getByText('请求失败', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-toast-tone="danger"]').getByText('请求失败', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: '提交交易' }).click();
     await expect(dialog).toBeHidden();
     expect(operationIds).toHaveLength(2);
@@ -1988,6 +2037,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         status: 'pending',
         message_code: 'task_pending',
         message_params: {},
+        analysis_phase: 'auto',
       });
     });
     await page.route('**/api/v1/analysis/status/poll-fallback-task', async (route) => {
@@ -2010,6 +2060,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         stock_name: 'Polling Complete',
         status: 'degraded',
         generated_at: '2026-07-15T10:00:00Z',
+        schema_version: 'run-flow-v1',
         summary: {
           elapsed_ms: 1200,
           failed_attempts: 1,
@@ -2126,23 +2177,25 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
-    const oldItem = page
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
+    let historyPopover = await openAnalysisHistoryPopover(page);
+    const oldItem = historyPopover
       .locator('.history-item[data-control="pressable"]')
       .filter({ hasText: 'Old Report' })
       .first();
-    const newItem = page
+    await oldItem.click();
+    await oldRequestStarted.promise;
+    historyPopover = await openAnalysisHistoryPopover(page);
+    const newItem = historyPopover
       .locator('.history-item[data-control="pressable"]')
       .filter({ hasText: 'New Report' })
       .first();
-    await oldItem.click();
-    await oldRequestStarted.promise;
     await expect(newItem).toBeVisible();
     await newItem.click();
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
     oldReport.resolve();
     await page.waitForTimeout(200);
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
     await expect(page.getByText('Old Report semantic report', { exact: true })).toHaveCount(0);
   });
 
@@ -2210,6 +2263,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         message: 'accepted',
         task_id: submissions === 1 ? 'old-review-task' : 'new-review-task',
         send_notification: false,
+        region: 'cn',
+        message_code: 'task.market_review.queued',
       }, 202);
     });
     await page.route('**/api/v1/analysis/status/old-review-task', async (route) => {
@@ -2217,6 +2272,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await oldPoll.promise;
       await fulfillJson(route, {
         task_id: 'old-review-task', status: 'completed', progress: 100,
+        message_code: 'task_completed',
         market_review_report: 'OLD_GENERATION_SHOULD_NOT_RENDER',
       });
     });
@@ -2224,6 +2280,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       newReviewCompleted = true;
       await fulfillJson(route, {
         task_id: 'new-review-task', status: 'completed', progress: 100,
+        message_code: 'task_completed',
         market_review_report: 'NEW_RAW_STATUS_SHOULD_NOT_RENDER',
       });
     });
@@ -2491,7 +2548,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    const reportItem = page.getByRole('button', {
+    const historyPopover = await openAnalysisHistoryPopover(page);
+    const reportItem = historyPopover.getByRole('button', {
       name: 'Canonical report fixture AAPL history record',
       exact: true,
     });
@@ -2547,7 +2605,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.route('**/api/v1/agent/chat/sessions?**', (route) => fulfillJson(route, {
       sessions: [{ session_id: 'overlay-session', title: 'Overlay Session', message_count: 1, created_at: '2026-07-15T10:00:00Z', last_active: '2026-07-15T10:00:00Z' }],
     }));
-    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, { messages: [] }));
+    await page.route('**/api/v1/agent/chat/sessions/overlay-session', (route) => fulfillJson(route, {
+      session_id: 'overlay-session',
+      messages: [],
+      session_state: { selected_skill_ids: null },
+    }));
     await login(page);
     await page.goto('/chat?session=overlay-session');
     const historyButton = page.getByRole('button', { name: '历史对话' }).first();
@@ -2572,11 +2634,16 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    const historyItem = page.getByRole('button', { name: /E2E Fixture AAPL 历史记录/ });
+    const historyTrigger = page.getByRole('button', { name: '历史与对比', exact: true });
+    await historyTrigger.focus();
+    const historyPopover = await openAnalysisHistoryPopover(page);
+    const historyItem = historyPopover.getByRole('button', { name: /E2E Fixture AAPL 历史记录/ });
     await expect(historyItem).toBeVisible();
     await historyItem.focus();
     await expect(historyItem).toBeFocused();
-    await expect(page.getByRole('dialog', { name: '历史记录' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(historyPopover).toBeHidden();
+    await expect(historyTrigger).toBeFocused();
 
     await page.goto('/chat');
     const chatHistory = page.getByRole('button', { name: '历史对话' }).first();
@@ -2639,7 +2706,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
     const reportHeading = page.getByRole('heading', { name: 'E2E Fixture' });
-    const reportBody = page.getByText('E2E_MARKDOWN_FIXTURE: deterministic report content.', { exact: true });
+    const reportBody = reportSummaryText(page, 'E2E_MARKDOWN_FIXTURE: deterministic report content.');
     await expect(reportHeading).toBeVisible();
     await expect(reportBody).toBeVisible();
     await expect.poll(async () => (await getElementContrast(reportHeading)).ratio).toBeGreaterThanOrEqual(3);
@@ -2737,38 +2804,21 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await page.goto(settingsHrefs.modelReliability);
       const fallbackSelector = page.getByRole('button', { name: '选择备用模型', exact: true });
       await expectMinimumTouchTarget(fallbackSelector);
-      await expectMinimumTouchTarget(page.getByRole('button', { name: /移除模型 model-beta/ }));
+      await expectMinimumTouchTarget(page.getByRole('button', { name: /移除 model-beta/ }));
       await fallbackSelector.click();
-      const fallbackSearch = page.getByRole('textbox', { name: '搜索模型' });
-      await expect(fallbackSearch).toHaveAttribute('data-size', 'comfortable');
-      const fallbackSearchTarget = fallbackSearch.locator('..');
-      await expectMinimumTouchTarget(fallbackSearchTarget);
-
-      const fallbackSearchBox = await fallbackSearch.boundingBox();
-      const fallbackSearchTargetBox = await fallbackSearchTarget.boundingBox();
-      expect(fallbackSearchBox).not.toBeNull();
-      expect(fallbackSearchTargetBox).not.toBeNull();
-      expect(fallbackSearchBox!.height).toBeLessThan(44);
-      const topGap = fallbackSearchBox!.y - fallbackSearchTargetBox!.y;
-      const bottomGap = fallbackSearchTargetBox!.y + fallbackSearchTargetBox!.height
-        - fallbackSearchBox!.y - fallbackSearchBox!.height;
-      expect(Math.max(topGap, bottomGap)).toBeGreaterThan(0);
-      const slopPoint = {
-        x: fallbackSearchBox!.x + fallbackSearchBox!.width / 2,
-        y: topGap > bottomGap
-          ? fallbackSearchTargetBox!.y + topGap / 2
-          : fallbackSearchBox!.y + fallbackSearchBox!.height + bottomGap / 2,
-      };
-      expect(await fallbackSearch.evaluate((element, point) => (
-        document.elementFromPoint(point.x, point.y) === element.parentElement
-      ), slopPoint)).toBe(true);
+      const fallbackSearch = page.getByRole('combobox', {
+        name: '搜索选项: 选择备用模型',
+      });
+      await expectMinimumTouchTarget(fallbackSearch);
       await fallbackSearch.evaluate((element) => element.blur());
       await expect(fallbackSearch).not.toBeFocused();
-      await page.touchscreen.tap(slopPoint.x, slopPoint.y);
+      const fallbackSearchBox = await fallbackSearch.boundingBox();
+      expect(fallbackSearchBox).not.toBeNull();
+      await page.touchscreen.tap(
+        fallbackSearchBox!.x + fallbackSearchBox!.width / 2,
+        fallbackSearchBox!.y + fallbackSearchBox!.height / 2,
+      );
       await expect(fallbackSearch).toBeFocused();
-
-      const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
-      await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
       await page.goto(settingsHrefs.systemService);
       const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });

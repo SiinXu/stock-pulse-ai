@@ -6,6 +6,7 @@ import {
   buildAnalysisWorkbenchHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';
+import { openAnalysisHistoryPopover } from './workbench-fixture';
 
 test.use({ locale: 'zh-CN' });
 
@@ -31,7 +32,8 @@ async function openSeededHistoryReport(page: Page) {
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
   }));
   await expect(page.getByRole('heading', { name: '分析工作台' })).toBeVisible({ timeout: 10_000 });
-  const firstHistoryItem = page.locator('.history-item[data-control="pressable"]').first();
+  const historyPopover = await openAnalysisHistoryPopover(page);
+  const firstHistoryItem = historyPopover.locator('.history-item[data-control="pressable"]').first();
   await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
   await expect(firstHistoryItem).toContainText('E2E Fixture');
   await firstHistoryItem.click();
@@ -104,7 +106,7 @@ test.describe('Share image', () => {
     await expect(page.getByTestId('share-image-error')).toHaveCount(0);
   });
 
-  test('surfaces renderer-unavailable 503 in the share-image error region', async ({ page }) => {
+  test('surfaces renderer-unavailable 503 in the global error Toast', async ({ page }) => {
     await page.route('**/api/v1/history/*/share-image', async (route) => {
       if (route.request().method() !== 'GET') {
         await route.fallback();
@@ -131,10 +133,9 @@ test.describe('Share image', () => {
     // history.getShareImage rehydrates the envelope, so the visible copy may be the
     // generic 503 network message until that product path is fixed. Unit tests cover
     // the share_image_unavailable localization contract for the rehydrated envelope.
-    const errorRegion = page.getByTestId('share-image-error');
-    await expect(errorRegion).toBeVisible({ timeout: 10_000 });
+    const errorToast = page.locator('[data-toast-tone="danger"]');
+    await expect(errorToast).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: '重试' }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: '分享', exact: true })).toHaveCount(0);
   });
 });
-

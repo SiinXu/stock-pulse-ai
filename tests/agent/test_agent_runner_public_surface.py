@@ -77,13 +77,13 @@ EXPECTED_GROUPS = (
         "_runner_loop",
         "_LOOP_FUNCTION_NAMES",
         ("run_agent_loop",),
-        "383b759e37ff40e3b02fe84210dfae44fafb6a88bd67240d0055d43515954a8a",
+        "86ccceee4910e6f1c64e14800c044c56d665302f5093f0d11f471a1ef5a0e79f",
     ),
     (
         "_runner_tools",
         "_TOOL_FUNCTION_NAMES",
         ("_execute_tools",),
-        "412bbf10da611c42b197601dbd989bfad1f0f0a310144dc4732c14390e8160b5",
+        "4ba7890077fe0c9e507cef212564722b602444502f11c6959797b93fec472290",
     ),
 )
 
@@ -154,7 +154,7 @@ EXPECTED_RETAINED_HELPER_AST_HASH = (
     "7e20269836fe2492cbb25356dff13ec293999574892b02e1d486dbac78143009"
 )
 EXPECTED_RETAINED_CLASS_AST_HASH = (
-    "3a1f17f2e966bd0151a861dcf2eada14b30879bbbdc5fd6cf4b9ba566e17ee12"
+    "d3f620819771796d1959e53bc3e4ec01a10a2207f9db1fa1c1e362c2e69fcd0b"
 )
 
 

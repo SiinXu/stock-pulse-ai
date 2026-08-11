@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from threading import Event, Thread
 from types import SimpleNamespace
 from typing import Callable
@@ -20,6 +21,8 @@ from data_provider import (
     DataProviderRegistration,
 )
 from data_provider.realtime_types import UnifiedRealtimeQuote
+from data_provider.money_flow_types import MoneyFlowSnapshot, MoneyFlowStatus
+from src.core.trading_calendar import get_effective_trading_date
 from src.plugins import Plugin, PluginContext, PluginManager, PluginManifest
 
 
@@ -35,6 +38,7 @@ _BUILTIN_IDENTITIES = {
     "LongbridgeFetcher": "longbridge",
     "FinnhubFetcher": "finnhub",
     "AlphaVantageFetcher": "alphavantage",
+    "CryptoCoingeckoFetcher": "crypto_coingecko",
 }
 
 
@@ -318,6 +322,48 @@ def test_plugin_market_and_capability_declarations_filter_before_routing() -> No
     assert cn_source == "FallbackFetcher"
     assert hk_source == "HongKongPluginFetcher"
     assert nondaily_provider.calls == 0
+
+
+def test_money_flow_capability_routes_through_real_plugin_registry() -> None:
+    fallback = _DailyProvider("LegacyDailyFetcher", 20, _daily_frame())
+    provider = _DailyProvider("CommunityMoneyFlowFetcher", 10, _daily_frame())
+    flow_calls = []
+
+    def get_money_flow(stock_code: str, days: int = 5) -> MoneyFlowSnapshot:
+        flow_calls.append((stock_code, days))
+        return MoneyFlowSnapshot(
+            code=stock_code,
+            date=get_effective_trading_date("cn").isoformat(),
+            source="community:money_flow",
+            main_net_inflow_ratio=2.5,
+            bucket_definition="community_v1;amount_unit=unknown;ratio_unit=percent",
+            as_of=datetime.now(timezone.utc).isoformat(),
+            requested_days=days,
+            observed_days=days,
+            completeness="complete",
+        )
+
+    provider.get_money_flow = get_money_flow  # type: ignore[attr-defined]
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        "money-flow-plugin",
+        _registration(
+            "community-money-flow",
+            lambda: provider,
+            capabilities={"money_flow"},
+        ),
+        priority=10,
+    )
+    assert plugins.register(plugin, source="external").success is True
+    assert plugins.load("money-flow-plugin").success is True
+
+    outcome = manager.get_money_flow("600519", days=5)
+
+    assert outcome.status == MoneyFlowStatus.PARTIAL
+    assert outcome.snapshot is not None
+    assert outcome.snapshot.source == "community:money_flow"
+    assert flow_calls == [("600519", 5)]
 
 
 def test_us_named_route_stays_ahead_of_plugin_priority_then_uses_plugin_fallback() -> None:

@@ -7,6 +7,7 @@ import {
   buildAnalysisWorkbenchHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
+import { openAnalysisHistoryPopover } from './workbench-fixture';
 
 const buttonHeights: Record<string, number> = {
   compact: 20,
@@ -156,7 +157,8 @@ test.describe('touch-capable foundation controls', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    const historySelection = page.getByRole('checkbox', {
+    const historyPopover = await openAnalysisHistoryPopover(page);
+    const historySelection = historyPopover.getByRole('checkbox', {
       name: /选择 .*历史记录|Select .* history record/,
     }).first();
     await expect(historySelection).toBeVisible();
@@ -171,9 +173,9 @@ test.describe('touch-capable foundation controls', () => {
     );
     await historySelection.check();
 
-    const historyDelete = page.getByRole('button', { name: /删除|Delete/, exact: true }).first();
+    const historyDelete = historyPopover.getByRole('button', { name: /删除|Delete/, exact: true }).first();
     await expect(historyDelete).toBeVisible();
-    await expectVisibleHeights(historyDelete, buttonHeights);
+    await expectVisibleHeights(historyDelete, iconButtonHeights);
     await expectCoarseHitTarget(historyDelete, 'history delete action');
     await historyDelete.click();
     const deleteDialog = page.getByRole('dialog', { name: '删除历史记录' });
@@ -183,12 +185,18 @@ test.describe('touch-capable foundation controls', () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(APP_ROUTE_PATHS.researchBacktest);
+    const mobileFiltersToggle = page.getByTestId('backtest-mobile-filters-toggle');
+    await expect(mobileFiltersToggle).toBeVisible();
+    await mobileFiltersToggle.click();
+    await expect(mobileFiltersToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('[data-control="input"]:visible').first()).toBeVisible();
     await expectVisibleHeights(page.locator('[data-control="input"]:visible'), inputHeights);
     await expectVisibleHeights(page.locator('[data-control="button"]:visible'), buttonHeights);
 
     await page.getByRole('button', { name: /打开.*日历/ }).first().click();
-    const iconButton = page.locator('[data-control="icon-button"]:visible').first();
+    const calendarDialog = page.getByRole('dialog', { name: /分析开始日期|Analysis start date/ });
+    await expect(calendarDialog).toBeVisible();
+    const iconButton = calendarDialog.locator('[data-control="icon-button"]:visible').first();
     await expect(iconButton).toBeVisible();
     await expectVisibleHeights(page.locator('[data-control="icon-button"]:visible'), iconButtonHeights);
     await expectCoarseHitTarget(iconButton, 'icon action');

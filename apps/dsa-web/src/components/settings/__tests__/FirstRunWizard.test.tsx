@@ -155,6 +155,26 @@ describe('FirstRunWizard', () => {
     vi.clearAllMocks();
   });
 
+  it('leads first-run setup with the local zero-cost path while requiring an explicit choice', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="en"
+        providers={BILINGUAL_CATALOG}
+      />,
+    );
+
+    const localChoice = screen.getByRole('button', { name: /Local model/ });
+    const cloudChoice = screen.getByRole('button', { name: /Cloud API/ });
+    expect(localChoice).toHaveAttribute('aria-pressed', 'false');
+    expect(localChoice).toHaveClass('border-primary/50', 'bg-primary/5');
+    expect(localChoice.compareDocumentPosition(cloudChoice) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
   it('uses borderless modal dividers for every wizard step', () => {
     render(
       <FirstRunWizard
@@ -1168,7 +1188,7 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
-    fireEvent.click(screen.getByLabelText(/deepseek-v4-pro/));
+    fireEvent.click(screen.getByRole('option', { name: /deepseek-v4-pro/ }));
     chooseOption(
       screen.getByLabelText('Vision 模型'),
       'modelref:v1:existing:openai%2Fgpt-4o-mini',

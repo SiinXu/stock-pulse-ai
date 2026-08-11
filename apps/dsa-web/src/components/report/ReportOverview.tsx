@@ -2,6 +2,7 @@ import type React from 'react';
 import type {
   ReportDetails as ReportDetailsType,
   ReportMeta,
+  ReportStrategy,
   ReportSummary as ReportSummaryType,
 } from '../../types/analysis';
 import { Badge, Button, Card, ScoreGauge } from '../common';
@@ -11,12 +12,14 @@ import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/mark
 import { normalizeBoardType } from '../../utils/reportDomain';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { ReportDecisionCard } from './ReportDecisionCard';
 import { ShareImageButton } from './ShareImageButton';
 
 interface ReportOverviewProps {
   meta: ReportMeta;
   summary: ReportSummaryType;
   details?: ReportDetailsType;
+  strategy?: ReportStrategy | null;
   isHistory?: boolean;
   watchlist?: {
     isInWatchlist: (code: string) => boolean;
@@ -154,6 +157,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   meta,
   summary,
   details,
+  strategy,
   watchlist,
 }) => {
   const { language, t } = useUiLanguage();
@@ -237,6 +241,15 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* Decision Card first (Issue #874 / #877 Phase 2): verdict above long evidence. */}
+      <ReportDecisionCard
+        meta={meta}
+        summary={summary}
+        strategy={strategy}
+        details={details}
+        language={reportLanguage}
+      />
+
       {/* Main Info Area - Two-Column Layout */}
       <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
         {/* Left side: Stock information and conclusions */}
@@ -246,7 +259,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
             <div className="mb-5 flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-heading-2 font-bold leading-tight text-foreground">
+                  <h2 className="text-xl font-bold leading-tight text-foreground">
                     {meta.stockName || meta.stockCode}
                   </h2>
                   {/* Price and percentage change */}
@@ -287,13 +300,14 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                 recordId={meta.id}
                 reportTitle={`${meta.stockName || meta.stockCode}-${meta.stockCode}`}
                 reportLanguage={reportLanguage}
+                className="[&_.home-surface-button]:w-10 [&_.home-surface-button]:gap-0 [&_.home-surface-button]:px-0 [&_.home-surface-button>span]:hidden"
               />
             </div>
 
             {/* Key conclusion */}
             <div className="border-t border-border pt-5">
               <span className="label-uppercase">{text.keyInsights}</span>
-              <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-base leading-7 text-foreground">
+              <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-sm leading-6 text-foreground">
                 {summary.analysisSummary || text.noAnalysisSummary}
               </p>
             </div>
