@@ -94,8 +94,8 @@ const withItems: TodaysFocusResponse = {
       {
         market: 'us',
         timezone: 'America/New_York',
-        localDate: '2026-08-09',
-        windowStart: '2026-08-09T04:00:00Z',
+        localDate: '2026-08-08',
+        windowStart: '2026-08-08T04:00:00Z',
         windowEnd: '2026-08-09T00:00:00Z',
         isTradingDay: false,
       },
