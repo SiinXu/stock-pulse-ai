@@ -135,10 +135,6 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alert-trigger-history', 'AlertTriggerHistory', 'components/alerts/AlertTriggerHistory.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alerts-workspace', 'AlertsWorkspace', 'components/alerts/AlertsWorkspace.tsx', ['default'], 'full'),
-  entry('alerts', 'event-alert-list', 'EventAlertList', 'components/event-alerts/EventAlertList.tsx', ['default', 'loading', 'empty']),
-  entry('alerts', 'event-alert-detail', 'EventAlertDetail', 'components/event-alerts/EventAlertDetail.tsx', ['default', 'empty']),
-  entry('alerts', 'event-alerts-panel', 'EventAlertsPanel', 'components/event-alerts/EventAlertsPanel.tsx', ['default', 'loading', 'empty'], 'full'),
-
   entry('history', 'history-list', 'HistoryList', 'components/history/HistoryList.tsx', ['default', 'loading', 'empty']),
   entry('history', 'history-list-item', 'HistoryListItem', 'components/history/HistoryListItem.tsx', ['default', 'states']),
   entry('history', 'stock-bar', 'StockBar', 'components/history/StockBar.tsx', ['default', 'loading', 'empty']),

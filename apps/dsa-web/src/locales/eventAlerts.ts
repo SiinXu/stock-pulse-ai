@@ -1,9 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
+import type { UiLanguage } from '../i18n/uiText';
 import type { CorporateEventCategory } from '../types/eventAlerts';
+import { EVENT_ALERT_TRANSLATIONS } from './eventAlertTranslations';
 
-export const EVENT_ALERT_PAGE_TEXT = createUiLanguageRecord('locales.eventAlerts.EVENT_ALERT_PAGE_TEXT', {
+const EVENT_ALERT_PAGE_TEXT_BASE = {
   zh: {
     documentTitle: '事件告警 - StockPulse', title: '事件驱动告警',
     description: '查看已触发的企业事件告警，包括事件分类、为何重要与影响上下文。说明文案由后端生成，前端仅展示。',
@@ -32,9 +33,37 @@ export const EVENT_ALERT_PAGE_TEXT = createUiLanguageRecord('locales.eventAlerts
     noWhatProvided: 'Backend did not provide an event summary.', filterAll: 'All grades', filterMajor: 'Major only', filterRoutine: 'Routine only', filterUnclassified: 'Unclassified only',
     ruleEventCategories: 'Event categories', lookbackHours: 'Lookback hours', minItems: 'Minimum matching items', noEventCategory: 'Select at least one event category',
   },
-} as const);
+} as const;
 
-export const EVENT_CATEGORY_LABELS = createUiLanguageRecord('locales.eventAlerts.EVENT_CATEGORY_LABELS', {
+type EventAlertPageText = {
+  [Key in keyof typeof EVENT_ALERT_PAGE_TEXT_BASE.en]: string;
+};
+
+export const EVENT_ALERT_PAGE_TEXT: Record<UiLanguage, EventAlertPageText> = {
+  ...EVENT_ALERT_PAGE_TEXT_BASE,
+  'zh-TW': EVENT_ALERT_TRANSLATIONS['zh-TW'].page,
+  ja: EVENT_ALERT_TRANSLATIONS.ja.page,
+  ko: EVENT_ALERT_TRANSLATIONS.ko.page,
+  de: EVENT_ALERT_TRANSLATIONS.de.page,
+  es: EVENT_ALERT_TRANSLATIONS.es.page,
+  ms: EVENT_ALERT_TRANSLATIONS.ms.page,
+  fr: EVENT_ALERT_TRANSLATIONS.fr.page,
+  id: EVENT_ALERT_TRANSLATIONS.id.page,
+};
+
+const EVENT_CATEGORY_LABELS_BASE = {
   zh: { earnings: '业绩/财报', shareholder: '股东变动', mna: '并购重组', regulatory: '监管合规', analyst: '分析师评级' } satisfies Record<CorporateEventCategory, string>,
   en: { earnings: 'Earnings', shareholder: 'Shareholder', mna: 'M&A', regulatory: 'Regulatory', analyst: 'Analyst' } satisfies Record<CorporateEventCategory, string>,
-});
+};
+
+export const EVENT_CATEGORY_LABELS: Record<UiLanguage, Record<CorporateEventCategory, string>> = {
+  ...EVENT_CATEGORY_LABELS_BASE,
+  'zh-TW': EVENT_ALERT_TRANSLATIONS['zh-TW'].categories,
+  ja: EVENT_ALERT_TRANSLATIONS.ja.categories,
+  ko: EVENT_ALERT_TRANSLATIONS.ko.categories,
+  de: EVENT_ALERT_TRANSLATIONS.de.categories,
+  es: EVENT_ALERT_TRANSLATIONS.es.categories,
+  ms: EVENT_ALERT_TRANSLATIONS.ms.categories,
+  fr: EVENT_ALERT_TRANSLATIONS.fr.categories,
+  id: EVENT_ALERT_TRANSLATIONS.id.categories,
+};

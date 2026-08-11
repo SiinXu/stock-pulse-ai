@@ -12,8 +12,8 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { EVENT_ALERT_PAGE_TEXT } from '../../locales/eventAlerts';
 import { formatUiText } from '../../i18n/uiText';
 import { ApiErrorAlert, AppPage, Button, PageHeader, Select, Toolbar } from '../common';
-import { EventAlertDetail } from './EventAlertDetail';
-import { EventAlertList } from './EventAlertList';
+import EventAlertDetail from './EventAlertDetail';
+import EventAlertList from './EventAlertList';
 
 export type EventAlertsPanelProps = {
   items?: EventAlertDisplayItem[];
@@ -23,7 +23,7 @@ export type EventAlertsPanelProps = {
   onRefresh?: () => void;
 };
 
-export const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
+const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
   items: controlledItems, isLoading: controlledLoading, error: controlledError = null, embedded = false, onRefresh,
 }) => {
   const { language } = useUiLanguage();
@@ -112,3 +112,5 @@ export const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
     </Root>
   );
 };
+
+export default EventAlertsPanel;

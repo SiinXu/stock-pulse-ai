@@ -53,7 +53,8 @@ const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage'));
 const NotificationCenterPage = lazy(() => import('./pages/NotificationCenterPage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
-const EventAlertsPage = lazy(() => import('./pages/EventAlertsPage'));
+const EventAlertsPage = lazy(() => import('./components/event-alerts/EventAlertsPanel'));
+const EVENT_ALERT_ROUTE_PATH = '/event-alerts';
 const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
 const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPage'));
 const FinancialCalculatorsPage = lazy(() => import('./pages/FinancialCalculatorsPage'));
@@ -231,7 +232,7 @@ const routes = [
               />
             ),
           },
-          { path: APP_ROUTE_PATHS.eventAlerts, element: <EventAlertsPage /> },
+          { path: EVENT_ALERT_ROUTE_PATH, element: <EventAlertsPage /> },
           { path: APP_ROUTE_PATHS.settings, element: <SettingsPage /> },
           { path: '*', element: <NotFoundPage /> },
         ],

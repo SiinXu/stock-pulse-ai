@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { EventAlertDisplayItem } from '../../../types/eventAlerts';
-import { EventAlertsPanel } from '../EventAlertsPanel';
+import EventAlertsPanel from '../EventAlertsPanel';
 import { chooseOption } from '../../../test-utils';
 
 const why = 'Earnings events can reprice profit expectations and valuation anchors.';

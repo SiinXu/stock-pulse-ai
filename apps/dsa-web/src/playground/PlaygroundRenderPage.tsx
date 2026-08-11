@@ -5,7 +5,6 @@ import { InlineAlert, Loading } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { UI_LANGUAGES, type UiLanguage } from '../i18n/uiLanguages';
 import { PLAYGROUND_TEXT } from '../locales/playground';
-import { cn } from '../utils/cn';
 import { getPlaygroundEntry, getPlaygroundScenario } from './catalog';
 import { installPlaygroundApiMock } from './mockApi';
 import { PlaygroundScenarioProvider } from './scenarioContext';
@@ -70,11 +69,7 @@ const PlaygroundRenderPage = () => {
   }, [entry.name, text.title]);
 
   if (!mockReady) {
-    return (
-      <div className="min-h-dvh bg-background">
-        <Loading label={text.loadingPreview} className="min-h-dvh" />
-      </div>
-    );
+    return <Loading label={text.loadingPreview} className="min-h-dvh bg-background" />;
   }
 
   if (!hasPlaygroundRenderer(entry.id)) {
@@ -88,10 +83,7 @@ const PlaygroundRenderPage = () => {
   return (
     <PlaygroundScenarioProvider profile={profile} scenario={scenario}>
       <div
-        className={cn(
-          'min-h-dvh bg-background text-foreground',
-          entry.canvas === 'full' ? 'overflow-hidden' : 'p-4 sm:p-6',
-        )}
+        className={`min-h-dvh bg-background text-foreground ${entry.canvas === 'full' ? 'overflow-hidden' : 'p-4 sm:p-6'}`}
       >
         {renderPlaygroundScenario(entry.id)}
       </div>

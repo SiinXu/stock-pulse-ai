@@ -17,7 +17,7 @@ export interface EventAlertListProps {
   gradeFilter?: 'all' | EventAlertImpactGrade;
 }
 
-export const EventAlertList: React.FC<EventAlertListProps> = ({
+const EventAlertList: React.FC<EventAlertListProps> = ({
   items, isLoading = false, selectedId = null, onSelect, gradeFilter = 'all',
 }) => {
   const { language } = useUiLanguage();
@@ -68,3 +68,5 @@ export const EventAlertList: React.FC<EventAlertListProps> = ({
   );
   return <Card title={text.listTitle} variant="bordered" padding="md">{table}</Card>;
 };
+
+export default EventAlertList;

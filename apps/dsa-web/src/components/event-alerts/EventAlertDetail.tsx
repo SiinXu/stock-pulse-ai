@@ -11,7 +11,7 @@ import { formatUiText } from '../../i18n/uiText';
 
 export interface EventAlertDetailProps { item?: EventAlertDisplayItem | null; }
 
-export const EventAlertDetail: React.FC<EventAlertDetailProps> = ({ item = null }) => {
+const EventAlertDetail: React.FC<EventAlertDetailProps> = ({ item = null }) => {
   const { language } = useUiLanguage();
   const text = EVENT_ALERT_PAGE_TEXT[language];
   const categoryLabels = EVENT_CATEGORY_LABELS[language];
@@ -61,3 +61,5 @@ export const EventAlertDetail: React.FC<EventAlertDetailProps> = ({ item = null 
     </Card>
   );
 };
+
+export default EventAlertDetail;

@@ -36,15 +36,6 @@ const LAZY_REPORT_VERSION_COMPARE_SCENARIOS: Record<string, PlaygroundScenarioRe
   )),
 };
 
-const LAZY_EVENT_ALERT_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = Object.fromEntries(
-  ['event-alert-list', 'event-alert-detail', 'event-alerts-panel'].map((scenarioId) => [
-    scenarioId,
-    createLazyScenario(async () => (
-      (await import('./eventAlertScenarios')).EVENT_ALERT_SCENARIOS[scenarioId]
-    )),
-  ]),
-);
-
 const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRenderer> = {
   'dcf-sensitivity-panel': createLazyScenario(async () => (
     (await import('./valuationScenarios')).VALUATION_SCENARIOS['dcf-sensitivity-panel']
@@ -63,7 +54,6 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
   ...SCREENING_SCENARIOS,
-  ...LAZY_EVENT_ALERT_SCENARIOS,
   ...LAZY_CHART_SCENARIOS,
   ...LAZY_VALUATION_SCENARIOS,
   ...LAZY_REPORT_VERSION_COMPARE_SCENARIOS,
