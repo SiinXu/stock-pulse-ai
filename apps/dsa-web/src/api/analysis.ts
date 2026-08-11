@@ -70,20 +70,21 @@ const reportMetaSchema = z.object({
   reportType: z.string().nullable().optional(),
   reportLanguage: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),
-  currentPrice: z.number().nullable().optional(),
-  changePct: z.number().nullable().optional(),
+  currentPrice: z.number().finite().nullable().optional(),
+  changePct: z.number().finite().nullable().optional(),
   modelUsed: z.string().nullable().optional(),
-  id: z.number().nullable().optional(),
+  id: z.number().int().finite().nullable().optional(),
   marketPhaseSummary: z.unknown().nullable().optional(),
 }).passthrough();
 
 const reportSummarySchema = z.object({
   analysisSummary: z.string().nullable().optional(),
   operationAdvice: z.string().nullable().optional(),
-  action: z.string().nullable().optional(),
+  action: z.enum(['buy', 'add', 'hold', 'reduce', 'sell', 'watch', 'avoid', 'alert'])
+    .nullable().optional(),
   actionLabel: z.string().nullable().optional(),
   trendPrediction: z.string().nullable().optional(),
-  sentimentScore: z.number().nullable().optional(),
+  sentimentScore: z.number().finite().nullable().optional(),
   sentimentLabel: z.string().nullable().optional(),
 }).passthrough();
 
@@ -108,9 +109,8 @@ const analysisResultSchema = z.object({
 const taskAcceptedSchema = z.object({
   taskId: z.string(),
   status: z.string(),
-  // OpenAPI defaults message_code / analysis_phase; accept omission for partial wire/fixtures.
-  messageCode: z.string().optional(),
-  analysisPhase: z.string().optional(),
+  messageCode: z.string(),
+  analysisPhase: z.enum(['auto', 'premarket', 'intraday', 'postmarket']),
   message: z.string().nullable().optional(),
   messageParams: z.record(z.string(), z.unknown()).optional(),
   traceId: z.string().nullable().optional(),
@@ -120,8 +120,8 @@ const batchTaskAcceptedItemSchema = z.object({
   taskId: z.string(),
   stockCode: z.string(),
   status: z.string(),
-  messageCode: z.string().optional(),
-  analysisPhase: z.string().optional(),
+  messageCode: z.string(),
+  analysisPhase: z.enum(['auto', 'premarket', 'intraday', 'postmarket']),
   message: z.string().nullable().optional(),
   messageParams: z.record(z.string(), z.unknown()).optional(),
   traceId: z.string().nullable().optional(),
@@ -154,8 +154,7 @@ const analyzeAsyncResponseSchema = z.union([
 const marketReviewAcceptedSchema = z.object({
   status: z.string(),
   message: z.string(),
-  // OpenAPI defaults message_code.
-  messageCode: z.string().optional(),
+  messageCode: z.string(),
   sendNotification: z.boolean(),
   region: z.string(),
   messageParams: z.record(z.string(), z.unknown()).optional(),
@@ -165,10 +164,17 @@ const marketReviewAcceptedSchema = z.object({
 
 const taskStatusSchema = z.object({
   taskId: z.string(),
-  status: z.string(),
-  // OpenAPI defaults message_code.
-  messageCode: z.string().optional(),
-  progress: z.number().nullable().optional(),
+  status: z.enum([
+    'pending',
+    'processing',
+    'cancel_requested',
+    'completed',
+    'failed',
+    'cancelled',
+    'interrupted',
+  ]),
+  messageCode: z.string(),
+  progress: z.number().finite().nullable().optional(),
   message: z.string().nullable().optional(),
   messageParams: z.record(z.string(), z.unknown()).optional(),
   result: analysisResultSchema.nullable().optional(),
@@ -187,13 +193,20 @@ const taskStatusSchema = z.object({
 const taskInfoSchema = z.object({
   taskId: z.string(),
   stockCode: z.string(),
-  status: z.string(),
-  // OpenAPI defaults progress / report_type / message_code / analysis_phase.
-  progress: z.number().optional(),
-  reportType: z.string().optional(),
+  status: z.enum([
+    'pending',
+    'processing',
+    'cancel_requested',
+    'completed',
+    'failed',
+    'cancelled',
+    'interrupted',
+  ]),
+  progress: z.number().finite(),
+  reportType: z.string(),
   createdAt: z.string(),
-  messageCode: z.string().optional(),
-  analysisPhase: z.string().optional(),
+  messageCode: z.string(),
+  analysisPhase: z.enum(['auto', 'premarket', 'intraday', 'postmarket']),
   stockName: z.string().nullable().optional(),
   message: z.string().nullable().optional(),
   messageParams: z.record(z.string(), z.unknown()).optional(),
@@ -208,18 +221,18 @@ const taskInfoSchema = z.object({
 }).passthrough();
 
 const taskListResponseSchema = z.object({
-  total: z.number(),
-  pending: z.number(),
-  processing: z.number(),
+  total: z.number().int().finite(),
+  pending: z.number().int().finite(),
+  processing: z.number().int().finite(),
   tasks: z.array(taskInfoSchema),
 }).passthrough();
 
 const runFlowSummarySchema = z.object({
-  dataSourceCount: z.number(),
-  eventCount: z.number(),
-  failedAttempts: z.number(),
-  fallbackCount: z.number(),
-  elapsedMs: z.number().nullable().optional(),
+  dataSourceCount: z.number().int().finite(),
+  eventCount: z.number().int().finite(),
+  failedAttempts: z.number().int().finite(),
+  fallbackCount: z.number().int().finite(),
+  elapsedMs: z.number().finite().nullable().optional(),
   bottleneckNodeId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
 }).passthrough();
@@ -227,10 +240,21 @@ const runFlowSummarySchema = z.object({
 const runFlowSnapshotSchema = z.object({
   taskId: z.string(),
   stockCode: z.string(),
-  status: z.string(),
+  status: z.enum([
+    'pending',
+    'running',
+    'success',
+    'failed',
+    'degraded',
+    'fallback',
+    'timeout',
+    'cancel_requested',
+    'cancelled',
+    'skipped',
+    'unknown',
+  ]),
   generatedAt: z.string(),
-  // OpenAPI defaults schema_version to run-flow-v1.
-  schemaVersion: z.string().optional(),
+  schemaVersion: z.string(),
   summary: runFlowSummarySchema,
   stockName: z.string().nullable().optional(),
   traceId: z.string().nullable().optional(),

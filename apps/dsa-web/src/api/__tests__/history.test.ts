@@ -76,6 +76,20 @@ describe('historyApi.getList', () => {
       return true;
     });
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'rejects non-finite history totals (%s)',
+    async (total) => {
+      get.mockResolvedValue({
+        data: { total, page: 1, limit: 20, items: [] },
+      });
+
+      await expect(historyApi.getList()).rejects.toSatisfy((error: unknown) => {
+        expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+        return true;
+      });
+    },
+  );
 });
 
 describe('historyApi.getDetail / getNews / getMarkdown', () => {
@@ -212,6 +226,28 @@ describe('historyApi diagnostics / flow / delete / stock bar', () => {
       expect(parsed.params).toMatchObject({ label: 'RunFlowSnapshot' });
       return true;
     });
+
+    get.mockResolvedValueOnce({
+      data: {
+        task_id: 't1',
+        stock_code: 'AAPL',
+        status: 'success',
+        generated_at: '2026-01-01T00:00:00Z',
+        // schema_version is generated from a backend default and is still required.
+        summary: {
+          data_source_count: 1,
+          event_count: 2,
+          failed_attempts: 0,
+          fallback_count: 0,
+        },
+      },
+    });
+    await expect(historyApi.getRecordFlow(5)).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'RunFlowSnapshot' });
+      return true;
+    });
   });
 
   it('validates delete and stock-bar responses', async () => {
@@ -282,6 +318,24 @@ describe('historyApi.search', () => {
       stockName: 'Kweichow Moutai',
       reportType: 'detailed',
       summary: 'Long-term value remains intact',
+    });
+  });
+
+  it('rejects search items missing generated identity fields', async () => {
+    get.mockResolvedValue({
+      data: {
+        query: 'value',
+        limit: 5,
+        items: [{ stock_code: '600519.SH', summary: 'missing id' }],
+      },
+    });
+
+    await expect(historyApi.search('value')).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'HistorySearchResponse' });
+      expect(parsed.message).toContain('items.0.id');
+      return true;
     });
   });
 });

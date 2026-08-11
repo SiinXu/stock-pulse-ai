@@ -21,6 +21,7 @@ import type { RunFlowSnapshot } from '../types/runFlow';
 import type { components } from '../types/api.generated';
 
 type OpenApiHistoryListResponse = components['schemas']['HistoryListResponse'];
+type OpenApiHistorySearchResponse = components['schemas']['HistorySearchResponse'];
 type OpenApiAnalysisReport = components['schemas']['AnalysisReport'];
 type OpenApiNewsIntelResponse = components['schemas']['NewsIntelResponse'];
 type OpenApiRunDiagnosticSummary = components['schemas']['RunDiagnosticSummaryResponse'];
@@ -30,6 +31,7 @@ type OpenApiStockBarResponse = components['schemas']['StockBarResponse'];
 type OpenApiMarkdownReportResponse = components['schemas']['MarkdownReportResponse'];
 
 type _AssertListFields = keyof OpenApiHistoryListResponse;
+type _AssertSearchFields = keyof OpenApiHistorySearchResponse;
 type _AssertReportFields = keyof OpenApiAnalysisReport;
 type _AssertNewsFields = keyof OpenApiNewsIntelResponse;
 type _AssertDiagFields = keyof OpenApiRunDiagnosticSummary;
@@ -38,6 +40,7 @@ type _AssertDeleteFields = keyof OpenApiDeleteHistoryResponse;
 type _AssertStockBarFields = keyof OpenApiStockBarResponse;
 type _AssertMarkdownFields = keyof OpenApiMarkdownReportResponse;
 const _listFieldAnchor: _AssertListFields = 'total';
+const _searchFieldAnchor: _AssertSearchFields = 'query';
 const _reportFieldAnchor: _AssertReportFields = 'meta';
 const _newsFieldAnchor: _AssertNewsFields = 'total';
 const _diagFieldAnchor: _AssertDiagFields = 'copy_text';
@@ -46,6 +49,7 @@ const _deleteFieldAnchor: _AssertDeleteFields = 'deleted';
 const _stockBarFieldAnchor: _AssertStockBarFields = 'total';
 const _markdownFieldAnchor: _AssertMarkdownFields = 'content';
 void _listFieldAnchor;
+void _searchFieldAnchor;
 void _reportFieldAnchor;
 void _newsFieldAnchor;
 void _diagFieldAnchor;
@@ -66,30 +70,46 @@ export const SHARE_IMAGE_REQUEST_TIMEOUT_MS = 90_000;
 const historyItemSchema = z.object({
   queryId: z.string(),
   stockCode: z.string(),
-  id: z.number().nullable().optional(),
+  id: z.number().int().finite().nullable().optional(),
   stockName: z.string().nullable().optional(),
   reportType: z.string().nullable().optional(),
   region: z.string().nullable().optional(),
   trendPrediction: z.string().nullable().optional(),
   analysisSummary: z.string().nullable().optional(),
-  sentimentScore: z.number().nullable().optional(),
+  sentimentScore: z.number().finite().nullable().optional(),
   operationAdvice: z.string().nullable().optional(),
-  action: z.string().nullable().optional(),
+  action: z.enum(['buy', 'add', 'hold', 'reduce', 'sell', 'watch', 'avoid', 'alert'])
+    .nullable().optional(),
   actionLabel: z.string().nullable().optional(),
-  currentPrice: z.number().nullable().optional(),
-  changePct: z.number().nullable().optional(),
-  volumeRatio: z.number().nullable().optional(),
-  turnoverRate: z.number().nullable().optional(),
+  currentPrice: z.number().finite().nullable().optional(),
+  changePct: z.number().finite().nullable().optional(),
+  volumeRatio: z.number().finite().nullable().optional(),
+  turnoverRate: z.number().finite().nullable().optional(),
   modelUsed: z.string().nullable().optional(),
   marketPhaseSummary: z.unknown().nullable().optional(),
   createdAt: z.string().nullable().optional(),
 }).passthrough();
 
 const historyListResponseSchema = z.object({
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
+  total: z.number().int().finite(),
+  page: z.number().int().finite(),
+  limit: z.number().int().finite(),
   items: z.array(historyItemSchema).optional(),
+}).passthrough();
+
+const historySearchItemSchema = z.object({
+  id: z.number().int().finite(),
+  stockCode: z.string(),
+  stockName: z.string().nullable().optional(),
+  reportType: z.string().nullable().optional(),
+  summary: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+}).passthrough();
+
+const historySearchResponseSchema = z.object({
+  query: z.string(),
+  limit: z.number().int().finite(),
+  items: z.array(historySearchItemSchema).optional(),
 }).passthrough();
 
 const reportMetaSchema = z.object({
@@ -99,20 +119,21 @@ const reportMetaSchema = z.object({
   reportType: z.string().nullable().optional(),
   reportLanguage: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),
-  currentPrice: z.number().nullable().optional(),
-  changePct: z.number().nullable().optional(),
+  currentPrice: z.number().finite().nullable().optional(),
+  changePct: z.number().finite().nullable().optional(),
   modelUsed: z.string().nullable().optional(),
-  id: z.number().nullable().optional(),
+  id: z.number().int().finite().nullable().optional(),
   marketPhaseSummary: z.unknown().nullable().optional(),
 }).passthrough();
 
 const reportSummarySchema = z.object({
   analysisSummary: z.string().nullable().optional(),
   operationAdvice: z.string().nullable().optional(),
-  action: z.string().nullable().optional(),
+  action: z.enum(['buy', 'add', 'hold', 'reduce', 'sell', 'watch', 'avoid', 'alert'])
+    .nullable().optional(),
   actionLabel: z.string().nullable().optional(),
   trendPrediction: z.string().nullable().optional(),
-  sentimentScore: z.number().nullable().optional(),
+  sentimentScore: z.number().finite().nullable().optional(),
   sentimentLabel: z.string().nullable().optional(),
 }).passthrough();
 
@@ -130,7 +151,7 @@ const newsIntelItemSchema = z.object({
 }).passthrough();
 
 const newsIntelResponseSchema = z.object({
-  total: z.number(),
+  total: z.number().int().finite(),
   items: z.array(newsIntelItemSchema).optional(),
 }).passthrough();
 
@@ -160,11 +181,11 @@ const runDiagnosticSummarySchema = z.object({
 }).passthrough();
 
 const runFlowSummarySchema = z.object({
-  dataSourceCount: z.number(),
-  eventCount: z.number(),
-  failedAttempts: z.number(),
-  fallbackCount: z.number(),
-  elapsedMs: z.number().nullable().optional(),
+  dataSourceCount: z.number().int().finite(),
+  eventCount: z.number().int().finite(),
+  failedAttempts: z.number().int().finite(),
+  fallbackCount: z.number().int().finite(),
+  elapsedMs: z.number().finite().nullable().optional(),
   bottleneckNodeId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
 }).passthrough();
@@ -172,9 +193,21 @@ const runFlowSummarySchema = z.object({
 const runFlowSnapshotSchema = z.object({
   taskId: z.string(),
   stockCode: z.string(),
-  status: z.string(),
+  status: z.enum([
+    'pending',
+    'running',
+    'success',
+    'failed',
+    'degraded',
+    'fallback',
+    'timeout',
+    'cancel_requested',
+    'cancelled',
+    'skipped',
+    'unknown',
+  ]),
   generatedAt: z.string(),
-  schemaVersion: z.string().optional(),
+  schemaVersion: z.string(),
   summary: runFlowSummarySchema,
   stockName: z.string().nullable().optional(),
   traceId: z.string().nullable().optional(),
@@ -185,18 +218,19 @@ const runFlowSnapshotSchema = z.object({
 }).passthrough();
 
 const deleteHistoryResponseSchema = z.object({
-  deleted: z.number(),
+  deleted: z.number().int().finite(),
 }).passthrough();
 
 const stockBarItemSchema = z.object({
-  id: z.number(),
+  id: z.number().int().finite(),
   stockCode: z.string(),
-  analysisCount: z.number(),
+  analysisCount: z.number().int().finite(),
   stockName: z.string().nullable().optional(),
   reportType: z.string().nullable().optional(),
-  sentimentScore: z.number().nullable().optional(),
+  sentimentScore: z.number().finite().nullable().optional(),
   operationAdvice: z.string().nullable().optional(),
-  action: z.string().nullable().optional(),
+  action: z.enum(['buy', 'add', 'hold', 'reduce', 'sell', 'watch', 'avoid', 'alert'])
+    .nullable().optional(),
   actionLabel: z.string().nullable().optional(),
   lastAnalysisTime: z.string().nullable().optional(),
   modelUsed: z.string().nullable().optional(),
@@ -204,7 +238,7 @@ const stockBarItemSchema = z.object({
 }).passthrough();
 
 const stockBarResponseSchema = z.object({
-  total: z.number(),
+  total: z.number().int().finite(),
   items: z.array(stockBarItemSchema).optional(),
 }).passthrough();
 
@@ -292,7 +326,11 @@ export const historyApi = {
       params: { q: normalizedQuery, limit },
       signal: options.signal,
     });
-    const data = toCamelCase<HistorySearchResponse>(response.data);
+    const data = parseCamelCasePayload<{
+      query: string;
+      limit: number;
+      items?: HistorySearchItem[];
+    }>(response.data, historySearchResponseSchema, 'HistorySearchResponse');
     return {
       query: data.query,
       limit: data.limit,

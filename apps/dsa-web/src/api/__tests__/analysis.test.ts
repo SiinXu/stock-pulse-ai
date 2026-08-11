@@ -242,6 +242,26 @@ describe('analysisApi response validation', () => {
     );
   });
 
+  it('rejects accepted tasks that omit generated defaulted fields', async () => {
+    post.mockResolvedValue({
+      status: 202,
+      data: {
+        task_id: 'task-missing-contract',
+        status: 'pending',
+        // message_code and analysis_phase are required response fields.
+      },
+    });
+
+    await expect(analysisApi.analyzeAsync({ stockCode: 'AAPL' })).rejects.toSatisfy(
+      (error: unknown) => {
+        const parsed = getParsedApiError(error);
+        expect(parsed.code).toBe('api_response_validation_failed');
+        expect(parsed.params).toMatchObject({ label: 'AnalyzeAsyncResponse' });
+        return true;
+      },
+    );
+  });
+
   it('validates market-review accepted payloads and rejects missing required fields', async () => {
     post.mockResolvedValueOnce({
       status: 202,
@@ -338,4 +358,25 @@ describe('analysisApi response validation', () => {
     const list = await analysisApi.getTasks();
     expect(list.tasks[0].stockCode).toBe('AAPL');
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'rejects non-finite task progress (%s)',
+    async (progress) => {
+      get.mockResolvedValueOnce({
+        data: {
+          task_id: 't-non-finite',
+          status: 'processing',
+          message_code: 'task.status',
+          progress,
+        },
+      });
+
+      await expect(analysisApi.getStatus('t-non-finite')).rejects.toSatisfy(
+        (error: unknown) => {
+          expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+          return true;
+        },
+      );
+    },
+  );
 });
