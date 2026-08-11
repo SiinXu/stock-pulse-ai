@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+
+- [Fixed] Normalize the yfinance TTM dividend cutoff to calendar days so boundary-date events remain included.
 - [Added] Portfolio page surfaces historical VaR, correlation matrix, and concentration/diversification metrics from `GET /api/v1/portfolio/risk-metrics` with always-visible assumptions and honest empty/insufficient/partial states (Refs #239).
 - [Fixed] Shrink config-registry unregistered debt baseline from 243 to 207 after registering MCP server keys and post-#1036 data-source domain keys (Refs #1023, #244).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after merging MCP Settings inventory onto post-#1036/#1031 main (Refs #244).
