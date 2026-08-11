@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Tests] Align Playwright analysis, history, and scheduled-task fixtures with required OpenAPI fields so runtime validation exercises successful real-contract paths.
 - [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
 - [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
 - [Fixed] Restore Popover focus during the closing commit so stale animation-frame callbacks cannot steal focus after nested-overlay keyboard navigation.
