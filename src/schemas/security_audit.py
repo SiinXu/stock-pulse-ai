@@ -5,15 +5,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SECURITY_AUDIT_SCHEMA_VERSION: Literal["security-audit-v1"] = "security-audit-v1"
 SECURITY_AUDIT_RETENTION_DAYS = 90
+SECURITY_AUDIT_MAX_EVENTS = 10_000
 SECURITY_AUDIT_MAX_PAGE_SIZE = 100
 SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS = 64
 SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH = 256
+SECURITY_AUDIT_MIN_RETENTION_DAYS = 1
+SECURITY_AUDIT_MAX_RETENTION_DAYS = 3650
+SECURITY_AUDIT_MIN_MAX_EVENTS = 100
+SECURITY_AUDIT_MAX_MAX_EVENTS = 1_000_000
 
 SecurityAuditPhase = Literal["attempt", "completion"]
 SecurityAuditOutcome = Literal[
@@ -57,7 +63,11 @@ class SecurityAuditTarget(_StrictAuditModel):
 def _bounded_metadata_value(value: Any, *, depth: int = 0) -> Any:
     if depth > 2:
         raise ValueError("security audit metadata nesting is too deep")
-    if value is None or type(value) in {bool, int, float}:
+    if value is None or type(value) in {bool, int}:
+        return value
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("security audit metadata number must be finite")
         return value
     if isinstance(value, str):
         if len(value) > SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH:

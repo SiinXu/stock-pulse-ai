@@ -295,10 +295,11 @@ def test_invoker_exception_is_step_failure_not_success() -> None:
     assert "sk-secret" not in str(result.to_metadata())
 
 
-def test_loop_still_not_wired_into_agent_executor_run() -> None:
+def test_loop_is_reachable_from_agent_executor_run_via_product_gate() -> None:
     source = inspect.getsource(_RunMethods.run)
+    assert "try_run_with_planning" in source
+    # Loop itself stays in product.py; run only gates.
     assert "execute_plan_loop" not in source
-    assert "planning" not in source
 
 
 def test_planning_engine_accepts_prior_observations_for_template_replan() -> None:
