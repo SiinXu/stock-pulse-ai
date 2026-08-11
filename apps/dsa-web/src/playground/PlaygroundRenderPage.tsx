@@ -69,7 +69,11 @@ const PlaygroundRenderPage = () => {
   }, [entry.name, text.title]);
 
   if (!mockReady) {
-    return <Loading label={text.loadingPreview} className="min-h-dvh bg-background" />;
+    return (
+      <div className="min-h-dvh bg-background">
+        <Loading label={text.loadingPreview} className="min-h-dvh" />
+      </div>
+    );
   }
 
   if (!hasPlaygroundRenderer(entry.id)) {
