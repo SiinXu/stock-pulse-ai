@@ -1367,7 +1367,7 @@ describe('PortfolioPage FX refresh', () => {
     });
     const taskPanel = await screen.findByTestId('portfolio-analysis-task-panel');
     expect(taskPanel).toBeInTheDocument();
-    const taskItem = within(taskPanel).getByTestId('task-panel-item');
+    const taskItem = await within(taskPanel).findByTestId('task-panel-item');
     expect(taskItem).toBeInTheDocument();
     expect(within(taskItem).getAllByText('HK00700').length).toBeGreaterThan(0);
     expect(screen.queryByText('已提交 HK00700 分析任务：task-portfolio-1')).not.toBeInTheDocument();
