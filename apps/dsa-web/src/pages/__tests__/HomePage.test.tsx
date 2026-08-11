@@ -70,7 +70,7 @@ vi.mock('../../api/todaysFocus', () => ({
 }));
 
 const emptyTodaysFocus: TodaysFocusResponse = {
-  packVersion: 'todays_focus/2.0',
+  packVersion: 'todays_focus/2.1',
   generatedAt: '2026-08-09T00:00:00Z',
   status: 'empty',
   maxItems: 5,
@@ -81,20 +81,55 @@ const emptyTodaysFocus: TodaysFocusResponse = {
   sourcesUsed: [],
   degradedSources: [],
   temporalPolicy: {
-    semantics: 'local_calendar_day',
-    timezone: 'UTC',
-    localDate: '2026-08-09',
-    windowStart: '2026-08-08T16:00:00Z',
+    semantics: 'per_market_local_calendar_day',
+    crossMarketRule: 'evidence_uses_target_symbol_market_timezone',
+    fallbackTimezone: 'Asia/Shanghai',
     windowEnd: '2026-08-09T00:00:00Z',
     naiveTimestampPolicy: 'assume_utc',
     missingTimestampPolicy: 'exclude',
     nonTradingDayPolicy: 'same_local_day_only',
+    markets: [
+      {
+        market: 'cn',
+        timezone: 'Asia/Shanghai',
+        localDate: '2026-08-09',
+        windowStart: '2026-08-08T16:00:00Z',
+        windowEnd: '2026-08-09T00:00:00Z',
+        isTradingDay: false,
+      },
+      {
+        market: 'hk',
+        timezone: 'Asia/Hong_Kong',
+        localDate: '2026-08-09',
+        windowStart: '2026-08-08T16:00:00Z',
+        windowEnd: '2026-08-09T00:00:00Z',
+        isTradingDay: false,
+      },
+      {
+        market: 'us',
+        timezone: 'America/New_York',
+        localDate: '2026-08-08',
+        windowStart: '2026-08-08T04:00:00Z',
+        windowEnd: '2026-08-09T00:00:00Z',
+        isTradingDay: false,
+      },
+      {
+        market: 'unknown',
+        timezone: 'Asia/Shanghai',
+        localDate: '2026-08-09',
+        windowStart: '2026-08-08T16:00:00Z',
+        windowEnd: '2026-08-09T00:00:00Z',
+        isTradingDay: null,
+      },
+    ],
   },
   universeContract: {
     symbolCount: 0,
     hardCap: 1000,
     truncated: false,
     sources: ['watchlist_config'],
+    excludedNonFinitePositions: 0,
+    dataNotes: [],
   },
   costContract: {
     alertRepositoryCalls: 1,
@@ -349,10 +384,11 @@ describe('HomePage attention hub', () => {
     const configurable = screen.getByRole('button', { name: /Configurable area/ });
     expect(configurable.closest('section')).toHaveClass('rounded-xl', 'border', 'border-border', 'p-4');
     expect(configurable).toHaveAttribute('aria-expanded', 'false');
-    expect(document.getElementById('home-configurable-content')).not.toBeVisible();
+    const configurableContent = document.getElementById('home-configurable-content');
+    expect(configurableContent).not.toBeVisible();
     expect(window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY)).toBeNull();
-    // Watchlist groups may expose a name field on Home; configurable area must stay collapsed.
-    expect(document.getElementById('home-configurable-content')?.querySelector('input')).toBeNull();
+    expect(configurableContent?.querySelector('input')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'New group name' })).toBeVisible();
   });
 
   it('keeps the configurable area usable when browser preference storage fails', async () => {

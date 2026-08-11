@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { History } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { Button, ConfirmDialog, Drawer, IconButton, InlineAlert, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
+import { Button, ConfirmDialog, Drawer, IconButton, SegmentedControl, Surface, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
 import { ChatComposer } from '../components/chat/ChatComposer';
+import { ChatSendFeedbackAlert } from '../components/chat/ChatSendFeedback';
+import { WhatIfScenarioPanel } from '../components/chat/WhatIfScenarioPanel';
 import {
   resolveActiveStockContextFromMessage,
   restoreActiveStockContextFromMessages,
@@ -15,13 +17,12 @@ import {
 } from '../components/chat/chatActiveStock';
 import { getMessageSkillLabel } from '../components/chat/chatMessageMeta';
 import { useChatPageUiState } from '../components/chat/useChatPageUiState';
+import { useChatWhatIf } from '../components/chat/useChatWhatIf';
+import { useChatSendFeedback } from '../components/chat/useChatSendFeedback';
 import { useAgentSetupAvailability } from '../hooks/useAgentSetupAvailability';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
-import {
-  useAgentChatStore,
-  type Message,
-} from '../stores/agentChatStore';
+import { useAgentChatStore, type Message } from '../stores/agentChatStore';
 import { downloadSession, formatSessionAsMarkdown } from '../utils/chatExport';
 import type { ChatFollowUpContext } from '../utils/chatFollowUp';
 import {
@@ -124,10 +125,7 @@ const ChatPage: React.FC = () => {
   }, [dispatchUi]);
   const closeSidebar = useCallback(() => setSidebarPresentationOpen(false), [setSidebarPresentationOpen]);
   const [isFollowUpContextLoading, setIsFollowUpContextLoading] = useState(false);
-  const [sendToast, setSendToast] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
+  const { sendToast, showSendFeedback, clearSendFeedback } = useChatSendFeedback();
   const [contextCompressionEnabled, setContextCompressionEnabled] = useState(false);
   const [contextCompressionLoaded, setContextCompressionLoaded] = useState(false);
   const [contextCompressionSaving, setContextCompressionSaving] = useState(false);
@@ -148,7 +146,6 @@ const ChatPage: React.FC = () => {
   const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
-  const sendToastTimerRef = useRef<number | null>(null);
   const followUpHydrationTokenRef = useRef(0);
   const sendGenerationRef = useRef(0);
   const lastHydratedFollowUpKeyRef = useRef<string | null>(null);
@@ -173,9 +170,6 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const timers = copyResetTimerRef.current;
     return () => {
-      if (sendToastTimerRef.current !== null) {
-        window.clearTimeout(sendToastTimerRef.current);
-      }
       Object.values(timers).forEach((timerId) => {
         if (timerId !== undefined) {
           window.clearTimeout(timerId);
@@ -299,6 +293,7 @@ const ChatPage: React.FC = () => {
     stopStream,
     clearCompletionBadge,
   } = useAgentChatStore();
+  const { whatIfDraft, setWhatIfDraft, planWhatIfSend } = useChatWhatIf(messages);
   const selectedSkillIds = sessionSelectedSkillIds ?? defaultSkillIds;
   const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
     setSearchParams((current) => {
@@ -678,11 +673,26 @@ const ChatPage: React.FC = () => {
         setActiveStockContext(nextActiveStockContext);
         setActiveStockCode(nextActiveStockContext.stock_code);
       }
-      const contextForSend = useActiveContextForThisSend
+      const baseContextForSend = useActiveContextForThisSend
         ? nextActiveStockContext
         : followUpContextRef.current ?? nextActiveStockContext ?? undefined;
+      const whatIfPlan = planWhatIfSend(
+        msgText,
+        baseContextForSend as Record<string, unknown> | null | undefined,
+      );
+      if (!whatIfPlan.ok) {
+        showSendFeedback(
+          {
+            type: 'error',
+            message: t(whatIfPlan.errorKey, whatIfPlan.errorParams),
+          },
+          5000,
+        );
+        return;
+      }
+      const contextForSend = whatIfPlan.context;
       const payload = {
-        message: msgText,
+        message: whatIfPlan.message,
         session_id: sessionId,
         ...(requestedSkillIds !== null
           ? { skills: normalizeSelectedSkillIds(requestedSkillIds) }
@@ -737,13 +747,17 @@ const ChatPage: React.FC = () => {
       // Unknown acknowledgement stays non-resendable because a legacy or unreachable
       // service may already have persisted the turn.
       if (streamOutcome.persistence === 'not_persisted') {
-        followUpContextRef.current = pendingFollowUpContext ?? contextForSend ?? null;
+        // Prefer the pre-what-if stock/follow-up context; a what_if payload is not
+        // a ChatFollowUpContext and must not become the next turn's base context.
+        followUpContextRef.current = pendingFollowUpContext
+          ?? (baseContextForSend as typeof followUpContextRef.current)
+          ?? null;
         if (unsentFollowUpParamsPresent || pendingFollowUpContext) {
           setInput(msgText);
         }
       }
     },
-    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, setSearchParams, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, planWhatIfSend, requestScrollToBottom, searchParams, selectedSkillIds, sessionId, sessionSelectedSkillIds, sessionLoading, setMobileSkillPickerOpen, setSearchParams, showSendFeedback, startStream, t],
   );
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Ignore the Enter that confirms an IME candidate so CJK input isn't sent
@@ -761,16 +775,6 @@ const ChatPage: React.FC = () => {
     setSelectedSkillIds(quickSkillIds);
     handleSend(q.label, quickSkillIds);
   };
-  const showSendFeedback = useCallback((nextToast: { type: 'success' | 'error'; message: string }, durationMs: number) => {
-    if (sendToastTimerRef.current !== null) {
-      window.clearTimeout(sendToastTimerRef.current);
-    }
-    setSendToast(nextToast);
-    sendToastTimerRef.current = window.setTimeout(() => {
-      setSendToast(null);
-      sendToastTimerRef.current = null;
-    }, durationMs);
-  }, []);
   const toggleThinking = (msgId: string) => {
     dispatchUi({ type: 'toggleThinking', messageId: msgId });
   };
@@ -952,7 +956,7 @@ const ChatPage: React.FC = () => {
                       onClick={async () => {
                         if (sending) return;
                         setSending(true);
-                        setSendToast(null);
+                        clearSendFeedback();
                         try {
                           const content = formatSessionAsMarkdown(messages, language);
                           await agentApi.sendChat(content);
@@ -1002,15 +1006,7 @@ const ChatPage: React.FC = () => {
               ]}
             />
           </div>
-          {sendToast ? (
-            <InlineAlert
-              variant={sendToast.type === 'success' ? 'success' : 'danger'}
-              size="compact"
-              title={sendToast.type === 'success' ? t('chat.sendSuccess') : t('chat.sendFailure')}
-              message={sendToast.message}
-              className="max-w-md"
-            />
-          ) : null}
+          <ChatSendFeedbackAlert toast={sendToast} successTitle={t('chat.sendSuccess')} failureTitle={t('chat.sendFailure')} />
         </header>
 
         {chatMode === 'research' ? (
@@ -1059,6 +1055,9 @@ const ChatPage: React.FC = () => {
             </div>
           )}
 
+          <WhatIfScenarioPanel t={t} draft={whatIfDraft} onChange={setWhatIfDraft}
+            disabled={loading || sessionLoading || isSkillsLoading} />
+
           <ChatComposer
             language={language}
             t={t}
@@ -1100,7 +1099,6 @@ const ChatPage: React.FC = () => {
             onStop={() => stopStream()}
             onSend={() => handleSend()}
           />
-
         </Surface>
       </div>
     </div>

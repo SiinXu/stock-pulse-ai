@@ -50,6 +50,10 @@ describe('ReportMarkdown', () => {
 
     const copyButton = await screen.findByRole('button', { name: '复制 Markdown 源码' });
     expect(copyButton).toBeDisabled();
+    const shareButton = screen.getByRole('button', { name: '分享' });
+    expect(shareButton.parentElement?.parentElement?.parentElement).toHaveClass(
+      '[&_.home-surface-button]:!shadow-none',
+    );
     const closeButtons = screen.getAllByRole('button', { name: '关闭' });
     const primaryClose = closeButtons.find((button) => button.getAttribute('data-control') === 'button');
     expect(primaryClose).toBeDefined();

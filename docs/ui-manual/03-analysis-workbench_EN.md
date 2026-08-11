@@ -42,7 +42,7 @@ sequenceDiagram
 
 ## Start an analysis
 
-1. Enter a code or name in the suggestion-enabled stock search (`600519`, `hk00700`, `AAPL`, …).
+1. Enter a code or name in the suggestion-enabled stock search (`600519`, `0941` for Hong Kong, `hk00700`, `AAPL`, …).
 2. Optionally pick from the watchlist.  
 3. Optionally choose a **Skill** (style pack); omit for default.  
 4. Choose an **Analysis phase**: Auto by default, or Premarket, Intraday, or Postmarket for this request.
@@ -77,9 +77,11 @@ The selected phase applies consistently to single-symbol, batch, watchlist, smar
 | Market | Examples | Common mistake |
 | --- | --- | --- |
 | A-share | `600519` | Company name without code |
-| Hong Kong | `hk00700` | Missing `hk` |
+| Hong Kong | `0941`, `hk00700`, `00700.HK` | A bare four-digit code is zero-padded and canonicalized as `HKxxxxx` |
 | US | `AAPL`, `BRK.B` | Odd casing |
 | JP / KR | `7203.T`, `005930.KS` | Missing suffix |
+
+Bare four-digit input is checked against the stock index first, so indexed `7203` is submitted as Japanese `7203.T`; only an unresolved value such as `0941` defaults to Hong Kong. Prefer an explicit exchange suffix for cross-market input when ambiguity matters.
 
 ## Task states
 

@@ -13,6 +13,7 @@ from tests.system_config_service_test_support import (
     os,
     patch,
 )
+from src.llm.model_ref import encode_model_ref
 
 
 class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
@@ -829,6 +830,31 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(checks["llm_agent"]["status"], "configured")
         self.assertIn("普通分析使用 Codex CLI", checks["llm_agent"]["message"])
         self.assertIn("Agent 工具调用仍使用主要模型", checks["llm_agent"]["message"])
+
+    def test_get_setup_status_accepts_connected_agent_model_ref_with_codex_primary(self) -> None:
+        agent_model_ref = encode_model_ref("custom", "openai/agent/deepseek-v4-pro")
+        self._rewrite_env(
+            "GENERATION_BACKEND=codex_cli",
+            "GENERATION_FALLBACK_BACKEND=",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=custom",
+            "LLM_CUSTOM_PROVIDER=custom",
+            "LLM_CUSTOM_PROTOCOL=openai",
+            "LLM_CUSTOM_BASE_URL=https://models.example/v1",
+            "LLM_CUSTOM_API_KEY=secret-key-value",
+            "LLM_CUSTOM_MODELS=agent/deepseek-v4-pro",
+            "LLM_CUSTOM_ENABLED=true",
+            f"AGENT_LITELLM_MODEL={agent_model_ref}",
+            "STOCK_LIST=600519",
+        )
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("src.services.system_config_service.shutil.which", return_value="/usr/bin/codex"):
+            status = self.service.get_setup_status()
+
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
+        self.assertNotIn("llm_agent", status["required_missing_keys"])
 
     def test_get_setup_status_codex_primary_agent_inherited_model_explains_litellm_split(self) -> None:
         self._rewrite_env(

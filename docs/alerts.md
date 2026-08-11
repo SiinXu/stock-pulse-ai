@@ -494,9 +494,17 @@ P9 在现有 Alert API、worker 与通知链路上扩展**企业事件规则**�
 - `src/services/alert_worker.py`：触发后挂载 impact_context，并 enrich 通知。
 - 配置：`AGENT_EVENT_IMPACT_CONTEXT_ENABLED`（registry + `.env.example`）。
 
+
+### Web 跟进（Issue #241）
+
+- 独立页面 `/event-alerts` 展示已触发企业事件告警。页面通过服务端 `alert_type=corporate_event` 过滤和不透明游标继续加载，因此不会只过滤通用触发历史的第一页。
+- `GET /api/v1/alerts/triggers` 一等暴露有长度和类型边界的 `impact_context` / `event_context`；响应不会包含账户标识、持仓数量、市值、原始匹配项或原始企业事件 diagnostics。
+- 影响等级由后端依据规则 `severity` 给出，并附 `rule_severity` 来源；规则已删除或无法关联时返回 `unclassified`，Web 不按事件分类自行推断等级。
+- Web 创建和编辑表单完整提交并回显 `event_categories`、`lookback_hours`、`min_items`。
+
 ### P9 不做
 
-- 不做 Web 创建表单/筛选扩展（#241 follow-up）。
+- 不做基于浏览器的影响等级推断或任意 diagnostics 展示。
 - 不做 live 新闻抓取或在告警热路径调用新的 blocking provider。
 - 不做 push/digest 双模式（digest 另期）。
 - 不做 LLM 即时影响分析。

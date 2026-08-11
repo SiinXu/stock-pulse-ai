@@ -31,8 +31,10 @@ router = APIRouter()
     },
     summary="Get today's focus recommendations",
     description=(
-        "Fresh local-calendar-day evidence from the watchlist and persisted holdings "
-        "cache. Hard-capped, read-only, and explicit about source degradation; never "
+        "Fresh market-local-calendar-day evidence from the watchlist and full "
+        "persisted holdings cache. A-shares, Hong Kong, and US symbols each use "
+        "their own exchange timezone day boundary; hard-capped, read-only, and "
+        "explicit about source degradation or non-finite financial values. Never "
         "fetches market data, runs analysis, or replays portfolio state."
     ),
     operation_id="getTodaysFocus",

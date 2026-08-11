@@ -60,25 +60,38 @@ export interface TodaysFocusCostContract {
   readOnly: true;
 }
 
-export interface TodaysFocusTemporalPolicy {
-  semantics: 'local_calendar_day';
+export interface TodaysFocusMarketDayWindow {
+  market: 'cn' | 'hk' | 'us' | 'unknown';
   timezone: string;
   localDate: string;
   windowStart: string;
   windowEnd: string;
+  isTradingDay: boolean | null;
+}
+
+export interface TodaysFocusTemporalPolicy {
+  semantics: 'per_market_local_calendar_day';
+  crossMarketRule: 'evidence_uses_target_symbol_market_timezone';
+  fallbackTimezone: string;
+  windowEnd: string;
   naiveTimestampPolicy: 'assume_utc';
   missingTimestampPolicy: 'exclude';
   nonTradingDayPolicy: 'same_local_day_only';
+  markets: TodaysFocusMarketDayWindow[];
 }
 
 export interface TodaysFocusResponse {
-  packVersion: 'todays_focus/2.0';
+  packVersion: 'todays_focus/2.1';
   generatedAt: string;
   status: 'ok' | 'empty' | 'degraded';
   maxItems: number;
   itemCount: number;
   items: TodaysFocusItem[];
-  emptyReason: 'source_unavailable' | 'no_fresh_deterministic_signals' | null;
+  emptyReason:
+    | 'source_unavailable'
+    | 'no_fresh_deterministic_signals'
+    | 'insufficient_finite_data'
+    | null;
   emptyMessage: string | null;
   sourcesUsed: (
     | 'alert'
@@ -105,6 +118,8 @@ export interface TodaysFocusResponse {
       | 'request'
       | 'watchlist_config'
     )[];
+    excludedNonFinitePositions: number;
+    dataNotes: string[];
   };
   costContract: TodaysFocusCostContract;
   presentationBoundary: {
