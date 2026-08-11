@@ -36,12 +36,15 @@ def _execute_tools(
     progress_callback: Optional[Callable],
     tool_calls_log: List[Dict[str, Any]],
     tool_wait_timeout_seconds: Optional[float] = None,
+    tool_deadline_monotonic: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
     """Execute one or more tool calls, returning ordered result dicts.
 
     Single tools run inline; multiple tools run in parallel threads. Every
     dispatch flows through the bound ``tool_session`` — the single tool
-    authority — via the migration mapper.
+    authority — via the migration mapper. Completion fences use the earlier
+    of the batch timeout and the owning session deadline so both layers publish
+    one deterministic timeout result at their shared boundary.
     """
 
     from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
@@ -122,7 +125,10 @@ def _execute_tools(
         if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0:
             pool = ThreadPoolExecutor(max_workers=1)
             ctx = contextvars.copy_context()
-            completion_fence = _ToolCompletionFence(tool_wait_timeout_seconds)
+            completion_fence = _ToolCompletionFence(
+                tool_wait_timeout_seconds,
+                deadline_monotonic=tool_deadline_monotonic,
+            )
             try:
                 future = pool.submit(ctx.run, _exec_single, tc, completion_fence)
                 try:
@@ -268,7 +274,10 @@ def _execute_tools(
             futures = {}
             for tc in tool_calls:
                 completion_fence = (
-                    _ToolCompletionFence(tool_wait_timeout_seconds)
+                    _ToolCompletionFence(
+                        tool_wait_timeout_seconds,
+                        deadline_monotonic=tool_deadline_monotonic,
+                    )
                     if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0
                     else None
                 )

@@ -433,6 +433,7 @@ def run_agent_loop(
                 progress_callback,
                 tool_calls_log,
                 tool_wait_timeout_seconds=effective_tool_timeout,
+                tool_deadline_monotonic=session_deadline_monotonic,
             )
 
             # Append tool results preserving original call order
