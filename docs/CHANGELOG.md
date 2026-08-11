@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
 
 - [Fixed] Overflowing pagination controls use safe centering so the leading prev control remains reachable under horizontal scroll (follow-up to #910 / #879 B4).
+- [Added] In-app notification inbox and header bell share best-effort durable event sources, versioned occurrence identities, server read state, stable cursor pagination, source provenance, and localized Web rendering (Refs #181).
 - [Fixed] Keep Backtest strategy run options (`minAge`/`limit`) in shareable URLs while preserving stable research-route wire keys (#879 A1).
 - [Added] Agent Chat what-if scenario mode with structured assumptions, hypothetical markers, turn limits, and hard isolation from AnalysisHistory / DecisionSignal / Agent memory (#130).
 - [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) across CLI, Web, analysis/watchlist APIs, imports, providers, and Bot flows, while preserving indexed Japanese codes and explicit market hints or suffixes.

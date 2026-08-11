@@ -19,6 +19,7 @@ export const APP_ROUTE_PATHS = {
   researchSkillOutcomes: '/research/skill-outcomes',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
+  notifications: '/notifications',
   calculators: '/tools/calculators',
 } as const;
 
@@ -379,4 +380,3 @@ export function buildInvestmentFrameworkSettingsHref(): string {
     view: 'investment_framework',
   });
 }
-

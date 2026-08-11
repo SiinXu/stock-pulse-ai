@@ -16,6 +16,7 @@ import { Shell } from '../../components/layout/Shell';
 import { SidebarNav } from '../../components/layout/SidebarNav';
 import { SidebarProfile } from '../../components/layout/SidebarProfile';
 import { NotificationBell } from '../../components/notifications';
+import { NotificationInboxList } from '../../components/notification-center';
 import { RouteFocusCoordinator } from '../../components/routing';
 import { DeepLinkGuard } from '../../components/routing/DeepLinkGuard';
 import { SessionContinuityGuard } from '../../components/routing/SessionContinuityGuard';
@@ -23,6 +24,7 @@ import { ThemeToggle } from '../../components/theme/ThemeToggle';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
+import { NOTIFICATION_CENTER_TEXT } from '../../locales/notificationCenter';
 import { usePlaygroundScenario } from '../scenarioContext';
 import type { PlaygroundScenarioRenderer } from '../types';
 
@@ -62,6 +64,31 @@ const NotificationBellStory = () => (
     <NotificationBell />
   </div>
 );
+
+const NotificationInboxListStory = () => {
+  const { language } = useUiLanguage();
+  const { scenario } = usePlaygroundScenario();
+  const text = NOTIFICATION_CENTER_TEXT[language];
+  return (
+    <NotificationInboxList
+      items={scenario === 'empty' ? [] : [{
+        id: 'v1:analysis_complete:42:1786320000000000',
+        kind: 'analysis_complete',
+        titleKey: 'analysisCompleteTitle',
+        titleParams: { label: 'AAPL' },
+        summary: 'Hold · Stable outlook',
+        severity: 'info',
+        createdAt: '2026-08-10T00:00:00Z',
+        isRead: false,
+        href: '/research/analysis?segment=history&recordId=42',
+        sourceId: '42',
+      }]}
+      emptyTitle={text.emptyTitle}
+      emptyDescription={text.emptyDescription}
+      onMarkRead={() => undefined}
+    />
+  );
+};
 
 const SidebarNavStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -182,6 +209,7 @@ export const LAYOUT_DASHBOARD_SCENARIOS: Record<string, PlaygroundScenarioRender
   shell: ShellStory,
   'command-palette': CommandPaletteStory,
   'notification-bell': NotificationBellStory,
+  'notification-inbox-list': NotificationInboxListStory,
   'sidebar-nav': SidebarNavStory,
   'sidebar-profile': SidebarProfileStory,
   'page-loading-fallback': PageLoadingFallback,
