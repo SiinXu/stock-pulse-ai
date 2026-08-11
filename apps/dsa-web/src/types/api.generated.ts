@@ -1271,7 +1271,7 @@ export interface paths {
         };
         /**
          * Get today's focus recommendations
-         * @description Fresh local-calendar-day evidence from the watchlist and persisted holdings cache. Hard-capped, read-only, and explicit about source degradation; never fetches market data, runs analysis, or replays portfolio state.
+         * @description Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.
          */
         get: operations["getTodaysFocus"];
         put?: never;
@@ -15153,6 +15153,33 @@ export interface components {
             /** Weight Pct */
             weight_pct?: number | null;
         };
+        /** TodaysFocusMarketDayWindow */
+        TodaysFocusMarketDayWindow: {
+            /** Is Trading Day */
+            is_trading_day?: boolean | null;
+            /**
+             * Local Date
+             * Format: date
+             */
+            local_date: string;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "cn" | "hk" | "us" | "unknown";
+            /** Timezone */
+            timezone: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+        };
         /** TodaysFocusPresentationBoundary */
         TodaysFocusPresentationBoundary: {
             /**
@@ -15179,7 +15206,7 @@ export interface components {
             /** Empty Message */
             empty_message?: string | null;
             /** Empty Reason */
-            empty_reason?: ("source_unavailable" | "no_fresh_deterministic_signals") | null;
+            empty_reason?: ("source_unavailable" | "no_fresh_deterministic_signals" | "insufficient_finite_data") | null;
             /**
              * Generated At
              * Format: date-time
@@ -15195,7 +15222,7 @@ export interface components {
              * Pack Version
              * @constant
              */
-            pack_version: "todays_focus/2.0";
+            pack_version: "todays_focus/2.1";
             presentation_boundary: components["schemas"]["TodaysFocusPresentationBoundary"];
             /** Sources Used */
             sources_used: ("alert" | "analysis" | "corporate_event" | "alerts" | "analysis_history" | "corporate_events")[];
@@ -15210,10 +15237,14 @@ export interface components {
         /** TodaysFocusTemporalPolicy */
         TodaysFocusTemporalPolicy: {
             /**
-             * Local Date
-             * Format: date
+             * Cross Market Rule
+             * @constant
              */
-            local_date: string;
+            cross_market_rule: "evidence_uses_target_symbol_market_timezone";
+            /** Fallback Timezone */
+            fallback_timezone: string;
+            /** Markets */
+            markets: components["schemas"]["TodaysFocusMarketDayWindow"][];
             /**
              * Missing Timestamp Policy
              * @constant
@@ -15233,22 +15264,19 @@ export interface components {
              * Semantics
              * @constant
              */
-            semantics: "local_calendar_day";
-            /** Timezone */
-            timezone: string;
+            semantics: "per_market_local_calendar_day";
             /**
              * Window End
              * Format: date-time
              */
             window_end: string;
-            /**
-             * Window Start
-             * Format: date-time
-             */
-            window_start: string;
         };
         /** TodaysFocusUniverseContract */
         TodaysFocusUniverseContract: {
+            /** Data Notes */
+            data_notes?: string[];
+            /** Excluded Non Finite Positions */
+            excluded_non_finite_positions: number;
             /**
              * Hard Cap
              * @constant
