@@ -927,7 +927,7 @@ class _ConfigLoadingMethods:
                 minimum=1,
                 maximum=8192,
             ),
-            agent_planning_proposal_timeout_seconds=parse_env_float(
+            agent_planning_proposal_timeout_seconds=_parse_env_finite_float(
                 os.getenv('AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS'),
                 30.0,
                 field_name='AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS',
@@ -948,7 +948,7 @@ class _ConfigLoadingMethods:
                 minimum=0,
                 maximum=3,
             ),
-            agent_planning_exec_timeout_seconds=parse_env_float(
+            agent_planning_exec_timeout_seconds=_parse_env_finite_float(
                 os.getenv('AGENT_PLANNING_EXEC_TIMEOUT_SECONDS'),
                 60.0,
                 field_name='AGENT_PLANNING_EXEC_TIMEOUT_SECONDS',

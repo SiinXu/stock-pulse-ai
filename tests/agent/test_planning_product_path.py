@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 from types import SimpleNamespace
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
@@ -23,6 +24,9 @@ from src.agent.tools.registry import (
     ToolPolicy,
     ToolRegistry,
 )
+from src.config import Config
+from src.services.security_audit_service import get_security_audit_service
+from src.storage import DatabaseManager
 
 
 def _registry_with_tools(names: List[str]) -> ToolRegistry:
@@ -37,7 +41,7 @@ def _registry_with_tools(names: List[str]) -> ToolRegistry:
                         name="stock_code",
                         type="string",
                         description="stock",
-                        required=False,
+                        required=True,
                     )
                 ],
                 handler=lambda stock_code=None, _n=name, **kwargs: {
@@ -46,7 +50,12 @@ def _registry_with_tools(names: List[str]) -> ToolRegistry:
                     "stock_code": stock_code,
                 },
                 category="data",
-                policy=ToolPolicy(permissions=["market_data_read"]),
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    side_effects=[],
+                    permissions=["analysis_context:read"],
+                    scope_dimensions=["stock"],
+                ),
             )
         )
     return registry
@@ -90,6 +99,36 @@ def test_resolve_settings_reject_non_finite_timeout_via_settings() -> None:
         resolve_planning_settings(cfg)
 
 
+@pytest.mark.parametrize(
+    ("field_name", "raw_value"),
+    [
+        ("AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS", "nan"),
+        ("AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS", "inf"),
+        ("AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS", "-inf"),
+        ("AGENT_PLANNING_EXEC_TIMEOUT_SECONDS", "nan"),
+        ("AGENT_PLANNING_EXEC_TIMEOUT_SECONDS", "inf"),
+        ("AGENT_PLANNING_EXEC_TIMEOUT_SECONDS", "-inf"),
+    ],
+)
+@patch("src.config.setup_env")
+@patch.object(Config, "_parse_litellm_yaml", return_value=[])
+@patch.object(Config, "_parse_stock_email_groups", return_value=[])
+def test_config_loader_rejects_non_finite_planning_timeouts(
+    _mock_groups: MagicMock,
+    _mock_litellm: MagicMock,
+    _mock_setup_env: MagicMock,
+    field_name: str,
+    raw_value: str,
+) -> None:
+    with patch.dict(
+        os.environ,
+        {"STOCK_LIST": "600519", field_name: raw_value},
+        clear=True,
+    ):
+        with pytest.raises(ValueError, match=field_name):
+            Config._load_from_env()
+
+
 def test_agent_executor_run_uses_planning_loop_when_enabled() -> None:
     """Prove the production AgentExecutor.run path enters plan→act→observe."""
     tools = ["get_realtime_quote", "get_daily_history", "analyze_trend", "search_stock_news"]
@@ -129,7 +168,7 @@ def test_agent_executor_run_uses_planning_loop_when_enabled() -> None:
     ), patch.object(executor, "_run_loop", return_value=synth) as run_loop:
         result = executor.run("Analyze stock 600519", context={"stock_code": "600519"})
 
-    assert result.success is True
+    assert result.success is True, result.tool_calls_log
     assert result.planning_metadata is not None
     assert result.planning_metadata.get("product_path") == "agent_executor_run"
     assert result.planning_metadata.get("success") is True
@@ -144,6 +183,49 @@ def test_agent_executor_run_uses_planning_loop_when_enabled() -> None:
     messages = run_loop.call_args.args[0]
     user = next(m for m in messages if m.get("role") == "user")
     assert "Plan execution evidence" in user["content"]
+
+
+def test_agent_executor_run_uses_real_bound_session_and_durable_audit(tmp_path) -> None:
+    """Exercise the production permission and SQLite audit gates without mocks."""
+    DatabaseManager.reset_instance()
+    DatabaseManager(f"sqlite:///{tmp_path / 'planning-product-audit.sqlite'}")
+    try:
+        tools = [
+            "get_realtime_quote",
+            "get_daily_history",
+            "analyze_trend",
+            "search_stock_news",
+        ]
+        executor = AgentExecutor(_registry_with_tools(tools), MagicMock(), max_steps=3)
+        synth = AgentResult(
+            success=True,
+            content='{"action":"hold"}',
+            dashboard={"action": "hold"},
+            total_steps=1,
+        )
+
+        with patch(
+            "src.agent.planning.product._resolve_config",
+            return_value=_enabled_config(),
+        ), patch.object(executor, "_run_loop", return_value=synth):
+            result = executor.run(
+                "Analyze stock 600519",
+                context={"stock_code": "600519"},
+            )
+
+        audit_page = get_security_audit_service().list_events(
+            page=1,
+            page_size=100,
+            event_type="tool.execute",
+        )
+    finally:
+        DatabaseManager.reset_instance()
+
+    assert result.success is True, result.tool_calls_log
+    assert any(row.get("source") == "plan_loop" for row in result.tool_calls_log)
+    assert audit_page.total >= 2
+    assert {event.phase for event in audit_page.items} == {"attempt", "completion"}
+    assert all(event.target.type == "tool" for event in audit_page.items)
 
 
 def test_agent_executor_run_terminates_on_tool_failure_without_fail_open() -> None:

@@ -692,7 +692,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {"label": "Template (deterministic)", "value": "template"},
             {"label": "LLM proposal", "value": "llm"},
         ],
-        "validation": {},
+        "validation": {"enum": ["template", "llm"]},
         "display_order": 661,
         "help_key": "settings.agent.AGENT_PLANNING_STRATEGY",
         "examples": [
@@ -950,7 +950,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {"label": "Replan (if budget remains)", "value": "replan"},
             {"label": "Terminate immediately", "value": "terminate"},
         ],
-        "validation": {},
+        "validation": {"enum": ["replan", "terminate"]},
         "display_order": 669,
         "help_key": "settings.agent.AGENT_PLANNING_ON_STEP_FAILURE",
         "examples": [
