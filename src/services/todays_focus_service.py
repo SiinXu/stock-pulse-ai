@@ -1,14 +1,28 @@
 # -*- coding: utf-8 -*-
 """Fresh, deterministic Today's Focus aggregation (Issue #157 / T26).
 
-"Today" means the current natural calendar day in the configured daily-brief
-timezone. Naive persisted timestamps follow the repository's UTC-naive storage
-convention. Before market open and on non-trading days the same calendar-day
-window applies; the service never rolls old evidence forward to fill the list.
+"Today" is executable and market-aware:
 
-The runtime reads only managed local stores. It does not call market providers,
-run analysis, replay portfolios, or write snapshots. Portfolio positions only
-expand the symbol universe; no lifetime P&L is presented as a daily move.
+- A-shares (cn) use Asia/Shanghai local calendar day boundaries
+- Hong Kong (hk) use Asia/Hong_Kong local calendar day boundaries
+- United States (us) use America/New_York local calendar day boundaries
+- Unrecognized symbols fall back to the configured daily-brief timezone
+
+Cross-market rule: each evidence row is freshened against the target symbol's
+own market-local day window. A single build may therefore accept a US-morning
+alert while rejecting the same absolute timestamp for a China-listed symbol
+(or vice versa). Non-trading days keep the same local calendar-day window;
+prior-session evidence is never rolled forward to pad the list.
+
+Naive persisted timestamps follow the repository's UTC-naive storage
+convention (``assume_utc``). Missing timestamps are excluded.
+
+The runtime reads only managed local stores. Alert evidence uses a targeted
+non-page-1 query that covers every requested target and only ``triggered``
+status. Portfolio positions are loaded from the full cached-position set (no
+first-page truncation) and non-finite amount / weight / change values are
+rejected rather than coerced to zero. No lifetime P&L is presented as a daily
+move.
 """
 
 from __future__ import annotations
@@ -17,9 +31,15 @@ import logging
 import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from src.core.trading_calendar import (
+    MARKET_TIMEZONE,
+    MarketSessionStatus,
+    classify_market_session,
+)
+from src.market.context import detect_market
 from src.services.stock_code_utils import (
     build_daily_code_candidates,
     canonicalize_analysis_stock_code,
@@ -28,14 +48,17 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
-TODAYS_FOCUS_PACK_VERSION = "todays_focus/2.0"
+TODAYS_FOCUS_PACK_VERSION = "todays_focus/2.1"
 DEFAULT_MAX_FOCUS_ITEMS = 5
 MAX_FOCUS_ITEMS_HARD_CAP = 10
 MAX_UNIVERSE_SYMBOLS = 1000
 ANALYSIS_LOOKBACK_DAYS = 90
 DEFAULT_TIMEZONE_NAME = "Asia/Shanghai"
+FOCUS_MARKETS: Tuple[str, ...] = ("cn", "hk", "us")
 MAX_DETAIL_LENGTH = 160
 MAX_NAME_LENGTH = 80
+MAX_DATA_NOTES = 4
+MAX_DATA_NOTE_LENGTH = 160
 
 REASON_PRIORITY: Dict[str, int] = {
     "alert_triggered": 100,
@@ -63,24 +86,64 @@ _REASON_TEMPLATES_ZH: Dict[str, str] = {
 
 
 @dataclass(frozen=True)
-class FocusTemporalPolicy:
-    """Executable calendar-day contract for one build."""
+class MarketDayWindow:
+    """One market's local-calendar-day freshness window for a build."""
 
+    market: str
     timezone_name: str
     local_date: date
     window_start: datetime
     window_end: datetime
+    is_trading_day: Optional[bool]
+
+    def contains(self, observed_at: datetime) -> bool:
+        return self.window_start <= observed_at <= self.window_end
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "semantics": "local_calendar_day",
+            "market": self.market,
             "timezone": self.timezone_name,
             "local_date": self.local_date.isoformat(),
             "window_start": self.window_start.isoformat(),
             "window_end": self.window_end.isoformat(),
+            "is_trading_day": self.is_trading_day,
+        }
+
+
+@dataclass(frozen=True)
+class FocusTemporalPolicy:
+    """Executable per-market calendar-day contract for one build."""
+
+    fallback_timezone_name: str
+    window_end: datetime
+    markets: Mapping[str, MarketDayWindow]
+
+    def window_for_code(self, code: str) -> MarketDayWindow:
+        market = _resolve_focus_market(code)
+        return self.markets.get(market) or self.markets["unknown"]
+
+    def earliest_window_start(self) -> datetime:
+        starts = [window.window_start for window in self.markets.values()]
+        return min(starts) if starts else self.window_end
+
+    def to_dict(self) -> Dict[str, Any]:
+        ordered = sorted(
+            self.markets.values(),
+            key=lambda window: (
+                0 if window.market in FOCUS_MARKETS else 1,
+                FOCUS_MARKETS.index(window.market) if window.market in FOCUS_MARKETS else 99,
+                window.market,
+            ),
+        )
+        return {
+            "semantics": "per_market_local_calendar_day",
+            "cross_market_rule": "evidence_uses_target_symbol_market_timezone",
+            "fallback_timezone": self.fallback_timezone_name,
+            "window_end": self.window_end.isoformat(),
             "naive_timestamp_policy": "assume_utc",
             "missing_timestamp_policy": "exclude",
             "non_trading_day_policy": "same_local_day_only",
+            "markets": [window.to_dict() for window in ordered],
         }
 
 
@@ -106,11 +169,9 @@ class FocusEvidence:
         priority = int(self.priority) if self.priority else REASON_PRIORITY[reason]
         if not 0 <= priority <= 100:
             raise ValueError("FocusEvidence.priority must be between 0 and 100")
-        weight = self.weight_pct
-        if weight is not None:
-            weight = float(weight)
-            if not math.isfinite(weight) or not 0 <= weight <= 100:
-                raise ValueError("FocusEvidence.weight_pct must be finite and between 0 and 100")
+        weight = _finite_optional_float(self.weight_pct, field_name="FocusEvidence.weight_pct")
+        if weight is not None and not 0 <= weight <= 100:
+            raise ValueError("FocusEvidence.weight_pct must be finite and between 0 and 100")
         evidence = dict(self.evidence or {})
         _validate_evidence_shape(reason, evidence)
         object.__setattr__(self, "code", code)
@@ -294,6 +355,9 @@ class TodaysFocusService:
         sources_used: List[str] = []
         universe_sources: List[str] = []
         universe_truncated = False
+        data_notes: List[str] = []
+        excluded_non_finite_positions = 0
+        universe_count = 0
 
         if evidences is not None:
             fresh_evidences = [item for item in evidences if self._is_fresh_evidence(item, temporal_policy)]
@@ -305,8 +369,11 @@ class TodaysFocusService:
             positions: List[Mapping[str, Any]] = []
             if universe is None:
                 source_calls["portfolio_repository_calls"] = 1
-                positions, portfolio_failed = self._load_cached_positions(account_id=account_id)
+                positions, portfolio_failed, excluded_non_finite_positions, position_notes = (
+                    self._load_cached_positions(account_id=account_id)
+                )
                 universe_sources.append("portfolio_position_cache")
+                data_notes.extend(position_notes)
                 if portfolio_failed:
                     degraded_sources.append("portfolio_position_cache")
             codes, universe_truncated = self._resolve_universe(
@@ -347,6 +414,26 @@ class TodaysFocusService:
 
         degraded_sources = sorted(set(degraded_sources))
         status = "degraded" if degraded_sources else ("ok" if selected else "empty")
+        empty_reason = None
+        empty_message = None
+        if not selected:
+            if degraded_sources:
+                empty_reason = "source_unavailable"
+                empty_message = (
+                    "One or more local sources were unavailable; focus is not reported as a normal empty list."
+                )
+            elif excluded_non_finite_positions > 0 and universe_count == 0:
+                empty_reason = "insufficient_finite_data"
+                empty_message = (
+                    "Position amount/weight/change values were non-finite or missing; "
+                    "no trustworthy focus conclusion is available."
+                )
+            else:
+                empty_reason = "no_fresh_deterministic_signals"
+                empty_message = (
+                    "No fresh deterministic alert, event, or analysis-change evidence is available "
+                    "for each symbol's market-local today."
+                )
         return {
             "pack_version": TODAYS_FOCUS_PACK_VERSION,
             "generated_at": now.isoformat(),
@@ -354,12 +441,8 @@ class TodaysFocusService:
             "max_items": cap,
             "item_count": len(selected),
             "items": [item.to_dict() for item in selected],
-            "empty_reason": None if selected else (
-                "source_unavailable" if degraded_sources else "no_fresh_deterministic_signals"
-            ),
-            "empty_message": None if selected else (
-                "No fresh deterministic alert, event, or analysis-change evidence is available for today."
-            ),
+            "empty_reason": empty_reason,
+            "empty_message": empty_message,
             "sources_used": sorted(set(sources_used)),
             "degraded_sources": degraded_sources,
             "temporal_policy": temporal_policy.to_dict(),
@@ -368,6 +451,8 @@ class TodaysFocusService:
                 "hard_cap": MAX_UNIVERSE_SYMBOLS,
                 "truncated": universe_truncated,
                 "sources": sorted(set(universe_sources)),
+                "excluded_non_finite_positions": excluded_non_finite_positions,
+                "data_notes": data_notes[:MAX_DATA_NOTES],
             },
             "cost_contract": {
                 **source_calls,
@@ -441,7 +526,12 @@ class TodaysFocusService:
         truncated = len(ordered) > MAX_UNIVERSE_SYMBOLS
         return set(ordered[:MAX_UNIVERSE_SYMBOLS]), truncated
 
-    def _load_cached_positions(self, *, account_id: Optional[int]) -> tuple[List[Mapping[str, Any]], bool]:
+    def _load_cached_positions(
+        self,
+        *,
+        account_id: Optional[int],
+    ) -> tuple[List[Mapping[str, Any]], bool, int, List[str]]:
+        """Load the full cached-position set (no first-page truncation)."""
         repository = self._portfolio_repository
         if repository is None:
             try:
@@ -456,8 +546,9 @@ class TodaysFocusService:
                     error_code="todays_focus_portfolio_unavailable",
                     level=logging.WARNING,
                 )
-                return [], True
+                return [], True, 0, []
         try:
+            # Full-set contract: no page/offset truncation.
             rows = repository.list_cached_positions(account_id=account_id, cost_method="fifo")
         except Exception as exc:  # broad-exception: fallback_recorded - surface degraded source
             log_safe_exception(
@@ -467,8 +558,32 @@ class TodaysFocusService:
                 error_code="todays_focus_portfolio_read_failed",
                 level=logging.WARNING,
             )
-            return [], True
-        return [row for row in (rows or []) if isinstance(row, Mapping)], False
+            return [], True, 0, []
+
+        accepted: List[Mapping[str, Any]] = []
+        excluded = 0
+        for row in rows or []:
+            if not isinstance(row, Mapping):
+                excluded += 1
+                continue
+            if not _position_financials_are_finite(row):
+                excluded += 1
+                continue
+            accepted.append(row)
+
+        notes: List[str] = []
+        if excluded:
+            notes.append(
+                _bounded_text(
+                    (
+                        f"Excluded {excluded} cached position row(s) with non-finite "
+                        "amount, weight, or change values; zeros were not substituted."
+                    ),
+                    MAX_DATA_NOTE_LENGTH,
+                    fallback="excluded non-finite positions",
+                )
+            )
+        return accepted, False, excluded, notes
 
     def _collect_alert_evidence(
         self,
@@ -496,9 +611,10 @@ class TodaysFocusService:
             for alias in build_daily_code_candidates(code)
         })
         try:
+            # Full-coverage contract: never use list_triggers(page=1).
             rows = repository.list_recent_triggered_for_targets(
                 targets=target_aliases,
-                triggered_since=policy.window_start,
+                triggered_since=policy.earliest_window_start(),
                 per_target_limit=1,
             )
         except Exception as exc:  # broad-exception: fallback_recorded - surface degraded source
@@ -522,8 +638,10 @@ class TodaysFocusService:
                 or target not in universe
                 or observed_at is None
                 or trigger_id is None
-                or not _within_policy(observed_at, policy)
+                or not _within_policy(observed_at, policy, code=target)
             ):
+                continue
+            if not _alert_row_financials_are_finite(row):
                 continue
             rule_id = _positive_int(_row_value(row, "rule_id"))
             evidence: Dict[str, Any] = {
@@ -597,7 +715,7 @@ class TodaysFocusService:
             history_by_code = loader(
                 sorted(universe),
                 limit=2,
-                created_at_from=policy.window_end - timedelta(days=ANALYSIS_LOOKBACK_DAYS),
+                created_at_from=policy.earliest_window_start() - timedelta(days=ANALYSIS_LOOKBACK_DAYS),
             )
         except Exception as exc:  # broad-exception: fallback_recorded - one batch call, no retry
             log_safe_exception(
@@ -627,7 +745,7 @@ class TodaysFocusService:
                 latest_observed is None
                 or previous_observed is None
                 or record_id is None
-                or not _within_policy(latest_observed, policy)
+                or not _within_policy(latest_observed, policy, code=code)
                 or not _is_directional_flip(previous_action, latest_action)
             ):
                 continue
@@ -655,7 +773,7 @@ class TodaysFocusService:
         if not isinstance(item, FocusEvidence):
             return False
         observed_at = _aware_utc(item.evidence.get("observed_at"))
-        return observed_at is not None and _within_policy(observed_at, policy)
+        return observed_at is not None and _within_policy(observed_at, policy, code=item.code)
 
 
 def _normalize_max_items(max_items: int) -> int:
@@ -668,29 +786,85 @@ def _normalize_max_items(max_items: int) -> int:
     return min(value, MAX_FOCUS_ITEMS_HARD_CAP)
 
 
+def _resolve_focus_market(code: str) -> str:
+    """Map a symbol to a focus market key (cn/hk/us or unknown)."""
+    market = str(detect_market(code) or "").strip().lower()
+    if market in FOCUS_MARKETS:
+        return market
+    if market in MARKET_TIMEZONE:
+        return market
+    return "unknown"
+
+
+def _resolve_timezone_name(name: str, *, fallback: str = DEFAULT_TIMEZONE_NAME) -> tuple[str, ZoneInfo]:
+    cleaned = str(name or "").strip() or fallback
+    try:
+        return cleaned, ZoneInfo(cleaned)
+    except (ZoneInfoNotFoundError, ValueError):
+        return fallback, ZoneInfo(fallback)
+
+
+def _build_market_day_window(
+    *,
+    market: str,
+    timezone_name: str,
+    now_utc: datetime,
+) -> MarketDayWindow:
+    resolved_name, local_zone = _resolve_timezone_name(timezone_name)
+    local_now = now_utc.astimezone(local_zone)
+    local_date = local_now.date()
+    local_start = datetime.combine(local_date, time.min, tzinfo=local_zone)
+    is_trading_day: Optional[bool] = None
+    if market in FOCUS_MARKETS or market in MARKET_TIMEZONE:
+        session = classify_market_session(market, local_date)
+        if session == MarketSessionStatus.OPEN:
+            is_trading_day = True
+        elif session == MarketSessionStatus.CLOSED:
+            is_trading_day = False
+    return MarketDayWindow(
+        market=market,
+        timezone_name=resolved_name,
+        local_date=local_date,
+        window_start=local_start.astimezone(timezone.utc),
+        window_end=now_utc,
+        is_trading_day=is_trading_day,
+    )
+
+
 def _resolve_temporal_policy(now_utc: datetime, config: Any) -> FocusTemporalPolicy:
-    timezone_name = str(
+    fallback_name = str(
         getattr(config, "daily_brief_timezone", None)
         or getattr(config, "notification_timezone", None)
         or DEFAULT_TIMEZONE_NAME
     ).strip() or DEFAULT_TIMEZONE_NAME
-    try:
-        local_zone = ZoneInfo(timezone_name)
-    except (ZoneInfoNotFoundError, ValueError):
-        timezone_name = DEFAULT_TIMEZONE_NAME
-        local_zone = ZoneInfo(DEFAULT_TIMEZONE_NAME)
-    local_now = now_utc.astimezone(local_zone)
-    local_start = datetime.combine(local_now.date(), time.min, tzinfo=local_zone)
+    fallback_name, _ = _resolve_timezone_name(fallback_name)
+
+    markets: Dict[str, MarketDayWindow] = {}
+    for market in FOCUS_MARKETS:
+        markets[market] = _build_market_day_window(
+            market=market,
+            timezone_name=MARKET_TIMEZONE[market],
+            now_utc=now_utc,
+        )
+    markets["unknown"] = _build_market_day_window(
+        market="unknown",
+        timezone_name=fallback_name,
+        now_utc=now_utc,
+    )
     return FocusTemporalPolicy(
-        timezone_name=timezone_name,
-        local_date=local_now.date(),
-        window_start=local_start.astimezone(timezone.utc),
+        fallback_timezone_name=fallback_name,
         window_end=now_utc,
+        markets=markets,
     )
 
 
-def _within_policy(observed_at: datetime, policy: FocusTemporalPolicy) -> bool:
-    return policy.window_start <= observed_at <= policy.window_end
+def _within_policy(
+    observed_at: datetime,
+    policy: FocusTemporalPolicy,
+    *,
+    code: str,
+) -> bool:
+    return policy.window_for_code(code).contains(observed_at)
 
 
 def _aware_utc(value: Any) -> Optional[datetime]:
@@ -783,3 +957,89 @@ def _bounded_optional_text(value: Any, limit: int) -> Optional[str]:
         return None
     text_value = str(value).strip()
     return text_value[:limit] if text_value else None
+
+
+def _finite_optional_float(value: Any, *, field_name: str) -> Optional[float]:
+    """Parse optional financial numbers; reject non-finite values explicitly."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be finite")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{field_name} must be finite") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field_name} must be finite")
+    return number
+
+
+def _is_present_non_finite(value: Any) -> bool:
+    """True when a value is provided but cannot be treated as a finite number."""
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return True
+    if isinstance(value, (int, float)):
+        return not math.isfinite(float(value))
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return False
+        try:
+            return not math.isfinite(float(text))
+        except (TypeError, ValueError, OverflowError):
+            return True
+    try:
+        return not math.isfinite(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return True
+
+
+_POSITION_FINANCIAL_FIELDS = (
+    "quantity",
+    "market_value_base",
+    "market_value",
+    "last_price",
+    "weight_pct",
+    "weight",
+    "unrealized_pnl",
+    "unrealized_pnl_pct",
+    "change_pct",
+    "day_change_pct",
+    "pct_change",
+)
+
+_ALERT_FINANCIAL_FIELDS = (
+    "price",
+    "threshold",
+    "change_pct",
+    "day_change_pct",
+    "pct_change",
+    "value",
+    "market_value",
+    "weight_pct",
+)
+
+
+def _position_financials_are_finite(row: Mapping[str, Any]) -> bool:
+    for field_name in _POSITION_FINANCIAL_FIELDS:
+        if field_name in row and _is_present_non_finite(row.get(field_name)):
+            return False
+    quantity = row.get("quantity")
+    if quantity is not None:
+        try:
+            qty = float(quantity)
+        except (TypeError, ValueError, OverflowError):
+            return False
+        if not math.isfinite(qty) or qty <= 0:
+            return False
+    return True
+
+
+def _alert_row_financials_are_finite(row: Any) -> bool:
+    for field_name in _ALERT_FINANCIAL_FIELDS:
+        value = _row_value(row, field_name)
+        if value is not None and _is_present_non_finite(value):
+            return False
+    return True

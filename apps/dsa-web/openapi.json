@@ -28758,6 +28758,62 @@
         "title": "TodaysFocusItem",
         "type": "object"
       },
+      "TodaysFocusMarketDayWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "is_trading_day": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Trading Day"
+          },
+          "local_date": {
+            "format": "date",
+            "title": "Local Date",
+            "type": "string"
+          },
+          "market": {
+            "enum": [
+              "cn",
+              "hk",
+              "us",
+              "unknown"
+            ],
+            "title": "Market",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "window_end": {
+            "format": "date-time",
+            "title": "Window End",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "date-time",
+            "title": "Window Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market",
+          "timezone",
+          "local_date",
+          "window_start",
+          "window_end"
+        ],
+        "title": "TodaysFocusMarketDayWindow",
+        "type": "object"
+      },
       "TodaysFocusPresentationBoundary": {
         "additionalProperties": false,
         "properties": {
@@ -28822,7 +28878,8 @@
               {
                 "enum": [
                   "source_unavailable",
-                  "no_fresh_deterministic_signals"
+                  "no_fresh_deterministic_signals",
+                  "insufficient_finite_data"
                 ],
                 "type": "string"
               },
@@ -28858,7 +28915,7 @@
             "type": "integer"
           },
           "pack_version": {
-            "const": "todays_focus/2.0",
+            "const": "todays_focus/2.1",
             "title": "Pack Version",
             "type": "string"
           },
@@ -28917,10 +28974,25 @@
       "TodaysFocusTemporalPolicy": {
         "additionalProperties": false,
         "properties": {
-          "local_date": {
-            "format": "date",
-            "title": "Local Date",
+          "cross_market_rule": {
+            "const": "evidence_uses_target_symbol_market_timezone",
+            "title": "Cross Market Rule",
             "type": "string"
+          },
+          "fallback_timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Fallback Timezone",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "$ref": "#/components/schemas/TodaysFocusMarketDayWindow"
+            },
+            "maxItems": 8,
+            "minItems": 4,
+            "title": "Markets",
+            "type": "array"
           },
           "missing_timestamp_policy": {
             "const": "exclude",
@@ -28938,36 +29010,25 @@
             "type": "string"
           },
           "semantics": {
-            "const": "local_calendar_day",
+            "const": "per_market_local_calendar_day",
             "title": "Semantics",
-            "type": "string"
-          },
-          "timezone": {
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Timezone",
             "type": "string"
           },
           "window_end": {
             "format": "date-time",
             "title": "Window End",
             "type": "string"
-          },
-          "window_start": {
-            "format": "date-time",
-            "title": "Window Start",
-            "type": "string"
           }
         },
         "required": [
           "semantics",
-          "timezone",
-          "local_date",
-          "window_start",
+          "cross_market_rule",
+          "fallback_timezone",
           "window_end",
           "naive_timestamp_policy",
           "missing_timestamp_policy",
-          "non_trading_day_policy"
+          "non_trading_day_policy",
+          "markets"
         ],
         "title": "TodaysFocusTemporalPolicy",
         "type": "object"
@@ -28975,6 +29036,20 @@
       "TodaysFocusUniverseContract": {
         "additionalProperties": false,
         "properties": {
+          "data_notes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Data Notes",
+            "type": "array"
+          },
+          "excluded_non_finite_positions": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Excluded Non Finite Positions",
+            "type": "integer"
+          },
           "hard_cap": {
             "const": 1000,
             "title": "Hard Cap",
@@ -29009,7 +29084,8 @@
           "symbol_count",
           "hard_cap",
           "truncated",
-          "sources"
+          "sources",
+          "excluded_non_finite_positions"
         ],
         "title": "TodaysFocusUniverseContract",
         "type": "object"
@@ -36176,8 +36252,8 @@
     },
     "/api/v1/event-calendar": {
       "get": {
-        "description": "Upcoming corporate events scoped to configured watchlist symbols and portfolio holdings. Disabled by default (EVENT_CALENDAR_ENABLED=false) with zero provider fetch. Impact preview reuses event_alerts.build_impact_context.",
-        "operationId": "getEventCalendar",
+        "description": "Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.",
+        "operationId": "getTodaysFocus",
         "parameters": [
           {
             "description": "Range start (default: today)",
