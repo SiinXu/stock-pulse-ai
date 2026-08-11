@@ -9,7 +9,7 @@ import {
   type ReasoningTraceExportFormat,
 } from '../../api/reasoningTraceExport';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
+import { REASONING_TRACE_EXPORT_TEXT } from '../../locales/reasoningTraceExport';
 import { buildSettingsHref } from '../../routing/routes';
 import { Button } from '../common/Button';
 import { IconButton } from '../common/IconButton';
@@ -42,12 +42,12 @@ function isExportDisabledError(code: string | undefined): boolean {
  */
 export const ReasoningTraceExportControls: React.FC<ReasoningTraceExportControlsProps> = ({
   recordId,
-  variant = 'toolbar',
+  variant = 'section',
   className,
   disabled = false,
 }) => {
   const { language: uiLanguage } = useUiLanguage();
-  const text = REPORT_CHROME_TEXT[uiLanguage];
+  const text = REASONING_TRACE_EXPORT_TEXT[uiLanguage];
   const [exporting, setExporting] = useState<ReasoningTraceExportFormat | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -199,3 +199,5 @@ export const ReasoningTraceExportControls: React.FC<ReasoningTraceExportControls
     </div>
   );
 };
+
+export default ReasoningTraceExportControls;

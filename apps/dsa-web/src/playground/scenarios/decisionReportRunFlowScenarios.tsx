@@ -42,6 +42,7 @@ import {
 import { AnalysisContextSummary } from '../../components/report/AnalysisContextSummary';
 import { MarketReviewReportView } from '../../components/report/MarketReviewReportView';
 import { MarketStructureCard } from '../../components/report/MarketStructureCard';
+import { ReasoningTraceExportControls } from '../../components/report/ReasoningTraceExportControls';
 import { ReportDecisionCard } from '../../components/report/ReportDecisionCard';
 import { ReportDetails } from '../../components/report/ReportDetails';
 import { ReportDiagnostics } from '../../components/report/ReportDiagnostics';
@@ -667,6 +668,16 @@ const ReportDiagnosticsStory = () => {
   return <ReportDiagnostics recordId={fixtureReport.meta.id} summary={summary} language="en" onOpenRunFlow={() => undefined} />;
 };
 
+const ReasoningTraceExportControlsStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ReasoningTraceExportControls
+      recordId={FIXTURE_RECORD_ID}
+      disabled={scenario === 'states'}
+    />
+  );
+};
+
 const ReportMarkdownStory = () => (
   <ReportMarkdown
     recordId={FIXTURE_RECORD_ID}
@@ -866,6 +877,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
   'market-structure-card': MarketStructureCardStory,
+  'reasoning-trace-export-controls': ReasoningTraceExportControlsStory,
   'report-decision-card': ReportDecisionCardStory,
   'report-details': ReportDetailsStory,
   'report-diagnostics': ReportDiagnosticsStory,
