@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after code-splitting plus the decision-report and what-if stories, and locale chunks enlarged by the Notifications hub, screening-state, decision-replay, and what-if translations. Updated caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "measuredAt": "2026-08-11",
+  "baselineNote": "PR #1030 historical long-tail Settings inventory combined with the post-#1032 locale baseline. Affected chunks were remeasured locally with a production build and 200 B headroom, with no i18n baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,8 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206424,
-      "measuredGzipBytes": 187658
+      "maxGzipBytes": 230136,
+      "measuredGzipBytes": 229936,
+      "note": "Remeasured after historical long-tail Settings help inventory (PR #1030); measured 229936 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -25,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 133078,
-      "measuredGzipBytes": 132878,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 148843,
+      "measuredGzipBytes": 148643,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 148643 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 126973,
-      "measuredGzipBytes": 126773,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 142245,
+      "measuredGzipBytes": 142045,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 142045 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 126894,
-      "measuredGzipBytes": 126694,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 142481,
+      "measuredGzipBytes": 142281,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 142281 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 127197,
-      "measuredGzipBytes": 126997,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 142871,
+      "measuredGzipBytes": 142671,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 142671 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 123142,
-      "measuredGzipBytes": 122942,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 138572,
+      "measuredGzipBytes": 138372,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 138372 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 120605,
-      "measuredGzipBytes": 120405,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 135116,
+      "measuredGzipBytes": 134916,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 134916 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 113876,
-      "measuredGzipBytes": 113676,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 128742,
+      "measuredGzipBytes": 128542,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 128542 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 114028,
-      "measuredGzipBytes": 113828,
-      "note": "Tight rebaseline for Notifications hub, screening-state, decision-replay, and what-if translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 128780,
+      "measuredGzipBytes": 128580,
+      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 128580 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -124,15 +125,16 @@
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
-      "maxGzipBytes": 74967,
-      "measuredGzipBytes": 68151
+      "maxGzipBytes": 73318,
+      "measuredGzipBytes": 73118,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57296,
-      "measuredGzipBytes": 57096,
-      "note": "Measured after moving the zero-config first-run and Today's Focus stories into separate lazy chunks, then adding decision-report and what-if stories; retains 200 bytes of headroom."
+      "maxGzipBytes": 57281,
+      "measuredGzipBytes": 57081,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 57081 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",
@@ -147,10 +149,18 @@
       "measuredGzipBytes": 42365
     },
     {
+      "id": "PortfolioRiskMetricsPanel",
+      "match": "assets/PortfolioRiskMetricsPanel-*.js",
+      "maxGzipBytes": 10654,
+      "measuredGzipBytes": 9685,
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
+    },
+    {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 25543,
-      "measuredGzipBytes": 23220
+      "measuredGzipBytes": 24263,
+      "note": "PR #841 code-splits the risk panel; the route remains below the unchanged 25543 B cap."
     },
     {
       "id": "DecisionSignalsPage",

@@ -848,6 +848,46 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PLUGIN_DATA_PROVIDER_AUTO_BIND": {
+        "title": "Plugin Data Provider Auto-Bind",
+        "description": (
+            "Opt-in composition-root auto-bind of PluginManager to the process "
+            "DataFetcherManager.plugin_registry so registered data providers route without "
+            "extra glue. Default off preserves manual manager behavior. When enabled, "
+            "incompatible binding fails closed at startup instead of silently falling back. "
+            "Restart required."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 55,
+        "help_key": "settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND",
+        "examples": [
+            "PLUGIN_DATA_PROVIDER_AUTO_BIND=false",
+            "PLUGIN_DATA_PROVIDER_AUTO_BIND=true",
+        ],
+        "docs": [
+            {
+                "label": "Plugin extension contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/plugin-extension-contract.md",
+            },
+            {
+                "label": "Plugin development guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/plugin-development-guide.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
     "SIGNAL_SCORECARD_PUBLIC_ENABLED": {
         "title": "Public Signal Scorecard",
         "description": (
@@ -1255,36 +1295,6 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "Outbound HTTP security policy",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md",
-            },
-        ],
-        "warning_codes": ["restart_required"],
-    },
-    "PLUGIN_DATA_PROVIDER_AUTO_BIND": {
-        "title": "Plugin Data Provider Auto-Bind",
-        "description": (
-            "When true, ApplicationServices fail-closed binds one complete plugin data-provider "
-            "registry into the process data manager used by stock services and the primary "
-            "analysis pipeline. Default false."
-        ),
-        "category": "system",
-        "data_type": "boolean",
-        "ui_control": "switch",
-        "is_sensitive": False,
-        "is_required": False,
-        "is_editable": True,
-        "default_value": "false",
-        "options": [],
-        "validation": {},
-        "display_order": 68,
-        "help_key": "settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND",
-        "examples": [
-            "PLUGIN_DATA_PROVIDER_AUTO_BIND=false",
-            "PLUGIN_DATA_PROVIDER_AUTO_BIND=true",
-        ],
-        "docs": [
-            {
-                "label": "完整指南：其他配置",
-                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
         "warning_codes": ["restart_required"],
@@ -1796,7 +1806,11 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "https://newsnow.busiyi.world",
         "options": [],
-        "validation": {"max_length": 1024},
+        "validation": {
+            "item_type": "url",
+            "allowed_schemes": ["http", "https"],
+            "max_length": 1024,
+        },
         "display_order": 87,
         "help_key": "settings.system.news_intel",
         "examples": [
@@ -1807,64 +1821,6 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "Intelligence sources",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/intelligence-sources.md",
-            },
-        ],
-        "warning_codes": [],
-    },
-    "REASONING_TRACE_EXPORT_ENABLED": {
-        "title": "Reasoning Trace Export Enabled",
-        "description": (
-            "Opt-in export of reasoning-trace artifacts for diagnostics. Default false; "
-            "exports can be large and may contain analysis content."
-        ),
-        "category": "system",
-        "data_type": "boolean",
-        "ui_control": "switch",
-        "is_sensitive": False,
-        "is_required": False,
-        "is_editable": True,
-        "default_value": "false",
-        "options": [],
-        "validation": {},
-        "display_order": 88,
-        "help_key": "settings.system.reasoning_trace_export",
-        "examples": [
-            "REASONING_TRACE_EXPORT_ENABLED=false",
-            "REASONING_TRACE_EXPORT_ENABLED=true",
-        ],
-        "docs": [
-            {
-                "label": "完整指南：其他配置",
-                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
-            },
-        ],
-        "warning_codes": [],
-    },
-    "REASONING_TRACE_EXPORT_MAX_CHARS": {
-        "title": "Reasoning Trace Export Max Chars",
-        "description": (
-            "Maximum characters retained when reasoning-trace export is enabled. "
-            "Clamped to 10000–2000000; default 500000."
-        ),
-        "category": "system",
-        "data_type": "integer",
-        "ui_control": "number",
-        "is_sensitive": False,
-        "is_required": False,
-        "is_editable": True,
-        "default_value": "500000",
-        "options": [],
-        "validation": {"min": 10000, "max": 2000000},
-        "display_order": 89,
-        "help_key": "settings.system.reasoning_trace_export",
-        "examples": [
-            "REASONING_TRACE_EXPORT_MAX_CHARS=500000",
-            "REASONING_TRACE_EXPORT_MAX_CHARS=100000",
-        ],
-        "docs": [
-            {
-                "label": "完整指南：其他配置",
-                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
         "warning_codes": [],
