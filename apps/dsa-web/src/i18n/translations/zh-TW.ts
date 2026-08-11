@@ -5233,6 +5233,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.organizing": "正在整理 {candidate_count} 條候選",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "正在執行選股任務",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "選股任務已加入佇列",
+  "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.8.label": "企業事件",
+  "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.15.label": "企業事件",
+  "locales.alerts.ALERT_TYPE_LABELS.corporate_event": "企業事件",
+
   "utils.taskMessage.TASK_STATUS_UPDATED": "任務狀態已更新",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "結論僅為協同推演預覽，不改變系統最終建議；不會寫入分析歷史、DecisionSignal 或 Agent 記憶。",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "假設推演（額外一輪）",

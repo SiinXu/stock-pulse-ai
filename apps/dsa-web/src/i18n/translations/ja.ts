@@ -5233,6 +5233,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.organizing": "{candidate_count} 件の候補銘柄を準備中",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "スクリーニング中",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "スクリーニングタスクはキューで待機中",
+  "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.8.label": "企業イベント",
+  "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.15.label": "企業イベント",
+  "locales.alerts.ALERT_TYPE_LABELS.corporate_event": "企業イベント",
+
   "utils.taskMessage.TASK_STATUS_UPDATED": "タスクステータス更新",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "結論は協調推演プレビューのみで、システムの最終推奨を変更しません。分析履歴・DecisionSignal・Agent メモリには書き込まれません。",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "仮定推演（追加ターン）",

@@ -5233,6 +5233,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.organizing": "후보 종목 {candidate_count}개 준비 중",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "종목 선별 중",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "스크리닝 작업이 대기열에 있음",
+  "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.8.label": "기업 이벤트",
+  "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.15.label": "기업 이벤트",
+  "locales.alerts.ALERT_TYPE_LABELS.corporate_event": "기업 이벤트",
+
   "utils.taskMessage.TASK_STATUS_UPDATED": "작업 상태 업데이트",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "결론은 협업 시나리오 미리보기일 뿐이며 시스템의 최종 권고를 바꾸지 않습니다. 분석 이력·DecisionSignal·Agent 메모리에 기록되지 않습니다.",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "가정 추론(추가 턴)",

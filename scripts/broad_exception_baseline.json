@@ -12,7 +12,6 @@
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.get_rule","caught":["Exception"],"digest":"4f4449ff91cea64929674184b3f4dcfd3008d75c7b64deeb9cf7058c4e28ed3d"},
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.list_notifications","caught":["Exception"],"digest":"f78ef901be7efb1b5f67bb39b306bb254a57bf5bff36ad42fb52f24b64a9f743"},
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.list_rules","caught":["Exception"],"digest":"43a20dc82b10647cd16f2e771df9d487624b8b440bbe6ad47de18e9d3bd3294c"},
-    {"path":"api/v1/endpoints/alerts.py","scope":"<module>.list_triggers","caught":["Exception"],"digest":"cf07ae697fccf3d6bb89fe0f736bf3935488572e87b7cf803d3426266ba71cbe"},
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.test_rule","caught":["Exception"],"digest":"fd2abfd3b21f6b13f18dc1e6be5ddf10b60c1371266b2725cf5bae76408913a2"},
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.update_rule","caught":["Exception"],"digest":"acaed1763692ff05d98def47f63e9ac03f6cae311501c09e1cbbb57956b4313f"},
     {"path":"api/v1/endpoints/auth.py","scope":"<module>._apply_auth_enabled","caught":["Exception"],"digest":"5a9c603247ec1f1e14a59ea5162fd90366b3a3b734686510cce1c5506045f135"},
