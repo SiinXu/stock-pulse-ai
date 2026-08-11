@@ -899,6 +899,32 @@ class _ConfigLoadingMethods:
                 minimum=30,
             ),
             agent_memory_enabled=os.getenv('AGENT_MEMORY_ENABLED', 'false').lower() == 'true',
+            layered_memory_collection_enabled=parse_env_bool(
+                os.getenv('LAYERED_MEMORY_COLLECTION_ENABLED'),
+                default=False,
+            ),
+            layered_memory_retention_days=parse_env_int(
+                os.getenv('LAYERED_MEMORY_RETENTION_DAYS'),
+                90,
+                field_name='LAYERED_MEMORY_RETENTION_DAYS',
+                minimum=1,
+                maximum=3650,
+            ),
+            layered_memory_vector_enabled=parse_env_bool(
+                os.getenv('LAYERED_MEMORY_VECTOR_ENABLED'),
+                default=False,
+            ),
+            layered_memory_max_records_per_principal=parse_env_int(
+                os.getenv('LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL'),
+                200,
+                field_name='LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL',
+                minimum=1,
+                maximum=200,
+            ),
+            layered_memory_audit_enabled=parse_env_bool(
+                os.getenv('LAYERED_MEMORY_AUDIT_ENABLED'),
+                default=True,
+            ),
             agent_skill_autoweight=(
                 os.getenv('AGENT_SKILL_AUTOWEIGHT')
                 or os.getenv('AGENT_STRATEGY_AUTOWEIGHT', 'true')
