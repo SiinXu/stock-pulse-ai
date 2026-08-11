@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+
 - [Fixed] Route the Home Today's Focus request through the versioned API so the panel loads without a persistent request-failure toast.
 - [Chore] Run path-selective backend tests on pull requests and duration-balanced full-suite shards with combined coverage on pushes to main.
 - [Tests] Keep native tool-trace redaction coverage aligned with the shared Agent session deadline contract.
