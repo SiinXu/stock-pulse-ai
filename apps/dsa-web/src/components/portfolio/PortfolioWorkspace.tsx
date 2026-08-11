@@ -18,11 +18,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_TEXT } from '../../locales/portfolio';
-import {
-  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
-  buildAnalysisWorkbenchHref,
-} from '../../routing/routes';
-import { usePortfolioAnalysisTasks } from './usePortfolioAnalysisTasks';
+import type { PortfolioAnalysisTaskPanelController } from './PortfolioAnalysisTaskPanel';
 import {
   formatBrokerLabel,
   formatCashDirectionLabel,
@@ -83,10 +79,7 @@ import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells
 const PortfolioRiskMetricsPanel = lazy(
   () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
 );
-const TaskPanel = lazy(() => import('../tasks/TaskPanel'));
-const RunFlowPanel = lazy(
-  () => import('../run-flow/RunFlowPanel').then((module) => ({ default: module.RunFlowPanel })),
-);
+const PortfolioAnalysisTaskPanel = lazy(() => import('./PortfolioAnalysisTaskPanel'));
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -134,18 +127,25 @@ const PortfolioWorkspace: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
   const [positionAnalysisLoadingKey, setPositionAnalysisLoadingKey] = useState<string | null>(null);
-  const {
-    tasks: portfolioAnalysisTasks,
-    acceptTask: acceptPortfolioAnalysisTask,
-    attachExistingTask: attachPortfolioAnalysisTask,
-    dismissTask: dismissPortfolioAnalysisTask,
-    openRunFlow: openPortfolioRunFlow,
-    closeRunFlow: closePortfolioRunFlow,
-    runFlowDialog: portfolioRunFlowDialog,
-  } = usePortfolioAnalysisTasks({
-    searchParams,
-    setSearchParams,
-  });
+  const portfolioAnalysisTaskControllerRef = useRef<PortfolioAnalysisTaskPanelController | null>(null);
+  const queuedPortfolioAnalysisTaskActionsRef = useRef<Array<(
+    controller: PortfolioAnalysisTaskPanelController,
+  ) => void>>([]);
+  const handlePortfolioAnalysisTaskControllerReady = useCallback((
+    controller: PortfolioAnalysisTaskPanelController | null,
+  ) => {
+    portfolioAnalysisTaskControllerRef.current = controller;
+    if (!controller) return;
+    const queued = queuedPortfolioAnalysisTaskActionsRef.current.splice(0);
+    queued.forEach((action) => action(controller));
+  }, []);
+  const dispatchPortfolioAnalysisTaskAction = useCallback((
+    action: (controller: PortfolioAnalysisTaskPanelController) => void,
+  ) => {
+    const controller = portfolioAnalysisTaskControllerRef.current;
+    if (controller) action(controller);
+    else queuedPortfolioAnalysisTaskActionsRef.current.push(action);
+  }, []);
 
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -403,7 +403,9 @@ const PortfolioWorkspace: React.FC = () => {
         analysisPhase: positionAnalysisPhase,
         force: false,
       });
-      acceptPortfolioAnalysisTask(task, row.symbol, positionAnalysisPhase);
+      dispatchPortfolioAnalysisTaskAction((controller) => {
+        controller.acceptTask(task, row.symbol, positionAnalysisPhase);
+      });
     } catch (err) {
       const parsed = getParsedApiError(err);
       const existingTaskId = String(
@@ -413,7 +415,9 @@ const PortfolioWorkspace: React.FC = () => {
       ).trim();
       // Reattach an in-flight duplicate instead of leaving the user with only an error toast.
       if (parsed.code === 'duplicate_task' && existingTaskId) {
-        await attachPortfolioAnalysisTask(existingTaskId, row.symbol, positionAnalysisPhase);
+        dispatchPortfolioAnalysisTaskAction((controller) => {
+          void controller.attachExistingTask(existingTaskId, row.symbol, positionAnalysisPhase);
+        });
       } else {
         setError(parsed);
       }
@@ -850,60 +854,14 @@ const PortfolioWorkspace: React.FC = () => {
           message={writeWarning}
         />
       ) : null}
-      {hasAccounts && portfolioAnalysisTasks.length > 0 ? (
-        <div className="space-y-2" data-testid="portfolio-analysis-task-panel">
-          <Suspense fallback={<Loading />}>
-            <TaskPanel
-              tasks={portfolioAnalysisTasks}
-              title={text.analysisTask}
-              onOpenRunFlow={openPortfolioRunFlow}
-              onDismiss={dismissPortfolioAnalysisTask}
-            />
-          </Suspense>
-          {portfolioAnalysisTasks.some((task) => task.status === 'completed') ? (
-            <div className="flex flex-wrap gap-2">
-              {portfolioAnalysisTasks
-                .filter((task) => task.status === 'completed')
-                .map((task) => (
-                  <Link
-                    key={`result-${task.taskId}`}
-                    to={buildAnalysisWorkbenchHref({
-                      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
-                      recordId: task.resultRecordId,
-                      stock: task.stockCode,
-                    })}
-                    data-control="navigation-link"
-                    className="control-hit-target inline-flex min-h-9 items-center rounded-md border border-subtle bg-elevated px-3 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                  >
-                    {t('analysisWorkbench.viewReport')}: {task.stockName || task.stockCode}
-                  </Link>
-                ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      <Modal
-        isOpen={portfolioRunFlowDialog.open}
-        onClose={closePortfolioRunFlow}
-        title={portfolioRunFlowDialog.open
-          ? t('runFlow.taskDrawerTitle', { stock: portfolioRunFlowDialog.title })
-          : t('taskPanel.title')}
-        size="fullscreen"
-      >
-        {portfolioRunFlowDialog.open ? (
-          <Suspense fallback={<Loading />}>
-            <RunFlowPanel
-              key={`portfolio-run-flow-${portfolioRunFlowDialog.source.type === 'task' ? portfolioRunFlowDialog.source.taskId : 'none'}`}
-              source={portfolioRunFlowDialog.source}
-              title={t('runFlow.taskDrawerTitle', { stock: portfolioRunFlowDialog.title })}
-              onUnavailable={() => {
-                closePortfolioRunFlow();
-              }}
-            />
-          </Suspense>
-        ) : null}
-      </Modal>
+      <Suspense fallback={null}>
+        <PortfolioAnalysisTaskPanel
+          searchParams={searchParams}
+          setSearchParams={setSearchParams}
+          visible={hasAccounts}
+          onControllerReady={handlePortfolioAnalysisTaskControllerReady}
+        />
+      </Suspense>
 
       <Modal
         isOpen={showCreateAccount}

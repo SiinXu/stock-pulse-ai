@@ -10,6 +10,7 @@ import type { DecisionSignalItem } from '../../types/decisionSignals';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
@@ -1348,7 +1349,7 @@ describe('PortfolioPage FX refresh', () => {
       { symbol: 'HK00700', market: 'hk', currency: 'HKD', quantity: 10, avgCost: 400, totalCost: 4000, lastPrice: 420, marketValueBase: 4200, unrealizedPnlBase: 200, unrealizedPnlPct: 5, valuationCurrency: 'HKD', priceSource: 'history_close', priceDate: '2026-03-18', priceStale: true, priceAvailable: true },
     ] }));
 
-    renderPortfolioPage();
+    const router = renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1371,6 +1372,18 @@ describe('PortfolioPage FX refresh', () => {
     expect(taskItem).toBeInTheDocument();
     expect(within(taskItem).getAllByText('HK00700').length).toBeGreaterThan(0);
     expect(screen.queryByText('已提交 HK00700 分析任务：task-portfolio-1')).not.toBeInTheDocument();
+
+    fireEvent.click(within(taskItem).getByRole('button', { name: /HK00700/ }));
+    await waitFor(() => {
+      expect(`${router.state.location.pathname}${router.state.location.search}`).toBe(
+        buildAnalysisWorkbenchHref({
+          segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+          runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
+          runFlowTaskId: 'task-portfolio-1',
+          stock: 'HK00700',
+        }),
+      );
+    });
   });
 
   it('restores a completed task result link with record and stock identity', async () => {

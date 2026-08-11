@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Portfolio-owned analysis task panel state: accept, poll/SSE, session+URL restore.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SetURLSearchParams } from 'react-router-dom';
 import { analysisApi } from '../../api/analysis';
 import {
@@ -17,7 +17,6 @@ import type {
   TaskLifecycleStatus,
   TaskStatus,
 } from '../../types/analysis';
-import type { RunFlowSnapshotSource } from '../../types/runFlow';
 import {
   applyPortfolioAnalysisTaskToSearch,
   PORTFOLIO_ANALYSIS_TASK_QUERY_KEY,
@@ -154,10 +153,6 @@ function toPersisted(task: PortfolioAnalysisTaskInfo): PersistedPortfolioAnalysi
   };
 }
 
-export type PortfolioRunFlowDialogState =
-  | { open: false }
-  | { open: true; source: RunFlowSnapshotSource; title: string; stockCode: string };
-
 type UsePortfolioAnalysisTasksOptions = {
   searchParams: URLSearchParams;
   setSearchParams: SetURLSearchParams;
@@ -170,7 +165,6 @@ export function usePortfolioAnalysisTasks({
   enabled = true,
 }: UsePortfolioAnalysisTasksOptions) {
   const [tasks, setTasks] = useState<PortfolioAnalysisTaskInfo[]>([]);
-  const [runFlowTaskId, setRunFlowTaskId] = useState<string | null>(null);
   const [hasHydrated, setHasHydrated] = useState(!enabled);
   const trackedIdsRef = useRef<Set<string>>(new Set());
   const tasksRef = useRef<PortfolioAnalysisTaskInfo[]>([]);
@@ -232,7 +226,6 @@ export function usePortfolioAnalysisTasks({
   const dropUnrecoverableTask = useCallback((taskId: string) => {
     trackedIdsRef.current.delete(taskId);
     setTasks((prev) => prev.filter((task) => task.taskId !== taskId));
-    setRunFlowTaskId((current) => (current === taskId ? null : current));
   }, []);
 
   const dismissTask = useCallback((taskId: string) => {
@@ -446,33 +439,11 @@ export function usePortfolioAnalysisTasks({
     };
   }, [dropUnrecoverableTask, enabled, upsertLocalTask]);
 
-  const openRunFlow = useCallback((task: TaskInfo) => {
-    setRunFlowTaskId(task.taskId);
-  }, []);
-
-  const closeRunFlow = useCallback(() => {
-    setRunFlowTaskId(null);
-  }, []);
-
-  const runFlowDialog = useMemo<PortfolioRunFlowDialogState>(() => {
-    if (!runFlowTaskId) return { open: false };
-    const task = tasks.find((candidate) => candidate.taskId === runFlowTaskId);
-    return {
-      open: true,
-      source: { type: 'task', taskId: runFlowTaskId },
-      title: task?.stockName || task?.stockCode || runFlowTaskId,
-      stockCode: task?.stockCode || '',
-    };
-  }, [runFlowTaskId, tasks]);
-
   return {
     tasks,
     acceptTask,
     attachExistingTask,
     dismissTask,
-    openRunFlow,
-    closeRunFlow,
-    runFlowDialog,
   };
 }
 
