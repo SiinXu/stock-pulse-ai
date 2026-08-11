@@ -104,12 +104,15 @@ describe('Pagination', () => {
     expect(screen.getByRole('button', { name: '下一页' })).toHaveAttribute('aria-label', '下一页');
   });
 
-  it('allows horizontal overflow instead of clipping controls', () => {
+  // Class-level contract only: jsdom has no layout/scroll engine. Browser-level
+  // leading-control reachability is covered by e2e/pagination-reachability.spec.ts.
+  it('uses max-w-full, overflow-x-auto, and safe centering for overflow reachability', () => {
     render(<Pagination currentPage={10} totalPages={20} onPageChange={vi.fn()} density="full" />);
 
     const nav = screen.getByRole('navigation', { name: '分页导航' });
     expect(nav).toHaveClass('max-w-full');
     expect(nav).toHaveClass('overflow-x-auto');
     expect(nav).not.toHaveClass('overflow-hidden');
+    expect(nav).toHaveClass('justify-center-safe');
   });
 });
