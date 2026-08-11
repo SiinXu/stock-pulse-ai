@@ -14,6 +14,7 @@ from src.schemas.run_flow import RunFlowSnapshot
 from src.services.run_diagnostics import (
     safe_diagnostic_key,
     sanitize_diagnostic_metadata,
+    sanitize_finite_diagnostic_metadata,
     sanitize_diagnostic_text,
 )
 from src.utils.data_processing import normalize_model_used, parse_json_field
@@ -320,6 +321,7 @@ def build_history_run_flow_snapshot(
         events,
         _as_list(diagnostics.get("agent_events")),
         anchor_node_id=last_analysis_node,
+        capture=_as_mapping(diagnostics.get("agent_events_capture")),
     )
     if agent_anchor:
         last_analysis_node = agent_anchor
@@ -636,6 +638,7 @@ def _append_agent_events(
     agent_events: List[Any],
     *,
     anchor_node_id: str,
+    capture: Optional[Mapping[str, Any]] = None,
 ) -> Optional[str]:
     """Project persisted agent observability events into the run-flow graph."""
     if not agent_events:
@@ -646,6 +649,10 @@ def _append_agent_events(
     tool_sequence: List[Dict[str, Any]] = []
     phase_node_id = "agent_phase"
     has_phase_node = False
+
+    safe_capture, capture_finite = sanitize_finite_diagnostic_metadata(capture or {})
+    if not isinstance(safe_capture, Mapping):
+        safe_capture = {}
 
     for raw_event in agent_events:
         event = _as_mapping(raw_event)
@@ -660,6 +667,17 @@ def _append_agent_events(
         duration_ms = _safe_int(event.get("duration_ms"))
         timestamp = _datetime_to_iso(event.get("timestamp"))
         step = _safe_int(event.get("step"))
+        sequence = _safe_int(event.get("sequence"))
+        schema_version = _safe_int(event.get("schema_version"))
+        raw_attrs = event.get("attrs") if isinstance(event.get("attrs"), Mapping) else {}
+        raw_payload = event.get("payload") if isinstance(event.get("payload"), Mapping) else {}
+        safe_attrs, attrs_finite = sanitize_finite_diagnostic_metadata(raw_attrs)
+        safe_payload, payload_finite = sanitize_finite_diagnostic_metadata(raw_payload)
+        detail_integrity = _safe_text(event.get("detail_integrity"), max_length=40)
+        if not attrs_finite or not payload_finite or not capture_finite:
+            detail_integrity = "invalid_non_finite"
+        elif not detail_integrity:
+            detail_integrity = "valid"
         is_start = type_key.endswith("_start")
 
         if type_key in {"agent_tool_start", "agent_tool_end"}:
@@ -777,6 +795,8 @@ def _append_agent_events(
             title=title,
             message=message,
             metadata={
+                "schema_version": schema_version,
+                "sequence": sequence,
                 "event_type": event_type,
                 "span_id": event.get("span_id"),
                 "parent_span_id": event.get("parent_span_id"),
@@ -786,6 +806,10 @@ def _append_agent_events(
                 "status": status_raw,
                 "tool": name if type_key.startswith("agent_tool") else None,
                 "model": name if type_key.startswith("agent_model") else None,
+                "attrs": safe_attrs if raw_attrs else None,
+                "payload": safe_payload if raw_payload else None,
+                "detail_integrity": detail_integrity,
+                "capture": safe_capture or None,
             },
         )
         previous_node_id = node_id
@@ -1640,7 +1664,7 @@ def _safe_int(value: Any) -> Optional[int]:
         return None
     try:
         parsed = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return parsed if parsed >= 0 else None
 

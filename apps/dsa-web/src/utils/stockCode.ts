@@ -8,6 +8,7 @@
  *   SZ000001    → 000001     000001.SZ   → 000001
  *   BJ920748    → 920748     920748.BJ   → 920748
  *   HK00700     → HK00700    00700       → HK00700
+ *   0001        → HK00001    0941        → HK00941
  *   00700.HK    → HK00700
  *   hk1810      → HK01810    1810.HK     → HK01810
  *   7203.T      → 7203.T     005930.KS   → 005930.KS
@@ -25,9 +26,11 @@ export function normalizeStockCode(stockCode: string): string {
     }
   }
 
-  // Pure 5-digit codes are HK stocks by validateStockCode() contract.
-  if (/^\d{5}$/.test(upper)) {
-    return `HK${upper}`;
+  // Pure 4-5 digit codes are HK stocks by validateStockCode() contract.
+  // A-share codes are 6 digits; JP/KR/TW bare bases require an explicit
+  // Yahoo suffix (mirrors data_provider.symbol_normalization).
+  if (/^\d{4,5}$/.test(upper)) {
+    return `HK${upper.padStart(5, '0')}`;
   }
 
   // Strip SH/SZ prefix (e.g. SH600519 → 600519)

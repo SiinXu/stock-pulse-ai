@@ -104,6 +104,9 @@ export const PLAYGROUND_TEXT = createUiLanguageRecord('locales.playground.PLAYGR
       loadingDescription: '正在读取隔离的示例数据。',
       appPageLabel: '应用页面',
       pageHeaderLabel: '页面标题',
+      openAgentOnboarding: '打开 Agent 引导',
+      openFirstRunWizard: '打开首次运行向导',
+      openAgentOnboardingWizard: '打开 Agent 引导向导',
     },
   },
   en: {
@@ -209,6 +212,9 @@ export const PLAYGROUND_TEXT = createUiLanguageRecord('locales.playground.PLAYGR
       loadingDescription: 'Loading isolated fixture data.',
       appPageLabel: 'AppPage',
       pageHeaderLabel: 'PageHeader',
+      openAgentOnboarding: 'Open agent onboarding',
+      openFirstRunWizard: 'Open first-run wizard',
+      openAgentOnboardingWizard: 'Open agent onboarding wizard',
     },
   },
 } as const);

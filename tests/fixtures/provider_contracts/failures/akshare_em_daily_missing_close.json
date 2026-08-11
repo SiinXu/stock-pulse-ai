@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "provider": "akshare",
+    "api": "stock_zh_a_hist",
+    "failure_mode": "missing_field",
+    "recorded_note": "Eastmoney daily row with 收盘 (close) omitted. Offline sample 2026-08-08 derived from akshare_em_daily.json.",
+    "source_shape": "tests/fixtures/provider_contracts/akshare_em_daily.json"
+  },
+  "columns": [
+    "日期",
+    "开盘",
+    "最高",
+    "最低",
+    "成交量",
+    "成交额",
+    "振幅",
+    "涨跌幅",
+    "涨跌额",
+    "换手率"
+  ],
+  "rows": [
+    [
+      "2026-05-06",
+      1680.0,
+      1702.0,
+      1675.0,
+      2456789,
+      4156789012.5,
+      1.61,
+      0.92,
+      15.5,
+      0.19
+    ]
+  ]
+}

@@ -598,6 +598,33 @@ class _SystemConfigLLMValidationMethods:
         """Validate dependencies across multiple keys."""
         issues: List[Dict[str, Any]] = []
 
+        indicator_keys = {
+            "INDICATOR_MA_PERIODS",
+            "INDICATOR_MACD_FAST",
+            "INDICATOR_MACD_SLOW",
+            "INDICATOR_MACD_SIGNAL",
+            "INDICATOR_RSI_PERIODS",
+        }
+        if updated_keys & indicator_keys:
+            from src.utils.indicator_periods import (
+                IndicatorPeriodValidationError,
+                validate_indicator_env_map,
+            )
+
+            try:
+                validate_indicator_env_map(effective_map)
+            except IndicatorPeriodValidationError as exc:
+                issues.append(
+                    {
+                        "key": exc.field_name,
+                        "code": "invalid_indicator_periods",
+                        "message": exc.detail,
+                        "severity": "error",
+                        "expected": "valid indicator periods with MACD fast < slow",
+                        "actual": effective_map.get(exc.field_name, ""),
+                    }
+                )
+
         token_value = (effective_map.get("TELEGRAM_BOT_TOKEN") or "").strip()
         chat_id_value = (effective_map.get("TELEGRAM_CHAT_ID") or "").strip()
         if token_value and not chat_id_value and (

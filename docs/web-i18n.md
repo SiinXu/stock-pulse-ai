@@ -30,13 +30,15 @@ locales/reportContent.ts
 
 设置字段标题按配置字段 key 使用 `utils.systemConfigI18n.fieldTitleMaps` 中的独立稳定资源；不能把可能被多个字段共享的 `helpKey` 标题当作字段身份。英文界面继续显示后端实时 Schema 标题，其余已知语言必须命中字段标题目录。新增或删除 `src/core/config_registry.py` 字段时，需同步该目录及全部语言资源；后端契约测试会校验字段注册表与前端标题目录完全一致。只有后端动态返回且目录未知的字段才允许显示 Schema 原文。
 
-每个领域字典必须以 `Record<UiLanguage, ...>` 或等价的类型约束保证语言结构一致。新增语言时，先扩展语言 catalog，再为每个领域补齐同一组稳定 key；不得在 JSX 中批量新增 `language === 'en' ? ... : ...`。`value`、`filename`、`id`、`key`、`href`、`url`、`route`、`path` 字段属于契约值并保持原样，股票代码和模型路由也不得作为普通文案翻译；只翻译用户可见 label。
+每个领域字典必须以 `Record<UiLanguage, ...>` 或等价的类型约束保证语言结构一致。新增语言时，先扩展语言 catalog，再为每个领域补齐同一组稳定 key；不得在 JSX 中批量新增 `language === 'en' ? ... : ...`。`value`、`filename`、`id`、`key`、`href`、`url`、`route`、`path` 字段属于契约值并保持原样，股票代码和模型路由也不得作为普通文案翻译；只翻译用户可见 label。 此外，仅限 `locales.settingsHelp.SETTINGS_HELP_MAPS` 的 `examples` 数组是可复制的配置字面量（`KEY=value`、URL、端口、枚举码等），在进入数组递归前即退出翻译 inventory；中英文 `examples` 必须结构一致且逐字节相同。其它注册表里的同名属性不自动按此规则处理。
 
 插值统一使用命名参数，例如 `{count}`、`{name}`。中英文的参数集合必须完全一致。动态服务端值只能在明确允许原文显示的字段中回退。
 
 ## 错误与格式化
 
 面向 Web 的后端错误使用统一 envelope：`error` 是稳定业务码，`params` 是本地化插值参数，`message`、`details` 和可选 `trace_id` 只提供诊断信息。过渡期内响应还会输出 deprecated、read-only 的 `detail`，它始终是 `details` 的同值别名而不是第二份来源；字段只能在未来 major 或 versioned API 中移除。新客户端优先读取 `details`，旧客户端继续读取 `detail`，5xx 的两个字段都不会承载原始异常。前端按 UI language 将 `error + params` 映射为主错误；未知 code 显示通用本地化错误，legacy 裸字符串通过兼容适配器保留到 Details，不能直接成为主提示。
+
+分析提交、股票代码校验和导入/图片上传的常见 400 校验失败使用专用稳定码（例如 `missing_stock_params`、`invalid_stock_or_name`、`analysis_batch_limit_exceeded`、`invalid_stock_code`、`missing_upload_file`、`unsupported_content_type` 和 `file_too_large`）。这些码及其 `params` 是 Web 本地化合同；中文 `message` 继续作为诊断与旧客户端回退，不应被新界面当作主文案。
 
 Agent 会话历史遵循同一契约。失败记录由历史 API 返回安全的兼容 `content`，并通过 `error + params` 标识可本地化的失败；普通消息不携带这两个字段。Web 必须在渲染时按当前 UI language 解析错误，且消息显示、单条复制和会话导出必须复用同一份解析结果，确保切换语言后已加载的历史立即更新。服务端会将历史 `[分析失败]...` 记录适配为稳定错误码；新失败不得把 Provider 原始错误写入历史或返回给客户端。
 
