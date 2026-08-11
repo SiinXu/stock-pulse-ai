@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Fixed] Capability inventory tool/skill/pipeline probes observe installed owners only, advance skill generation by identity, and stop over-claiming healthy from registration (Refs #221).
+- [Fixed] Capability inventory tool/skill/pipeline probes observe installed owners only, advance skill generation for every record-visible declarative field, and stop over-claiming healthy from registration (Refs #221).
 
 - [Fixed] Route the Home Today's Focus request through the versioned API so the panel loads without a persistent request-failure toast.
 - [Chore] Run path-selective backend tests on pull requests and duration-balanced full-suite shards with combined coverage on pushes to main.
