@@ -496,6 +496,27 @@ describe('PortfolioPage FX refresh', () => {
     );
   }
 
+
+  async function openPortfolioRiskTab() {
+    const riskTab = await screen.findByRole('tab', { name: /^(风险|Risk)$/ });
+    fireEvent.click(riskTab);
+    expect(await screen.findByTestId('portfolio-tab-risk')).toBeInTheDocument();
+  }
+
+  async function openCsvImportWizardAndReachConfirm(file: File) {
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    expect(await screen.findByTestId('portfolio-import-wizard')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.getByLabelText('选择 CSV')).toHaveAttribute('data-control', 'file-input');
+    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveAttribute('data-control', 'button');
+    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    await screen.findByText('CSV 解析结果');
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.getByRole('button', { name: '提交导入' })).toBeInTheDocument();
+  }
+
   it('uses the shared page shell and keeps the overview separate from positions', async () => {
     renderPortfolioPage();
     await waitForInitialLoad();
@@ -567,6 +588,85 @@ describe('PortfolioPage FX refresh', () => {
       costMethod: 'fifo',
       includeRealtime: false,
     }));
+  });
+
+
+  it('restores workspace tab and selected position from the URL', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({
+      accountId: 1,
+      positions: [makePosition({ symbol: 'AAPL', market: 'us' })],
+    }));
+    const router = renderPortfolioPage('/portfolio?account=1&tab=risk&selected=1-AAPL-us');
+    await waitForInitialLoad();
+    expect(router.state.location.search).toContain('tab=risk');
+    expect(router.state.location.search).toContain('selected=1-AAPL-us');
+    expect(screen.getByTestId('portfolio-tab-risk')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('tab', { name: '持仓明细' }));
+    await waitFor(() => expect(router.state.location.search).not.toContain('tab=risk'));
+  });
+
+  it('clears account-scoped selection and ledger page when the account changes', async () => {
+    getAccounts.mockResolvedValueOnce(makeAccounts([
+      { id: 1, name: 'Main' },
+      { id: 2, name: 'Growth' },
+    ]));
+    getSnapshot.mockImplementation(async ({ accountId }: { accountId?: number } = {}) => makeSnapshot({
+      accountId,
+      accountCount: accountId ? 1 : 2,
+      positions: [makePosition({ symbol: accountId === 2 ? 'MSFT' : 'AAPL', market: 'us' })],
+    }));
+    listTrades.mockImplementation(async ({ accountId, page }: { accountId?: number; page: number }) => ({
+      items: [],
+      total: 60,
+      page,
+      pageSize: 20,
+      accountId,
+    }));
+    const router = renderPortfolioPage(
+      '/portfolio?account=1&tab=ledger&selected=1-AAPL-us&page=2&keep=yes',
+    );
+
+    await waitFor(() => expect(listTrades).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: 1,
+      page: 2,
+    })));
+    chooseOption(screen.getAllByRole('combobox')[0], '2');
+
+    await waitFor(() => expect(router.state.location.search).toBe(
+      '?account=2&tab=ledger&keep=yes',
+    ));
+    await waitFor(() => expect(listTrades).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: 2,
+      page: 1,
+    })));
+  });
+
+  it('resets the ledger page URL when filters reset the event query', async () => {
+    listTrades.mockImplementation(async ({ page }: { page: number }) => ({
+      items: [],
+      total: 60,
+      page,
+      pageSize: 20,
+    }));
+    const router = renderPortfolioPage('/portfolio?tab=ledger&page=2');
+
+    await waitFor(() => expect(listTrades).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })));
+    const ledger = await screen.findByTestId('portfolio-tab-ledger');
+    fireEvent.click(within(ledger).getByRole('button', { name: '刷新流水' }));
+    const dialog = screen.getByRole('dialog', { name: '事件记录' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '刷新流水' }));
+
+    await waitFor(() => expect(router.state.location.search).toBe('?tab=ledger'));
+    await waitFor(() => expect(listTrades).toHaveBeenCalledWith(expect.objectContaining({ page: 1 })));
+  });
+
+  it('hides risk-only panels from the ledger tab', async () => {
+    renderPortfolioPage('/portfolio?tab=ledger');
+    await waitForInitialLoad();
+
+    expect(await screen.findByTestId('portfolio-tab-ledger')).toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-risk-metrics-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-risk-heatmap-card')).not.toBeInTheDocument();
   });
 
   it('replaces an unavailable account deep link with the first active account', async () => {
@@ -732,11 +832,77 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    const dialog = screen.getByRole('dialog', { name: '券商 CSV 导入' });
+    const wizard = await screen.findByTestId('portfolio-import-wizard');
 
-    expect(within(dialog).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
-    expect(within(dialog).getByRole('combobox', { name: '券商' })).toBeDisabled();
-    expect(within(dialog).getByRole('button', { name: '解析文件' })).toBeDisabled();
+    expect(within(wizard).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
+    expect(within(wizard).getByRole('combobox', { name: '券商' })).toBeDisabled();
+    expect(within(wizard).getByRole('button', { name: '下一步' })).toBeDisabled();
+  });
+
+  it('keeps pasted CSV editable after row errors and reparses the corrected source', async () => {
+    parseCsvImport
+      .mockResolvedValueOnce({
+        broker: 'huatai',
+        recordCount: 1,
+        skippedCount: 0,
+        errorCount: 1,
+        records: [],
+        errors: ['row=2: invalid quantity'],
+      })
+      .mockResolvedValueOnce({
+        broker: 'huatai',
+        recordCount: 1,
+        skippedCount: 0,
+        errorCount: 0,
+        records: [],
+        errors: [],
+      });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    await screen.findByTestId('portfolio-import-wizard');
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    const source = screen.getByLabelText('或粘贴 CSV 文本');
+    fireEvent.change(source, { target: { value: 'symbol,quantity\nAAPL,bad' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    await waitFor(() => expect(parseCsvImport).toHaveBeenCalledTimes(1));
+    await screen.findByText('CSV 解析结果');
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(await screen.findByText('row=2: invalid quantity')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '返回修正' }));
+
+    const editableSource = screen.getByLabelText('或粘贴 CSV 文本');
+    expect(editableSource).toHaveValue('symbol,quantity\nAAPL,bad');
+    fireEvent.change(editableSource, { target: { value: 'symbol,quantity\nAAPL,2' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    await waitFor(() => expect(parseCsvImport).toHaveBeenCalledTimes(2));
+    const correctedFile = parseCsvImport.mock.calls[1][1] as File;
+    expect(correctedFile.name).toBe('pasted-import.csv');
+    expect(await correctedFile.text()).toBe('symbol,quantity\nAAPL,2');
+  });
+
+  it('does not automatically retry a failed CSV parse', async () => {
+    parseCsvImport.mockRejectedValueOnce(
+      createApiError(createParsedApiError({ title: '解析失败', message: 'CSV 格式无效' })),
+    );
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    await screen.findByTestId('portfolio-import-wizard');
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    const file = new File(['bad'], 'bad.csv', { type: 'text/csv' });
+    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(await screen.findByText('解析失败')).toBeInTheDocument();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(parseCsvImport).toHaveBeenCalledTimes(1);
   });
 
   it('renders stale FX status with a manual refresh button', async () => {
@@ -767,6 +933,7 @@ describe('PortfolioPage FX refresh', () => {
     renderEnglishPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(await screen.findByText('Portfolio management')).toBeInTheDocument();
     expect(screen.getByText('Drawdown monitor')).toBeInTheDocument();
@@ -805,6 +972,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText('AI 风险信号')).toBeInTheDocument();
     expect(screen.getByText(/风险信号: 2/)).toBeInTheDocument();
@@ -835,6 +1003,7 @@ describe('PortfolioPage FX refresh', () => {
     renderEnglishPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText('AI risk signals')).toBeInTheDocument();
     expect(screen.getByText('600519 · Sell')).toBeInTheDocument();
@@ -874,6 +1043,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText(/卖出: 1 · 减仓: 0 · 预警: 0/)).toBeInTheDocument();
     expect(screen.getByText('600519 · 卖出')).toBeInTheDocument();
@@ -894,6 +1064,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
 
     await waitForInitialLoad();
+    await openPortfolioRiskTab();
 
     expect(screen.getByText('信号风险暂不可用')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '查看全部' })).toHaveAttribute(
@@ -2149,12 +2320,9 @@ describe('PortfolioPage FX refresh', () => {
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByLabelText('选择 CSV')).toHaveAttribute('data-control', 'file-input');
-    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveAttribute('data-control', 'button');
     const file = new File(['header\nrow'], 'trades.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    await openCsvImportWizardAndReachConfirm(file);
+    expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
     fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
 
@@ -2197,15 +2365,15 @@ describe('PortfolioPage FX refresh', () => {
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
     const file = new File(['header\nrow'], 'partial-trades.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    await openCsvImportWizardAndReachConfirm(file);
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
     fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
 
     await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(1));
     const firstOperationId = commitCsvImport.mock.calls[0][3];
     await screen.findByText(/失败 1 条/);
+    expect(screen.getByRole('button', { name: '返回修正' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
 
     await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(2));
