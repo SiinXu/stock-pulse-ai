@@ -303,7 +303,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     setPendingRemove(null);
   }
 
-  // The page-level "Add model service" button lives in the parent header; it bumps
+  // The page-level "Add model source" button lives in the parent header; it bumps
   // addSignal to open the add dialog here (same adjust-during-render pattern).
   const [prevAddSignal, setPrevAddSignal] = useState(addSignal);
   if (prevAddSignal !== addSignal) {

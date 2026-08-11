@@ -228,8 +228,8 @@ test.describe('complete UI i18n acceptance', () => {
   test('English Settings localizes model access, discovery success, and discovery failure', async ({ page }) => {
     await loginInEnglish(page);
     await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
-    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 15_000 }); // 26
-    await page.getByRole('button', { name: /Add model service/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Model sources' })).toBeVisible({ timeout: 15_000 }); // 26
+    await page.getByRole('button', { name: /Add model source/ }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Add model service' });
     await expect(dialog).toBeVisible(); // 27
     await dialog.getByLabel('Choose model provider').click();
@@ -249,8 +249,8 @@ test.describe('complete UI i18n acceptance', () => {
   test('English Connection Modal renders all built-in Provider labels without Chinese script', async ({ page }) => {
     await loginInEnglish(page);
     await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
-    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: /Add model service/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Model sources' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Add model source/ }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Add model service' });
     await dialog.getByLabel('Choose model provider').click();
 
@@ -264,8 +264,8 @@ test.describe('complete UI i18n acceptance', () => {
   test('Chinese Connection Modal renders the localized built-in Provider labels', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+    await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /添加模型来源/ }).first().click();
     const dialog = page.getByRole('dialog', { name: '添加模型服务' });
     await dialog.getByLabel('选择模型服务商').click();
 
@@ -279,8 +279,8 @@ test.describe('complete UI i18n acceptance', () => {
     await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
     await selectUiLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: /Add model service/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Model sources' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Add model source/ }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Add model service' });
     const localizedSelect = dialog.getByLabel('Choose model provider');
     await localizedSelect.click();
