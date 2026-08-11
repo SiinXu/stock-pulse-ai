@@ -56,8 +56,10 @@ _STRUCTURAL_KEY_PREFIX_PARTS = frozenset(
         "field",
         "foreign",
         "hash",
+        "help",
         "id",
         "index",
+        "issue",
         "json",
         "label",
         "lookup",
@@ -72,6 +74,7 @@ _STRUCTURAL_KEY_PREFIX_PARTS = frozenset(
         "public",
         "record",
         "row",
+        "scope",
         "setting",
         "shard",
         "sort",
@@ -80,6 +83,14 @@ _STRUCTURAL_KEY_PREFIX_PARTS = frozenset(
         "type",
         "xml",
         "yaml",
+    }
+)
+_NON_SENSITIVE_MAPPING_KEYS = frozenset(
+    {
+        # Public response metadata about a sensitive install specification.
+        "install_spec_is_default",
+        # Boolean capability metadata, not an API key value.
+        "requires_api_key",
     }
 )
 _SENSITIVE_KEY_PHRASES = {
@@ -1632,6 +1643,9 @@ def _is_sensitive_mapping_key_text(key_text: str) -> bool:
     if not key_text:
         return False
     parts = _mapping_key_parts(key_text)
+    normalized_key = "_".join(parts)
+    if normalized_key in _NON_SENSITIVE_MAPPING_KEYS:
+        return False
     if parts and parts[-1] == "proxy":
         return True
     if {"header", "headers"} & set(parts):
@@ -1644,7 +1658,7 @@ def _is_sensitive_mapping_key_text(key_text: str) -> bool:
         if index + 1 < len(parts) and parts[index + 1] == "tokens":
             continue
         return True
-    if _has_sensitive_phrase("_".join(parts)):
+    if _has_sensitive_phrase(normalized_key):
         return True
     if parts and parts[-1] in {"key", "keys"}:
         # Generic {"key": ...} payloads are not credentials.

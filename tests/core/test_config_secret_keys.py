@@ -40,6 +40,8 @@ class TestSensitiveConfigKeyClassifier(unittest.TestCase):
         "LLM_ALPHA_EXTRA_HEADERS",
         "ALPHASIFT_INSTALL_SPEC",
         "LITELLM_CONFIG",
+        "DINGTALK_WEBHOOK_URL",
+        "PROXY_HOST",
         "LONGBRIDGE_ACCESS_TOKEN",
         "LONGBRIDGE_APP_KEY",
         "LONGBRIDGE_APP_SECRET",
@@ -199,6 +201,11 @@ class TestSanitizeKeyAlignment(unittest.TestCase):
             "key",
             "LLM_MAX_TOKENS",
             "LLM_USAGE_HMAC_KEY_VERSION",
+            "install_spec_is_default",
+            "requires_api_key",
+            "issue_key",
+            "help_key",
+            "scope_key",
         ):
             with self.subTest(key=key):
                 self.assertFalse(sanitize_is_sensitive_key(key), key)

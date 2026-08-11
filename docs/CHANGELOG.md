@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Fixed] Harden shared sensitive-config key detection so token-count / public-key / key-version names are not masked, bare credential `*_KEY` names are redacted in logs and diagnostics, and config read/save paths keep mask-token preserve behavior for registered and inferred secrets.
+- [Fixed] Harden shared sensitive-config key detection so token-count / public-key / key-version and response-metadata names stay visible, bare credential `*_KEY` names are redacted in logs and diagnostics, and config read/save paths preserve registered and inferred secrets when a mask token is submitted (Refs #1023).
 - [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
 - [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
 - [Fixed] Restore Popover focus during the closing commit so stale animation-frame callbacks cannot steal focus after nested-overlay keyboard navigation.

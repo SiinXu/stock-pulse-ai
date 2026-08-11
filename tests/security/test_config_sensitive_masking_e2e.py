@@ -27,7 +27,6 @@ class _ConfigMaskingE2EBase(unittest.TestCase):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmpdir.cleanup)
         self.env_path = Path(self._tmpdir.name) / ".env"
-        self._orig_env_file = os.environ.get("ENV_FILE")
         self._write_env(
             "STOCK_LIST=600519",
             "ADMIN_AUTH_ENABLED=true",
@@ -42,17 +41,19 @@ class _ConfigMaskingE2EBase(unittest.TestCase):
             "LLM_USAGE_HMAC_KEY_VERSION=local-v1",
             "SOCIAL_SENTIMENT_API_KEY=social-sentiment-secret",
         )
-        os.environ["ENV_FILE"] = str(self.env_path)
+        self._environment = patch.dict(
+            os.environ,
+            {"ENV_FILE": str(self.env_path)},
+            clear=False,
+        )
+        self._environment.start()
+        self.addCleanup(self._environment.stop)
         Config.reset_instance()
         self.manager = ConfigManager(env_path=self.env_path)
         self.service = SystemConfigService(manager=self.manager)
 
     def tearDown(self) -> None:
         Config.reset_instance()
-        if self._orig_env_file is None:
-            os.environ.pop("ENV_FILE", None)
-        else:
-            os.environ["ENV_FILE"] = self._orig_env_file
 
     def _write_env(self, *lines: str) -> None:
         self.env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
