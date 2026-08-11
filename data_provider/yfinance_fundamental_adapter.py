@@ -329,11 +329,13 @@ class YfinanceFundamentalAdapter:
             if hasattr(div_series, "columns"):
                 div_series = div_series.iloc[:, 0]
             try:
-                # Index is timezone-aware (ex-dividend date)
                 # Dividend entries are calendar dates normalized to midnight. Compare
-                # them with a calendar-day cutoff as well so an event exactly 365 days
-                # ago remains in the inclusive TTM window throughout the current day.
-                cutoff = pd.Timestamp.now(tz=div_series.index.tz).normalize() - pd.Timedelta(days=365)
+                # them with a calendar-day cutoff so an event exactly 365 days ago
+                # remains in the inclusive TTM window throughout the current day.
+                cutoff = (
+                    pd.Timestamp.now(tz=div_series.index.tz).normalize()
+                    - pd.Timedelta(days=365)
+                )
                 for ts, value in div_series.items():
                     per_share = _safe_float(value)
                     if per_share is None or per_share <= 0:
