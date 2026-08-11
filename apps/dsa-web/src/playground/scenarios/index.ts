@@ -36,6 +36,12 @@ const LAZY_REPORT_VERSION_COMPARE_SCENARIOS: Record<string, PlaygroundScenarioRe
   )),
 };
 
+const LAZY_WORKBENCH_HISTORY_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'workbench-history-popover': createLazyScenario(async () => (
+    (await import('./workbenchHistoryPopoverScenario')).default
+  )),
+};
+
 const LAZY_RISK_GATE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'report-decision-card': createLazyScenario(async () => (
     (await import('./riskGate')).default[0]
@@ -82,6 +88,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
     (await import('./workbenchHistory')).default
   )),
   ...ALERT_HISTORY_SCENARIOS,
+  ...LAZY_WORKBENCH_HISTORY_SCENARIOS,
   ...DECISION_REPORT_RUN_FLOW_SCENARIOS,
   ...LAZY_RISK_GATE_SCENARIOS,
   ...LAZY_REPORT_MARKDOWN_SCENARIOS,
