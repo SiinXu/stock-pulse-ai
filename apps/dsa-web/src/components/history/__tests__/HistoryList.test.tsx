@@ -27,6 +27,13 @@ const items: HistoryItem[] = [
   },
 ];
 
+const secondItem: HistoryItem = {
+  ...items[0],
+  id: 2,
+  queryId: 'q-2',
+  createdAt: '2026-03-16T08:00:00Z',
+};
+
 const longChineseNameItem: HistoryItem = {
   id: 2,
   queryId: 'q-2',
@@ -285,6 +292,32 @@ describe('HistoryList', () => {
     expect(deleteButton).toHaveAttribute('data-size', 'compact');
     expect(deleteButton.querySelector('svg')).toBeInTheDocument();
     expect(deleteButton).not.toHaveTextContent('删除');
+  });
+
+  it('offers comparison only for two selected runs of the same stock', () => {
+    const onCompareSelected = vi.fn();
+    const sameStockItems = [items[0], secondItem];
+    const { rerender } = render(
+      <HistoryList
+        {...baseProps}
+        items={sameStockItems}
+        selectedIds={new Set([1, 2])}
+        onCompareSelected={onCompareSelected}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('history-compare-selected'));
+    expect(onCompareSelected).toHaveBeenCalledWith(sameStockItems);
+
+    rerender(
+      <HistoryList
+        {...baseProps}
+        items={[items[0], { ...secondItem, stockCode: 'AAPL' }]}
+        selectedIds={new Set([1, 2])}
+        onCompareSelected={onCompareSelected}
+      />,
+    );
+    expect(screen.queryByTestId('history-compare-selected')).not.toBeInTheDocument();
   });
 
   it('truncates long stock names with trailing dot', () => {

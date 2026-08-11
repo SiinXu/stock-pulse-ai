@@ -2,7 +2,7 @@
 
 [中文](report-version-compare.md) | [English](report-version-compare_EN.md)
 
-Issue #188 / T18 foundation: users can page through analysis history, select two runs for the same symbol, and review typed report and configuration differences side by side. Issue #188 remains open for discoverability from existing report/history surfaces and optional multi-agent sections.
+Issue #188 / T18: users can select two runs for the same symbol from analysis history, or enter from Stock Details, and review typed report and configuration differences side by side. Issue #188 remains open for structured risk/catalyst diffing and explicit behavior when optional multi-agent sections are absent.
 
 ## Scope
 
@@ -49,19 +49,12 @@ Tests may inject fixtures with `ReportVersionCompareService(compare_fn=...)`.
 - Draft stock input and loaded stock identity are separate. Editing the draft invalidates old selections and results.
 - Retry is operation-owned: list failures repeat the list request; compare failures repeat the same compare inputs without reloading versions or clearing selections.
 
-## Optional navigation wiring
+## Navigation and prefill
 
-This task does not modify `SidebarNav` or `ResearchOverviewPage` (frozen / contested in the batch). After merge, research overview can add:
-
-```tsx
-{
-  key: 'report-compare',
-  titleKey: /* new i18n key */,
-  descriptionKey: /* new i18n key */,
-  to: APP_ROUTE_PATHS.researchReportCompare,
-  icon: GitCompareArrows,
-}
-```
+- Analysis Workbench History shows **Compare** after two records for the same stock are selected, then carries the stock code plus baseline and target history primary keys to the comparison page.
+- Stock Details provides a **Report version compare** action that carries the canonical stock code to the comparison page.
+- The page accepts `stock`, `baseRunId`, and `targetRunId` query parameters. `stock` triggers version loading; when both run IDs are distinct positive safe integers, comparison starts automatically after the list loads.
+- Invalid or missing run IDs do not start comparison. Users can still choose runs manually from the loaded picker.
 
 ## Related files
 

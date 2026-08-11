@@ -10,6 +10,7 @@ import { systemConfigApi } from '../../api/systemConfig';
 import {
   APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
+  buildReportVersionCompareHref,
   buildSignalCenterHref,
 } from '../../routing/routes';
 import type { StockHistoryResponse, StockQuote } from '../../types/stocks';
@@ -32,6 +33,11 @@ const addWatchlistMock = vi.mocked(systemConfigApi.addToWatchlist);
 function SignalLocationProbe() {
   const location = useLocation();
   return <output data-testid="signal-location">{`${location.pathname}${location.search}`}</output>;
+}
+
+function ReportCompareLocationProbe() {
+  const location = useLocation();
+  return <output data-testid="report-compare-location">{`${location.pathname}${location.search}`}</output>;
 }
 
 function makeQuote(overrides: Partial<StockQuote> = {}): StockQuote {
@@ -83,6 +89,10 @@ function renderPage(code = '600519') {
             <Route path="/stocks/:stockCode" element={<StockDetailsPage />} />
             <Route path="/" element={<div>home-route</div>} />
             <Route path={APP_ROUTE_PATHS.signals} element={<SignalLocationProbe />} />
+            <Route
+              path={APP_ROUTE_PATHS.researchReportCompare}
+              element={<ReportCompareLocationProbe />}
+            />
           </Routes>
         </MemoryRouter>
       </UiLanguageProvider>,
@@ -290,6 +300,19 @@ describe('StockDetailsPage', () => {
         createRule: true,
         stock: '600519',
       }));
+  });
+
+  it('opens report comparison with the canonical stock code', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockResolvedValue(makeHistory());
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Kweichow Moutai')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Report version compare' }));
+
+    expect(await screen.findByTestId('report-compare-location'))
+      .toHaveTextContent(buildReportVersionCompareHref({ stock: '600519' }));
   });
 
   it('canonicalizes an equivalent stock-code spelling in the route', async () => {

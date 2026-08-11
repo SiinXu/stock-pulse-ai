@@ -63,6 +63,7 @@ import {
   HOME_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
   type AnalysisWorkbenchSegment,
+  buildReportVersionCompareHref,
 } from '../routing/routes';
 import {
   DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
@@ -71,7 +72,12 @@ import {
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
 import { useStockPoolStore, type SubmitAnalysisOptions } from '../stores/stockPoolStore';
-import type { AnalysisPhase, StockReportType, TaskInfo } from '../types/analysis';
+import type {
+  AnalysisPhase,
+  HistoryItem,
+  StockReportType,
+  TaskInfo,
+} from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { buildDeepLink } from '../utils/deepLink';
@@ -781,6 +787,13 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       return new Set(visibleIds);
     });
   }, [analysisHistoryItems]);
+  const compareSelectedHistory = useCallback((items: readonly [HistoryItem, HistoryItem]) => {
+    navigate(buildReportVersionCompareHref({
+      stock: items[0].stockCode,
+      baseRunId: items[0].id,
+      targetRunId: items[1].id,
+    }));
+  }, [navigate]);
   const requestDeleteSelectedHistory = useCallback(() => {
     if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
     setDeleteError(null);
@@ -1201,8 +1214,28 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             )}
           />
         ) : (
-          <WorkspaceLayout>
-            <section className="relative min-w-0" aria-label={t('analysisWorkbench.history')}>
+          <WorkspaceLayout
+            railPosition="start"
+            rail={(
+              <HistoryList
+                className="min-h-96"
+                items={analysisHistoryItems}
+                isLoading={isLoadingHistory}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
+                selectedId={routeState.recordId ?? undefined}
+                selectedIds={new Set(selectedHistoryIds)}
+                isDeleting={isDeletingHistory}
+                onItemClick={navigateToRecord}
+                onLoadMore={() => void loadMoreHistory()}
+                onToggleItemSelection={toggleHistorySelection}
+                onToggleSelectAll={toggleAllHistory}
+                onDeleteSelected={requestDeleteSelectedHistory}
+                onCompareSelected={compareSelectedHistory}
+              />
+            )}
+          >
+            <section className="min-w-0" aria-label={t('analysisWorkbench.history')}>
               {isLoadingReport ? (
                 <DashboardStateBlock title={t('home.loadingReport')} loading />
               ) : selectedAnalysisReport ? (
