@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Fixed] Complete Simplified Chinese settings-help source parity for RSS feeds and multi-strategy deliberation, refresh locale bundles, and re-freeze identical-to-English baseline so web-gate `test:i18n` can pass after the previously blocked resource extract.
 - [Added] Portfolio page URL contract (account/tab/selection/page via urlState) and full-page CSV import wizard with recoverable row errors and partial-success presentation (#879 A1, #872).
+- [Fixed] Lazy-load report Playground stories so Risk Manager evidence does not expand the shared Playground render budget.
 - [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).
 - [Tests] Align the application-shell Playwright fixture with the server-authoritative notification inbox contract so auth redirects cannot mask shell regressions.
 - [Fixed] Harden shared sensitive-config key detection so token-count / public-key / key-version and response-metadata names stay visible, bare credential `*_KEY` names are redacted in logs and diagnostics, and config read/save paths preserve registered and inferred secrets when a mask token is submitted (Refs #1023).

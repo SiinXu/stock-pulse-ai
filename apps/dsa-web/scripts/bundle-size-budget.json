@@ -132,9 +132,9 @@
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57620,
-      "measuredGzipBytes": 57420,
-      "note": "Remeasured after adding the Risk Manager gate playground scenario (PR #1038); measured 57420 B + 200 B headroom."
+      "maxGzipBytes": 57281,
+      "measuredGzipBytes": 56919,
+      "note": "Restored the pre-PR #1038 ceiling after lazy-loading report Playground stories; two consecutive builds measured 56911–56919 B, leaving at least 362 B headroom."
     },
     {
       "id": "SettingsPage",
