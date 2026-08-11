@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] When `PLUGIN_DATA_PROVIDER_AUTO_BIND` is enabled, the `ApplicationServices` composition root fail-closed binds one complete plugin registry to the data manager used by stock services and the primary analysis pipeline.
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
+- [Added] Read-only corporate-event calendar at `/events`, backed by the alert trigger contract with bounded pagination, partial-result provenance, and localized impact summaries (#153).
 
 - [Added] Web event-driven corporate alert view with server-filtered stable pagination, rule-severity impact grading, editable event parameters, and bounded public trigger context for issue #241.
 - [Fixed] Portfolio position analysis attaches the shared TaskPanel/RunFlow progress surface, reacts to URL `task` changes, restores stock and result identity from session/status data, preserves task identity across 401/403 responses, and drops confirmed-missing (404/not_found) task ids instead of fabricating a stuck pending card (#879 A6).
