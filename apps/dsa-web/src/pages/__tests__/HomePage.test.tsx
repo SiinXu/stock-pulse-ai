@@ -388,7 +388,7 @@ describe('HomePage attention hub', () => {
     expect(configurableContent).not.toBeVisible();
     expect(window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY)).toBeNull();
     expect(configurableContent?.querySelector('input')).toBeNull();
-    expect(screen.getByRole('textbox', { name: 'New group name' })).toBeVisible();
+    expect(await screen.findByRole('textbox', { name: 'New group name' })).toBeVisible();
   });
 
   it('keeps the configurable area usable when browser preference storage fails', async () => {
