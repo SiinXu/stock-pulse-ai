@@ -2144,6 +2144,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/{plugin_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one plugin's generated settings contract
+         * @description Return the strict manifest-declared settings schema and effective values. Sensitive values are represented only by mask_token.
+         */
+        get: operations["getPluginSettings"];
+        /**
+         * Validate and persist one plugin's settings
+         * @description Replace explicit per-plugin settings after strict manifest validation. Omitted keys reset to defaults; masked sensitive values preserve the stored secret.
+         */
+        put: operations["updatePluginSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/accounts": {
         parameters: {
             query?: never;
@@ -9600,6 +9624,12 @@ export interface components {
              */
             reloadable: boolean;
             /**
+             * Settings Count
+             * @description Number of declarative settings fields in the plugin manifest
+             * @default 0
+             */
+            settings_count: number;
+            /**
              * Source
              * @enum {string}
              */
@@ -9668,6 +9698,128 @@ export interface components {
             items?: components["schemas"]["PluginInfo"][];
             /** Total */
             total: number;
+        };
+        /**
+         * PluginSettingFieldResponse
+         * @description One strict manifest-declared plugin settings field.
+         */
+        PluginSettingFieldResponse: {
+            /**
+             * Data Type
+             * @enum {string}
+             */
+            data_type: "string" | "integer" | "number" | "boolean";
+            /** Default Value */
+            default_value?: string | number | boolean | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Display Order
+             * @default 100
+             */
+            display_order: number;
+            /**
+             * Is Required
+             * @default false
+             */
+            is_required: boolean;
+            /**
+             * Is Sensitive
+             * @default false
+             */
+            is_sensitive: boolean;
+            /** Key */
+            key: string;
+            /** Options */
+            options?: components["schemas"]["PluginSettingOptionResponse"][];
+            /** Title */
+            title: string;
+            /**
+             * Ui Control
+             * @enum {string}
+             */
+            ui_control: "text" | "password" | "number" | "select" | "textarea" | "switch";
+            /** Validation */
+            validation?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * PluginSettingOptionResponse
+         * @description One finite option for a generated plugin setting control.
+         */
+        PluginSettingOptionResponse: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string | number | boolean | null;
+        };
+        /**
+         * PluginSettingsResponse
+         * @description Generated schema and masked effective values for one plugin.
+         */
+        PluginSettingsResponse: {
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Masked Keys */
+            masked_keys?: string[];
+            /** Plugin Id */
+            plugin_id: string;
+            /** Schema */
+            schema?: components["schemas"]["PluginSettingFieldResponse"][];
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        /**
+         * PluginSettingsUpdateRequest
+         * @description Full replacement of explicit values; omitted keys reset to defaults.
+         */
+        PluginSettingsUpdateRequest: {
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        /**
+         * PluginSettingsUpdateResponse
+         * @description Persisted settings projection plus apply semantics.
+         */
+        PluginSettingsUpdateResponse: {
+            /** Changed Keys */
+            changed_keys?: string[];
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Masked Keys */
+            masked_keys?: string[];
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Restart Required
+             * @default false
+             */
+            restart_required: boolean;
+            /** Schema */
+            schema?: components["schemas"]["PluginSettingFieldResponse"][];
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
         };
         /** PortfolioAccountCreateRequest */
         PortfolioAccountCreateRequest: {
@@ -21322,6 +21474,135 @@ export interface operations {
                 };
             };
             /** @description Security audit storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPluginSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettingsResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    updatePluginSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettingsUpdateResponse"];
+                };
+            };
+            /** @description Settings validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Settings persistence failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

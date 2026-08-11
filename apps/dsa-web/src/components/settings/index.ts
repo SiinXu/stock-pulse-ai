@@ -28,6 +28,5 @@ export * from './InvestmentFrameworkPromptPreview';
 export * from './GenerationBackendStatusPanel';
 export * from './KronosSettingsFields';
 export * from './KronosStatusPanel';
-export { default as LoadedExtensionsPanel } from './LoadedExtensionsPanel';
 export * from './LocalModelsPanel';
 export * from './LocalModelsWithKronos';

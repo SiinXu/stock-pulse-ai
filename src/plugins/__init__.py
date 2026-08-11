@@ -63,15 +63,22 @@ from .manager import (
     PluginManager,
     PluginOperationResult,
     PluginReloadResult,
+    PluginSettingsUpdateResult,
+    PluginSettingsValidationError,
     PluginSnapshot,
     PluginSource,
     PluginState,
 )
 from .state_store import PluginLifecycleStateStore
+from .settings_store import PluginSettingsPersistenceError, PluginSettingsStore
 from .manifest import (
     MANIFEST_PERMISSIONS_UNDECLARED,
     PERMISSION_ID_PATTERN,
     PluginManifest,
+    PluginSettingDefinition,
+    PluginSettingOption,
+    PluginSettingValidation,
+    validate_plugin_setting_value,
 )
 from .notification_channels import (
     NotificationAdapterResult,
@@ -160,6 +167,13 @@ __all__ = [
     "PluginManifest",
     "PluginOperationResult",
     "PluginReloadResult",
+    "PluginSettingDefinition",
+    "PluginSettingOption",
+    "PluginSettingValidation",
+    "PluginSettingsPersistenceError",
+    "PluginSettingsStore",
+    "PluginSettingsUpdateResult",
+    "PluginSettingsValidationError",
     "PluginLifecycleStateStore",
     "PluginRegistryError",
     "PluginSnapshot",
@@ -197,4 +211,5 @@ __all__ = [
     "validate_event_hook_registration",
     "validate_notification_channel_factory",
     "validate_report_template",
+    "validate_plugin_setting_value",
 ]
