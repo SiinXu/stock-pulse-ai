@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "provider": "yfinance",
+    "ticker": "AAPL",
+    "failure_mode": "missing_field",
+    "recorded_note": "Yahoo history rows missing Volume. Offline sample 2026-08-08 derived from yfinance_daily.json.",
+    "source_shape": "tests/fixtures/provider_contracts/yfinance_daily.json"
+  },
+  "index_name": "Date",
+  "columns": [
+    "Open",
+    "High",
+    "Low",
+    "Close"
+  ],
+  "rows": [
+    {
+      "Date": "2026-05-06",
+      "Open": 189.5,
+      "High": 191.2,
+      "Low": 188.8,
+      "Close": 190.4
+    },
+    {
+      "Date": "2026-05-07",
+      "Open": 190.5,
+      "High": 192.0,
+      "Low": 189.9,
+      "Close": 191.1
+    },
+    {
+      "Date": "2026-05-08",
+      "Open": 191.0,
+      "High": 191.8,
+      "Low": 189.5,
+      "Close": 190.0
+    }
+  ]
+}

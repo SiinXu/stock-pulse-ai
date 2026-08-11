@@ -4,6 +4,10 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { loadUiLanguageTranslations } from '../../i18n/translations';
 import { getFieldTitle } from '../../utils/systemConfigI18n';
 import SettingsPageTestHarness from './SettingsPage.testHarness';
+import {
+  AGENT_PRESET_MANAGED_KEYS,
+  AGENT_SETUP_PRESETS,
+} from '../../components/settings/agentSetupPresets';
 
 const {
   SettingsPage,
@@ -11,6 +15,7 @@ const {
   TEST_PROVIDER_ID_FIELD,
   alphasiftEnable,
   alphasiftInstall,
+  applyPartialUpdate,
   buildSystemConfigState,
   getChangedItems,
   getLlmProviderCatalog,
@@ -21,6 +26,7 @@ const {
   rollbackSystemConfig,
   routerSearchParamsMock,
   save,
+  setDraftValue,
   updateSystemConfig,
   useSystemConfigMock,
   useAdvancedConfigState,
@@ -28,6 +34,89 @@ const {
 } = SettingsPageTestHarness;
 
 export function registerSettingsPageIntegrationTests(): void {
+  it('wires confirmed Agent presets through one Settings-host draft batch', async () => {
+    const standard = AGENT_SETUP_PRESETS.find((preset) => preset.id === 'standard_research')!;
+    const agentItem = (key: string, value: string, displayOrder: number) => ({
+      key,
+      value,
+      rawValueExists: value !== '',
+      isMasked: false,
+      schema: {
+        key,
+        title: key.replaceAll('_', ' '),
+        category: 'agent',
+        dataType: key.includes('STEPS') || key.includes('TIMEOUT') ? 'integer' : key.includes('ENABLED') || key === 'AGENT_MODE' || key === 'AGENT_FEATURES_ACKNOWLEDGED_OFF' ? 'boolean' : 'string',
+        uiControl: key.includes('STEPS') || key.includes('TIMEOUT') ? 'number' : key.includes('ENABLED') || key === 'AGENT_MODE' || key === 'AGENT_FEATURES_ACKNOWLEDGED_OFF' ? 'switch' : 'text',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder,
+      },
+    });
+    const agentItems = [
+      ...AGENT_PRESET_MANAGED_KEYS.map((key, index) => agentItem(key, standard.values[key], index + 1)),
+      agentItem('AGENT_SKILLS', '', 30),
+      agentItem('AGENT_RISK_OVERRIDE', 'true', 31),
+      agentItem('VALUATION_AGENT_TOOL_ENABLED', 'false', 32),
+      agentItem('AGENT_CONTEXT_ENABLED', 'true', 33),
+    ];
+    const configState = buildSystemConfigState();
+    const modelItem = (key: string) => ({
+      key,
+      value: 'deepseek/deepseek-v4-pro',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model',
+        dataType: 'string',
+        uiControl: 'text',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+        uiPlacement: 'task_routing',
+      },
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'agent',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        agent: agentItems,
+        ai_model: [modelItem('LITELLM_MODEL'), modelItem('AGENT_LITELLM_MODEL')],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'agent_behavior', view: 'execution' });
+
+    render(<SettingsPage />);
+
+    expect(screen.getByTestId('agent-behavior-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-AGENT_MAX_STEPS')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-AGENT_CONTEXT_ENABLED')).not.toBeInTheDocument();
+    expect(screen.getByTestId('agent-advanced-fields')).not.toHaveAttribute('open');
+
+    const trigger = screen.getByTestId('agent-preset-apply-simple_qa');
+    fireEvent.click(trigger);
+    expect(applyPartialUpdate).not.toHaveBeenCalled();
+    expect(setDraftValue).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/Agent 最大步数|Agent Max Steps/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: /Apply preset|确认应用/ }));
+
+    expect(applyPartialUpdate).toHaveBeenCalledTimes(1);
+    const updates = applyPartialUpdate.mock.calls[0][0] as Array<{ key: string; value: string }>;
+    expect(updates).toEqual(expect.arrayContaining([
+      { key: 'AGENT_MAX_STEPS', value: '5' },
+      { key: 'AGENT_ARCH', value: 'single' },
+    ]));
+    expect(updates.some((item) => item.key === 'AGENT_SKILLS')).toBe(false);
+    await waitFor(() => expect(screen.getByTestId('agent-active-summary')).toHaveTextContent(/deepseek-v4-pro/));
+  });
+
   it('refreshes rollback-updated keys while preserving unrelated settings drafts', async () => {
     useAdvancedConfigState();
     render(<SettingsPage />);

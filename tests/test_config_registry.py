@@ -1280,5 +1280,251 @@ class TestUiPlacement(unittest.TestCase):
         self.assertEqual(get_field_definition("STOCK_LIST")["ui_placement"], None)
 
 
+class TestDataSourceDomainKeysRegistered(unittest.TestCase):
+    """Crypto, validation, and local-first keys must be explicitly registered (Refs #1023)."""
+
+    _CRYPTO_KEYS = (
+        "CRYPTO_PROVIDER_ENABLED",
+        "COINGECKO_API_PLAN",
+        "COINGECKO_API_KEY",
+        "COINGECKO_API_BASE",
+        "CRYPTO_COINGECKO_PRIORITY",
+    )
+    _VALIDATION_KEYS = (
+        "DATA_VALIDATION_ENABLED",
+        "DATA_VALIDATION_STRICT",
+        "DATA_VALIDATION_STRICT_SCOPES",
+        "DATA_VALIDATION_INSTRUMENT_OVERRIDES",
+        "DATA_VALIDATION_UPPER_LAYER_MODE",
+    )
+    _LOCAL_FIRST_KEYS = (
+        "PROVIDER_MARKET_DATA_MODE",
+        "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS",
+        "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES",
+        "PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS",
+    )
+
+    def test_all_keys_are_explicitly_registered_in_data_source(self):
+        for key in self._CRYPTO_KEYS + self._VALIDATION_KEYS + self._LOCAL_FIRST_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "data_source", key)
+            self.assertNotEqual(
+                field["display_order"],
+                9000,
+                f"{key} should be explicitly registered, not inferred",
+            )
+            self.assertTrue(field.get("help_key"), f"{key} missing help_key")
+            self.assertTrue(field.get("examples"), f"{key} missing examples")
+            self.assertTrue(field.get("docs"), f"{key} missing docs")
+
+    def test_crypto_controls_and_defaults(self):
+        enabled = get_field_definition("CRYPTO_PROVIDER_ENABLED")
+        self.assertEqual(enabled["data_type"], "boolean")
+        self.assertEqual(enabled["ui_control"], "switch")
+        self.assertEqual(enabled["default_value"], "false")
+
+        plan = get_field_definition("COINGECKO_API_PLAN")
+        self.assertEqual(plan["ui_control"], "select")
+        self.assertEqual(plan["default_value"], "keyless")
+        self.assertEqual(plan["options"], ["keyless", "demo", "pro"])
+        self.assertEqual(plan["validation"]["enum"], ["keyless", "demo", "pro"])
+
+        key = get_field_definition("COINGECKO_API_KEY")
+        self.assertTrue(key["is_sensitive"])
+        self.assertEqual(key["ui_control"], "password")
+
+        base = get_field_definition("COINGECKO_API_BASE")
+        self.assertEqual(base["ui_control"], "text")
+        self.assertEqual(base["validation"]["item_type"], "url")
+        self.assertIn("https", base["validation"]["allowed_schemes"])
+
+        priority = get_field_definition("CRYPTO_COINGECKO_PRIORITY")
+        self.assertEqual(priority["data_type"], "integer")
+        self.assertEqual(priority["ui_control"], "number")
+        self.assertEqual(priority["default_value"], "10")
+        self.assertEqual(priority["validation"]["min"], 0)
+        self.assertEqual(priority["validation"]["max"], 99)
+        # Crypto priority belongs with other data-source provider priorities.
+        self.assertEqual(priority["category"], "data_source")
+
+    def test_validation_controls_and_defaults(self):
+        enabled = get_field_definition("DATA_VALIDATION_ENABLED")
+        self.assertEqual(enabled["data_type"], "boolean")
+        self.assertEqual(enabled["ui_control"], "switch")
+        self.assertEqual(enabled["default_value"], "true")
+
+        strict = get_field_definition("DATA_VALIDATION_STRICT")
+        self.assertEqual(strict["data_type"], "boolean")
+        self.assertEqual(strict["ui_control"], "switch")
+        self.assertEqual(strict["default_value"], "false")
+
+        scopes = get_field_definition("DATA_VALIDATION_STRICT_SCOPES")
+        self.assertEqual(scopes["default_value"], "*/*")
+        self.assertEqual(scopes["ui_control"], "text")
+
+        overrides = get_field_definition("DATA_VALIDATION_INSTRUMENT_OVERRIDES")
+        # Runtime stores comma-separated SYMBOL=instrument pairs, not JSON.
+        self.assertEqual(overrides["data_type"], "string")
+        self.assertEqual(overrides["ui_control"], "textarea")
+        self.assertEqual(overrides["default_value"], "")
+
+        upper = get_field_definition("DATA_VALIDATION_UPPER_LAYER_MODE")
+        self.assertEqual(upper["ui_control"], "select")
+        self.assertEqual(upper["default_value"], "warn")
+        self.assertEqual(upper["options"], ["warn", "reject"])
+        self.assertEqual(upper["validation"]["enum"], ["warn", "reject"])
+
+    def test_local_first_controls_and_defaults(self):
+        mode = get_field_definition("PROVIDER_MARKET_DATA_MODE")
+        self.assertEqual(mode["ui_control"], "select")
+        self.assertEqual(mode["default_value"], "auto")
+        self.assertEqual(mode["options"], ["auto", "local_only", "refresh"])
+        self.assertEqual(mode["validation"]["enum"], ["auto", "local_only", "refresh"])
+
+        local_only_age = get_field_definition(
+            "PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS"
+        )
+        self.assertEqual(local_only_age["data_type"], "integer")
+        self.assertEqual(local_only_age["ui_control"], "number")
+        self.assertEqual(local_only_age["default_value"], "2592000")
+        self.assertEqual(local_only_age["unit"], "s")
+        self.assertEqual(local_only_age["validation"]["min"], 1)
+
+        persistent_age = get_field_definition(
+            "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS"
+        )
+        self.assertEqual(persistent_age["default_value"], "7776000")
+        self.assertEqual(persistent_age["unit"], "s")
+        self.assertEqual(persistent_age["validation"]["min"], 0)
+
+        max_entries = get_field_definition(
+            "PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES"
+        )
+        self.assertEqual(max_entries["default_value"], "512")
+        self.assertEqual(max_entries["validation"]["min"], 1)
+
+        grace = get_field_definition("PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS")
+        self.assertEqual(grace["default_value"], "1")
+        self.assertEqual(grace["unit"], "d")
+        self.assertEqual(grace["validation"]["min"], 1)
+
+    def test_schema_response_includes_data_source_domain_keys(self):
+        schema = build_schema_response()
+        data_source = next(
+            (c for c in schema["categories"] if c["category"] == "data_source"),
+            None,
+        )
+        self.assertIsNotNone(data_source, "data_source category missing")
+        field_keys = {f["key"] for f in data_source["fields"]}
+        for key in self._CRYPTO_KEYS + self._VALIDATION_KEYS + self._LOCAL_FIRST_KEYS:
+            self.assertIn(key, field_keys, f"{key} missing from schema response")
+
 if __name__ == "__main__":
     unittest.main()
+
+class TestMcpFieldsRegistered(unittest.TestCase):
+    """Optional MCP process settings must be explicitly registered for Settings UI."""
+
+    _MCP_KEYS = (
+        "MCP_SERVER_ENABLED",
+        "MCP_SERVER_TRANSPORT",
+        "MCP_SERVER_HOST",
+        "MCP_SERVER_PORT",
+        "MCP_STDIO_PRINCIPAL",
+        "MCP_STDIO_SCOPES",
+        "MCP_HTTP_SCOPES",
+        "MCP_HTTP_SESSION_TOKEN_SHA256",
+        "MCP_HTTP_RESOURCE",
+        "MCP_HTTP_ALLOWED_HOSTS",
+        "MCP_HTTP_ALLOWED_ORIGINS",
+        "MCP_HTTP_MAX_BODY_BYTES",
+        "MCP_HTTP_MAX_HEADER_BYTES",
+        "MCP_HTTP_MAX_CONNECTIONS",
+        "MCP_HTTP_BACKLOG",
+        "MCP_HTTP_READ_TIMEOUT_SECONDS",
+        "MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS",
+        "MCP_MAX_CONCURRENT_TOOLS",
+        "MCP_RATE_LIMIT_PER_MINUTE",
+        "MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE",
+        "MCP_ANALYSIS_MAX_STOCKS",
+    )
+
+    def test_all_mcp_keys_registered_in_mcp_category(self):
+        for key in self._MCP_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "mcp", key)
+            self.assertNotEqual(field["display_order"], 9000, key)
+            self.assertTrue(field.get("help_key"), key)
+            self.assertTrue(field.get("title"), key)
+            self.assertTrue(field.get("description"), key)
+            self.assertNotIn("Auto-inferred", field.get("description", ""), key)
+            self.assertNotIn(key, WEB_SETTINGS_HIDDEN_FROM_UI)
+
+    def test_enabled_is_boolean_switch_default_off(self):
+        field = get_field_definition("MCP_SERVER_ENABLED")
+        self.assertEqual(field["data_type"], "boolean")
+        self.assertEqual(field["ui_control"], "switch")
+        self.assertEqual(field["default_value"], "false")
+        self.assertFalse(field["is_sensitive"])
+
+    def test_transport_is_select_with_enum(self):
+        field = get_field_definition("MCP_SERVER_TRANSPORT")
+        self.assertEqual(field["ui_control"], "select")
+        self.assertEqual(field["default_value"], "stdio")
+        self.assertEqual(field["validation"]["enum"], ["stdio", "streamable-http"])
+
+    def test_port_and_timeout_ranges_match_runtime(self):
+        expected = {
+            "MCP_SERVER_PORT": {"min": 1, "max": 65535},
+            "MCP_HTTP_MAX_BODY_BYTES": {"min": 1024, "max": 10_000_000},
+            "MCP_HTTP_MAX_HEADER_BYTES": {"min": 4096, "max": 262_144},
+            "MCP_HTTP_MAX_CONNECTIONS": {"min": 1, "max": 1024},
+            "MCP_HTTP_BACKLOG": {"min": 1, "max": 1024},
+            "MCP_HTTP_READ_TIMEOUT_SECONDS": {"min": 1, "max": 120},
+            "MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS": {"min": 1, "max": 120},
+            "MCP_MAX_CONCURRENT_TOOLS": {"min": 1, "max": 128},
+            "MCP_RATE_LIMIT_PER_MINUTE": {"min": 1, "max": 10_000},
+            "MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE": {"min": 1, "max": 60},
+            "MCP_ANALYSIS_MAX_STOCKS": {"min": 1, "max": 50},
+        }
+        for key, validation in expected.items():
+            field = get_field_definition(key)
+            self.assertEqual(field["data_type"], "integer", key)
+            self.assertEqual(field["ui_control"], "number", key)
+            self.assertEqual(field["validation"]["min"], validation["min"], key)
+            self.assertEqual(field["validation"]["max"], validation["max"], key)
+
+    def test_session_token_is_sensitive_password_with_hex_pattern(self):
+        field = get_field_definition("MCP_HTTP_SESSION_TOKEN_SHA256")
+        self.assertTrue(field["is_sensitive"])
+        self.assertEqual(field["ui_control"], "password")
+        self.assertIn("secret_value", field.get("warning_codes", []))
+        pattern = re.compile(field["validation"]["pattern"])
+        self.assertIsNotNone(pattern.fullmatch(""))
+        self.assertIsNotNone(pattern.fullmatch("a" * 64))
+        self.assertIsNotNone(pattern.fullmatch("A" * 64))
+        self.assertIsNone(pattern.fullmatch("not-a-hash"))
+        self.assertIsNone(pattern.fullmatch("a" * 63))
+
+    def test_allowlists_document_widening_risk(self):
+        for key in ("MCP_HTTP_ALLOWED_HOSTS", "MCP_HTTP_ALLOWED_ORIGINS"):
+            field = get_field_definition(key)
+            description = field["description"].lower()
+            self.assertTrue(
+                "risk" in description or "cross-origin" in description or "widening" in description,
+                key,
+            )
+            self.assertIn("security_surface", field.get("warning_codes", []))
+
+    def test_schema_response_includes_mcp_category_and_fields(self):
+        schema = build_schema_response()
+        mcp_cat = next((c for c in schema["categories"] if c["category"] == "mcp"), None)
+        self.assertIsNotNone(mcp_cat, "mcp category missing from schema")
+        field_keys = {f["key"] for f in mcp_cat["fields"]}
+        for key in self._MCP_KEYS:
+            self.assertIn(key, field_keys, key)
+        # category must sort before uncategorized
+        orders = {c["category"]: c["display_order"] for c in schema["categories"]}
+        self.assertLess(orders["mcp"], orders["uncategorized"])
+

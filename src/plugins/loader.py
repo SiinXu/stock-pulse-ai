@@ -139,6 +139,14 @@ class ExternalPluginLoader:
         except ValidationError:
             return self._failure(candidate_name, "external_manifest_invalid")
 
+        logger.info(
+            "External plugin manifest accepted candidate=%s id=%s version=%s permissions=%s",
+            candidate_name,
+            manifest.id,
+            manifest.version,
+            list(manifest.permissions),
+        )
+
         compatibility_error = self._manager.compatibility_error(manifest)
         if compatibility_error is not None:
             return self._failure(

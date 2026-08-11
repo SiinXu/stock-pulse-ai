@@ -90,6 +90,7 @@
       "decision_type",
       "key_points",
       "operation_advice",
+      "risk_manager",
       "risk_warning",
       "sentiment_score",
       "stock_name",
@@ -154,9 +155,30 @@
         "均线多头排列且量能配合，趋势延续概率较高。",
         "技术面多头排列，趋势评分78，采取回踩低吸策略。"
       ],
-      "risk_warning": "跌破MA20需止损"
+      "risk_warning": "跌破MA20需止损",
+      "risk_manager": {
+        "schema_version": "risk-manager-result/v1",
+        "verdict": "pass",
+        "original_action": "buy",
+        "final_action": "buy",
+        "reason_codes": [
+          "no_risk_evidence"
+        ],
+        "reason_params": {},
+        "adjustment": null,
+        "evidence_codes": [],
+        "evidence_provenance": [],
+        "profile": "balanced",
+        "override_enabled": true,
+        "override_would_apply": false,
+        "exit_id": "orchestrator_multi_agent",
+        "evaluation_id": "<runtime-generated>",
+        "evaluated_at": "<runtime-evaluated-at>",
+        "authorized_bypass_id": null,
+        "fail_closed": false
+      }
     },
-    "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 72,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"多头趋势延续，回踩低吸为主\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面数据完整\",\n      \"data_limitations\": \"未包含情报阶段数据\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"技术面多头排列，趋势评分78，采取回踩低吸策略。\",\n  \"key_points\": [\n    \"均线多头排列且量能配合，趋势延续概率较高。\",\n    \"技术面多头排列，趋势评分78，采取回踩低吸策略。\"\n  ],\n  \"risk_warning\": \"跌破MA20需止损\"\n}",
+    "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 72,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"多头趋势延续，回踩低吸为主\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面数据完整\",\n      \"data_limitations\": \"未包含情报阶段数据\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"技术面多头排列，趋势评分78，采取回踩低吸策略。\",\n  \"key_points\": [\n    \"均线多头排列且量能配合，趋势延续概率较高。\",\n    \"技术面多头排列，趋势评分78，采取回踩低吸策略。\"\n  ],\n  \"risk_warning\": \"跌破MA20需止损\",\n  \"risk_manager\": {\n    \"schema_version\": \"risk-manager-result/v1\",\n    \"verdict\": \"pass\",\n    \"original_action\": \"buy\",\n    \"final_action\": \"buy\",\n    \"reason_codes\": [\n      \"no_risk_evidence\"\n    ],\n    \"reason_params\": {},\n    \"adjustment\": null,\n    \"evidence_codes\": [],\n    \"evidence_provenance\": [],\n    \"profile\": \"balanced\",\n    \"override_enabled\": true,\n    \"override_would_apply\": false,\n    \"exit_id\": \"orchestrator_multi_agent\",\n    \"evaluation_id\": \"<runtime-generated>\",\n    \"evaluated_at\": \"<runtime-evaluated-at>\",\n    \"authorized_bypass_id\": null,\n    \"fail_closed\": false\n  }\n}",
     "error": null
   }
 }
