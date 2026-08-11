@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "PR #1030 historical long-tail Settings inventory combined with the post-#1032 locale baseline. Affected chunks were remeasured locally with a production build and 200 B headroom, with no i18n baseline expansion.",
+  "baselineNote": "PR #1030 historical long-tail Settings inventory combined with current main planning, plugin, agent/report, validation-error, and portfolio-risk locales. Affected chunks were remeasured from the merged production build with 200 B headroom and no i18n baseline expansion.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 230136,
-      "measuredGzipBytes": 229936,
-      "note": "Remeasured after historical long-tail Settings help inventory (PR #1030); measured 229936 B + 200 B headroom."
+      "maxGzipBytes": 231056,
+      "measuredGzipBytes": 230856,
+      "note": "Remeasured after merging historical long-tail Settings help with current main inventories (PR #1030); measured 230856 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 148843,
-      "measuredGzipBytes": 148643,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 148643 B + 200 B headroom."
+      "maxGzipBytes": 149519,
+      "measuredGzipBytes": 149319,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 149319 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 142245,
-      "measuredGzipBytes": 142045,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 142045 B + 200 B headroom."
+      "maxGzipBytes": 142907,
+      "measuredGzipBytes": 142707,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 142707 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 142481,
-      "measuredGzipBytes": 142281,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 142281 B + 200 B headroom."
+      "maxGzipBytes": 143100,
+      "measuredGzipBytes": 142900,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 142900 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 142871,
-      "measuredGzipBytes": 142671,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 142671 B + 200 B headroom."
+      "maxGzipBytes": 143459,
+      "measuredGzipBytes": 143259,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 143259 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 138572,
-      "measuredGzipBytes": 138372,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 138372 B + 200 B headroom."
+      "maxGzipBytes": 139161,
+      "measuredGzipBytes": 138961,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 138961 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 135116,
-      "measuredGzipBytes": 134916,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 134916 B + 200 B headroom."
+      "maxGzipBytes": 135767,
+      "measuredGzipBytes": 135567,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 135567 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 128742,
-      "measuredGzipBytes": 128542,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 128542 B + 200 B headroom."
+      "maxGzipBytes": 129354,
+      "measuredGzipBytes": 129154,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 129154 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 128780,
-      "measuredGzipBytes": 128580,
-      "note": "Remeasured after historical long-tail Settings translations (PR #1030); measured 128580 B + 200 B headroom."
+      "maxGzipBytes": 129408,
+      "measuredGzipBytes": 129208,
+      "note": "Remeasured after merging historical long-tail Settings translations with current main (PR #1030); measured 129208 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
