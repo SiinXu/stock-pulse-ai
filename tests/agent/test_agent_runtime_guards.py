@@ -27,6 +27,7 @@ from src.agent.runtime.guards import (
     StageFailurePolicy,
     log_runtime_guard_event,
 )
+from src.agent.runtime import ExecutionContext, ExecutionLifecycle, ExecutionMode
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.runtime_facts import DegradationBoundary
 from src.agent.tools.registry import (
@@ -968,6 +969,95 @@ def test_uncaught_noncritical_stage_exception_isolated_and_pipeline_continues(ca
         for event in events
     )
     assert all("provider payload" not in json.dumps(event) for event in events)
+
+
+def test_stream_lifecycle_cancel_probe_survives_stage_context_isolation():
+    orchestrator = AgentOrchestrator(
+        tool_registry=_echo_registry(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(agent_orchestrator_timeout_s=0),
+        runtime_guard_policy=_policy(),
+    )
+    lifecycle = ExecutionLifecycle(
+        ExecutionContext(
+            mode=ExecutionMode.CHAT,
+            prompt="test",
+            session_id="stream-isolation-test",
+            request_context={"nested": {"value": 1}},
+        )
+    )
+    ctx = AgentContext(query="test")
+    ctx.meta["response_mode"] = "chat"
+    cancelled_probe = lifecycle.cancelled_check
+    ctx.meta["_approval_cancelled_check"] = cancelled_probe
+    agent = SimpleNamespace(agent_name="technical")
+
+    with patch.object(
+        orchestrator,
+        "_run_stage_agent",
+        return_value=StageResult(
+            stage_name="technical",
+            status=StageStatus.COMPLETED,
+        ),
+    ):
+        result, staged_ctx = orchestrator._execute_isolated_stage(
+            agent,
+            ctx,
+            stage_name="technical",
+            progress_callback=None,
+            timeout_seconds=None,
+            cancelled_check=cancelled_probe,
+        )
+
+    assert result.status is StageStatus.COMPLETED
+    assert staged_ctx is not ctx
+    assert staged_ctx.meta["_approval_cancelled_check"] is cancelled_probe
+
+
+def test_pipeline_isolates_stream_lifecycle_cancel_probe_without_mappingproxy_error():
+    orchestrator = AgentOrchestrator(
+        tool_registry=_echo_registry(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(agent_orchestrator_timeout_s=0),
+        runtime_guard_policy=_policy(),
+    )
+    lifecycle = ExecutionLifecycle(
+        ExecutionContext(
+            mode=ExecutionMode.CHAT,
+            prompt="test",
+            session_id="stream-pipeline-test",
+            request_context={"nested": {"value": 1}},
+        )
+    )
+    ctx = AgentContext(query="test")
+    ctx.meta["response_mode"] = "chat"
+    cancelled_probe = lifecycle.cancelled_check
+    agents = [
+        SimpleNamespace(agent_name="technical"),
+        SimpleNamespace(agent_name="decision"),
+    ]
+
+    def _run_stage(agent, _ctx, **_kwargs):
+        return StageResult(
+            stage_name=agent.agent_name,
+            status=StageStatus.COMPLETED,
+            meta={"raw_text": "done" if agent.agent_name == "decision" else ""},
+        )
+
+    with patch.object(
+        orchestrator,
+        "_build_agent_chain",
+        return_value=agents,
+    ), patch.object(orchestrator, "_run_stage_agent", side_effect=_run_stage):
+        result = orchestrator._execute_pipeline(
+            ctx,
+            parse_dashboard=False,
+            cancelled_check=cancelled_probe,
+        )
+
+    assert result.success is True
+    assert result.content == "done"
+    assert ctx.meta["_approval_cancelled_check"] is cancelled_probe
 
 
 def test_stage_timeout_isolates_late_context_and_continues(caplog):

@@ -6,6 +6,7 @@ import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../../utils/marketPhase';
+import { getMarketLightColor } from '../../utils/marketReview';
 import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -29,6 +30,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
   const { language, t } = useUiLanguage();
   const sentimentScore = typeof item.sentimentScore === 'number' ? item.sentimentScore : null;
   const sentimentColor = sentimentScore !== null ? getSentimentColor(sentimentScore) : null;
+  const marketLightColor = getMarketLightColor(sentimentScore ?? 50);
   const stockName = item.stockName || item.stockCode;
   const actionLabels = buildDecisionActionLabelMap(t);
   const operationLabel = getDecisionActionLabel(
@@ -55,7 +57,11 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
       >
         <div className="relative z-10 flex w-full items-center gap-2">
           {isMarketReview ? (
-            <div className="h-2 w-2 flex-shrink-0 rounded-full bg-warning" />
+            <div
+              data-testid="market-light-indicator"
+              className="h-2 w-2 flex-shrink-0 rounded-full"
+              style={{ backgroundColor: marketLightColor }}
+            />
           ) : sentimentColor ? (
             <div
               className="h-2 w-2 rounded-full flex-shrink-0"
@@ -78,7 +84,12 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                   <Badge
                     variant="default"
                     size="sm"
-                    className="shrink-0 border-warning/30 bg-warning/10 text-xs font-semibold leading-none text-warning shadow-none"
+                    className="shrink-0 text-xs font-semibold leading-none shadow-none"
+                    style={{
+                      color: marketLightColor,
+                      borderColor: `${marketLightColor}30`,
+                      backgroundColor: `${marketLightColor}10`,
+                    }}
                   >
                     {t('stockBar.market')}
                   </Badge>

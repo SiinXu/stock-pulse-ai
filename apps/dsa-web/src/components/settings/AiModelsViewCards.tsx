@@ -27,6 +27,7 @@ import { AiOverviewMatrix } from './AiOverviewMatrix';
 import type { ModelReferenceReplacement } from './llmChannelEditorModel';
 import type { ModelAccessFieldFocusRequest } from '../../utils/modelAccessFieldKey';
 import { TASK_MODEL_KEYS } from './aiModelsViewModel';
+import { CLI_AGENT_CAPABILITY_NOTE, isGenerationOnlyBackend } from './aiTaskMatrix';
 // Barrel imports so SettingsPage.testHarness mocks apply to nested cards.
 import {
   LLMChannelEditor,
@@ -132,6 +133,13 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
 }) => {
   const { language: uiLanguage } = useUiLanguage();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
+  const generationBackend = (allValuesByKey.GENERATION_BACKEND || 'litellm').trim();
+  const configuredAgentBackend = (allValuesByKey.AGENT_GENERATION_BACKEND || 'auto').trim();
+  const agentBackend = configuredAgentBackend === 'auto'
+    ? generationBackend
+    : configuredAgentBackend;
+  const usesGenerationOnlyBackend = isGenerationOnlyBackend(generationBackend)
+    || isGenerationOnlyBackend(agentBackend);
   const generationBackendItem = taskRoutingItems.find((item) => item.key === 'GENERATION_BACKEND');
   const modelRoutingItems = taskRoutingItems.filter((item) => item.key !== 'GENERATION_BACKEND');
 
@@ -141,16 +149,23 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
       description={settingsText.taskRoutingDescription}
     >
       {generationBackendItem ? (
-        <SettingsField
-          item={generationBackendItem}
-          value={generationBackendItem.value}
-          disabled={isSaving}
-          onChange={setDraftValue}
-          issues={issueByKey.GENERATION_BACKEND || []}
-          requirement={resolveFieldRequirement(generationBackendItem.schema?.contract, allValuesByKey)}
-          dependencyLocked={!isFieldEnabledByContract(generationBackendItem.schema?.contract, allValuesByKey)}
-          readOnlyDiagnostic={readOnlyDiagnosticForItem(generationBackendItem, 'ai_model')}
-        />
+        <div className="mb-3 overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+          <SettingsField
+            item={generationBackendItem}
+            value={generationBackendItem.value}
+            disabled={isSaving}
+            onChange={setDraftValue}
+            issues={issueByKey.GENERATION_BACKEND || []}
+            requirement={resolveFieldRequirement(generationBackendItem.schema?.contract, allValuesByKey)}
+            dependencyLocked={!isFieldEnabledByContract(generationBackendItem.schema?.contract, allValuesByKey)}
+            readOnlyDiagnostic={readOnlyDiagnosticForItem(generationBackendItem, 'ai_model')}
+          />
+        </div>
+      ) : null}
+      {usesGenerationOnlyBackend ? (
+        <p className="mb-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
+          {CLI_AGENT_CAPABILITY_NOTE[uiLanguage]}
+        </p>
       ) : null}
       {availableModelsError ? (
         <SettingsAlert

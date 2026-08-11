@@ -64,6 +64,15 @@ def _execute_tools(
         redacted = redact_sensitive_data(value)
         return redacted if isinstance(redacted, dict) else {}
 
+    def _safe_tool_result_preview(value: Any) -> str:
+        redacted = redact_sensitive_data(value)
+        rendered = (
+            redacted
+            if isinstance(redacted, str)
+            else json.dumps(redacted, ensure_ascii=False, default=str)
+        )
+        return rendered[:1200]
+
     def _exec_single(tc_item, completion_fence=None):
         """Execute one tool with an optional per-dispatch completion fence."""
         if completion_fence is None:
@@ -110,11 +119,13 @@ def _execute_tools(
     if len(tool_calls) == 1:
         tc = tool_calls[0]
         tool_name = _safe_tool_trace_name(tc.name)
+        safe_arguments = _safe_tool_trace_arguments(tc.arguments)
         if progress_callback:
             progress_callback(stream_event(
                 "tool_start",
                 step=step,
                 tool=tool_name,
+                meta={"arguments": safe_arguments},
             ))
         start_event = emit_tool_start(
             tool_name,
@@ -157,6 +168,7 @@ def _execute_tools(
                 pool.shutdown(wait=not timeout_triggered, cancel_futures=timeout_triggered)
         else:
             _, result_str, success, dur, cached, guard_result = _exec_single(tc)
+        result_preview = _safe_tool_result_preview(result_str)
         if progress_callback:
             progress_callback(stream_event(
                 "tool_done",
@@ -164,6 +176,12 @@ def _execute_tools(
                 tool=tool_name,
                 success=success,
                 duration=dur,
+                meta={
+                    "arguments": safe_arguments,
+                    "cached": cached,
+                    "result_length": len(result_str),
+                    "result_preview": result_preview,
+                },
             ))
         duration_ms = None
         try:
@@ -183,9 +201,9 @@ def _execute_tools(
         log_entry = {
             "step": step,
             "tool": tool_name,
-            "arguments": _safe_tool_trace_arguments(tc.arguments),
+            "arguments": safe_arguments,
             "success": success, "duration": dur, "result_length": len(result_str),
-            "cached": cached,
+            "cached": cached, "result_preview": result_preview,
         }
         if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0 and not success:
             try:
@@ -207,6 +225,8 @@ def _execute_tools(
             """Record one accepted parallel result in the existing output shape."""
             tc_item, result_str, success, dur, cached, guard_result = execution_result
             tool_name = _safe_tool_trace_name(tc_item.name)
+            safe_arguments = _safe_tool_trace_arguments(tc_item.arguments)
+            result_preview = _safe_tool_result_preview(result_str)
             if progress_callback:
                 progress_callback(stream_event(
                     "tool_done",
@@ -214,6 +234,12 @@ def _execute_tools(
                     tool=tool_name,
                     success=success,
                     duration=dur,
+                    meta={
+                        "arguments": safe_arguments,
+                        "cached": cached,
+                        "result_length": len(result_str),
+                        "result_preview": result_preview,
+                    },
                 ))
             duration_ms = None
             try:
@@ -233,11 +259,12 @@ def _execute_tools(
             log_entry = {
                 "step": step,
                 "tool": tool_name,
-                "arguments": _safe_tool_trace_arguments(tc_item.arguments),
+                "arguments": safe_arguments,
                 "success": success,
                 "duration": dur,
                 "result_length": len(result_str),
                 "cached": cached,
+                "result_preview": result_preview,
             }
             if timed_out:
                 log_entry["timeout"] = True
@@ -254,11 +281,13 @@ def _execute_tools(
         tool_span_by_id: Dict[str, Optional[str]] = {}
         for tc in tool_calls:
             tool_name = _safe_tool_trace_name(tc.name)
+            safe_arguments = _safe_tool_trace_arguments(tc.arguments)
             if progress_callback:
                 progress_callback(stream_event(
                     "tool_start",
                     step=step,
                     tool=tool_name,
+                    meta={"arguments": safe_arguments},
                 ))
             start_event = emit_tool_start(
                 tool_name,

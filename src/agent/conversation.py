@@ -51,9 +51,28 @@ class ConversationSession:
         compare=False,
     )
 
-    def add_message(self, role: str, content: str) -> int:
+    def add_message(
+        self,
+        role: str,
+        content: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> int:
         """Add a message to the session history."""
-        message_id = get_db().save_conversation_message(self.session_id, role, content)
+        message_id = (
+            get_db().save_conversation_message(
+                self.session_id,
+                role,
+                content,
+                context=context,
+            )
+            if context
+            else get_db().save_conversation_message(
+                self.session_id,
+                role,
+                content,
+            )
+        )
         with self._context_lock:
             self.last_active = datetime.now()
         return message_id
@@ -257,9 +276,18 @@ class ConversationManager:
 
             return self._sessions[session_id]
 
-    def add_message(self, session_id: str, role: str, content: str) -> int:
+    def add_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> int:
         """Add a message to a session."""
         session = self.get_or_create(session_id)
+        if context:
+            return session.add_message(role, content, context=context)
         return session.add_message(role, content)
 
     def add_user_message(

@@ -99,7 +99,8 @@ describe('GenerationBackendStatusPanel', () => {
     expect(previewGenerationBackendStatus).not.toHaveBeenCalled();
     expect(await screen.findByText('codex_cli')).toBeInTheDocument();
     expect(screen.getByText('仅生成')).toBeInTheDocument();
-    expect(screen.getByText(/本地 CLI 只用于报告和文本生成/)).toBeInTheDocument();
+    expect(screen.getByText(/本地 CLI 可用于报告、文本生成，并通过受控桥接请求问股工具/))
+      .toBeInTheDocument();
   });
 
   it('previews unsaved draft generation backend status', async () => {

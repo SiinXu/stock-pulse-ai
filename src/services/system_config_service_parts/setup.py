@@ -12,7 +12,6 @@ if TYPE_CHECKING:
         Any,
         CODEX_CLI_BACKEND_ID,
         Dict,
-        GENERATION_ONLY_BACKEND_IDS,
         HERMES_DEFAULT_BASE_URL,
         HERMES_DEFAULT_MODEL,
         HERMES_DEFAULT_PROTOCOL,
@@ -337,8 +336,8 @@ class _SystemConfigSetupMethods:
                 "agent",
                 True,
                 "optional",
-                "已确认暂不使用问股 Agent。CLI 后端仅覆盖报告生成；问股 Agent 需要支持工具调用的 API 模型。",
-                "需要启用 Agent 时，请关闭「确认暂不使用 Agent 功能」，并配置 API 模型连接。",
+                "已确认暂不使用问股 Agent。",
+                "需要启用 Agent 时，请关闭「确认暂不使用 Agent 功能」，并配置可用的 API 模型或本地 CLI。",
             )
         return check
 
@@ -365,15 +364,30 @@ class _SystemConfigSetupMethods:
             effective_map.get("AGENT_GENERATION_BACKEND"),
             default=AUTO_AGENT_BACKEND_ID,
         )
-        if agent_backend in GENERATION_ONLY_BACKEND_IDS:
+        effective_agent_backend = (
+            generation_backend
+            if agent_backend == AUTO_AGENT_BACKEND_ID
+            else agent_backend
+        )
+        if effective_agent_backend in LOCAL_CLI_GENERATION_BACKEND_IDS:
+            preset = resolve_local_cli_preset(effective_agent_backend)
+            if shutil.which(preset.executable):
+                return self._setup_check(
+                    "llm_agent",
+                    "Agent 模型",
+                    "agent",
+                    True,
+                    "configured",
+                    f"问股 Agent 将通过受控工具桥接使用 {preset.display_name}。",
+                )
             return self._setup_check(
                 "llm_agent",
                 "Agent 模型",
                 "agent",
                 True,
                 "needs_action",
-                f"Agent 工具调用暂不支持 {agent_backend} text-only backend。",
-                "请将 Agent 生成方式设为自动或默认模型配置，并配置支持工具调用的模型连接。",
+                f"问股 Agent 已选择 {preset.display_name}，但未找到可执行文件。",
+                f"请安装并登录 {preset.display_name}，或选择其他 Agent 生成方式。",
             )
 
         agent_model_raw = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()

@@ -327,7 +327,7 @@ export function registerSettingsPageLlmTests(): void {
       });
       const inspect = screen.getByRole('button', { name: 'inspect existing connection' });
       expect(inspect).toBeEnabled();
-      expect(screen.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /添加模型来源/ })).toBeDisabled();
       fireEvent.click(inspect);
       expect(screen.getByRole('dialog', { name: 'existing connection inspection' })).toBeInTheDocument();
 
@@ -560,7 +560,7 @@ export function registerSettingsPageLlmTests(): void {
 
     // The AI & Models section is active and its second-level view options render.
     expect(screen.getByRole('button', { name: /AI 与模型/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('radio', { name: '模型接入' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '模型来源' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: '任务路由' })).toBeInTheDocument();
 
     // Clicking a first-level section pushes the canonical section/view URL
@@ -581,7 +581,7 @@ export function registerSettingsPageLlmTests(): void {
 
     const { rerender } = render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '前往模型接入' }));
+    fireEvent.click(await screen.findByRole('button', { name: '前往模型来源' }));
     const [modelAccessParams, modelAccessOptions] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(modelAccessParams?.get('section')).toBe('ai_models');
     expect(modelAccessParams?.get('view')).toBe('connections');
@@ -774,6 +774,7 @@ export function registerSettingsPageLlmTests(): void {
     const modelTriggers = document.querySelectorAll('button[aria-haspopup="listbox"]');
     expect(modelTriggers.length).toBeGreaterThanOrEqual(3);
     expect(screen.getByTestId('settings-field-GENERATION_BACKEND')).toHaveTextContent('Codex CLI (experimental)');
+    expect(screen.getByTestId('cli-agent-capability-note')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LLM_TEMPERATURE')).toBeInTheDocument();
     // Fallback order is NOT an editable field here; it is a read-only summary.
     expect(screen.queryByTestId('settings-field-LITELLM_FALLBACK_MODELS')).not.toBeInTheDocument();

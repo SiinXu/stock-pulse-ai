@@ -377,7 +377,8 @@ export function registerSettingsPageIntegrationTests(): void {
 
     render(<SettingsPage />);
 
-    expect(screen.getByText('有 1 项配置需要修正')).toBeInTheDocument();
+    const summaryTitle = screen.getByText('有 1 项配置需要修正');
+    expect(summaryTitle.closest('[data-overlay-root="toast"]')).not.toBeNull();
     expect(screen.getByText('企业微信 Webhook 地址格式不正确')).toBeInTheDocument();
 
     // Clicking the summary entry navigates to the section that owns the field.
@@ -385,6 +386,50 @@ export function registerSettingsPageIntegrationTests(): void {
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('notifications');
     expect(nextParams?.get('view')).toBe('channels');
+  });
+
+  it('dismisses the current validation summary and reopens for changed errors', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      issueByKey: {
+        WECHAT_WEBHOOK_URL: [
+          { key: 'WECHAT_WEBHOOK_URL', code: 'invalid', message: '企业微信 Webhook 地址格式不正确', severity: 'error' },
+        ],
+      },
+    }));
+
+    const { rerender } = render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(screen.queryByText('有 1 项配置需要修正')).not.toBeInTheDocument();
+
+    // A new validation error reopens the summary instead of preserving a stale dismissal.
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      issueByKey: {
+        LITELLM_MODEL: [
+          { key: 'LITELLM_MODEL', code: 'invalid', message: '主模型不可用', severity: 'error' },
+        ],
+      },
+    }));
+    rerender(<SettingsPage />);
+    expect(screen.getByText('主模型不可用')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['saveError', '配置保存失败'],
+    ['loadError', '配置加载失败'],
+  ] as const)('renders %s in the top toast viewport', (errorKey, title) => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      [errorKey]: {
+        title,
+        message: '请稍后重试。',
+        rawMessage: title,
+        category: 'http_error',
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText(title).closest('[data-overlay-root="toast"]')).not.toBeNull();
   });
 
   it.each(['de', 'ja', 'zh-TW'] as const)(

@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "Current main includes PR #1040 reasoning-trace export controls. PR #938 adds the Portfolio URL contract and 27 translated wizard keys across all eight additional locales; combined locale ceilings use the current-main measurement plus each isolated PR #938 delta and 200 B headroom, with no identical-to-English baseline expansion.",
+  "baselineNote": "Integration rebuild on current main. Changed chunks use the GitHub Actions Linux gzip measurement from PR #1050 plus 200 B headroom; untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 231961,
-      "measuredGzipBytes": 231761,
-      "note": "Rebaselined after adding reasoning-trace export controls (PR #1040); measured 231761 B + 200 B headroom."
+      "maxGzipBytes": 233722,
+      "measuredGzipBytes": 233522,
+      "note": "GitHub Actions Linux measurement after the integrated Settings changes in PR #1050; measured 233522 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 151579,
-      "measuredGzipBytes": 151379,
-      "note": "Current main measured 150477 B; PR #938 adds an isolated 902 B Portfolio translation delta. Combined ceiling 151379 B + 200 B headroom."
+      "maxGzipBytes": 152369,
+      "measuredGzipBytes": 152169,
+      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 152169 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 144885,
-      "measuredGzipBytes": 144685,
-      "note": "Current main measured 143830 B; PR #938 adds an isolated 855 B Portfolio translation delta. Combined ceiling 144685 B + 200 B headroom."
+      "maxGzipBytes": 146022,
+      "measuredGzipBytes": 145822,
+      "note": "Remeasured after the integration rebuild translation additions; measured 145822 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 144954,
-      "measuredGzipBytes": 144754,
-      "note": "Current main measured 143972 B; PR #938 adds an isolated 782 B Portfolio translation delta. Combined ceiling 144754 B + 200 B headroom."
+      "maxGzipBytes": 145723,
+      "measuredGzipBytes": 145523,
+      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 145523 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 145247,
-      "measuredGzipBytes": 145047,
-      "note": "Current main measured 144303 B; PR #938 adds an isolated 744 B Portfolio translation delta. Combined ceiling 145047 B + 200 B headroom."
+      "maxGzipBytes": 145994,
+      "measuredGzipBytes": 145794,
+      "note": "Remeasured after the integration rebuild translation additions; measured 145794 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 141046,
-      "measuredGzipBytes": 140846,
-      "note": "Current main measured 139997 B; PR #938 adds an isolated 849 B Portfolio translation delta. Combined ceiling 140846 B + 200 B headroom."
+      "maxGzipBytes": 141744,
+      "measuredGzipBytes": 141544,
+      "note": "Remeasured after the integration rebuild translation additions; measured 141544 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 137492,
-      "measuredGzipBytes": 137292,
-      "note": "Current main measured 136575 B; PR #938 adds an isolated 717 B Portfolio translation delta. Combined ceiling 137292 B + 200 B headroom."
+      "maxGzipBytes": 138341,
+      "measuredGzipBytes": 138141,
+      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 138141 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 131088,
-      "measuredGzipBytes": 130888,
-      "note": "Current main measured 130148 B; PR #938 adds an isolated 740 B Portfolio translation delta. Combined ceiling 130888 B + 200 B headroom."
+      "maxGzipBytes": 131717,
+      "measuredGzipBytes": 131517,
+      "note": "Remeasured after the integration rebuild translation additions; measured 131517 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 131131,
-      "measuredGzipBytes": 130931,
-      "note": "Current main measured 130213 B; PR #938 adds an isolated 718 B Portfolio translation delta. Combined ceiling 130931 B + 200 B headroom."
+      "maxGzipBytes": 131772,
+      "measuredGzipBytes": 131572,
+      "note": "Remeasured after the integration rebuild translation additions; measured 131572 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -158,9 +158,9 @@
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 26394,
-      "measuredGzipBytes": 26194,
-      "note": "Remeasured for PR #938 after lazy-loading the import wizard and workspace-tab surfaces; the remaining route growth implements the reactive Portfolio URL contract. Measured 26194 B + 200 B headroom."
+      "maxGzipBytes": 26363,
+      "measuredGzipBytes": 26163,
+      "note": "GitHub Actions Linux measurement after the integrated portfolio flow; measured 26163 B + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",

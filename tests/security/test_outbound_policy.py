@@ -194,6 +194,7 @@ def test_rejects_any_private_answer_from_mixed_dns_results() -> None:
 
 
 def test_proxy_fake_ip_dns_requires_explicit_opt_in(monkeypatch) -> None:
+    monkeypatch.delenv("OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP", raising=False)
     fake_ip_answers = [
         (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("198.18.0.93", 443)),
         (

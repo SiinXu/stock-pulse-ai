@@ -37,7 +37,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     PortfolioTrade ScheduledTaskRecord ScheduledTaskRunRecord Session StockDaily
     TaskQueueInflightRecord NotificationInboxReadStateRecord
     String T TYPE_CHECKING Text Tuple
-    TypeVar Union UniqueConstraint agent_history_public_fields and_
+    TypeVar Union UniqueConstraint agent_history_public_fields
+    agent_history_public_params and_
     apply_pending_within_transaction atexit contextmanager
     create_database_engine create_engine date datetime declarative_base delete
     desc event extract_sniper_points func get_config get_db hashlib inspect json
@@ -322,7 +323,7 @@ EXPECTED_GROUPS = (
             "get_conversation_messages",
             "delete_conversation_session",
         ),
-        "b11e857f79dc5f3a3026e86bf426ecb7a3df8ebb389be3e5304fdcca787bdefb",
+        "1136cdcd9d110ae9a87206a5fdb4a54faff9937bf974daa917d9db33184b8823",
     ),
     (
         "_UsageMethods",

@@ -167,6 +167,7 @@ const SettingsPage: React.FC = () => {
   const [setupSmokeError, setSetupSmokeError] = useState<ParsedApiError | null>(null);
   const [setupSmokeSuccess, setSetupSmokeSuccess] = useState('');
   const [llmChannelDraftItems, setLlmChannelDraftItems] = useState<SystemConfigUpdateItem[]>([]);
+  const [dismissedErrorSummaryFingerprint, setDismissedErrorSummaryFingerprint] = useState('');
   const [groupSaveStates, setGroupSaveStates] = useState<Record<string, SettingsGroupSaveState>>({});
   const groupSaveStatesRef = useRef<Record<string, SettingsGroupSaveState>>({});
   const pendingGroupsRef = useRef<Map<string, SystemConfigUpdateItem[]>>(new Map());
@@ -777,6 +778,13 @@ const SettingsPage: React.FC = () => {
     }
     return entries;
   }, [issueByKey, categoryByKey, configItemByKey, uiLanguage]);
+  const errorSummaryFingerprint = useMemo(
+    () => JSON.stringify(errorSummaryEntries.map((entry) => [entry.key, entry.message])),
+    [errorSummaryEntries],
+  );
+  const hasValidationSummary = errorSummaryEntries.length > 0;
+  const showErrorSummary = hasValidationSummary
+    && dismissedErrorSummaryFingerprint !== errorSummaryFingerprint;
   const jumpToErrorField = useCallback((entry: ErrorSummaryEntry) => {
     selectSectionView(entry.section as SettingsSectionId, entry.view);
     if (parseModelAccessFieldKey(entry.key)) {
@@ -1475,17 +1483,6 @@ const SettingsPage: React.FC = () => {
           actions={settingsSaveActions}
         />
 
-        {saveError ? (
-          <ApiErrorAlert
-            className="mt-3"
-            error={saveError}
-            actionLabel={retryAction === 'save' && lastSaveGroupRef.current ? settingsText.autosaveRetry : undefined}
-            onAction={retryAction === 'save' && lastSaveGroupRef.current
-              ? () => retryAutosaveGroup(lastSaveGroupRef.current!)
-              : undefined}
-          />
-        ) : null}
-
         {conflictState ? (
           <SettingsConflictPanel
             fields={conflictState.fields}
@@ -1494,15 +1491,6 @@ const SettingsPage: React.FC = () => {
           />
         ) : null}
       </div>
-
-      {loadError && activeSection !== SETTINGS_SECTION_IDS.usage ? (
-        <ApiErrorAlert
-          error={loadError}
-          actionLabel={retryAction === 'load' ? t('common.retry') : t('settings.reload')}
-          onAction={() => void retry()}
-          className="mb-4"
-        />
-      ) : null}
 
       {isLoading && activeSection !== SETTINGS_SECTION_IDS.usage ? (
         <SettingsLoading />
@@ -1538,11 +1526,6 @@ const SettingsPage: React.FC = () => {
                   onSelectView={(view) => selectSectionView(activeSection, view)}
                   language={uiLanguage}
                   tabsLabel={t('settings.categoryNavTitle')}
-                />
-                <SettingsErrorSummary
-                  entries={errorSummaryEntries}
-                  onJump={jumpToErrorField}
-                  language={uiLanguage}
                 />
                 {hasDirtyRestartRequired ? (
               <SettingsAlert
@@ -1867,10 +1850,17 @@ const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      {toast ? (
+      {(
+        showErrorSummary
+        || (!hasValidationSummary && (
+          saveError
+          || (loadError && activeSection !== SETTINGS_SECTION_IDS.usage)
+          || toast
+        ))
+      ) ? (
         <ToastViewport>
           <div
-            className="pointer-events-auto"
+            className="pointer-events-auto max-h-[calc(100dvh-2rem)] overflow-y-auto"
             onMouseEnter={() => setIsToastPaused(true)}
             onMouseLeave={() => setIsToastPaused(false)}
             onFocusCapture={() => setIsToastPaused(true)}
@@ -1880,15 +1870,37 @@ const SettingsPage: React.FC = () => {
               }
             }}
           >
-            {toast.type === 'success'
-              ? (
-                  <SettingsAlert
-                    title={t('settings.actionSuccess')}
-                    message={toast.message}
-                    variant="success"
-                  />
-                )
-              : <ApiErrorAlert error={toast.error} />}
+            {showErrorSummary ? (
+              <SettingsErrorSummary
+                entries={errorSummaryEntries}
+                onJump={jumpToErrorField}
+                language={uiLanguage}
+                dismissLabel={t('common.close')}
+                onDismiss={() => setDismissedErrorSummaryFingerprint(errorSummaryFingerprint)}
+              />
+            ) : !hasValidationSummary && saveError ? (
+              <ApiErrorAlert
+                error={saveError}
+                actionLabel={retryAction === 'save' && lastSaveGroupRef.current ? settingsText.autosaveRetry : undefined}
+                onAction={retryAction === 'save' && lastSaveGroupRef.current
+                  ? () => retryAutosaveGroup(lastSaveGroupRef.current!)
+                  : undefined}
+              />
+            ) : loadError && activeSection !== SETTINGS_SECTION_IDS.usage ? (
+              <ApiErrorAlert
+                error={loadError}
+                actionLabel={retryAction === 'load' ? t('common.retry') : t('settings.reload')}
+                onAction={() => void retry()}
+              />
+            ) : toast?.type === 'success' ? (
+              <SettingsAlert
+                title={t('settings.actionSuccess')}
+                message={toast.message}
+                variant="success"
+              />
+            ) : toast ? (
+              <ApiErrorAlert error={toast.error} />
+            ) : null}
           </div>
         </ToastViewport>
       ) : null}

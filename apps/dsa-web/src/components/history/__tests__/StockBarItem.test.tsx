@@ -19,6 +19,25 @@ const issue1600Item: StockBarItem = {
 };
 
 describe('StockBarItemComponent', () => {
+  it('renders a 60-point market review as a green market light', () => {
+    render(
+      <StockBarItemComponent
+        item={{
+          ...issue1600Item,
+          stockCode: 'MARKET',
+          stockName: '大盘复盘',
+          sentimentScore: 60,
+        }}
+        isViewing={false}
+        isMarketReview
+        onClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('market-light-indicator')).toHaveStyle({ backgroundColor: '#22c55e' });
+    expect(screen.getByText('大盘')).toHaveStyle({ color: '#22c55e' });
+  });
+
   it('keeps market phase in the meta row instead of the action row', () => {
     render(
       <StockBarItemComponent

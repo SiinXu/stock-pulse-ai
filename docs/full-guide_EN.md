@@ -214,6 +214,8 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 
 ## Complete Environment Variables List
 
+> The full key inventory and config-addition process live in [Environment variable inventory](environment-variables_EN.md). This section is a curated guide; after changing configuration, run `python scripts/check_config_doc_consistency.py` to check `.env.example`, registry, and docs alignment.
+
 ### AI Model Configuration
 
 > Full details: [LLM Config Guide](LLM_CONFIG_GUIDE_EN.md) (three-tier config, channels, Vision, Agent, troubleshooting).

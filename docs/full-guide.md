@@ -231,6 +231,8 @@ stock-pulse-ai/
 
 ## 环境变量完整列表
 
+> 完整键清单与配置项新增流程见 [环境变量清单与配置事实源](environment-variables.md)。本节只保留高频说明；修改配置后运行 `python scripts/check_config_doc_consistency.py` 检查 `.env.example`、注册表与文档是否同步。
+
 ### AI 模型配置
 
 > 完整说明见 [LLM 配置指南](LLM_CONFIG_GUIDE.md)（三层配置、渠道模式、Vision、Agent、排错）；常用服务商预设、Actions 变量对照和错误排障见 [LLM 服务商配置指南](llm-providers.md)。
