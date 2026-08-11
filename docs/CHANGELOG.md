@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Restore Analysis Workbench submission through the shared API service and present generic server failures as dismissible top Toasts with diagnostic trace IDs.
 - [Fixed] Prevent Deep Research from reporting blank successful conclusions by retrying empty planning and synthesis responses, parsing sequential plain-text sub-questions, enforcing the API deadline, prioritizing conclusions before long detail, and failing closed with a top Toast when no final report is available.
 - [Fixed] Persist bounded, redacted Agent tool-call details with successful replies and restore expandable details from conversation history without exposing provider traces or credentials.
 - [Fixed] Persist Deep Research prompts, reports, and stable failures in the current Agent conversation, refresh the conversation list on completion, and let disconnected page waits finish in the backend within the current server process.

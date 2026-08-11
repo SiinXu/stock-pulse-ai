@@ -164,8 +164,8 @@ def _coalesce_text(*values: Any) -> Optional[str]:
     return _analysis_api_service_cls().coalesce_text(*values)
 
 
-def _invalid_analysis_input_error() -> HTTPException:
-    return api_error(400, "invalid_stock_or_name", "请输入有效的股票代码或股票名称")
+def _invalid_analysis_input_error():
+    return _analysis_api_service_cls().invalid_analysis_input_error()
 
 
 def _is_obviously_invalid_analysis_input(text: str) -> bool:
@@ -315,81 +315,8 @@ def trigger_analysis(
         config: Config = Depends(get_config_dep),
         security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> Union[AnalysisResultResponse, JSONResponse]:
-    """
-    触发股票分析
-    
-    启动 AI 智能分析任务，支持单只或多只股票批量分析
-    
-    流程：
-    1. 校验请求参数
-    2. 异步模式：检查重复 -> 提交任务队列 -> 返回 202
-    3. 同步模式：直接执行分析 -> 返回 200
-    
-    Args:
-        request: 分析请求参数
-        config: 配置依赖
-        
-    Returns:
-        AnalysisResultResponse: 分析结果（同步模式）
-        TaskAccepted | BatchTaskAcceptedResponse: 任务已接受（异步模式，返回 202）
-        
-    Raises:
-        HTTPException: 400 - 请求参数错误
-        HTTPException: 409 - 股票正在分析中
-        HTTPException: 500 - 分析失败
-    """
-    # Validate request parameters
-    stock_codes = []
-    if request.stock_code:
-        stock_codes.append(request.stock_code)
-    if request.stock_codes:
-        stock_codes.extend(request.stock_codes)
-
-    if not stock_codes:
-        raise api_error(400, "missing_stock_params", "必须提供 stock_code 或 stock_codes 参数")
-
-    # Normalize and de-duplicate inputs while preserving compatibility.
-    resolved = [_resolve_and_normalize_input(c) for c in stock_codes]
-    
-    seen = set()
-    unique_codes = []
-    for code in resolved:
-        if not code:
-            continue
-        # Use normalize_stock_code to ensure '600519' and '600519.SH' are merged
-        norm = normalize_stock_code(code)
-        if norm not in seen:
-            seen.add(norm)
-            unique_codes.append(code)
-    
-    stock_codes = unique_codes
-
-    # Limit the number of stocks in a single request to prevent DoS
-    MAX_BATCH_SIZE = 50
-    if len(stock_codes) > MAX_BATCH_SIZE:
-        raise api_error(
-            400,
-            "analysis_batch_limit_exceeded",
-            f"单次分析请求最多支持 {MAX_BATCH_SIZE} 只股票",
-            params={"max_batch_size": MAX_BATCH_SIZE},
-        )
-
-    if not stock_codes:
-        raise api_error(400, "empty_stock_code", "股票代码不能为空或仅包含空白字符")
-
-    # Sync mode only supports single-stock analysis.
-    if not request.async_mode:
-        if len(stock_codes) > 1:
-            raise api_error(
-                400,
-                "sync_mode_batch_unsupported",
-                "同步模式仅支持单只股票分析，请使用 async_mode=true 进行批量分析",
-            )
-        return _handle_sync_analysis(stock_codes[0], request)
-
-    # Async mode submits one task per stock.
-    return _handle_async_analysis_batch(
-        stock_codes,
+    """Trigger stock analysis (sync or async)."""
+    return _analysis_api_service().trigger_analysis(
         request,
         config=config,
         security_audit=security_audit,

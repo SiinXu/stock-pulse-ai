@@ -557,6 +557,33 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     }));
   });
 
+  it('shows generic analysis submission failures only in the top toast', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(
+      createApiError(createParsedApiError({
+        title: '服务器处理失败',
+        message: '请稍后重试，并在问题持续时提供诊断编号。',
+        code: 'internal_error',
+        status: 500,
+        traceId: 'trace-analysis-500',
+      })),
+    );
+    useStockPoolStore.setState({ query: 'NVTS', selectionSource: 'manual' });
+    renderWorkbench();
+
+    const stockSearch = await screen.findByRole('combobox', { name: '股票搜索' });
+    const launchPanel = stockSearch.closest('[role="tabpanel"]')!;
+    const analyzeButton = within(launchPanel).getByRole('button', { name: '分析' });
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    fireEvent.click(analyzeButton);
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1));
+    const toast = await screen.findByRole('alert');
+    expect(toast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(toast).toHaveTextContent('服务器处理失败');
+    expect(toast).toHaveTextContent('trace-analysis-500');
+    expect(screen.queryByTestId('actionable-api-error-inline')).toBeNull();
+  });
+
   it('retries a failed launch with the exact captured request instead of clearing it', async () => {
     vi.mocked(agentApi.getSkills).mockResolvedValue({
       skills: [{ id: 'retry-strategy', name: 'Retry strategy', description: 'Retry strategy' }],

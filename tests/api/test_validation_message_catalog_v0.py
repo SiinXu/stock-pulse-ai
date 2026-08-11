@@ -64,11 +64,8 @@ def test_empty_stock_code_after_whitespace_filter() -> None:
 
 def test_analysis_batch_limit_exceeded_includes_max_param() -> None:
     codes = [f"{600000 + i}" for i in range(51)]
-    with patch("api.v1.endpoints.analysis.is_code_like", return_value=True), patch(
+    with patch(
         "api.v1.endpoints.analysis.resolve_index_stock_code_for_analysis",
-        side_effect=lambda c: c,
-    ), patch(
-        "api.v1.endpoints.analysis.normalize_stock_code",
         side_effect=lambda c: c,
     ):
         with pytest.raises(HTTPException) as exc_info:
@@ -83,11 +80,8 @@ def test_analysis_batch_limit_exceeded_includes_max_param() -> None:
 
 
 def test_sync_mode_batch_unsupported() -> None:
-    with patch("api.v1.endpoints.analysis.is_code_like", return_value=True), patch(
+    with patch(
         "api.v1.endpoints.analysis.resolve_index_stock_code_for_analysis",
-        side_effect=lambda c: c,
-    ), patch(
-        "api.v1.endpoints.analysis.normalize_stock_code",
         side_effect=lambda c: c,
     ):
         with pytest.raises(HTTPException) as exc_info:

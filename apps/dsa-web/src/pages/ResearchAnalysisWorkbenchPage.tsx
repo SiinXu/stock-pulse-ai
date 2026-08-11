@@ -38,6 +38,7 @@ import { TaskPanel } from '../components/tasks';
 import type { WatchlistAnalyzeMode } from '../components/watchlist/HomeStockWorkspace';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { useAnalysisWorkbenchErrorContract } from '../hooks/useAnalysisWorkbenchErrorContract';
+import { useAnalysisErrorToast } from '../hooks/useAnalysisErrorToast';
 import { useAnalysisWorkbenchState } from '../hooks/useAnalysisWorkbenchState';
 import { useDashboardLifecycle } from '../hooks/useDashboardLifecycle';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -1036,10 +1037,11 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     lastBatchIntentRef.current = null;
     setBatchNotice(null);
   }, []);
+  const analysisErrorIsToastOnly = useAnalysisErrorToast(error, clearError);
   const hasWorkbenchErrorNotice = Boolean(
     inputError
     || duplicateError
-    || error
+    || (error && !analysisErrorIsToastOnly)
     || reportDetailError
     || runFlowError
     || batchNotice,
@@ -1087,7 +1089,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             inputError={inputError}
             duplicateError={duplicateError}
             duplicateTask={duplicateTask}
-            analysisError={error}
+            analysisError={analysisErrorIsToastOnly ? null : error}
             reportDetailError={reportDetailError}
             runFlowError={runFlowError}
             batchNotice={batchNotice}
