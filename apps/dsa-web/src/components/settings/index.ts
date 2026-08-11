@@ -7,6 +7,8 @@ export * from './NotificationTestPanel';
 export * from './NotificationChannelsPanel';
 export * from './DataProvidersPanel';
 export * from './dataProviders';
+export * from './AgentBehaviorPanel';
+export * from './agentSetupPresets';
 export * from './notificationChannels';
 export * from './notificationFieldGroups';
 export * from './categoryFieldGroups';

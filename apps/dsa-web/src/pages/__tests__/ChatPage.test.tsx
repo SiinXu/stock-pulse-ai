@@ -243,7 +243,11 @@ beforeEach(() => {
   mockStartNewChat.mockReturnValue('session-new');
   mockSwitchSession.mockResolvedValue(true);
   mockStartStream.mockReset();
-  mockStartStream.mockResolvedValue(undefined);
+  mockStartStream.mockResolvedValue({
+    terminal: 'completed',
+    persistence: 'persisted',
+    turnId: 'turn-default',
+  });
 });
 
 describe('ChatPage', () => {
@@ -1420,6 +1424,11 @@ describe('ChatPage', () => {
         rawMessage: 'upstream disconnected',
         category: 'upstream_network',
       });
+      return {
+        terminal: 'failed',
+        persistence: 'not_persisted',
+        turnId: 'turn-failed',
+      };
     });
 
     const router = createMemoryRouter(
@@ -1444,6 +1453,111 @@ describe('ChatPage', () => {
       });
       expect(params.context).toBeUndefined();
     });
+  });
+
+  it('keeps unsent report query params and restores the draft when the user aborts the stream', async () => {
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      meta: {
+        id: 3,
+        queryId: 'q-3',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        createdAt: '2026-03-18T10:00:00Z',
+        currentPrice: 210,
+        changePct: 1.1,
+      },
+      summary: {
+        analysisSummary: 'Stable',
+        operationAdvice: 'Hold',
+        trendPrediction: 'Range',
+        sentimentScore: 70,
+      },
+      strategy: {
+        stopLoss: '200',
+      },
+    });
+
+    // User-abort shape: startStream resolves without lastFailedRequest (retry stays inert).
+    mockStartStream.mockImplementationOnce(async () => ({
+      terminal: 'aborted',
+      persistence: 'not_persisted',
+      turnId: 'turn-aborted',
+    }));
+
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=3'] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toContain('session=session-1'));
+    fireEvent.click(await getReadySendButton());
+
+    await waitFor(() => {
+      expect(mockStartStream).toHaveBeenCalled();
+      expect(screen.getByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+      const params = Object.fromEntries(new URLSearchParams(router.state.location.search));
+      expect(params).toMatchObject({
+        stock: 'AAPL',
+        name: 'Apple',
+        recordId: '3',
+        session: 'session-1',
+      });
+      expect(params.context).toBeUndefined();
+    });
+  });
+
+  it('marks unknown persistence without recreating a resendable draft on refresh', async () => {
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      meta: {
+        id: 3,
+        queryId: 'q-3',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        createdAt: '2026-03-18T10:00:00Z',
+      },
+      summary: {
+        analysisSummary: 'Stable',
+        operationAdvice: 'Hold',
+        trendPrediction: 'Range',
+        sentimentScore: 70,
+      },
+      strategy: {},
+    });
+    mockStartStream.mockResolvedValueOnce({
+      terminal: 'failed',
+      persistence: 'unknown',
+      turnId: 'turn-unknown',
+    });
+
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=3'] },
+    );
+    const firstRender = render(<RouterProvider router={router} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    fireEvent.click(await getReadySendButton());
+    await waitFor(() => {
+      expect(new URLSearchParams(router.state.location.search).get('context'))
+        .toBe('unknown');
+      expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
+    });
+
+    const refreshEntry = `${router.state.location.pathname}${router.state.location.search}`;
+    firstRender.unmount();
+    const refreshedRouter = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: [refreshEntry] },
+    );
+    render(<RouterProvider router={refreshedRouter} />);
+
+    await screen.findByRole('heading', { name: '问股' });
+    expect(screen.queryByDisplayValue('请深入分析 Apple(AAPL)')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
   });
 
   it('finishes report context hydration after StrictMode replays mount effects', async () => {

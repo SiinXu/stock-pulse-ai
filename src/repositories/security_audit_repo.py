@@ -51,9 +51,12 @@ class SecurityAuditRepository:
         )
         with self.db.get_session() as session:
             session.add(row)
+            session.flush()
+            row_id = int(row.id)
             session.commit()
-            session.refresh(row)
-            return self._to_event(row)
+        return SecurityAuditEvent.model_validate(
+            {"id": row_id, **event.model_dump()}
+        )
 
     def apply_retention(self, *, cutoff: datetime) -> int:
         cutoff_utc_naive = cutoff.astimezone(timezone.utc).replace(tzinfo=None)
@@ -61,6 +64,48 @@ class SecurityAuditRepository:
             result = session.execute(
                 delete(SecurityAuditEventRecord).where(
                     SecurityAuditEventRecord.occurred_at < cutoff_utc_naive
+                )
+            )
+            session.commit()
+            return int(result.rowcount or 0)
+
+    def apply_capacity(self, *, max_events: int) -> int:
+        """Delete oldest events when the table exceeds the hard capacity bound.
+
+        Capacity is a storage upper bound independent of time retention. Oldest
+        rows (by ``occurred_at``, then ``id``) are removed first so recent
+        privileged decisions remain queryable.
+        """
+        bound = int(max_events)
+        if bound < 1:
+            raise ValueError("security audit capacity must be at least one event")
+        with self.db.get_session() as session:
+            total = int(
+                session.execute(
+                    select(func.count(SecurityAuditEventRecord.id))
+                ).scalar()
+                or 0
+            )
+            excess = total - bound
+            if excess <= 0:
+                return 0
+            oldest_ids = list(
+                session.execute(
+                    select(SecurityAuditEventRecord.id)
+                    .order_by(
+                        SecurityAuditEventRecord.occurred_at.asc(),
+                        SecurityAuditEventRecord.id.asc(),
+                    )
+                    .limit(excess)
+                )
+                .scalars()
+                .all()
+            )
+            if not oldest_ids:
+                return 0
+            result = session.execute(
+                delete(SecurityAuditEventRecord).where(
+                    SecurityAuditEventRecord.id.in_(oldest_ids)
                 )
             )
             session.commit()

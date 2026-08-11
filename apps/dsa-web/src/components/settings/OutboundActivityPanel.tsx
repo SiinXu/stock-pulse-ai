@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { RefreshCw } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
@@ -8,7 +8,7 @@ import { outboundActivityApi } from '../../api/outboundActivity';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import type { LocalOnlyModeStatus, OutboundActivityItem } from '../../types/outboundActivity';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Badge, EmptyState, IconButton, StatePanel } from '../common';
+import { ApiErrorAlert, Badge, DataTable, type DataTableColumn, EmptyState, IconButton, StatePanel } from '../common';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
 type OutboundActivityPanelProps = {
@@ -59,6 +59,47 @@ const OutboundActivityPanel: React.FC<OutboundActivityPanelProps> = ({ disabled 
 
   useEffect(() => { void load('initial'); }, [load]);
 
+  const columns = useMemo<DataTableColumn<OutboundActivityItem>[]>(() => [
+    {
+      id: 'when',
+      header: t('settings.outboundActivityWhen'),
+      nowrap: true,
+      cell: (item) => formatTimestamp(item.occurredAt, language),
+    },
+    {
+      id: 'decision',
+      header: t('settings.outboundActivityDecision'),
+      cell: (item) => (
+        <Badge variant={item.decision === 'allowed' ? 'success' : 'danger'}>
+          {item.decision === 'allowed'
+            ? t('settings.outboundActivityAllowed')
+            : t('settings.outboundActivityBlocked')}
+        </Badge>
+      ),
+    },
+    {
+      id: 'class',
+      header: t('settings.outboundActivityClass'),
+      cell: (item) => (
+        <span className="font-mono text-xs">{item.destinationClass}</span>
+      ),
+    },
+    {
+      id: 'reason',
+      header: t('settings.outboundActivityReason'),
+      cell: (item) => (
+        <span className="font-mono text-xs">{item.reason}</span>
+      ),
+    },
+    {
+      id: 'correlation',
+      header: t('settings.outboundActivityCorrelation'),
+      cell: (item) => (
+        <span className="font-mono text-xs">{item.correlationId}</span>
+      ),
+    },
+  ], [language, t]);
+
   return (
     <SettingsSectionCard
       title={t('settings.outboundActivityTitle')}
@@ -89,33 +130,20 @@ const OutboundActivityPanel: React.FC<OutboundActivityPanelProps> = ({ disabled 
       ) : items.length === 0 ? (
         <EmptyState title={t('settings.outboundActivityEmptyTitle')} description={t('settings.outboundActivityEmptyDescription')} />
       ) : (
-        <div className="overflow-x-auto" data-testid="settings-outbound-activity-list">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-2 pr-3 font-medium">{t('settings.outboundActivityWhen')}</th>
-                <th className="py-2 pr-3 font-medium">{t('settings.outboundActivityDecision')}</th>
-                <th className="py-2 pr-3 font-medium">{t('settings.outboundActivityClass')}</th>
-                <th className="py-2 pr-3 font-medium">{t('settings.outboundActivityReason')}</th>
-                <th className="py-2 pr-3 font-medium">{t('settings.outboundActivityCorrelation')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={`${item.correlationId}-${item.occurredAt}`} className="border-b border-border/60">
-                  <td className="py-2 pr-3 whitespace-nowrap">{formatTimestamp(item.occurredAt, language)}</td>
-                  <td className="py-2 pr-3">
-                    <Badge variant={item.decision === 'allowed' ? 'success' : 'danger'}>
-                      {item.decision === 'allowed' ? t('settings.outboundActivityAllowed') : t('settings.outboundActivityBlocked')}
-                    </Badge>
-                  </td>
-                  <td className="py-2 pr-3 font-mono text-xs">{item.destinationClass}</td>
-                  <td className="py-2 pr-3 font-mono text-xs">{item.reason}</td>
-                  <td className="py-2 pr-3 font-mono text-xs">{item.correlationId}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div data-testid="settings-outbound-activity-list">
+          <DataTable
+            caption={t('settings.outboundActivityTitle')}
+            frame="embedded"
+            density="compact"
+            minWidth="content"
+            columns={columns}
+            rows={items}
+            getRowKey={(item) => `${item.correlationId}-${item.occurredAt}`}
+            emptyState={{
+              title: t('settings.outboundActivityEmptyTitle'),
+              description: t('settings.outboundActivityEmptyDescription'),
+            }}
+          />
           <p className="mt-3 text-xs text-muted-foreground">{t('settings.outboundActivityReadOnlyNote')}</p>
         </div>
       )}

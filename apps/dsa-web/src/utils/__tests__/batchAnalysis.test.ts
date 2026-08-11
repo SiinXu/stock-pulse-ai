@@ -53,6 +53,9 @@ describe('batchAnalysis', () => {
     expect(submitChunk).toHaveBeenCalledTimes(2);
     expect(submitChunk.mock.calls.map(([chunk]) => chunk.length)).toEqual([50, 1]);
     expect(result).toMatchObject({ accepted: 50, duplicates: 1, confirmed: 51, unconfirmed: 0 });
+    expect(result.acceptedCodes).toEqual([...codes.slice(0, 49), codes[50]]);
+    expect(result.duplicateCodes).toEqual([codes[49]]);
+    expect(result.unconfirmedCodes).toEqual([]);
     expect(result.submissionError).toBeNull();
     expect(result.reconciliationError).toBeNull();
     expect(reconcile).toHaveBeenCalledTimes(1);
@@ -64,6 +67,7 @@ describe('batchAnalysis', () => {
     ));
 
     expect(result).toMatchObject({ accepted: 0, duplicates: 1, confirmed: 1, unconfirmed: 0 });
+    expect(result.duplicateCodes).toEqual(['AAPL']);
     expect(result.submissionError).toBeNull();
   });
 
@@ -73,7 +77,20 @@ describe('batchAnalysis', () => {
     const result = await submit(['AAPL', 'MSFT'], submitChunk);
 
     expect(result).toMatchObject({ accepted: 1, duplicates: 0, confirmed: 1, unconfirmed: 1 });
+    expect(result.acceptedCodes).toEqual(['AAPL']);
+    expect(result.unconfirmedCodes).toEqual(['MSFT']);
     expect(result.submissionError?.rawMessage).toContain('1/2 confirmed');
+  });
+
+  it('uses returned identities instead of assuming response order', async () => {
+    const result = await submit(
+      ['AAPL', 'MSFT', 'TSLA'],
+      vi.fn().mockResolvedValue(accepted(['TSLA'], ['AAPL'])),
+    );
+
+    expect(result.acceptedCodes).toEqual(['TSLA']);
+    expect(result.duplicateCodes).toEqual(['AAPL']);
+    expect(result.unconfirmedCodes).toEqual(['MSFT']);
   });
 
   it('returns the reconciliation outcome independently from submission', async () => {

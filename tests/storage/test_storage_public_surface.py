@@ -35,7 +35,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     PortfolioCorporateAction PortfolioDailySnapshot PortfolioFxRate
     PortfolioIdempotencyRecord PortfolioPosition PortfolioPositionLot
     PortfolioTrade ScheduledTaskRecord ScheduledTaskRunRecord Session StockDaily
-    TaskQueueInflightRecord
+    TaskQueueInflightRecord NotificationInboxReadStateRecord
     String T TYPE_CHECKING Text Tuple
     TypeVar Union UniqueConstraint agent_history_public_fields and_
     apply_pending_within_transaction atexit contextmanager
@@ -96,9 +96,10 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
     "TaskQueueInflightRecord",
+    "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "015141b6b893cd35882b8bf3a26e37de0ad1441aaa73dbff941212c25452ff0b"
+    "cd766374f44ac0a456e8b27f3b247179fb873102d11f18feeb3918f53ba8c3ad"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -141,6 +142,7 @@ EXPECTED_SCHEMA_MODELS = (
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
     "TaskQueueInflightRecord",
+    "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -183,6 +185,7 @@ EXPECTED_SCHEMA_TABLES = (
     "investment_frameworks",
     "investment_framework_versions",
     "task_queue_inflight",
+    "notification_inbox_read_state",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -223,6 +226,7 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("task_queue_inflight", "created_at", "default"),
     ("task_queue_inflight", "updated_at", "default"),
     ("task_queue_inflight", "updated_at", "onupdate"),
+    ("notification_inbox_read_state", "read_at", "default"),
 )
 
 EXPECTED_GROUPS = (
@@ -278,8 +282,10 @@ EXPECTED_GROUPS = (
             "save_analysis_history",
             "update_analysis_history_diagnostics",
             "get_analysis_history",
+            "get_analysis_history_batch",
             "get_latest_analysis_history_id",
             "get_analysis_history_paginated",
+            "search_analysis_history",
             "get_analysis_history_by_id",
             "delete_analysis_history_records",
             "get_distinct_stocks_from_history",
@@ -295,7 +301,7 @@ EXPECTED_GROUPS = (
             "_extract_sniper_points",
             "_build_fallback_url_key",
         ),
-        "f5aee9366c7cc397ff498a8ca194141ca0dd782f45758eeffcc14e92f6baf98d",
+        "d55af92829eab68c5cfb8eebc47cff79b150e96ed7b25daac681b7a677efc738",
     ),
     (
         "_ConversationMethods",
@@ -316,7 +322,7 @@ EXPECTED_GROUPS = (
             "get_conversation_messages",
             "delete_conversation_session",
         ),
-        "4cea1a2e30ad9cf7bc2b19ab0f7c622c5d4ca5684d63b78a7aaef666feb9ad50",
+        "b11e857f79dc5f3a3026e86bf426ecb7a3df8ebb389be3e5304fdcca787bdefb",
     ),
     (
         "_UsageMethods",

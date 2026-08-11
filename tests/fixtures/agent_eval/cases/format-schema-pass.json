@@ -1,0 +1,23 @@
+{
+  "id": "format-schema-pass",
+  "title": "Required decision fields present",
+  "tags": ["language_format", "pass"],
+  "dimensions": ["language_format"],
+  "context": {
+    "stock_code": "600519"
+  },
+  "agent_output": {
+    "signal": "hold",
+    "confidence": "medium",
+    "risk_warning": "Macro volatility may widen ranges.",
+    "analysis_summary": "Hold pending confirmation."
+  },
+  "evaluation": {
+    "language_format": {
+      "expect_json_object": true,
+      "required_fields": ["signal", "confidence", "risk_warning", "analysis_summary"],
+      "required_substrings": ["Hold"],
+      "forbidden_substrings": ["GUARANTEED PROFIT"]
+    }
+  }
+}

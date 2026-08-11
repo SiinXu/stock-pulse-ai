@@ -678,7 +678,18 @@ class ConversationMessage(Base):
     session_id = Column(String(100), index=True, nullable=False)
     role = Column(String(20), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
+    turn_id = Column(String(64), nullable=True)
+    context_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now, index=True)
+
+    __table_args__ = (
+        Index(
+            'uix_conversation_messages_session_turn',
+            'session_id',
+            'turn_id',
+            unique=True,
+        ),
+    )
 
 
 class ConversationSessionState(Base):
@@ -1406,3 +1417,18 @@ class TaskQueueInflightRecord(Base):
         index=True,
     )
 
+
+class NotificationInboxReadStateRecord(Base):
+    """Durable per-item read markers for the in-app notification inbox.
+
+    Inbox items themselves are projected on read from existing event sources
+    (analysis history, alert triggers, scheduled runs, decision signals).
+    This table only stores administrator-local read state so the inbox can
+    mark items without mutating outbound push channels or source tables.
+    """
+
+    __tablename__ = 'notification_inbox_read_state'
+
+    item_id = Column(String(128), primary_key=True)
+    kind = Column(String(32), nullable=False, index=True)
+    read_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)

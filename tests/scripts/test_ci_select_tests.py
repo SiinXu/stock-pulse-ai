@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+import subprocess
+
+from scripts import ci_select_tests
 from scripts.ci_select_tests import select_targets
 
 
@@ -26,3 +29,23 @@ def test_docs_only_is_none() -> None:
 
 def test_empty_paths_full() -> None:
     assert select_targets([]) == "FULL"
+
+
+def test_missing_merge_base_fails_closed_to_full_suite(
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            args=[],
+            returncode=1,
+            stdout="",
+            stderr="no merge base",
+        ),
+    )
+
+    assert ci_select_tests._git_diff_names("origin/main") is None
+    assert ci_select_tests.main(["--base", "origin/main"]) == 0
+    assert capsys.readouterr().out == "FULL\n"

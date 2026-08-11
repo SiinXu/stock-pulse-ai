@@ -2,7 +2,7 @@
 
 StockPulse 可将财经 PDF 解析为结构化文本/表格，并将行情图表读成结构化视觉观察。本文描述 issue #253 的**第一阶段**：后端服务 + 默认关闭的可选 Agent Tools。
 
-HTTP 上传 UI、默认分析路径的报告/Prompt 投影、财报电话会纪要分析，以及扫描件 PDF 的视觉辅助，均留到后续阶段。
+HTTP 上传 UI、默认分析路径的报告/Prompt 投影、扫描件 PDF 的视觉辅助，以及第三方转录自动拉取，均留到后续阶段。用户提供的财报电话会转录解析见 `docs/earnings-transcript-parsing.md`（工具 `parse_earnings_transcript`）。
 
 ## 诚实契约
 
@@ -16,7 +16,8 @@ HTTP 上传 UI、默认分析路径的报告/Prompt 投影、财报电话会纪�
 
 ## 默认与注册契约
 
-Agent Tools `parse_financial_pdf` 与 `read_price_chart` **默认关闭**。
+Agent Tools `parse_financial_pdf`、`read_price_chart` 与
+`parse_earnings_transcript` **默认关闭**。
 
 | 条件 | 行为 |
 | --- | --- |
@@ -41,7 +42,9 @@ MULTIMODAL_AGENT_TOOLS_ENABLED=false
 | --- | --- |
 | `src/services/pdf_parsing_service.py` | 本地 PDF 解析 → `schema_version=pdf-parse-v1` |
 | `src/services/chart_reading_service.py` | Vision 图表阅读 → `schema_version=chart-reading-v1` |
+| `src/services/earnings_transcript_service.py` | 转录解析 → `schema_version=earnings-transcript-v2` |
 | `src/agent/tools/multimodal_tools.py` | 默认关闭的 `ToolDefinition` 工厂 |
+| `src/agent/tools/earnings_transcript_tools.py` | 独立的默认关闭转录工具 |
 
 ### PDF 输出（摘要）
 
@@ -68,7 +71,7 @@ MULTIMODAL_AGENT_TOOLS_ENABLED=false
 ## 延后（非第一阶段）
 
 - HTTP 上传 API / Web UI
-- 财报电话会纪要分析
+- 自动从第三方拉取财报电话会转录
 - 扫描件 PDF 页面栅格化 + 视觉辅助
 - 默认分析路径投影与报告证据链接入
 

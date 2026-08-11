@@ -109,7 +109,7 @@ describe('ApprovalsPage', () => {
 
     expect(await screen.findByTestId('approvals-precondition-rule-disabled')).toBeInTheDocument();
     expect(screen.getByTestId('approvals-precondition-risk-override')).toBeInTheDocument();
-    expect(screen.getAllByText(/AGENT_RISK_OVERRIDE/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/mandatory Risk Manager final-action decision always runs first/)).toBeInTheDocument();
     expect(screen.queryByTestId('approvals-precondition-auth-disabled')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
   });

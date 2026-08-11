@@ -22,7 +22,18 @@ class _RecordingDailyFetcher:
 
     def get_daily_data(self, stock_code: str, *args, **kwargs) -> pd.DataFrame:
         self.calls.append(stock_code)
-        return pd.DataFrame({"date": ["2026-05-22"], "close": [10.0]})
+        return pd.DataFrame(
+            {
+                "date": ["2026-05-22"],
+                "open": [10.0],
+                "high": [10.0],
+                "low": [10.0],
+                "close": [10.0],
+                "volume": [100.0],
+                "amount": [1000.0],
+                "pct_chg": [0.0],
+            }
+        )
 
 
 class TestDataFetcherManagerAShareCodes(unittest.TestCase):
