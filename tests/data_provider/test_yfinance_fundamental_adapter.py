@@ -19,7 +19,7 @@ from data_provider.yfinance_fundamental_adapter import (
 )
 
 
-DIVIDEND_TEST_NOW = pd.Timestamp("2026-08-10 12:00:00", tz="America/New_York")
+DIVIDEND_TEST_NOW = pd.Timestamp("2026-08-11 12:00:00", tz="America/New_York")
 
 
 def _build_mock_ticker(
@@ -106,8 +106,8 @@ class TestYfinanceFundamentalAdapter(unittest.TestCase):
         )
         ticker = _build_mock_ticker(info, income_df_with_yoy, cashflow_df, dividends)
 
-        # Freeze the adapter clock so the fixed dividend fixture cannot age
-        # out of its 365-day TTM window as the calendar advances.
+        # Freeze at noon on the 365-day boundary: ex-dividend timestamps are
+        # calendar dates at midnight and must remain included all day.
         with (
             patch("yfinance.Ticker", return_value=ticker),
             patch(
