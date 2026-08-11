@@ -305,10 +305,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
 
           {recordId != null ? (
             <Suspense fallback={false}>
-              <ReasoningTraceExportControls
-                recordId={recordId}
-                disabled={isLoading}
-              />
+              <ReasoningTraceExportControls recordId={recordId} disabled={isLoading} />
             </Suspense>
           ) : null}
 
@@ -365,3 +362,5 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
     </Card>
   );
 };
+
+export default ReportDiagnostics;

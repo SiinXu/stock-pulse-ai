@@ -610,7 +610,7 @@
     },
     {
       "id": "stable_api_error",
-      "contractSource": "apps/dsa-web/src/api/error.ts STABLE_ERROR_TEXT",
+      "contractSource": "apps/dsa-web/src/api/error/catalog.ts STABLE_ERROR_TEXT",
       "translationCodePattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.([^.]+)\\.(?:title|message)$",
       "internalCodes": [
         "agent_chat_failed",
