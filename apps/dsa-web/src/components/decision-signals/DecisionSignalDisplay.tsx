@@ -27,6 +27,9 @@ import {
   getDecisionSignalMarketPhaseLabel,
   getDecisionSignalPlanQualityLabel,
 } from '../../utils/decisionSignalLabels';
+import { getReportLanguageForUi } from '../../utils/reportLanguage';
+import { ReportRiskGateBanner } from '../report/ReportRiskGateBanner';
+import { buildRiskGatePresentation } from '../report/reportRiskGateUtils';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'history';
 
@@ -237,6 +240,18 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
         </div>
       </div>
 
+      <ReportRiskGateBanner
+        presentation={buildRiskGatePresentation({
+          metadata:
+            item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+              ? (item.metadata as Record<string, unknown>)
+              : null,
+        })}
+        language={getReportLanguageForUi(language)}
+        compact
+        className="mt-3"
+      />
+
       <div className="mt-4 grid grid-cols-3 gap-2">
         <SignalMetric label={t('decisionSignals.score')} value={formatNumber(item.score)} />
         <SignalMetric label={t('decisionSignals.confidence')} value={formatConfidence(presentation.confidence)} />
@@ -363,6 +378,16 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
+
+      <ReportRiskGateBanner
+        presentation={buildRiskGatePresentation({
+          metadata:
+            item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+              ? (item.metadata as Record<string, unknown>)
+              : null,
+        })}
+        language={getReportLanguageForUi(language)}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <DetailRow label={t('decisionSignals.score')} value={formatNumber(item.score)} />

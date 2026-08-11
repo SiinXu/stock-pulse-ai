@@ -1,9 +1,38 @@
 """Notification configuration field definitions."""
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from src.notification_noise import NOTIFICATION_SEVERITIES
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
+from src.services.report_mode import (
+    REPORT_MODE_BRIEF,
+    REPORT_MODE_RESEARCH,
+    REPORT_MODE_STANDARD,
+    VALID_REPORT_MODES,
+)
+
+_REPORT_MODE_ORDERED: List[str] = [
+    REPORT_MODE_BRIEF,
+    REPORT_MODE_STANDARD,
+    REPORT_MODE_RESEARCH,
+]
+_REPORT_MODE_LABELS = {
+    REPORT_MODE_BRIEF: "Brief (Decision Card + key risk)",
+    REPORT_MODE_STANDARD: "Standard (Decision Card + main analysis)",
+    REPORT_MODE_RESEARCH: "Research (full detail)",
+}
+_REPORT_MODE_OPTIONS = [
+    {"label": _REPORT_MODE_LABELS[mode], "value": mode}
+    for mode in _REPORT_MODE_ORDERED
+    if mode in VALID_REPORT_MODES
+]
+if set(_REPORT_MODE_ORDERED) != set(VALID_REPORT_MODES):
+    missing = set(VALID_REPORT_MODES) - set(_REPORT_MODE_ORDERED)
+    extra = set(_REPORT_MODE_ORDERED) - set(VALID_REPORT_MODES)
+    raise RuntimeError(
+        "REPORT_MODE registry options drifted from VALID_REPORT_MODES "
+        f"(missing={sorted(missing)}, extra={sorted(extra)})"
+    )
 
 NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "WECHAT_WEBHOOK_URL": {
@@ -1082,6 +1111,43 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "REPORT_MODE": {
+        "title": "Report Mode",
+        "description": (
+            "Jinja report presentation mode when REPORT_RENDERER_ENABLED is true. "
+            f"'{REPORT_MODE_BRIEF}' keeps Decision Card plus key risk; "
+            f"'{REPORT_MODE_STANDARD}' (default) is Decision Card plus main analysis; "
+            f"'{REPORT_MODE_RESEARCH}' expands detail and strata limits. Hard limits never "
+            "drop the Decision Card. Per-request override: extra_context.report_mode."
+        ),
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": REPORT_MODE_STANDARD,
+        "options": list(_REPORT_MODE_OPTIONS),
+        "validation": {"enum": list(_REPORT_MODE_ORDERED)},
+        "display_order": 58,
+        "help_key": "settings.report.REPORT_MODE",
+        "examples": [
+            f"REPORT_MODE={REPORT_MODE_STANDARD}",
+            f"REPORT_MODE={REPORT_MODE_BRIEF}",
+            f"REPORT_MODE={REPORT_MODE_RESEARCH}",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+            {
+                "label": "Full guide (EN): environment variables",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "REPORT_INTEGRITY_ENABLED": {
         "title": "Report Integrity Enabled",
         "description": "Validate mandatory report fields after LLM output; retry or placeholder on missing.",
@@ -1449,6 +1515,40 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "分享图片说明",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/share-images.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "FAILURE_NOTIFY_ENABLED": {
+        "title": "Failure Notify Enabled",
+        "description": (
+            "Controls daily-run failure notifications. Empty (default) enables notify only when "
+            "NOTIFICATION_SYSTEM_ERROR_CHANNELS is configured; true forces on; false forces off."
+        ),
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"label": "Auto (system error channels)", "value": ""},
+            {"label": "Always on", "value": "true"},
+            {"label": "Always off", "value": "false"},
+        ],
+        "validation": {"enum": ["", "true", "false"]},
+        "display_order": 72,
+        "help_key": "settings.notification.FAILURE_NOTIFY_ENABLED",
+        "examples": [
+            "FAILURE_NOTIFY_ENABLED=",
+            "FAILURE_NOTIFY_ENABLED=true",
+            "FAILURE_NOTIFY_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "通知渠道与路由",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/notifications.md",
             },
         ],
         "warning_codes": [],

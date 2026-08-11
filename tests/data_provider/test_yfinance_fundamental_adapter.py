@@ -19,6 +19,9 @@ from data_provider.yfinance_fundamental_adapter import (
 )
 
 
+DIVIDEND_TEST_NOW = pd.Timestamp("2026-08-11 12:00:00", tz="America/New_York")
+
+
 def _build_mock_ticker(
     info: dict,
     income_stmt: pd.DataFrame | None = None,
@@ -103,7 +106,15 @@ class TestYfinanceFundamentalAdapter(unittest.TestCase):
         )
         ticker = _build_mock_ticker(info, income_df_with_yoy, cashflow_df, dividends)
 
-        with patch("yfinance.Ticker", return_value=ticker):
+        # Freeze at noon on the 365-day boundary: ex-dividend timestamps are
+        # calendar dates at midnight and must remain included all day.
+        with (
+            patch("yfinance.Ticker", return_value=ticker),
+            patch(
+                "data_provider.yfinance_fundamental_adapter.pd.Timestamp.now",
+                return_value=DIVIDEND_TEST_NOW,
+            ),
+        ):
             bundle = YfinanceFundamentalAdapter().get_fundamental_bundle("AAPL")
 
         self.assertEqual(bundle["status"], "partial")
@@ -153,7 +164,13 @@ class TestYfinanceFundamentalAdapter(unittest.TestCase):
             "trailingAnnualDividendRate": 99.0,  # a WRONG fallback we must NOT fall back to
         }
         ticker = _build_mock_ticker(info, dividends=dividends_df)
-        with patch("yfinance.Ticker", return_value=ticker):
+        with (
+            patch("yfinance.Ticker", return_value=ticker),
+            patch(
+                "data_provider.yfinance_fundamental_adapter.pd.Timestamp.now",
+                return_value=DIVIDEND_TEST_NOW,
+            ),
+        ):
             bundle = YfinanceFundamentalAdapter().get_fundamental_bundle("AAPL")
 
         div = bundle["earnings"]["dividend"]

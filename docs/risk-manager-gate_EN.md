@@ -77,6 +77,19 @@ the original action, stores the approval ID in the structured result, and uses
 wording that says the original action was authorized. It must not claim that a
 downgrade was applied.
 
+
+
+## Web report and decision surface
+
+The Web report Decision Card always renders the Risk Manager conclusion at the
+top of the decision surface (`ReportRiskGateBanner`). Verdicts are `pass`,
+`downgrade`, and `reject`. When `summary.riskManager` /
+`rawResult.riskGateResult` is missing or not the canonical
+`risk-manager-result/v1` shape, the UI shows **Not evaluated** and never implies
+pass. Reject is shown with an assertive danger alert. DecisionSignal cards and
+detail drawers project the same payload from `metadata.riskManager` without
+re-evaluating risk on the client.
+
 ## Rollback
 
 Revert the change. There is no schema migration: new persisted fields are

@@ -10,6 +10,9 @@ import LoadedExtensionsPanel from '../LoadedExtensionsPanel';
 vi.mock('../../../api/plugins', () => ({
   pluginsApi: {
     list: vi.fn(),
+    updateLifecycle: vi.fn(),
+    getSettings: vi.fn(),
+    updateSettings: vi.fn(),
   },
 }));
 
@@ -42,6 +45,7 @@ describe('LoadedExtensionsPanel', () => {
           extensionPoints: ['agent_tool'],
           description: 'Built-in forecasting tool',
           author: 'StockPulse',
+          settingsCount: 0,
         },
         {
           id: 'acme-notify',
@@ -56,6 +60,7 @@ describe('LoadedExtensionsPanel', () => {
           lastErrorCode: 'manifest_permissions_undeclared',
           description: '',
           author: 'Acme',
+          settingsCount: 0,
         },
         {
           id: 'legacy-failed',
@@ -69,6 +74,7 @@ describe('LoadedExtensionsPanel', () => {
           extensionPoints: [],
           description: '',
           author: '',
+          settingsCount: 0,
         },
       ],
     });
@@ -95,12 +101,12 @@ describe('LoadedExtensionsPanel', () => {
     expect(screen.getByTestId('settings-loaded-extensions-trust')).toHaveTextContent(
       /not sandboxed/i,
     );
-    expect(screen.getByTestId('settings-loaded-extensions-readonly')).toHaveTextContent(
-      /Read-only/i,
+    expect(screen.getByTestId('settings-loaded-extensions-management-note')).toHaveTextContent(
+      /persisted/i,
     );
     // No marketplace / install affordance.
     expect(screen.queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /enable/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /Disabled: Kronos/i })).toBeInTheDocument();
     expect(pluginsApi.list).toHaveBeenCalledTimes(1);
   });
 
@@ -138,6 +144,7 @@ describe('LoadedExtensionsPanel', () => {
           extensionPoints: [],
           description: '',
           author: '',
+          settingsCount: 0,
         }],
       });
 
@@ -171,6 +178,7 @@ describe('LoadedExtensionsPanel', () => {
         extensionPoints: ['notification_channel'],
         description: '',
         author: '',
+        settingsCount: 0,
       }],
     });
 
@@ -181,5 +189,123 @@ describe('LoadedExtensionsPanel', () => {
     expect(screen.getByText(/Persisted intent: disabled/i)).toBeInTheDocument();
     expect(screen.getByText(/not sandboxed/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /install|browse store|marketplace/i })).not.toBeInTheDocument();
+  });
+
+  it('persists an enable action through the lifecycle API', async () => {
+    vi.mocked(pluginsApi.list).mockResolvedValue({
+      total: 1,
+      items: [{
+        id: 'toggle-demo',
+        name: 'Toggle Demo',
+        version: '1.0.0',
+        source: 'external',
+        state: 'disabled',
+        desiredEnabled: false,
+        reloadable: true,
+        packageRoot: '/opt/plugins/toggle-demo',
+        extensionPoints: [],
+        description: '',
+        author: '',
+        settingsCount: 0,
+      }],
+    });
+    vi.mocked(pluginsApi.updateLifecycle).mockResolvedValue({
+      pluginId: 'toggle-demo',
+      action: 'enable',
+      success: true,
+      state: 'enabled',
+      reloaded: false,
+      restartRequired: false,
+      plugin: null,
+    });
+
+    render(<LoadedExtensionsPanel t={t} language="en" />);
+    const toggle = await screen.findByRole('switch', { name: /Enabled: Toggle Demo/i });
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(pluginsApi.updateLifecycle).toHaveBeenCalledWith('toggle-demo', 'enable');
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+    });
+  });
+
+  it('generates a settings form from the plugin schema and saves typed values', async () => {
+    vi.mocked(pluginsApi.list).mockResolvedValue({
+      total: 1,
+      items: [{
+        id: 'configured-demo',
+        name: 'Configured Demo',
+        version: '1.0.0',
+        source: 'external',
+        state: 'enabled',
+        desiredEnabled: true,
+        reloadable: true,
+        packageRoot: '/opt/plugins/configured-demo',
+        extensionPoints: [],
+        description: '',
+        author: '',
+        settingsCount: 2,
+      }],
+    });
+    vi.mocked(pluginsApi.getSettings).mockResolvedValue({
+      pluginId: 'configured-demo',
+      schema: [
+        {
+          key: 'threshold',
+          title: 'Threshold',
+          description: 'Finite score threshold.',
+          dataType: 'number',
+          uiControl: 'number',
+          isSensitive: false,
+          isRequired: true,
+          defaultValue: 0.5,
+          options: [],
+          validation: { minimum: 0, maximum: 1 },
+          displayOrder: 10,
+        },
+        {
+          key: 'api_token',
+          title: 'API token',
+          description: '',
+          dataType: 'string',
+          uiControl: 'password',
+          isSensitive: true,
+          isRequired: true,
+          defaultValue: null,
+          options: [],
+          validation: { minLength: 8 },
+          displayOrder: 20,
+        },
+      ],
+      values: { threshold: 0.5, api_token: '******' },
+      maskedKeys: ['api_token'],
+      maskToken: '******',
+    });
+    vi.mocked(pluginsApi.updateSettings).mockResolvedValue({
+      pluginId: 'configured-demo',
+      schema: [],
+      values: { threshold: 0.75, api_token: '******' },
+      maskedKeys: ['api_token'],
+      maskToken: '******',
+      changedKeys: ['threshold'],
+      restartRequired: true,
+    });
+
+    render(<LoadedExtensionsPanel t={t} language="en" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View details: Configured Demo' }));
+
+    expect(await screen.findByRole('dialog', { name: 'View details: Configured Demo' })).toBeInTheDocument();
+    const threshold = await screen.findByLabelText(/^Threshold/);
+    fireEvent.change(threshold, { target: { value: '0.75' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+
+    await waitFor(() => {
+      expect(pluginsApi.updateSettings).toHaveBeenCalledWith(
+        'configured-demo',
+        { threshold: 0.75, api_token: '******' },
+        '******',
+      );
+    });
+    expect(await screen.findByText('Restart to apply')).toBeInTheDocument();
   });
 });

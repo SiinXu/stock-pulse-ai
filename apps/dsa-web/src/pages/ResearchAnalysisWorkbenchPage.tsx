@@ -4,6 +4,7 @@ import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
+  CircleHelp,
   FileText,
   FlaskConical,
   History,
@@ -32,6 +33,7 @@ import {
   PageHeader,
   SegmentedControl,
   TabPanel,
+  Tooltip,
   WorkspaceLayout,
   getTabPanelId,
 } from '../components/common';
@@ -39,7 +41,8 @@ import { AnalysisPhaseSelect } from '../components/analysis';
 import type { WorkbenchBatchNotice } from '../components/analysis/AnalysisWorkbenchErrorStack';
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
-import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
+import { StockHistoryTrendDrawer } from '../components/history';
+import { WorkbenchHistoryPopover } from '../components/history/WorkbenchHistoryPopover';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { useRouteFocusTarget } from '../components/routing';
@@ -82,13 +85,10 @@ import {
 type RunFlowDialogState =
   | { open: false }
   | { open: true; source: RunFlowSnapshotSource; title: string };
-
 type WorkbenchNotice = WorkbenchBatchNotice;
-
 type WorkbenchNavigationState = {
   focusStockSearch?: boolean;
 };
-
 type BatchLaunchIntent = {
   codes: readonly string[];
   reportType: StockReportType;
@@ -96,7 +96,6 @@ type BatchLaunchIntent = {
   analysisPhase: AnalysisPhase;
   skills?: readonly string[];
 };
-
 const WORKBENCH_TABS_ID = 'analysis-workbench-tabs';
 const AnalysisWorkbenchErrorStack = lazy(
   () => import('../components/analysis/AnalysisWorkbenchErrorStack'),
@@ -177,7 +176,6 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
   const [batchNotice, setBatchNotice] = useState<WorkbenchNotice>(null);
   const [markdownRecordId, setMarkdownRecordId] = useState<number | null>(null);
-
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -1065,7 +1063,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       />
       <SegmentedControl
         id={WORKBENCH_TABS_ID}
-        className="mt-5"
+        className="mt-5 dark:!bg-foreground/10 dark:[&_.segmented-control-tab]:!text-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:!text-background"
         ariaLabel={t('analysisWorkbench.tabsLabel')}
         value={routeState.segment}
         options={tabItems.map((item) => ({
@@ -1197,41 +1195,36 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             )}
           />
         ) : (
-          <WorkspaceLayout
-            railPosition="start"
-            rail={(
-              <HistoryList
-                className="min-h-96"
-                items={analysisHistoryItems}
-                isLoading={isLoadingHistory}
-                isLoadingMore={isLoadingMore}
-                hasMore={hasMore}
-                selectedId={routeState.recordId ?? undefined}
-                selectedIds={new Set(selectedHistoryIds)}
-                isDeleting={isDeletingHistory}
-                onItemClick={navigateToRecord}
-                onLoadMore={() => void loadMoreHistory()}
-                onToggleItemSelection={toggleHistorySelection}
-                onToggleSelectAll={toggleAllHistory}
-                onDeleteSelected={requestDeleteSelectedHistory}
-              />
-            )}
-          >
-            <section className="min-w-0" aria-label={t('analysisWorkbench.history')}>
-              {isLoadingReport ? (
-                <DashboardStateBlock title={t('home.loadingReport')} loading />
-              ) : selectedAnalysisReport ? (
-                <>
-                  {!isHistoryTrendOpen ? (
-                    <div className="mb-3 flex flex-wrap items-end justify-end gap-2">
+          <WorkspaceLayout>
+            <section className="relative min-w-0" aria-label={t('analysisWorkbench.history')}>
+              {!isHistoryTrendOpen ? (
+                <div className="mb-3 flex flex-nowrap items-end justify-end gap-2 overflow-x-auto pb-1">
+                  <WorkbenchHistoryPopover
+                    items={analysisHistoryItems}
+                    isLoading={isLoadingHistory}
+                    isLoadingMore={isLoadingMore}
+                    hasMore={hasMore}
+                    selectedId={routeState.recordId ?? undefined}
+                    selectedIds={selectedHistoryIds}
+                    isDeleting={isDeletingHistory}
+                    onItemClick={navigateToRecord}
+                    onLoadMore={() => void loadMoreHistory()}
+                    onToggleItemSelection={toggleHistorySelection}
+                    onToggleSelectAll={toggleAllHistory}
+                    onDeleteSelected={requestDeleteSelectedHistory}
+                  />
+                  {selectedAnalysisReport ? (
+                    <>
                       <AnalysisPhaseSelect
                         id="analysis-workbench-reanalysis-phase"
                         value={analysisPhase}
                         onChange={setAnalysisPhase}
                         label={t('analysis.phase')}
-                        hint={t('analysis.phaseHint')}
                         disabled={isAnalyzing}
-                        className="mr-auto w-full sm:w-64"
+                        className="mr-auto w-44 shrink-0"
+                        labelAction={(
+                          <Tooltip content={t('analysis.phaseHint')}><button type="button" aria-label={`${t('analysis.phase')} · ${t('common.details')}`} className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-text hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"><CircleHelp className="h-3.5 w-3.5" aria-hidden="true" /></button></Tooltip>
+                        )}
                       />
                       <Button
                         type="button"
@@ -1274,8 +1267,14 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                         <FileText className="h-4 w-4" aria-hidden="true" />
                         {t('home.fullReport')}
                       </Button>
-                    </div>
+                    </>
                   ) : null}
+                </div>
+              ) : null}
+              {isLoadingReport ? (
+                <DashboardStateBlock title={t('home.loadingReport')} loading />
+              ) : selectedAnalysisReport ? (
+                <>
                   {isHistoryTrendOpen ? (
                     <StockHistoryTrendDrawer
                       key={`workbench-stock-history-${selectedAnalysisReport.meta.id}`}

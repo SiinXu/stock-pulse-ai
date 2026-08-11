@@ -10,6 +10,12 @@ StockPulse uses the official Python MCP SDK `mcp==2.0.0`. The selected compatibi
 
 The MCP process is a thin adapter over existing services. It is never started by `server.py`, `main.py --serve`, Web, or Desktop.
 
+## Web Settings registry
+
+All `MCP_*` keys are explicitly registered under the **MCP Server** category (`category=mcp`) in `src/core/config_registry_parts/mcp.py`. Settings therefore renders correct switch/select/number controls, defaults, validation ranges, and sensitive masking for `MCP_HTTP_SESSION_TOKEN_SHA256`. Unregistered keys fall into Uncategorized as plain text boxes, or stay invisible when never saved.
+
+Widening `MCP_HTTP_ALLOWED_HOSTS` / `MCP_HTTP_ALLOWED_ORIGINS` expands the HTTP attack surface; defaults stay loopback-only.
+
 ## Transports and lifecycle
 
 | Config value | Standard transport | Authentication | Connection state |

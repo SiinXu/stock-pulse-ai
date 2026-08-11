@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { APP_ROUTE_PATHS } from '../../../routing/routes';
@@ -181,6 +181,53 @@ describe('Popover', () => {
     expect(screen.queryByRole('menu', { name: 'Filter actions' })).not.toBeInTheDocument();
     expect(onModalClose).not.toHaveBeenCalled();
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('does not steal focus back after a caller moves on following close', () => {
+    const pendingFrames: FrameRequestCallback[] = [];
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        pendingFrames.push(callback);
+        return pendingFrames.length;
+      });
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+
+    try {
+      render(
+        <div>
+          <Popover
+            autoFocusContent={false}
+            contentRole="menu"
+            ariaLabel="Filter actions"
+            trigger={({ open, toggle }) => (
+              <button type="button" aria-expanded={open} onClick={toggle}>Actions</button>
+            )}
+          >
+            {({ close }) => (
+              <button type="button" role="menuitem" onClick={close}>Close actions</button>
+            )}
+          </Popover>
+          <button type="button">Next control</button>
+        </div>,
+      );
+
+      const trigger = screen.getByRole('button', { name: 'Actions' });
+      trigger.focus();
+      fireEvent.click(trigger);
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Close actions' }));
+
+      const nextControl = screen.getByRole('button', { name: 'Next control' });
+      nextControl.focus();
+      act(() => {
+        pendingFrames.splice(0).forEach((callback) => callback(performance.now()));
+      });
+
+      expect(screen.queryByRole('menu', { name: 'Filter actions' })).not.toBeInTheDocument();
+      expect(nextControl).toHaveFocus();
+    } finally {
+      requestFrame.mockRestore();
+      cancelFrame.mockRestore();
+    }
   });
 
   it('keeps a nested popup mounted while its option handles pointer selection', async () => {

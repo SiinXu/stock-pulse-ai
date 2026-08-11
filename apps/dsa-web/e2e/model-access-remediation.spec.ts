@@ -261,6 +261,23 @@ async function selectStrictModel(page: Page, label: string, route: string) {
   await page.locator(`[role="option"][data-value="${route}"]`).click();
 }
 
+async function openFallbackModelSearch(page: Page) {
+  await page.getByRole('button', { name: '选择备用模型', exact: true }).click();
+  const search = page.getByRole('combobox', {
+    name: '搜索选项: 选择备用模型',
+  });
+  await expect(search).toBeVisible();
+  return search;
+}
+
+async function selectFallbackModel(page: Page, route: string, query: string) {
+  const search = await openFallbackModelSearch(page);
+  await search.fill(query);
+  const option = page.locator(`[role="option"][data-value="${route}"]`);
+  await expect(option).toBeVisible();
+  await option.click();
+}
+
 test.describe('model access product convergence', () => {
   test.use({ locale: 'zh-CN' });
 
@@ -782,20 +799,19 @@ test.describe('model access product convergence', () => {
   test('26 fallback models are searchable, deduplicated, and reorderable', async ({ page }) => {
     await createSavedConnection(page);
     await page.getByRole('radio', { name: '可靠性' }).click();
-    await page.getByRole('button', { name: '选择备用模型' }).click();
-    await page.getByLabel('搜索模型').fill('agent');
-    await expect(page.getByRole('checkbox', { name: 'fake-agent-model' })).toBeVisible();
-    await expect(page.getByRole('checkbox', { name: 'fake-vision-model' })).toHaveCount(0);
-    await page.getByRole('checkbox', { name: 'fake-agent-model' }).check();
-    await page.getByLabel('搜索模型').fill('vision');
-    await page.getByRole('checkbox', { name: 'fake-vision-model' }).check();
-    await page.getByLabel('搜索模型').press('Escape');
+    const agentModelRef = modelRef('custom', 'fake-agent-model');
+    const visionModelRef = modelRef('custom', 'fake-vision-model');
+    const search = await openFallbackModelSearch(page);
+    await search.fill('agent');
+    await expect(page.locator(`[role="option"][data-value="${agentModelRef}"]`)).toBeVisible();
+    await expect(page.locator(`[role="option"][data-value="${visionModelRef}"]`)).toHaveCount(0);
+    await page.locator(`[role="option"][data-value="${agentModelRef}"]`).click();
+    await selectFallbackModel(page, visionModelRef, 'vision');
     await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toBeEnabled();
     await page.getByRole('button', { name: '上移 fake-vision-model' }).click();
     await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toBeDisabled();
-    await page.getByRole('button', { name: '选择备用模型' }).click();
-    await expect(page.getByRole('checkbox', { name: 'fake-vision-model' })).toBeChecked();
-    await expect(page.getByRole('checkbox', { name: 'fake-vision-model' })).toHaveCount(1);
+    await openFallbackModelSearch(page);
+    await expect(page.locator(`[role="option"][data-value="${visionModelRef}"]`)).toHaveCount(0);
     await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toHaveCount(1);
   });
 
@@ -805,9 +821,7 @@ test.describe('model access product convergence', () => {
     const agentModelRef = modelRef('custom', 'fake-agent-model');
     await waitForAiAutosave(page, async () => {
       await page.getByRole('radio', { name: '可靠性' }).click();
-      await page.getByRole('button', { name: '选择备用模型' }).click();
-      await page.getByRole('checkbox', { name: 'fake-report-model' }).check();
-      await page.getByLabel('搜索模型').press('Escape');
+      await selectFallbackModel(page, reportModelRef, 'report');
       await page.getByRole('radio', { name: '任务路由' }).click();
       await selectStrictModel(page, '主要模型', reportModelRef);
       await selectStrictModel(page, 'Agent 主要模型', reportModelRef);
