@@ -108,6 +108,10 @@ function deferred<T = void>() {
   return { promise, resolve };
 }
 
+function reportSummaryText(page: Page, text: string) {
+  return page.getByText(text, { exact: true }).and(page.getByRole('paragraph'));
+}
+
 async function getElementContrast(locator: Locator) {
   return locator.evaluate((node) => {
     const toRgba = (color: string): [number, number, number, number] => {
@@ -2167,7 +2171,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
     const oldItem = page
       .locator('.history-item[data-control="pressable"]')
       .filter({ hasText: 'Old Report' })
@@ -2180,10 +2184,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await oldRequestStarted.promise;
     await expect(newItem).toBeVisible();
     await newItem.click();
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
     oldReport.resolve();
     await page.waitForTimeout(200);
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
     await expect(page.getByText('Old Report semantic report', { exact: true })).toHaveCount(0);
   });
 
@@ -2251,6 +2255,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         message: 'accepted',
         task_id: submissions === 1 ? 'old-review-task' : 'new-review-task',
         send_notification: false,
+        region: 'cn',
+        message_code: 'task.market_review.queued',
       }, 202);
     });
     await page.route('**/api/v1/analysis/status/old-review-task', async (route) => {
@@ -2684,7 +2690,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
     const reportHeading = page.getByRole('heading', { name: 'E2E Fixture' });
-    const reportBody = page.getByText('E2E_MARKDOWN_FIXTURE: deterministic report content.', { exact: true });
+    const reportBody = reportSummaryText(page, 'E2E_MARKDOWN_FIXTURE: deterministic report content.');
     await expect(reportHeading).toBeVisible();
     await expect(reportBody).toBeVisible();
     await expect.poll(async () => (await getElementContrast(reportHeading)).ratio).toBeGreaterThanOrEqual(3);

@@ -118,6 +118,8 @@ class AgentResult:
     runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
+    # Opt-in plan→act→observe product path metadata (default None when unused).
+    planning_metadata: Optional[Dict[str, Any]] = None
 
 
 # ============================================================

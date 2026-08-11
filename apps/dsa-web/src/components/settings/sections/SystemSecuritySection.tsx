@@ -1,13 +1,17 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { AuthSettingsCard, ChangePasswordCard, LoadedExtensionsPanel } from '..';
+import { lazy, Suspense } from 'react';
+import { AuthSettingsCard } from '../AuthSettingsCard';
+import { ChangePasswordCard } from '../ChangePasswordCard';
 import OutboundActivityPanel from '../OutboundActivityPanel';
 import SchedulerSettingsCard from '../SchedulerSettingsCard';
 import ScheduledTasksPanel from '../ScheduledTasksPanel';
 import SecurityAuditPanel from '../SecurityAuditPanel';
 import SignalScorecardPanel from '../SignalScorecardPanel';
 import SystemAboutCard from '../SystemAboutCard';
+
+const LoadedExtensionsPanel = lazy(() => import('../LoadedExtensionsPanel'));
 
 type SchedulerProps = React.ComponentProps<typeof SchedulerSettingsCard>;
 type ExtensionProps = React.ComponentProps<typeof LoadedExtensionsPanel>;
@@ -82,7 +86,11 @@ const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (props) => {
 
   if (props.activeView === 'about') return <SystemAboutCard />;
   if (props.activeView === 'extensions') {
-    return <LoadedExtensionsPanel disabled={props.disabled} t={props.t} language={props.language} />;
+    return (
+      <Suspense fallback={null}>
+        <LoadedExtensionsPanel disabled={props.disabled} t={props.t} language={props.language} />
+      </Suspense>
+    );
   }
   return null;
 };

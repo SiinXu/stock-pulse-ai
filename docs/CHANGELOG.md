@@ -9,7 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Harden shared sensitive-config key detection so token-count / public-key / key-version names are not masked, bare credential `*_KEY` names are redacted in logs and diagnostics, and config read/save paths keep mask-token preserve behavior for registered and inferred secrets.
+- [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
+- [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
+- [Fixed] Restore Popover focus during the closing commit so stale animation-frame callbacks cannot steal focus after nested-overlay keyboard navigation.
+- [Added] Wire opt-in plan→act→observe into AgentExecutor.run with Config/registry knobs, BoundToolSession tool dispatch, hard budgets, and production-path regression coverage (Refs #199).
+- [Fixed] Settings fields resolve controls from `dataType` / options / sensitivity even when `uiControl` is missing or wrong, so uncategorized booleans, enums, numbers, and secrets no longer render as free-text inputs; contract tests lock the schema→control mapping and the change/save display loop.
+- [Docs] Document the shipped Electron 43.3.0 / electron-builder 26.15.7 / electron-updater 6.8.9 security stack, advisory matrix, migration notes, and rollback steps for #615 in bilingual desktop packaging guides.
+- [Fixed] Treat timezone-aware ex-dividend timestamps as calendar dates so the inclusive 365-day TTM window keeps boundary-day events throughout the current day.
+- [Added] Portfolio page surfaces historical VaR, correlation matrix, and concentration/diversification metrics from `GET /api/v1/portfolio/risk-metrics` with always-visible assumptions and honest empty/insufficient/partial states (Refs #239).
+- [Fixed] Shrink config-registry unregistered debt baseline from 243 to 207 after registering MCP server keys and post-#1036 data-source domain keys (Refs #1023, #244).
+- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after merging MCP Settings inventory onto post-#1036/#1031 main (Refs #244).
+- [Added] Register all optional MCP server env keys in config registry category `mcp` with typed controls, validation ranges, sensitive masking, and bilingual Settings titles (Refs #244).
+- [Added] Report Markdown panel download actions call history export for Markdown/PDF so archive export #163 is user-reachable (Refs #163, #1008).
+- [Added] Model Access hub surfaces local model runtime and local CLI detection status (available/unavailable/not configured, last checked, honest probe failures) alongside cloud connections (Refs #865).
+- [Fixed] Config registry type inference treats boolean-named keys and inline-comment value hints as boolean/switch, and select when options are present; CI guard freezes unregistered `.env.example` keys as shrink-only temporary debt (Refs #1023).
+- [Fixed] Register 28 previously unregistered historical long-tail Settings keys for daily briefs, outbound access, fundamental and portfolio risk, news intelligence, LLM limits, failure notifications, and paper cash with typed controls, validation, and bilingual help (Refs #1023).
+- [Fixed] Register agent runtime guards, decision memory, reasoning-trace export, report mode, and plugin data-provider auto-bind in the config registry so Settings uses correct categories, controls, defaults, and validation instead of uncategorized text fields (Refs #1023).
+- [Fixed] Register crypto, data-validation, and local-first daily-cache Settings fields in the config registry with correct controls, enums, defaults, and bilingual help so they no longer land as uncategorized free-text (Refs #1023).
+- [Chore] Rebaseline Web locale bundle gzip budgets after data-source Settings help inventory growth (Refs #1023).
 - [Added] Agent planning gains an opt-in plan→act→observe→replan loop with hard tool-call/replan/time bounds, explicit failure termination (no fail-open), and trace-safe execution metadata via existing agent observability (Refs #199).
+- [Added] Wire shared financial charts into product pages: Stock Details KlineChart (history API candles) and Portfolio RiskHeatmap (existing risk API weight/stop-loss/drawdown scores) with loading, empty, and invalid-value guards (Refs #142).
 - [Fixed] Capability inventory availability is projected only from live tool/skill/pipeline/plugin/data owners; registry and config read failures return explicit partial source errors instead of fail-open success snapshots (Refs #221).
 - [Changed] Mount Today's Focus panel on the Home attention grid via `getTodaysFocus`, replacing the ad-hoc active-signal list so the #157 service is user-reachable (Refs #157, #1008).
 - [Added] Agent decision replay V1 adds a sequence cursor, version/trace/capture integrity states, and sanitized event details to existing task and history run-flow views (Refs #254).
@@ -20,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Plugin lifecycle security-audit events with fail-closed administrator mutations, opt-in Data Provider auto-bind, health snapshots with recovery-aware last error codes, and additive plugin health/list API diagnostics.
 - [Changed] Extract Settings overview and system/security rendering into typed section components while keeping page state and orchestration under the existing size guard.
 
+- [Changed] Migrated analysis-cluster Web API modules (`analysis`, `history`, `scheduledTasks`, `agent` plain JSON) to OpenAPI-generated type anchors with Zod boundary validation via `ParsedApiError` (`api_response_validation_failed`); SSE/streaming agent and analysis task stream surfaces remain documented skips for #721.
+- [Added] Signal Center Alerts filters, pagination, and `?alert=` edit deep links restore from namespaced query parameters with replace/push history, while the existing Signal Center route remains the production owner (#879 A1).
+- [Added] Declarative per-plugin settings schemas, atomic local persistence, immutable runtime projection, audited settings API, and a generated Web Settings form with persistent enable/disable controls (Fixes #277).
+- [Fixed] Alerts primary filters (status / rule type) stay inline above the 48rem breakpoint; AdvancedFilterSheet fold remains mobile-only (#909 follow-up).
+- [Fixed] Token Usage period selection is owned by the URL (`?period=`) so refresh/share under Settings keeps the time range (#879 A1).
+- [Fixed] Overflowing pagination controls use safe centering so the leading prev control remains reachable under horizontal scroll (follow-up to #910 / #879 B4).
+- [Fixed] Keep Backtest strategy run options (`minAge`/`limit`) in shareable URLs while preserving stable research-route wire keys (#879 A1).
+- [Added] Agent Chat what-if scenario mode with structured assumptions, hypothetical markers, turn limits, and hard isolation from AnalysisHistory / DecisionSignal / Agent memory (#130).
 - [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) across CLI, Web, analysis/watchlist APIs, imports, providers, and Bot flows, while preserving indexed Japanese codes and explicit market hints or suffixes.
 - [Added] SmartMoney money-flow tracking with a default-off composition gate, typed provider outcomes, cancellable AkShare deadlines, bounded cache/circuit fallback, strict calibration and freshness metadata, and optional analysis-context injection (#862).
 - [Fixed] Screening/Discover URL contract: persist candidate/hotspot view via urlState, keep filter params shareable on refresh, and hand off hotspot analyze intent through Home `?stock=` query instead of location.state (#879 A1/A4).
@@ -181,6 +208,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Ported upstream explicit-suffix stock-list analysis-target parsing (`parse_analysis_target` / IndexRegistry) with reject contract for invalid exchange suffixes.
 
 - [Added] Applied Content-Security-Policy and related security headers (nosniff, frame deny, referrer) on FastAPI responses as defense-in-depth for the served web app.
+- [Changed] Modularized the Web API error catalog behind its existing import path and added paired, localized Toast remediation for high-impact codes.
 - [Chore] Extracted NotificationConfig and ShareImageConfig domain sub-objects behind the flat Config facade (phase 1; attribute access unchanged).
 - [Changed] Migrated portfolio, backtest, decisionSignals, and scorecard Web API modules to OpenAPI-generated types with Zod boundary validation (money-math numeric-string mismatches fail closed).
 - [Tests] Expand Playwright e2e coverage for share-image success/503 UI, per-market market-review region selection, and auth-disable current-password re-confirmation.
@@ -200,6 +228,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Migrated system-cluster Web API modules (systemConfig, auth, securityAudit, usage, approvals) to OpenAPI-generated type anchors with Zod boundary validation.
 - [Added] Froze the plugin extension surface v1 (version constant, author export set, contract freeze section) and added contract tests around the reference notification-channel plugin.
 - [Added] Connected durable security-audit events to auth policy/session/password paths and system config export/import/rollback (fail-closed, redacted payloads).
+- [Changed] Emitted stable validation error codes for the top analysis/stocks user-facing messages (Chinese fallback retained; Web localizes via the error catalog) and remeasured only the affected locale chunk budgets with 200 B headroom.
 - [Added] Default-off Bayesian skill outcome weights at aggregation, plus an opt-in historical sample backfill script.
 - [Changed] Unified baostock/pytdx/longbridge retry and request-timeout policy via `data_provider/retry_policy.py` (BaseFetcher-level enforcement deferred).
 - [Chore] Extracted the provider health/circuit registry from DataFetcherManager behind an import-preserving facade and inverted the run-diagnostics dependency.
