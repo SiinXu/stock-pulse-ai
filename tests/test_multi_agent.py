@@ -3060,6 +3060,57 @@ class TestResearchCommandTimeout(unittest.TestCase):
         self.assertEqual(captured["timeout_seconds"], 1)
         self.assertTrue(captured["query"].startswith("[Stock: GOOGL]"))
 
+    def test_research_canonicalizes_bare_four_digit_hk_code(self):
+        from bot.commands.research import ResearchCommand
+        from bot.models import BotMessage
+
+        cmd = ResearchCommand()
+        msg = MagicMock(spec=BotMessage)
+        msg.platform = "test"
+        msg.user_id = "u1"
+        result = SimpleNamespace(
+            success=True,
+            report="ok",
+            sub_questions=["q"],
+            findings_count=1,
+            total_tokens=100,
+            duration_s=1.0,
+            error=None,
+            timed_out=False,
+        )
+        captured = {}
+
+        def _capture_research(query, context=None, timeout_seconds=None):
+            captured["query"] = query
+            captured["context"] = context
+            return result
+
+        config = SimpleNamespace(
+            agent_deep_research_budget=30000,
+            agent_deep_research_timeout=1,
+            litellm_model="test-model",
+            agent_mode=True,
+        )
+        with patch("bot.commands.research.get_config", return_value=config), patch(
+            "src.agent.factory.get_tool_registry", return_value=MagicMock()
+        ), patch(
+            "src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()
+        ), patch(
+            "src.data.stock_index_loader.resolve_index_stock_code",
+            return_value=None,
+        ), patch(
+            "src.agent.research.ResearchAgent.research",
+            side_effect=_capture_research,
+        ):
+            response = cmd.execute(msg, ["0941", "风险"])
+
+        self.assertIn("Deep Research Report", response.text)
+        self.assertEqual(
+            captured["context"],
+            {"stock_code": "HK00941", "stock_name": ""},
+        )
+        self.assertTrue(captured["query"].startswith("[Stock: HK00941]"))
+
 
 # ============================================================
 # ResearchAgent filtered registry & API endpoint

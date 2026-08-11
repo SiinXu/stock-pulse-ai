@@ -479,6 +479,157 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响新闻上下文数量、时效性和报告长度。'],
     notes: ['窗口过长可能引入陈旧信息，过短可能遗漏慢发酵事件。'],
   },
+
+  'settings.data_source.CRYPTO_PROVIDER_ENABLED': {
+    title: '启用加密货币数据源',
+    summary: '为 crypto:TICKER 身份注册默认关闭的 CoinGecko 行情路径。',
+    usage: '仅在确实需要分析 crypto:BTC 等加密标的时开启。关闭时股票路径保持不变。',
+    valueNotes: [
+      '裸 BTC / ETH 代码不会自动按加密货币处理。',
+      '更改 provider 注册开关后通常需要重启进程。',
+    ],
+    impact: ['控制新建生产数据 manager 是否挂载 CoinGecko 加密货币 provider。'],
+    notes: ['身份、UTC 日线与出站策略详见 docs/crypto-market-support.md。'],
+  },
+  'settings.data_source.COINGECKO_API_PLAN': {
+    title: 'CoinGecko API 方案',
+    summary: '选择 keyless、Demo 或 Pro 鉴权模式及对应官方域名。',
+    usage: 'keyless 无需密钥；demo / pro 仅在配置了匹配的 COINGECKO_API_KEY 时使用。',
+    valueNotes: [
+      'keyless 使用公共 API 且不发送凭据。',
+      'demo 与 pro 会选择对应官方 origin 与请求头。',
+      '非法值在加载时回退为 keyless。',
+    ],
+    impact: ['影响 CoinGecko 鉴权请求头与官方域名选择。'],
+    notes: ['自定义 COINGECKO_API_BASE 仅允许在 keyless 模式下使用。'],
+  },
+  'settings.data_source.COINGECKO_API_KEY': {
+    title: 'CoinGecko API Key',
+    summary: '可选的 CoinGecko Demo 或 Pro API 密钥。',
+    usage: 'keyless 模式请留空；仅当 COINGECKO_API_PLAN 为 demo 或 pro 时粘贴密钥。',
+    valueNotes: ['凭据不会发送到自定义 COINGECKO_API_BASE 地址。'],
+    impact: ['在方案匹配时启用已鉴权的 CoinGecko Demo / Pro 请求。'],
+    notes: ['不要把真实密钥提交到仓库或贴进公开 Issue / 截图。'],
+  },
+  'settings.data_source.COINGECKO_API_BASE': {
+    title: 'CoinGecko API 基础地址',
+    summary: '仅 keyless 模式下可选的自定义 HTTPS 基础地址。',
+    usage: '留空使用官方端点；仅在需要受信 keyless 镜像时填写完整 HTTPS URL。',
+    valueNotes: [
+      'Demo / Pro 始终使用官方域名，不受此字段影响。',
+      '私有主机还需加入 OUTBOUND_HTTP_ALLOWLIST。',
+    ],
+    impact: ['影响 keyless 加密货币行情请求的发送目标。'],
+    notes: ['保存自定义地址前请确认你信任该端点运营方。'],
+    examples: ['https://api.coingecko.com/api/v3'],
+  },
+  'settings.data_source.CRYPTO_COINGECKO_PRIORITY': {
+    title: 'CoinGecko 加密货币优先级',
+    summary: '控制 CoinGecko 在加密市场数据源中的尝试顺序。',
+    usage: '填写 0–99 的整数，数值越小越优先。默认 10。',
+    valueNotes: [
+      '归类在数据源优先级字段中，不会重排股票日 K 或实时行情链。',
+      '仅在 CRYPTO_PROVIDER_ENABLED=true 时生效。',
+    ],
+    impact: ['仅影响 crypto: 身份的加密货币 provider 选择顺序。'],
+    notes: ['除非新增了竞争优先级的加密 provider，否则保持默认即可。'],
+  },
+  'settings.data_source.PROVIDER_MARKET_DATA_MODE': {
+    title: '行情本地优先模式',
+    summary: '选择本地优先、仅本地或强制刷新的日线行情策略。',
+    usage: '日常保持 auto；离线完整缓存读取用 local_only；跳过本地并强制走一轮 provider 用 refresh。',
+    valueNotes: [
+      'auto：完整新鲜本地 → provider 链 → 全失败时可用 stale。',
+      'local_only：永不进入 provider/socket；本地不完整或过期则结构化失败。',
+      'refresh：跳过本地读，严格走一轮 provider，失败不回 stale。',
+      '非法非空值在配置加载时 fail-closed，不会静默变成 auto。',
+    ],
+    impact: ['影响分析、股票历史 API 与依赖行情的定时任务的日线读取路径。'],
+    notes: [
+      '与进程级出站 HTTP 门禁 LOCAL_ONLY_MODE 相互独立。',
+      '详见 docs/local-first-market-data.md。',
+    ],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS': {
+    title: '仅本地缓存最大年龄',
+    summary: 'local_only 模式下仍可使用的完整本地日线缓存最大年龄。',
+    usage: '填写秒数。默认 2592000（30 天）。必须大于 0。',
+    valueNotes: ['超过年龄的完整条目按结构化离线缺失处理，不会伪装成实时行情。'],
+    impact: ['限制 PROVIDER_MARKET_DATA_MODE=local_only 时可接受的本地缓存陈旧程度。'],
+    notes: ['不会替代 auto 模式使用的内存/持久化新鲜度 TTL。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS': {
+    title: '持久日线缓存最大年龄',
+    summary: '读写时删除超过该年龄的持久化日线缓存文件。',
+    usage: '填写秒数。默认 7776000（90 天）。设为 0 可关闭按年龄删除。',
+    valueNotes: ['保留清理是确定性的，不会把密钥等敏感信息写入缓存。'],
+    impact: ['控制 provider 日线缓存目录的磁盘占用。'],
+    notes: ['schema 与列白名单独立于保留年龄继续生效。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES': {
+    title: '持久日线缓存最大条目数',
+    summary: '限制保留的持久化日线缓存条目数量。',
+    usage: '填写正整数。默认 512。优先删除最老条目。',
+    valueNotes: ['相同时间戳时按文件名做确定性决胜。'],
+    impact: ['限制多标的长时间运行时缓存目录增长。'],
+    notes: ['可与最大年龄设置组合，同时做时间与数量维度的保留控制。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS': {
+    title: '日线缓存滚动宽限天数',
+    summary: '允许已覆盖本地区间跨若干自然日服务默认结束日期滚动窗口。',
+    usage: '填写正整数。默认 1 天滚动宽限。',
+    valueNotes: ['auto 模式仍会按新鲜度 TTL 对老化数据做在线复验。'],
+    impact: ['减少默认结束日期跨日后对重叠窗口的不必要 provider 调用。'],
+    notes: ['除非有意放宽或收紧滚动复用，否则保持默认。'],
+  },
+  'settings.data_source.DATA_VALIDATION_ENABLED': {
+    title: '启用数据校验',
+    summary: '运行统一数值校验层并写入版本化诊断证据。',
+    usage: '默认开启。仅在需要临时绕过校验诊断时关闭。',
+    valueNotes: ['开启时覆盖日线、实时、基本面及选定技术指标字段。'],
+    impact: ['控制是否产出校验证据，以及严格拒绝是否可生效。'],
+    notes: ['范围与回滚说明见 docs/data-validation-layer.md。'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT': {
+    title: '数据校验严格模式',
+    summary: '在接受或缓存前拒绝错误级数据，使既有有界回退链继续尝试下一数据源。',
+    usage: '默认关闭（偏告警）。仅在希望 reject 级发现直接丢弃候选时开启。',
+    valueNotes: ['严格模式复用既有有界 provider 回退，不会新建第二条抓取链。'],
+    impact: ['数据源返回结构不合法数值时可能触发更多回退。'],
+    notes: ['可与 DATA_VALIDATION_STRICT_SCOPES 配合，限制执行拒绝的市场/品种范围。'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT_SCOPES': {
+    title: '数据校验严格作用域',
+    summary: '用市场/品种选择器限制严格拒绝生效的范围。',
+    usage: '逗号分隔选择器，例如 cn/equity,hk/etf,us/index。默认 */* 表示全部。',
+    valueNotes: ['支持的品种包括 equity、etf、index；两侧均可用 * 通配。'],
+    impact: ['收窄或扩大 DATA_VALIDATION_STRICT 下可被拒绝的标的集合。'],
+    notes: ['空值在配置加载时会规范为默认 */*。'],
+  },
+  'settings.data_source.DATA_VALIDATION_INSTRUMENT_OVERRIDES': {
+    title: '数据校验品种覆盖',
+    summary: '为无法从代码安全推断 ETF/指数身份的海外标的提供权威品种映射。',
+    usage: '逗号分隔 SYMBOL=instrument，例如 SPY=etf,HK02800=etf,1306.T=etf。内置分类足够时请留空。',
+    valueNotes: [
+      '这是逗号分隔映射，不是 JSON 文档。',
+      '仅在 ETF/指数身份可能被误判时使用。',
+    ],
+    impact: ['影响所列标的的校验品种身份及严格作用域匹配。'],
+    notes: ['优先维护稀疏权威覆盖，避免手维护大目录。'],
+    examples: ['SPY=etf,HK02800=etf,1306.T=etf'],
+  },
+  'settings.data_source.DATA_VALIDATION_UPPER_LAYER_MODE': {
+    title: '数据校验上层模式',
+    summary: '聚合基本面在合成边界的最终处理策略。',
+    usage: '保持 warn 以保留结果并记录证据；仅在需要上层显式失败时使用 reject。',
+    valueNotes: [
+      'warn 保留聚合结果并记录证据。',
+      'reject 在上层边界抛错，不描述为数据源回退。',
+      '其他值在加载时规范为 warn。',
+    ],
+    impact: ['影响聚合基本面校验失败如何向上游调用方暴露。'],
+    notes: ['与 DATA_VALIDATION_STRICT 的 provider 候选拒绝相互独立。'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: '飞书群机器人 Webhook',
     summary: '配置飞书自定义群机器人，用于把分析报告推送到指定飞书群。',
@@ -1674,6 +1825,217 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['需要 Agent multi 能力。'],
   },
 
+
+  'settings.mcp.MCP_SERVER_ENABLED': {
+    title: '启用 MCP 服务',
+    summary: '可选 MCP 进程总开关，默认关闭；主 API/Web 进程不会自动启动 MCP。',
+    usage: '仅在你明确要执行 `python -m src.mcp_server` 时设为 true。修改后需重启 MCP 进程。',
+    valueNotes: [
+      'false 时保持对外工具面关闭。',
+      '仅开启开关不够，还需要 scopes 与对应传输的安全配置。',
+    ],
+    impact: [
+      '决定独立 MCP 进程是否允许启动。',
+    ],
+    notes: [
+      'HTTP 传输属于安全敏感对外面。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_TRANSPORT': {
+    title: 'MCP 传输方式',
+    summary: '官方 SDK 传输：stdio（本机进程）或 streamable-http。',
+    usage: '本机操作优先 stdio。仅在具备管理员认证、scopes 与会话摘要时使用 streamable-http。',
+    valueNotes: [
+      'stdio 为默认本机边界。',
+      '运行时接受 http 作为 streamable-http 别名。',
+    ],
+    impact: [
+      '决定客户端如何连接以及适用哪些安全控制。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_HOST': {
+    title: 'MCP 绑定主机',
+    summary: 'streamable-http 绑定主机，优先 loopback。',
+    usage: '除非有可信网络控制，否则保持 127.0.0.1/localhost。',
+    valueNotes: [
+      '绑定到非本机地址会扩大攻击面。',
+    ],
+    impact: [
+      '影响 MCP HTTP 监听接受连接的位置。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_PORT': {
+    title: 'MCP 绑定端口',
+    summary: 'streamable-http TCP 端口（1–65535）。',
+    usage: '默认 8765；端口冲突时再修改。',
+    impact: [
+      '影响 MCP HTTP 监听地址。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_PRINCIPAL': {
+    title: 'MCP stdio 主体',
+    summary: 'stdio 审计与限速使用的稳定主体名。',
+    usage: '使用符合支持字符规则的短稳定标识。',
+    impact: [
+      '用于标注 stdio 工具调用日志与限速桶。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_SCOPES': {
+    title: 'MCP stdio 权限范围',
+    summary: 'stdio 的逗号分隔最小权限 scopes。',
+    usage: 'transport=stdio 且启用时必填。允许：market.read、history.read、portfolio.read、analysis.trigger。',
+    valueNotes: [
+      '只授予本机操作者真正需要的范围。',
+    ],
+    impact: [
+      '限制 stdio 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '放宽 scope 会扩大可调用能力。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SCOPES': {
+    title: 'MCP HTTP 权限范围',
+    summary: 'streamable-http 的逗号分隔最小权限 scopes。',
+    usage: '启用 HTTP 传输时必填；允许范围与 stdio 相同。',
+    impact: [
+      '限制 HTTP 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '远程可达传输应保持最小权限。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SESSION_TOKEN_SHA256': {
+    title: 'MCP HTTP 会话令牌 SHA-256',
+    summary: '唯一接受的管理员会话令牌的 SHA-256 十六进制摘要。',
+    usage: 'streamable-http 必填。只存摘要，不存原始 Bearer。',
+    valueNotes: [
+      '须为 64 位十六进制，或在未使用时留空。',
+      '设置页会掩码此敏感字段。',
+    ],
+    impact: [
+      '为 HTTP MCP 锚定可接受的管理员会话。',
+    ],
+    notes: [
+      '若 Bearer 可能泄露，应轮换摘要。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_RESOURCE': {
+    title: 'MCP HTTP 资源 URL',
+    summary: 'streamable-http 的绝对 http(s) 资源/受众 URL。',
+    usage: '默认 http://127.0.0.1:8765/mcp，需与客户端使用的公开 MCP 端点一致。',
+    impact: [
+      '影响 HTTP MCP 的 resource/audience 绑定。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_HOSTS': {
+    title: 'MCP HTTP 允许 Host',
+    summary: 'streamable-http 的 Host 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback。通配端口使用官方 SDK 的 :* 形式。',
+    valueNotes: [
+      '放宽列表（如 * 或公网主机）会增加 Host 头与跨站风险。',
+    ],
+    impact: [
+      '控制 HTTP MCP 接受哪些 Host 值。',
+    ],
+    notes: [
+      '应把放宽视为安全决策，而非便利开关。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_ORIGINS': {
+    title: 'MCP HTTP 允许 Origin',
+    summary: '浏览器客户端的 Origin 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback HTTP origin。',
+    valueNotes: [
+      '放宽 origin（尤其 * 或不可信站点）会允许浏览器跨源访问 MCP 工具。',
+    ],
+    impact: [
+      '控制 HTTP MCP 的浏览器 CORS/Origin 接受策略。',
+    ],
+    notes: [
+      '保持列表尽量小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_BODY_BYTES': {
+    title: 'MCP HTTP 最大 Body 字节',
+    summary: 'streamable-http 接受的最大 JSON Body 大小。',
+    usage: '默认 1000000。仅在有真实大负载需求时上调。',
+    impact: [
+      '限制请求体内存占用。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_HEADER_BYTES': {
+    title: 'MCP HTTP 最大 Header 字节',
+    summary: 'streamable-http 未完整 Header 块上限。',
+    usage: '默认 32768。通常无需修改。',
+    impact: [
+      '限制 Header 缓冲大小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_CONNECTIONS': {
+    title: 'MCP HTTP 最大连接数',
+    summary: 'streamable-http 最大并发连接数。',
+    usage: '默认 32。小主机可下调，加压测试后再上调。',
+    impact: [
+      '限制并发 HTTP MCP 客户端。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_BACKLOG': {
+    title: 'MCP HTTP 监听 backlog',
+    summary: 'streamable-http 接受器的 OS listen backlog。',
+    usage: '默认 16。容量调优之外很少改动。',
+    impact: [
+      '影响待处理连接队列深度。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_READ_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP 读取超时',
+    summary: 'streamable-http 每个 body chunk 读取超时（秒）。',
+    usage: '默认 10，范围 1–120。',
+    impact: [
+      '控制慢客户端可占用读取的时间。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Keep-Alive 超时',
+    summary: 'streamable-http 连接 keep-alive 空闲超时（秒）。',
+    usage: '默认 5，范围 1–120。',
+    impact: [
+      '控制空闲连接保留时间。',
+    ],
+  },
+  'settings.mcp.MCP_MAX_CONCURRENT_TOOLS': {
+    title: 'MCP 最大并发工具数',
+    summary: '单个 MCP 进程最大并发工具 worker 数。',
+    usage: '默认 8，范围 1–128。',
+    impact: [
+      '限制并发工具执行成本。',
+    ],
+  },
+  'settings.mcp.MCP_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 工具速率限制',
+    summary: '按主体/工具的每分钟调用上限。',
+    usage: '默认 60，范围 1–10000。',
+    impact: [
+      '限制通用工具刷量。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 分析速率限制',
+    summary: 'analysis.trigger 每分钟调用上限。',
+    usage: '默认 2。请保持较低以控制 LLM/数据成本。',
+    impact: [
+      '保护分析成本预算。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_MAX_STOCKS': {
+    title: 'MCP 单次分析最大标的数',
+    summary: '单次 analysis.trigger 允许的最大标的数。',
+    usage: '默认 5，范围 1–50。',
+    impact: [
+      '限制单次分析成本。',
+    ],
+  },
 };
 
 export default settingsHelpZhCN;

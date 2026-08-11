@@ -113,14 +113,14 @@ def _strip_exchange_suffix(text: str) -> Optional[str]:
 
 
 def is_code_like(value: str) -> bool:
-    """Check if string looks like a stock code (5-6 digits, 1-5 letters, or prefixed code)."""
+    """Check if string looks like a supported stock-code input."""
     text = value.strip().upper()
     if not text:
         return False
     from data_provider.symbol_normalization import normalize_crypto_symbol
     if normalize_crypto_symbol(value) is not None:
         return True
-    if text.isdigit() and len(text) in (5, 6):
+    if text.isdigit() and len(text) in (4, 5, 6):
         return True
     if _strip_exchange_suffix(text) is not None:
         return True
@@ -136,7 +136,7 @@ def normalize_code(raw: str) -> Optional[str]:
     """Normalize and validate a single stock code.
 
     Supports:
-    - Plain digit codes: 600519, 00700
+    - Plain digit codes: 600519, 00700, 0941 (bare HK)
     - Suffix format: 600519.SH, 600519.SZ, 920493.BJ, 00700.HK
     - Prefix format: SH600519, SH.600519, SZ000001, BJ920493, HK00700 (case-insensitive)
     - US ticker symbols: AAPL, TSLA
@@ -149,8 +149,8 @@ def normalize_code(raw: str) -> Optional[str]:
     text = raw.strip().upper()
     if not text:
         return None
-    if text.isdigit() and len(text) in (5, 6):
-        return text
+    if text.isdigit() and len(text) in (4, 5, 6):
+        return text.zfill(5) if len(text) == 4 else text
     suffix_symbol = normalize_suffix_market_symbol(text)
     if suffix_symbol is not None:
         return suffix_symbol
@@ -402,12 +402,25 @@ def canonicalize_analysis_stock_code(raw: str) -> Optional[str]:
     Kong symbols are made explicit before index resolution so they cannot be
     confused with another market.
     """
+    text = (raw or "").strip()
+    if not text:
+        return None
+
     from data_provider.symbol_normalization import normalize_crypto_symbol
 
-    crypto_symbol = normalize_crypto_symbol(raw)
+    crypto_symbol = normalize_crypto_symbol(text)
     if crypto_symbol is not None:
         return crypto_symbol
-    normalized = normalize_code(raw)
+
+    # A four-digit base is ambiguous with index-backed Japanese listings.
+    # Resolve the index first; only an unresolved value takes the documented
+    # bare-HK default through normalize_code().
+    resolved_input = (
+        resolve_index_stock_code_for_analysis(text)
+        if text.isdigit() and len(text) == 4
+        else text
+    )
+    normalized = normalize_code(resolved_input)
     if normalized is None:
         return None
 
@@ -439,25 +452,33 @@ def canonicalize_analysis_stock_code(raw: str) -> Optional[str]:
 
 
 def resolve_index_stock_code_for_analysis(raw: str) -> str:
-    """Resolve bare JP/KR candidates via stock index and keep suffix forms.
+    """Resolve bare JP/KR candidates with an HK fallback for four digits.
 
-    For code-like inputs and indexed 4-digit JP bare bases:
+    For code-like inputs and ambiguous 4-digit bare bases:
     - Existing index-backed entries (e.g. ``005930`` -> ``005930.KS``) are
       preferred.
-    - Non-matching code-like inputs keep the canonicalized input.
+    - An unresolved 4-digit base is interpreted as Hong Kong and rewritten to
+      an explicit five-digit ``HK`` identity (e.g. ``0941`` -> ``HK00941``).
+    - Other non-matching code-like inputs keep the canonicalized input.
 
-    Non-code-like values are still canonicalized only, letting callers keep
-    their own validation policy (e.g. API name resolution path).
+    Existing explicit forms keep their caller-visible shape. This is important
+    for task/API compatibility; callers that require a provider-facing identity
+    use :func:`canonicalize_analysis_stock_code` after this resolution step.
+    Non-code-like values are canonicalized only so callers retain their own
+    validation or name-resolution policy.
     """
     text = (raw or "").strip()
     if not text:
         return ""
 
-    if is_code_like(text) or (text.isdigit() and len(text) == 4):
+    if is_code_like(text):
         from src.data.stock_index_loader import resolve_index_stock_code
 
         resolved = resolve_index_stock_code(text)
         if resolved:
             return canonical_stock_code(resolved)
+
+        if text.isdigit() and len(text) == 4:
+            return f"HK{text.zfill(5)}"
 
     return canonical_stock_code(text)

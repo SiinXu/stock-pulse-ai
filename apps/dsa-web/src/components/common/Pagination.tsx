@@ -142,8 +142,11 @@ export const Pagination: React.FC<PaginationProps> = ({
     <nav
       ref={navRef}
       className={cn(
-        // max-w-full + overflow-x-auto: never clip controls even if still tight after compact.
-        'flex max-w-full items-center justify-center gap-2 overflow-x-auto overscroll-x-contain',
+        // max-w-full + overflow-x-auto keep the strip scrollable when still tight after compact.
+        // justify-center-safe: center when content fits; on overflow fall back to start alignment
+        // so the leading control stays at scrollLeft 0 and remains reachable (unsafe center
+        // would push the start half into clamped negative scroll space).
+        'flex max-w-full items-center justify-center-safe gap-2 overflow-x-auto overscroll-x-contain',
         className,
       )}
       aria-label={t('common.pageNav')}
