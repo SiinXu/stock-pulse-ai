@@ -283,7 +283,6 @@ def test_parallel_timeout_uses_the_shared_session_deadline():
         progress_callback=None,
         tool_calls_log=tool_calls_log,
         tool_wait_timeout_seconds=1.0,
-        tool_deadline_monotonic=deadline,
     )
 
     slow_log = next(

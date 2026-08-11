@@ -36,7 +36,6 @@ def _execute_tools(
     progress_callback: Optional[Callable],
     tool_calls_log: List[Dict[str, Any]],
     tool_wait_timeout_seconds: Optional[float] = None,
-    tool_deadline_monotonic: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
     """Execute one or more tool calls, returning ordered result dicts.
 
@@ -48,6 +47,8 @@ def _execute_tools(
     """
 
     from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
+
+    tool_deadline_monotonic = tool_session.deadline_monotonic
 
     def _safe_tool_trace_name(value: Any) -> str:
         canonicalize = getattr(tool_session, "canonical_tool_name", None)
