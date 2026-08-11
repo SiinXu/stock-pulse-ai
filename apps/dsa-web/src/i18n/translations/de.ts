@@ -5233,6 +5233,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.organizing": "Vorbereitung {candidate_count} Kandidaten",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Screening läuft",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Screening-Aufgabe in der Warteschlange",
+  "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.8.label": "Unternehmensereignis",
+  "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.15.label": "Unternehmensereignis",
+  "locales.alerts.ALERT_TYPE_LABELS.corporate_event": "Unternehmensereignis",
+
   "utils.taskMessage.TASK_STATUS_UPDATED": "Aufgabenstatus aktualisiert",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "Vorschau.",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "Szenario",

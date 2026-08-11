@@ -3850,6 +3850,84 @@ export interface components {
             /** Deleted */
             deleted: number;
         };
+        /** AlertEventAffectedContext */
+        AlertEventAffectedContext: {
+            /**
+             * In Portfolio
+             * @default false
+             */
+            in_portfolio: boolean;
+            /**
+             * In Watchlist
+             * @default false
+             */
+            in_watchlist: boolean;
+            /** Symbol */
+            symbol?: string | null;
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /** AlertEventContext */
+        AlertEventContext: {
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactContext */
+        AlertImpactContext: {
+            affected?: components["schemas"]["AlertEventAffectedContext"] | null;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Related Analysis */
+            related_analysis?: string | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactResult */
+        AlertImpactResult: {
+            /**
+             * Grade
+             * @enum {string}
+             */
+            grade: "major" | "routine" | "unclassified";
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "rule_severity" | "unavailable";
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
+        };
         /** AlertNotificationItem */
         AlertNotificationItem: {
             /** Attempt */
@@ -4065,6 +4143,8 @@ export interface components {
         };
         /** AlertTriggerItem */
         AlertTriggerItem: {
+            /** Alert Type */
+            alert_type?: string | null;
             analysis_context_pack_overview?: components["schemas"]["AnalysisContextPackOverview"] | null;
             /**
              * Analysis Visibility Source
@@ -4081,8 +4161,11 @@ export interface components {
             } | null;
             /** Diagnostics */
             diagnostics?: string | null;
+            event_context?: components["schemas"]["AlertEventContext"] | null;
             /** Id */
             id: number;
+            impact_context?: components["schemas"]["AlertImpactContext"] | null;
+            impact_result?: components["schemas"]["AlertImpactResult"] | null;
             market_phase_summary?: components["schemas"]["MarketPhaseSummary"] | null;
             /** Observed Value */
             observed_value?: number | null;
@@ -4090,6 +4173,8 @@ export interface components {
             reason?: string | null;
             /** Rule Id */
             rule_id?: number | null;
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
             /** Status */
             status: string;
             /** Target */
@@ -4103,6 +4188,8 @@ export interface components {
         AlertTriggerListResponse: {
             /** Items */
             items?: components["schemas"]["AlertTriggerItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
             /** Page */
             page: number;
             /** Page Size */
@@ -16594,6 +16681,10 @@ export interface operations {
                 target?: string | null;
                 /** @description Optional status filter */
                 status?: string | null;
+                /** @description Optional typed corporate-event filter */
+                alert_type?: "corporate_event" | null;
+                /** @description Stable continuation cursor */
+                cursor?: string | null;
                 page?: number;
                 page_size?: number;
             };
@@ -16610,6 +16701,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertTriggerListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

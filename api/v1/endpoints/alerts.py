@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy.exc import SQLAlchemyError
 
 from api.v1.schemas.alerts import (
     AlertDeleteResponse,
@@ -17,6 +18,7 @@ from api.v1.schemas.alerts import (
     AlertRuleTestResponse,
     AlertRuleUpdateRequest,
     AlertTriggerListResponse,
+    CorporateAlertTypeFilter,
 )
 from api.v1.schemas.common import ErrorResponse
 from src.services.alert_service import (
@@ -215,28 +217,36 @@ def test_rule(rule_id: int) -> AlertRuleTestResponse:
 @router.get(
     "/triggers",
     response_model=AlertTriggerListResponse,
-    responses={500: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="List alert trigger history",
 )
 def list_triggers(
     rule_id: Optional[int] = Query(None, description="Optional rule id filter"),
     target: Optional[str] = Query(None, description="Optional target filter"),
     status: Optional[str] = Query(None, description="Optional status filter"),
+    alert_type: Optional[CorporateAlertTypeFilter] = Query(
+        None,
+        description="Optional typed corporate-event filter",
+    ),
+    cursor: Optional[str] = Query(None, max_length=256, description="Stable continuation cursor"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> AlertTriggerListResponse:
     service = AlertService()
     try:
-        return AlertTriggerListResponse(
-            **service.list_triggers(
-                rule_id=rule_id,
-                target=target,
-                status=status,
-                page=page,
-                page_size=page_size,
-            )
+        payload: Dict[str, Any] = service.list_triggers(
+            rule_id=rule_id,
+            target=target,
+            status=status,
+            alert_type=alert_type,
+            cursor=cursor,
+            page=page,
+            page_size=page_size,
         )
-    except Exception as exc:
+        return AlertTriggerListResponse(**payload)
+    except AlertServiceError as exc:
+        raise _bad_request(exc, error=exc.error_code)
+    except SQLAlchemyError as exc:
         raise _internal_error("List alert triggers failed", exc)
 
 

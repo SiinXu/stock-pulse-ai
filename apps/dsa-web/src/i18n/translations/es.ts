@@ -5233,6 +5233,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.organizing": "Preparación {candidate_count} Candidatos",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Selección en curso",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Tarea de selección en cola",
+  "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.8.label": "Evento corporativo",
+  "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.15.label": "Evento corporativo",
+  "locales.alerts.ALERT_TYPE_LABELS.corporate_event": "Evento corporativo",
+
   "utils.taskMessage.TASK_STATUS_UPDATED": "Estado de la tarea actualizado",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "Solo vista previa colaborativa del escenario; no cambia la recomendacion final del sistema. Nunca escribe historial de analisis, DecisionSignal ni memoria del Agent.",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "Escenario hipotetico (turno extra)",

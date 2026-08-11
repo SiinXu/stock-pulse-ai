@@ -5233,6 +5233,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.organizing": "Menyediakan {candidate_count} calon",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.processing": "Saringan sedang dijalankan",
   "utils.taskMessage.TASK_MESSAGE_TEXT.task.screening.queued": "Tugasan saringan dalam baris gilir",
+  "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.8.label": "Acara korporat",
+  "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.15.label": "Acara korporat",
+  "locales.alerts.ALERT_TYPE_LABELS.corporate_event": "Acara korporat",
+
   "utils.taskMessage.TASK_STATUS_UPDATED": "Status tugas dikemas kini",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerMessage": "Pratonton senario kolaboratif sahaja; tidak mengubah cadangan akhir sistem. Tidak menulis sejarah analisis, DecisionSignal, atau memori Agent.",
   "i18n.uiText.UI_TEXT.chat.whatIf.bannerTitle": "Senario hipotetikal (giliran tambahan)",

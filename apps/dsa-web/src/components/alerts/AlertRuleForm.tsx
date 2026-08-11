@@ -13,6 +13,7 @@ import type {
   PortfolioStopLossMode,
 } from '../../types/alerts';
 import type { PortfolioAccountItem } from '../../types/portfolio';
+import { CORPORATE_EVENT_CATEGORIES, type CorporateEventCategory } from '../../types/eventAlerts';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
@@ -38,6 +39,7 @@ import {
   MAX_ALERT_COOLDOWN_SECONDS,
 } from '../../utils/alertCooldown';
 import { formatUiNumber } from '../../utils/uiLocale';
+import { EVENT_ALERT_PAGE_TEXT, EVENT_CATEGORY_LABELS } from '../../locales/eventAlerts';
 import { Button, Checkbox, Input, Select } from '../common';
 
 const MAX_REQUESTED_DAYS = 365;
@@ -71,6 +73,9 @@ interface AlertRuleFormValues {
   dPeriod: string;
   marketLightStatuses: MarketLightStatus[];
   minDrop: string;
+  eventCategories: CorporateEventCategory[];
+  lookbackHours: string;
+  minItems: string;
   cooldownMode: AlertCooldownMode;
   customCooldownSeconds: string;
 }
@@ -142,6 +147,11 @@ function alertRuleToFormValues(rule: AlertRuleItem): AlertRuleFormValues {
       ? params.statuses
       : ['red', 'yellow'],
     minDrop: numText(params.minDrop, '10'),
+    eventCategories: Array.isArray(params.eventCategories)
+      ? params.eventCategories.filter((value): value is CorporateEventCategory => CORPORATE_EVENT_CATEGORIES.includes(value as CorporateEventCategory))
+      : [...CORPORATE_EVENT_CATEGORIES],
+    lookbackHours: numText(params.lookbackHours, '24'),
+    minItems: numText(params.minItems, '1'),
     cooldownMode: cooldown.mode,
     customCooldownSeconds: cooldown.customSeconds,
   };
@@ -180,6 +190,8 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
 }) => {
   const { language } = useUiLanguage();
   const text = ALERT_FORM_TEXT[language];
+  const eventText = EVENT_ALERT_PAGE_TEXT[language];
+  const eventCategoryLabels = EVENT_CATEGORY_LABELS[language];
   const seed = useMemo(() => (initialRule ? alertRuleToFormValues(initialRule) : null), [initialRule]);
   const [name, setName] = useState(seed?.name ?? '');
   const defaultTargetScope = seed?.targetScope ?? initialTargetScope ?? 'single_symbol';
@@ -212,6 +224,9 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
   const [dPeriod, setDPeriod] = useState(seed?.dPeriod ?? '3');
   const [marketLightStatuses, setMarketLightStatuses] = useState<MarketLightStatus[]>(seed?.marketLightStatuses ?? ['red', 'yellow']);
   const [minDrop, setMinDrop] = useState(seed?.minDrop ?? '10');
+  const [eventCategories, setEventCategories] = useState<CorporateEventCategory[]>(seed?.eventCategories ?? [...CORPORATE_EVENT_CATEGORIES]);
+  const [lookbackHours, setLookbackHours] = useState(seed?.lookbackHours ?? '24');
+  const [minItems, setMinItems] = useState(seed?.minItems ?? '1');
   const [cooldownMode, setCooldownMode] = useState<AlertCooldownMode>(
     seed?.cooldownMode ?? 'default',
   );
@@ -285,6 +300,10 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
       setMarketLightStatuses(['red', 'yellow']);
     } else if (nextType === 'market_light_score_drop') {
       setMinDrop('10');
+    } else if (nextType === 'corporate_event') {
+      setEventCategories([...CORPORATE_EVENT_CATEGORIES]);
+      setLookbackHours('24');
+      setMinItems('1');
     }
   };
 
@@ -293,6 +312,14 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
       current.includes(status)
         ? current.filter((item) => item !== status)
         : [...current, status]
+    ));
+  };
+
+  const toggleEventCategory = (category: CorporateEventCategory) => {
+    setEventCategories((current) => (
+      current.includes(category)
+        ? current.filter((item) => item !== category)
+        : [...current, category]
     ));
   };
 
@@ -424,6 +451,16 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
       if (parsedMinDrop == null) return null;
       return { minDrop: parsedMinDrop };
     }
+    if (alertType === 'corporate_event') {
+      if (eventCategories.length === 0) {
+        setFormError(eventText.noEventCategory);
+        return null;
+      }
+      const parsedLookback = parseIntegerInRange(lookbackHours, eventText.lookbackHours, 'alert-event-lookback', 1, 168);
+      const parsedMinItems = parseIntegerInRange(minItems, eventText.minItems, 'alert-event-min-items', 1, 50);
+      if (parsedLookback == null || parsedMinItems == null) return null;
+      return { eventCategories, lookbackHours: parsedLookback, minItems: parsedMinItems };
+    }
     return {};
   };
 
@@ -530,6 +567,9 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
     setDPeriod('3');
     setMarketLightStatuses(['red', 'yellow']);
     setMinDrop('10');
+    setEventCategories([...CORPORATE_EVENT_CATEGORIES]);
+    setLookbackHours('24');
+    setMinItems('1');
     setCooldownMode('default');
     setCustomCooldownSeconds(DEFAULT_CUSTOM_COOLDOWN_SECONDS);
     resetParameters(alertType);
@@ -913,6 +953,49 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
             onChange={(event) => setMinDrop(event.target.value)}
             disabled={isSubmitting}
           />
+        ) : null}
+
+        {alertType === 'corporate_event' ? (
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-foreground">{eventText.ruleEventCategories}</div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {CORPORATE_EVENT_CATEGORIES.map((category) => (
+                <Checkbox
+                  key={category}
+                  label={eventCategoryLabels[category]}
+                  checked={eventCategories.includes(category)}
+                  disabled={isSubmitting}
+                  onChange={() => toggleEventCategory(category)}
+                />
+              ))}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                id="alert-event-lookback"
+                label={eventText.lookbackHours}
+                type="number"
+                min="1"
+                max="168"
+                step="1"
+                value={lookbackHours}
+                error={fieldErrors['alert-event-lookback']}
+                onChange={(event) => setLookbackHours(event.target.value)}
+                disabled={isSubmitting}
+              />
+              <Input
+                id="alert-event-min-items"
+                label={eventText.minItems}
+                type="number"
+                min="1"
+                max="50"
+                step="1"
+                value={minItems}
+                error={fieldErrors['alert-event-min-items']}
+                onChange={(event) => setMinItems(event.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
         ) : null}
 
         <div className="rounded-xl border border-border/60 bg-elevated/35 p-3">
