@@ -28,7 +28,7 @@ const StrategyItem: React.FC<StrategyItemProps> = ({
   >
     <div className="flex flex-col">
       <span className="report-strategy-label mb-0.5 text-xs">{label}</span>
-      <span className="report-strategy-value text-lg font-bold font-mono" style={!value ? { color: 'var(--text-muted-text)' } : undefined}>
+      <span className="report-strategy-value text-sm font-bold leading-5 font-mono" style={!value ? { color: 'var(--text-muted-text)' } : undefined}>
         {value || '—'}
       </span>
     </div>

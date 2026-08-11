@@ -29,8 +29,10 @@ Prefer a **smaller** mechanism when it is enough:
 - Natural-language strategies and tool *metadata* → YAML / `SKILL.md` under
   `AGENT_SKILL_DIR` (no trusted process code).
 - Jinja-only report layout changes → `REPORT_TEMPLATES_DIR`.
-- UI panels, Settings pages, remote marketplaces, dependency installers, or a
-  seventh extension point → new ADR. They are **not** surface v1.
+- Plugin-owned UI components, remote marketplaces, dependency installers, or a
+  seventh extension point → new ADR. They are **not** surface v1. A plugin may
+  declare bounded scalar settings in its manifest; StockPulse owns the generated
+  Settings form and does not execute plugin-supplied frontend code.
 
 ## Security Model (Read This First)
 
@@ -127,6 +129,56 @@ my-plugins/                 # value of PLUGINS_DIR
 `manifest.json` fields, version rules, and entrypoint containment are defined
 in the [package and manifest](plugin-extension-contract.md#package-and-manifest)
 section of the contract. Copy any official example and change the stable IDs.
+
+### Declarative plugin settings
+
+An optional manifest `settings` list lets a plugin request host-owned controls
+without shipping Web code. Supported data types are `string`, `integer`,
+`number`, and `boolean`; supported controls are `text`, `password`, `number`,
+`select`, `textarea`, and `switch`. The manifest parser rejects incompatible
+type/control pairs, duplicate keys/options, invalid regexes, non-finite numeric
+values or bounds, and plaintext defaults for sensitive fields.
+
+```json
+{
+  "settings": [
+    {
+      "key": "endpoint",
+      "title": "Service endpoint",
+      "dataType": "string",
+      "uiControl": "text",
+      "isRequired": true,
+      "validation": {"maxLength": 500},
+      "displayOrder": 10
+    },
+    {
+      "key": "api_token",
+      "title": "API token",
+      "dataType": "string",
+      "uiControl": "password",
+      "isSensitive": true,
+      "isRequired": true,
+      "validation": {"minLength": 8},
+      "displayOrder": 20
+    }
+  ]
+}
+```
+
+Validated effective values are available during load as the immutable
+`context.settings` mapping. Settings → System & Security → Extensions provides
+the generated form and persistent enable/disable switch. Values are stored per
+plugin in `plugin_settings.json` beside the lifecycle-state file; writes are
+atomic and the file is restricted to the current OS user when supported. This
+file is local plaintext, not an encrypted secret vault, so protect its data
+directory accordingly. Sensitive values are masked by the API and Web form;
+leaving the mask unchanged preserves the existing stored value.
+
+Saving settings for an enabled plugin reports `restart_required`. Re-enable the
+plugin or restart the application before assuming its running instance has the
+new values. Omitted keys reset to their declared defaults, and unknown keys,
+wrong types, out-of-range values, NaN, and positive/negative Infinity fail
+closed without changing the persisted file.
 
 ## Frozen Author Import Surface
 
@@ -265,7 +317,8 @@ python -m pytest tests/plugins/test_example_*.py tests/plugins/test_extension_su
 - Marketplace distribution, signature verification, or multi-tenant isolation
 - Enforced sandboxing of plugin code (process-equivalent trust only)
 - Migrating built-in tools into plugins without ToolSurface preservation (#432 / #539)
-- UI, Settings, or MCP connector extension points
+- Plugin-supplied UI components or MCP connector extension points (the generated
+  scalar settings form remains host-owned)
 
 Those remain separate design tracks. Do not stretch a nearby registration API
 to simulate them.

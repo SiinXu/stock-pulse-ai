@@ -219,6 +219,9 @@ class _SystemConfigLLMValidationMethods:
             )
             if not isinstance(redacted, dict):
                 return {}
+            for diagnostic_key in ("issue_key", "issue_code", "reason"):
+                if diagnostic_key in value:
+                    redacted[diagnostic_key] = value[diagnostic_key]
             return {
                 cls._sanitize_llm_error_text(key, redaction_values=redaction_values): cls._sanitize_llm_value(
                     item,

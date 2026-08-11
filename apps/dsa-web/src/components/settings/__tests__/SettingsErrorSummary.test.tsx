@@ -30,6 +30,22 @@ describe('SettingsErrorSummary', () => {
     expect(onJump).toHaveBeenCalledWith(entries[1]);
   });
 
+  it('exposes a dismiss action when the page provides one', () => {
+    const onDismiss = vi.fn();
+    render(
+      <SettingsErrorSummary
+        entries={entries}
+        onJump={() => {}}
+        language="zh"
+        dismissLabel="关闭"
+        onDismiss={onDismiss}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
   it('uses singular English copy for a single error', () => {
     render(<SettingsErrorSummary entries={[entries[0]]} onJump={() => {}} language="en" />);
     expect(screen.getByText('1 setting needs attention')).toBeInTheDocument();

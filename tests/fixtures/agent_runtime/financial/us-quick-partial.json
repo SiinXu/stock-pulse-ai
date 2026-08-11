@@ -76,7 +76,8 @@
         },
         "success": true,
         "result_length": 124,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"AAPL\", \"name\": \"Synthetic Co\", \"price\": 100.0, \"change_pct\": 1.5, \"volume_ratio\": 1.2, \"turnover_rate\": 2.4}"
       }
     ],
     "total_steps": 2,

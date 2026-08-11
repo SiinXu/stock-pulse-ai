@@ -40,6 +40,7 @@ TodaysFocusDegradedSource = Literal[
     "corporate_events",
     "portfolio_position_cache",
 ]
+TodaysFocusMarketCode = Literal["cn", "hk", "us", "unknown"]
 
 
 class TodaysFocusAlertEvidence(_StrictModel):
@@ -104,20 +105,42 @@ class TodaysFocusPresentationBoundary(_StrictModel):
     duplicate_alert_ui: Literal[False]
 
 
-class TodaysFocusTemporalPolicy(_StrictModel):
-    semantics: Literal["local_calendar_day"]
+class TodaysFocusMarketDayWindow(_StrictModel):
+    market: TodaysFocusMarketCode
     timezone: str = Field(min_length=1, max_length=64)
     local_date: date
     window_start: AwareDatetime
     window_end: AwareDatetime
+    is_trading_day: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def validate_window(self) -> "TodaysFocusMarketDayWindow":
+        if self.window_start > self.window_end:
+            raise ValueError("window_start must not follow window_end")
+        return self
+
+
+class TodaysFocusTemporalPolicy(_StrictModel):
+    semantics: Literal["per_market_local_calendar_day"]
+    cross_market_rule: Literal["evidence_uses_target_symbol_market_timezone"]
+    fallback_timezone: str = Field(min_length=1, max_length=64)
+    window_end: AwareDatetime
     naive_timestamp_policy: Literal["assume_utc"]
     missing_timestamp_policy: Literal["exclude"]
     non_trading_day_policy: Literal["same_local_day_only"]
+    markets: List[TodaysFocusMarketDayWindow] = Field(min_length=4, max_length=8)
 
     @model_validator(mode="after")
-    def validate_window(self) -> "TodaysFocusTemporalPolicy":
-        if self.window_start > self.window_end:
-            raise ValueError("window_start must not follow window_end")
+    def validate_required_markets(self) -> "TodaysFocusTemporalPolicy":
+        codes = [window.market for window in self.markets]
+        if len(codes) != len(set(codes)):
+            raise ValueError("temporal_policy markets must be unique")
+        required = {"cn", "hk", "us", "unknown"}
+        if not required.issubset(set(codes)):
+            raise ValueError("temporal_policy must include cn, hk, us, and unknown windows")
+        for window in self.markets:
+            if window.window_end != self.window_end:
+                raise ValueError("market windows must share the build window_end")
         return self
 
 
@@ -133,6 +156,8 @@ class TodaysFocusUniverseContract(_StrictModel):
             "watchlist_config",
         ]
     ] = Field(max_length=4)
+    excluded_non_finite_positions: int = Field(ge=0, le=100000)
+    data_notes: List[str] = Field(default_factory=list, max_length=4)
 
 
 class TodaysFocusItem(_StrictModel):
@@ -162,14 +187,18 @@ class TodaysFocusItem(_StrictModel):
 
 
 class TodaysFocusResponse(_StrictModel):
-    pack_version: Literal["todays_focus/2.0"]
+    pack_version: Literal["todays_focus/2.1"]
     generated_at: AwareDatetime
     status: TodaysFocusStatus
     max_items: int = Field(ge=0, le=10)
     item_count: int = Field(ge=0, le=10)
     items: List[TodaysFocusItem] = Field(max_length=10)
     empty_reason: Optional[
-        Literal["source_unavailable", "no_fresh_deterministic_signals"]
+        Literal[
+            "source_unavailable",
+            "no_fresh_deterministic_signals",
+            "insufficient_finite_data",
+        ]
     ] = None
     empty_message: Optional[str] = Field(default=None, max_length=240)
     sources_used: List[TodaysFocusSource] = Field(max_length=6)

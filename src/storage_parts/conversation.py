@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from src.agent.provider_trace import PROVIDER_TRACE_RETENTION_LIMIT
 from src.agent.public_contract import (
+    agent_history_public_params,
     agent_history_public_fields,
     sanitize_agent_history_content,
 )
@@ -41,7 +42,14 @@ def _load_conversation_context(raw: Optional[str]) -> Optional[Dict[str, Any]]:
 class _ConversationMethods:
     """Source container rebound onto ``DatabaseManager`` by the facade."""
 
-    def save_conversation_message(self, session_id: str, role: str, content: str) -> int:
+    def save_conversation_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> int:
         """
         保存 Agent 对话消息
         """
@@ -49,7 +57,12 @@ class _ConversationMethods:
             msg = ConversationMessage(
                 session_id=session_id,
                 role=role,
-                content=content
+                content=content,
+                context_json=(
+                    json.dumps(context, ensure_ascii=False, default=str)
+                    if context
+                    else None
+                ),
             )
             session.add(msg)
             session.flush()
@@ -478,16 +491,21 @@ class _ConversationMethods:
                 .limit(limit)
             )
             messages = session.execute(stmt).scalars().all()
-            return [
-                {
+            results = []
+            for msg in messages:
+                context = _load_conversation_context(msg.context_json)
+                item = {
                     "id": str(msg.id),
                     "role": msg.role,
                     **agent_history_public_fields(msg.role, msg.content),
                     "created_at": msg.created_at.isoformat() if msg.created_at else None,
                     "turn_id": msg.turn_id,
                 }
-                for msg in messages
-            ]
+                params = agent_history_public_params(msg.role, msg.content, context)
+                if params:
+                    item["params"] = params
+                results.append(item)
+            return results
 
     def delete_conversation_session(self, session_id: str) -> int:
         """

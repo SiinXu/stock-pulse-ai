@@ -644,4 +644,3 @@ def _pipeline_records(
             display_name=name,
         ))
     return records
-

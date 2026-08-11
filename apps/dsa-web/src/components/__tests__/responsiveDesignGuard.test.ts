@@ -29,7 +29,7 @@ describe('responsive design guard', () => {
     expect(failures).toEqual([]);
   });
 
-  it('defines the report H2 token as exactly 28px and uses it for both headings', () => {
+  it('keeps the market review H2 token at 28px and the stock summary heading compact', () => {
     const headingToken = tailwindConfigSource.match(
       /['"]heading-2['"]:\s*\[\s*['"]([^'"]+)['"]\s*,\s*\{\s*lineHeight:\s*['"]([^'"]+)['"]\s*\}\s*\]/,
     );
@@ -37,7 +37,8 @@ describe('responsive design guard', () => {
     expect(headingToken?.[1]).toBe('1.75rem');
     expect(Number.parseFloat(headingToken?.[1] ?? '') * 16).toBe(28);
     expect(headingToken?.[2]).toBe('1.2');
-    expect(reportOverviewSource).toContain('text-heading-2');
+    expect(reportOverviewSource).toContain('<h2 className="text-xl');
+    expect(reportOverviewSource).not.toContain('text-heading-2');
     expect(marketReviewSource).toContain('text-heading-2');
     expect(reportOverviewSource).not.toContain('text-3xl');
     expect(marketReviewSource).not.toContain('sm:text-3xl');

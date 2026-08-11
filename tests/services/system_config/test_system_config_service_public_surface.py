@@ -249,7 +249,7 @@ EXPECTED_CLASS_SURFACE = (
  'export_desktop_env',
  'import_env',
  'import_desktop_env',
- '_resolve_hermes_saved_secret',
+ '_resolve_saved_connection_secret',
  '_validate_hermes_submitted_secret',
  'discover_llm_channel_models',
  'test_llm_channel',
@@ -386,7 +386,7 @@ EXPECTED_CLASS_STATIC_ATTRIBUTES = (
     "_runtime_scheduler",
     "_runtime_config_transaction",
 )
-EXPECTED_METHOD_METADATA_SHA256 = '191013324555e66eb0140b18bf4317dc5329b8a49f3922f9e03c3269a7edc536'
+EXPECTED_METHOD_METADATA_SHA256 = '6ba62def12c168ab4285ee54205d8bf39dd466e0ffe7b82a88c9836683e0de05'
 
 
 def _descriptor_function(descriptor):

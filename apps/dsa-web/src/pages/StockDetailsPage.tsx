@@ -1,19 +1,11 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { BellPlus, LineChart as LineChartIcon, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { BellPlus, GitCompareArrows, LineChart as LineChartIcon, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { stocksApi } from '../api/stocks';
 import { systemConfigApi } from '../api/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
+import { KlineChart } from '../components/charts';
 import {
   ApiErrorAlert,
   AppPage,
@@ -29,6 +21,8 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
+import { DcfSensitivityPanel } from '../components/valuation';
+import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   buildStockDetailsHistoryQueryKey,
@@ -37,6 +31,7 @@ import {
   useStockDetailsQuoteQuery,
 } from '../hooks';
 import type { UiTextKey } from '../i18n/uiText';
+import { REPORT_VERSION_COMPARE_TEXT } from '../locales/reportVersionCompare';
 import type {
   StockHistoryCandle,
   StockHistoryPeriod,
@@ -46,6 +41,7 @@ import { aggregateCandles, summarizeCandles } from '../utils/klineAggregate';
 import {
   SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
+  buildReportVersionCompareHref,
   buildSignalCenterHref,
 } from '../routing/routes';
 import { normalizeStockCode } from '../utils/stockCode';
@@ -359,6 +355,8 @@ const StockDetailsPage: React.FC = () => {
     { id: 'volume', header: t('stocks.workspace.volume'), cell: (candle) => formatQuantity(candle.volume, language) },
   ];
 
+  const valuationText = VALUATION_TEXT[language] ?? VALUATION_TEXT.en;
+
   return (
     <AppPage className="max-w-none">
       <div className="space-y-5">
@@ -391,6 +389,15 @@ const StockDetailsPage: React.FC = () => {
           <Button type="button" variant="secondary" size="comfortable" onClick={() => navigate(buildAnalysisWorkbenchHref({ stock: canonicalCode }))}>
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             {t('stocks.workspace.analyze')}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="comfortable"
+            onClick={() => navigate(buildReportVersionCompareHref({ stock: canonicalCode }))}
+          >
+            <GitCompareArrows className="h-4 w-4" aria-hidden="true" />
+            {REPORT_VERSION_COMPARE_TEXT[language].title}
           </Button>
           <Button
             type="button"
@@ -515,16 +522,18 @@ const StockDetailsPage: React.FC = () => {
                   change: formatSignedChangePercent(summary.changePercent).replace(/%$/, ''),
                 })}
               </p>
-              <div className="h-64 w-full" role="img" aria-label={t('stocks.workspace.chartLabel', { code: canonicalCode })}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={displayCandles} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} width={56} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="close" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div
+                aria-label={t('stocks.workspace.chartLabel', { code: canonicalCode })}
+                data-testid="stock-details-kline"
+              >
+                <KlineChart
+                  candles={displayCandles}
+                  market={marketId ?? 'cn'}
+                  colorPreference={changeColorPref}
+                  height={320}
+                  showVolume
+                  data-testid="stock-details-kline-chart"
+                />
               </div>
               <div className="max-h-72 overflow-y-auto">
                 <DataTable<StockHistoryCandle>
@@ -551,6 +560,10 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
+          <DcfSensitivityPanel stockCode={canonicalCode} />
+        </section>
       </div>
     </AppPage>
   );

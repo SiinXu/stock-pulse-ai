@@ -333,7 +333,7 @@ def test_agent_auto_ignores_local_generation_backend_when_litellm_route_exists(
 
 
 @pytest.mark.parametrize("agent_backend", LOCAL_CLI_BACKENDS)
-def test_agent_explicit_local_cli_backend_remains_unsupported(agent_backend: str) -> None:
+def test_agent_explicit_local_cli_backend_uses_the_tool_bridge(agent_backend: str) -> None:
     resolution = resolve_agent_litellm_route(
         _config(
             generation_backend="litellm",
@@ -343,23 +343,29 @@ def test_agent_explicit_local_cli_backend_remains_unsupported(agent_backend: str
     )
 
     assert not resolution.available
-    assert resolution.reason == "unsupported_agent_backend"
+    assert resolution.reason == "local_cli_agent_bridge"
 
 
 @pytest.mark.parametrize("generation_backend", LOCAL_CLI_BACKENDS)
 def test_llm_tool_adapter_available_for_agent_auto_with_local_generation_backend(
     generation_backend: str,
 ) -> None:
-    adapter = LLMToolAdapter(
-        _config(
-            generation_backend=generation_backend,
-            agent_generation_backend="auto",
-            litellm_model="cohere/command-r-plus",
+    backend = SimpleNamespace(get_config_error=lambda: None)
+    with patch(
+        "src.agent.llm_adapter._create_generation_backend",
+        return_value=backend,
+    ):
+        adapter = LLMToolAdapter(
+            _config(
+                generation_backend=generation_backend,
+                agent_generation_backend="auto",
+                litellm_model="cohere/command-r-plus",
+            )
         )
-    )
 
     assert adapter.is_available is True
-    assert adapter._litellm_available is True
+    assert adapter._litellm_available is False
+    assert adapter._local_cli_backend is backend
     assert adapter._backend_error is None
 
 

@@ -215,7 +215,12 @@ describe('DecisionSignalDetails', () => {
     expect(container.textContent).toContain('<svg onload=\\"window.__signalMetadataXss = true\\"></svg>');
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('script')).toBeNull();
-    expect(container.querySelector('svg')).toBeNull();
+    // Decorative Lucide icons (e.g. Risk Manager banner) may render SVG; reject
+    // only injection-style SVG coming from opaque JSON string values.
+    const opaqueSvg = Array.from(container.querySelectorAll('svg')).filter(
+      (node) => !node.classList.contains('lucide'),
+    );
+    expect(opaqueSvg).toHaveLength(0);
     expect(container.querySelector('[onerror]')).toBeNull();
     expect(container.querySelector('[onload]')).toBeNull();
   });

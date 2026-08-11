@@ -3,22 +3,24 @@
 // Portfolio route workspace — feature-owned composition for PortfolioPage.
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
-import { BriefcaseBusiness, Inbox, X } from 'lucide-react';
+import { BriefcaseBusiness, Inbox } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { readParams, writeParams } from '../../utils/urlState';
 import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../analysis';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
+import { RiskHeatmap } from '../charts';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_TEXT } from '../../locales/portfolio';
+import type { PortfolioAnalysisTaskPanelController } from './PortfolioAnalysisTaskPanel';
 import {
-  formatBrokerLabel,
   formatCashDirectionLabel,
   formatCorporateActionLabel,
   formatMoney,
@@ -27,8 +29,6 @@ import {
   formatPositionPrice,
   formatSideLabel,
   formatSignedPct,
-  getCsvCommitVariant,
-  getCsvParseVariant,
   getFxRefreshFeedbackVariant,
   getPositionPriceLabel,
   hasPositionPrice,
@@ -63,6 +63,11 @@ import { usePortfolioLedgerMutationWorkflow } from '../../hooks/portfolio/usePor
 import { usePortfolioHoldingSignals } from '../../hooks/portfolio/usePortfolioHoldingSignals';
 import { usePortfolioLedgerEntryForms } from '../../hooks/portfolio/usePortfolioLedgerEntryForms';
 import { usePortfolioCsvImportSession } from '../../hooks/portfolio/usePortfolioCsvImportSession';
+import {
+  buildPositionRowKey,
+  portfolioUrlSchema,
+  type PortfolioTab,
+} from './portfolioUrlState';
 import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
 import { PIE_COLORS, PORTFOLIO_DATE_TRIGGER_CLASS } from '../../hooks/portfolio/constants';
 import type {
@@ -72,6 +77,14 @@ import type {
   PendingDelete,
   PortfolioAccountMarket,
 } from '../../hooks/portfolio/types';
+import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells';
+
+const PortfolioRiskMetricsPanel = lazy(
+  () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
+);
+const PortfolioAnalysisTaskPanel = lazy(() => import('./PortfolioAnalysisTaskPanel'));
+const PortfolioImportWizard = lazy(() => import('./PortfolioImportWizard'));
+const PortfolioWorkspaceTabs = lazy(() => import('./PortfolioWorkspaceTabs'));
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -89,9 +102,13 @@ const PortfolioWorkspace: React.FC = () => {
     () => parseDeepLink(`/portfolio${searchParams.size ? `?${searchParams.toString()}` : ''}`),
     [searchParams],
   );
+  const urlState = useMemo(
+    () => readParams(portfolioUrlSchema, searchParams),
+    [searchParams],
+  );
   const requestedAccountId = parsedPortfolioLink.target?.page === 'portfolio'
     ? parsedPortfolioLink.target.accountId
-    : undefined;
+    : (urlState.account ?? undefined);
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [selectedAccount, setSelectedAccountState] = useState<AccountOption>(requestedAccountId ?? 'all');
@@ -101,6 +118,9 @@ const PortfolioWorkspace: React.FC = () => {
   const setSearchParamsRef = useRef(setSearchParams);
   searchParamsRef.current = searchParams;
   setSearchParamsRef.current = setSearchParams;
+  const activeTab = urlState.tab as PortfolioTab;
+  const selectedPositionKey = urlState.selected;
+  const ledgerPageFromUrl = urlState.page ?? 1;
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [accountCreating, setAccountCreating] = useState(false);
@@ -119,7 +139,25 @@ const PortfolioWorkspace: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
   const [positionAnalysisLoadingKey, setPositionAnalysisLoadingKey] = useState<string | null>(null);
-  const [positionAnalysisMessage, setPositionAnalysisMessage] = useState<string | null>(null);
+  const portfolioAnalysisTaskControllerRef = useRef<PortfolioAnalysisTaskPanelController | null>(null);
+  const queuedPortfolioAnalysisTaskActionsRef = useRef<Array<(
+    controller: PortfolioAnalysisTaskPanelController,
+  ) => void>>([]);
+  const handlePortfolioAnalysisTaskControllerReady = useCallback((
+    controller: PortfolioAnalysisTaskPanelController | null,
+  ) => {
+    portfolioAnalysisTaskControllerRef.current = controller;
+    if (!controller) return;
+    const queued = queuedPortfolioAnalysisTaskActionsRef.current.splice(0);
+    queued.forEach((action) => action(controller));
+  }, []);
+  const dispatchPortfolioAnalysisTaskAction = useCallback((
+    action: (controller: PortfolioAnalysisTaskPanelController) => void,
+  ) => {
+    const controller = portfolioAnalysisTaskControllerRef.current;
+    if (controller) action(controller);
+    else queuedPortfolioAnalysisTaskActionsRef.current.push(action);
+  }, []);
 
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -138,6 +176,17 @@ const PortfolioWorkspace: React.FC = () => {
   const isPaperAccountSelected = Boolean(writableAccount) && writableAccountType === 'paper';
   const writeBlocked = !writableAccountId;
 
+  const patchPortfolioUrl = useCallback((
+    patch: Parameters<typeof writeParams<typeof portfolioUrlSchema>>[1],
+    history?: 'replace' | 'push',
+  ) => {
+    const result = writeParams(portfolioUrlSchema, patch, {
+      search: searchParamsRef.current,
+      ...(history ? { history } : {}),
+    });
+    setSearchParamsRef.current(result.params, { replace: result.history === 'replace' });
+  }, []);
+
   const setSelectedAccount = useCallback((
     account: AccountOption,
     replace = false,
@@ -146,11 +195,30 @@ const PortfolioWorkspace: React.FC = () => {
     selectedAccountRef.current = account;
     setSelectedAccountState(account);
     setUnavailableAccountId(unavailableId);
+    // Preserve existing query key order (unknown keys + account) so shareable
+    // deep links and Back navigation stay byte-stable with prior contracts.
     const next = new URLSearchParams(searchParamsRef.current);
     if (account === 'all') next.delete('account');
     else next.set('account', String(account));
+    next.delete('selected');
+    next.delete('page');
     setSearchParamsRef.current(next, { replace });
   }, []);
+
+  const setActiveTab = useCallback((tab: PortfolioTab) => {
+    patchPortfolioUrl({
+      tab,
+      ...(tab === 'ledger' ? {} : { page: 1 }),
+    }, 'replace');
+  }, [patchPortfolioUrl]);
+
+  const setSelectedPositionKey = useCallback((key: string | null) => {
+    patchPortfolioUrl({ selected: key }, 'push');
+  }, [patchPortfolioUrl]);
+
+  const setLedgerPageInUrl = useCallback((page: number) => {
+    patchPortfolioUrl({ page }, 'replace');
+  }, [patchPortfolioUrl]);
 
   useEffect(() => {
     const nextAccount = requestedAccountId ?? 'all';
@@ -248,9 +316,40 @@ const PortfolioWorkspace: React.FC = () => {
     setError,
   });
 
+  // Keep ledger pagination durable in the URL (replace history).
+  useEffect(() => {
+    setEventPage((current) => (current === ledgerPageFromUrl ? current : ledgerPageFromUrl));
+  }, [ledgerPageFromUrl, setEventPage]);
+
+  const handleLedgerPageChange = useCallback((nextPage: number) => {
+    setEventPage(nextPage);
+    setLedgerPageInUrl(nextPage);
+  }, [setEventPage, setLedgerPageInUrl]);
+
+  useEffect(() => {
+    if (eventLoading || eventPage <= totalEventPages) return;
+    handleLedgerPageChange(totalEventPages);
+  }, [eventLoading, eventPage, handleLedgerPageChange, totalEventPages]);
+
+  const handleEventTypeChange = useCallback((nextEventType: PortfolioEventType) => {
+    setEventType(nextEventType);
+    setLedgerPageInUrl(1);
+  }, [setEventType, setLedgerPageInUrl]);
+
+  const handleApplyEventFilters = useCallback(() => {
+    applyEventFilters();
+    setLedgerPageInUrl(1);
+  }, [applyEventFilters, setLedgerPageInUrl]);
+
+  const refreshPaperTradeSurfaces = useCallback(async (): Promise<boolean> => {
+    const refreshed = await refreshPaperTradeProjection();
+    if (refreshed) setLedgerPageInUrl(1);
+    return refreshed;
+  }, [refreshPaperTradeProjection, setLedgerPageInUrl]);
+
   const mutation = usePortfolioLedgerMutationWorkflow({
     refreshPortfolioData,
-    refreshPaperTradeSurfaces: refreshPaperTradeProjection,
+    refreshPaperTradeSurfaces,
   });
   const {
     tradeSubmitting,
@@ -355,6 +454,19 @@ const PortfolioWorkspace: React.FC = () => {
     return accounts.length === 0 || Number(snapshot.accountCount || 0) === accounts.length;
   }, [accounts.length, queryAccountId, snapshot]);
 
+  useEffect(() => {
+    if (!selectedPositionKey || !snapshotMatchesAccountScope) return;
+    const selectionExists = positionRows.some((row) => (
+      buildPositionRowKey(row.accountId, row.symbol, row.market) === selectedPositionKey
+    ));
+    if (!selectionExists) setSelectedPositionKey(null);
+  }, [
+    positionRows,
+    selectedPositionKey,
+    setSelectedPositionKey,
+    snapshotMatchesAccountScope,
+  ]);
+
   const {
     portfolioSignalsLoading,
     portfolioSignalsWarning,
@@ -370,7 +482,6 @@ const PortfolioWorkspace: React.FC = () => {
   const handleAnalyzePosition = async (row: FlatPosition) => {
     const key = `${row.accountId}-${row.symbol}-${row.market}`;
     setPositionAnalysisLoadingKey(key);
-    setPositionAnalysisMessage(null);
     setError(null);
     try {
       const task = await portfolioApi.analyzePosition(row.symbol, {
@@ -378,9 +489,24 @@ const PortfolioWorkspace: React.FC = () => {
         analysisPhase: positionAnalysisPhase,
         force: false,
       });
-      setPositionAnalysisMessage(formatUiText(text.analysisSubmitted, { symbol: row.symbol, taskId: task.taskId }));
+      dispatchPortfolioAnalysisTaskAction((controller) => {
+        controller.acceptTask(task, row.symbol, positionAnalysisPhase);
+      });
     } catch (err) {
-      setError(getParsedApiError(err));
+      const parsed = getParsedApiError(err);
+      const existingTaskId = String(
+        parsed.params?.existing_task_id
+          ?? parsed.params?.existingTaskId
+          ?? '',
+      ).trim();
+      // Reattach an in-flight duplicate instead of leaving the user with only an error toast.
+      if (parsed.code === 'duplicate_task' && existingTaskId) {
+        dispatchPortfolioAnalysisTaskAction((controller) => {
+          void controller.attachExistingTask(existingTaskId, row.symbol, positionAnalysisPhase);
+        });
+      } else {
+        setError(parsed);
+      }
     } finally {
       setPositionAnalysisLoadingKey(null);
     }
@@ -412,6 +538,16 @@ const PortfolioWorkspace: React.FC = () => {
 
   const concentrationPieData = sectorPieData.length > 0 ? sectorPieData : positionFallbackPieData;
   const concentrationMode = sectorPieData.length > 0 ? 'sector' : 'position';
+
+  const riskHeatmapCells = useMemo(
+    () => buildPortfolioRiskHeatmapCells(risk, {
+      portfolioRow: text.riskRowPortfolio,
+      weight: text.riskColWeight,
+      stopLoss: text.riskColStopLoss,
+      drawdown: text.riskColDrawdown,
+    }),
+    [risk, text.riskColDrawdown, text.riskColStopLoss, text.riskColWeight, text.riskRowPortfolio],
+  );
 
   const openDeleteDialog = (item: PendingDelete) => {
     if (!writableAccountId) {
@@ -733,6 +869,42 @@ const PortfolioWorkspace: React.FC = () => {
 
   return (
     <AppPage className="portfolio-page space-y-4">
+      {csvModalOpen ? (
+        <Suspense fallback={<Loading />}>
+          <PortfolioImportWizard
+          text={text}
+          fileText={fileText}
+          language={language}
+          writableAccountId={writableAccountId}
+          brokers={brokers}
+          selectedBroker={selectedBroker}
+          setSelectedBroker={setSelectedBroker}
+          brokerLoadWarning={brokerLoadWarning}
+          csvFile={csvFile}
+          setCsvFile={setCsvFile}
+          csvInputRef={csvInputRef}
+          csvDryRun={csvDryRun}
+          setCsvDryRun={setCsvDryRun}
+          csvParsing={csvParsing}
+          csvCommitting={csvCommitting}
+          csvError={csvError}
+          setCsvError={setCsvError}
+          csvParseResult={csvParseResult}
+          setCsvParseResult={setCsvParseResult}
+          csvCommitResult={csvCommitResult}
+          setCsvCommitResult={setCsvCommitResult}
+          onParse={handleParseCsv}
+          onCommit={handleCommitCsv}
+          onClose={() => {
+            setCsvError(null);
+            setCsvModalOpen(false);
+          }}
+          commonCancelLabel={t('common.cancel')}
+          commonCloseLabel={t('common.close')}
+          />
+        </Suspense>
+      ) : (
+      <>
       <section className="space-y-3">
         <PageHeader
           title={text.title}
@@ -804,13 +976,14 @@ const PortfolioWorkspace: React.FC = () => {
           message={writeWarning}
         />
       ) : null}
-      {hasAccounts && positionAnalysisMessage ? (
-        <InlineAlert
-          variant="success"
-          title={text.analysisTask}
-          message={positionAnalysisMessage}
+      <Suspense fallback={null}>
+        <PortfolioAnalysisTaskPanel
+          searchParams={searchParams}
+          setSearchParams={setSearchParams}
+          visible={hasAccounts}
+          onControllerReady={handlePortfolioAnalysisTaskControllerReady}
         />
-      ) : null}
+      </Suspense>
 
       <Modal
         isOpen={showCreateAccount}
@@ -1118,6 +1291,29 @@ const PortfolioWorkspace: React.FC = () => {
         </Card>
       </section>
 
+
+      <Suspense fallback={null}>
+        <PortfolioWorkspaceTabs
+          text={text}
+          language={language}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          eventType={eventType}
+          eventLoading={eventLoading}
+          eventPage={eventPage}
+          totalEventPages={totalEventPages}
+          tradeEvents={tradeEvents}
+          cashEvents={cashEvents}
+          corporateEvents={corporateEvents}
+          onOpenLedger={() => {
+            setEventError(null);
+            setEventModalOpen(true);
+          }}
+          onLedgerPageChange={handleLedgerPageChange}
+        />
+      </Suspense>
+
+      {activeTab === 'positions' ? (
       <section className="grid grid-cols-1 gap-3">
         <Card padding="md">
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1150,7 +1346,15 @@ const PortfolioWorkspace: React.FC = () => {
             caption={text.positionsTitle}
             columns={positionColumns}
             rows={positionRows}
-            getRowKey={(row) => `${row.accountId}-${row.symbol}-${row.market}`}
+            getRowKey={(row) => buildPositionRowKey(row.accountId, row.symbol, row.market)}
+            isRowSelected={(row) => (
+              selectedPositionKey === buildPositionRowKey(row.accountId, row.symbol, row.market)
+            )}
+            onRowActivate={(row) => {
+              const key = buildPositionRowKey(row.accountId, row.symbol, row.market);
+              setSelectedPositionKey(selectedPositionKey === key ? null : key);
+            }}
+            getRowAriaLabel={(row) => `${row.symbol} ${row.accountName}`}
             emptyState={{
               title: text.noPositionsTitle,
               description: text.noPositionsDescription,
@@ -1160,6 +1364,7 @@ const PortfolioWorkspace: React.FC = () => {
           />
         </Card>
       </section>
+      ) : null}
 
       {writeBlocked && hasAccounts ? (
         <InlineAlert
@@ -1169,7 +1374,8 @@ const PortfolioWorkspace: React.FC = () => {
         />
       ) : null}
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      {activeTab !== 'ledger' ? (
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3" data-testid="portfolio-tab-risk">
         <Card padding="md">
           <h3 className="text-sm font-semibold text-foreground mb-2">{text.drawdownMonitor}</h3>
           <div className="text-xs text-secondary space-y-1">
@@ -1228,6 +1434,25 @@ const PortfolioWorkspace: React.FC = () => {
           </div>
         </Card>
       </section>
+      ) : null}
+
+      {hasAccounts && activeTab !== 'ledger' ? (
+        <>
+          <Suspense fallback={<Loading />}>
+            <PortfolioRiskMetricsPanel
+              accountId={queryAccountId}
+              costMethod={costMethod}
+            />
+          </Suspense>
+          <section className="grid grid-cols-1 gap-3">
+            <Card padding="md" data-testid="portfolio-risk-heatmap-card">
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{text.riskHeatmapTitle}</h2>
+              <p className="mb-3 text-xs text-secondary">{text.riskHeatmapDescription}</p>
+              <RiskHeatmap cells={riskHeatmapCells} data-testid="portfolio-risk-heatmap" />
+            </Card>
+          </section>
+        </>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {isPaperAccountSelected ? (
@@ -1507,138 +1732,20 @@ const PortfolioWorkspace: React.FC = () => {
           </form>
       </Modal>
 
-      <Modal
-        isOpen={csvModalOpen}
-        closeDisabled={csvParsing || csvCommitting}
-        onClose={() => {
-          setCsvError(null);
-          setCsvModalOpen(false);
-        }}
-        title={text.csvImport}
-      >
-          <fieldset
-            disabled={csvParsing || csvCommitting}
-            aria-busy={csvParsing || csvCommitting}
-            className="m-0 min-w-0 space-y-2 border-0 p-0"
-          >
-            {brokerLoadWarning ? (
-              <InlineAlert
-                variant="warning"
-                size="compact"
-                message={brokerLoadWarning}
-              />
-            ) : null}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Select
-                label={text.broker}
-                value={selectedBroker}
-                onChange={(value) => {
-                  setSelectedBroker(value);
-                  setCsvCommitResult(null);
-                }}
-                disabled={csvParsing || csvCommitting || brokers.length === 0}
-                options={brokers.map((item) => ({ value: item.broker, label: formatBrokerLabel(item.broker, item.displayName, language) }))}
-              />
-              <div className="grid gap-1">
-                <span className="block text-xs text-muted-text">{text.csvFile}</span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="primary"
-                  disabled={csvParsing || csvCommitting || brokers.length === 0}
-                  onClick={() => csvInputRef.current?.click()}
-                >
-                  {text.chooseCsv}
-                </Button>
-                <FileInput
-                  ref={csvInputRef}
-                  accept=".csv"
-                  aria-label={text.chooseCsv}
-                  disabled={csvParsing || csvCommitting || brokers.length === 0}
-                  onChange={(e) => {
-                    setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
-                    setCsvParseResult(null);
-                    setCsvCommitResult(null);
-                  }}
-                />
-                {csvFile ? (
-                  <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-subtle-soft px-2 py-1.5">
-                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">{csvFile.name}</span>
-                    <span className="shrink-0 text-xs text-muted-text">
-                      {formatUiText(fileText.size, { size: Math.max(0.1, csvFile.size / 1024).toFixed(1) })}
-                    </span>
-                    <IconButton
-                      type="button"
-                      variant="ghost"
-                      size="default"
-                      aria-label={fileText.clear}
-                      onClick={() => {
-                        setCsvFile(null);
-                        if (csvInputRef.current) csvInputRef.current.value = '';
-                        setCsvParseResult(null);
-                        setCsvCommitResult(null);
-                      }}
-                    >
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </IconButton>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            <Checkbox
-              id="csv-dry-run"
-              checked={csvDryRun}
-              onChange={(event) => {
-                setCsvDryRun(event.target.checked);
-              }}
-              containerClassName="min-h-11 text-xs text-secondary"
-              label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <Button type="button" variant="secondary" size="comfortable" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
-                {text.parseFile}
-              </Button>
-              <Button type="button" variant="secondary" size="comfortable"
-                disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing} isLoading={csvCommitting} loadingText={text.submitting} onClick={() => void handleCommitCsv()}>
-                {text.commitImport}
-              </Button>
-            </div>
-            {csvError ? (
-              <ApiErrorAlert error={csvError} onDismiss={() => setCsvError(null)} />
-            ) : null}
-            {csvParseResult ? (
-              <InlineAlert
-                variant={getCsvParseVariant(csvParseResult)}
-                size="compact"
-                title={text.csvParseResult}
-                message={formatUiText(text.csvParseSummary, { valid: csvParseResult.recordCount, skipped: csvParseResult.skippedCount, errors: csvParseResult.errorCount })}
-              />
-            ) : null}
-            {csvCommitResult ? (
-              <InlineAlert
-                variant={getCsvCommitVariant(csvCommitResult, csvCommitResult.dryRun)}
-                size="compact"
-                title={csvCommitResult.dryRun ? text.csvDryResult : text.csvCommitResult}
-                message={formatUiText(text.csvCommitSummary, { mode: csvCommitResult.dryRun ? text.dryCheck : text.actualWrite, inserted: csvCommitResult.insertedCount, duplicates: csvCommitResult.duplicateCount, failed: csvCommitResult.failedCount })}
-              />
-            ) : null}
-          </fieldset>
-      </Modal>
-
       <Modal isOpen={eventModalOpen} onClose={() => { setEventError(null); setEventModalOpen(false); }} title={text.eventLog}>
           <div className="space-y-2">
             <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
               <Select
                 label={text.type}
                 value={eventType}
-                onChange={(value) => setEventType(value as PortfolioEventType)}
+                onChange={(value) => handleEventTypeChange(value as PortfolioEventType)}
                 options={[
                   { value: 'trade', label: text.tradeLedger },
                   { value: 'cash', label: text.cashLedger },
                   { value: 'corporate', label: text.corporateAction },
                 ]}
               />
-              <Button type="button" variant="secondary" size="comfortable" onClick={applyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
+              <Button type="button" variant="secondary" size="comfortable" onClick={handleApplyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
                 {text.refreshLedger}
               </Button>
             </div>
@@ -1705,7 +1812,7 @@ const PortfolioWorkspace: React.FC = () => {
               <ApiErrorAlert
                 error={eventError}
                 actionLabel={t('common.retry')}
-                onAction={applyEventFilters}
+                onAction={handleApplyEventFilters}
                 onDismiss={() => setEventError(null)}
               />
             ) : null}
@@ -1791,11 +1898,11 @@ const PortfolioWorkspace: React.FC = () => {
               <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
               <div className="flex gap-2">
                 <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage <= 1}
-                  onClick={() => setEventPage((prev) => Math.max(1, prev - 1))}>
+                  onClick={() => handleLedgerPageChange(Math.max(1, eventPage - 1))}>
                   {text.prevPage}
                 </Button>
                 <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage >= totalEventPages}
-                  onClick={() => setEventPage((prev) => Math.min(totalEventPages, prev + 1))}>
+                  onClick={() => handleLedgerPageChange(Math.min(totalEventPages, eventPage + 1))}>
                   {text.nextPage}
                 </Button>
               </div>
@@ -1845,6 +1952,8 @@ const PortfolioWorkspace: React.FC = () => {
         }}
       />
         </>
+      )}
+      </>
       )}
     </AppPage>
   );

@@ -80,7 +80,8 @@
         },
         "success": true,
         "result_length": 127,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"hk00700\", \"name\": \"Synthetic Co\", \"price\": 100.0, \"change_pct\": 1.5, \"volume_ratio\": 1.2, \"turnover_rate\": 2.4}"
       },
       {
         "step": 2,
@@ -90,7 +91,8 @@
         },
         "success": true,
         "result_length": 180,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"hk00700\", \"ma_alignment\": \"bullish\", \"trend_score\": 78, \"ma5\": 99.0, \"ma10\": 97.5, \"ma20\": 95.0, \"bias_ma5\": 1.0, \"current_price\": 100.0, \"volume_status\": \"normal\"}"
       }
     ],
     "total_steps": 3,

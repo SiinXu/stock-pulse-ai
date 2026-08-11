@@ -183,6 +183,19 @@ test.describe('web smoke', () => {
               next_run_at: '2026-07-25T10:00:00Z',
               created_at: '2026-07-24T20:00:00Z',
               updated_at: '2026-07-24T20:00:00Z',
+              max_attempts: 3,
+              payload: {
+                stock_code: 'AAPL',
+                report_type: 'detailed',
+                notify: true,
+              },
+              schedule: {
+                kind: 'daily',
+                time: '10:00',
+                timezone: 'Asia/Shanghai',
+                calendar_market: 'us',
+                non_trading_day_policy: 'skip',
+              },
             },
             scheduled_for: '2026-07-25T10:00:00Z',
             status: 'retry_wait',
@@ -192,7 +205,13 @@ test.describe('web smoke', () => {
       });
     });
     await mockCompletedSetupStatus(page);
+    const focusResponse = page.waitForResponse((response) => (
+      response.url().includes('/api/v1/focus/today')
+      && response.request().method() === 'GET'
+    ));
     await login(page);
+
+    expect((await focusResponse).status()).toBe(200);
 
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();

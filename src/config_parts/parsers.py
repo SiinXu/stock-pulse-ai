@@ -383,13 +383,22 @@ def channel_allows_empty_api_key(protocol: Optional[str], base_url: Optional[str
     return parsed.hostname in LLM_EMPTY_API_KEY_HOSTNAMES
 
 
-def normalize_llm_channel_model(model: str, protocol: Optional[str], base_url: Optional[str] = None) -> str:
-    """Attach a provider prefix when the model omits it."""
+def normalize_llm_channel_model(
+    model: str,
+    protocol: Optional[str],
+    base_url: Optional[str] = None,
+    *,
+    preserve_wire_model: bool = False,
+) -> str:
+    """Attach a provider prefix while optionally preserving the literal wire model ID."""
     normalized_model = model.strip()
     if not normalized_model:
         return normalized_model
 
     resolved_protocol = resolve_llm_channel_protocol(protocol, base_url=base_url, models=[normalized_model])
+
+    if preserve_wire_model and resolved_protocol:
+        return f"{resolved_protocol}/{normalized_model}"
 
     if "/" in normalized_model:
         # The model already has a slash, e.g. 'deepseek-ai/DeepSeek-V3'.

@@ -62,10 +62,58 @@ On first run, Electron copies `.env.example` to the runtime `.env` when missing.
 
 ```bash
 cd apps/dsa-desktop
-npm install
+npm ci
+npm audit
+npm audit --omit=dev
+npm ls js-yaml tar
 npm run lint
 npm test
+# optional: npm run typecheck  (// @ts-check; incomplete JSDoc diagnostics may remain)
 ```
+
+## Dependencies and toolchain (Desktop)
+
+Pinned in `apps/dsa-desktop/package.json` (landed for #615 via PR #776 / #907; keep the lockfile and `tests/lint-and-deps.test.js` in sync):
+
+| Package | Pin | Role |
+| --- | --- | --- |
+| `electron` | `43.3.0` | Declared as a devDependency, but shipped as the packaged runtime |
+| `electron-builder` | `26.15.7` | Packaging toolchain (`app-builder-lib` 26.15.7) |
+| `electron-updater` | `6.8.9` | Auto-update (production dependency) |
+| `app-builder-lib` → `tar` override | `7.5.22` | Build-chain audit pin; archive-path compatibility is unit-tested |
+| Top-level `js-yaml` override | `4.3.1` | Forces the updater/builder `^4.1.0` / `^4.3.0` graph past the 4.x advisory floor |
+
+Expected: `npm audit` and `npm audit --omit=dev` both report **0 vulnerabilities**. Do not treat Electron as "dev-only exposure" because it is embedded in release artifacts.
+
+### Advisory basis (#615)
+
+Representative advisories that motivated leaving Electron 31 / builder 24 / older updater, and how current pins clear them:
+
+| Component | Advisory | Severity | Affected range (summary) | Current disposition |
+| --- | --- | --- | --- | --- |
+| Electron runtime | Multiple 2026 GHSA/CVE lines (iframe/popup, DevTools, contextBridge; e.g. [GHSA-9f4c-93c8-jc8g](https://github.com/advisories/GHSA-9f4c-93c8-jc8g) / CVE-2026-70608) | High / Moderate | Primarily 39.x–42.x patch lines; **43.3.0 stable is not listed as vulnerable** | Pin `43.3.0` (npm `latest` / `43-x-y`) |
+| electron-updater | [GHSA-9jxc-qjr9-vjxq](https://github.com/advisories/GHSA-9jxc-qjr9-vjxq) / CVE-2024-39698 | High | `<= 6.3.0-alpha.5` | `6.8.9` |
+| electron-builder | No separate open npm GHSA node; legacy 24.x trees showed high findings under local audit | — | Pre-26 packaging graph | `26.15.7` |
+| `tar` (builder transitive) | e.g. [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw) / CVE-2026-59873, [GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m) | Critical / High / Moderate | `<=7.5.18`, `<=7.5.20`, etc. | Override `7.5.22` |
+| `js-yaml` 4.x | [GHSA-5p4m-2wfm-xmqj](https://github.com/advisories/GHSA-5p4m-2wfm-xmqj) (**no** standalone CVE ID) | High | `>=4.0.0, <4.3.1` | Override `4.3.1` |
+| `js-yaml` 5.x (do not conflate) | [GHSA-724g-mxrg-4qvm](https://github.com/advisories/GHSA-724g-mxrg-4qvm) / CVE-2026-59870 | Moderate | `>=5.0.0, <=5.2.0` | Desktop stays on the 4.x line |
+
+Do not clear findings with `npm audit fix --force` or blanket audit suppressions. New advisories need an applicability decision (shipped runtime / updater vs build-host-only) before changing pins.
+
+### Breaking changes and migration notes (Electron 31 → 43 / builder 24 → 26)
+
+- **Multi-major Chromium/Node/V8 jump**: isolation defaults can change upstream; this app keeps `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and locks protocol/IPC isolation with desktop unit tests.
+- **electron-builder 26 archive API**: archive helpers take a single **options object** (not legacy positional args); see `tests/dependency-overrides.test.js`.
+- **Windows protocol registration**: builder 24–26 does **not** write Windows registry entries from `build.protocols`. `stockpulse://` still depends on `installer.nsh` plus runtime `app.setAsDefaultProtocolClient`. macOS still uses `protocols` for `CFBundleURLTypes`.
+- **Auto-update**: production `electron-updater@6.8.9`; `build.win.publish` remains GitHub Releases (`SiinXu/stock-pulse-ai`). `main.js` keeps `autoDownload = true` and Windows install-directory backup/restore around updates. The product `0.x` line still cannot auto-update from installed `3.x` clients (semver); see the Chinese doc version-restart section.
+- **Startup / local models / CLI**: this stack upgrade does not change Ollama resolution order, embedded runtime manifests, generation-backend CLI discovery policy, or desktop port selection (`8000–8100`). PATH/CLI visibility diagnostics belong to #884 and are out of the #615 dependency boundary.
+- **Release artifacts**: full NSIS/DMG with frozen backend + embedded Ollama, signing/notarization, and installed-client update cycles require Windows release runners or macOS with Apple identity. A host-local `electron-builder --mac dir` layout smoke is not release-equivalent.
+
+### Rollback
+
+1. Restore `apps/dsa-desktop/package.json` and `package-lock.json` to the previous pins (or `git revert` the dependency commits).
+2. Reinstall from the restored lock and rebuild desktop artifacts.
+3. No database/config schema migration; `appId` (`com.daily-stock-analysis.desktop`) is unchanged, so NSIS install identity does not flip solely because of a dependency rollback.
 
 ## Packaging and release
 

@@ -11,6 +11,7 @@ Covers:
 - PortfolioAgent.post_process: JSON parsing via try_parse_json
 """
 
+import asyncio
 import json
 import sys
 import os
@@ -1900,6 +1901,54 @@ class TestOrchestratorExecution(unittest.TestCase):
         )
         add_message.assert_called_once_with("session-1", "assistant", "assistant reply")
 
+    def test_chat_persists_public_tool_details_with_the_assistant_message(self):
+        from src.agent.orchestrator import OrchestratorResult
+
+        orch = self._make_orchestrator()
+        fake_result = OrchestratorResult(
+            success=True,
+            content="assistant reply",
+            tool_calls_log=[{
+                "step": 1,
+                "tool": "get_daily_history",
+                "arguments": {"stock_code": "600519"},
+                "success": True,
+                "duration": 0.25,
+                "cached": False,
+                "result_length": 128,
+                "result_preview": '{"rows":[{"close":1500}]}',
+            }],
+        )
+
+        with patch.object(orch, "_execute_pipeline", return_value=fake_result):
+            with patch(
+                "src.agent.conversation.conversation_manager.add_user_message"
+            ), patch(
+                "src.agent.conversation.conversation_manager.add_message"
+            ) as add_message:
+                orch.chat("hello", "tool-detail-session")
+
+        add_message.assert_called_once_with(
+            "tool-detail-session",
+            "assistant",
+            "assistant reply",
+            context={
+                "thinking_steps": [{
+                    "type": "tool_done",
+                    "step": 1,
+                    "tool": "get_daily_history",
+                    "success": True,
+                    "duration": 0.25,
+                    "meta": {
+                        "arguments": {"stock_code": "600519"},
+                        "cached": False,
+                        "result_length": 128,
+                        "result_preview": '{"rows":[{"close":1500}]}',
+                    },
+                }],
+            },
+        )
+
     def test_chat_persists_exact_fail_closed_final_content(self):
         from src.agent.orchestrator import OrchestratorResult
 
@@ -3151,6 +3200,91 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
         self.assertEqual(result["questions"], ["Q1", "Q2"])
         llm_adapter.call_text.assert_called_once()
 
+    def test_research_accepts_numbered_plain_text_decomposition(self):
+        from src.agent.research import ResearchAgent
+
+        llm_adapter = MagicMock()
+        llm_adapter.call_text.return_value = SimpleNamespace(
+            provider="openai",
+            content=(
+                "1: NVTS 的核心业务与竞争优势是什么？\n"
+                "2: NVTS 最近五年的财务趋势如何？\n"
+                "3: GaN 与 SiC 市场前景如何？\n"
+                "4: NVTS 与主要竞争对手相比估值如何？\n"
+                "5: NVTS 未来 12—24 个月有哪些催化剂与风险？"
+            ),
+            usage={"total_tokens": 42},
+        )
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=llm_adapter)
+
+        with patch.object(
+            agent,
+            "_research_sub_question",
+            side_effect=lambda question, *_args, **_kwargs: {
+                "question": question,
+                "content": f"Evidence for {question}",
+                "tokens": 1,
+                "success": True,
+            },
+        ), patch.object(
+            agent,
+            "_synthesise_report",
+            return_value={"content": "Final report", "tokens": 2},
+        ):
+            result = agent.research("分析 NVTS")
+
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.sub_questions), 5)
+        self.assertEqual(
+            result.sub_questions[0],
+            "NVTS 的核心业务与竞争优势是什么？",
+        )
+        self.assertEqual(
+            result.sub_questions[-1],
+            "NVTS 未来 12—24 个月有哪些催化剂与风险？",
+        )
+
+    def test_research_retries_an_empty_decomposition_response(self):
+        from src.agent.research import ResearchAgent
+
+        llm_adapter = MagicMock()
+        llm_adapter.call_text.side_effect = [
+            SimpleNamespace(
+                provider="openai",
+                content="",
+                reasoning_content="planning without a final answer",
+                usage={"total_tokens": 400},
+            ),
+            SimpleNamespace(
+                provider="openai",
+                content='{"questions":["Q1","Q2","Q3"]}',
+                reasoning_content=None,
+                usage={"total_tokens": 30},
+            ),
+        ]
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=llm_adapter)
+
+        with patch.object(
+            agent,
+            "_research_sub_question",
+            side_effect=lambda question, *_args, **_kwargs: {
+                "question": question,
+                "content": f"Evidence for {question}",
+                "tokens": 1,
+                "success": True,
+            },
+        ), patch.object(
+            agent,
+            "_synthesise_report",
+            return_value={"content": "Final report", "tokens": 2},
+        ):
+            result = agent.research("分析 NVTS")
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.sub_questions, ["Q1", "Q2", "Q3"])
+        self.assertEqual(llm_adapter.call_text.call_count, 2)
+        self.assertEqual(result.total_tokens, 435)
+
     def test_synthesise_report_uses_shared_adapter(self):
         from src.agent.research import ResearchAgent
 
@@ -3170,6 +3304,53 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
 
         self.assertEqual(result["content"], "Final research report")
         llm_adapter.call_text.assert_called_once()
+        system_prompt = llm_adapter.call_text.call_args.args[0][0]["content"]
+        self.assertLess(
+            system_prompt.index("Conclusion & Recommendations"),
+            system_prompt.index("Detailed Analysis"),
+        )
+
+    def test_research_retries_an_empty_synthesis_response(self):
+        from src.agent.research import ResearchAgent
+
+        llm_adapter = MagicMock()
+        llm_adapter.call_text.side_effect = [
+            SimpleNamespace(
+                provider="openai",
+                content='{"questions":["Q1"]}',
+                usage={"total_tokens": 20},
+            ),
+            SimpleNamespace(
+                provider="openai",
+                content="",
+                reasoning_content="analysis without a final answer",
+                usage={"total_tokens": 2000},
+            ),
+            SimpleNamespace(
+                provider="openai",
+                content="Final research report",
+                reasoning_content=None,
+                usage={"total_tokens": 1200},
+            ),
+        ]
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=llm_adapter)
+
+        with patch.object(
+            agent,
+            "_research_sub_question",
+            return_value={
+                "question": "Q1",
+                "content": "Verified evidence",
+                "tokens": 10,
+                "success": True,
+            },
+        ):
+            result = agent.research("分析 NVTS")
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.report, "Final research report")
+        self.assertEqual(result.total_tokens, 3230)
+        self.assertEqual(llm_adapter.call_text.call_count, 3)
 
     def test_research_marks_synthesis_fallback_as_failure(self):
         from src.agent.research import ResearchAgent
@@ -3300,8 +3481,121 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
         self.assertTrue(result.timed_out)
         self.assertIn("timed out", result.error)
 
+    def test_research_reserves_time_for_synthesis_after_bounded_sub_questions(self):
+        from src.agent.research import ResearchAgent
+
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+        sub_question_timeouts = []
+        synthesis_timeouts = []
+
+        def _bounded_sub_question(question, *args, timeout_seconds=None, **kwargs):
+            sub_question_timeouts.append(timeout_seconds)
+            return {
+                "question": question,
+                "content": f"Evidence for {question}",
+                "tokens": 7,
+                "success": False,
+                "timed_out": True,
+            }
+
+        def _synthesise(*args, timeout_seconds=None, **kwargs):
+            synthesis_timeouts.append(timeout_seconds)
+            return {"content": "partial but useful report", "tokens": 5}
+
+        with patch.object(
+            agent,
+            "_decompose_query",
+            return_value={"questions": ["Q1", "Q2", "Q3", "Q4", "Q5"], "tokens": 3},
+        ), patch.object(
+            agent,
+            "_research_sub_question",
+            side_effect=_bounded_sub_question,
+        ), patch.object(
+            agent,
+            "_synthesise_report",
+            side_effect=_synthesise,
+        ):
+            result = agent.research("分析 NVTS", timeout_seconds=180)
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.report, "partial but useful report")
+        self.assertEqual(result.findings_count, 5)
+        self.assertEqual(len(sub_question_timeouts), 5)
+        self.assertTrue(all(timeout is not None and timeout <= 24 for timeout in sub_question_timeouts))
+        self.assertEqual(len(synthesis_timeouts), 1)
+        self.assertGreater(synthesis_timeouts[0], 30)
+
+    def test_sub_question_preserves_bounded_tool_evidence_when_loop_times_out(self):
+        from src.agent.research import ResearchAgent
+
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+        loop_result = SimpleNamespace(
+            success=False,
+            content="",
+            total_tokens=11,
+            error="Agent step skipped due to insufficient budget",
+            messages=[
+                {"role": "system", "content": "instructions"},
+                {"role": "tool", "name": "search_stock_news", "content": "verified source evidence"},
+            ],
+        )
+        with patch.object(agent, "_filtered_registry", return_value=MagicMock()), patch(
+            "src.agent.research.run_agent_loop",
+            return_value=loop_result,
+        ):
+            result = agent._research_sub_question(
+                "Q1",
+                {},
+                0,
+                stock_scope=None,
+                timeout_seconds=20,
+            )
+
+        self.assertTrue(result["timed_out"])
+        self.assertIn("verified source evidence", result["content"])
+
 
 class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
+    async def test_agent_research_enforces_the_api_deadline(self):
+        from api.v1.endpoints.agent import ResearchRequest, agent_research
+
+        config = SimpleNamespace(
+            litellm_model="gemini/test-model",
+            agent_deep_research_budget=30000,
+            agent_deep_research_timeout=0.01,
+            is_agent_available=lambda: True,
+        )
+
+        async def slow_research(*_args, **_kwargs):
+            await asyncio.sleep(0.2)
+            return SimpleNamespace(
+                success=True,
+                report="Late report",
+                sub_questions=["Q1"],
+                total_tokens=12,
+                error=None,
+                timed_out=False,
+            )
+
+        with (
+            patch("api.v1.endpoints.agent.get_config", return_value=config),
+            patch(
+                "api.v1.endpoints.agent._run_research_in_background",
+                new=slow_research,
+            ),
+            patch("src.agent.factory.get_tool_registry", return_value=MagicMock()),
+            patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()),
+        ):
+            response = await asyncio.wait_for(
+                agent_research(ResearchRequest(question="Bound this research")),
+                timeout=0.1,
+            )
+
+        self.assertFalse(response.success)
+        self.assertEqual(response.content, "")
+        self.assertEqual(response.sources, [])
+        self.assertEqual(response.error, "agent_research_failed")
+
     async def test_agent_research_returns_timeout_response(self):
         from api.v1.endpoints.agent import ResearchRequest, agent_research
 
@@ -3336,6 +3630,66 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.sources, [])
         self.assertEqual(response.token_usage, 0)
         self.assertEqual(response.error, "agent_research_failed")
+
+    async def test_cancelled_http_wait_keeps_research_and_persists_result(self):
+        from api.v1.endpoints.agent import ResearchRequest, agent_research
+
+        config = SimpleNamespace(
+            litellm_model="gemini/test-model",
+            agent_deep_research_budget=30000,
+            agent_deep_research_timeout=180,
+            is_agent_available=lambda: True,
+        )
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def delayed_research(*_args, **_kwargs):
+            started.set()
+            await release.wait()
+            return SimpleNamespace(
+                success=True,
+                report="Background research report",
+                sub_questions=["Q1"],
+                total_tokens=12,
+                error=None,
+                timed_out=False,
+            )
+
+        session_service = MagicMock()
+        with (
+            patch("api.v1.endpoints.agent.get_config", return_value=config),
+            patch(
+                "api.v1.endpoints.agent._run_research_in_background",
+                new=delayed_research,
+            ),
+            patch("src.agent.factory.get_tool_registry", return_value=MagicMock()),
+            patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()),
+        ):
+            request_task = asyncio.create_task(
+                agent_research(
+                    ResearchRequest(
+                        question="Keep researching",
+                        session_id="background-session",
+                        turn_id="background-turn",
+                    ),
+                    session_service=session_service,
+                )
+            )
+            await started.wait()
+            request_task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await request_task
+
+            release.set()
+            for _ in range(20):
+                if session_service.record_research_success.called:
+                    break
+                await asyncio.sleep(0)
+
+        session_service.record_research_success.assert_called_once_with(
+            session_id="background-session",
+            content="Background research report",
+        )
 
 
 if __name__ == '__main__':

@@ -466,7 +466,10 @@ class GenerationBackendStatusService:
             "available": available,
             "health_status": current_health,
             "supports_json": capabilities.supports_json,
-            "supports_tools": capabilities.supports_tools,
+            "supports_tools": (
+                capabilities.supports_tools
+                or backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS
+            ),
             "supports_stream": capabilities.supports_stream,
             "supports_vision": capabilities.supports_vision,
             "is_primary": is_primary,
@@ -877,6 +880,11 @@ class GenerationBackendStatusService:
                 api_keys = cls._split_csv(effective_map.get("ANSPIRE_API_KEYS") or "")
 
             raw_models = cls._split_csv(effective_map.get(f"{prefix}_MODELS") or "")
+            model_id_mode = (
+                effective_map.get(f"{prefix}_MODEL_ID_MODE") or "route"
+            ).strip().lower()
+            if model_id_mode not in {"route", "literal"}:
+                model_id_mode = "route"
             if lower == "anspire" and not raw_models:
                 raw_models = [(effective_map.get("ANSPIRE_LLM_MODEL") or ANSPIRE_LLM_MODEL_DEFAULT).strip()]
 
@@ -896,6 +904,15 @@ class GenerationBackendStatusService:
 
             protocol = resolve_llm_channel_protocol(protocol_raw, base_url=base_url, models=raw_models, channel_name=name)
             models = [normalize_llm_channel_model(model, protocol, base_url) for model in raw_models]
+            wire_models = {
+                route: normalize_llm_channel_model(
+                    raw_model,
+                    protocol,
+                    base_url,
+                    preserve_wire_model=True,
+                )
+                for raw_model, route in zip(raw_models, models)
+            } if provider_id == "custom" and model_id_mode == "literal" else {}
             if not api_keys and channel_allows_empty_api_key(protocol, base_url):
                 api_keys = [""]
             if not api_keys or not models:
@@ -911,6 +928,9 @@ class GenerationBackendStatusService:
                     "base_url": base_url,
                     "api_keys": api_keys,
                     "models": models,
+                    "raw_models": list(raw_models),
+                    "model_id_mode": model_id_mode,
+                    "wire_models": wire_models,
                     "extra_headers": extra_headers,
                 }
             )

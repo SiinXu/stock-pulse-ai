@@ -10,6 +10,7 @@ from tests.litellm_stub import ensure_litellm_stub
 ensure_litellm_stub()
 
 from src.llm.generation_backend import GenerationError, GenerationErrorCode
+from src.llm.model_ref import encode_model_ref
 from src.services.generation_backend_status_service import GenerationBackendStatusService
 
 
@@ -67,6 +68,32 @@ def _litellm_effective_map(api_key: str = "sk-secret-value") -> dict:
     }
 
 
+def test_custom_literal_channel_smoke_config_preserves_openai_gateway_route() -> None:
+    route = "deepseek/deepseek-v4-flash"
+    model_ref = encode_model_ref("custom", route)
+    service = GenerationBackendStatusService(
+        effective_map={
+            "GENERATION_BACKEND": "litellm",
+            "GENERATION_FALLBACK_BACKEND": "",
+            "LLM_CHANNELS": "custom",
+            "LLM_CUSTOM_PROVIDER": "custom",
+            "LLM_CUSTOM_PROTOCOL": "openai",
+            "LLM_CUSTOM_BASE_URL": "https://gateway.example/v1",
+            "LLM_CUSTOM_API_KEY": "sk-secret-value",
+            "LLM_CUSTOM_MODELS": route,
+            "LLM_CUSTOM_MODEL_ID_MODE": "literal",
+            "LLM_CUSTOM_ENABLED": "true",
+            "LITELLM_MODEL": model_ref,
+        }
+    )
+
+    config = service._build_backend_config()
+    entry = next(item for item in config.llm_model_list if item.get("model_name") == model_ref)
+
+    assert entry["litellm_params"]["model"] == "openai/deepseek/deepseek-v4-flash"
+    assert entry["litellm_params"]["custom_llm_provider"] == "openai"
+
+
 def test_local_cli_missing_executable_reports_current_config_error() -> None:
     service = GenerationBackendStatusService(
         effective_map={
@@ -83,7 +110,7 @@ def test_local_cli_missing_executable_reports_current_config_error() -> None:
     assert primary["available"] is False
     assert primary["health_status"] == "failed"
     assert primary["last_error_code"] == "command_not_found"
-    assert primary["supports_tools"] is False
+    assert primary["supports_tools"] is True
 
 
 def test_local_cli_invalid_numeric_config_reports_unsafe_config() -> None:
@@ -139,7 +166,7 @@ def test_local_cli_smoke_failure_keeps_available_true_when_cheap_check_passes() 
     assert status["available"] is True
     assert status["health_status"] == "failed"
     assert status["last_error_code"] == "invalid_json"
-    assert status["supports_tools"] is False
+    assert status["supports_tools"] is True
 
 
 def test_smoke_timeout_overrides_config_timeout_for_local_cli() -> None:

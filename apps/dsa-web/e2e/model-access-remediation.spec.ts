@@ -119,11 +119,11 @@ async function openConnections(page: Page, reset = true) {
     await resetModelConfig(page);
   }
   await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
-  await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible({ timeout: 15_000 });
 }
 
 async function openAddDialog(page: Page) {
-  await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+  await page.getByRole('button', { name: /添加模型来源/ }).first().click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
   return dialog;
@@ -261,12 +261,29 @@ async function selectStrictModel(page: Page, label: string, route: string) {
   await page.locator(`[role="option"][data-value="${route}"]`).click();
 }
 
+async function openFallbackModelSearch(page: Page) {
+  await page.getByRole('button', { name: '选择备用模型', exact: true }).click();
+  const search = page.getByRole('combobox', {
+    name: '搜索选项: 选择备用模型',
+  });
+  await expect(search).toBeVisible();
+  return search;
+}
+
+async function selectFallbackModel(page: Page, route: string, query: string) {
+  const search = await openFallbackModelSearch(page);
+  await search.fill(query);
+  const option = page.locator(`[role="option"][data-value="${route}"]`);
+  await expect(option).toBeVisible();
+  await option.click();
+}
+
 test.describe('model access product convergence', () => {
   test.use({ locale: 'zh-CN' });
 
   test('01 AI & Models exposes exactly four product views', async ({ page }) => {
     await openConnections(page);
-    for (const label of ['总览', '模型接入', '任务路由', '可靠性']) {
+    for (const label of ['总览', '模型来源', '任务路由', '可靠性']) {
       await expect(page.getByRole('radio', { name: label })).toBeVisible();
     }
     await expect(page.getByRole('radio', { name: '高级' })).toHaveCount(0);
@@ -275,7 +292,7 @@ test.describe('model access product convergence', () => {
   test('02 legacy provider URLs replace-redirect to Model Access', async ({ page }) => {
     await login(page);
     await page.goto(buildSettingsHref({ legacyCategory: 'ai_model', legacySub: 'providers' }));
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible();
     await expect.poll(() => page.url()).toContain('section=ai_models');
     expect(page.url()).toContain('view=connections');
     expect(page.url()).not.toContain('sub=providers');
@@ -284,8 +301,8 @@ test.describe('model access product convergence', () => {
   test('03 Model Access has the concise title, description, and one primary action', async ({ page }) => {
     await openConnections(page);
     await selectTheme(page, '浅色');
-    await expect(page.getByText('连接模型服务，并管理可用于报告、Agent 和视觉任务的模型。')).toBeVisible();
-    await expect(page.getByRole('button', { name: /添加模型服务/ })).toHaveCount(1);
+    await expect(page.getByText('统一管理云端 API、本地模型服务与本地 CLI，并将可用模型分配到任务。')).toBeVisible();
+    await expect(page.getByRole('button', { name: /添加模型来源/ })).toHaveCount(1);
   });
 
   test('04 Model Access removes generation-backend diagnostics from the first screen', async ({ page }) => {
@@ -305,7 +322,7 @@ test.describe('model access product convergence', () => {
 
   test('06 normal AI views contain no raw config keys or legacy terminology', async ({ page }) => {
     await openConnections(page);
-    for (const label of ['总览', '模型接入', '任务路由', '可靠性']) {
+    for (const label of ['总览', '模型来源', '任务路由', '可靠性']) {
       await page.getByRole('radio', { name: label }).click();
       const text = await page.locator('main').innerText();
       expect(text).not.toMatch(/LLM_|LITELLM_|GENERATION_BACKEND|模型供应商|快速添加渠道|渠道管理|Legacy Provider/);
@@ -600,9 +617,18 @@ test.describe('model access product convergence', () => {
     await expect(card.getByTestId('provider-avatar-custom')).toBeVisible();
     await expect(card).toContainText('自定义兼容服务');
     await expect(card.getByText('已启用', { exact: true })).toBeVisible();
-    await expect(card.getByText('未测试', { exact: true })).toBeVisible();
+    await expect(card).toHaveAttribute('data-source-availability', 'untested');
+    await expect(card.getByTestId('source-availability-custom')).toHaveText('未测试');
+    const testResponsePromise = page.waitForResponse(
+      (response) => response.url().endsWith('/api/v1/system/config/llm/test-channel')
+        && response.request().method() === 'POST',
+    );
     await card.getByRole('button', { name: '测试', exact: true }).click();
-    await expect(card.getByText('测试通过', { exact: true })).toBeVisible({ timeout: 30_000 });
+    const testResponse = await testResponsePromise;
+    expect(testResponse.status()).toBe(200);
+    await expect(card.getByText(/连接成功/)).toBeVisible({ timeout: 30_000 });
+    await expect(card).toHaveAttribute('data-source-availability', 'available');
+    await expect(card.getByTestId('source-availability-custom')).toHaveText('可用');
     await expect(card.getByText('已启用', { exact: true })).toBeVisible();
   });
 
@@ -669,7 +695,7 @@ test.describe('model access product convergence', () => {
       }),
     ]));
 
-    await page.getByRole('radio', { name: '模型接入' }).click();
+    await page.getByRole('radio', { name: '模型来源' }).click();
     await page.getByRole('button', { name: '更多操作 e2e' }).click();
     await page.getByRole('menuitem', { name: '删除连接' }).click();
     const dialog = page.getByRole('dialog', { name: '无法直接删除连接' });
@@ -687,15 +713,15 @@ test.describe('model access product convergence', () => {
     await openConnections(page);
     await page.getByRole('radio', { name: '任务路由' }).click();
     await expect(page.getByText('还没有可用模型')).toBeVisible();
-    await page.getByRole('button', { name: '前往模型接入' }).click();
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible();
+    await page.getByRole('button', { name: '前往模型来源' }).click();
+    await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible();
   });
 
   test('22b task routing round-trip preserves source, Back/Forward, and refreshes models after save', async ({ page }) => {
     await openConnections(page);
     await page.getByRole('radio', { name: '任务路由' }).click();
     await expect(page.getByText('还没有可用模型')).toBeVisible();
-    await page.getByRole('button', { name: '前往模型接入' }).click();
+    await page.getByRole('button', { name: '前往模型来源' }).click();
     await expect(page).toHaveURL(/section=ai_models&view=connections&from=task_routing/);
     await expect(page.getByRole('button', { name: '返回任务路由' })).toBeVisible();
 
@@ -782,20 +808,19 @@ test.describe('model access product convergence', () => {
   test('26 fallback models are searchable, deduplicated, and reorderable', async ({ page }) => {
     await createSavedConnection(page);
     await page.getByRole('radio', { name: '可靠性' }).click();
-    await page.getByRole('button', { name: '选择备用模型' }).click();
-    await page.getByLabel('搜索模型').fill('agent');
-    await expect(page.getByRole('checkbox', { name: 'fake-agent-model' })).toBeVisible();
-    await expect(page.getByRole('checkbox', { name: 'fake-vision-model' })).toHaveCount(0);
-    await page.getByRole('checkbox', { name: 'fake-agent-model' }).check();
-    await page.getByLabel('搜索模型').fill('vision');
-    await page.getByRole('checkbox', { name: 'fake-vision-model' }).check();
-    await page.getByLabel('搜索模型').press('Escape');
+    const agentModelRef = modelRef('custom', 'fake-agent-model');
+    const visionModelRef = modelRef('custom', 'fake-vision-model');
+    const search = await openFallbackModelSearch(page);
+    await search.fill('agent');
+    await expect(page.locator(`[role="option"][data-value="${agentModelRef}"]`)).toBeVisible();
+    await expect(page.locator(`[role="option"][data-value="${visionModelRef}"]`)).toHaveCount(0);
+    await page.locator(`[role="option"][data-value="${agentModelRef}"]`).click();
+    await selectFallbackModel(page, visionModelRef, 'vision');
     await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toBeEnabled();
     await page.getByRole('button', { name: '上移 fake-vision-model' }).click();
     await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toBeDisabled();
-    await page.getByRole('button', { name: '选择备用模型' }).click();
-    await expect(page.getByRole('checkbox', { name: 'fake-vision-model' })).toBeChecked();
-    await expect(page.getByRole('checkbox', { name: 'fake-vision-model' })).toHaveCount(1);
+    await openFallbackModelSearch(page);
+    await expect(page.locator(`[role="option"][data-value="${visionModelRef}"]`)).toHaveCount(0);
     await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toHaveCount(1);
   });
 
@@ -805,16 +830,14 @@ test.describe('model access product convergence', () => {
     const agentModelRef = modelRef('custom', 'fake-agent-model');
     await waitForAiAutosave(page, async () => {
       await page.getByRole('radio', { name: '可靠性' }).click();
-      await page.getByRole('button', { name: '选择备用模型' }).click();
-      await page.getByRole('checkbox', { name: 'fake-report-model' }).check();
-      await page.getByLabel('搜索模型').press('Escape');
+      await selectFallbackModel(page, reportModelRef, 'report');
       await page.getByRole('radio', { name: '任务路由' }).click();
       await selectStrictModel(page, '主要模型', reportModelRef);
       await selectStrictModel(page, 'Agent 主要模型', reportModelRef);
       await selectStrictModel(page, 'Vision 模型', reportModelRef);
     });
 
-    await page.getByRole('radio', { name: '模型接入' }).click();
+    await page.getByRole('radio', { name: '模型来源' }).click();
     await page.getByRole('button', { name: '管理模型 e2e' }).click();
     const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
     await dialog.getByRole('button', { name: '移除模型 fake-report-model' }).click();

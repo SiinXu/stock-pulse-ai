@@ -33,6 +33,7 @@ _REGISTRY_PART_MODULES = (
     "src.core.config_registry_parts.backtest",
     "src.core.config_registry_parts.indicators",
     "src.core.config_registry_parts.agent",
+    "src.core.config_registry_parts.mcp",
     "src.core.config_registry_parts.help_metadata",
 )
 for _registry_part_name in _REGISTRY_PART_MODULES:
@@ -75,6 +76,9 @@ from src.core.config_registry_parts.indicators import (
 from src.core.config_registry_parts.agent import (
     AGENT_FIELD_DEFINITIONS as _AGENT_FIELD_DEFINITIONS,
 )
+from src.core.config_registry_parts.mcp import (
+    MCP_FIELD_DEFINITIONS as _MCP_FIELD_DEFINITIONS,
+)
 from src.core.config_registry_parts.help_metadata import (
     _DOC_CUSTOM_WEBHOOK,
     _DOC_FULL_GUIDE_DATA_SOURCE,
@@ -95,6 +99,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     **_BACKTEST_FIELD_DEFINITIONS,
     **_INDICATOR_FIELD_DEFINITIONS,
     **_AGENT_FIELD_DEFINITIONS,
+    **_MCP_FIELD_DEFINITIONS,
 }
 _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]]
 
@@ -107,6 +112,7 @@ del _SYSTEM_FIELD_DEFINITIONS
 del _BACKTEST_FIELD_DEFINITIONS
 del _INDICATOR_FIELD_DEFINITIONS
 del _AGENT_FIELD_DEFINITIONS
+del _MCP_FIELD_DEFINITIONS
 del _REGISTRY_PART_MODULES
 del _importlib
 del _sys
@@ -140,24 +146,27 @@ def _extract_option_values(options: List[Any]) -> List[str]:
 # field only in the surface its placement declares, instead of maintaining its
 # own provider/field lists:
 #   - model_access: edited exclusively by the model-access connection manager
-#   - task_routing: task model selectors (report / agent / vision) and routing
+#   - task_routing: report-generation backend and task model routing
 #   - developer_diagnostics: advanced diagnostics, collapsed by default
 #   - local_models: optional local finance model keys (Kronos), dedicated panel
 #   - hidden_legacy: legacy provider keys kept for back-compat; readable through
 #     the API but never rendered as a generic editable settings field
 #   - None: regular field, rendered by its category page as usual
 _UI_PLACEMENT_TASK_ROUTING_KEYS = frozenset({
+    "GENERATION_BACKEND",
     "LITELLM_MODEL",
     "AGENT_LITELLM_MODEL",
     "VISION_MODEL",
     "LITELLM_FALLBACK_MODELS",
     "LLM_TEMPERATURE",
+    # AlphaSift stock-selection reordering reuses these DSA LLM bounds.
+    "LLM_TIMEOUT_SEC",
+    "LLM_MAX_TOKENS",
 })
 
 _UI_PLACEMENT_DIAGNOSTICS_KEYS = frozenset({
     "LLM_CONFIG_MODE",
     "LITELLM_CONFIG",
-    "GENERATION_BACKEND",
     "GENERATION_FALLBACK_BACKEND",
     "GENERATION_BACKEND_MAX_CONCURRENCY",
     "GENERATION_BACKEND_MAX_OUTPUT_BYTES",
@@ -186,7 +195,7 @@ _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANS
 # group(1) captures the channel name. Shared with the service layer so "what is
 # a channel field key" has a single definition.
 LLM_CHANNEL_FIELD_KEY_RE = re.compile(
-    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|API_SURFACE|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|API_SURFACE|BASE_URL|API_KEY|API_KEYS|MODELS|MODEL_ID_MODE|EXTRA_HEADERS|ENABLED)$"
 )
 
 
@@ -230,18 +239,19 @@ def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str
 
     category = _infer_category(key_upper)
     data_type = _infer_data_type(key_upper, value_hint)
+    options: List[Any] = []
     field = {
         "key": key_upper,
         "title": key_upper.replace("_", " ").title(),
         "description": "Auto-inferred field metadata.",
         "category": category,
         "data_type": data_type,
-        "ui_control": _infer_ui_control(data_type, key_upper),
+        "ui_control": _infer_ui_control(data_type, key_upper, options=options),
         "is_sensitive": _is_sensitive_key(key_upper),
         "is_required": False,
         "is_editable": True,
         "default_value": None,
-        "options": [],
+        "options": options,
         "validation": {},
         "display_order": 9000,
         "ui_placement": derive_ui_placement(key_upper),
@@ -329,8 +339,10 @@ def build_schema_response() -> Dict[str, Any]:
 
 
 def _is_sensitive_key(key: str) -> bool:
-    markers = ("KEY", "TOKEN", "SECRET", "PASSWORD")
-    return key.endswith("_EXTRA_HEADERS") or any(marker in key for marker in markers)
+    """Infer whether an unregistered config key carries a secret value."""
+    from src.core.config_secret_keys import is_sensitive_config_key_name
+
+    return is_sensitive_config_key_name(key)
 
 
 def _infer_category(key: str) -> str:
@@ -384,36 +396,112 @@ def _infer_category(key: str) -> str:
     return "uncategorized"
 
 
-def _infer_data_type(key: str, value_hint: Optional[str]) -> str:
-    if key.endswith("_TIME"):
-        return "time"
-    if key.endswith("_EXTRA_HEADERS"):
-        return "json"
-    if value_hint is None:
-        return "string"
+# Name patterns that almost always store boolean env values. Inference only —
+# explicit registry entries remain the required presentation contract.
+_BOOLEAN_KEY_SUFFIXES = (
+    "_ENABLED",
+    "_ENABLE",
+    "_DISABLED",
+    "_STRICT",
+)
+_BOOLEAN_KEY_PREFIXES = (
+    "ENABLE_",
+    "DISABLE_",
+)
 
-    lowered = value_hint.strip().lower()
-    if lowered in {"true", "false"}:
+
+def _is_boolean_named_key(key: str) -> bool:
+    """Return True when the key name strongly implies a boolean toggle."""
+    key_upper = key.upper()
+    if key_upper.startswith(_BOOLEAN_KEY_PREFIXES):
+        return True
+    return key_upper.endswith(_BOOLEAN_KEY_SUFFIXES)
+
+
+def _normalize_value_hint_token(value_hint: Optional[str]) -> Optional[str]:
+    """Normalize a raw value hint for type inference.
+
+    Handles surrounding quotes and trailing inline comments that commonly appear
+    in ``.env.example`` (e.g. ``true # Global toggle``). Complex free-text values
+    are returned stripped but otherwise unchanged so path/URL hints still work.
+    """
+    if value_hint is None:
+        return None
+    text = str(value_hint).strip()
+    if not text:
+        return None
+    if (text.startswith('"') and text.endswith('"')) or (
+        text.startswith("'") and text.endswith("'")
+    ):
+        text = text[1:-1].strip()
+        if not text:
+            return None
+
+    # Scalar tokens may be followed by an inline comment in env examples.
+    scalar_match = re.match(
+        r"^(true|false|[+-]?\d+(?:\.\d+)?)(?:\s*(?:#.*)?)?$",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if scalar_match:
+        return scalar_match.group(1)
+
+    return text
+
+
+def _infer_data_type(key: str, value_hint: Optional[str]) -> str:
+    """Infer a fallback data type for unregistered keys.
+
+    Explicit registry metadata always wins via ``get_field_definition``. This
+    helper is only a presentation fallback for ad-hoc / legacy keys so Settings
+    does not render every unknown toggle as a free-text box.
+    """
+    key_upper = key.upper()
+    if key_upper.endswith("_TIME"):
+        return "time"
+    if key_upper.endswith("_EXTRA_HEADERS"):
+        return "json"
+    if key_upper in {"STOCK_LIST", "EMAIL_RECEIVERS", "CUSTOM_WEBHOOK_URLS"}:
+        return "array"
+
+    token = _normalize_value_hint_token(value_hint)
+    if token is not None:
+        lowered = token.lower()
+        if lowered in {"true", "false"}:
+            return "boolean"
+        try:
+            int(token)
+            return "integer"
+        except (TypeError, ValueError):
+            pass
+        try:
+            float(token)
+            return "number"
+        except (TypeError, ValueError):
+            pass
+
+    # Name-based boolean fallback when the value is missing or non-scalar.
+    if _is_boolean_named_key(key_upper):
         return "boolean"
 
-    try:
-        int(value_hint)
-        return "integer"
-    except (TypeError, ValueError):
-        pass
-
-    try:
-        float(value_hint)
-        return "number"
-    except (TypeError, ValueError):
-        pass
-
-    if key in {"STOCK_LIST", "EMAIL_RECEIVERS", "CUSTOM_WEBHOOK_URLS"}:
-        return "array"
     return "string"
 
 
-def _infer_ui_control(data_type: str, key: str) -> str:
+def _infer_ui_control(
+    data_type: str,
+    key: str,
+    options: Optional[List[Any]] = None,
+) -> str:
+    """Infer a fallback UI control for unregistered keys.
+
+    When ``options`` is non-empty the control is ``select`` (enum path). Callers
+    that have explicit options should pass them; inference still does not invent
+    option lists — registration remains the source of enum choices.
+    """
+    if options:
+        option_values = _extract_option_values(list(options))
+        if option_values:
+            return "select"
     if data_type == "json":
         return "textarea"
     if _is_sensitive_key(key):
