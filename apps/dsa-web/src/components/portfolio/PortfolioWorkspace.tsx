@@ -13,7 +13,7 @@ import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../analysis';
 import { RiskHeatmap } from '../charts';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, SegmentedControl, Select, Surface } from '../common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
@@ -84,6 +84,7 @@ const PortfolioRiskMetricsPanel = lazy(
 );
 const PortfolioAnalysisTaskPanel = lazy(() => import('./PortfolioAnalysisTaskPanel'));
 const PortfolioImportWizard = lazy(() => import('./PortfolioImportWizard'));
+const PortfolioWorkspaceTabs = lazy(() => import('./PortfolioWorkspaceTabs'));
 
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1291,17 +1292,26 @@ const PortfolioWorkspace: React.FC = () => {
       </section>
 
 
-      <SegmentedControl
-        id="portfolio-workspace-tabs"
-        ariaLabel={text.workspaceTabsLabel}
-        value={activeTab}
-        onChange={(value) => setActiveTab(value)}
-        options={[
-          { value: 'positions', label: text.positionsTitle },
-          { value: 'ledger', label: text.eventLog },
-          { value: 'risk', label: text.tabRisk },
-        ]}
-      />
+      <Suspense fallback={null}>
+        <PortfolioWorkspaceTabs
+          text={text}
+          language={language}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          eventType={eventType}
+          eventLoading={eventLoading}
+          eventPage={eventPage}
+          totalEventPages={totalEventPages}
+          tradeEvents={tradeEvents}
+          cashEvents={cashEvents}
+          corporateEvents={corporateEvents}
+          onOpenLedger={() => {
+            setEventError(null);
+            setEventModalOpen(true);
+          }}
+          onLedgerPageChange={handleLedgerPageChange}
+        />
+      </Suspense>
 
       {activeTab === 'positions' ? (
       <section className="grid grid-cols-1 gap-3">
@@ -1424,62 +1434,6 @@ const PortfolioWorkspace: React.FC = () => {
           </div>
         </Card>
       </section>
-      ) : null}
-
-      {activeTab === 'ledger' ? (
-        <Card padding="md" data-testid="portfolio-tab-ledger" className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-foreground">{text.eventLog}</h2>
-            <Button
-              type="button"
-              variant="secondary"
-              size="comfortable"
-              onClick={() => {
-                setEventError(null);
-                setEventModalOpen(true);
-              }}
-            >
-              {text.refreshLedger}
-            </Button>
-          </div>
-          <p className="text-xs text-secondary-text">{text.deleteHint}</p>
-          <div className="max-h-96 overflow-auto rounded-lg border border-subtle p-2">
-            {eventType === 'trade' && tradeEvents.map((item) => (
-              <div key={`tab-t-${item.id}`} className="border-b border-subtle py-2 text-xs text-secondary">
-                {formatUiText(text.tradeRow, { date: item.tradeDate, side: formatSideLabel(item.side, language), symbol: item.symbol, quantity: item.quantity, price: item.price })}
-              </div>
-            ))}
-            {eventType === 'cash' && cashEvents.map((item) => (
-              <div key={`tab-c-${item.id}`} className="border-b border-subtle py-2 text-xs text-secondary">
-                {item.eventDate} {formatCashDirectionLabel(item.direction, language)} {item.amount} {item.currency}
-              </div>
-            ))}
-            {eventType === 'corporate' && corporateEvents.map((item) => (
-              <div key={`tab-ca-${item.id}`} className="border-b border-subtle py-2 text-xs text-secondary">
-                {item.effectiveDate} {formatCorporateActionLabel(item.actionType, language)} {item.symbol}
-              </div>
-            ))}
-            {!eventLoading
-              && ((eventType === 'trade' && tradeEvents.length === 0)
-                || (eventType === 'cash' && cashEvents.length === 0)
-                || (eventType === 'corporate' && corporateEvents.length === 0)) ? (
-                  <EmptyState title={text.noLedger} description={text.noLedgerDescription} compact />
-                ) : null}
-          </div>
-          <div className="flex items-center justify-between text-xs text-secondary">
-            <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage <= 1}
-                onClick={() => handleLedgerPageChange(Math.max(1, eventPage - 1))}>
-                {text.prevPage}
-              </Button>
-              <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage >= totalEventPages}
-                onClick={() => handleLedgerPageChange(Math.min(totalEventPages, eventPage + 1))}>
-                {text.nextPage}
-              </Button>
-            </div>
-          </div>
-        </Card>
       ) : null}
 
       {hasAccounts && activeTab !== 'ledger' ? (

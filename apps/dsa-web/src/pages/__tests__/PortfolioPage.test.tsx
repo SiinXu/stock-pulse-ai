@@ -498,8 +498,7 @@ describe('PortfolioPage FX refresh', () => {
 
 
   async function openPortfolioRiskTab() {
-    const riskTab = screen.queryByRole('tab', { name: '风险' })
-      ?? screen.getByRole('tab', { name: 'Risk' });
+    const riskTab = await screen.findByRole('tab', { name: /^(风险|Risk)$/ });
     fireEvent.click(riskTab);
     expect(await screen.findByTestId('portfolio-tab-risk')).toBeInTheDocument();
   }
@@ -602,7 +601,7 @@ describe('PortfolioPage FX refresh', () => {
     expect(router.state.location.search).toContain('tab=risk');
     expect(router.state.location.search).toContain('selected=1-AAPL-us');
     expect(screen.getByTestId('portfolio-tab-risk')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '持仓明细' }));
+    fireEvent.click(await screen.findByRole('tab', { name: '持仓明细' }));
     await waitFor(() => expect(router.state.location.search).not.toContain('tab=risk'));
   });
 
