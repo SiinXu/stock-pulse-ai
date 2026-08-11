@@ -84,9 +84,6 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   'notification-inbox-list': createLazyScenario(async () => (
     (await import('./inbox')).default
   )),
-  'workbench-history-popover': createLazyScenario(async () => (
-    (await import('./workbenchHistory')).default
-  )),
   ...ALERT_HISTORY_SCENARIOS,
   ...LAZY_WORKBENCH_HISTORY_SCENARIOS,
   ...DECISION_REPORT_RUN_FLOW_SCENARIOS,
