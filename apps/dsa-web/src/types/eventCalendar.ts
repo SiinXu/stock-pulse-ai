@@ -1,12 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export type CorporateEventCategory =
-  | 'earnings'
-  | 'shareholder'
-  | 'mna'
-  | 'regulatory'
-  | 'analyst';
+import type { CorporateEventCategory } from './eventAlerts';
+
+export type { CorporateEventCategory } from './eventAlerts';
 
 export type EventCalendarErrorCode =
   | 'event_calendar_page_unavailable'

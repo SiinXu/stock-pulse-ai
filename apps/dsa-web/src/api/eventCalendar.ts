@@ -9,16 +9,11 @@ import type {
   EventCalendarQuery,
   EventCalendarResponse,
 } from '../types/eventCalendar';
+import { CORPORATE_EVENT_CATEGORIES } from '../types/eventAlerts';
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
-const CORPORATE_CATEGORIES = new Set<CorporateEventCategory>([
-  'earnings',
-  'shareholder',
-  'mna',
-  'regulatory',
-  'analyst',
-]);
+const CORPORATE_CATEGORIES = new Set<CorporateEventCategory>(CORPORATE_EVENT_CATEGORIES);
 
 const eventContextSchema = z.object({
   eventCategory: z.string().nullable().optional(),

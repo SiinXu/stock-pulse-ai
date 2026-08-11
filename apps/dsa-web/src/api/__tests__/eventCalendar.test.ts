@@ -38,6 +38,29 @@ describe('eventCalendarApi', () => {
     expect(result.loadedCount).toBe(2);
   });
 
+  it('continues with the stable opaque cursor from the corporate-alert contract', async () => {
+    get
+      .mockResolvedValueOnce({
+        data: {
+          items: [trigger(1, '2026-08-10')],
+          total: 2,
+          page: 1,
+          page_size: 100,
+          next_cursor: 'stable-cursor',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { items: [trigger(2, '2026-08-11')], total: 2, page: 1, page_size: 100 },
+      });
+
+    const result = await eventCalendarApi.getCalendar({ dateFrom: '2026-08-01', dateTo: '2026-08-31' });
+
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(get.mock.calls[1][1].params.cursor).toBe('stable-cursor');
+    expect(get.mock.calls[1][1].params.page).toBeUndefined();
+    expect(result.events.map((item) => item.eventId)).toEqual([1, 2]);
+  });
+
   it('returns structured partial provenance when a later page fails', async () => {
     get
       .mockResolvedValueOnce({ data: { items: [trigger(1, '2026-08-10')], total: 2, page: 1, page_size: 100 } })
