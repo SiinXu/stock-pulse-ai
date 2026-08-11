@@ -13,8 +13,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from src.repositories.alert_repo import AlertRepository
 from src.repositories.base import RepositoryError
 from src.repositories.decision_signal_repo import DecisionSignalRepository
@@ -347,7 +345,7 @@ class NotificationInboxService:
                 continue
             try:
                 source_items = loader()
-            except (RepositoryError, SQLAlchemyError) as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - one inbox source failure is logged and recorded without hiding healthy sources
                 error_code = (
                     getattr(exc, "error_code", None)
                     or f"notification_inbox_{source}_projection_failed"

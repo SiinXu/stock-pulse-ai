@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-10",
-  "baselineNote": "Rebaselined AlertsWorkspace after PR #909, PlaygroundRenderPage after lazy scenario splitting plus the notification inbox scenario, and locale chunks enlarged by genuine Notifications hub, screening-state, and inbox provenance translations. Updated caps retain 200 bytes of headroom; unchanged measuredGzipBytes still come from the 2026-08-08 initial baseline.",
+  "baselineNote": "PR #1033 MCP registry inventory + post-#1036 data-source help + #1031 model-access hub + #1022 report export chrome. Locale budgets remeasured locally with production build; 200B headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,8 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 206424,
-      "measuredGzipBytes": 187658
+      "maxGzipBytes": 220606,
+      "measuredGzipBytes": 220406,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 220406 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -25,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 132717,
-      "measuredGzipBytes": 132517,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 140899,
+      "measuredGzipBytes": 140699,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 140699 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 127041,
-      "measuredGzipBytes": 126841,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 135061,
+      "measuredGzipBytes": 134861,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 134861 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 126620,
-      "measuredGzipBytes": 126420,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 134930,
+      "measuredGzipBytes": 134730,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 134730 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 126933,
-      "measuredGzipBytes": 126733,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 135341,
+      "measuredGzipBytes": 135141,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 135141 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 122895,
-      "measuredGzipBytes": 122695,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 131281,
+      "measuredGzipBytes": 131081,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 131081 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 120327,
-      "measuredGzipBytes": 120127,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 127979,
+      "measuredGzipBytes": 127779,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 127779 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 113643,
-      "measuredGzipBytes": 113443,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 121777,
+      "measuredGzipBytes": 121577,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 121577 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 113795,
-      "measuredGzipBytes": 113595,
-      "note": "Linux measurement for Notifications hub, screening-state, and inbox provenance translations; retains 200 bytes of headroom."
+      "maxGzipBytes": 121941,
+      "measuredGzipBytes": 121741,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 121741 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -124,15 +125,16 @@
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
-      "maxGzipBytes": 74967,
-      "measuredGzipBytes": 68151
+      "maxGzipBytes": 73318,
+      "measuredGzipBytes": 73118,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57378,
-      "measuredGzipBytes": 57178,
-      "note": "Linux measurement after lazy scenario splitting plus the screening-state and notification inbox registrations; retains 200 bytes of headroom."
+      "maxGzipBytes": 57281,
+      "measuredGzipBytes": 57081,
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 57081 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",

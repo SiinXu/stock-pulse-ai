@@ -902,7 +902,7 @@ export interface paths {
         };
         /**
          * List the runtime capability inventory (read-only)
-         * @description Capture a versioned read-only inventory from the live data-provider, tool, and plugin owners. Unknown readiness remains null. Source read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or health-check capabilities.
+         * @description Capture a versioned read-only inventory from the live data-provider, tool, plugin, skill, and pipeline owners. Availability comes only from runtime registration and owner health state, never from a static catalog. Unknown readiness remains null. Source or config read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or perform side-effecting health checks.
          */
         get: operations["listCapabilities"];
         put?: never;
@@ -5622,7 +5622,7 @@ export interface components {
             /** Executable Count */
             executable_count: number;
             /** Items */
-            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"])[];
+            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"] | components["schemas"]["SkillCapabilityItem"] | components["schemas"]["PipelineCapabilityItem"])[];
             /** Non Executable Count */
             non_executable_count: number;
             /** Partial */
@@ -5654,7 +5654,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "data" | "tool" | "extension";
+            source: "data" | "tool" | "extension" | "skill" | "pipeline";
             /**
              * State
              * @enum {string}
@@ -9664,6 +9664,74 @@ export interface components {
             win_rate_pct?: number | null;
         };
         /**
+         * PipelineCapabilityItem
+         * @description Live pipeline-stage observation from the shared execution contract.
+         */
+        PipelineCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "pipeline";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "pipeline_stage";
+            /** Version */
+            version: string;
+        };
+        /**
          * PluginHealthEntryResponse
          * @description One plugin health row for operator diagnostics consumers.
          */
@@ -12882,6 +12950,74 @@ export interface components {
             /** Return Distribution */
             return_distribution: components["schemas"]["ScorecardReturnBand"][];
         };
+        /**
+         * SkillCapabilityItem
+         * @description Live analysis-skill observation from plugin or declarative owners.
+         */
+        SkillCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "skill";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "analysis_skill";
+            /** Version */
+            version: string;
+        };
         /** SkillInfo */
         SkillInfo: {
             /** Description */
@@ -13735,7 +13871,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "uncategorized";
+            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "mcp" | "uncategorized";
             /** @description Authoritative requirement, condition, and connection-test metadata */
             contract?: components["schemas"]["SystemConfigFieldContract"] | null;
             /**
@@ -17770,7 +17906,7 @@ export interface operations {
     listCapabilities: {
         parameters: {
             query?: {
-                /** @description Optional domain filter. Allowed values: data, tool, extension. */
+                /** @description Optional domain filter. Allowed values: data, tool, extension, skill, pipeline. */
                 domain?: string[] | null;
             };
             header?: never;

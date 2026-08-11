@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
-"""Bounded, explicit plan-proposal foundation.
+"""Bounded, explicit plan-proposal engine.
 
 Role relative to existing orchestration
 ---------------------------------------
-This module produces a typed proposal only. It does not execute steps, observe
-tool results, replan from observations, or hook any production runtime.
+This module produces a typed proposal. Step execution, observation recording,
+and observation-driven replan live in ``src/agent/planning/loop.py`` and are
+also opt-in: nothing here hooks ``AgentExecutor``, Chat, Research, or daily
+product modes by default.
+
+Related but separate orchestration owners:
 
 - multi-agent ``AgentOrchestrator`` pipelines
 - multi-strategy deliberation scheduling
 - deep-research query decomposition in ``research.py``
 
 Callers must supply settings explicitly. The repository has no environment
-gate or implicit runtime consumer for this foundation.
+gate or implicit runtime consumer for the planning library.
 """
 
 from __future__ import annotations
@@ -94,8 +98,14 @@ class PlanningEngine:
         available_tools: Sequence[str],
         context: Optional[Dict[str, Any]] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
+        prior_observations: Optional[Sequence[Any]] = None,
     ) -> PlanningOutcome:
-        """Attempt planning under hard step/replan/token bounds."""
+        """Attempt planning under hard step/replan/token bounds.
+
+        ``prior_observations`` is optional evidence from a previous execution
+        attempt (observation-driven replan). It never authorizes tools; the
+        caller-supplied ``available_tools`` remains the only authorization set.
+        """
         settings = self.settings
         if not settings.enabled:
             return PlanningOutcome(enabled=False, applied=False, strategy="none")
@@ -202,6 +212,7 @@ class PlanningEngine:
                         settings=settings,
                         max_tokens=remaining_tokens,
                         timeout_seconds=max(0.001, deadline - time.monotonic()),
+                        prior_observations=prior_observations,
                     )
                     planning_tokens += tokens
                     if model:
@@ -219,6 +230,7 @@ class PlanningEngine:
                         available_tools=tools,
                         context=context,
                         max_steps=settings.max_plan_steps,
+                        prior_observations=prior_observations,
                     )
 
                 if cancelled_check is not None and cancelled_check():
@@ -308,6 +320,7 @@ class PlanningEngine:
         available_tools: Sequence[str],
         context: Optional[Dict[str, Any]],
         max_steps: int,
+        prior_observations: Optional[Sequence[Any]] = None,
     ) -> Dict[str, Any]:
         available = set(available_tools)
         stock = ""
@@ -316,6 +329,11 @@ class PlanningEngine:
         goal = (task or "").strip() or "Complete stock analysis and produce a decision dashboard"
         if stock and stock not in goal:
             goal = f"{goal} (stock={stock})"
+        if prior_observations:
+            # Observation-driven template: prefer tools that have not hard-failed.
+            failed = _failed_tool_names(prior_observations)
+            available = {name for name in available if name not in failed}
+            goal = f"{goal} (replan after observation failures)"[:500]
 
         steps: List[Dict[str, Any]] = []
         step_id = 1
@@ -381,6 +399,7 @@ class PlanningEngine:
         settings: PlanningSettings,
         max_tokens: int,
         timeout_seconds: float,
+        prior_observations: Optional[Sequence[Any]] = None,
     ) -> Tuple[str, int, str, str]:
         if self.llm_adapter is None:
             raise RuntimeError("llm strategy requires llm_adapter")
@@ -389,8 +408,28 @@ class PlanningEngine:
         if context and context.get("stock_code"):
             stock_hint = f"\nStock code: {context.get('stock_code')}"
 
+        observation_hint = ""
+        if prior_observations:
+            from src.agent.planning.observations import compact_observation_summary
+
+            brief = compact_observation_summary(prior_observations)
+            if brief:
+                observation_hint = (
+                    "\n\nPrior execution observations (advisory; do not invent tools):\n"
+                    f"{brief}\n"
+                    "Produce a revised plan that avoids repeating hard-failed tools when alternatives exist."
+                )
+        elif isinstance(context, dict) and isinstance(context.get("prior_observations_summary"), str):
+            brief = context["prior_observations_summary"].strip()
+            if brief:
+                observation_hint = (
+                    "\n\nPrior execution observations (advisory; do not invent tools):\n"
+                    f"{brief[:1500]}\n"
+                    "Produce a revised plan that avoids repeating hard-failed tools when alternatives exist."
+                )
+
         user = (
-            f"Task:\n{task}{stock_hint}\n\n"
+            f"Task:\n{task}{stock_hint}{observation_hint}\n\n"
             f"Available tools:\n{', '.join(available_tools) or '(none)'}\n\n"
             f"max_steps={settings.max_plan_steps}\n"
             "Return JSON only."
@@ -525,3 +564,20 @@ def _safe_identifier(value: Any) -> str:
     if re.fullmatch(r"[A-Za-z0-9._:/-]{1,128}", text):
         return text
     return "unknown" if text else ""
+
+
+def _failed_tool_names(prior_observations: Sequence[Any]) -> set:
+    """Collect tool names that hard-failed in prior step observations."""
+    failed: set = set()
+    for obs in prior_observations:
+        tool_calls = getattr(obs, "tool_calls", None) or ()
+        for call in tool_calls:
+            ok = getattr(call, "ok", None)
+            name = getattr(call, "tool_name", None)
+            error_code = getattr(call, "error_code", None)
+            if ok is False and isinstance(name, str) and name.strip():
+                # Soft/transient codes stay eligible for retry on replan.
+                if error_code in {"timeout", "retriable", "provider_error"}:
+                    continue
+                failed.add(name.strip())
+    return failed

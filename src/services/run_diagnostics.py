@@ -197,6 +197,40 @@ def sanitize_diagnostic_metadata(value: Any, *, depth: int = 0) -> Any:
     return sanitize_diagnostic_text(value, max_length=160)
 
 
+def sanitize_finite_diagnostic_metadata(value: Any) -> tuple[Any, bool]:
+    """Sanitize diagnostic metadata and omit non-finite numeric values.
+
+    The boolean reports whether the input was fully finite so consumers can
+    surface an integrity failure instead of silently treating an omitted value
+    as complete replay evidence.
+    """
+
+    def omit_non_finite(item: Any) -> tuple[Any, bool]:
+        if isinstance(item, float) and not math.isfinite(item):
+            return None, False
+        if isinstance(item, Mapping):
+            result: Dict[str, Any] = {}
+            valid = True
+            for key, child in item.items():
+                safe_child, child_valid = omit_non_finite(child)
+                valid = valid and child_valid
+                if safe_child not in (None, "", [], {}):
+                    result[str(key)] = safe_child
+            return result, valid
+        if isinstance(item, list):
+            result_list: List[Any] = []
+            valid = True
+            for child in item:
+                safe_child, child_valid = omit_non_finite(child)
+                valid = valid and child_valid
+                if safe_child not in (None, "", [], {}):
+                    result_list.append(safe_child)
+            return result_list, valid
+        return item, True
+
+    return omit_non_finite(sanitize_diagnostic_metadata(value))
+
+
 @dataclass
 class ProviderRun:
     """One provider attempt in a trace."""
@@ -716,10 +750,12 @@ class RunDiagnosticContext:
         payload = dict(event) if isinstance(event, Mapping) else {}
         if not payload:
             return
-        sanitized = sanitize_diagnostic_metadata(payload)
+        sanitized, finite = sanitize_finite_diagnostic_metadata(payload)
         if not isinstance(sanitized, Mapping):
             return
         entry = dict(sanitized)
+        if not finite:
+            entry["detail_integrity"] = "invalid_non_finite"
         self.agent_events_original_count += 1
         self.agent_events.append(entry)
         max_events = 200
@@ -727,7 +763,16 @@ class RunDiagnosticContext:
             dropped = len(self.agent_events) - max_events
             self.agent_events_dropped_count += dropped
             del self.agent_events[:dropped]
-        self._emit_flow_event(_agent_flow_event(self, entry))
+        live_entry = {
+            **entry,
+            "capture": {
+                "original_count": self.agent_events_original_count,
+                "returned_count": len(self.agent_events),
+                "dropped_count": self.agent_events_dropped_count,
+                "truncated": self.agent_events_dropped_count > 0,
+            },
+        }
+        self._emit_flow_event(_agent_flow_event(self, live_entry))
 
     def _emit_flow_event(self, event: Dict[str, Any]) -> None:
         if self.event_sink is None:
@@ -1035,15 +1080,31 @@ def _agent_flow_event(
     duration_ms = event.get("duration_ms")
     try:
         duration_ms_int = int(duration_ms) if duration_ms is not None else None
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         duration_ms_int = None
     if duration_ms_int is not None and duration_ms_int < 0:
         duration_ms_int = 0
     step = event.get("step")
     try:
         step_int = int(step) if step is not None else None
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         step_int = None
+
+    sequence = event.get("sequence")
+    try:
+        sequence_int = int(sequence) if sequence is not None else None
+    except (TypeError, ValueError, OverflowError):
+        sequence_int = None
+    if sequence_int is not None and sequence_int < 1:
+        sequence_int = None
+
+    schema_version = event.get("schema_version")
+    try:
+        schema_version_int = int(schema_version) if schema_version is not None else None
+    except (TypeError, ValueError, OverflowError):
+        schema_version_int = None
+    if schema_version_int is not None and schema_version_int < 1:
+        schema_version_int = None
 
     is_tool = event_type in {"agent_tool_start", "agent_tool_end"}
     is_model = event_type in {"agent_model_start", "agent_model_end"}
@@ -1116,8 +1177,18 @@ def _agent_flow_event(
     message = sanitize_diagnostic_text(" · ".join(message_bits), max_length=220)
 
     attrs = event.get("attrs") if isinstance(event.get("attrs"), Mapping) else {}
+    payload = event.get("payload") if isinstance(event.get("payload"), Mapping) else {}
+    safe_attrs, attrs_finite = sanitize_finite_diagnostic_metadata(attrs)
+    safe_payload, payload_finite = sanitize_finite_diagnostic_metadata(payload)
+    detail_integrity = sanitize_diagnostic_text(event.get("detail_integrity"), max_length=40)
+    if not attrs_finite or not payload_finite:
+        detail_integrity = "invalid_non_finite"
+    elif not detail_integrity:
+        detail_integrity = "valid"
     metadata = _clean_metadata(
         {
+            "schema_version": schema_version_int,
+            "sequence": sequence_int,
             "trace_id": event.get("trace_id") or context.trace_id,
             "span_id": event.get("span_id"),
             "parent_span_id": event.get("parent_span_id"),
@@ -1129,7 +1200,10 @@ def _agent_flow_event(
             "tool": name if is_tool else None,
             "model": name if is_model else None,
             "success": attrs.get("success") if isinstance(attrs, Mapping) else None,
-            "attrs": sanitize_diagnostic_metadata(attrs) if attrs else None,
+            "attrs": safe_attrs if attrs else None,
+            "payload": safe_payload if payload else None,
+            "detail_integrity": detail_integrity,
+            "capture": event.get("capture") if isinstance(event.get("capture"), Mapping) else None,
             "node": {
                 "id": node_id,
                 "lane": lane,

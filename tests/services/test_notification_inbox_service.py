@@ -48,7 +48,7 @@ class _FakeReadRepo:
 
 
 class _FakeAlertRepo:
-    def __init__(self, rows: List[Any], error: Optional[RepositoryError] = None) -> None:
+    def __init__(self, rows: List[Any], error: Optional[Exception] = None) -> None:
         self.rows = rows
         self.error = error
 
@@ -60,7 +60,7 @@ class _FakeAlertRepo:
 
 
 class _FakeScheduledRepo:
-    def __init__(self, rows: List[Any], error: Optional[RepositoryError] = None) -> None:
+    def __init__(self, rows: List[Any], error: Optional[Exception] = None) -> None:
         self.rows = rows
         self.error = error
 
@@ -76,7 +76,7 @@ class _FakeScheduledRepo:
 
 
 class _FakeSignalRepo:
-    def __init__(self, rows: List[Any], error: Optional[RepositoryError] = None) -> None:
+    def __init__(self, rows: List[Any], error: Optional[Exception] = None) -> None:
         self.rows = rows
         self.error = error
         self.statuses: list[Optional[str]] = []
@@ -92,7 +92,7 @@ class _FakeSignalRepo:
 
 
 class _FakeDb:
-    def __init__(self, rows: List[Any], error: Optional[RepositoryError] = None) -> None:
+    def __init__(self, rows: List[Any], error: Optional[Exception] = None) -> None:
         self.rows = rows
         self.error = error
 
@@ -172,10 +172,10 @@ def _service(
     alerts: Optional[List[Any]] = None,
     runs: Optional[List[Any]] = None,
     signals: Optional[List[Any]] = None,
-    analysis_error: Optional[RepositoryError] = None,
-    alert_error: Optional[RepositoryError] = None,
-    scheduled_error: Optional[RepositoryError] = None,
-    signal_error: Optional[RepositoryError] = None,
+    analysis_error: Optional[Exception] = None,
+    alert_error: Optional[Exception] = None,
+    scheduled_error: Optional[Exception] = None,
+    signal_error: Optional[Exception] = None,
     retention_days: int = 90,
     max_items: int = 100,
     read_repo: Optional[_FakeReadRepo] = None,
@@ -236,6 +236,27 @@ def test_one_source_failure_returns_other_sources_with_provenance() -> None:
     alert_status = next(status for status in page.source_statuses if status.source == "alerts")
     assert alert_status.available is False
     assert alert_status.error_code == "alerts_unavailable"
+
+
+def test_unexpected_source_failure_is_isolated_with_structured_provenance() -> None:
+    service = _service(
+        analysis=[_analysis()],
+        alerts=[_alert()],
+        runs=[_run()],
+        signals=[_signal()],
+        alert_error=RuntimeError("malformed alert row"),
+    )
+
+    page = service.list_items()
+
+    assert page.total == 3
+    alert_status = next(status for status in page.source_statuses if status.source == "alerts")
+    assert alert_status.model_dump() == {
+        "source": "alerts",
+        "available": False,
+        "item_count": 0,
+        "error_code": "notification_inbox_alerts_projection_failed",
+    }
 
 
 def test_all_source_failures_fail_the_request() -> None:

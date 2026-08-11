@@ -81,6 +81,7 @@ class _AnalysisContextStageMixin:
         fundamental_context: Optional[Dict[str, Any]] = None,
         market_phase_context: Optional[Dict[str, Any]] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        money_flow_data: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         增强分析上下文
@@ -151,6 +152,23 @@ class _AnalysisContextStageMixin:
                 'concentration_70': chip_data.concentration_70,
                 'chip_status': chip_data.get_chip_status(current_price or 0),
             }
+
+        # Optional SmartMoney money-flow context (fail-open; only when fetched).
+        if money_flow_data is not None:
+            try:
+                from src.services.smartmoney_flow_service import money_flow_to_context
+
+                money_flow_context = money_flow_to_context(money_flow_data)
+                if money_flow_context:
+                    enhanced["money_flow"] = money_flow_context
+            except Exception as exc:  # broad-exception: fallback_recorded - optional money-flow inject
+                log_safe_exception(
+                    logger,
+                    "SmartMoney money-flow context inject failed",
+                    exc,
+                    error_code="pipeline_money_flow_context_inject_failed",
+                    level=logging.DEBUG,
+                )
 
         # Add trend analysis results
         if trend_result:

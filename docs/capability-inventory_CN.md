@@ -13,6 +13,12 @@ issue #221 的清单基础，并不是中央能力注册表：该端点不能注
 | `data` | 已在服务调用方的进程 manager 所持有的数据源运行时 | 活跃数据源及其声明的方法 |
 | `tool` | Agent `ToolRegistry` | 已注册定义、所有者声明的可选成员及 scope |
 | `extension` | `PluginManager` 及统一扩展注册表 | 插件生命周期观测和活跃贡献 |
+| `skill` | 已安装的 `ApplicationServices` 分析策略目录与声明式 `SkillManager` | 进程内真实加载的插件分析策略与自定义 Skill |
+| `pipeline` | 共享管线阶段契约（`PIPELINE_STAGE_NAMES` / `PipelineStageName`） | 已绑定的分析管线阶段；未绑定名称会被显式报告，不会伪造 |
+
+可用性判断只来自运行时真实注册与所有者健康状态，绝不复制静态就绪清单。
+当注册表或配置读取失败时，该来源返回 `error` 或 `not_initialized` 及明确
+`error_code`，响应为 `partial=true`。清单不会安装替代组合根来伪造成功快照。
 
 每个来源只产生一个稳定快照和 generation；同一来源的所有记录共享
 `source_generation` 与 `as_of`。插件生命周期记录与扩展注册记录严格分离：
@@ -23,6 +29,11 @@ issue #221 的清单基础，并不是中央能力注册表：该端点不能注
 manager。新建的 `DataFetcherManager` 拥有另一个数据源运行时，其活跃注册不服务
 于任何调用方。当两者都尚未存在时，数据来源报告为 `not_initialized`，而不是
 返回空清单。
+
+扩展与技能来源同样只观测已经安装的组合根。调用清单端点绝不会构造默认
+`ApplicationServices`：缺失时报告 `not_initialized`
+（`application_services_not_initialized`）。技能配置或目录加载失败分别暴露为
+`skill_config_unavailable` 与 `skill_catalog_unavailable`。
 
 所有者 generation 覆盖记录可暴露的每一处变化。工具条目是注册时捕获的冻结
 副本，因此事后原地修改活跃 `ToolDefinition` 不会改变已发布清单；真实变更必须

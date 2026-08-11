@@ -1,67 +1,95 @@
-# Typed Agent Plan-Proposal Foundation
+# Agent Planning: Proposal Foundation and Execution Loop
 
-**Status**: proposal-only foundation referencing issue [#199](https://github.com/SiinXu/stock-pulse-ai/issues/199)
+**Status**: partial delivery for issue [#199](https://github.com/SiinXu/stock-pulse-ai/issues/199)
 
 **Chinese**: [agent-planning-engine.md](agent-planning-engine.md)
 
 ## Honest boundary
 
-`src/agent/planning/` can produce and validate a bounded plan proposal when an offline caller invokes it explicitly. It is not wired into `AgentExecutor`, Chat, Research, daily analysis, the multi-agent orchestrator, reports, diagnostics, persistence, or Web settings.
+`src/agent/planning/` provides:
 
-It does **not** execute plan steps, attach tool results to observations, replan from observations, enforce a shared execution budget, or provide an audit trace. Those are remaining #199 acceptance items. A proposal must never be described as a plan→act→observe engine.
+1. **Proposal foundation** — produce and validate a bounded `AgentPlan` (`PlanningEngine`).
+2. **Execution loop** — optional `execute_plan_loop` that runs plan → act → observe → replan under hard budgets.
 
-## Contracts
+Neither path is wired into `AgentExecutor`, Chat, Research, daily analysis, the multi-agent orchestrator, reports, Web settings, or product configuration. Callers must invoke the APIs explicitly.
+
+A proposal alone must never be described as a complete production planning engine. The loop is the first real execution slice; product integration remains open.
+
+## Proposal contracts
 
 - Callers construct `PlanningSettings` explicitly. There are no `AGENT_PLANNING_*` environment variables or parallel configuration owner.
-- **One limit authority.** Every absolute bound lives in `src/agent/planning/config.py` and is imported by settings validation, payload validation, the engine, and prompt projection. No module restates a limit as a literal.
-- Exact finite limits: at most 16 steps, 3 retries, 8,192 planner tokens, and 60 seconds per proposal call. Invalid explicit values raise `ValueError`; they are never clamped or silently defaulted.
-- The `max_steps` argument of the public `validate_plan_payload` is a *caller cap that may only tighten* the absolute 16-step authority. Passing `max_steps=17` is rejected outright, so no caller can widen the public contract to accept a 17-step plan.
-- Schema version must be exactly `agent-plan-v1`. Step ids are positive, unique, and sequential. Goals, success criteria, tool names, the available-tool set size, the input task, and the projected prompt are bounded.
-- Every expected tool must be present in the caller-supplied available-tool set. An empty registry authorizes no tools; unknown tools invalidate the proposal.
-- **Acceptance implies projectability.** Per-field bounds do not bound the whole payload, so validation also rejects any plan whose rendered projection would exceed the 20,000-character limit. A validated plan can therefore always be projected; `format_plan_for_prompt` never fails on an accepted plan.
-- Cancellation is checked before and after an LLM call and again before acceptance, so a late response cannot be applied.
-- The remaining deadline is passed into the adapter call as its transport `timeout`, so the planner call is genuinely interruptible rather than only checked after it returns. The post-return deadline check remains as a second fence.
-- Provider usage is collected before JSON validation, including billed invalid responses. Metadata contains stable error codes and exception types, never raw exception text or planner output.
-- **Retry evidence is truthful.** `replan_attempts` counts the retries actually performed on every exit path, including a successful one. When an `llm` attempt fails and the retry degrades to `template`, `requested_strategy` stays `llm` while `strategy` becomes `template`, so billed tokens and the recorded model remain attributable. `max_replans_exceeded` is reported only when replans were both permitted and spent; otherwise the reason is `planning_failed`.
-- A stable SHA-256 `plan_id` identifies the canonical proposal.
-- Prompt projection is labeled `NON_AUTHORITATIVE_PLAN_PROPOSAL`; generated fields are advisory data and cannot add tools, permissions, or instructions or override the original user/system request.
-- **One projected-string contract, applied to every projected field.** `unprojectable_reason` in `src/agent/planning/types.py` is the single authority, and it governs the plan goal, every step goal, every success criterion, every expected tool name, and the available-tool names those are drawn from. A string is rejected when it either (a) contains any spelling of the boundary marker, or (b) contains an unpaired surrogate code point. The matcher itself is derived in `config.py` from the marker the renderer emits, so it cannot drift from it.
-- **The advisory boundary is unforgeable by model text.** Because the rule above covers tool names as well as prose, a proposal cannot close the advisory block early and have the remainder read as authoritative instructions — the exact `[/NON_AUTHORITATIVE_PLAN_PROPOSAL]` spelling and whitespace-tolerant variants such as `[ / non_authoritative_plan_proposal ]` are both rejected. Every other character is carried inside a JSON string, which escapes quotes, backslashes, and control characters. `format_plan_for_prompt` re-applies the same matcher and asserts each marker appears exactly once, as defense in depth for hand-built `AgentPlan` values.
-- **Planner-controlled text cannot raise an encoding error.** `plan_id` hashes UTF-8 bytes, so a lone surrogate (which survives `json.loads` as `"\ud800"`) would otherwise turn `plan_id`, `to_metadata()`, and `prepare_run_with_planning` into a `UnicodeEncodeError` instead of a degraded outcome. Validation rejects such strings with a stable reason; the engine additionally fences an unencodable task (`invalid_task`) and an unencodable or marker-bearing tool registry (`invalid_tools`) at entry, so the public wrapper always degrades and returns the caller's inputs unchanged. `to_canonical_json` escapes any remaining surrogate as `\uXXXX`, which keeps `plan_id` total for hand-built plans while leaving readable non-ASCII text — and therefore every accepted plan's id — unchanged.
-- Metadata identifiers reported by an adapter are bounded to `[A-Za-z0-9._:/-]{1,128}` and otherwise reduced to `unknown`. This covers both `planning_model` and `exception_type`.
+- **One limit authority.** Every absolute bound lives in `src/agent/planning/config.py` and is imported by settings validation, payload validation, the engine, prompt projection, and the execution loop. No module restates a limit as a literal.
+- Exact finite proposal limits: at most 16 steps, 3 proposal retries, 8,192 planner tokens, and 60 seconds per proposal call. Invalid explicit values raise `ValueError`; they are never clamped or silently defaulted.
+- The `max_steps` argument of the public `validate_plan_payload` is a *caller cap that may only tighten* the absolute 16-step authority.
+- Schema version must be exactly `agent-plan-v1`. Step ids are positive, unique, and sequential.
+- Every expected tool must be present in the caller-supplied available-tool set. An empty registry authorizes no tools.
+- **Acceptance implies projectability.** Validated plans always fit the 20,000-character projection budget.
+- Cancellation is checked before and after an LLM call and again before acceptance.
+- Provider usage is collected before JSON validation, including billed invalid responses.
+- Prompt projection is labeled `NON_AUTHORITATIVE_PLAN_PROPOSAL` and cannot add tools, permissions, or instructions.
+- One projected-string contract (`unprojectable_reason`) covers every projected field, including tool names (marker forgery and unpaired surrogates).
 
-## Explicit example
+## Execution loop contracts
+
+`execute_plan_loop` is the plan → act → observe → replan entry point.
+
+- Callers construct `PlanExecutionSettings` explicitly (no environment/Config owner in this slice).
+- Absolute execution maxima: 32 tool calls, 3 observation-driven replans, 120 seconds wall clock, 500-character observation summaries. Settings may only tighten these.
+- Each plan step invokes its `expected_tools` through a **caller-supplied invoker** (typically wrapping `ToolSurface.execute_tool`). The loop does not bypass tool authorization, capabilities, or the Tool Surface security contract.
+- Tool results must include an exact boolean `ok`. Missing or non-bool `ok` is a failure (`invalid_tool_result`). The loop **never fail-opens** a failed or ambiguous tool result as overall success.
+- Empty `expected_tools` steps are synthesis steps and succeed without inventing tool work.
+- On step failure with `on_step_failure="terminate"` (or exhausted replan budget), the loop terminates with a stable `reason` / `error_code` and `success=False`.
+- On step failure with `on_step_failure="replan"` and remaining budget, the loop calls the planner with `prior_observations`, records the replan in the audit trail, and restarts from the new plan. Prior observations remain visible in metadata.
+- Template replan excludes hard-failed tools (non-transient error codes) when building the next proposal; authorization still comes only from the caller-supplied available-tool set.
+- Cost/step upper bounds that stop the loop: `max_tool_calls_exceeded`, `execution_timeout`, `max_observation_replans_exceeded`, `cancelled`, `replan_failed`.
+- Trace channel: the loop emits `plan_execution` / `plan_step` phase events, tool start/end events, and terminal decision events through the existing agent observability helpers (persisted when a diagnostic context is active). Full structured metadata is always available via `PlanExecutionResult.to_metadata()` for diagnostics and evaluation consumers.
+- `success=True` only when the active plan completes every step successfully after any replans. Historical failed steps before a successful replan stay in the observation list and do not flip the terminal flag to success by themselves — the terminal flag reflects loop completion, not “every observation row is green.”
+
+### Explicit execution example
 
 ```python
-from src.agent.planning import PlanningEngine, PlanningSettings
-
-engine = PlanningEngine(
-    PlanningSettings(enabled=True, strategy="template", max_plan_steps=4)
+from src.agent.planning import (
+    PlanningEngine,
+    PlanningSettings,
+    PlanExecutionSettings,
+    execute_plan_loop,
 )
+
+engine = PlanningEngine(PlanningSettings(enabled=True, strategy="template"))
 outcome = engine.plan(
     "Analyze 600519",
     available_tools=["get_realtime_quote", "get_daily_history"],
     context={"stock_code": "600519"},
 )
 assert outcome.plan is not None
-print(outcome.to_metadata())
-```
 
-The template strategy performs no network call. The `llm` strategy requires a caller-provided adapter and remains proposal-only.
+def invoker(name, arguments):
+    # Wrap ToolSurface.execute_tool in production callers.
+    return surface.execute_tool(name, arguments, context=access_ctx)
+
+result = execute_plan_loop(
+    plan=outcome.plan,
+    tool_invoker=invoker,
+    available_tools=["get_realtime_quote", "get_daily_history"],
+    task="Analyze 600519",
+    context={"stock_code": "600519"},
+    settings=PlanExecutionSettings(max_total_tool_calls=8, max_observation_replans=1),
+    planning_settings=PlanningSettings(enabled=True, strategy="template"),
+)
+print(result.success, result.status, result.to_metadata())
+```
 
 ## Privacy and retention
 
-This foundation does not persist anything. Callers must not persist private task text, free-form model reasoning, credentials, or raw provider responses. Returned failure metadata is restricted to stable reason codes, exception type, bounded usage, model name, and the validated proposal.
+The library does not persist anything by itself. Observability emit is best-effort and fail-open at the emit boundary only; execution outcomes never claim success on failure. Callers must not persist private task text, free-form model reasoning, credentials, or raw provider responses. Returned metadata is restricted to stable reason codes, bounded summaries, plan ids, and observation status rows.
 
 ## Remaining #199 scope
 
-- mode-aware RUN/CHAT/RESEARCH/daily product policy;
-- authorized step execution and typed observations;
-- observation-driven replanning;
-- one total planner/executor/tool deadline and token/cost/step budget;
-- shared UsageRecorder, security audit, run diagnostics, tenant identity, redaction, and retention;
-- deterministic multi-step real-tool acceptance evidence.
+- mode-aware RUN/CHAT/RESEARCH/daily product policy and shared tool authorization budgets across those modes;
+- durable plan/action/observation audit persistence, tenant identity, redaction/retention ownership, and product UI;
+- one shared UsageRecorder / security-audit / run-diagnostics configuration owner for planning;
+- deterministic multi-step real-tool acceptance evidence inside production workflows.
 
 ## Rollback
 
-Revert the additive planning module, tests, and documentation. There is no runtime switch, migration, persisted data, or production integration to roll back.
+Revert the additive planning module, tests, and documentation. There is no runtime switch, migration, or production integration to roll back.
