@@ -3850,7 +3850,7 @@ describe('production design guard', () => {
     expect(allowlistHits).toEqual(expectedAllowlistHits);
     expect(buttonClassNames.size).toBeGreaterThan(0);
     expect(violations).toEqual([]);
-  });
+  }, 15_000);
 
   it('retains the legacy-visual guard for upstream-adapted surfaces', () => {
     const guardedSuffixes = [

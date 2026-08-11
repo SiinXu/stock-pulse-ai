@@ -165,6 +165,66 @@ describe('alertsApi', () => {
     expect(created.parameters.changePct).toBe(3);
   });
 
+  it('round-trips corporate-event parameters and server trigger cursors', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        id: 21,
+        name: 'event rule',
+        target_scope: 'single_symbol',
+        target: 'AAPL',
+        alert_type: 'corporate_event',
+        parameters: { event_categories: ['earnings', 'regulatory'], lookback_hours: 72, min_items: 3 },
+        severity: 'critical',
+        enabled: true,
+        source: 'api',
+      },
+    });
+    get.mockResolvedValueOnce({
+      data: {
+        items: [{
+          id: 31,
+          rule_id: 21,
+          target: 'AAPL',
+          status: 'triggered',
+          alert_type: 'corporate_event',
+          impact_context: { why_it_matters: 'Guidance changed', affected: { in_watchlist: true } },
+          impact_result: { grade: 'major', severity: 'critical', provenance: 'rule_severity' },
+        }],
+        total: 1,
+        page: 1,
+        page_size: 20,
+        next_cursor: 'opaque-next',
+      },
+    });
+
+    const created = await alertsApi.createRule({
+      name: 'event rule',
+      targetScope: 'single_symbol',
+      target: 'AAPL',
+      alertType: 'corporate_event',
+      parameters: { eventCategories: ['earnings', 'regulatory'], lookbackHours: 72, minItems: 3 },
+      severity: 'critical',
+      enabled: true,
+    });
+    const triggers = await alertsApi.listTriggers({
+      alertType: 'corporate_event',
+      status: 'triggered',
+      cursor: 'opaque-current',
+      pageSize: 20,
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/v1/alerts/rules', expect.objectContaining({
+      parameters: { event_categories: ['earnings', 'regulatory'], lookback_hours: 72, min_items: 3 },
+    }));
+    expect(created.parameters).toEqual({ eventCategories: ['earnings', 'regulatory'], lookbackHours: 72, minItems: 3 });
+    expect(get).toHaveBeenCalledWith('/api/v1/alerts/triggers', {
+      params: { alert_type: 'corporate_event', status: 'triggered', cursor: 'opaque-current', page_size: 20 },
+    });
+    expect(triggers.nextCursor).toBe('opaque-next');
+    expect(triggers.items[0].impactContext?.affected?.inWatchlist).toBe(true);
+    expect(triggers.items[0].impactResult?.provenance).toBe('rule_severity');
+  });
+
   it('round-trips explicit cooldown policies without rewriting opaque keys', async () => {
     post
       .mockResolvedValueOnce({
