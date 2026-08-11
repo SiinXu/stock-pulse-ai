@@ -165,6 +165,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
             recordId={recordId}
             reportTitle={`${stockName || stockCode}-${stockCode}`}
             reportLanguage={reportLanguage}
+            className="[&_.home-surface-button]:!shadow-none"
           />
           <IconButton
             type="button"

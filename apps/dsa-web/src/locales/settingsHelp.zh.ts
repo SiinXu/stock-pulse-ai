@@ -1871,6 +1871,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响所有面向私网/回环的 fail-closed 出站请求。'],
     notes: ['建议重启，使长连接客户端重新加载策略。'],
   },
+  'settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP': {
+    title: '允许可信代理 Fake-IP',
+  },
   'settings.system.SMARTMONEY_ENABLED': {
     title: '启用 SmartMoney 资金流',
     summary: 'SmartMoney 资金流跟踪与可选分析上下文注入的默认关闭总开关。',

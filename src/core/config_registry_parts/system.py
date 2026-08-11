@@ -1369,6 +1369,36 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["restart_required"],
     },
+    "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP": {
+        "title": "Allow Trusted Proxy Fake-IP",
+        "description": (
+            "Opt in to Clash/Mihomo Fake-IP DNS ranges for syntactically public "
+            "hostnames and the exact configured loopback proxy. Literal Fake-IP, "
+            "internal, metadata, and non-loopback proxy targets remain blocked."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 68,
+        "help_key": "settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP",
+        "examples": [
+            "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP=false",
+            "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP=true",
+        ],
+        "docs": [
+            {
+                "label": "Outbound HTTP security policy",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/security-outbound-policy.md#clashmihomo-tun-fake-ip-mode",
+            },
+        ],
+        "warning_codes": ["network_scope"],
+    },
     "SMARTMONEY_ENABLED": {
         "title": "SmartMoney Money-Flow Enabled",
         "description": (

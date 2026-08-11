@@ -1178,6 +1178,7 @@ class TestUiPlacement(unittest.TestCase):
         from src.core.config_registry import derive_ui_placement
 
         for key in (
+            "GENERATION_BACKEND",
             "LITELLM_MODEL",
             "AGENT_LITELLM_MODEL",
             "VISION_MODEL",
@@ -1194,7 +1195,6 @@ class TestUiPlacement(unittest.TestCase):
         for key in (
             "LLM_CONFIG_MODE",
             "LITELLM_CONFIG",
-            "GENERATION_BACKEND",
             "GENERATION_FALLBACK_BACKEND",
             "GENERATION_BACKEND_MAX_CONCURRENCY",
             "GENERATION_BACKEND_MAX_OUTPUT_BYTES",
@@ -1439,6 +1439,7 @@ class TestLongtailBatch1FieldRegistration(unittest.TestCase):
             "DAILY_BRIEF_SAVE_REPORT_FILE": ("system", "boolean", "switch", "true"),
             "ADMIN_SESSION_MAX_AGE_HOURS": ("system", "integer", "number", "24"),
             "OUTBOUND_HTTP_ALLOWLIST": ("system", "string", "textarea", ""),
+            "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP": ("system", "boolean", "switch", "false"),
             "SMARTMONEY_ENABLED": ("system", "boolean", "switch", "false"),
             "ENABLE_FUNDAMENTAL_PIPELINE": ("system", "boolean", "switch", "true"),
             "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS": ("system", "number", "number", "8.0"),
@@ -1493,6 +1494,7 @@ class TestLongtailBatch1FieldRegistration(unittest.TestCase):
             "DAILY_BRIEF_SAVE_REPORT_FILE",
             "ADMIN_SESSION_MAX_AGE_HOURS",
             "OUTBOUND_HTTP_ALLOWLIST",
+            "OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP",
             "SMARTMONEY_ENABLED",
             "ENABLE_FUNDAMENTAL_PIPELINE",
             "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS",

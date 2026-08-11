@@ -44,8 +44,8 @@ describe('ModelFallbackEditor', () => {
         language="zh"
       />,
     );
-    expect(screen.getAllByText('deepseek-v4-pro').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('gpt-5.5').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('deepseek-v4-pro')).toHaveLength(1);
+    expect(screen.getAllByText('gpt-5.5')).toHaveLength(1);
   });
 
   it('appends a selected model to the list via the selector', () => {
@@ -61,11 +61,10 @@ describe('ModelFallbackEditor', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
     const listbox = screen.getByRole('listbox');
-    // The primary model is excluded; selected fallbacks remain visible and
-    // checked so the same collapsed control can add and remove values.
+    // Primary and already-selected models stay out of the add-only selector.
     expect(within(listbox).queryByText('deepseek-v4-flash')).not.toBeInTheDocument();
-    expect(within(listbox).getByRole('checkbox', { name: 'deepseek-v4-pro' })).toBeChecked();
-    fireEvent.click(within(listbox).getByRole('checkbox', { name: 'gpt-5.5' }));
+    expect(within(listbox).queryByText('deepseek-v4-pro')).not.toBeInTheDocument();
+    fireEvent.click(within(listbox).getByRole('option', { name: 'gpt-5.5' }));
     expect(onChange).toHaveBeenCalledWith('deepseek/deepseek-v4-pro,openai/gpt-5.5');
   });
 
@@ -74,7 +73,9 @@ describe('ModelFallbackEditor', () => {
       <ModelFallbackEditor value="" onChange={() => {}} options={options} language="zh" />,
     );
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
-    fireEvent.change(screen.getByLabelText('搜索模型'), { target: { value: 'gpt' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '搜索选项: 选择备用模型' }), {
+      target: { value: 'gpt' },
+    });
     const listbox = screen.getByRole('listbox');
     expect(within(listbox).getByText('gpt-5.5')).toBeInTheDocument();
     expect(within(listbox).queryByText('deepseek-v4-flash')).not.toBeInTheDocument();
@@ -156,7 +157,7 @@ describe('ModelFallbackEditor', () => {
     expect(screen.getAllByText('gpt-4o · OpenAI · Personal').length).toBeGreaterThan(0);
     expect(screen.queryByText('当前配置不可用')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
-    expect(screen.getByRole('checkbox', { name: 'gpt-4o · OpenAI · Personal' })).toBeChecked();
+    expect(screen.queryByRole('option', { name: 'gpt-4o · OpenAI · Personal' })).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -184,8 +185,8 @@ describe('ModelFallbackEditor', () => {
     expect(screen.getByText('openai/gpt-4o')).toBeInTheDocument();
     expect(screen.getByText('当前配置不可用')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
-    for (const checkbox of screen.getAllByRole('checkbox', { name: /gpt-4o · OpenAI/ })) {
-      expect(checkbox).not.toBeChecked();
+    for (const option of screen.getAllByRole('option', { name: /gpt-4o.*OpenAI/ })) {
+      expect(option).toHaveAttribute('aria-selected', 'false');
     }
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -212,7 +213,7 @@ describe('ModelFallbackEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'gpt-4o · OpenAI · Personal' }));
+    fireEvent.click(screen.getByRole('option', { name: /gpt-4o.*OpenAI · Personal/ }));
 
     expect(onChange).toHaveBeenCalledWith(personalGptRef);
   });
@@ -232,7 +233,7 @@ describe('ModelFallbackEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'gpt-4o-mini · OpenAI · Personal' }));
+    fireEvent.click(screen.getByRole('option', { name: /gpt-4o-mini.*OpenAI · Personal/ }));
 
     expect(onChange).toHaveBeenCalledWith(`${personalGptRef},${backupRef}`);
   });
