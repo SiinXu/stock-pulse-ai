@@ -95,7 +95,11 @@ class AlphaSiftService:
             payload["source_health"] = source_health
         if diagnostics:
             payload["diagnostics"] = diagnostics
-        return _sanitize_public_alphasift_diagnostics(payload)
+        sanitized = _sanitize_public_alphasift_diagnostics(payload)
+        # This derived flag is safe to expose, but the generic redactor treats
+        # its ``install_spec`` name segment as a credential-bearing field.
+        sanitized["install_spec_is_default"] = payload["install_spec_is_default"]
+        return sanitized
 
     def strategies(self) -> Dict[str, Any]:
         _ensure_alphasift_enabled(self.config)

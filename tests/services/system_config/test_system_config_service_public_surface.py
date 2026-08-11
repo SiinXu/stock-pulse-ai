@@ -249,7 +249,7 @@ EXPECTED_CLASS_SURFACE = (
  'export_desktop_env',
  'import_env',
  'import_desktop_env',
- '_resolve_hermes_saved_secret',
+ '_resolve_saved_connection_secret',
  '_validate_hermes_submitted_secret',
  'discover_llm_channel_models',
  'test_llm_channel',
@@ -314,6 +314,7 @@ EXPECTED_CLASS_SURFACE = (
  '_has_any_config_value',
  '_has_valid_ntfy_endpoint',
  '_has_valid_gotify_config',
+ '_setup_model_runtime_route',
  '_anspire_legacy_llm_enabled',
  '_provider_has_setup_credentials',
  '_has_setup_runtime_source_for_model',
@@ -386,7 +387,7 @@ EXPECTED_CLASS_STATIC_ATTRIBUTES = (
     "_runtime_scheduler",
     "_runtime_config_transaction",
 )
-EXPECTED_METHOD_METADATA_SHA256 = '191013324555e66eb0140b18bf4317dc5329b8a49f3922f9e03c3269a7edc536'
+EXPECTED_METHOD_METADATA_SHA256 = '465353253d2350ceeeda1b104ee119308a71337fbe63a4164f00b160de132335'
 
 
 def _descriptor_function(descriptor):

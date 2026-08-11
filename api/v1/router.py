@@ -36,6 +36,7 @@ from api.v1.endpoints import (
     portfolio,
     portfolio_health,
     portfolio_risk_metrics,
+    portfolio_stress_test,
     reasoning_trace,
     report_export,
     report_version_compare,
@@ -177,6 +178,18 @@ router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
+)
+
+router.include_router(
+    notification_inbox.router,
+    prefix="/notification-inbox",
+    tags=["NotificationInbox"],
+)
+
+router.include_router(
+    todays_focus.router,
+    prefix="/focus",
+    tags=["TodaysFocus"],
 )
 
 router.include_router(

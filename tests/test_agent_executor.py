@@ -1406,6 +1406,15 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertTrue(first.success)
         self.assertTrue(second.success)
         self.assertEqual(len(db.get_agent_provider_turns("executor-trace")), 1)
+        first_assistant = next(
+            message
+            for message in db.get_conversation_messages("executor-trace")
+            if message["role"] == "assistant" and message["content"] == "first final"
+        )
+        first_tool = first_assistant["params"]["thinking_steps"][0]
+        self.assertEqual(first_tool["tool"], "echo")
+        self.assertEqual(first_tool["meta"]["arguments"], {"message": "first"})
+        self.assertIn('"echo": "first"', first_tool["meta"]["result_preview"])
         second_request_messages = adapter.call_with_tools.call_args_list[2].args[0]
         ordered_roles = [msg["role"] for msg in second_request_messages[-5:]]
         self.assertEqual(ordered_roles, ["user", "assistant", "tool", "assistant", "user"])

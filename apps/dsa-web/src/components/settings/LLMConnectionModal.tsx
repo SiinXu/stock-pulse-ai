@@ -45,7 +45,7 @@ import {
   getChannelCompletenessIssues,
   getChannelDisplayNameIssues,
   getChannelNameIssues,
-  hasRuntimeOnlyMaskedHermesSecret,
+  hasRuntimeOnlyMaskedConnectionSecret,
   isHermesChannel,
   modelIdentityForConnection,
   normalizeModelForRuntime,
@@ -54,7 +54,7 @@ import {
   preservesUnavailableProviderSnapshot,
   runChannelConnectionTest,
   runChannelModelDiscovery,
-  shouldUseSavedHermesSecret,
+  shouldUseSavedConnectionSecret,
   splitModels,
   toggleModelSelection,
   type ChannelConfig,
@@ -78,7 +78,7 @@ interface ConnectionModalProps {
   connectionFields?: LlmConnectionFieldSchema[];
   emptyApiKeyHosts: string[];
   maskToken: string;
-  hermesSecretPersisted: boolean;
+  connectionSecretPersisted: boolean;
   catalogUnavailable: boolean;
   disabled: boolean;
   taskModelRefs: TaskModelReference[];
@@ -106,7 +106,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   connectionFields,
   emptyApiKeyHosts,
   maskToken,
-  hermesSecretPersisted,
+  connectionSecretPersisted,
   catalogUnavailable,
   disabled,
   taskModelRefs,
@@ -172,6 +172,10 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const [stagedReplacements, setStagedReplacements] = useState<ModelReferenceReplacement[]>([]);
   const testNonceRef = useRef(0);
   const discoveryNonceRef = useRef(0);
+  const savedApiKeyIsMasked = Boolean(
+    draft
+    && shouldUseSavedConnectionSecret(draft, maskToken, connectionSecretPersisted),
+  );
 
   const existingNames = useMemo(() => {
     const excluded = initialChannel?.name.trim().toLowerCase();
@@ -194,6 +198,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       apiKey: '',
       credentialField: 'api_key',
       models: '',
+      modelIdMode: 'route',
       extraHeaders: '',
       enabled: true,
       enabledValuePresent: true,
@@ -288,6 +293,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       ...draft,
       providerId: id,
       providerIdExplicit: true,
+      modelIdMode: 'route',
       protocol: normalizeProtocol(chosen.protocol),
       protocolValuePresent: true,
       baseUrl: nextBaseUrl,
@@ -317,6 +323,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       ...draft,
       providerId: id,
       providerIdExplicit: true,
+      modelIdMode: 'route',
     };
     const canAdoptProviderDefault = (key: string) => !hasConnectionSchema
       || proposedStates[key] === undefined
@@ -491,7 +498,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     if (!draft || disabled || !connectionContractKnown) {
       return;
     }
-    if (hasRuntimeOnlyMaskedHermesSecret(draft, maskToken, hermesSecretPersisted)) {
+    if (hasRuntimeOnlyMaskedConnectionSecret(draft, maskToken, connectionSecretPersisted)) {
       setTest({ status: 'error', text: text.runtimeSecret });
       return;
     }
@@ -500,7 +507,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     setTest({ status: 'loading', text: text.testing });
     const result = await runChannelConnectionTest(
       draft,
-      shouldUseSavedHermesSecret(draft, maskToken, hermesSecretPersisted),
+      shouldUseSavedConnectionSecret(draft, maskToken, connectionSecretPersisted),
       language,
     );
     if (testNonceRef.current === nonce) {
@@ -512,7 +519,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     if (!draft || !discoveryEnabledByContract || modelsAreReadOnly) {
       return;
     }
-    if (hasRuntimeOnlyMaskedHermesSecret(draft, maskToken, hermesSecretPersisted)) {
+    if (hasRuntimeOnlyMaskedConnectionSecret(draft, maskToken, connectionSecretPersisted)) {
       setDiscovery({ status: 'error', text: text.runtimeSecret, models: discovery?.models || [] });
       return;
     }
@@ -521,10 +528,13 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     setDiscovery({ status: 'loading', text: text.loadingModels, models: discovery?.models || [] });
     const result = await runChannelModelDiscovery(
       draft,
-      shouldUseSavedHermesSecret(draft, maskToken, hermesSecretPersisted),
+      shouldUseSavedConnectionSecret(draft, maskToken, connectionSecretPersisted),
       language,
     );
     if (discoveryNonceRef.current === nonce) {
+      if (result.status === 'success' && result.models.length > 0 && provider?.isCustom) {
+        setDraft((previous) => previous ? { ...previous, modelIdMode: 'literal' } : previous);
+      }
       setDiscovery(result.status === 'error' && (discovery?.models.length || 0) > 0
         ? { ...result, models: discovery?.models || [] }
         : result);
@@ -919,13 +929,18 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               <CredentialInput
                 id={apiKeyInputId}
                 purpose="provider-secret"
-                allowTogglePassword
+                allowTogglePassword={!savedApiKeyIsMasked}
                 iconType="key"
-                passwordVisible={keyVisible}
+                passwordVisible={savedApiKeyIsMasked ? false : keyVisible}
                 onPasswordVisibleChange={setKeyVisible}
-                value={draft.apiKey}
+                value={savedApiKeyIsMasked ? '' : draft.apiKey}
                 onChange={(e) => handleApiKeyChange(e.target.value)}
-                placeholder={apiKeyRequired ? text.multipleKeys : text.localKeyOptional}
+                placeholder={savedApiKeyIsMasked
+                  ? text.savedApiKeyPlaceholder
+                  : apiKeyRequired
+                    ? text.multipleKeys
+                    : text.localKeyOptional}
+                hint={savedApiKeyIsMasked ? text.savedApiKeyHint : undefined}
                 error={apiKeyError}
                 disabled={apiKeyIsReadOnly}
               />

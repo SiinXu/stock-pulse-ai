@@ -324,12 +324,18 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
         self.assertEqual(field["category"], "agent")
         self.assertEqual(field["ui_control"], "select")
         self.assertEqual(field["default_value"], "auto")
-        self.assertEqual(field["validation"], {"enum": ["auto", "litellm"]})
+        self.assertEqual(
+            field["validation"],
+            {"enum": ["auto", "litellm", "codex_cli", "claude_code_cli", "opencode_cli"]},
+        )
         self.assertEqual(
             field["options"],
             [
                 {"label": "Auto", "value": "auto"},
                 {"label": "Default model settings", "value": "litellm"},
+                {"label": "Codex CLI (local)", "value": "codex_cli"},
+                {"label": "Claude Code CLI (local)", "value": "claude_code_cli"},
+                {"label": "OpenCode CLI (local)", "value": "opencode_cli"},
             ],
         )
         self.assertEqual(field["help_key"], "settings.agent.AGENT_GENERATION_BACKEND")
@@ -1481,5 +1487,4 @@ class TestLongtailBatch1FieldRegistration(unittest.TestCase):
                 and get_field_definition(other)["display_order"] == order
             ]
             self.assertEqual(peers, [key], f"display_order collision for {key}: {peers}")
-
 

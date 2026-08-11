@@ -766,13 +766,13 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             status = self.service.get_setup_status()
 
         checks = {check["key"]: check for check in status["checks"]}
-        self.assertFalse(status["is_complete"])
+        self.assertTrue(status["is_complete"])
         self.assertTrue(status["ready_for_smoke"])
         self.assertEqual(checks["llm_primary"]["status"], "configured")
-        self.assertEqual(checks["llm_agent"]["status"], "needs_action")
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
         self.assertIn("Codex CLI", checks["llm_primary"]["message"])
         self.assertNotIn("llm_primary", status["required_missing_keys"])
-        self.assertIn("llm_agent", status["required_missing_keys"])
+        self.assertNotIn("llm_agent", status["required_missing_keys"])
 
     def test_get_setup_status_allows_local_cli_primary_smoke_without_agent_model(self) -> None:
         self._rewrite_env(
@@ -786,13 +786,13 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             status = self.service.get_setup_status()
 
         checks = {check["key"]: check for check in status["checks"]}
-        self.assertFalse(status["is_complete"])
+        self.assertTrue(status["is_complete"])
         self.assertTrue(status["ready_for_smoke"])
         self.assertEqual(checks["llm_primary"]["status"], "configured")
         self.assertEqual(checks["stock_list"]["status"], "configured")
-        self.assertEqual(checks["llm_agent"]["status"], "needs_action")
-        self.assertIn("本机 CLI 生成方式不会被自动继承", checks["llm_agent"]["message"])
-        self.assertEqual(status["required_missing_keys"], ["llm_agent"])
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
+        self.assertIn("受控工具桥接使用 Claude Code CLI", checks["llm_agent"]["message"])
+        self.assertEqual(status["required_missing_keys"], [])
 
     def test_get_setup_status_codex_cli_missing_reports_backend_path(self) -> None:
         self._rewrite_env(
@@ -813,7 +813,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertIn("Codex CLI 交互窗口", checks["llm_primary"]["next_step"])
         self.assertNotIn("请先安装并登录", checks["llm_primary"]["next_step"])
 
-    def test_get_setup_status_codex_primary_agent_model_explains_litellm_split(self) -> None:
+    def test_get_setup_status_codex_primary_agent_model_uses_cli_bridge(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
             "GENERATION_FALLBACK_BACKEND=",
@@ -828,8 +828,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "configured")
-        self.assertIn("普通分析使用 Codex CLI", checks["llm_agent"]["message"])
-        self.assertIn("Agent 工具调用仍使用主要模型", checks["llm_agent"]["message"])
+        self.assertIn("受控工具桥接使用 Codex CLI", checks["llm_agent"]["message"])
 
     def test_get_setup_status_accepts_connected_agent_model_ref_with_codex_primary(self) -> None:
         agent_model_ref = encode_model_ref("custom", "openai/agent/deepseek-v4-pro")
@@ -856,7 +855,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(checks["llm_agent"]["status"], "configured")
         self.assertNotIn("llm_agent", status["required_missing_keys"])
 
-    def test_get_setup_status_codex_primary_agent_inherited_model_explains_litellm_split(self) -> None:
+    def test_get_setup_status_codex_primary_agent_auto_uses_cli_bridge(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
             "GENERATION_FALLBACK_BACKEND=",
@@ -871,12 +870,9 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "configured")
-        self.assertIn(
-            "普通分析使用 Codex CLI；Agent 工具调用仍使用主要模型: openai/gpt-5.5",
-            checks["llm_agent"]["message"],
-        )
+        self.assertIn("受控工具桥接使用 Codex CLI", checks["llm_agent"]["message"])
 
-    def test_get_setup_status_claude_cli_primary_agent_inherited_model_uses_display_name(self) -> None:
+    def test_get_setup_status_claude_cli_primary_agent_bridge_uses_display_name(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=claude_code_cli",
             "GENERATION_FALLBACK_BACKEND=",
@@ -891,13 +887,10 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "configured")
-        self.assertIn(
-            "普通分析使用 Claude Code CLI；Agent 工具调用仍使用主要模型: openai/gpt-5.5",
-            checks["llm_agent"]["message"],
-        )
+        self.assertIn("受控工具桥接使用 Claude Code CLI", checks["llm_agent"]["message"])
         self.assertNotIn("Codex CLI", checks["llm_agent"]["message"])
 
-    def test_get_setup_status_codex_primary_hermes_only_agent_inheritance_needs_action(self) -> None:
+    def test_get_setup_status_codex_primary_ignores_litellm_hermes_route_for_agent(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
             "GENERATION_FALLBACK_BACKEND=",
@@ -916,15 +909,11 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_primary"]["status"], "configured")
-        self.assertEqual(checks["llm_agent"]["status"], "needs_action")
-        self.assertIn("Hermes", checks["llm_agent"]["message"])
-        self.assertIn("llm_agent", status["required_missing_keys"])
-        self.assertNotIn(
-            "Agent 工具调用仍使用主要模型",
-            checks["llm_agent"]["message"],
-        )
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
+        self.assertIn("受控工具桥接使用 Codex CLI", checks["llm_agent"]["message"])
+        self.assertNotIn("llm_agent", status["required_missing_keys"])
 
-    def test_get_setup_status_rejects_agent_codex_cli_tool_backend(self) -> None:
+    def test_get_setup_status_accepts_agent_codex_cli_tool_bridge(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
             "AGENT_GENERATION_BACKEND=codex_cli",
@@ -936,10 +925,10 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             status = self.service.get_setup_status()
 
         checks = {check["key"]: check for check in status["checks"]}
-        self.assertEqual(checks["llm_agent"]["status"], "needs_action")
-        self.assertIn("暂不支持 codex_cli", checks["llm_agent"]["message"])
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
+        self.assertIn("受控工具桥接使用 Codex CLI", checks["llm_agent"]["message"])
 
-    def test_get_setup_status_rejects_agent_claude_and_opencode_tool_backends(self) -> None:
+    def test_get_setup_status_reports_missing_agent_cli_executables(self) -> None:
         for backend in ("claude_code_cli", "opencode_cli"):
             with self.subTest(backend=backend):
                 self._rewrite_env(
@@ -953,7 +942,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
                 checks = {check["key"]: check for check in status["checks"]}
                 self.assertEqual(checks["llm_agent"]["status"], "needs_action")
-                self.assertIn(f"暂不支持 {backend}", checks["llm_agent"]["message"])
+                self.assertIn("未找到可执行文件", checks["llm_agent"]["message"])
 
     def test_get_setup_status_accepts_opencode_without_model_override(self) -> None:
         self._rewrite_env(
@@ -986,7 +975,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertIn("未检测到可用模型配置", checks["llm_agent"]["message"])
         self.assertNotIn("需要 LiteLLM backend", checks["llm_agent"]["message"])
 
-    def test_get_setup_status_cli_only_acknowledged_off_settles_agent_check(self) -> None:
+    def test_get_setup_status_cli_bridge_supersedes_acknowledged_off(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
             "GENERATION_FALLBACK_BACKEND=",
@@ -997,11 +986,11 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
              patch("src.services.system_config_service.shutil.which", return_value="/usr/bin/codex"):
             status = self.service.get_setup_status()
         checks = {check["key"]: check for check in status["checks"]}
-        self.assertEqual(checks["llm_agent"]["status"], "optional")
-        self.assertIn("已确认暂不使用问股 Agent", checks["llm_agent"]["message"])
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
+        self.assertIn("受控工具桥接使用 Codex CLI", checks["llm_agent"]["message"])
         self.assertNotIn("llm_agent", status["required_missing_keys"])
 
-    def test_get_setup_status_acknowledged_off_superseded_when_api_model_available(self) -> None:
+    def test_get_setup_status_acknowledged_off_superseded_when_cli_bridge_available(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
             "GENERATION_FALLBACK_BACKEND=",
@@ -1015,7 +1004,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             status = self.service.get_setup_status()
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "configured")
-        self.assertIn("Agent 工具调用仍使用主要模型", checks["llm_agent"]["message"])
+        self.assertIn("受控工具桥接使用 Codex CLI", checks["llm_agent"]["message"])
         self.assertNotIn("已确认暂不使用问股 Agent", checks["llm_agent"]["message"])
 
     def test_get_setup_status_api_only_agent_inherits_without_ack(self) -> None:

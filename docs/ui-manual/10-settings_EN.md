@@ -33,6 +33,8 @@ flowchart LR
   C -->|no| E[Read error, fix, save again]
 ```
 
+Page-level load, save, and cross-section validation errors appear in the top Toast. Use its top-right close control to dismiss the current summary, or select an entry to jump directly to the affected field, where precise repair guidance remains visible. The summary reappears when its error content changes.
+
 | Habit | Why |
 | --- | --- |
 | Save after edits | Home readiness reads **saved** config |
@@ -41,6 +43,12 @@ flowchart LR
 | Autosave (when present) | Wait for “saved” before leaving |
 
 Save control is often on the top or bottom toolbar—scroll once on narrow screens.
+
+### Viewing and replacing secrets
+
+For security, the server never returns plaintext for a saved API key, token, webhook secret, or password. When Settings is reopened, such a field is blank and says “Key saved; enter a new key to replace it.” There is no eye action in this state because the page has no plaintext to reveal. Saving without editing preserves the existing secret rather than replacing it with the blank display value.
+
+After you enter a new secret, the eye action appears and only shows or hides the current unsaved draft. Multi-key fields also start with one blank replacement row and never treat `******` as a real key. Enter the complete replacement and save; after a successful save, the field returns to the non-revealable saved state.
 
 ## First-time: readiness checklist
 
@@ -65,6 +73,8 @@ Save control is often on the top or bottom toolbar—scroll once on narrow scree
 
 The provider picker uses a rounded search field. Success, empty, and error states from **Fetch models** appear below the action instead of squeezing it; manual model entry remains available after a failure.
 
+After model discovery, custom OpenAI-compatible services preserve model IDs exactly as returned by `/models`, including `openai/...`, organization names, and multi-segment paths. Do not duplicate a provider prefix just to make the connection test pass. Existing and manually entered configurations retain LiteLLM route semantics by default; set `LLM_<CONNECTION>_MODEL_ID_MODE=literal` only when the remote service treats the prefix as part of its model ID.
+
 ### Local models
 
 Browse catalog, pull/register, activate. Desktop may prefer bundled Ollama. Respect delete protections on catalog models.
@@ -75,7 +85,7 @@ Browse catalog, pull/register, activate. Desktop may prefer bundled Ollama. Resp
 | --- | --- |
 | Task routing | Which backend handles which job type |
 | Default model config | Calm daily choice |
-| Local CLI generation | Experimental; not fully offline; Agent tools may be unavailable |
+| Local CLI generation | Experimental; not fully offline; Agent tools run through the controlled application bridge |
 | Fallback generation backend | After local CLI failure: fail vs try cloud default |
 
 A **backup model on a connection** is not the same as **fallback generation backend**.

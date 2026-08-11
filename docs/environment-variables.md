@@ -108,7 +108,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_EVENT_MONITOR_ENABLED` | `false` | 是 | 模板中注释 |
 | `AGENT_EVENT_MONITOR_INTERVAL_MINUTES` | `5` | 是 | 模板中注释 |
 | `AGENT_FEATURES_ACKNOWLEDGED_OFF` | `false` | 是 | 模板中注释; When true, settles the Agent readiness check for CLI-only users who do not need Q&A Agent |
-| `AGENT_GENERATION_BACKEND` | `auto` | 是 | Agent Chat backend; Web settings page only exposes auto/litellm, hand-written local CLI backend will return unsupport... |
+| `AGENT_GENERATION_BACKEND` | `auto` | 是 | 问股 Agent 生成方式；支持 `auto`、`litellm`、`codex_cli`、`claude_code_cli`、`opencode_cli`，本地 CLI 通过受控工具桥接运行 |
 | `AGENT_INTEL_AGENT_TIMEOUT_S` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `AGENT_INVESTMENT_COMMITTEE_MODE` | `false` | 是 | 模板中注释; Investment Committee mode (default off) |
 | `AGENT_LITELLM_MODEL` | `空` | 是 | 模板中注释; Agent main model (optional): Empty when inheriting from the main model; without provider prefix will parse as openai/... |
@@ -327,6 +327,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_MOONSHOT_PROVIDER` | `moonshot` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_MY_PROXY_API_KEY` | `sk-xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_MY_PROXY_BASE_URL` | `https://your-proxy.example.com/v1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `LLM_MY_PROXY_MODEL_ID_MODE` | `route` | 是 | 模板中注释; 自定义服务经模型发现后可用 `literal` 原样传递远端模型 ID。 |
 | `LLM_MY_PROXY_MODELS` | `gpt-5.5,claude-sonnet-4-6` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_MY_PROXY_PROTOCOL` | `openai` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_MY_PROXY_PROVIDER` | `custom` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |

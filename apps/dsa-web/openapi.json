@@ -21849,6 +21849,19 @@
             "title": "Question",
             "type": "string"
           },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
           "stock_code": {
             "anyOf": [
               {
@@ -21859,6 +21872,20 @@
               }
             ],
             "title": "Stock Code"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^\\S(?:.*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -28157,6 +28184,15 @@
             "default": true,
             "title": "Enabled",
             "type": "boolean"
+          },
+          "model_id_mode": {
+            "default": "route",
+            "enum": [
+              "route",
+              "literal"
+            ],
+            "title": "Model Id Mode",
+            "type": "string"
           },
           "models": {
             "items": {
@@ -36252,8 +36288,8 @@
     },
     "/api/v1/event-calendar": {
       "get": {
-        "description": "Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.",
-        "operationId": "getTodaysFocus",
+        "description": "Upcoming corporate events scoped to configured watchlist symbols and portfolio holdings. Disabled by default (EVENT_CALENDAR_ENABLED=false) with zero provider fetch. Impact preview reuses event_alerts.build_impact_context.",
+        "operationId": "getEventCalendar",
         "parameters": [
           {
             "description": "Range start (default: today)",
@@ -36399,6 +36435,112 @@
         "summary": "Get event calendar for watchlist and holdings",
         "tags": [
           "EventCalendar"
+        ]
+      }
+    },
+    "/api/v1/focus/today": {
+      "get": {
+        "description": "Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.",
+        "operationId": "getTodaysFocus",
+        "parameters": [
+          {
+            "description": "Hard cap for returned focus items (default 5, max 10)",
+            "in": "query",
+            "name": "max_items",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "Hard cap for returned focus items (default 5, max 10)",
+              "maximum": 10,
+              "minimum": 0,
+              "title": "Max Items",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional portfolio account id for the cached holdings universe",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional portfolio account id for the cached holdings universe",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "Reason display language (en/zh); defaults to report_language",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(en|zh)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reason display language (en/zh); defaults to report_language",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaysFocusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Focus aggregation failed"
+          }
+        },
+        "summary": "Get today's focus recommendations",
+        "tags": [
+          "TodaysFocus"
         ]
       }
     },

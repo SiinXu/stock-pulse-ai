@@ -5,7 +5,12 @@ import { createDeferred } from '../../test-utils';
 vi.mock('../../api/agent', () => ({
   agentApi: {
     getChatSessions: vi.fn(async () => []),
-    getChatSessionMessages: vi.fn(async () => []),
+    getChatSessionMessages: vi.fn(async () => ({
+      session_id: 'session-test',
+      messages: [],
+      session_state: { selected_skill_ids: null },
+      turn_identity_supported: true,
+    })),
     chatStream: vi.fn(),
   },
 }));
@@ -559,6 +564,47 @@ describe('agentChatStore.stopStream', () => {
 });
 
 describe('agentChatStore.switchSession', () => {
+  it('force-refreshes an already loaded current session after research updates', async () => {
+    useAgentChatStore.setState({
+      sessionId: 'session-test',
+      messages: [{ id: 'existing', role: 'assistant', content: 'Existing reply' }],
+    });
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue({
+      session_id: 'session-test',
+      messages: [
+        { id: 'research-question', role: 'user', content: 'Research this', created_at: null },
+        {
+          id: 'research-report',
+          role: 'assistant',
+          content: 'Research report',
+          created_at: null,
+          params: {
+            thinking_steps: [{
+              type: 'tool_done',
+              tool: 'get_daily_history',
+              success: true,
+              duration: 0.5,
+              meta: { result_preview: '{"close":1500}' },
+            }],
+          },
+        },
+      ],
+      session_state: { selected_skill_ids: null },
+    });
+
+    await useAgentChatStore.getState().switchSession('session-test', true);
+
+    expect(agentApi.getChatSessionMessages).toHaveBeenCalledWith('session-test');
+    expect(useAgentChatStore.getState().messages.map((message) => message.content)).toEqual([
+      'Research this',
+      'Research report',
+    ]);
+    expect(useAgentChatStore.getState().messages[1].thinkingSteps?.[0]).toMatchObject({
+      type: 'tool_done',
+      tool: 'get_daily_history',
+      meta: { result_preview: '{"close":1500}' },
+    });
+  });
 
   it('clears transient loading state when switching sessions during a stream', async () => {
     const ac = new AbortController();

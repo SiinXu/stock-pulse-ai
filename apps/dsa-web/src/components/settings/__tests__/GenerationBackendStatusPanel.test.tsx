@@ -33,7 +33,7 @@ const localCliStatus: GenerationBackendStatusResponse = {
     available: true,
     healthStatus: 'passed',
     supportsJson: true,
-    supportsTools: false,
+    supportsTools: true,
     supportsStream: true,
     supportsVision: false,
     isPrimary: true,
@@ -98,8 +98,8 @@ describe('GenerationBackendStatusPanel', () => {
     });
     expect(previewGenerationBackendStatus).not.toHaveBeenCalled();
     expect(await screen.findByText('codex_cli')).toBeInTheDocument();
-    expect(screen.getByText('仅生成')).toBeInTheDocument();
-    expect(screen.getByText(/本地 CLI 只用于报告和文本生成/)).toBeInTheDocument();
+    expect(screen.getByText('工具调用')).toBeInTheDocument();
+    expect(screen.getByText(/通过受控桥接请求问股工具/)).toBeInTheDocument();
   });
 
   it('previews unsaved draft generation backend status', async () => {
@@ -262,6 +262,6 @@ describe('GenerationBackendStatusPanel', () => {
     });
 
     expect(await screen.findByText('Primary backend')).toBeInTheDocument();
-    expect(screen.getByText('Generation only')).toBeInTheDocument();
+    expect(screen.getByText('Tool calls')).toBeInTheDocument();
   });
 });

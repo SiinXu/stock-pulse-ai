@@ -5,6 +5,7 @@ import { Badge, Button, CredentialInput, IconButton, Input, Select, Textarea, Ti
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
+import { MODEL_ACCESS_TEXT } from '../../locales/settingsModelAccess';
 import { resolveSettingsFieldTitle } from '../../locales/settingsFieldTitle';
 import { getFieldDescriptionZh, getFieldOptionLabel } from '../../utils/systemConfigI18n';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
@@ -53,6 +54,20 @@ function serializeMultiValues(values: string[]): string {
 
 function inferPasswordIconType(key: string): 'password' | 'key' {
   return key.toUpperCase().includes('PASSWORD') ? 'password' : 'key';
+}
+
+function isPersistedMaskedSecret(item: SystemConfigItem, value: string, isMultiValue: boolean): boolean {
+  if (!item.isMasked) {
+    return false;
+  }
+
+  const persistedValue = item.persistedValue ?? item.value;
+  if (!isMultiValue) {
+    return value === persistedValue;
+  }
+
+  const nonEmptyValues = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  return nonEmptyValues.length > 0 && nonEmptyValues.every((entry) => entry === persistedValue);
 }
 
 function resolveDisplayValue(
@@ -111,6 +126,9 @@ function renderFieldControl(
   language: UiLanguage,
   t: (key: UiTextKey) => string,
   controlType: ResolvedSettingsControl,
+  savedSecretIsMasked: boolean,
+  passwordVisibility: Record<number, boolean>,
+  onPasswordVisibilityChange: (index: number, visible: boolean) => void,
   enumOptionFilter?: (optionValue: string) => boolean,
   enumEmptyState?: React.ReactNode,
 ) {
@@ -240,9 +258,10 @@ function renderFieldControl(
     // Sensitive / masked fields always use CredentialInput even when the
     // backend ui_control hint is wrong (common for uncategorized secrets).
     const iconType = inferPasswordIconType(item.key);
+    const savedSecretText = MODEL_ACCESS_TEXT[language];
 
     if (isMultiValue) {
-      const values = parseMultiValues(value);
+      const values = savedSecretIsMasked ? [''] : parseMultiValues(value);
 
       return (
         <div className="space-y-2">
@@ -254,7 +273,9 @@ function renderFieldControl(
                   <CredentialInput
                     purpose="configuration-secret"
                     credentialId={`${item.key}-${index + 1}`}
-                    allowTogglePassword
+                    allowTogglePassword={!savedSecretIsMasked}
+                    passwordVisible={savedSecretIsMasked ? false : Boolean(passwordVisibility[index])}
+                    onPasswordVisibleChange={(visible) => onPasswordVisibilityChange(index, visible)}
                     passwordToggleLabel={rowLabel}
                     iconType={iconType}
                     id={index === 0 ? controlId : `${controlId}-${index}`}
@@ -264,8 +285,13 @@ function renderFieldControl(
                     readOnly={!isPasswordEditable}
                     onFocus={onPasswordFocus}
                     value={entry}
+                    placeholder={savedSecretIsMasked ? savedSecretText.savedApiKeyPlaceholder : undefined}
+                    hint={savedSecretIsMasked ? savedSecretText.savedApiKeyHint : undefined}
                     disabled={disabled || !schema?.isEditable}
                     onChange={(event) => {
+                      if (savedSecretIsMasked) {
+                        onPasswordVisibilityChange(index, false);
+                      }
                       const nextValues = [...values];
                       nextValues[index] = event.target.value;
                       onChange(serializeMultiValues(nextValues));
@@ -310,16 +336,25 @@ function renderFieldControl(
       <CredentialInput
         purpose="configuration-secret"
         credentialId={item.key}
-        allowTogglePassword
+        allowTogglePassword={!savedSecretIsMasked}
+        passwordVisible={savedSecretIsMasked ? false : Boolean(passwordVisibility[0])}
+        onPasswordVisibleChange={(visible) => onPasswordVisibilityChange(0, visible)}
         iconType={iconType}
         id={controlId}
         aria-invalid={hasError || undefined}
         aria-describedby={ariaDescribedBy}
         readOnly={!isPasswordEditable}
         onFocus={onPasswordFocus}
-        value={value}
+        value={savedSecretIsMasked ? '' : value}
+        placeholder={savedSecretIsMasked ? savedSecretText.savedApiKeyPlaceholder : undefined}
+        hint={savedSecretIsMasked ? savedSecretText.savedApiKeyHint : undefined}
         disabled={disabled || !schema?.isEditable}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          if (savedSecretIsMasked) {
+            onPasswordVisibilityChange(0, false);
+          }
+          onChange(event.target.value);
+        }}
       />
     );
   }
@@ -383,10 +418,13 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
     : helpContent?.summary ?? schema?.description ?? '';
   const hasError = issues.some((issue) => issue.severity === 'error');
   const [isPasswordEditable, setIsPasswordEditable] = useState(false);
+  const [passwordVisibility, setPasswordVisibility] = useState<Record<number, boolean>>({});
   const controlId = `setting-${item.key}`;
   const issueDescriptionIds = issues.map((_, index) => `${controlId}-issue-${index}`);
   const ariaDescribedBy = issueDescriptionIds.join(' ') || undefined;
   const displayValue = resolveDisplayValue(item, value, resolvedControl);
+  const savedSecretIsMasked = resolvedControl === 'password'
+    && isPersistedMaskedSecret(item, displayValue, isMultiValueField(item));
 
   return (
     <div
@@ -452,6 +490,9 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           language,
           t,
           resolvedControl,
+          savedSecretIsMasked,
+          passwordVisibility,
+          (index, visible) => setPasswordVisibility((current) => ({ ...current, [index]: visible })),
           enumOptionFilter,
           enumEmptyState,
         )}

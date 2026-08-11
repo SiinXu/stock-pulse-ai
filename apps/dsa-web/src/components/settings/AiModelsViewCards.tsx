@@ -27,7 +27,7 @@ import { AiOverviewMatrix } from './AiOverviewMatrix';
 import type { ModelReferenceReplacement } from './llmChannelEditorModel';
 import type { ModelAccessFieldFocusRequest } from '../../utils/modelAccessFieldKey';
 import { TASK_MODEL_KEYS } from './aiModelsViewModel';
-import { CLI_AGENT_CAPABILITY_NOTE, isGenerationOnlyBackend } from './aiTaskMatrix';
+import { CLI_AGENT_CAPABILITY_NOTE, isLocalCliBackend } from './aiTaskMatrix';
 // Barrel imports so SettingsPage.testHarness mocks apply to nested cards.
 import {
   LLMChannelEditor,
@@ -134,7 +134,7 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
   const { language: uiLanguage } = useUiLanguage();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const generationBackend = (allValuesByKey.GENERATION_BACKEND || 'litellm').trim();
-  const usesGenerationOnlyBackend = isGenerationOnlyBackend(generationBackend);
+  const usesLocalCliBackend = isLocalCliBackend(generationBackend);
   const generationBackendItem = taskRoutingItems.find((item) => item.key === 'GENERATION_BACKEND');
   const modelRoutingItems = taskRoutingItems.filter((item) => item.key !== 'GENERATION_BACKEND');
 
@@ -157,7 +157,7 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
           />
         </div>
       ) : null}
-      {usesGenerationOnlyBackend ? (
+      {usesLocalCliBackend ? (
         <p className="mb-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
           {CLI_AGENT_CAPABILITY_NOTE[uiLanguage]}
         </p>

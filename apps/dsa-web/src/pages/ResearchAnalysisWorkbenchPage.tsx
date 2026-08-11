@@ -2,24 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  BarChart3,
-  FileText,
-  FlaskConical,
-  History,
-  MessageCircle,
-  RefreshCw,
-  Workflow,
-  X,
-} from 'lucide-react';
+import { BarChart3, CircleHelp, FileText, FlaskConical, History, MessageCircle, RefreshCw, Workflow, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { analysisApi } from '../api/analysis';
-import {
-  getParsedApiError,
-  isPermanentlyUnavailableResourceError,
-  type ParsedApiError,
-} from '../api/error';
+import { getParsedApiError, isPermanentlyUnavailableResourceError, type ParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
 import { stocksApi } from '../api/stocks';
 import { systemConfigApi } from '../api/systemConfig';
@@ -29,13 +16,12 @@ import {
   Button,
   ConfirmDialog,
   EmptyState,
-  FileInput,
-  InlineAlert,
   IconButton,
   Modal,
   PageHeader,
   SegmentedControl,
   TabPanel,
+  Tooltip,
   WorkspaceLayout,
   getTabPanelId,
 } from '../components/common';
@@ -72,12 +58,7 @@ import {
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
 import { useStockPoolStore, type SubmitAnalysisOptions } from '../stores/stockPoolStore';
-import type {
-  AnalysisPhase,
-  HistoryItem,
-  StockReportType,
-  TaskInfo,
-} from '../types/analysis';
+import type { AnalysisPhase, HistoryItem, StockReportType, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { buildDeepLink } from '../utils/deepLink';

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import type { ProgressStep } from '../../stores/agentChatStore';
 import type { UiTextKey } from '../../i18n/uiText';
@@ -9,6 +10,26 @@ import {
 } from './chatMessageMeta';
 
 type Translate = (key: UiTextKey, params?: Record<string, string | number>) => string;
+
+function getToolDetail(step: ProgressStep): {
+  arguments?: unknown;
+  resultPreview?: string;
+  cached?: boolean;
+  resultLength?: number;
+} | null {
+  if (step.type !== 'tool_done' || !step.meta) return null;
+  const detail = {
+    ...(step.meta.arguments !== undefined ? { arguments: step.meta.arguments } : {}),
+    ...(typeof step.meta.result_preview === 'string'
+      ? { resultPreview: step.meta.result_preview }
+      : {}),
+    ...(typeof step.meta.cached === 'boolean' ? { cached: step.meta.cached } : {}),
+    ...(typeof step.meta.result_length === 'number'
+      ? { resultLength: step.meta.result_length }
+      : {}),
+  };
+  return Object.keys(detail).length > 0 ? detail : null;
+}
 
 export function ChatThinkingDetails({
   steps,
@@ -58,6 +79,51 @@ export function ChatThinkingDetails({
           iconClass = 'chat-progress-dot-generating';
         } else {
           text = step.message || step.type;
+        }
+        const toolDetail = getToolDetail(step);
+        if (toolDetail) {
+          return (
+            <details key={idx} className="group/tool">
+              <summary
+                role="button"
+                aria-label={`${text} · ${t('common.details')}`}
+                className={cn('chat-progress-item cursor-pointer list-none', statusClass)}
+              >
+                <span className={cn('chat-progress-dot', iconClass)} />
+                <span className="min-w-0 flex-1 leading-relaxed">{text}</span>
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 transition-transform group-open/tool:rotate-90"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="ml-6 mt-1.5 space-y-2 border-l border-border/50 pl-3 pb-1 text-xs">
+                {toolDetail.arguments !== undefined ? (
+                  <div>
+                    <code className="text-muted-text">arguments</code>
+                    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-secondary-text">
+                      {JSON.stringify(toolDetail.arguments, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+                {toolDetail.resultPreview ? (
+                  <div>
+                    <code className="text-muted-text">result_preview</code>
+                    <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words text-secondary-text">
+                      {toolDetail.resultPreview}
+                    </pre>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-x-3 text-muted-text">
+                  {toolDetail.cached !== undefined ? (
+                    <code>cached: {String(toolDetail.cached)}</code>
+                  ) : null}
+                  {toolDetail.resultLength !== undefined ? (
+                    <code>result_length: {toolDetail.resultLength}</code>
+                  ) : null}
+                </div>
+              </div>
+            </details>
+          );
         }
         return (
           <div key={idx} className={cn('chat-progress-item', statusClass)}>

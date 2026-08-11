@@ -267,10 +267,13 @@ describe('FirstRunWizard', () => {
     expect(providerCredential).toHaveAttribute('name', 'stockpulse-provider-api-key');
     expect(providerCredential).toHaveAttribute('autocomplete', 'off');
     expect(providerCredential).toHaveValue('');
+    expect(screen.getByRole('button', { name: '显示内容' })).toBeInTheDocument();
 
     fireEvent.change(providerCredential, { target: { value: 'autofilled-admin-password' } });
+    fireEvent.click(screen.getByRole('button', { name: '显示内容' }));
 
     expect(providerCredential).toHaveValue('autofilled-admin-password');
+    expect(providerCredential).toHaveAttribute('type', 'text');
     expect(discoverLLMChannelModels).not.toHaveBeenCalled();
     expect(testLLMChannel).not.toHaveBeenCalled();
     expect(onComplete).not.toHaveBeenCalled();

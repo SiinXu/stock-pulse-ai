@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Prevent Deep Research from reporting blank successful conclusions by retrying empty planning and synthesis responses, parsing sequential plain-text sub-questions, enforcing the API deadline, prioritizing conclusions before long detail, and failing closed with a top Toast when no final report is available.
+- [Fixed] Persist bounded, redacted Agent tool-call details with successful replies and restore expandable details from conversation history without exposing provider traces or credentials.
+- [Fixed] Persist Deep Research prompts, reports, and stable failures in the current Agent conversation, refresh the conversation list on completion, and let disconnected page waits finish in the backend within the current server process.
+- [Fixed] Persist and display the canonical Market Light score for every market-review region instead of a constant neutral score, including partial index-based Japan/Korea snapshots, legacy snapshot-backed history, deterministic multi-market averaging, and red/yellow/green history-card colors aligned with Market Light thresholds.
+- [Fixed] Restore Agent chat history hydration, persist Deep Research in the current conversation while it continues in the background, and preserve bounded tool evidence for final synthesis; research failures now use the shared top Toast.
+- [Fixed] Make every persisted masked Settings credential replace-only while keeping newly entered API keys, tokens, and passwords revealable before save, including multi-key fields and the first-run wizard.
+- [Changed] Show dismissible Settings page-level load, save, and cross-section validation errors in the top Toast viewport while preserving field-level repair guidance.
+- [Added] Allow the ask-stock Agent to use Codex, Claude Code, or OpenCode CLI through a strict JSON bridge while preserving the existing bounded tool permission, scope, timeout, and audit checks.
+- [Fixed] Preserve the streaming Agent cancellation probe across isolated stage copies so immutable runtime context no longer crashes Agent chat.
+- [Fixed] Reuse persisted masked credentials when testing or discovering models for an unchanged LLM connection while rejecting reuse after provider or endpoint changes.
+- [Fixed] Preserve provider-prefixed model IDs returned by custom OpenAI-compatible services across connection tests, saved routing, runtime generation, and the AlphaSift bridge.
+- [Fixed] Present saved provider credentials as replace-only fields without a misleading reveal action, and ignore stale LiteLLM Agent assignments while a local CLI Agent backend is active.
+- [Fixed] Preserve the boolean AlphaSift default-install indicator through public diagnostic sanitization so the status API no longer fails response validation.
 - [Chore] Rebaseline Web locale gzip budgets after SECURITY_AUDIT_* Settings help inventory (Refs #535).
 - [Added] Privileged-operation security audit adds configurable retention and hard capacity, durable local-process (OCR / local CLI) accept/reject trails, and bilingual documentation of the connected audit matrix (Refs #535).
 - [Added] Web report Decision Card and DecisionSignal surfaces render the backend Risk Manager gate verdict (pass / downgrade / reject / not-evaluated) with trigger reasons; missing gate never presents as pass (Refs #120).

@@ -16,19 +16,27 @@ describe('agentApi.research', () => {
     mockGet.mockReset();
   });
 
-  it('POSTs the question with snake_case stock_code, a long timeout, and the abort signal', async () => {
+  it('POSTs the question with session identity and a long timeout', async () => {
     mockPost.mockResolvedValue({
       data: { success: true, content: '# Findings', sources: ['q1', 'q2'], token_usage: 100 },
     });
-    const controller = new AbortController();
     const result = await agentApi.research(
-      { question: 'Why?', stockCode: '600519' },
-      { signal: controller.signal },
+      {
+        question: 'Why?',
+        stockCode: '600519',
+        sessionId: 'session-1',
+        turnId: 'turn-1',
+      },
     );
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v1/agent/research',
-      { question: 'Why?', stock_code: '600519' },
-      expect.objectContaining({ timeout: 200000, signal: controller.signal }),
+      {
+        question: 'Why?',
+        stock_code: '600519',
+        session_id: 'session-1',
+        turn_id: 'turn-1',
+      },
+      expect.objectContaining({ timeout: 200000 }),
     );
     expect(result.success).toBe(true);
     expect(result.sources).toEqual(['q1', 'q2']);
@@ -41,7 +49,12 @@ describe('agentApi.research', () => {
     const result = await agentApi.research({ question: 'Q' });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v1/agent/research',
-      { question: 'Q', stock_code: undefined },
+      {
+        question: 'Q',
+        stock_code: undefined,
+        session_id: undefined,
+        turn_id: undefined,
+      },
       expect.any(Object),
     );
     expect(result.error).toBe('timed out');
@@ -212,16 +225,22 @@ describe('agentApi.getSkills / sessions', () => {
           role: 'user',
           content: 'hello',
           created_at: null,
+          turn_id: 'turn-1',
         }],
+        session_state: { selected_skill_ids: null },
+        turn_identity_supported: true,
       },
     });
-    const messages = await agentApi.getChatSessionMessages('s1');
-    expect(messages[0].content).toBe('hello');
+    const detail = await agentApi.getChatSessionMessages('s1');
+    expect(detail.messages[0]).toMatchObject({ content: 'hello', turn_id: 'turn-1' });
+    expect(detail.turn_identity_supported).toBe(true);
 
     mockGet.mockResolvedValueOnce({
       data: {
         session_id: 's1',
         messages: [{ role: 'user', content: 'no id' }],
+        session_state: { selected_skill_ids: null },
+        turn_identity_supported: true,
       },
     });
     await expect(agentApi.getChatSessionMessages('s1')).rejects.toSatisfy((error: unknown) => {
@@ -249,6 +268,7 @@ describe('agentApi.getChatSessionMessages', () => {
         session_state: {
           selected_skill_ids: ['technical', 'risk'],
         },
+        turn_identity_supported: true,
       },
     });
 
@@ -268,11 +288,29 @@ describe('agentApi.getChatSessionMessages', () => {
         session_state: {
           selected_skill_ids: null,
         },
+        turn_identity_supported: true,
       },
     });
 
     const result = await agentApi.getChatSessionMessages('legacy-session');
 
     expect(result.session_state.selected_skill_ids).toBeNull();
+  });
+
+  it('rejects a detail payload that omits persisted session state', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        session_id: 'broken-session',
+        messages: [],
+        turn_identity_supported: true,
+      },
+    });
+
+    await expect(agentApi.getChatSessionMessages('broken-session')).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'SessionMessagesResponse' });
+      return true;
+    });
   });
 });

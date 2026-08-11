@@ -47,10 +47,13 @@ from src.llm.errors import call_litellm_with_param_recovery
 from src.llm.backend_registry import (
     AUTO_AGENT_BACKEND_ID,
     GENERATION_ONLY_BACKEND_IDS,
+    LOCAL_CLI_GENERATION_BACKEND_IDS as _LOCAL_CLI_GENERATION_BACKEND_IDS,
     LITELLM_BACKEND_ID,
     resolve_agent_generation_backend_id,
 )
+from src.llm.backend_factory import create_generation_backend as _create_generation_backend
 from src.llm.generation_backend import GenerationError, GenerationErrorCode
+from src.agent.local_cli_tool_bridge import call_local_cli_agent as _call_local_cli_agent
 from src.llm.generation_params import apply_litellm_generation_params, resolve_litellm_wire_model
 from src.llm.usage import attach_message_hmacs, extract_usage_payload, normalize_litellm_usage
 from src.llm.provider_cache import (
@@ -357,6 +360,7 @@ class LLMToolAdapter:
         self._router = None          # litellm Router (multi-key primary model)
         self._legacy_router_model_list: List[Dict[str, Any]] = []
         self._litellm_available = False
+        self._local_cli_backend = None
         self._backend_error: Optional[GenerationError] = None
         self._generation_backend_id = ""
         self._route_resolution: AgentLiteLLMRouteResolution = AgentLiteLLMRouteResolution(False)
@@ -382,6 +386,39 @@ class LLMToolAdapter:
             )
             logger.error(error_msg)
             return LLMResponse(content=error_msg, provider="error")
+        if self._local_cli_backend is not None:
+            try:
+                turn = _call_local_cli_agent(
+                    self._local_cli_backend,
+                    messages,
+                    tools or [],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
+            except GenerationError as exc:
+                log_safe_exception(
+                    logger,
+                    "Agent local CLI call failed",
+                    exc,
+                    error_code="agent_local_cli_call_failed",
+                    level=logging.WARNING,
+                    context={"backend": self._generation_backend_id},
+                )
+                return LLMResponse(
+                    content=f"{AGENT_LLM_FAILURE_MESSAGE} ({exc.error_code.value}).",
+                    provider="error",
+                )
+            return LLMResponse(
+                content=turn.content,
+                tool_calls=[
+                    ToolCall(id=call.id, name=call.name, arguments=call.arguments)
+                    for call in turn.tool_calls
+                ],
+                usage=turn.usage,
+                provider=turn.provider,
+                model=turn.model,
+            )
         route_resolution = resolve_agent_litellm_route(config)
         models_to_try = route_resolution.models_to_try
         if not models_to_try:

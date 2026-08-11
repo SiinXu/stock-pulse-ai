@@ -6,7 +6,7 @@ import { cn } from '../../utils/cn';
 import { DataTable, type DataTableColumn } from '../common';
 import {
   CLI_AGENT_CAPABILITY_NOTE,
-  isGenerationOnlyBackend,
+  isLocalCliBackend,
   resolveAiTaskMatrix,
   type AiTaskRow,
   type AiTaskStatus,
@@ -42,7 +42,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
   const tx = (entry: Record<UiLang, string>) => entry[language];
   const text = SETTINGS_MISC_TEXT[language];
-  const showCliCapabilityNote = isGenerationOnlyBackend((getValue('GENERATION_BACKEND') || 'litellm').trim());
+  const showCliCapabilityNote = isLocalCliBackend((getValue('GENERATION_BACKEND') || 'litellm').trim());
   const columns: readonly DataTableColumn<AiTaskRow>[] = [
     {
       id: 'task',

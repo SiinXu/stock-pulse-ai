@@ -8,6 +8,7 @@ export const CHANNEL_FIELD_SUFFIXES = [
   'API_KEY',
   'API_KEYS',
   'MODELS',
+  'MODEL_ID_MODE',
   'EXTRA_HEADERS',
   'ENABLED',
 ] as const;
@@ -22,6 +23,7 @@ export const CONNECTION_SCHEMA_KEY_BY_SUFFIX: Record<ChannelFieldSuffix, string>
   API_KEY: 'api_key',
   API_KEYS: 'api_keys',
   MODELS: 'models',
+  MODEL_ID_MODE: 'models',
   EXTRA_HEADERS: 'extra_headers',
   ENABLED: 'enabled',
 };

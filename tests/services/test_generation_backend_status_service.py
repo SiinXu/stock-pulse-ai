@@ -83,7 +83,7 @@ def test_local_cli_missing_executable_reports_current_config_error() -> None:
     assert primary["available"] is False
     assert primary["health_status"] == "failed"
     assert primary["last_error_code"] == "command_not_found"
-    assert primary["supports_tools"] is False
+    assert primary["supports_tools"] is True
 
 
 def test_local_cli_invalid_numeric_config_reports_unsafe_config() -> None:
@@ -139,7 +139,7 @@ def test_local_cli_smoke_failure_keeps_available_true_when_cheap_check_passes() 
     assert status["available"] is True
     assert status["health_status"] == "failed"
     assert status["last_error_code"] == "invalid_json"
-    assert status["supports_tools"] is False
+    assert status["supports_tools"] is True
 
 
 def test_smoke_timeout_overrides_config_timeout_for_local_cli() -> None:

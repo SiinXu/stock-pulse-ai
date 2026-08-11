@@ -280,7 +280,13 @@ class _ExecutionMethods:
         cancelled_check: Optional[Callable[[], bool]],
     ) -> tuple[StageResult, AgentContext]:
         """Run a whole stage against a copy and fence late state or progress."""
-        staged_ctx = copy.deepcopy(ctx)
+        cancelled_probe = ctx.meta.get("_approval_cancelled_check")
+        deepcopy_memo = (
+            {id(cancelled_probe): cancelled_probe}
+            if callable(cancelled_probe)
+            else None
+        )
+        staged_ctx = copy.deepcopy(ctx, deepcopy_memo)
         progress_fence = _StageProgressFence()
 
         def _stage_cancelled() -> bool:

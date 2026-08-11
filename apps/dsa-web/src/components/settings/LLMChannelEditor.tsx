@@ -56,14 +56,14 @@ import {
   getChannelDisplayNameIssues,
   getChannelNameIssues,
   getChannelSaveIssues,
-  hasRuntimeOnlyMaskedHermesSecret,
+  hasRuntimeOnlyMaskedConnectionSecret,
   modelIdentityForConnection,
   normalizeTaskReferenceRoute,
   parseChannelsFromItems,
   parseRuntimeConfigFromItems,
   resolveChannelRouteModels,
   runChannelConnectionTest,
-  shouldUseSavedHermesSecret,
+  shouldUseSavedConnectionSecret,
   type ChannelConfig,
   type ChannelTestState,
   type LLMChannelEditorProps,
@@ -123,7 +123,11 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const initialNames = useMemo(() => initialChannels.map((channel) => channel.name), [initialChannels]);
   const initialRuntimeConfig = useMemo(() => parseRuntimeConfigFromItems(items), [items]);
   const savedItemMap = useMemo(() => new Map(items.map((item) => [item.key.toUpperCase(), item.value])), [items]);
-  const hermesSecretPersisted = initialItemSourceByKey.get('LLM_HERMES_API_KEY') === true;
+  const connectionHasPersistedSecret = useCallback((channel: ChannelConfig): boolean => {
+    const prefix = `LLM_${channel.name.trim().toUpperCase()}`;
+    const suffix = channel.credentialField === 'api_keys' ? 'API_KEYS' : 'API_KEY';
+    return initialItemSourceByKey.get(`${prefix}_${suffix}`) === true;
+  }, [initialItemSourceByKey]);
 
   const channelsFingerprint = useMemo(() => JSON.stringify(initialChannels), [initialChannels]);
   const persistedDraftFingerprint = useMemo(
@@ -669,7 +673,8 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       ));
     };
 
-    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hermesSecretPersisted)) {
+    const hasPersistedSecret = connectionHasPersistedSecret(channel);
+    if (hasRuntimeOnlyMaskedConnectionSecret(channel, maskToken, hasPersistedSecret)) {
       markUnavailableAfterFailedTest(channel, MODEL_ACCESS_TEXT[language].runtimeSecret);
       return;
     }
@@ -682,7 +687,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     }));
     const result = await runChannelConnectionTest(
       channel,
-      shouldUseSavedHermesSecret(channel, maskToken, hermesSecretPersisted),
+      shouldUseSavedConnectionSecret(channel, maskToken, hasPersistedSecret),
       language,
     );
     if (testNonceRef.current[channel.id] !== requestId) {
@@ -1021,7 +1026,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               connectionFields={connectionFields}
               emptyApiKeyHosts={emptyApiKeyHosts}
               maskToken={maskToken}
-              hermesSecretPersisted={hermesSecretPersisted}
+              connectionSecretPersisted={modal.mode === 'edit' && channels[modal.index]
+                ? connectionHasPersistedSecret(channels[modal.index])
+                : false}
               catalogUnavailable={catalogUnavailable}
               disabled={busy}
               taskModelRefs={resolvedTaskModelRefs}

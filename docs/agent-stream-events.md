@@ -66,8 +66,8 @@ so these additions do not expand the public Ask Stock Chat SSE payload.
 | `stage_start` | single-agent loop, multi-agent orchestrator | An agent or pipeline stage has started. | `stage`, `message` |
 | `stage_done` | single-agent loop, multi-agent orchestrator | An agent or pipeline stage has completed. | `stage`, `status`, `duration` |
 | `thinking` | single-agent loop | The agent is deciding the next action. | `step`, `message` |
-| `tool_start` | single-agent loop | A tool call has started. | `step`, `tool`, `display_name` |
-| `tool_done` | single-agent loop | A tool call has completed or failed. | `step`, `tool`, `success`, `duration`, `display_name` |
+| `tool_start` | single-agent loop | A tool call has started. | `step`, `tool`, `display_name`, bounded `meta.arguments` |
+| `tool_done` | single-agent loop | A tool call has completed or failed. | `step`, `tool`, `success`, `duration`, `display_name`, bounded `meta` |
 | `generating` | single-agent loop | The final response is being generated. | `step`, `message` |
 | `pipeline_timeout` | multi-agent orchestrator | The orchestrator stopped because the stage or pipeline budget expired. | `stage`, `elapsed`, `timeout` |
 | `pipeline_budget_skipped` | multi-agent orchestrator | The orchestrator stopped before starting the next stage because the remaining budget was too low for useful work. | `stage`, `elapsed`, `timeout`, `remaining`, `minimum`, `reason`, `message` |
@@ -96,6 +96,16 @@ render their bounded fields directly or treat them as an additive unknown type.
 If a future backend event is not recognized, the UI keeps the event in the
 message progress history and renders a generic fallback instead of an empty
 progress row.
+
+Completed tool rows can be expanded to inspect an auditable subset of the
+call: redacted arguments, cache state, result length, and a bounded result
+preview. Up to 32 completed tool calls are stored with a successful assistant
+message in the existing conversation context column, so those details survive
+a page reload without a database migration. The history API applies the same
+allowlist, redaction, and length limits again before returning data. Hidden
+model reasoning, provider traces, credentials, and complete unbounded tool
+payloads are not part of this contract. Messages created before this metadata
+was persisted remain readable but cannot be backfilled with missing details.
 
 ## Runtime And Provider Scope
 

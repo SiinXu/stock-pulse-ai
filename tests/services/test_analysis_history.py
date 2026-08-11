@@ -791,6 +791,9 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 news_content="大盘复盘正文",
                 context_snapshot={
                     "report_kind": "market_review",
+                    "market_light_snapshots": {
+                        "cn": {"score": 62},
+                    },
                     "market_review_payload": {
                         "kind": "market_review",
                         "sections": [{"title": "复盘", "markdown": "结构化正文"}],
@@ -812,6 +815,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(payload["total"], 1)
         self.assertEqual(payload["items"][0]["stock_code"], "MARKET")
         self.assertEqual(payload["items"][0]["report_type"], "market_review")
+        self.assertEqual(payload["items"][0]["sentiment_score"], 62)
         self.assertIsNone(payload["items"][0]["action"])
         self.assertIsNone(payload["items"][0]["action_label"])
 
@@ -2073,8 +2077,13 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             query_id="market_review_query_detail_001",
             report_type="market_review",
             news_content="## 今日大盘\n\n复盘正文",
-            context_snapshot=None,
-            save_snapshot=False,
+            context_snapshot={
+                "report_kind": "market_review",
+                "market_light_snapshots": {
+                    "cn": {"score": 30},
+                },
+            },
+            save_snapshot=True,
         )
         self.assertGreater(saved, 0)
 
@@ -2090,6 +2099,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         report = get_history_detail(str(record_id), db_manager=self.db)
 
         self.assertEqual(report.meta.report_type, "market_review")
+        self.assertEqual(report.summary.sentiment_score, 30)
         self.assertEqual(report.summary.analysis_summary, report_content)
         self.assertIsNone(report.summary.action)
         self.assertIsNone(report.summary.action_label)

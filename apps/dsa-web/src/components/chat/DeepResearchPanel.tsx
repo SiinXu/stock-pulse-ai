@@ -2,10 +2,10 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CircleHelp, Search, StopCircle } from 'lucide-react';
+import { CircleHelp, Minimize2, Search } from 'lucide-react';
 import { agentApi } from '../../api/agent';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Button, InlineAlert, StatePanel, Surface, Textarea, Tooltip } from '../common';
+import { ApiErrorAlert, Button, StatePanel, Surface, Textarea, Tooltip } from '../common';
 import { StockAutocomplete } from '../StockAutocomplete';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
@@ -15,6 +15,7 @@ import {
   removeSessionItem,
   writeSessionItem,
 } from '../../utils/sessionPersistence';
+import { generateUUID } from '../../utils/uuid';
 
 type ResearchStatus = 'idle' | 'running' | 'done' | 'error';
 
@@ -41,14 +42,20 @@ function loadRun(sessionId: string): ResearchRun | null {
     // Whitelist the persisted status: a 'running' run cannot resume after a
     // refresh (the synchronous request was lost) and any unknown value is
     // treated as re-runnable idle rather than silently dropping content.
-    const status: ResearchStatus = parsed.status === 'done' || parsed.status === 'error' ? parsed.status : 'idle';
+    const content = typeof parsed.content === 'string' ? parsed.content : undefined;
+    let status: ResearchStatus = parsed.status === 'done' || parsed.status === 'error' ? parsed.status : 'idle';
+    let storedError = typeof parsed.error === 'string' ? parsed.error : undefined;
+    if (status === 'done' && !content?.trim()) {
+      status = 'error';
+      storedError = 'agent_research_failed';
+    }
     return {
       question: parsed.question,
       stockCode: typeof parsed.stockCode === 'string' ? parsed.stockCode : '',
       status,
-      content: typeof parsed.content === 'string' ? parsed.content : undefined,
+      content,
       sources: Array.isArray(parsed.sources) ? parsed.sources.filter((item): item is string => typeof item === 'string') : undefined,
-      error: typeof parsed.error === 'string' ? parsed.error : undefined,
+      error: storedError,
     };
   } catch {
     return null;
@@ -67,9 +74,15 @@ function saveRun(sessionId: string, run: ResearchRun | null): void {
 
 interface DeepResearchPanelProps {
   sessionId: string;
+  onHistoryChanged?: () => void;
+  onRunInBackground?: () => void;
 }
 
-export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId }) => {
+export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({
+  sessionId,
+  onHistoryChanged,
+  onRunInBackground,
+}) => {
   const { language, t } = useUiLanguage();
   // The panel is remounted per session (keyed by sessionId in the parent), so
   // this reads the persisted run once on mount.
@@ -77,9 +90,12 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
   const [run, setRun] = useState<ResearchRun | null>(initialRun);
   const [question, setQuestion] = useState(initialRun?.question ?? '');
   const [stockCode, setStockCode] = useState(initialRun?.stockCode ?? '');
-  const [error, setError] = useState<ParsedApiError | null>(null);
+  const [error, setError] = useState<ParsedApiError | null>(() => (
+    initialRun?.status === 'error' && initialRun.error
+      ? getParsedApiError({ error: initialRun.error }, language)
+      : null
+  ));
   const formRef = useRef<HTMLFormElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const runSeqRef = useRef(0);
   const mountedRef = useRef(true);
 
@@ -87,7 +103,6 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      abortRef.current?.abort();
     };
   }, []);
 
@@ -107,34 +122,47 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
     const trimmedStock = stockCode.trim();
     const seq = runSeqRef.current + 1;
     runSeqRef.current = seq;
-    const controller = new AbortController();
-    abortRef.current = controller;
     setError(null);
     persist({ question: trimmedQuestion, stockCode: trimmedStock, status: 'running' });
     try {
-      const response = await agentApi.research(
-        { question: trimmedQuestion, stockCode: trimmedStock || undefined },
-        { signal: controller.signal },
-      );
+      const response = await agentApi.research({
+        question: trimmedQuestion,
+        stockCode: trimmedStock || undefined,
+        sessionId,
+        turnId: generateUUID(),
+      });
+      onHistoryChanged?.();
       if (!mountedRef.current || runSeqRef.current !== seq) return;
-      persist(response.success
-        ? { question: trimmedQuestion, stockCode: trimmedStock, status: 'done', content: response.content, sources: response.sources }
-        : { question: trimmedQuestion, stockCode: trimmedStock, status: 'error', error: response.error || t('research.failed') });
-    } catch (err) {
-      if (!mountedRef.current || runSeqRef.current !== seq) return;
-      if (controller.signal.aborted) {
-        persist({ question: trimmedQuestion, stockCode: trimmedStock, status: 'idle' });
-        return;
+      if (response.success && response.content.trim()) {
+        persist({
+          question: trimmedQuestion,
+          stockCode: trimmedStock,
+          status: 'done',
+          content: response.content,
+          sources: response.sources,
+        });
+      } else {
+        const errorCode = response.error || 'agent_research_failed';
+        setError(getParsedApiError({ error: errorCode }, language));
+        persist({
+          question: trimmedQuestion,
+          stockCode: trimmedStock,
+          status: 'error',
+          error: errorCode,
+        });
       }
+    } catch (err) {
+      onHistoryChanged?.();
+      if (!mountedRef.current || runSeqRef.current !== seq) return;
       const parsed = getParsedApiError(err);
       setError(parsed);
       persist({ question: trimmedQuestion, stockCode: trimmedStock, status: 'error', error: parsed.message });
     }
-  }, [persist, question, running, stockCode, t]);
+  }, [language, onHistoryChanged, persist, question, running, sessionId, stockCode]);
 
-  const handleCancel = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  const handleRunInBackground = useCallback(() => {
+    onRunInBackground?.();
+  }, [onRunInBackground]);
 
   return (
     <section className="flex min-h-full flex-col gap-4" aria-labelledby="deep-research-title">
@@ -148,10 +176,6 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
       ) : null}
 
       {error ? <ApiErrorAlert error={error} /> : null}
-
-      {run && run.status === 'error' && !error ? (
-        <InlineAlert variant="danger" title={t('research.errorTitle')} message={run.error || t('research.failed')} />
-      ) : null}
 
       {run && run.status === 'done' ? (
         <div className="space-y-4">
@@ -229,9 +253,9 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
             </div>
           </div>
           {running ? (
-            <Button type="button" variant="secondary" size="comfortable" onClick={handleCancel}>
-              <StopCircle className="h-4 w-4" aria-hidden="true" />
-              {t('research.cancel')}
+            <Button type="button" variant="secondary" size="comfortable" onClick={handleRunInBackground}>
+              <Minimize2 className="h-4 w-4" aria-hidden="true" />
+              {t('research.runInBackground')}
             </Button>
           ) : (
             <Button type="submit" variant="primary" size="primary" disabled={!question.trim()}>

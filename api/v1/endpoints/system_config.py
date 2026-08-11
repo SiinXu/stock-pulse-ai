@@ -1276,6 +1276,7 @@ def test_llm_channel(
             base_url=request.base_url,
             api_key=request.api_key,
             models=request.models,
+            model_id_mode=request.model_id_mode,
             enabled=request.enabled,
             timeout_seconds=request.timeout_seconds,
             capability_checks=request.capability_checks,

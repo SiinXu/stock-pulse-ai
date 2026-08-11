@@ -64,6 +64,8 @@ In narrower content areas, review history and the report pane stack vertically. 
 | Risk summary | What to watch | “Official order ticket” |
 | Data quality | Degradation / session incompleteness | Overconfidence after ignoring it |
 
+The sentiment score comes from the Market Light score persisted with the review; it is not a separate model-generated rating. Japan and Korea still produce a `partial` score from available indices when breadth and limit-move data are missing. Multi-market reviews use an equal-weight average of valid market scores. The neutral compatibility fallback of 50 is used only when every market lacks a valid score and should be read together with data quality. History cards use the same traffic-light thresholds: green for 60–100, yellow for 40–59, and red for 0–39.
+
 ## Glossary
 
 | Term | Meaning |

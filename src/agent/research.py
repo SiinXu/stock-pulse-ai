@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Default token budget for deep research
 _DEFAULT_TOKEN_BUDGET = 30000
+_SYNTHESIS_RESERVE_SECONDS = 60.0
+_MAX_TOOL_EVIDENCE_CHARS = 16000
 
 
 class ResearchAgent:
@@ -127,6 +129,11 @@ class ResearchAgent:
             )
         logger.info("[ResearchAgent] decomposed into %d sub-questions", len(questions))
 
+        initial_collection_timeout = self._allocate_sub_question_timeout(
+            self._remaining_timeout_seconds(started_at, timeout_seconds),
+            len(questions),
+        )
+
         # Phase 2: Research each sub-question
         for i, question in enumerate(questions):
             if self._is_timed_out(started_at, timeout_seconds):
@@ -150,24 +157,44 @@ class ResearchAgent:
                     "progress": (i + 1) / len(questions),
                 })
 
+            remaining_timeout = self._remaining_timeout_seconds(
+                started_at,
+                timeout_seconds,
+            )
+            sub_question_timeout = self._allocate_sub_question_timeout(
+                remaining_timeout,
+                len(questions) - i,
+            )
+            if (
+                sub_question_timeout is not None
+                and initial_collection_timeout is not None
+            ):
+                sub_question_timeout = min(
+                    sub_question_timeout,
+                    initial_collection_timeout,
+                )
+            if sub_question_timeout is not None and sub_question_timeout <= 0:
+                logger.warning(
+                    "[ResearchAgent] stopping sub-question collection to preserve synthesis budget"
+                )
+                break
+
             finding = self._research_sub_question(
                 question,
                 effective_context,
                 tokens_used,
                 stock_scope=scope_resolution.stock_scope,
-                timeout_seconds=self._remaining_timeout_seconds(started_at, timeout_seconds),
+                timeout_seconds=sub_question_timeout,
             )
             tokens_used += finding.get("tokens", 0)
             if finding.get("timed_out"):
-                return self._build_timeout_result(
-                    query=query,
-                    questions=questions,
-                    findings_count=len(all_findings),
-                    total_tokens=tokens_used,
-                    duration_s=round(time.monotonic() - started_at, 2),
-                    timeout_seconds=timeout_seconds,
+                logger.warning(
+                    "[ResearchAgent] sub-question %d/%d reached its bounded budget; preserving gathered evidence",
+                    i + 1,
+                    len(questions),
                 )
-            all_findings.append(finding)
+            if finding.get("content") or not finding.get("timed_out"):
+                all_findings.append(finding)
 
         # Phase 3: Synthesise
         if self._is_timed_out(started_at, timeout_seconds):
@@ -227,6 +254,23 @@ class ResearchAgent:
         """Return whether the overall research deadline has been exceeded."""
         remaining = ResearchAgent._remaining_timeout_seconds(started_at, timeout_seconds)
         return remaining is not None and remaining <= 0
+
+    @staticmethod
+    def _allocate_sub_question_timeout(
+        remaining_timeout: Optional[float],
+        remaining_questions: int,
+    ) -> Optional[float]:
+        """Fair-share the collection budget while reserving final synthesis time."""
+        if remaining_timeout is None:
+            return None
+        if remaining_timeout <= 0 or remaining_questions <= 0:
+            return 0.0
+        synthesis_reserve = min(
+            _SYNTHESIS_RESERVE_SECONDS,
+            remaining_timeout * 0.4,
+        )
+        collection_budget = max(0.0, remaining_timeout - synthesis_reserve)
+        return collection_budget / remaining_questions
 
     @staticmethod
     def _resolve_step_timeout(default_timeout: int, timeout_seconds: Optional[float]) -> Optional[int]:
@@ -321,21 +365,36 @@ Return a JSON object:
             step_timeout = self._resolve_step_timeout(15, timeout_seconds)
             if step_timeout is None:
                 return {"questions": [query], "tokens": 0, "timed_out": True}
-            completion = self._call_text_completion(
-                messages,
-                temperature=0.3,
-                max_tokens=400,
-                timeout=step_timeout,
-            )
-            raw = completion["content"]
-            tokens = completion["tokens"]
+            tokens = 0
+            for max_tokens in (400, 1600):
+                completion = self._call_text_completion(
+                    messages,
+                    temperature=0.3,
+                    max_tokens=max_tokens,
+                    timeout=step_timeout,
+                )
+                raw = completion["content"]
+                tokens += completion["tokens"]
 
-            # Parse JSON
-            if raw.startswith("```"):
-                raw = re.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re.sub(r'\s*```$', '', raw)
-            parsed = json.loads(raw)
-            return {"questions": parsed.get("questions", [query]), "tokens": tokens}
+                if raw.startswith("```"):
+                    raw = re.sub(r'^```(?:json)?\s*', '', raw)
+                    raw = re.sub(r'\s*```$', '', raw)
+                try:
+                    parsed = json.loads(raw)
+                    parsed_questions = parsed.get("questions", [])
+                    questions = [
+                        item.strip()
+                        for item in parsed_questions
+                        if isinstance(item, str) and item.strip()
+                    ]
+                except (json.JSONDecodeError, AttributeError):
+                    questions = self._parse_numbered_questions(raw)
+                if questions:
+                    return {
+                        "questions": questions[:self.max_sub_questions],
+                        "tokens": tokens,
+                    }
+            raise ValueError("Research decomposition returned no usable questions")
         except Exception as exc:  # broad-exception: fallback_recorded - Fall back to the original query when decomposition fails.
             log_safe_exception(
                 logger,
@@ -347,6 +406,33 @@ Return a JSON object:
             if timeout_seconds is not None and self._looks_like_timeout_error(exc):
                 return {"questions": [query], "tokens": 0, "timed_out": True, "error": str(exc)}
             return {"questions": [query], "tokens": 0}
+
+    def _parse_numbered_questions(self, raw: str) -> List[str]:
+        """Parse a sequential numbered list when a model omits the JSON wrapper."""
+        marker_pattern = re.compile(
+            r"(?:^|\s)(?:[-*]\s*)?(\d{1,2})\s*[.)、:：]\s*",
+            flags=re.MULTILINE,
+        )
+        markers = list(marker_pattern.finditer(raw))
+        if len(markers) < 2:
+            return []
+
+        numbers = [int(marker.group(1)) for marker in markers]
+        expected = list(range(1, len(numbers) + 1))
+        if numbers != expected:
+            return []
+
+        questions: List[str] = []
+        for index, marker in enumerate(markers[:self.max_sub_questions]):
+            end = (
+                markers[index + 1].start()
+                if index + 1 < len(markers)
+                else len(raw)
+            )
+            question = raw[marker.end():end].strip(" \t\r\n-*•")
+            if question:
+                questions.append(question)
+        return questions
 
     def _research_sub_question(
         self,
@@ -374,6 +460,8 @@ Return a JSON object:
 You are a research agent investigating a specific question.
 Use your tools to search for relevant information, then summarise \
 your findings in 2-4 paragraphs.  Be factual and cite sources.
+Keep tool use bounded. After enough relevant evidence is available, stop \
+searching and produce the summary within the current turn budget.
 Token budget remaining: ~{remaining_budget}
 """
         stock_context = ""
@@ -398,10 +486,13 @@ Token budget remaining: ~{remaining_budget}
                 tool_call_timeout_seconds=timeout_seconds,
                 stock_scope=stock_scope,
             )
+            evidence = result.content or self._extract_tool_evidence(
+                getattr(result, "messages", None)
+            )
             if not result.success and self._looks_like_timeout_error(result.error):
                 return {
                     "question": question,
-                    "content": "",
+                    "content": evidence,
                     "tokens": result.total_tokens,
                     "success": False,
                     "timed_out": True,
@@ -409,7 +500,7 @@ Token budget remaining: ~{remaining_budget}
                 }
             return {
                 "question": question,
-                "content": result.content,
+                "content": evidence,
                 "tokens": result.total_tokens,
                 "success": result.success,
             }
@@ -432,6 +523,29 @@ Token budget remaining: ~{remaining_budget}
                 }
             return {"question": question, "content": "", "tokens": 0, "success": False, "error": str(exc)}
 
+    @staticmethod
+    def _extract_tool_evidence(messages: Any) -> str:
+        """Keep bounded tool evidence when a collection loop cannot write its summary."""
+        if not isinstance(messages, list):
+            return ""
+        evidence: List[str] = []
+        remaining = _MAX_TOOL_EVIDENCE_CHARS
+        for message in messages:
+            if not isinstance(message, dict) or message.get("role") != "tool":
+                continue
+            content = message.get("content")
+            if not isinstance(content, str) or not content.strip():
+                continue
+            tool_name = str(message.get("name") or "tool")
+            section = f"[{tool_name}]\n{content.strip()}"
+            if len(section) > remaining:
+                section = section[:remaining]
+            evidence.append(section)
+            remaining -= len(section)
+            if remaining <= 0:
+                break
+        return "\n\n".join(evidence)
+
     def _synthesise_report(
         self,
         original_query: str,
@@ -451,12 +565,14 @@ findings into a comprehensive, well-structured report.
 
 ## Report Structure
 1. **Executive Summary** (2-3 sentences)
-2. **Key Findings** (bullet points)
-3. **Detailed Analysis** (sections per topic)
+2. **Conclusion & Recommendations**
+3. **Key Findings** (bullet points)
 4. **Risk Factors** (if applicable)
-5. **Conclusion & Recommendations**
+5. **Detailed Analysis** (sections per topic)
 
-Use Markdown formatting.  Be concise but thorough.
+Use Markdown formatting. Be concise but thorough. Complete the conclusion
+before expanding the detailed analysis so it remains available if the output
+budget is reached.
 """
         messages = [
             {"role": "system", "content": system},
@@ -464,18 +580,61 @@ Use Markdown formatting.  Be concise but thorough.
         ]
 
         try:
-            step_timeout = self._resolve_step_timeout(30, timeout_seconds)
-            if step_timeout is None:
-                return {"content": "", "tokens": 0, "timed_out": True}
-            completion = self._call_text_completion(
-                messages,
-                temperature=0.3,
-                max_tokens=2000,
-                timeout=step_timeout,
+            synthesis_started_at = time.monotonic()
+            tokens = 0
+            attempts = (
+                (messages, 2000),
+                ([
+                    {
+                        "role": "system",
+                        "content": (
+                            system
+                            + "\nReturn the final report text now. Do not return "
+                            "reasoning without the final report."
+                        ),
+                    },
+                    messages[1],
+                ], 6000),
             )
-            content = completion["content"]
-            tokens = completion["tokens"]
-            return {"content": content, "tokens": tokens}
+            for attempt_number, (attempt_messages, max_tokens) in enumerate(
+                attempts,
+                start=1,
+            ):
+                remaining_timeout = (
+                    None
+                    if timeout_seconds is None
+                    else max(
+                        0.0,
+                        timeout_seconds
+                        - (time.monotonic() - synthesis_started_at),
+                    )
+                )
+                step_timeout = self._resolve_step_timeout(30, remaining_timeout)
+                if step_timeout is None:
+                    return {
+                        "content": "",
+                        "tokens": tokens,
+                        "timed_out": True,
+                    }
+                completion = self._call_text_completion(
+                    attempt_messages,
+                    temperature=0.3,
+                    max_tokens=max_tokens,
+                    timeout=step_timeout,
+                )
+                tokens += completion["tokens"]
+                content = completion["content"]
+                if content:
+                    return {"content": content, "tokens": tokens}
+                logger.warning(
+                    "[ResearchAgent] synthesis attempt %d returned no final report",
+                    attempt_number,
+                )
+            return {
+                "content": "",
+                "tokens": tokens,
+                "error": "Research synthesis returned an empty final report",
+            }
         except Exception as exc:
             log_safe_exception(
                 logger,

@@ -13,6 +13,7 @@ import { EVENT_ALERT_SCENARIOS } from './eventAlertScenarios';
 
 type ChartScenarioId = 'kline-chart' | 'risk-heatmap';
 type ValuationScenarioId = 'dcf-sensitivity-panel';
+type AdditionalProductScenarioId = 'portfolio-import-wizard' | 'reasoning-trace-export-controls';
 
 function createLazyScenario(loadRenderer: () => Promise<PlaygroundScenarioRenderer>): PlaygroundScenarioRenderer {
   const LazyRenderer = lazy(async () => {
@@ -43,6 +44,15 @@ const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRe
   )),
 };
 
+const LAZY_ADDITIONAL_PRODUCT_SCENARIOS: Record<AdditionalProductScenarioId, PlaygroundScenarioRenderer> = {
+  'portfolio-import-wizard': createLazyScenario(async () => (
+    (await import('./additionalProductScenarios')).ADDITIONAL_PRODUCT_SCENARIOS['portfolio-import-wizard']
+  )),
+  'reasoning-trace-export-controls': createLazyScenario(async () => (
+    (await import('./additionalProductScenarios')).ADDITIONAL_PRODUCT_SCENARIOS['reasoning-trace-export-controls']
+  )),
+};
+
 type WatchlistWorkspaceScenarioId = 'home-stock-workspace' | 'watchlist-score-column';
 
 // Lazy-load watchlist workspace stories so score-column product wiring does not
@@ -65,8 +75,10 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
   ...SCREENING_SCENARIOS,
+  ...EVENT_ALERT_SCENARIOS,
   ...LAZY_CHART_SCENARIOS,
   ...LAZY_VALUATION_SCENARIOS,
+  ...LAZY_ADDITIONAL_PRODUCT_SCENARIOS,
   ...LAZY_REPORT_VERSION_COMPARE_SCENARIOS,
   ...LAZY_WATCHLIST_WORKSPACE_SCENARIOS,
 };

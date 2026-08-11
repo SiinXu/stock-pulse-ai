@@ -921,6 +921,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <CredentialInput
                   id="wizard-api-key"
                   purpose="provider-secret"
+                  allowTogglePassword
+                  iconType="key"
                   value={apiKey}
                   onChange={(event) => handleApiKeyChange(event.target.value)}
                   placeholder={apiKeyRequired

@@ -782,6 +782,9 @@ class LocalCliGenerationBackend(GenerationBackend):
             ),
             MAX_LOCAL_CLI_TIMEOUT_SECONDS,
         )
+        requested_timeout = generation_config.get("timeout_seconds")
+        if isinstance(requested_timeout, (int, float)) and requested_timeout > 0:
+            timeout_seconds = max(1, min(timeout_seconds, int(requested_timeout)))
         max_output_bytes = min(
             _positive_int(
                 getattr(self._config, "generation_backend_max_output_bytes", None),

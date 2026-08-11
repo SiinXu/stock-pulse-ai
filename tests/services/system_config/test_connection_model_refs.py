@@ -80,6 +80,53 @@ def test_available_models_keeps_same_route_for_each_connection(tmp_path, monkeyp
     assert len({model["model_ref"] for model in models}) == 2
 
 
+def test_custom_connection_preserves_provider_prefixed_wire_model(tmp_path, monkeypatch) -> None:
+    expected_route = "openai/gpt-5.6-sol"
+    expected_wire_model = "openai/openai/gpt-5.6-sol"
+    expected_ref = encode_model_ref("custom", expected_route)
+    content = (
+        "LLM_CONFIG_MODE=channels\n"
+        "LLM_CHANNELS=custom\n"
+        "LLM_CUSTOM_PROVIDER=custom\n"
+        "LLM_CUSTOM_PROTOCOL=openai\n"
+        "LLM_CUSTOM_BASE_URL=https://proxy.example.com/v1\n"
+        "LLM_CUSTOM_API_KEY=sk-custom\n"
+        "LLM_CUSTOM_MODELS=openai/gpt-5.6-sol\n"
+        "LLM_CUSTOM_MODEL_ID_MODE=literal\n"
+        "LLM_CUSTOM_ENABLED=true\n"
+        f"LITELLM_MODEL={expected_ref}\n"
+    )
+
+    with _isolated_service(tmp_path, monkeypatch, content) as (service, _):
+        config = Config.get_instance()
+        available = service.get_available_models()["models"]
+        validation = service.validate([])
+
+    assert config.llm_channels[0]["models"] == [expected_route]
+    assert config.litellm_model == expected_ref
+    entry = next(item for item in config.llm_model_list if item.get("model_name") == expected_ref)
+    assert entry["litellm_params"]["model"] == expected_wire_model
+    assert available == [
+        {
+            "model_ref": expected_ref,
+            "route": expected_route,
+            "display": "openai/gpt-5.6-sol",
+            "connection": "custom",
+            "connection_id": "custom",
+            "connection_name": "custom",
+            "provider": "openai",
+            "provider_id": "custom",
+            "provider_label": "自定义兼容服务",
+            "available": True,
+        }
+    ]
+    assert not [
+        issue
+        for issue in validation["issues"]
+        if issue["key"] == "LITELLM_MODEL" and issue["severity"] == "error"
+    ]
+
+
 def test_selected_model_ref_routes_to_exact_connection(tmp_path, monkeypatch) -> None:
     selected_ref = encode_model_ref("openai_work", "openai/gpt-4o")
     with _isolated_service(

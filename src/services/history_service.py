@@ -49,6 +49,7 @@ from src.schemas.decision_action import (
     display_operation_advice_for_result,
 )
 from src.schemas.decision_scale import extract_decision_guardrail_reason
+from src.schemas.market_light import resolve_market_light_sentiment_score
 from src.utils.sniper_points import find_sniper_points
 from src.utils.data_processing import (
     extract_realtime_detail_fields,
@@ -396,6 +397,7 @@ class HistoryService:
             getattr(record, "context_snapshot", None),
         )
         action_fields = self._decision_action_fields_for_record(record, raw_result)
+        sentiment_score = self._resolve_history_sentiment_score(record)
 
         return {
             "id": record.id,
@@ -408,7 +410,7 @@ class HistoryService:
             ),
             "trend_prediction": record.trend_prediction,
             "analysis_summary": record.analysis_summary,
-            "sentiment_score": record.sentiment_score,
+            "sentiment_score": sentiment_score,
             "operation_advice": record.operation_advice,
             "action": action_fields["action"],
             "action_label": action_fields["action_label"],
@@ -650,6 +652,29 @@ class HistoryService:
             return news_content
         return None
 
+    @staticmethod
+    def _resolve_history_sentiment_score(record, context_snapshot: Any = None) -> Optional[int]:
+        """Project legacy market-review scores from their persisted canonical snapshots."""
+        stored_score = getattr(record, "sentiment_score", None)
+        if getattr(record, "report_type", None) != "market_review":
+            return stored_score
+
+        snapshot = (
+            context_snapshot
+            if context_snapshot is not None
+            else parse_json_field(getattr(record, "context_snapshot", None))
+        )
+        market_light_snapshots = (
+            snapshot.get("market_light_snapshots")
+            if isinstance(snapshot, dict)
+            else None
+        )
+        fallback = stored_score if isinstance(stored_score, int) else 50
+        return resolve_market_light_sentiment_score(
+            market_light_snapshots,
+            fallback=fallback,
+        )
+
     def _record_to_detail_dict(self, record) -> Dict[str, Any]:
         """
         Convert an AnalysisHistory ORM record to a detail response dict.
@@ -674,6 +699,7 @@ class HistoryService:
         action_fields = self._decision_action_fields_for_record(record, raw_result)
         display_code = self._display_stock_code(record.code)
         market_phase_summary = self._display_market_phase_summary(record.code, context_snapshot)
+        sentiment_score = self._resolve_history_sentiment_score(record, context_snapshot)
         return {
             "id": record.id,
             "query_id": record.query_id,
@@ -688,8 +714,10 @@ class HistoryService:
             "action": action_fields["action"],
             "action_label": action_fields["action_label"],
             "trend_prediction": record.trend_prediction,
-            "sentiment_score": record.sentiment_score,
-            "sentiment_label": self._get_sentiment_label(record.sentiment_score or 50),
+            "sentiment_score": sentiment_score,
+            "sentiment_label": self._get_sentiment_label(
+                sentiment_score if sentiment_score is not None else 50
+            ),
             "ideal_buy": sniper_points.get("ideal_buy"),
             "secondary_buy": sniper_points.get("secondary_buy"),
             "stop_loss": sniper_points.get("stop_loss"),

@@ -1270,10 +1270,30 @@ export interface paths {
             cookie?: never;
         };
         /**
+         * Get event calendar for watchlist and holdings
+         * @description Upcoming corporate events scoped to configured watchlist symbols and portfolio holdings. Disabled by default (EVENT_CALENDAR_ENABLED=false) with zero provider fetch. Impact preview reuses event_alerts.build_impact_context.
+         */
+        get: operations["getEventCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/focus/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
          * Get today's focus recommendations
          * @description Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.
          */
-        get: operations["getEventCalendar"];
+        get: operations["getTodaysFocus"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12150,8 +12170,12 @@ export interface components {
         ResearchRequest: {
             /** Question */
             question: string;
+            /** Session Id */
+            session_id?: string | null;
             /** Stock Code */
             stock_code?: string | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ResearchResponse */
         ResearchResponse: {
@@ -14820,6 +14844,12 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+            /**
+             * Model Id Mode
+             * @default route
+             * @enum {string}
+             */
+            model_id_mode: "route" | "literal";
             /** Models */
             models?: string[];
             /**
@@ -19431,6 +19461,60 @@ export interface operations {
                 };
             };
             /** @description Event calendar failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getTodaysFocus: {
+        parameters: {
+            query?: {
+                /** @description Hard cap for returned focus items (default 5, max 10) */
+                max_items?: number;
+                /** @description Optional portfolio account id for the cached holdings universe */
+                account_id?: number | null;
+                /** @description Reason display language (en/zh); defaults to report_language */
+                language?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodaysFocusResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Focus aggregation failed */
             500: {
                 headers: {
                     [name: string]: unknown;

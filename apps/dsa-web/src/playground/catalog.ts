@@ -130,6 +130,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('dashboard', 'onboarding-today-plan-card', 'OnboardingTodayPlanCard', 'components/onboarding/OnboardingTodayPlanCard.tsx', ['default']),
   entry('dashboard', 'agent-onboarding-wizard', 'AgentOnboardingWizard', 'components/onboarding/AgentOnboardingWizard.tsx', ['interactive']),
   entry('dashboard', 'zero-config-first-run-panel', 'ZeroConfigFirstRunPanel', 'components/onboarding/ZeroConfigFirstRunPanel.tsx', ['default', 'empty']),
+  entry('dashboard', 'portfolio-import-wizard', 'PortfolioImportWizard', 'components/portfolio/PortfolioImportWizard.tsx', ['interactive'], 'full'),
 
   entry('alerts', 'alert-rule-form', 'AlertRuleForm', 'components/alerts/AlertRuleForm.tsx', ['interactive', 'states']),
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
@@ -178,6 +179,8 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'report-strategy', 'ReportStrategy', 'components/report/ReportStrategy.tsx', ['default', 'empty']),
   entry('reports', 'report-structured-insights', 'ReportStructuredInsights', 'components/report/ReportStructuredInsights.tsx', ['default', 'empty']),
   entry('reports', 'report-summary', 'ReportSummary', 'components/report/ReportSummary.tsx', ['default', 'loading', 'error']),
+  entry('reports', 'reasoning-trace-export-controls', 'ReasoningTraceExportControls', 'components/report/ReasoningTraceExportControls.tsx'),
+  entry('reports', 'dcf-sensitivity-panel', 'DcfSensitivityPanel', 'components/valuation/DcfSensitivityPanel.tsx', ['default', 'interactive', 'empty']),
   entry(
     'reports',
     'report-version-compare-view',

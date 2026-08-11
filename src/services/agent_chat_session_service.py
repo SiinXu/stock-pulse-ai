@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from src.agent.factory import normalize_requested_skill_ids
+from src.agent.public_contract import AGENT_RESEARCH_FAILURE_HISTORY_SENTINEL
 from src.storage import DatabaseManager
 
 
@@ -86,6 +87,38 @@ class AgentChatSessionService:
         return ChatSessionDetail(
             messages=messages,
             selected_skill_ids=selected_skill_ids,
+        )
+
+    def record_research_start(
+        self,
+        *,
+        session_id: str,
+        question: str,
+        stock_code: Optional[str],
+        turn_id: Optional[str],
+    ) -> int:
+        """Persist a deep-research prompt as a normal visible conversation turn."""
+        context = {
+            "agent_mode": "research",
+            **({"stock_code": stock_code} if stock_code else {}),
+        }
+        return self.db.save_conversation_user_turn(
+            session_id,
+            question,
+            turn_id=turn_id,
+            context=context,
+        )
+
+    def record_research_success(self, *, session_id: str, content: str) -> int:
+        """Persist the completed research report in the shared conversation history."""
+        return self.db.save_conversation_message(session_id, "assistant", content)
+
+    def record_research_failure(self, *, session_id: str) -> int:
+        """Persist a stable, sanitized research failure in conversation history."""
+        return self.db.save_conversation_message(
+            session_id,
+            "assistant",
+            AGENT_RESEARCH_FAILURE_HISTORY_SENTINEL,
         )
 
     def delete_session(self, session_id: str) -> int:

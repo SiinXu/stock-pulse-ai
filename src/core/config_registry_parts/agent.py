@@ -103,13 +103,27 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [
             {"label": "Auto", "value": "auto"},
             {"label": "Default model settings", "value": "litellm"},
+            {"label": "Codex CLI (local)", "value": "codex_cli"},
+            {"label": "Claude Code CLI (local)", "value": "claude_code_cli"},
+            {"label": "OpenCode CLI (local)", "value": "opencode_cli"},
         ],
-        "validation": {"enum": ["auto", "litellm"]},
+        "validation": {
+            "enum": [
+                "auto",
+                "litellm",
+                "codex_cli",
+                "claude_code_cli",
+                "opencode_cli",
+            ]
+        },
         "display_order": 2,
         "help_key": "settings.agent.AGENT_GENERATION_BACKEND",
         "examples": [
             "AGENT_GENERATION_BACKEND=auto",
             "AGENT_GENERATION_BACKEND=litellm",
+            "AGENT_GENERATION_BACKEND=codex_cli",
+            "AGENT_GENERATION_BACKEND=claude_code_cli",
+            "AGENT_GENERATION_BACKEND=opencode_cli",
         ],
         "docs": [
             {
@@ -123,8 +137,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "title": "Acknowledge Agent Features Off",
         "description": (
             "Confirm that Q&A Agent features are not needed. Settles the Agent model "
-            "readiness check for CLI-only setups. Automatically superseded when a "
-            "tool-capable API model becomes available for Agent."
+            "readiness check when neither an API model nor a local CLI backend is available."
         ),
         "category": "agent",
         "data_type": "boolean",

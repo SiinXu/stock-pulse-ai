@@ -14,7 +14,7 @@ from tests.litellm_stub import ensure_litellm_stub
 ensure_litellm_stub()
 
 from src.agent.agents.base_agent import BaseAgent
-from src.agent.llm_adapter import LLMResponse
+from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.orchestrator import AgentOrchestrator
 from src.agent.protocols import AgentContext, StageResult, StageStatus
 from src.agent.runner import run_agent_loop
@@ -129,6 +129,42 @@ def test_run_agent_loop_emits_paired_stage_and_legacy_progress_events() -> None:
     assert "duration" in events[-1]
     assert any(event["type"] == "thinking" and "step" in event for event in events)
     assert any(event["type"] == "generating" and "step" in event for event in events)
+
+
+def test_run_agent_loop_emits_bounded_tool_details() -> None:
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[ToolCall(id="echo-1", name="echo", arguments={"message": "hello"})],
+            usage={},
+            provider="openai",
+            model="openai/gpt-test",
+        ),
+        LLMResponse(
+            content="Done.",
+            tool_calls=[],
+            usage={},
+            provider="openai",
+            model="openai/gpt-test",
+        ),
+    ]
+    events = []
+
+    result = run_agent_loop(
+        messages=[{"role": "user", "content": "Analyze"}],
+        tool_registry=_make_registry(),
+        llm_adapter=adapter,
+        max_steps=2,
+        progress_callback=events.append,
+    )
+
+    assert result.success is True
+    completed = next(event for event in events if event["type"] == "tool_done")
+    assert completed["meta"]["arguments"] == {"message": "hello"}
+    assert '"echo": "hello"' in completed["meta"]["result_preview"]
+    assert completed["meta"]["result_length"] > 0
+    assert completed["meta"]["cached"] is False
 
 
 def test_orchestrator_real_agent_path_does_not_emit_nested_agent_loop_stage() -> None:

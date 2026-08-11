@@ -33,6 +33,7 @@ from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_MESSAGE,
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    build_agent_tool_history_context,
     sanitize_agent_diagnostic,
 )
 from src.agent.runner import parse_dashboard_json_result, run_agent_loop
@@ -68,6 +69,7 @@ _EXECUTOR_COMPAT_EXPORTS = (
     build_agent_chat_context_bundle,
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
+    build_agent_tool_history_context,
     Callable,
     classify_result_terminal_state,
     _compose_agent_soul_prompt,

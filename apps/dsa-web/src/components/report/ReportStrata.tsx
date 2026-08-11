@@ -84,6 +84,8 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
   const strata = resolveReportStrataFromDetails(details);
+  const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
+  const bodyId = useId();
   const rawResult = details?.rawResult;
 
   const fallbackFactStatements = [

@@ -145,7 +145,7 @@ const todaysFocusResponseSchema = z.object({
 export async function getTodaysFocus(
   query: TodaysFocusQuery = {},
 ): Promise<TodaysFocusResponse> {
-  const response = await apiClient.get('/focus/today', {
+  const response = await apiClient.get('/api/v1/focus/today', {
     params: {
       max_items: query.maxItems,
       account_id: query.accountId,

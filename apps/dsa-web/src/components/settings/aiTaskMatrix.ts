@@ -47,21 +47,21 @@ const BACKEND_LABELS: Record<string, BilingualLabel> = {
   opencode_cli: createUiLanguageRecord("components.settings.aiTaskMatrix.BACKEND_LABELS.opencode_cli", { zh: 'OpenCode CLI（本地）', en: 'OpenCode CLI (local)' }),
 };
 
-export const GENERATION_ONLY_BACKEND_IDS = new Set([
+export const LOCAL_CLI_BACKEND_IDS = new Set([
   'codex_cli',
   'claude_code_cli',
   'opencode_cli',
 ]);
 
-export function isGenerationOnlyBackend(backendId: string): boolean {
-  return GENERATION_ONLY_BACKEND_IDS.has((backendId || '').trim().toLowerCase());
+export function isLocalCliBackend(backendId: string): boolean {
+  return LOCAL_CLI_BACKEND_IDS.has((backendId || '').trim().toLowerCase());
 }
 
 export const CLI_AGENT_CAPABILITY_NOTE = createUiLanguageRecord(
   'components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE',
   {
-    zh: 'Codex、Claude Code 和 OpenCode CLI 是报告生成方式，不是模型连接，因此不会出现在模型下拉中；问股 Agent 仍需选择支持工具调用的 API 模型。',
-    en: 'Codex, Claude Code, and OpenCode CLI are report-generation methods, not model connections, so they do not appear in model dropdowns; the Q&A Agent still requires a tool-capable API model.',
+    zh: 'Codex、Claude Code 和 OpenCode CLI 可通过受控工具桥接用于问股 Agent；请在 Agent 设置中选择生成方式。它们不是模型连接，因此不会出现在模型下拉中。',
+    en: 'Codex, Claude Code, and OpenCode CLI can run the Q&A Agent through the controlled tool bridge. Select one as the Agent generation method; CLI backends do not appear in model-connection dropdowns.',
   },
 );
 
@@ -99,13 +99,15 @@ export function resolveAiTaskMatrix(
 ): AiTaskRow[] {
   const { availableRoutes } = options;
   const backendId = (get('GENERATION_BACKEND') || 'litellm').trim();
+  const configuredAgentBackendId = (get('AGENT_GENERATION_BACKEND') || 'auto').trim();
+  const agentBackendId = configuredAgentBackendId === 'auto'
+    ? backendId
+    : configuredAgentBackendId;
   const fallbackBackendId = (get('GENERATION_FALLBACK_BACKEND') || '').trim();
   const reportModel = get('LITELLM_MODEL').trim();
   const agentModel = get('AGENT_LITELLM_MODEL').trim();
   const visionModel = get('VISION_MODEL').trim();
   const fallbackModels = splitModels(get('LITELLM_FALLBACK_MODELS'));
-  const label = backendLabel(backendId);
-  const isCliBackend = isGenerationOnlyBackend(backendId);
 
   const resolveApiModelStatus = (model: string): AiTaskStatus => {
     if (model.length === 0) {
@@ -117,8 +119,8 @@ export function resolveAiTaskMatrix(
     return 'active';
   };
 
-  const resolveStatus = (taskId: string, model: string): AiTaskStatus => {
-    if (isCliBackend && (taskId === 'report' || taskId === 'market_review')) {
+  const resolveStatus = (taskId: string, taskBackendId: string, model: string): AiTaskStatus => {
+    if (isLocalCliBackend(taskBackendId) && taskId !== 'vision') {
       return 'active';
     }
     return resolveApiModelStatus(model);
@@ -127,16 +129,17 @@ export function resolveAiTaskMatrix(
   const row = (
     id: string,
     labelText: BilingualLabel,
+    taskBackendId: string,
     model: string,
     inherited: boolean,
     fallbacks: string[],
   ): AiTaskRow => {
-    const status = resolveStatus(id, model);
+    const status = resolveStatus(id, taskBackendId, model);
     return {
       id,
       label: labelText,
-      backendId,
-      backendLabel: label,
+      backendId: taskBackendId,
+      backendLabel: backendLabel(taskBackendId),
       fallbackBackendId,
       primaryModel: model,
       primaryInherited: inherited,
@@ -147,9 +150,9 @@ export function resolveAiTaskMatrix(
   };
 
   return [
-    row('report', TASK_LABELS.report, reportModel, false, fallbackModels),
-    row('market_review', TASK_LABELS.market_review, reportModel, true, fallbackModels),
-    row('agent', TASK_LABELS.agent, agentModel || reportModel, agentModel.length === 0, fallbackModels),
-    row('vision', TASK_LABELS.vision, visionModel || reportModel, visionModel.length === 0, []),
+    row('report', TASK_LABELS.report, backendId, reportModel, false, fallbackModels),
+    row('market_review', TASK_LABELS.market_review, backendId, reportModel, true, fallbackModels),
+    row('agent', TASK_LABELS.agent, agentBackendId, agentModel || reportModel, agentModel.length === 0, fallbackModels),
+    row('vision', TASK_LABELS.vision, backendId, visionModel || reportModel, visionModel.length === 0, []),
   ];
 }

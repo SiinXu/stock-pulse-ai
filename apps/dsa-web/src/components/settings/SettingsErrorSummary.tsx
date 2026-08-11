@@ -18,11 +18,19 @@ export interface ErrorSummaryEntry {
   view: string;
 }
 
-interface SettingsErrorSummaryProps {
+type SettingsErrorSummaryBaseProps = {
   entries: ErrorSummaryEntry[];
   onJump: (entry: ErrorSummaryEntry) => void;
   language: UiLang;
-}
+};
+
+type SettingsErrorSummaryProps = SettingsErrorSummaryBaseProps & ({
+  dismissLabel: string;
+  onDismiss: () => void;
+} | {
+  dismissLabel?: never;
+  onDismiss?: never;
+});
 
 /**
  * Page-level validation summary. Lists every errored field across all sections
@@ -33,6 +41,8 @@ export const SettingsErrorSummary: React.FC<SettingsErrorSummaryProps> = ({
   entries,
   onJump,
   language,
+  dismissLabel,
+  onDismiss,
 }) => {
   if (entries.length === 0) {
     return null;
@@ -43,27 +53,33 @@ export const SettingsErrorSummary: React.FC<SettingsErrorSummaryProps> = ({
     { count: entries.length },
   );
   const jumpHint = text.jumpToField;
-  return (
-    <InlineAlert
-      variant="danger"
-      title={title}
-      message={(
-        <ul className="mt-1 space-y-1.5">
-          {entries.map((entry) => (
-            <li key={entry.key}>
-              <button
-                type="button"
-                onClick={() => onJump(entry)}
-                aria-label={`${jumpHint}: ${entry.label}`}
-                className="flex w-full flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-[hsl(var(--color-danger-alert-text)/0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              >
-                <span className="text-sm font-medium underline-offset-2 group-hover:underline">{entry.label}</span>
-                <span className="text-xs opacity-80">{entry.message}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    />
+  const message = (
+    <ul className="mt-1 space-y-1.5">
+      {entries.map((entry) => (
+        <li key={entry.key}>
+          <button
+            type="button"
+            onClick={() => onJump(entry)}
+            aria-label={`${jumpHint}: ${entry.label}`}
+            className="flex w-full flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-[hsl(var(--color-danger-alert-text)/0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <span className="text-sm font-medium underline-offset-2 group-hover:underline">{entry.label}</span>
+            <span className="text-xs opacity-80">{entry.message}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
+  if (dismissLabel && onDismiss) {
+    return (
+      <InlineAlert
+        variant="danger"
+        title={title}
+        dismissLabel={dismissLabel}
+        onDismiss={onDismiss}
+        message={message}
+      />
+    );
+  }
+  return <InlineAlert variant="danger" title={title} message={message} />;
 };

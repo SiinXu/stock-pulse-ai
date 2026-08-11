@@ -87,7 +87,7 @@ export interface ChatSessionMessage {
   created_at: string | null;
   error?: string | null;
   params?: Record<string, unknown> | null;
-  turn_id?: string;
+  turn_id?: string | null;
 }
 
 export interface ChatSessionDetail {
@@ -102,6 +102,8 @@ export interface ChatSessionDetail {
 export interface ResearchRequest {
   question: string;
   stockCode?: string;
+  sessionId?: string;
+  turnId?: string;
 }
 
 export interface ResearchResponse {
@@ -162,16 +164,21 @@ const sessionsResponseSchema = z.object({
 
 const sessionMessageSchema = z.object({
   id: z.string(),
-  role: z.string(),
+  role: z.enum(['user', 'assistant']),
   content: z.string(),
   created_at: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   params: z.record(z.string(), z.unknown()).nullable().optional(),
+  turn_id: z.string().nullable().optional(),
 }).passthrough();
 
 const sessionMessagesResponseSchema = z.object({
   session_id: z.string(),
   messages: z.array(sessionMessageSchema),
+  session_state: z.object({
+    selected_skill_ids: z.array(z.string()).nullable(),
+  }).passthrough(),
+  turn_identity_supported: z.boolean(),
 }).passthrough();
 
 function parseSnakeCasePayload<T>(
@@ -205,16 +212,18 @@ function parseSnakeCasePayload<T>(
 }
 
 export const agentApi = {
-  // Deep Research is synchronous (no task id / SSE); it can take up to ~180s,
-  // so allow a long timeout and support cancellation via an AbortSignal.
-  async research(
-    payload: ResearchRequest,
-    options?: { signal?: AbortSignal },
-  ): Promise<ResearchResponse> {
+  // Deep Research can take up to ~180s. The server persists session-bound
+  // runs, including when the page stops waiting for the HTTP response.
+  async research(payload: ResearchRequest): Promise<ResearchResponse> {
     const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/agent/research',
-      { question: payload.question, stock_code: payload.stockCode },
-      { timeout: 200000, signal: options?.signal },
+      {
+        question: payload.question,
+        stock_code: payload.stockCode,
+        session_id: payload.sessionId,
+        turn_id: payload.turnId,
+      },
+      { timeout: 200000 },
     );
     const parsed = parseSnakeCasePayload<ResearchResponse>(
       response.data,
@@ -257,16 +266,15 @@ export const agentApi = {
     );
     return data.sessions;
   },
-  async getChatSessionMessages(sessionId: string): Promise<ChatSessionMessage[]> {
+  async getChatSessionMessages(sessionId: string): Promise<ChatSessionDetail> {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`,
     );
-    const data = parseSnakeCasePayload<{ messages: ChatSessionMessage[] }>(
+    return parseSnakeCasePayload<ChatSessionDetail>(
       response.data,
       sessionMessagesResponseSchema,
       'SessionMessagesResponse',
     );
-    return data.messages;
   },
   async deleteChatSession(sessionId: string): Promise<void> {
     // OpenAPI response body is unknown; no structured validation.

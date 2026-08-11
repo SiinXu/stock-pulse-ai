@@ -30,14 +30,14 @@ function exportedVisualComponentNames(): string[] {
     return [...source.matchAll(/export\s+(?:const|function)\s+([A-Z][A-Za-z0-9_]*)/g)]
       .map((match: RegExpMatchArray) => match[1]);
   });
-  return names.filter((name) => name !== 'ThemeProvider').sort();
+  return names.filter((name) => name !== 'ThemeProvider' && name !== name.toUpperCase()).sort();
 }
 
 describe('playground catalog', () => {
   it('uses stable, unique ids and valid source paths', () => {
     const ids = PLAYGROUND_CATALOG.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(PLAYGROUND_CATALOG).toHaveLength(200);
+    expect(PLAYGROUND_CATALOG).toHaveLength(206);
     for (const entry of PLAYGROUND_CATALOG) {
       expect(fs.existsSync(path.join(sourceRoot, entry.sourcePath))).toBe(true);
       expect(entry.scenarios.length).toBeGreaterThan(0);

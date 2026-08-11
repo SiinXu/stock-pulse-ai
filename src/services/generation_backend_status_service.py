@@ -466,7 +466,10 @@ class GenerationBackendStatusService:
             "available": available,
             "health_status": current_health,
             "supports_json": capabilities.supports_json,
-            "supports_tools": capabilities.supports_tools,
+            "supports_tools": (
+                capabilities.supports_tools
+                or backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS
+            ),
             "supports_stream": capabilities.supports_stream,
             "supports_vision": capabilities.supports_vision,
             "is_primary": is_primary,

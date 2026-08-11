@@ -936,6 +936,29 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
 
         self.assertEqual(env["SNAPSHOT_SOURCE_PRIORITY"], "tushare,sina,efinance,akshare_em,em_datacenter")
 
+    def test_alphasift_runtime_preserves_custom_channel_wire_model_id(self) -> None:
+        config = Config(
+            llm_channels=[
+                {
+                    "name": "custom",
+                    "provider_id": "custom",
+                    "protocol": "openai",
+                    "enabled": True,
+                    "base_url": "https://proxy.example.com/v1",
+                    "api_keys": ["runtime-key"],
+                    "models": ["openai/gpt-custom"],
+                    "raw_models": ["gpt-custom"],
+                    "model_id_mode": "literal",
+                }
+            ],
+        )
+
+        env = alphasift_service._build_alphasift_runtime_env(config)
+
+        self.assertEqual(env["LLM_CUSTOM_PROVIDER"], "custom")
+        self.assertEqual(env["LLM_CUSTOM_MODELS"], "gpt-custom")
+        self.assertEqual(env["LLM_CUSTOM_MODEL_ID_MODE"], "literal")
+
     def test_screen_preserves_explicit_candidate_context_provider_override(self) -> None:
         config = self._config(enabled=True)
         captured: dict[str, object] = {}

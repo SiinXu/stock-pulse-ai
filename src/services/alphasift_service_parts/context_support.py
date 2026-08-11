@@ -230,12 +230,18 @@ def _normalize_dsa_llm_channels(config: Config) -> List[Dict[str, Any]]:
         name = _env_text(raw.get("name")) or f"channel{index + 1}"
         api_keys = _dedupe_strings(raw.get("api_keys") if isinstance(raw.get("api_keys"), list) else [])
         models = _dedupe_strings(raw.get("models") if isinstance(raw.get("models"), list) else [])
+        raw_models = _dedupe_strings(
+            raw.get("raw_models") if isinstance(raw.get("raw_models"), list) else []
+        )
         channel = {
             "name": name,
+            "provider_id": _env_text(raw.get("provider_id")),
             "protocol": _env_text(raw.get("protocol")),
             "base_url": _env_text(raw.get("base_url")),
             "api_keys": api_keys,
             "models": models,
+            "raw_models": raw_models or models,
+            "model_id_mode": _env_text(raw.get("model_id_mode")) or "route",
             "extra_headers": raw.get("extra_headers") if isinstance(raw.get("extra_headers"), dict) else {},
             "enabled": bool(raw.get("enabled", True)),
         }

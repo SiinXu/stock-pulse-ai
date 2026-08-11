@@ -688,7 +688,11 @@ def _build_alphasift_runtime_env(config: Config, *, max_results: Optional[int] =
             put(f"LLM_{prefix}_PROTOCOL", channel.get("protocol"))
             put(f"LLM_{prefix}_BASE_URL", channel.get("base_url"))
             put(f"LLM_{prefix}_API_KEYS", ",".join(channel.get("api_keys") or []))
-            put(f"LLM_{prefix}_MODELS", ",".join(channel.get("models") or []))
+            put(
+                f"LLM_{prefix}_MODELS",
+                ",".join(channel.get("raw_models") or channel.get("models") or []),
+            )
+            put(f"LLM_{prefix}_MODEL_ID_MODE", channel.get("model_id_mode"))
             if channel.get("extra_headers"):
                 put(
                     f"LLM_{prefix}_EXTRA_HEADERS",

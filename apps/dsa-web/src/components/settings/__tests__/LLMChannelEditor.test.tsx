@@ -1805,6 +1805,61 @@ describe('LLMChannelEditor', () => {
     });
   });
 
+  it('reuses a persisted masked secret when testing a regular connection', async () => {
+    testLLMChannel.mockResolvedValue({ success: true, message: 'ok' });
+    const maskedItems = OPENAI_ITEMS.map((item) => (
+      item.key === 'LLM_OPENAI_API_KEY'
+        ? { ...item, value: '******', rawValueExists: true }
+        : item
+    ));
+    renderWithRouter(
+      <LLMChannelEditor
+        items={maskedItems}
+        providers={PROVIDERS}
+        maskToken="******"
+      />,
+    );
+
+    fireEvent.click(within(connectionCard()).getByRole('button', { name: '测试' }));
+
+    await waitFor(() => expect(testLLMChannel).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: '******',
+      useSavedSecret: true,
+    })));
+  });
+
+  it('presents a saved masked secret as replace-only instead of revealable content', async () => {
+    const onDraftItemsChange = vi.fn();
+    const maskedItems = OPENAI_ITEMS.map((item) => (
+      item.key === 'LLM_OPENAI_API_KEY'
+        ? { ...item, value: '******', rawValueExists: true }
+        : item
+    ));
+    renderWithRouter(
+      <LLMChannelEditor
+        items={maskedItems}
+        providers={PROVIDERS}
+        maskToken="******"
+        onDraftItemsChange={onDraftItemsChange}
+      />,
+    );
+
+    const dialog = editConnection();
+    const input = within(dialog).getByLabelText('API 密钥');
+    expect(input).toHaveValue('');
+    expect(input).toHaveAttribute('placeholder', '密钥已保存；输入新密钥可替换');
+    expect(within(dialog).getByText('出于安全，已保存的密钥不会回显。')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '显示内容' })).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'replacement-secret' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() => expect(lastDraft(onDraftItemsChange)).toContainEqual({
+      key: 'LLM_OPENAI_API_KEY',
+      value: 'replacement-secret',
+    }));
+  });
+
   it('returns to an empty draft when an edit is restored to the saved value', async () => {
     const onDraftItemsChange = vi.fn();
     renderWithRouter(
@@ -2214,6 +2269,53 @@ describe('LLMChannelEditor', () => {
     expect(within(dialog).queryByText('gpt-5.4-mini')).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'gpt-5.5' }));
     expect(within(dialog).getAllByRole('button', { name: '移除模型 gpt-5.5' }).length).toBeGreaterThan(0);
+  });
+
+  it('preserves provider-prefixed model IDs discovered from a custom service', async () => {
+    discoverLLMChannelModels.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      models: ['openai/gpt-5.6-sol'],
+    });
+    const onDraftItemsChange = vi.fn();
+    const dialog = openAddAfterRender({ onDraftItemsChange });
+    selectProvider('custom');
+    fireEvent.change(within(dialog).getByLabelText('服务地址'), {
+      target: { value: 'https://proxy.example/v1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('API 密钥'), {
+      target: { value: 'sk-test' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '获取模型' }));
+    await within(dialog).findByTestId('model-multi-select');
+    fireEvent.click(within(dialog).getByRole('button', { name: '选择模型' }));
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'openai/gpt-5.6-sol' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '添加到配置' }));
+
+    await waitFor(() => {
+      const draft = lastDraft(onDraftItemsChange);
+      expect(draft).toContainEqual({ key: 'LLM_CUSTOM_MODELS', value: 'openai/gpt-5.6-sol' });
+      expect(draft).toContainEqual({ key: 'LLM_CUSTOM_MODEL_ID_MODE', value: 'literal' });
+    });
+  });
+
+  it('keeps manually entered custom model IDs in compatible route mode', async () => {
+    const onDraftItemsChange = vi.fn();
+    const dialog = openAddAfterRender({ onDraftItemsChange });
+    selectProvider('custom');
+    fireEvent.change(within(dialog).getByLabelText('服务地址'), {
+      target: { value: 'https://proxy.example/v1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('API 密钥'), {
+      target: { value: 'sk-test' },
+    });
+    addManualModels(['openai/gpt-4o-mini']);
+    fireEvent.click(within(dialog).getByRole('button', { name: '添加到配置' }));
+
+    await waitFor(() => expect(lastDraft(onDraftItemsChange)).toContainEqual({
+      key: 'LLM_CUSTOM_MODEL_ID_MODE',
+      value: 'route',
+    }));
   });
 
   it('distinguishes an empty discovery result from a request error', async () => {
