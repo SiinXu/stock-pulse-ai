@@ -7,12 +7,8 @@ on:
     branches: [main]
   push:
     branches: [main]
-  # Merge Queue: full-tier gates run here once per queued merge, not on every
-  # PR resync. Required check *names* must still report for merge_group events.
-  merge_group:
 
-# PRs share a group by PR number; pushes to main share ci-refs/heads/main;
-# merge_group uses the merge ref so queued merges do not cancel each other.
+# PRs share a group by PR number; pushes to main share ci-refs/heads/main.
 # cancel-in-progress drops superseded runs (merge-burst on main or force-push-like
 # rapid PR updates) so only the newest revision keeps consuming runners.
 concurrency:
@@ -40,7 +36,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: 🧭 Filter paths
         id: filter
-        if: github.event_name != 'merge_group'
         uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         with:
           filters: |
@@ -110,15 +105,15 @@ jobs:
         run: python scripts/check_ai_assets.py
 
   # ---------------------------------------------------------------------------
-  # PR / push tier: fast backend-gate (selective pytest; full suite on uncertain
-  # path maps). Required check name: backend-gate
+  # PR tier: fast backend-gate (selective pytest; full suite on uncertain path
+  # maps). Required check name: backend-gate
   # ---------------------------------------------------------------------------
   backend-gate-pr:
     name: backend-gate
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [changes, ai-governance]
-    if: needs.changes.outputs.backend == 'true'
+    if: github.event_name == 'pull_request' && needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
     steps:
@@ -176,29 +171,23 @@ jobs:
         run: ./scripts/ci_gate.sh flake8
       - name: ✅ Local deterministic checks
         run: ./scripts/ci_gate.sh deterministic
-      # PR tier: path-mapped pytest (FULL fallback when infrastructure is touched).
-      # Push-to-main: full offline suite + coverage floor.
       - name: ✅ Selective offline tests (PR tier)
-        if: github.event_name == 'pull_request'
         env:
           CI_SELECT_BASE: origin/main
         run: |
           git fetch --no-tags --depth=1 origin main 2>/dev/null || true
           ./scripts/ci_gate.sh offline-tests-selective
-      - name: ✅ Offline test suite (push-to-main)
-        if: github.event_name != 'pull_request'
-        run: ./scripts/ci_gate.sh offline-tests
 
   # ---------------------------------------------------------------------------
-  # Merge-queue tier: sharded full offline suite. Coverage floor runs once after
-  # combine. Required check name still: backend-gate (summary job below).
+  # Push-to-main tier: sharded full offline suite. Coverage floor runs once
+  # after combine. Required check name still: backend-gate (summary job below).
   # ---------------------------------------------------------------------------
   backend-tests:
     name: backend-tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [ai-governance]
-    if: github.event_name == 'merge_group'
+    needs: [changes, ai-governance]
+    if: github.event_name == 'push' && needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
     strategy:
@@ -272,18 +261,17 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-shard-${{ matrix.shard }}
-          path: |
-            ${{ runner.temp }}/cov/.coverage.shard${{ matrix.shard }}
-            ${{ runner.temp }}/cov/coverage-shard-${{ matrix.shard }}.json
+          path: ${{ runner.temp }}/cov/.coverage.shard${{ matrix.shard }}
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 3
 
-  backend-gate-mq:
+  backend-gate-main:
     name: backend-gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [ai-governance, backend-tests]
-    if: always() && github.event_name == 'merge_group'
+    needs: [changes, ai-governance, backend-tests]
+    if: always() && github.event_name == 'push' && needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
     steps:
@@ -330,7 +318,7 @@ jobs:
           COVERAGE_SHARD_DIR: ${{ runner.temp }}/cov-in
         run: ./scripts/ci_gate.sh offline-tests-combine
 
-  # PR tier: 3.10 smoke (not a second full suite). Merge-group: full offline
+  # PR tier: 3.10 smoke (not a second full suite). Push-to-main: full offline
   # suite on 3.10 so the floor runtime stays real on the declared Python floor.
   python-minimum:
     name: python-minimum

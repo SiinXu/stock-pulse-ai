@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 import subprocess
 import sys
@@ -45,7 +46,12 @@ def load_durations(path: Path = DEFAULT_DURATIONS_PATH) -> dict[str, float]:
     for test_file, duration in payload["durations"].items():
         if not isinstance(test_file, str) or not test_file.startswith("tests/"):
             raise ValueError(f"Invalid test path in CI duration data: {test_file!r}")
-        if not isinstance(duration, (int, float)) or duration <= 0:
+        if (
+            isinstance(duration, bool)
+            or not isinstance(duration, (int, float))
+            or not math.isfinite(duration)
+            or duration <= 0
+        ):
             raise ValueError(f"Invalid duration for {test_file}: {duration!r}")
         durations[test_file] = float(duration)
     return durations
@@ -64,10 +70,26 @@ def partition_test_files(
         raise ValueError("test_files must not contain duplicates")
     if initial_totals is None:
         initial_totals = [0.0] * splits
-    if len(initial_totals) != splits or any(total < 0 for total in initial_totals):
+    if len(initial_totals) != splits or any(
+        isinstance(total, bool)
+        or not isinstance(total, (int, float))
+        or not math.isfinite(total)
+        or total < 0
+        for total in initial_totals
+    ):
         raise ValueError("initial_totals must contain one non-negative value per split")
 
-    known = [float(value) for value in durations.values() if value > 0]
+    invalid_weights = [
+        value
+        for value in durations.values()
+        if isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or value <= 0
+    ]
+    if invalid_weights:
+        raise ValueError("durations must contain only positive finite numbers")
+    known = [float(value) for value in durations.values()]
     fallback = statistics.median(known) if known else 1.0
     weights = {test_file: float(durations.get(test_file, fallback)) for test_file in test_files}
     groups: list[list[str]] = [[] for _ in range(splits)]

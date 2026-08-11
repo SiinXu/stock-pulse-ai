@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [Chore] CI throughput: two-tier gates (selective pytest on PR, sharded full suite + combined coverage on merge_group), python-minimum smoke on PR, Merge Queue ready triggers.
+- [Chore] Run path-selective backend tests on pull requests and duration-balanced full-suite shards with combined coverage on pushes to main.
 - [Tests] Keep native tool-trace redaction coverage aligned with the shared Agent session deadline contract.
 - [Fixed] Keep Workbench history reachable through its compact Popover before a report is selected, and align end-to-end journeys with the explicit history and fallback-model selectors.
 - [Fixed] Share the Agent session deadline with per-tool completion fences so parallel late tools retain deterministic timeout evidence.
