@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type React from 'react';
+import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
 import { eventCalendarApi } from '../../api/eventCalendar';
@@ -25,6 +26,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { EVENT_CALENDAR_TEXT } from '../../locales/eventCalendar';
 import type { CalendarEventItem, CorporateEventCategory, EventCalendarResponse } from '../../types/eventCalendar';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 
 function isoDate(value: Date): string {
   const year = value.getFullYear();
@@ -158,9 +160,19 @@ const EventCalendarWorkspace: React.FC = () => {
         title={text.title}
         description={text.description}
         actions={(
-          <Button type="button" variant="secondary" onClick={() => void load()}>
-            {text.refresh}
-          </Button>
+          <>
+            <Link
+              to={APP_ROUTE_PATHS.eventAlerts}
+              data-testid="event-calendar-open-event-alerts"
+              data-control="navigation-link"
+              className="control-hit-target inline-flex min-h-7 items-center rounded-md px-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+            >
+              {text.openEventAlerts}
+            </Link>
+            <Button type="button" variant="secondary" onClick={() => void load()}>
+              {text.refresh}
+            </Button>
+          </>
         )}
       />
 

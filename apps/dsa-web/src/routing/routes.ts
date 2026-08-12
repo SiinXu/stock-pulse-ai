@@ -18,6 +18,7 @@ export const APP_ROUTE_PATHS = {
   researchBacktest: '/research/backtest',
   researchSkillOutcomes: '/research/skill-outcomes',
   eventCalendar: '/events',
+  eventAlerts: '/event-alerts',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
   notifications: '/notifications',
