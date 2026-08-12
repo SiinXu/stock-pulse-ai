@@ -700,6 +700,79 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("temperature", mock_completion.call_args.kwargs)
 
     @patch("litellm.completion")
+    def test_test_llm_channel_reuses_saved_secret_for_unchanged_connection(
+        self,
+        mock_completion,
+    ) -> None:
+        saved_secret = "saved-custom-secret-value"
+        self._rewrite_env(
+            "LLM_CHANNELS=custom",
+            "LLM_CUSTOM_PROVIDER=custom",
+            "LLM_CUSTOM_PROTOCOL=openai",
+            "LLM_CUSTOM_BASE_URL=https://models.example/v1",
+            f"LLM_CUSTOM_API_KEY={saved_secret}",
+            "LLM_CUSTOM_MODELS=gpt-custom",
+            "LLM_CUSTOM_ENABLED=true",
+        )
+        mock_completion.return_value = type(
+            "MockResponse",
+            (),
+            {
+                "choices": [
+                    type(
+                        "Choice",
+                        (),
+                        {"message": type("Message", (), {"content": "OK"})()},
+                    )()
+                ],
+            },
+        )()
+
+        payload = self.service.test_llm_channel(
+            name="custom",
+            provider_id="custom",
+            protocol="openai",
+            base_url="https://models.example/v1",
+            api_key="******",
+            models=["gpt-custom"],
+            use_saved_secret=True,
+        )
+
+        self.assertTrue(payload["success"])
+        self.assertEqual(mock_completion.call_args.kwargs["api_key"], saved_secret)
+        self.assertNotIn(saved_secret, str(payload))
+
+    @patch("litellm.completion")
+    def test_test_llm_channel_rejects_saved_secret_after_endpoint_change(
+        self,
+        mock_completion,
+    ) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=custom",
+            "LLM_CUSTOM_PROVIDER=custom",
+            "LLM_CUSTOM_PROTOCOL=openai",
+            "LLM_CUSTOM_BASE_URL=https://saved.example/v1",
+            "LLM_CUSTOM_API_KEY=saved-custom-secret-value",
+            "LLM_CUSTOM_MODELS=gpt-custom",
+            "LLM_CUSTOM_ENABLED=true",
+        )
+
+        payload = self.service.test_llm_channel(
+            name="custom",
+            provider_id="custom",
+            protocol="openai",
+            base_url="https://changed.example/v1",
+            api_key="******",
+            models=["gpt-custom"],
+            use_saved_secret=True,
+        )
+
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["error_code"], "saved_secret_scope_mismatch")
+        self.assertEqual(payload["details"]["reason"], "endpoint_mismatch")
+        mock_completion.assert_not_called()
+
+    @patch("litellm.completion")
     @patch("src.services.system_config_service.Config._load_from_env")
     def test_test_llm_channel_recovers_from_unsupported_temperature(
         self,
@@ -760,6 +833,30 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(payload["success"])
         self.assertEqual(payload["resolved_model"], "openai/gpt-4o-mini")
         self.assertEqual(mock_completion.call_args.kwargs["temperature"], 0.42)
+
+    @patch("litellm.completion")
+    def test_test_custom_channel_preserves_provider_prefixed_wire_model(
+        self,
+        mock_completion,
+    ) -> None:
+        mock_completion.return_value = self._mock_completion_response("OK")
+
+        payload = self.service.test_llm_channel(
+            name="custom",
+            provider_id="custom",
+            protocol="openai",
+            base_url="https://proxy.example.com/v1",
+            api_key="sk-test-value",
+            models=["openai/gpt-5.6-sol"],
+            model_id_mode="literal",
+        )
+
+        self.assertTrue(payload["success"], payload)
+        self.assertEqual(payload["resolved_model"], "openai/openai/gpt-5.6-sol")
+        self.assertEqual(
+            mock_completion.call_args.kwargs["model"],
+            "openai/openai/gpt-5.6-sol",
+        )
 
     @patch("litellm.completion")
     def test_test_llm_channel_classifies_common_failure_scenarios(self, mock_completion) -> None:

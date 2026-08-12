@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 """Watchlist API regressions for stock-code variant matching."""
 
-from api.v1.endpoints.stocks import add_to_watchlist, get_watchlist, remove_from_watchlist
+from api.v1.endpoints.stocks import (
+    _validate_and_normalize_stock_code,
+    add_to_watchlist,
+    get_watchlist,
+    remove_from_watchlist,
+)
 from api.v1.schemas.history import WatchlistRequest
 
 
@@ -85,3 +90,29 @@ def test_watchlist_add_normalizes_existing_mixed_separators_on_write() -> None:
     assert response.stock_codes == ["600519", "300750", "AAPL"]
     assert service.stock_list == "600519,300750,AAPL"
     assert service.update_calls == ["600519,300750,AAPL"]
+
+
+def test_raw_watchlist_api_accepts_and_stores_bare_four_digit_hk() -> None:
+    service = FakeSystemConfigService("")
+
+    response = add_to_watchlist(
+        WatchlistRequest(stock_code="0941"),
+        service=service,
+    )
+
+    assert response.stock_codes == ["HK00941"]
+    assert service.stock_list == "HK00941"
+
+
+def test_raw_watchlist_api_canonicalizes_five_digit_hk_on_new_write() -> None:
+    service = FakeSystemConfigService("")
+
+    add_to_watchlist(WatchlistRequest(stock_code="00700"), service=service)
+
+    assert service.stock_list == "HK00700"
+
+
+def test_stock_api_shared_boundary_preserves_explicit_suffix_markets() -> None:
+    assert _validate_and_normalize_stock_code("7203.T") == "7203.T"
+    assert _validate_and_normalize_stock_code("2330.TW") == "2330.TW"
+    assert _validate_and_normalize_stock_code("005930.KS") == "005930.KS"

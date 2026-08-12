@@ -60,8 +60,8 @@ export function isGenerationOnlyBackend(backendId: string): boolean {
 export const CLI_AGENT_CAPABILITY_NOTE = createUiLanguageRecord(
   'components.settings.aiTaskMatrix.CLI_AGENT_CAPABILITY_NOTE',
   {
-    zh: 'CLI 后端仅覆盖报告生成；问股 Agent 需要支持工具调用的 API 模型（否则不可用）。',
-    en: 'CLI backends cover report generation only; the Q&A Agent requires a tool-capable API model (or will be unavailable).',
+    zh: 'Codex、Claude Code 和 OpenCode CLI 是本地生成方式，不会出现在模型下拉中；它们可通过受控工具桥接运行问股 Agent。',
+    en: 'Codex, Claude Code, and OpenCode CLI are local generation methods, so they do not appear in model dropdowns; they can run the Q&A Agent through the controlled tool bridge.',
   },
 );
 
@@ -99,13 +99,15 @@ export function resolveAiTaskMatrix(
 ): AiTaskRow[] {
   const { availableRoutes } = options;
   const backendId = (get('GENERATION_BACKEND') || 'litellm').trim();
+  const configuredAgentBackendId = (get('AGENT_GENERATION_BACKEND') || 'auto').trim();
+  const agentBackendId = configuredAgentBackendId === 'auto'
+    ? backendId
+    : configuredAgentBackendId;
   const fallbackBackendId = (get('GENERATION_FALLBACK_BACKEND') || '').trim();
   const reportModel = get('LITELLM_MODEL').trim();
   const agentModel = get('AGENT_LITELLM_MODEL').trim();
   const visionModel = get('VISION_MODEL').trim();
   const fallbackModels = splitModels(get('LITELLM_FALLBACK_MODELS'));
-  const label = backendLabel(backendId);
-  const isCliBackend = isGenerationOnlyBackend(backendId);
 
   const resolveApiModelStatus = (model: string): AiTaskStatus => {
     if (model.length === 0) {
@@ -117,8 +119,15 @@ export function resolveAiTaskMatrix(
     return 'active';
   };
 
-  const resolveStatus = (taskId: string, model: string): AiTaskStatus => {
-    if (isCliBackend && (taskId === 'report' || taskId === 'market_review')) {
+  const resolveStatus = (
+    taskId: string,
+    model: string,
+    taskBackendId: string,
+  ): AiTaskStatus => {
+    if (
+      isGenerationOnlyBackend(taskBackendId)
+      && (taskId === 'report' || taskId === 'market_review' || taskId === 'agent')
+    ) {
       return 'active';
     }
     return resolveApiModelStatus(model);
@@ -130,14 +139,16 @@ export function resolveAiTaskMatrix(
     model: string,
     inherited: boolean,
     fallbacks: string[],
+    taskBackendId: string,
+    taskFallbackBackendId: string,
   ): AiTaskRow => {
-    const status = resolveStatus(id, model);
+    const status = resolveStatus(id, model, taskBackendId);
     return {
       id,
       label: labelText,
-      backendId,
-      backendLabel: label,
-      fallbackBackendId,
+      backendId: taskBackendId,
+      backendLabel: backendLabel(taskBackendId),
+      fallbackBackendId: taskFallbackBackendId,
       primaryModel: model,
       primaryInherited: inherited,
       fallbackModels: fallbacks,
@@ -147,9 +158,17 @@ export function resolveAiTaskMatrix(
   };
 
   return [
-    row('report', TASK_LABELS.report, reportModel, false, fallbackModels),
-    row('market_review', TASK_LABELS.market_review, reportModel, true, fallbackModels),
-    row('agent', TASK_LABELS.agent, agentModel || reportModel, agentModel.length === 0, fallbackModels),
-    row('vision', TASK_LABELS.vision, visionModel || reportModel, visionModel.length === 0, []),
+    row('report', TASK_LABELS.report, reportModel, false, fallbackModels, backendId, fallbackBackendId),
+    row('market_review', TASK_LABELS.market_review, reportModel, true, fallbackModels, backendId, fallbackBackendId),
+    row(
+      'agent',
+      TASK_LABELS.agent,
+      agentModel || reportModel,
+      agentModel.length === 0,
+      isGenerationOnlyBackend(agentBackendId) ? [] : fallbackModels,
+      agentBackendId,
+      '',
+    ),
+    row('vision', TASK_LABELS.vision, visionModel || reportModel, visionModel.length === 0, [], backendId, ''),
   ];
 }

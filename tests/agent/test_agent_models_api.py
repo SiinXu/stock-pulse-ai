@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from api.v1.endpoints import agent
 from src.config import Config
-from src.llm.backend_registry import GENERATION_ONLY_BACKEND_IDS
+from src.llm.backend_registry import LOCAL_CLI_GENERATION_BACKEND_IDS
 from src.services.agent_model_service import list_agent_model_deployments
 
 
@@ -52,8 +52,8 @@ class AgentModelsApiTestCase(unittest.TestCase):
         self.assertTrue(deployments[0]["is_primary"])
         self.assertFalse("api_key" in str(deployments))
 
-    def test_models_endpoint_does_not_expose_local_cli_as_litellm_deployment(self) -> None:
-        for backend in sorted(GENERATION_ONLY_BACKEND_IDS):
+    def test_models_endpoint_exposes_selected_local_cli_agent_backend(self) -> None:
+        for backend in sorted(LOCAL_CLI_GENERATION_BACKEND_IDS):
             with self.subTest(backend=backend):
                 config = _build_config(
                     agent_generation_backend=backend,
@@ -66,7 +66,21 @@ class AgentModelsApiTestCase(unittest.TestCase):
                     ],
                 )
 
-                self.assertEqual(list_agent_model_deployments(config), [])
+                self.assertEqual(
+                    list_agent_model_deployments(config),
+                    [
+                        {
+                            "deployment_id": f"local_cli:{backend}",
+                            "model": backend,
+                            "provider": backend,
+                            "source": "local_cli",
+                            "api_base": None,
+                            "deployment_name": backend,
+                            "is_primary": True,
+                            "is_fallback": False,
+                        }
+                    ],
+                )
 
     def test_models_endpoint_returns_channel_deployments_with_api_base(self) -> None:
         config = _build_config(

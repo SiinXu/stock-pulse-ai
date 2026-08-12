@@ -120,6 +120,7 @@ stock-pulse-ai/
 | `REPORT_MODE` | Jinja 报告呈现模式（`brief` / `standard` / `research`，默认 `standard`）。`brief` 仅 Decision Card + 关键风险；`standard` 为 Decision Card + 主要分析段落；`research` 为全量细节与更高 strata 上限。硬性上限永不丢弃 Decision Card。单次可通过 `extra_context.report_mode` 覆盖。仅 `REPORT_RENDERER_ENABLED=true` 时生效。 | 可选 |
 | `REPORT_SUMMARY_ONLY` | 仅分析结果摘要：设为 `true` 时只推送汇总，不含个股详情；多股时适合快速浏览（默认 false，Issue #262） | 可选 |
 | `REPORT_SHOW_LLM_MODEL` | 通知报告底部是否显示本次分析使用的 LLM 模型名称，默认 `true`；设为 `false` 可隐藏运行时模型信息。该变量仅调整展示，不影响 provider/model/Base URL、LiteLLM 路由或运行时模型保存/迁移/清理语义。 | 可选 |
+| `NOTIFICATION_DELTA_FIRST` | 是否在个股出站通知顶部增加确定性的“较上次分析变化”摘要，默认 `false`。首次分析、无实质变化和暂时无法对比会明确区分；只读取已持久化历史，不额外调用模型，也不修改本地保存的报告。 | 可选 |
 | `REPORT_TEMPLATES_DIR` | Jinja2 模板目录（相对项目根，默认 `templates`） | 可选 |
 | `REPORT_RENDERER_ENABLED` | 启用 Jinja2 模板渲染（默认 `false`，保证零回归） | 可选 |
 | `REPORT_INTEGRITY_ENABLED` | 启用报告完整性校验，缺失必填字段时重试或占位补全（默认 `true`） | 可选 |
@@ -144,6 +145,8 @@ stock-pulse-ai/
 | `PREFETCH_REALTIME_QUOTES` | 设为 `false` 可禁用实时行情预取，避免 efinance/akshare_em 全市场拉取（默认 true） | 可选 |
 
 > 兼容性说明：`REPORT_SHOW_LLM_MODEL` 维持默认 `true` 的原始展示语义，关闭时只影响底部模型文案输出。该配置不会变更 provider/model/Base URL、LiteLLM 路由、模型保存、迁移或清理语义；回退方式为恢复或删除该变量，并设为 `true`。
+
+> `NOTIFICATION_DELTA_FIRST` 只影响通知且默认关闭。对比或格式化失败不会阻断原通知；回退时删除该变量或设为 `false`，无需迁移已存数据。
 
 > 说明：`REPORT_LANGUAGE` 影响报告文本、Web 报告页固定文案与未显式指定语言的 Agent Chat 回复；WebUI 页面语言（导航、登录页、侧边栏、设置页、通用控件）使用独立状态，不与其联动。
 > WebUI 语言状态保存在浏览器 `localStorage` 的 `dsa.uiLanguage`，启动顺序为：
@@ -227,6 +230,8 @@ stock-pulse-ai/
 ---
 
 ## 环境变量完整列表
+
+> 完整键清单与配置项新增流程见 [环境变量清单与配置事实源](environment-variables.md)。本节只保留高频说明；修改配置后运行 `python scripts/check_config_doc_consistency.py` 检查 `.env.example`、注册表与文档是否同步。
 
 ### AI 模型配置
 
@@ -1419,11 +1424,13 @@ PUSHOVER_API_TOKEN=your_api_token
 
 ### 港股支持
 
-使用 `hk` 前缀指定港股代码：
+港股可使用裸 4/5 位数字、`hk` 前缀或 `.HK` 后缀：
 
 ```bash
 STOCK_LIST=600519,hk00700,hk01810
 ```
+
+CLI、Web、分析/自选 API、CSV/Excel/剪贴板智能导入以及 Bot 分析/深研共享同一输入规则。裸 4 位代码（如 `0941`）会先查询股票索引，未命中时规范为 `HK00941`；已收录的日股 `7203` 仍解析为 `7203.T`。`1810.HK`、`7203.T`、`2330.TW`、`005930.KS` 等显式市场形式，以及 API 中的显式市场参数，始终优先且不会被改判为港股。
 
 港股日线会跳过 efinance、pytdx、baostock 等不支持港股日线的数据源，避免把港股代码错配到非港股市场；默认改由 AkShare/Tushare/YFinance/Longbridge 等港股路径继续兜底。
 
@@ -1479,6 +1486,8 @@ LITELLM_FALLBACK_MODELS=anthropic/claude-sonnet-4-6,openai/gpt-5.4-mini
 > 兼容性说明：`/api/v1/stocks/extract-from-image` 响应在原 `codes` 基础上新增 `items` 字段。若下游客户端使用严格 JSON Schema 且不接受未知字段，请同步更新 schema。
 
 **智能导入**：除图片外，还支持 CSV/Excel 文件及剪贴板粘贴（`/api/v1/stocks/parse-import`），自动解析代码/名称列，名称→代码解析支持本地映射、拼音匹配及 AkShare 在线 fallback。依赖 `pypinyin`（拼音匹配）和 `openpyxl`（Excel 解析），已包含在 `requirements.txt` 中。
+
+- **代码规范化**：裸 4 位港股代码（如 `0941`）会输出为 `HK00941`；索引已收录的日股裸码（如 `7203`）仍优先输出 `7203.T`。显式前缀/后缀不受该默认规则影响。
 
 - **AkShare 名称解析缓存**：名称→代码解析使用 AkShare 在线 fallback 时，结果缓存 1 小时（TTL），避免频繁请求；首次调用或缓存过期后会自动刷新。
 - **CSV/Excel 列名**：支持 `code`、`股票代码`、`代码`、`name`、`股票名称`、`名称` 等（不区分大小写）；无表头时默认第 1 列为代码、第 2 列为名称。
@@ -1840,7 +1849,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 |------|------|------|
 | A股 | 6位数字 | `600519`、`000001`、`300750` |
 | 北交所 | 8/4/92 开头 6 位，支持 `BJ` 前缀或 `.BJ` 后缀 | `920748`、`BJ920493`、`920493.BJ` |
-| 港股 | hk + 5位数字 | `hk00700`、`hk09988` |
+| 港股 | 裸 4/5 位数字、`HK` 前缀或 `.HK` 后缀 | `0941`、`00700`、`hk00700`、`1810.HK` |
 | 美股 | 1-5 字母（可选 .X 后缀） | `AAPL`、`TSLA`、`BRK.B` |
 | 日股 | Yahoo 后缀 `.T` | `7203.T`、`6758.T` |
 | 韩股 | Yahoo 后缀 `.KS` / `.KQ` | `005930.KS`、`035720.KQ` |

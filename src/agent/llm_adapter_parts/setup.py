@@ -16,11 +16,11 @@ from src.config import (
     get_effective_agent_primary_model,
 )
 from src.llm.backend_registry import (
-    AUTO_AGENT_BACKEND_ID,
-    GENERATION_ONLY_BACKEND_IDS,
+    LOCAL_CLI_GENERATION_BACKEND_IDS as _LOCAL_CLI_GENERATION_BACKEND_IDS,
     LITELLM_BACKEND_ID,
     resolve_agent_generation_backend_id,
 )
+from src.llm.backend_factory import create_generation_backend as _create_generation_backend
 from src.llm.generation_backend import GenerationError, GenerationErrorCode
 from src.utils.sanitize import log_safe_exception
 
@@ -78,6 +78,25 @@ class _SetupMethods:
                 error_code="agent_backend_configuration_error",
             )
             return
+        if self._generation_backend_id in _LOCAL_CLI_GENERATION_BACKEND_IDS:
+            try:
+                backend = _create_generation_backend(
+                    self._generation_backend_id,
+                    config=config,
+                )
+                backend_error = backend.get_config_error()
+            except GenerationError as exc:
+                self._backend_error = exc
+                return
+            if backend_error is not None:
+                self._backend_error = backend_error
+                return
+            self._local_cli_backend = backend
+            logger.info(
+                "Agent LLM: local CLI tool bridge initialized (backend=%s)",
+                self._generation_backend_id,
+            )
+            return
         if self._generation_backend_id != LITELLM_BACKEND_ID:
             self._backend_error = GenerationError(
                 error_code=GenerationErrorCode.UNSUPPORTED_TOOL_CALLING,
@@ -117,34 +136,6 @@ class _SetupMethods:
             logger.error("Agent LLM unavailable: %s", self._route_resolution.reason)
             return
         if not litellm_model:
-            generation_backend = str(
-                getattr(config, "generation_backend", LITELLM_BACKEND_ID) or LITELLM_BACKEND_ID
-            ).strip().lower()
-            agent_backend = str(
-                getattr(config, "agent_generation_backend", AUTO_AGENT_BACKEND_ID)
-                or AUTO_AGENT_BACKEND_ID
-            ).strip().lower()
-            if generation_backend in GENERATION_ONLY_BACKEND_IDS and agent_backend == AUTO_AGENT_BACKEND_ID:
-                self._backend_error = GenerationError(
-                    error_code=GenerationErrorCode.UNSUPPORTED_TOOL_CALLING,
-                    stage="generation",
-                    retryable=False,
-                    fallbackable=False,
-                    backend=generation_backend,
-                    provider=generation_backend,
-                    details={
-                        "field": "AGENT_GENERATION_BACKEND",
-                        "requested_backend": AUTO_AGENT_BACKEND_ID,
-                        "generation_backend": generation_backend,
-                        "supported_tool_backend": LITELLM_BACKEND_ID,
-                        "reason": "litellm_agent_backend_unavailable",
-                    },
-                )
-                logger.error(
-                    "Agent auto backend cannot inherit %s because it does not support tool calling",
-                    generation_backend,
-                )
-                return
             logger.warning("Agent LLM: no effective primary model configured")
             return
 
@@ -223,11 +214,17 @@ class _SetupMethods:
         """True if litellm is configured and at least one API key is present."""
         if self._backend_error is not None:
             return False
-        return self._router is not None or self._litellm_available
+        return (
+            self._local_cli_backend is not None
+            or self._router is not None
+            or self._litellm_available
+        )
 
     @property
     def primary_provider(self) -> str:
         """Provider name extracted from litellm_model prefix."""
+        if getattr(self, "_local_cli_backend", None) is not None:
+            return self._generation_backend_id
         model = get_effective_agent_primary_model(self._config)
         if "/" in model:
             return model.split("/")[0]

@@ -4,6 +4,7 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { AlertRuleForm } from '../AlertRuleForm';
 import { chooseOption, openListbox } from '../../../test-utils';
+import type { AlertRuleItem } from '../../../types/alerts';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -45,7 +46,7 @@ describe('AlertRuleForm', () => {
   }
 
   it('seeds fields from an existing rule and submits an updated payload in edit mode', async () => {
-    const rule = {
+    const rule: AlertRuleItem = {
       id: 7,
       name: '旧名称',
       targetScope: 'single_symbol',
@@ -55,7 +56,7 @@ describe('AlertRuleForm', () => {
       severity: 'warning',
       enabled: true,
       source: 'api',
-    } as const;
+    };
 
     render(<AlertRuleForm mode="edit" initialRule={rule} onSubmit={onSubmit} />);
 
@@ -73,6 +74,46 @@ describe('AlertRuleForm', () => {
         alertType: 'price_cross',
         parameters: { direction: 'above', price: 1900 },
         enabled: true,
+      }));
+    });
+  });
+
+  it('preserves every corporate-event parameter through the edit form', async () => {
+    const rule: AlertRuleItem = {
+      id: 11,
+      name: 'Corporate event watch',
+      targetScope: 'single_symbol',
+      target: 'AAPL',
+      alertType: 'corporate_event',
+      parameters: {
+        eventCategories: ['earnings', 'regulatory'],
+        lookbackHours: 72,
+        minItems: 3,
+      },
+      severity: 'critical',
+      enabled: true,
+      source: 'api',
+    };
+
+    render(<AlertRuleForm mode="edit" initialRule={rule} onSubmit={onSubmit} />);
+
+    expect(screen.getByLabelText('业绩/财报')).toBeChecked();
+    expect(screen.getByLabelText('监管合规')).toBeChecked();
+    expect(screen.getByLabelText('股东变动')).not.toBeChecked();
+    expect(screen.getByLabelText('回看小时数')).toHaveValue(72);
+    expect(screen.getByLabelText('最少匹配条数')).toHaveValue(3);
+
+    fireEvent.change(screen.getByLabelText('回看小时数'), { target: { value: '96' } });
+    fireEvent.click(screen.getByRole('button', { name: '更新规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        alertType: 'corporate_event',
+        parameters: {
+          eventCategories: ['earnings', 'regulatory'],
+          lookbackHours: 96,
+          minItems: 3,
+        },
       }));
     });
   });

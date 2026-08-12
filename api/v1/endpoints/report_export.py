@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""History report export endpoints (Markdown / optional PDF).
+"""History report export endpoints (Markdown / HTML / optional PDF).
 
 Mounted under ``/history`` so paths match the existing report history surface
 without editing ``history.py`` (parallel-batch ownership boundary).
@@ -60,6 +60,14 @@ def _truncate_utf8(value: str, max_bytes: int) -> str:
     return encoded.decode("utf-8", errors="ignore")
 
 
+def _export_filename_suffix(filename: str) -> str:
+    lowered = str(filename).lower()
+    for suffix in (".pdf", ".html", ".htm", ".md"):
+        if lowered.endswith(suffix):
+            return ".html" if suffix == ".htm" else suffix
+    return ".md"
+
+
 def build_content_disposition(filename: str) -> str:
     """Build a bounded ASCII fallback plus RFC 5987 UTF-8 filename."""
     # Discard everything after the first line break instead of attempting to
@@ -69,8 +77,9 @@ def build_content_disposition(filename: str) -> str:
     normalized = unicodedata.normalize("NFKD", bounded)
     ascii_name = normalized.encode("ascii", errors="ignore").decode("ascii")
     ascii_name = re.sub(r"[^A-Za-z0-9._-]+", "_", ascii_name).strip("._")
-    suffix = ".pdf" if bounded.lower().endswith(".pdf") else ".md"
-    if not ascii_name or ascii_name in {"pdf", "md"}:
+    suffix = _export_filename_suffix(bounded)
+    bare_suffixes = {item.lstrip(".") for item in (".pdf", ".html", ".md")}
+    if not ascii_name or ascii_name in bare_suffixes:
         ascii_name = f"stockpulse-report{suffix}"
     elif not ascii_name.lower().endswith(suffix):
         ascii_name = f"{ascii_name[:56]}{suffix}"
@@ -90,9 +99,10 @@ def build_content_disposition(filename: str) -> str:
     summary="Report export capabilities",
     description=(
         "Return which report export formats are available in this process. "
-        "Markdown is always available. PDF requires the optional fpdf2 package "
-        "and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not "
-        "implemented in this release."
+        "Markdown is always available. HTML is the office-friendly format and "
+        "requires markdown-it-py from the optional report-export set. PDF "
+        "requires the optional fpdf2 package and a resolvable CJK/Unicode font. "
+        "DOCX/XLSX are not implemented; office_formats_status is html_only."
     ),
 )
 def get_report_export_capabilities(
@@ -113,6 +123,7 @@ def get_report_export_capabilities(
             "description": "Exported report file",
             "content": {
                 "text/markdown": {"schema": {"type": "string", "format": "binary"}},
+                "text/html": {"schema": {"type": "string", "format": "binary"}},
                 "application/pdf": {"schema": {"type": "string", "format": "binary"}},
             },
         },
@@ -122,19 +133,22 @@ def get_report_export_capabilities(
         404: {"description": "Report not found", "model": ErrorResponse},
         500: {"description": "Export or report generation failed", "model": ErrorResponse},
         503: {
-            "description": "PDF dependency, font, deadline, or render worker unavailable",
+            "description": (
+                "PDF/HTML dependency, font, deadline, or render worker unavailable"
+            ),
             "model": ErrorResponse,
         },
     },
     summary="Export a history report",
     description=(
-        "Export an analysis history record as Markdown (always) or PDF "
-        "(optional fpdf2 + font). Content is converted from the same Markdown "
-        "intermediate representation used by GET /history/{id}/markdown. Markdown "
-        "is lossless. PDF preserves visible wording but drops link destinations "
-        "and complete image destinations, replaces images with an omission note, "
-        "and renders tables wider than six columns as stacked header/value rows. "
-        "Explicit byte/page/table/time/concurrency limits apply."
+        "Export an analysis history record as Markdown (always), HTML "
+        "(office-friendly; optional markdown-it-py), or PDF (optional fpdf2 + "
+        "font). Content is converted from the same Markdown intermediate "
+        "representation used by GET /history/{id}/markdown. Markdown is "
+        "lossless. HTML and PDF preserve visible wording but drop link "
+        "destinations and complete image destinations, replace images with an "
+        "omission note, and enforce explicit byte/table bounds. PDF also "
+        "enforces page/time/concurrency limits and exact glyph coverage."
     ),
 )
 def export_history_report(
@@ -143,17 +157,17 @@ def export_history_report(
         str,
         Query(
             alias="format",
-            description="Export format: md (default) or pdf",
-            json_schema_extra={"enum": ["md", "pdf"]},
+            description="Export format: md (default), html, or pdf",
+            json_schema_extra={"enum": ["md", "html", "pdf"]},
         ),
     ] = "md",
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> Response:
-    if format not in ("md", "pdf"):
+    if format not in ("md", "html", "pdf"):
         raise api_error(
             400,
             "export_format_invalid",
-            "Unsupported export format. Supported formats: md, pdf.",
+            "Unsupported export format. Supported formats: md, html, pdf.",
         )
     service = HistoryService(db_manager)
     detail = service.resolve_and_get_detail(record_id)
@@ -205,12 +219,13 @@ def export_history_report(
     except ReportExportFormatError as exc:
         raise api_error(400, exc.error_code, exc.message) from exc
     except ReportExportDependencyError as exc:
+        dependency = "markdown-it-py" if format == "html" else "fpdf2"
         raise api_error(
             503,
             exc.error_code,
-            "The optional PDF export backend is unavailable.",
+            "The optional export backend is unavailable for the requested format.",
             params={
-                "dependency": "fpdf2",
+                "dependency": dependency,
                 "install_hint": exc.install_hint,
             },
         ) from exc

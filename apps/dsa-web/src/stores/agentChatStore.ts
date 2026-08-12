@@ -54,12 +54,20 @@ export interface Message {
 }
 
 function fromSessionMessage(message: ChatSessionMessage): Message {
+  const thinkingSteps = Array.isArray(message.params?.thinking_steps)
+    ? message.params.thinking_steps.filter(
+        (step): step is ProgressStep => Boolean(
+          step && typeof step === 'object' && typeof (step as { type?: unknown }).type === 'string',
+        ),
+      )
+    : undefined;
   return {
     id: message.id,
     role: message.role,
     content: message.content,
     ...(message.error ? { error: message.error } : {}),
     ...(message.params ? { params: message.params } : {}),
+    ...(thinkingSteps?.length ? { thinkingSteps } : {}),
     ...(message.turn_id ? { turnId: message.turn_id } : {}),
   };
 }
@@ -189,7 +197,7 @@ interface AgentChatActions {
   clearCompletionBadge: () => void;
   loadSessions: () => Promise<void>;
   loadInitialSession: (preferredSessionId?: string) => Promise<void>;
-  switchSession: (targetSessionId: string) => Promise<boolean>;
+  switchSession: (targetSessionId: string, forceReload?: boolean) => Promise<boolean>;
   startNewChat: () => string;
   startStream: (
     payload: ChatStreamRequest,
@@ -318,9 +326,9 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     }
   },
 
-  switchSession: async (targetSessionId) => {
+  switchSession: async (targetSessionId, forceReload = false) => {
     const { sessionId, messages, abortController } = get();
-    if (targetSessionId === sessionId && messages.length > 0) return true;
+    if (!forceReload && targetSessionId === sessionId && messages.length > 0) return true;
 
     const generation = ++sessionHistoryGeneration;
     abortController?.abort();

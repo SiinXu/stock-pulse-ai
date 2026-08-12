@@ -52,6 +52,15 @@ _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
         "display_order": 65,
     },
     {
+        "category": "mcp",
+        "title": "MCP Server",
+        "description": (
+            "Optional Model Context Protocol process settings. Default off; "
+            "HTTP transport is a security-sensitive external surface."
+        ),
+        "display_order": 70,
+    },
+    {
         "category": "uncategorized",
         "title": "Uncategorized",
         "description": "Keys not mapped in the field registry.",

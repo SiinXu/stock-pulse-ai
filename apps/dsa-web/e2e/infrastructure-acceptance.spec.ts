@@ -35,7 +35,10 @@ import {
   buildSettingsSectionHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin, mockCompletedSetupStatus, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
-import { expectAnalyzeButtonReady } from './workbench-fixture';
+import {
+  expectAnalyzeButtonReady,
+  openAnalysisHistoryPopover,
+} from './workbench-fixture';
 
 type JsonObject = Record<string, unknown>;
 
@@ -106,6 +109,10 @@ function deferred<T = void>() {
     resolve = next;
   });
   return { promise, resolve };
+}
+
+function reportSummaryText(page: Page, text: string) {
+  return page.getByText(text, { exact: true }).and(page.getByRole('paragraph'));
 }
 
 async function getElementContrast(locator: Locator) {
@@ -258,23 +265,34 @@ async function installMockAuth(page: Page, options: {
 }
 
 async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLanguage: 'zh' | 'en') {
+  const detailReady = deferred();
+  let detailRequests = 0;
+  let upstreamDetailFetches = 0;
+  let seededDetailPromise: Promise<{ body: JsonObject; status: number }> | null = null;
   await page.route('**/api/v1/history/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (!/\/api\/v1\/history\/\d+$/.test(pathname)) {
       await route.continue();
       return;
     }
-    const response = await route.fetch();
-    const body = await response.json() as JsonObject;
-    const meta = body.meta as JsonObject;
-    body.meta = { ...meta, report_language: reportLanguage };
-    const details = (body.details as JsonObject | undefined) ?? {};
-    body.details = {
-      ...details,
-      raw_result: { fixture: 'raw-diagnostic-value' },
-      context_snapshot: { fixture: 'context-snapshot-value' },
-    };
-    await route.fulfill({ response, json: body });
+    detailRequests += 1;
+    seededDetailPromise ??= (async () => {
+      upstreamDetailFetches += 1;
+      const response = await route.fetch();
+      const body = await response.json() as JsonObject;
+      const meta = body.meta as JsonObject;
+      body.meta = { ...meta, report_language: reportLanguage };
+      const details = (body.details as JsonObject | undefined) ?? {};
+      body.details = {
+        ...details,
+        raw_result: { fixture: 'raw-diagnostic-value' },
+        context_snapshot: { fixture: 'context-snapshot-value' },
+      };
+      return { body, status: response.status() };
+    })();
+    const seededDetail = await seededDetailPromise;
+    await fulfillJson(route, seededDetail.body, seededDetail.status);
+    detailReady.resolve();
   });
   await page.route('**/api/v1/history/*/diagnostics', async (route) => {
     await fulfillJson(route, {
@@ -294,13 +312,19 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
   await page.goto(buildAnalysisWorkbenchHref({
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
   }));
-  const historyItem = page
+  const historyPopover = await openAnalysisHistoryPopover(page);
+  const historyItem = historyPopover
     .locator('.history-item[data-control="pressable"]')
     .filter({ hasText: 'E2E Fixture' })
     .first();
   await expect(historyItem).toBeVisible({ timeout: 15_000 });
   await historyItem.click();
+  await detailReady.promise;
   await expect(page.getByText('E2E Fixture', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+  return {
+    detailRequests: () => detailRequests,
+    upstreamDetailFetches: () => upstreamDetailFetches,
+  };
 }
 
 async function currentConfig(page: Page) {
@@ -403,11 +427,11 @@ async function openConnections(page: Page, reset = true) {
   await login(page);
   if (reset) await resetModelConfig(page);
   await page.goto(settingsHrefs.modelConnections);
-  await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible({ timeout: 15_000 });
 }
 
 async function addOpenAiConnectionThroughUi(page: Page, id: string, model: string) {
-  await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+  await page.getByRole('button', { name: /添加模型来源/ }).first().click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
   await dialog.getByLabel('选择模型服务商').click();
   await page.locator('[role="option"][data-value="openai"]').click();
@@ -1163,7 +1187,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   });
 
   test('10 report copy, diagnostics, and traceability chrome always follows UI language', async ({ page }) => {
-    await openSeededReport(page, 'en', 'zh');
+    const seededReport = await openSeededReport(page, 'en', 'zh');
     await expect(page.getByText('Run Status', { exact: true })).toBeVisible();
     await expect(page.getByText('Data Traceability', { exact: true })).toBeVisible();
     await expect(page.getByText('运行状态', { exact: true })).toHaveCount(0);
@@ -1171,6 +1195,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const drawer = page.getByRole('dialog', { name: /Full Analysis Report/ });
     await expect(drawer.getByRole('button', { name: 'Copy Markdown Source' })).toBeVisible();
     await expect(drawer.getByRole('button', { name: 'Copy Plain Text' })).toBeVisible();
+
+    const requestsBeforeReload = seededReport.detailRequests();
+    await page.reload();
+    await expect.poll(seededReport.detailRequests).toBeGreaterThan(requestsBeforeReload);
+    await expect(page.getByText('Run Status', { exact: true })).toBeVisible();
+    expect(seededReport.upstreamDetailFetches()).toBe(1);
   });
 
   test('11 Chat handles labeled input, IME composition, stream failure, and retry without duplicating the user message', async ({ page }) => {
@@ -1722,7 +1752,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('19 Model Access has one connection manager and no second provider credential form', async ({ page }) => {
     await openConnections(page);
     const main = page.locator('main');
-    await expect(main.getByRole('button', { name: /添加模型服务/ })).toHaveCount(1);
+    await expect(main.getByRole('button', { name: /添加模型来源/ })).toHaveCount(1);
     await expect(main.getByLabel('API 密钥')).toHaveCount(0);
     await expect(main.getByLabel('服务地址')).toHaveCount(0);
     await expect(main.getByText(/LLM_|LITELLM_/)).toHaveCount(0);
@@ -1744,7 +1774,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await route.fulfill({ response, json: { ...body, items } });
     });
     await page.goto(settingsHrefs.modelConnections);
-    await expect(page.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /添加模型来源/ })).toBeDisabled();
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
     await page.goto(settingsHrefs.advancedDiagnostics);
     await expect(page.getByText(/schema_ui_placement_missing/).first()).toBeVisible();
@@ -2004,7 +2034,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page);
     await resetModelConfig(page);
     await page.goto(settingsHrefs.modelTaskRouting);
-    await page.getByRole('button', { name: '前往模型接入' }).click();
+    await page.getByRole('button', { name: '前往模型来源' }).click();
     await expect(page).toHaveURL(/view=connections&from=task_routing/);
     const connectionId = await addOpenAiConnectionThroughUi(page, 'alpha_conn', 'round-trip-model');
     await page.getByRole('button', { name: '返回任务路由' }).click();
@@ -2029,6 +2059,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         status: 'pending',
         message_code: 'task_pending',
         message_params: {},
+        analysis_phase: 'auto',
       });
     });
     await page.route('**/api/v1/analysis/status/poll-fallback-task', async (route) => {
@@ -2051,6 +2082,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         stock_name: 'Polling Complete',
         status: 'degraded',
         generated_at: '2026-07-15T10:00:00Z',
+        schema_version: 'run-flow-v1',
         summary: {
           elapsed_ms: 1200,
           failed_attempts: 1,
@@ -2167,23 +2199,25 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
-    const oldItem = page
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
+    let historyPopover = await openAnalysisHistoryPopover(page);
+    const oldItem = historyPopover
       .locator('.history-item[data-control="pressable"]')
       .filter({ hasText: 'Old Report' })
       .first();
-    const newItem = page
+    await oldItem.click();
+    await oldRequestStarted.promise;
+    historyPopover = await openAnalysisHistoryPopover(page);
+    const newItem = historyPopover
       .locator('.history-item[data-control="pressable"]')
       .filter({ hasText: 'New Report' })
       .first();
-    await oldItem.click();
-    await oldRequestStarted.promise;
     await expect(newItem).toBeVisible();
     await newItem.click();
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
     oldReport.resolve();
     await page.waitForTimeout(200);
-    await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
+    await expect(reportSummaryText(page, 'New Report semantic report')).toBeVisible();
     await expect(page.getByText('Old Report semantic report', { exact: true })).toHaveCount(0);
   });
 
@@ -2251,6 +2285,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         message: 'accepted',
         task_id: submissions === 1 ? 'old-review-task' : 'new-review-task',
         send_notification: false,
+        region: 'cn',
+        message_code: 'task.market_review.queued',
       }, 202);
     });
     await page.route('**/api/v1/analysis/status/old-review-task', async (route) => {
@@ -2258,6 +2294,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await oldPoll.promise;
       await fulfillJson(route, {
         task_id: 'old-review-task', status: 'completed', progress: 100,
+        message_code: 'task_completed',
         market_review_report: 'OLD_GENERATION_SHOULD_NOT_RENDER',
       });
     });
@@ -2265,6 +2302,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       newReviewCompleted = true;
       await fulfillJson(route, {
         task_id: 'new-review-task', status: 'completed', progress: 100,
+        message_code: 'task_completed',
         market_review_report: 'NEW_RAW_STATUS_SHOULD_NOT_RENDER',
       });
     });
@@ -2532,7 +2570,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    const reportItem = page.getByRole('button', {
+    const historyPopover = await openAnalysisHistoryPopover(page);
+    const reportItem = historyPopover.getByRole('button', {
       name: 'Canonical report fixture AAPL history record',
       exact: true,
     });
@@ -2617,11 +2656,16 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    const historyItem = page.getByRole('button', { name: /E2E Fixture AAPL 历史记录/ });
+    const historyTrigger = page.getByRole('button', { name: '历史与对比', exact: true });
+    await historyTrigger.focus();
+    const historyPopover = await openAnalysisHistoryPopover(page);
+    const historyItem = historyPopover.getByRole('button', { name: /E2E Fixture AAPL 历史记录/ });
     await expect(historyItem).toBeVisible();
     await historyItem.focus();
     await expect(historyItem).toBeFocused();
-    await expect(page.getByRole('dialog', { name: '历史记录' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(historyPopover).toBeHidden();
+    await expect(historyTrigger).toBeFocused();
 
     await page.goto('/chat');
     const chatHistory = page.getByRole('button', { name: '历史对话' }).first();
@@ -2684,7 +2728,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
     const reportHeading = page.getByRole('heading', { name: 'E2E Fixture' });
-    const reportBody = page.getByText('E2E_MARKDOWN_FIXTURE: deterministic report content.', { exact: true });
+    const reportBody = reportSummaryText(page, 'E2E_MARKDOWN_FIXTURE: deterministic report content.');
     await expect(reportHeading).toBeVisible();
     await expect(reportBody).toBeVisible();
     await expect.poll(async () => (await getElementContrast(reportHeading)).ratio).toBeGreaterThanOrEqual(3);
@@ -2752,7 +2796,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       path: contrastPath,
       contentType: 'application/json',
     });
-    await expect(page.getByRole('button', { name: /添加模型服务/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /添加模型来源/ }).first()).toBeVisible();
   });
 
   test.describe('touch-capable control targets', () => {
@@ -2782,38 +2826,21 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await page.goto(settingsHrefs.modelReliability);
       const fallbackSelector = page.getByRole('button', { name: '选择备用模型', exact: true });
       await expectMinimumTouchTarget(fallbackSelector);
-      await expectMinimumTouchTarget(page.getByRole('button', { name: /移除模型 model-beta/ }));
+      await expectMinimumTouchTarget(page.getByRole('button', { name: /移除 model-beta/ }));
       await fallbackSelector.click();
-      const fallbackSearch = page.getByRole('textbox', { name: '搜索模型' });
-      await expect(fallbackSearch).toHaveAttribute('data-size', 'comfortable');
-      const fallbackSearchTarget = fallbackSearch.locator('..');
-      await expectMinimumTouchTarget(fallbackSearchTarget);
-
-      const fallbackSearchBox = await fallbackSearch.boundingBox();
-      const fallbackSearchTargetBox = await fallbackSearchTarget.boundingBox();
-      expect(fallbackSearchBox).not.toBeNull();
-      expect(fallbackSearchTargetBox).not.toBeNull();
-      expect(fallbackSearchBox!.height).toBeLessThan(44);
-      const topGap = fallbackSearchBox!.y - fallbackSearchTargetBox!.y;
-      const bottomGap = fallbackSearchTargetBox!.y + fallbackSearchTargetBox!.height
-        - fallbackSearchBox!.y - fallbackSearchBox!.height;
-      expect(Math.max(topGap, bottomGap)).toBeGreaterThan(0);
-      const slopPoint = {
-        x: fallbackSearchBox!.x + fallbackSearchBox!.width / 2,
-        y: topGap > bottomGap
-          ? fallbackSearchTargetBox!.y + topGap / 2
-          : fallbackSearchBox!.y + fallbackSearchBox!.height + bottomGap / 2,
-      };
-      expect(await fallbackSearch.evaluate((element, point) => (
-        document.elementFromPoint(point.x, point.y) === element.parentElement
-      ), slopPoint)).toBe(true);
+      const fallbackSearch = page.getByRole('combobox', {
+        name: '搜索选项: 选择备用模型',
+      });
+      await expectMinimumTouchTarget(fallbackSearch);
       await fallbackSearch.evaluate((element) => element.blur());
       await expect(fallbackSearch).not.toBeFocused();
-      await page.touchscreen.tap(slopPoint.x, slopPoint.y);
+      const fallbackSearchBox = await fallbackSearch.boundingBox();
+      expect(fallbackSearchBox).not.toBeNull();
+      await page.touchscreen.tap(
+        fallbackSearchBox!.x + fallbackSearchBox!.width / 2,
+        fallbackSearchBox!.y + fallbackSearchBox!.height / 2,
+      );
       await expect(fallbackSearch).toBeFocused();
-
-      const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
-      await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
       await page.goto(settingsHrefs.systemService);
       const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });

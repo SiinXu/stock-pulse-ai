@@ -718,9 +718,16 @@ class ExtensionRegistry:
 class PluginContext:
     """Short-lived owner context valid only during one plugin ``onload`` call."""
 
-    def __init__(self, plugin_id: str, registry: ExtensionRegistry) -> None:
+    def __init__(
+        self,
+        plugin_id: str,
+        registry: ExtensionRegistry,
+        *,
+        settings: Mapping[str, JSONValue] | None = None,
+    ) -> None:
         self._plugin_id = plugin_id
         self._registry = registry
+        self._settings: Mapping[str, JSONValue] = MappingProxyType(dict(settings or {}))
         self._handles: list[RegistrationHandle] = []
         self._recovery_error_code: str | None = None
         self._active = True
@@ -739,6 +746,12 @@ class PluginContext:
 
         with self._lock:
             return tuple(self._handles)
+
+    @property
+    def settings(self) -> Mapping[str, JSONValue]:
+        """Return the immutable effective settings snapshot for this load."""
+
+        return self._settings
 
     @property
     def recovery_error_code(self) -> str | None:

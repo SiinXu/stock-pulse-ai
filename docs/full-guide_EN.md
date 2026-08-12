@@ -132,6 +132,7 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `REPORT_LANGUAGE` | Default output language for reports and Agent Chat: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, fixed copy in the Web report view, and Agent Chat replies that do not set `context.report_language`. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
 | `REPORT_MODE` | Jinja report presentation mode (`brief` / `standard` / `research`, default `standard`). `brief` keeps Decision Card + key risk; `standard` is Decision Card + main analysis; `research` is full detail with expanded strata limits. Hard limits apply; Decision Card is never dropped. Per-request override: `extra_context.report_mode`. Presentation only when `REPORT_RENDERER_ENABLED=true`. | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
+| `NOTIFICATION_DELTA_FIRST` | Prepend a compact, deterministic “changes since previous analysis” section to outbound stock notifications. Defaults to `false`; first analysis, no material change, and unavailable comparison remain distinct. Uses persisted history only and makes no extra model call. Local saved reports are unchanged. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
 | `REPORT_RENDERER_ENABLED` | Enable Jinja2 template rendering (default `false`, zero regression) | Optional |
 | `REPORT_INTEGRITY_ENABLED` | Enable report integrity checks, retry or placeholder on missing fields (default `true`) | Optional |
@@ -150,6 +151,8 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `NOTIFICATION_DAILY_DIGEST_ENABLED` | Reserved daily digest flag. The current implementation does not send or persist digests | Optional |
 
 > Compatibility note: `REPORT_SHOW_LLM_MODEL` keeps the previous default-visible behavior (`true`) and only changes report footer rendering. It does not alter provider/model/Base URL, LiteLLM routing, or runtime model persistence/migration/cleanup semantics. Rollback is to remove the variable or set it back to `true`.
+
+> `NOTIFICATION_DELTA_FIRST` is notification-only and defaults off. Comparison or formatting failure is isolated and cannot block the original notification. Rollback is to remove the variable or set it to `false`; no stored data needs migration.
 
 > `REPORT_LANGUAGE` affects report text, report page fixed copy, and Agent Chat replies that do not explicitly set a language. Web UI chrome language (navigation, login, settings, shell labels, shared controls) is intentionally independent and stored in browser `localStorage` as `dsa.uiLanguage`.
 > UI language resolution is: explicit localStorage value (`zh` or `en`) -> browser language (`navigator.languages` / `navigator.language`) -> default `zh`.
@@ -210,6 +213,8 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 ---
 
 ## Complete Environment Variables List
+
+> The full key inventory and config-addition process live in [Environment variable inventory](environment-variables_EN.md). This section is a curated guide; after changing configuration, run `python scripts/check_config_doc_consistency.py` to check `.env.example`, registry, and docs alignment.
 
 ### AI Model Configuration
 
@@ -1291,11 +1296,13 @@ System defaults to AkShare (free), also supports other data sources:
 
 ### Hong Kong Stock Support
 
-Use `hk` prefix for HK stock codes:
+HK stocks accept bare four- or five-digit numbers, an `hk` prefix, or a `.HK` suffix:
 
 ```bash
 STOCK_LIST=600519,hk00700,hk01810
 ```
+
+CLI, Web, analysis/watchlist APIs, CSV/Excel/clipboard smart import, and Bot analysis/research share the same input rule. A bare four-digit code such as `0941` is checked against the stock index and becomes `HK00941` when unresolved; indexed Japanese `7203` remains `7203.T`. Explicit forms such as `1810.HK`, `7203.T`, `2330.TW`, and `005930.KS`, as well as an explicit API market hint, always take precedence and are never reinterpreted as Hong Kong.
 
 HK daily history skips efinance, pytdx, baostock, and other built-in providers that do not support HK daily data, avoiding mismatches between HK symbols and non-HK market data. AkShare/Tushare/YFinance/Longbridge continue to provide HK fallback paths. If Longbridge is inside its connection cooldown window, the route temporarily skips it and continues with the remaining HK-capable fallbacks.
 
@@ -1682,7 +1689,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 |------|------|------|
 | A-shares | 6-digit number | `600519`, `000001`, `300750` |
 | BSE (Beijing) | 8/4/92 prefix, 6-digit; supports `BJ` prefix or `.BJ` suffix | `920748`, `BJ920493`, `920493.BJ` |
-| HK stocks | hk + 5-digit number | `hk00700`, `hk09988` |
+| HK stocks | Bare 4/5 digits, `HK` prefix, or `.HK` suffix | `0941`, `00700`, `hk00700`, `1810.HK` |
 | US stocks | 1-5 letters, optional `.X` suffix | `AAPL`, `TSLA`, `BRK.B` |
 | Japanese stocks | Yahoo `.T` suffix | `7203.T`, `6758.T` |
 | Korean stocks | Yahoo `.KS` / `.KQ` suffix | `005930.KS`, `035720.KQ` |

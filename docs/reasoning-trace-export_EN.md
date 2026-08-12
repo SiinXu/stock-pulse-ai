@@ -11,6 +11,16 @@ This document defines the multi-agent reasoning-trace export contract (Issue #13
 
 When disabled, `GET /api/v1/reasoning-trace/{record_id}` returns `404 reasoning_trace_export_disabled` without reading or exporting history content.
 
+Both keys are registered in the Web Settings config registry (Agent Behavior → Execution) so operators can enable export and tune the character budget without editing free-text uncategorized fields.
+
+## Web product entry
+
+- Report Markdown panel and run diagnostics show always-visible export actions for JSON and Markdown.
+- When the gate is off, the UI keeps the actions visible and surfaces an explicit enable guide with a deep link to Settings → Agent Behavior → Execution (`REASONING_TRACE_EXPORT_ENABLED`).
+- Downloads use browser blob attachments (no in-page render of the full package) so large traces do not freeze the UI.
+- Truncation is reported from the `X-Reasoning-Trace-Truncated` response header and mirrored as an inline notice; details remain in the package `truncation` field.
+- Readable errors cover disabled export, missing auth, not found, and server failures.
+
 ## API and identity semantics
 
 ```http
@@ -76,7 +86,7 @@ Pattern scanning cannot prove that every unknown secret embedded in arbitrary na
 
 When present, the exporter covers history run metadata, `diagnostics.agent_events`, provider/LLM/pipeline-stage summaries, dashboard synthesis summaries, and context-pack data-quality summaries.
 
-Agent core does not yet persist complete system/user prompts, tool arguments without deep payload, chat-provider thinking blocks, ephemeral SSE events, or raw provider API responses. Issue #135 remains open; Web Settings and complete capture are also outside T03.
+Agent core does not yet persist complete system/user prompts, tool arguments without deep payload, chat-provider thinking blocks, ephemeral SSE events, or raw provider API responses. Issue #135 remains open for complete live capture beyond already-persisted diagnostics. Web Settings registration and report/run-detail export controls are delivered.
 
 ## Rollback
 

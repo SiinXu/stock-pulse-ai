@@ -181,7 +181,7 @@ describe('SettingsViewTabs', () => {
     const options = screen.getAllByRole('radio');
     expect(options.map((option) => option.textContent)).toEqual([
       'Overview',
-      'Model Access',
+      'Model Sources',
       'Local Models',
       'Task Routing',
       'Reliability',

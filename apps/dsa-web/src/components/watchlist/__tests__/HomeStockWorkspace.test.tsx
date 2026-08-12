@@ -1,9 +1,40 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { watchlistScoresApi } from '../../../api/watchlistScores';
 import { HomeStockWorkspace } from '../HomeStockWorkspace';
 import type { HomeWorkspaceTab } from '../HomeStockWorkspace';
+import type { WatchlistScoreItem, WatchlistScoreResponse } from '../../../types/watchlistScore';
+
+vi.mock('../../../api/watchlistScores', () => ({
+  watchlistScoresApi: {
+    score: vi.fn(),
+  },
+}));
+
+const scoreItem = (stockCode: string, score: number): WatchlistScoreItem => ({
+  stockCode,
+  status: 'scored',
+  score,
+  asOf: '2026-08-09T00:00:00Z',
+  ageDays: 0,
+  analysisId: score,
+  operationAdvice: 'buy',
+  factors: [],
+  freshness: 'today',
+  degradedReasons: [],
+});
+
+const scoreResponse = (items: WatchlistScoreItem[]): WatchlistScoreResponse => ({
+  formulaVersion: 'watchlist_score_v1',
+  scoringMode: 'aggregate_existing',
+  sort: 'manual',
+  items,
+  queryCount: { analysis: 1, signals: 1 },
+  sourceRows: { analysis: items.length, signals: 0 },
+  disclaimerKey: 'watchlist_score.disclaimer',
+});
 
 const buildProps = (activeTab: HomeWorkspaceTab, onTabChange = vi.fn()) => ({
   activeTab,
@@ -28,6 +59,13 @@ const buildProps = (activeTab: HomeWorkspaceTab, onTabChange = vi.fn()) => ({
 });
 
 describe('HomeStockWorkspace', () => {
+  beforeEach(() => {
+    vi.mocked(watchlistScoresApi.score).mockReset();
+    vi.mocked(watchlistScoresApi.score).mockResolvedValue(
+      scoreResponse([scoreItem('600519', 82)]),
+    );
+  });
+
   it('keeps the workspace controls compact', () => {
     render(
       <HomeStockWorkspace
@@ -126,5 +164,121 @@ describe('HomeStockWorkspace', () => {
     fireEvent.click(watchlistOption);
 
     expect(onTabChange).toHaveBeenCalledWith('watchlist');
+  });
+
+  it('mounts WatchlistScoreColumn from the live score API on the watchlist view', async () => {
+    render(
+      <HomeStockWorkspace
+        activeTab="watchlist"
+        onTabChange={vi.fn()}
+        watchlistRows={[{ code: '600519', analyzedToday: true }]}
+        watchlistLoading={false}
+        watchlistActioning={false}
+        watchlistMessage={null}
+        onAddToWatchlist={vi.fn(async () => undefined)}
+        onRemoveFromWatchlist={vi.fn(async () => undefined)}
+        onRefreshWatchlist={vi.fn(async () => undefined)}
+        onAnalyzeWatchlist={vi.fn(async () => undefined)}
+        isBatchAnalyzing={false}
+        batchStatus={null}
+        todayItems={[]}
+        isLoadingTodayItems={false}
+        todayLoadError={false}
+        watchlistAnalyzedTodayCount={1}
+        historyItems={[]}
+        isLoadingHistory={false}
+        onHistoryItemClick={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(watchlistScoresApi.score).toHaveBeenCalledWith(
+        expect.objectContaining({ stockCodes: ['600519'] }),
+      );
+    });
+    expect(await screen.findByTestId('watchlist-score-column')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-score-value')).toHaveTextContent('82');
+  });
+
+  it('refetches and reorders scores when analysis state changes with the same symbols', async () => {
+    vi.mocked(watchlistScoresApi.score)
+      .mockResolvedValueOnce(scoreResponse([
+        scoreItem('600519', 82),
+        scoreItem('AAPL', 20),
+      ]))
+      .mockResolvedValueOnce(scoreResponse([
+        scoreItem('600519', 10),
+        scoreItem('AAPL', 91),
+      ]));
+    const props = {
+      ...buildProps('watchlist'),
+      watchlistRows: [
+        { code: 'AAPL', analyzedToday: false },
+        { code: '600519', analyzedToday: false },
+      ],
+    };
+    const view = render(<HomeStockWorkspace {...props} />);
+
+    await waitFor(() => expect(watchlistScoresApi.score).toHaveBeenCalledTimes(1));
+    await screen.findAllByTestId('watchlist-score-column');
+    const sort = screen.getByRole('combobox', { name: '手动排序' });
+    fireEvent.click(sort);
+    const sortListbox = document.getElementById(sort.getAttribute('aria-controls')!)!;
+    fireEvent.click(within(sortListbox).getByRole('option', { name: '按 AI 分从高到低' }));
+    expect(screen.getAllByTestId('watchlist-row')[0]).toHaveTextContent('600519');
+
+    view.rerender(
+      <HomeStockWorkspace
+        {...props}
+        watchlistRows={[
+          { code: 'AAPL', analyzedToday: true },
+          { code: '600519', analyzedToday: true },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(watchlistScoresApi.score).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getAllByTestId('watchlist-row')[0]).toHaveTextContent('AAPL'));
+    expect(screen.getByText('AI 91')).toBeInTheDocument();
+    expect(screen.getByText('AI 10')).toBeInTheDocument();
+  });
+
+  it('fails closed after a follow-up score request instead of displaying or sorting by old scores', async () => {
+    vi.mocked(watchlistScoresApi.score)
+      .mockResolvedValueOnce(scoreResponse([
+        scoreItem('600519', 82),
+        scoreItem('AAPL', 20),
+      ]))
+      .mockRejectedValueOnce(new Error('score refresh failed'));
+    const props = {
+      ...buildProps('watchlist'),
+      watchlistRows: [
+        { code: 'AAPL', analyzedToday: false },
+        { code: '600519', analyzedToday: false },
+      ],
+    };
+    const view = render(<HomeStockWorkspace {...props} />);
+
+    await screen.findAllByTestId('watchlist-score-column');
+    const sort = screen.getByRole('combobox', { name: '手动排序' });
+    fireEvent.click(sort);
+    const sortListbox = document.getElementById(sort.getAttribute('aria-controls')!)!;
+    fireEvent.click(within(sortListbox).getByRole('option', { name: '按 AI 分从高到低' }));
+    expect(screen.getAllByTestId('watchlist-row')[0]).toHaveTextContent('600519');
+
+    view.rerender(
+      <HomeStockWorkspace
+        {...props}
+        watchlistRows={[
+          { code: 'AAPL', analyzedToday: true },
+          { code: '600519', analyzedToday: true },
+        ]}
+      />,
+    );
+
+    expect(await screen.findByText('AI 评分暂时不可用；刷新成功前不会显示评分或按评分排序。')).toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('watchlist-row')[0]).toHaveTextContent('AAPL');
+    expect(screen.getByRole('combobox', { name: '手动排序' })).toBeDisabled();
   });
 });

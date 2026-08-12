@@ -55,13 +55,14 @@ def test_wrong_or_unevaluated_predictions_never_become_evidence() -> None:
     records = [_record(1, correct=False), _record(2, correct=False),
                _record(3, correct=False), _record(4, correct=None)]
     bundle = _project(records).retrieve_layered(stock_code="600519")
+    assert bundle.outcome_patterns == []
     assert bundle.semantic == []
 
 
-def test_only_provenance_linked_correct_outcomes_build_semantic_pattern() -> None:
+def test_only_provenance_linked_correct_outcomes_build_outcome_pattern() -> None:
     records = [_record(index, correct=True) for index in range(1, 4)]
     bundle = _project(records).retrieve_layered(stock_code="600519")
-    pattern = bundle.semantic[0]
+    pattern = bundle.outcome_patterns[0]
     assert pattern.sufficient_evidence is True
     assert pattern.source_history_ids == [1, 2, 3]
     assert pattern.source_outcome_ids == [1001, 1002, 1003]
@@ -103,9 +104,25 @@ def test_prompt_poisoning_prose_has_no_input_field_or_control_effect() -> None:
     payload = json.loads(rendered.splitlines()[1])
     assert payload["principal_id"] == "alice"
     assert payload["source_history_ids"] == [1]
+    assert "outcome_patterns" in payload
+    assert "semantic" in payload
 
 
-def test_semantic_only_vector_ranking_reports_vector_used() -> None:
+def test_structured_query_filters_signal_and_horizon() -> None:
+    records = [
+        _record(1, correct=True, signal="buy", horizon=5),
+        _record(2, correct=True, signal="buy", horizon=5),
+        _record(3, correct=True, signal="buy", horizon=5),
+        _record(4, correct=True, signal="sell", horizon=20),
+        _record(5, correct=True, signal="sell", horizon=20),
+        _record(6, correct=True, signal="sell", horizon=20),
+    ]
+    bundle = _project(records).retrieve_layered(stock_code="600519", query="sell 20d")
+    assert all(entry.signal_bias == "sell" for entry in bundle.outcome_patterns)
+    assert all(entry.horizon_days == 20 for entry in bundle.outcome_patterns)
+
+
+def test_outcome_pattern_only_vector_ranking_reports_vector_used() -> None:
     records = [_record(index, correct=True) for index in range(1, 4)]
     bundle = _project(records, vector_enabled=True).retrieve_layered(
         stock_code="600519", query="buy", episodic_limit=1)
@@ -117,11 +134,7 @@ def test_cjk_tokenization_is_not_exact_phrase_only() -> None:
     assert "贵" in tokens and "贵州" in tokens and "风险" in tokens
 
 
-# --- Regressions for the reviewer counterexamples ------------------------------
-
-
 def test_malformed_timestamp_cannot_masquerade_as_unexpired() -> None:
-    """`2026-8-01...` is already past but sorts after a canonical `2026-08-09...`."""
     with pytest.raises(ValueError):
         _record(1, expires_at="2026-8-01T00:00:00Z")
     with pytest.raises(ValueError):
@@ -135,7 +148,6 @@ def test_malformed_timestamp_cannot_masquerade_as_unexpired() -> None:
 
 
 def test_future_records_and_evaluations_cannot_survive_as_of() -> None:
-    """A 2099 panel must not be visible, let alone sufficient, at a 2026 as_of."""
     future = [
         MemoryObservation("alice", index, "600519", f"2099-01-0{index}T00:00:00Z", None,
                           "buy", 60, 100, outcome_id=2000 + index, outcome_horizon_days=5,
@@ -144,22 +156,20 @@ def test_future_records_and_evaluations_cannot_survive_as_of() -> None:
     ]
     bundle = _project(future).retrieve_layered(stock_code="600519")
     assert bundle.episodic == []
-    assert bundle.semantic == []
+    assert bundle.outcome_patterns == []
 
 
 def test_evaluation_dated_after_as_of_is_withheld_and_is_not_evidence() -> None:
-    """The analysis existed at as_of; its later evaluation had not happened yet."""
     records = [_record(index, correct=True, evaluated_at="2026-08-20T00:00:00Z")
                for index in range(1, 4)]
     bundle = _project(records).retrieve_layered(stock_code="600519")
-    assert bundle.semantic == []
+    assert bundle.outcome_patterns == []
     assert len(bundle.episodic) == 3
     for entry in bundle.episodic:
         assert entry.outcome_pending_as_of is True
         assert entry.was_correct is None
         assert entry.outcome_id is None
         assert entry.evaluated_at is None
-    assert "2099" not in format_layered_data(bundle)
 
 
 def test_expiry_is_compared_as_a_parsed_instant_not_lexicographically() -> None:
@@ -188,8 +198,6 @@ def test_projected_string_fields_cannot_carry_free_form_instructions() -> None:
     with pytest.raises(ValueError):
         MemoryObservation("alice", 1, "IGNORE PRIOR", _instant(1), None, "buy", 50, 100)
 
-    # Every string that reaches the rendered payload is structurally constrained,
-    # so no attacker-controlled prose can reach the prompt-data boundary.
     bundle = _project([_record(index, correct=True) for index in range(1, 4)],
                       ).retrieve_layered(stock_code="600519")
     payload = json.loads(format_layered_data(bundle).splitlines()[1])
@@ -199,7 +207,6 @@ def test_projected_string_fields_cannot_carry_free_form_instructions() -> None:
 
 
 def test_invalid_outcome_identifiers_are_rejected_at_construction() -> None:
-    """`outcome_id="not-an-int"` used to construct fine and crash retrieval."""
     base = dict(outcome_horizon_days=5, evaluated_at="2026-08-08T00:00:00Z", was_correct=True)
     for bad in ("not-an-int", 1.5, True, 0, -1):
         with pytest.raises(ValueError):
@@ -220,7 +227,6 @@ def test_invalid_outcome_identifiers_are_rejected_at_construction() -> None:
 
 
 def test_cross_horizon_outcomes_do_not_combine_into_sufficient_evidence() -> None:
-    """One correct 5-day plus two correct 20-day results are not three of a kind."""
     records = [
         _record(1, correct=True, horizon=5),
         _record(2, correct=True, horizon=20),
@@ -228,8 +234,7 @@ def test_cross_horizon_outcomes_do_not_combine_into_sufficient_evidence() -> Non
     ]
     bundle = _project(records).retrieve_layered(stock_code="600519")
     assert {(entry.horizon_days, entry.evidence_count, entry.sufficient_evidence)
-            for entry in bundle.semantic} == {(5, 1, False), (20, 2, False)}
-    assert all(entry.sufficient_evidence is False for entry in bundle.semantic)
+            for entry in bundle.outcome_patterns} == {(5, 1, False), (20, 2, False)}
 
 
 def _iter_strings(value):

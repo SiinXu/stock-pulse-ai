@@ -1276,14 +1276,20 @@ def test_llm_channel(
             base_url=request.base_url,
             api_key=request.api_key,
             models=request.models,
+            model_id_mode=request.model_id_mode,
             enabled=request.enabled,
             timeout_seconds=request.timeout_seconds,
             capability_checks=request.capability_checks,
             use_saved_secret=request.use_saved_secret,
         )
         return TestLLMChannelResponse.model_validate(payload)
-    except Exception as exc:
-        _log_config_exception("LLM channel test failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - channel probes log diagnostics and return a stable error envelope
+        log_safe_exception(
+            logger,
+            "LLM channel test failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={

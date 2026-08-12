@@ -21,7 +21,7 @@ from src.config import (
     extra_litellm_params,
     normalize_litellm_temperature,
 )
-from src.llm.backend_registry import GENERATION_ONLY_BACKEND_IDS
+from src.llm.backend_registry import LOCAL_CLI_GENERATION_BACKEND_IDS
 from src.llm.hermes import open_hermes_no_proxy_client, parse_hermes_channel, route_has_hermes
 from src.llm.generation_params import (
     apply_litellm_generation_params,
@@ -889,12 +889,12 @@ class LLMChannelConfigTestCase(unittest.TestCase):
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
-    def test_agent_generation_backend_local_cli_is_unavailable_even_with_safe_route(
+    def test_agent_generation_backend_local_cli_requires_available_executable(
         self,
         _mock_parse_yaml,
         _mock_setup_env,
     ) -> None:
-        for backend in sorted(GENERATION_ONLY_BACKEND_IDS):
+        for backend in sorted(LOCAL_CLI_GENERATION_BACKEND_IDS):
             with self.subTest(backend=backend):
                 env = {
                     "AGENT_MODE": "true",
@@ -906,10 +906,40 @@ class LLMChannelConfigTestCase(unittest.TestCase):
                     "LLM_REMOTE_MODELS": "gpt-4o-mini",
                 }
 
-                with patch.dict(os.environ, env, clear=True):
+                with patch.dict(os.environ, env, clear=True), \
+                     patch("src.config._shutil.which", return_value=f"/usr/bin/{backend}"):
                     config = Config._load_from_env()
+                    self.assertTrue(config.is_agent_available())
 
-                self.assertFalse(config.is_agent_available())
+                with patch("src.config._shutil.which", return_value=None):
+                    self.assertFalse(config.is_agent_available())
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_local_cli_agent_ignores_stale_litellm_agent_model_validation(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        env = {
+            "AGENT_GENERATION_BACKEND": "codex_cli",
+            "AGENT_LITELLM_MODEL": "openai/stale-agent-model",
+            "LLM_CHANNELS": "primary",
+            "LLM_PRIMARY_PROTOCOL": "openai",
+            "LLM_PRIMARY_BASE_URL": "https://api.example.com/v1",
+            "LLM_PRIMARY_API_KEY": "sk-primary-test-value",
+            "LLM_PRIMARY_MODELS": "report-model",
+            "LITELLM_MODEL": "openai/report-model",
+        }
+
+        with patch.dict(os.environ, env, clear=True):
+            config = Config._load_from_env()
+
+        issues = config.validate_structured()
+        self.assertFalse(
+            any(issue.field == "AGENT_LITELLM_MODEL" for issue in issues),
+            issues,
+        )
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])

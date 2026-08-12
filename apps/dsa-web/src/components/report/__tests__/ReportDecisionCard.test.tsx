@@ -142,8 +142,8 @@ describe('ReportDecisionCard', () => {
     expect(screen.queryByText('操作点位')).not.toBeInTheDocument();
   });
 
-  it('returns null when there is no decision content', () => {
-    const { container } = render(
+  it('still renders the risk-gate not-evaluated banner when other decision fields are empty', () => {
+    render(
       <ReportDecisionCard
         meta={baseMeta}
         summary={{
@@ -156,7 +156,11 @@ describe('ReportDecisionCard', () => {
       />,
     );
 
-    expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByTestId('report-decision-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-decision-card')).toBeVisible();
+    expect(screen.getByTestId('report-risk-gate-banner')).toHaveAttribute(
+      'data-risk-gate-not-evaluated',
+      'true',
+    );
+    expect(screen.getByTestId('report-risk-gate-verdict')).toHaveTextContent('未评估');
   });
 });

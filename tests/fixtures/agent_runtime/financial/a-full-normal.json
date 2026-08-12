@@ -144,7 +144,8 @@
         },
         "success": true,
         "result_length": 179,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"600519\", \"ma_alignment\": \"bullish\", \"trend_score\": 78, \"ma5\": 99.0, \"ma10\": 97.5, \"ma20\": 95.0, \"bias_ma5\": 1.0, \"current_price\": 100.0, \"volume_status\": \"normal\"}"
       },
       {
         "step": 1,
@@ -154,7 +155,8 @@
         },
         "success": true,
         "result_length": 186,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"600519\", \"items\": [{\"title\": \"Synthetic quarterly report beats estimates\", \"sentiment\": \"positive\"}, {\"title\": \"Synthetic sector policy update\", \"sentiment\": \"neutral\"}]}"
       },
       {
         "step": 1,
@@ -164,7 +166,8 @@
         },
         "success": true,
         "result_length": 72,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"stock_code\": \"600519\", \"pe\": 21.5, \"pb\": 3.1, \"industry\": \"Synthetic\"}"
       }
     ],
     "total_steps": 4,

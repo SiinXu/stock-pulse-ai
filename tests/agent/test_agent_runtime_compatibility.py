@@ -33,6 +33,7 @@ from tests.agent_runtime_replay import (
     ReplayLLMAdapter,
     _normalize_dashboard,
     _normalize_json_content,
+    _normalize_tool_log,
     build_replay_tool_registry,
     load_case,
     load_manifest,
@@ -157,6 +158,41 @@ def test_replay_does_not_mask_malformed_identity_or_non_json_content():
 
     assert _normalize_dashboard(dashboard) == dashboard
     assert _normalize_json_content("plain-text result") == "plain-text result"
+
+
+def test_replay_normalizes_only_tool_timeout_preview_duration():
+    timeout_preview = (
+        '{"error": "Tool execution timed out after 0.99s", "timeout": true}'
+    )
+    ordinary_preview = '{"error": "provider timed out after 0.99s"}'
+
+    normalized = _normalize_tool_log([
+        {
+            "tool": "slow_tool",
+            "duration": 0.9946,
+            "result_preview": timeout_preview,
+            "timeout": True,
+        },
+        {
+            "tool": "provider_tool",
+            "result_preview": ordinary_preview,
+        },
+    ])
+
+    assert normalized == [
+        {
+            "tool": "slow_tool",
+            "result_preview": (
+                '{"error": "Tool execution timed out after '
+                '<runtime-duration>", "timeout": true}'
+            ),
+            "timeout": True,
+        },
+        {
+            "tool": "provider_tool",
+            "result_preview": ordinary_preview,
+        },
+    ]
 
 
 # ---------------------------------------------------------------------------

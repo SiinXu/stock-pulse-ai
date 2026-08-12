@@ -37,6 +37,8 @@ python -m pip check
 cp .env.example .env
 ```
 
+新增配置键时，必须同步更新 `.env.example`、配置注册表（`src/core/config_registry_parts/`）以及中英清单 `docs/environment-variables.md` / `docs/environment-variables_EN.md`。运行 `python scripts/check_config_doc_consistency.py` 做三方一致性检查。
+
 ### 提交流程
 
 1. Fork 本仓库
