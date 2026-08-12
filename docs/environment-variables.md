@@ -200,7 +200,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | `空` | 是 | 模板中注释; Optional: For Webhooks requiring authentication (Header Authorization: Bearer <token>) |
 | `CUSTOM_WEBHOOK_BODY_TEMPLATE` | `空` | 是 | 模板中注释; Optional global JSON body template, overrides Bark/Slack/Discord etc |
 | `CUSTOM_WEBHOOK_URLS` | `https://oapi.dingtalk.com/robot/send?access_token=xxx,https://hooks.slack.com/services/xxx` | 是 | 模板中注释; Custom Webhook (Supports multiple, comma-separated) Suitable for: DingTalk, Discord, Slack, Bark, and any service tha... |
-| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Personal daily morning brief (#149) + historical accuracy review (#466; default off) |
+| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Personal daily morning brief (#149) + historical accuracy review (#466; default off) When enabled, the runtime schedu... |
 | `DAILY_BRIEF_MIN_SAMPLES` | `10` | 是 | 模板中注释 |
 | `DAILY_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
 | `DAILY_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
@@ -327,6 +327,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_ANTHROPIC_PROVIDER` | `anthropic` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_CHANNELS` | `openrouter` | 是 | 模板中注释; OpenRouter（OpenAI Compatible） Source: Official Models API https://openrouter.ai/docs/api/api-reference/models/get-models |
 | `LLM_CONFIG_MODE` | `auto` | 是 | 模板中注释; --- Model Configuration Source Mode (Optional) --- auto(Default): Maintain historical priority YAML > Channels > Lega... |
+| `LLM_COST_PRICING_PATH` | `空` | 是 | 模板中注释 |
 | `LLM_DASHSCOPE_API_KEY` | `sk-xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_DASHSCOPE_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_DASHSCOPE_MODELS` | `qwen3.6-plus,qwen3.6-flash` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -391,6 +392,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_SILICONFLOW_PROVIDER` | `siliconflow` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_TEMPERATURE` | `0.7` | 是 | 模板中注释; Sampling temperature (0.0-2.0, default 0.7; 0 is most deterministic and 2 is most random) |
 | `LLM_TIMEOUT_SEC` | `60` | 是 | 模板中注释; The timeout seconds for a single LLM request; AlphaSift stock selection reuses DSA configuration, downgrades to non-L... |
+| `LLM_USAGE_ATTRIBUTION_ENABLED` | `true` | 是 | 模板中注释; LLM cost attribution + routing quality (default on). |
 | `LLM_USAGE_HMAC_KEY_VERSION` | `local-v1` | 是 | 模板中注释 |
 | `LLM_USAGE_HMAC_SECRET` | `空` | 是 | 模板中注释; LLM usage telemetry message HMAC configuration (optional) |
 | `LLM_VOLCENGINE_API_KEY` | `xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -542,6 +544,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PYTDX_PORT` | `7709` | 是 | 模板中注释 |
 | `PYTDX_PRIORITY` | `2` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PYTDX_SERVERS` | `192.168.1.100:7709,10.0.0.1:7709` | 是 | 模板中注释; Comma-separated ip:port list; overrides PYTDX_HOST/PYTDX_PORT when set. |
+| `READINESS_CHECK_TIMEOUT_SECONDS` | `1.0` | 是 | 模板中注释; Structured readiness/self-check (on-demand GET /api/v1/system/readiness; never auto-run at startup) |
 | `REALTIME_SOURCE_PRIORITY` | `tencent,akshare_sina,efinance,akshare_em` | 是 | 模板中注释 |
 | `REASONING_TRACE_EXPORT_ENABLED` | `false` | 是 | 模板中注释; Reasoning-trace export (Issue #135): default off |
 | `REASONING_TRACE_EXPORT_MAX_CHARS` | `500000` | 是 | 模板中注释; clamped to 10000..2000000 |
@@ -556,6 +559,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPORT_SUMMARY_ONLY` | `false` | 是 | 模板中注释; Only analyze the result summary: when set to true, it only pushes summaries, without individual stock details |
 | `REPORT_TEMPLATES_DIR` | `templates` | 是 | 模板中注释; Report Engine P0 (Jinja2 / integrity check / Historical comparison) |
 | `REPORT_TYPE` | `simple` | 是 | 模板中注释; Report type: simple (concise), full (complete), brief (3-5 sentence summary) In a Docker environment, if content is n... |
+| `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; Read-only research API for stratified conclusions (Issue #1143; default off) Authenticated GET /api/v1/research/concl... |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释 |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |

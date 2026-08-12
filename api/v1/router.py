@@ -39,6 +39,7 @@ from api.v1.endpoints import (
     portfolio_stress_test,
     reasoning_trace,
     report_export,
+    research,
     report_version_compare,
     scheduled_tasks,
     scorecard,
@@ -237,6 +238,12 @@ router.include_router(
     scorecard.router,
     prefix="/scorecard",
     tags=["Scorecard"]
+)
+
+router.include_router(
+    research.router,
+    prefix="/research",
+    tags=["Research"],
 )
 
 router.include_router(

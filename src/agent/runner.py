@@ -36,6 +36,9 @@ parse_dashboard_json = _runner_parsing.parse_dashboard_json
 parse_dashboard_json_result = _runner_parsing.parse_dashboard_json_result
 run_agent_loop = _runner_loop.run_agent_loop
 _NATIVE_TOOL_RESULT_MAX_BYTES = _runner_loop._NATIVE_TOOL_RESULT_MAX_BYTES
+_record_usage_with_optional_attribution = (
+    _runner_loop._record_usage_with_optional_attribution
+)
 
 from src.agent.dashboard_payload import (
     has_reserved_explanation_field,
