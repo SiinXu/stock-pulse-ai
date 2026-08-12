@@ -38,6 +38,7 @@ import {
   resolveAgentPresetStatus,
 } from './agentSetupPresets';
 import { buildModelSourceSetupHref } from './modelSourcesRoute';
+import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 
 export type AgentModelSummary = {
   value: string;
@@ -60,6 +61,12 @@ export type AgentBehaviorPanelProps = {
   fieldGroupIdOf: (key: string) => string;
   fieldGroupOrderOf: (key: string) => number;
   readOnlyDiagnosticForItem?: (item: SystemConfigItem, categoryHint?: string) => string | undefined;
+  /**
+   * Chat / remediation deep-link mode: keep summary + presets + essentials
+   * in the primary path; nest Behavior + Governance under one disclosure so
+   * expert fields stay reachable without appearing as a flat expert list.
+   */
+  essentialsFocus?: boolean;
 };
 
 function sortByEssentialOrder(items: SystemConfigItem[]): SystemConfigItem[] {
@@ -92,6 +99,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
   fieldGroupIdOf,
   fieldGroupOrderOf,
   readOnlyDiagnosticForItem,
+  essentialsFocus = false,
 }) => {
   const { language, t } = useUiLanguage();
   const copy = AGENT_SETUP_COPY[language];
@@ -384,41 +392,74 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
         <form className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1" onSubmit={(event) => event.preventDefault()}>{essentialItems.map(renderField)}</form>
       </section>
 
-      {behaviorItems.length ? (
-        <details
-          className="group/agent-behavior overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
-          data-testid="agent-behavior-fields"
-        >
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">{copy.advancedTitle}</p>
-              <p className="text-xs leading-5 text-muted-text">{copy.advancedDescription}</p>
+      {(() => {
+        const behaviorSection = behaviorItems.length ? (
+          <details
+            className="group/agent-behavior overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+            data-testid="agent-behavior-fields"
+          >
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">{copy.advancedTitle}</p>
+                <p className="text-xs leading-5 text-muted-text">{copy.advancedDescription}</p>
+              </div>
+              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-behavior:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
+              {renderGroupedFields(behaviorItems)}
             </div>
-            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-behavior:rotate-180" aria-hidden="true" />
-          </summary>
-          <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
-            {renderGroupedFields(behaviorItems)}
-          </div>
-        </details>
-      ) : null}
+          </details>
+        ) : null;
 
-      {governanceItems.length ? (
-        <details
-          className="group/agent-governance overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
-          data-testid="agent-governance-fields"
-        >
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">{copy.governanceTitle}</p>
-              <p className="text-xs leading-5 text-muted-text">{copy.governanceDescription}</p>
+        const governanceSection = governanceItems.length ? (
+          <details
+            className="group/agent-governance overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+            data-testid="agent-governance-fields"
+          >
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">{copy.governanceTitle}</p>
+                <p className="text-xs leading-5 text-muted-text">{copy.governanceDescription}</p>
+              </div>
+              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-governance:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
+              {renderGroupedFields(governanceItems)}
             </div>
-            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-governance:rotate-180" aria-hidden="true" />
-          </summary>
-          <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
-            {renderGroupedFields(governanceItems)}
-          </div>
-        </details>
-      ) : null}
+          </details>
+        ) : null;
+
+        if (!behaviorSection && !governanceSection) {
+          return null;
+        }
+
+        // Chat / remediation deep links: nest advanced layers under one control so
+        // the primary surface stays summary + presets + essentials + ask path.
+        if (essentialsFocus) {
+          return (
+            <details
+              className="group/agent-essentials-focus overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+              data-testid="agent-essentials-focus-advanced"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                <span>{SETTINGS_MISC_TEXT[language].showAdvanced}</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-essentials-focus:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
+                {behaviorSection}
+                {governanceSection}
+              </div>
+            </details>
+          );
+        }
+
+        return (
+          <>
+            {behaviorSection}
+            {governanceSection}
+          </>
+        );
+      })()}
 
       <ConfirmDialog
         isOpen={Boolean(confirmPresetId)}
