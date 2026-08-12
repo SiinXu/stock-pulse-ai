@@ -263,7 +263,7 @@
 {% endif %}
 
 {% set multi_model = dashboard.get('multi_model_comparison') if dashboard else none %}
-{% if multi_model and multi_model.get('enabled') %}
+{% if multi_model and multi_model.get('enabled') and mode_limits.get('include_detail_sections') %}
 ### 🤝 {{ labels.multi_model_comparison_heading }}
 
 {% set mm_handling = multi_model.get('disagreement_handling') or {} %}
@@ -273,7 +273,7 @@
 
 - **{{ labels.multi_model_status_label }}**: {{ multi_model.get('status') or 'N/A' }}
 - **{{ labels.multi_model_consensus_level_label }}**: {{ localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language) }}
-- **{{ labels.multi_model_consensus_score_label }}**: {{ multi_model.get('consensus_score', 'N/A') }}
+- **{{ labels.multi_model_consensus_score_label }}**: {{ multi_model.get('consensus_score') if multi_model.get('consensus_score') is not none else labels.multi_model_not_evaluated_label }}
 {% if multi_model.get('degradation') %}
 - **{{ labels.multi_model_degraded_label }}**: {{ (multi_model.get('degradation') or {}).get('annotation') or (multi_model.get('degradation') or {}).get('reason') }}
 {% endif %}
@@ -281,7 +281,7 @@
 
 **{{ labels.multi_model_agreement_table_label }}**
 {% for row in (multi_model.get('agreement_table') or [])[:5] %}
-- `{{ row.get('model_id') or row.get('model_version') or 'model' }}` ({{ row.get('status') or 'n/a' }}): {{ localize_strategy_signal(row.get('signal') or row.get('action') or 'N/A', report_language) }} | {{ row.get('score_band') or 'N/A' }}{% if row.get('key_risks') %} | risks: {{ (row.get('key_risks') or [])[:2] | join('; ') }}{% endif %}
+- `{{ row.get('model_id') or row.get('model_version') or 'model' }}` ({{ row.get('status') or 'n/a' }}): {{ localize_strategy_signal(row.get('signal') or row.get('action'), report_language) if (row.get('signal') or row.get('action')) else labels.multi_model_not_evaluated_label }} | {{ row.get('score_band') or labels.multi_model_not_evaluated_label }}{% if row.get('key_risks') %} | risks: {{ (row.get('key_risks') or [])[:2] | join('; ') }}{% endif %}
 {% endfor %}
 
 {% if (mm_handling.get('points') or []) %}

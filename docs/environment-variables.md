@@ -123,7 +123,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `MULTI_MODEL_CONSENSUS_MODELS` | 空 | 是 | 模板中注释; 可选的逗号分隔 LiteLLM 模型列表 |
 | `MULTI_MODEL_CONSENSUS_PRESET` | 空 | 是 | 模板中注释; 模型列表为空时可选 `fast` / `quality` |
 | `MULTI_MODEL_CONSENSUS_MAX_MODELS` | `3` | 是 | 模板中注释; 单次对比最大模型数（2–5） |
-| `MULTI_MODEL_CONSENSUS_MAX_COST_USD` | 空 | 是 | 模板中注释; USD 预算：空=仅 MAX_MODELS；0=关闭扇出；正值=硬限制最多 2 个模型（暂无实时计价） |
+| `MULTI_MODEL_CONSENSUS_MAX_COST_USD` | 空 | 是 | 模板中注释; 有限 USD 预算：空=仅 MAX_MODELS；0=关闭扇出；正值=硬限制最多 2 个模型（暂无实时计价）；拒绝 NaN/±Inf |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |

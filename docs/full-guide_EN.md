@@ -1322,6 +1322,8 @@ Default **off**. When `MULTI_MODEL_CONSENSUS_ENABLED=true`, the legacy stock ana
 - Consensus level + agreement score (not a blended trading signal)
 - Disagreement points using the same low-sensitivity point contract as multi-agent disagreement handling (`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`)
 - Hard honesty rules: **no majority vote**, **no averaging** of opposing directions; high disagreement stays visible; single-model failure degrades to the surviving result with `single_model_fallback` annotation
+- With fewer than two usable conclusions, the agreement score is explicitly **Not evaluated** instead of a misleading `0`; `NaN` and `±Inf` are rejected in budgets, confidence metrics, and shared snapshots
+- `brief` keeps only the Decision Card, key risk, and explicit omission notice; the full comparison is limited to `standard` / `research`, history export, and non-brief notifications so push budgets remain bounded
 - Model id / version / provider identities are recorded under `dashboard.multi_model_comparison.trace` and each LLM diagnostic run uses `call_type=multi_model_consensus`
 
 ```bash

@@ -970,7 +970,7 @@ class _ConfigLoadingMethods:
                 maximum=5,
             ),
             multi_model_consensus_max_cost_usd=(
-                parse_env_float(
+                _parse_env_finite_float(
                     os.getenv('MULTI_MODEL_CONSENSUS_MAX_COST_USD'),
                     0.0,
                     field_name='MULTI_MODEL_CONSENSUS_MAX_COST_USD',

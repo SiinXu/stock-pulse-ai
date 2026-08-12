@@ -98,7 +98,7 @@
 {% endif %}
 
 {% set multi_model = dashboard.get('multi_model_comparison') if dashboard else none %}
-{% if multi_model and multi_model.get('enabled') %}
+{% if multi_model and multi_model.get('enabled') and mode_limits.get('include_detail_sections') %}
 🤝 **{{ labels.multi_model_comparison_heading }}**
 {% set mm_handling = multi_model.get('disagreement_handling') or {} %}
 {% if mm_handling.get('high_disagreement') %}
@@ -106,7 +106,7 @@
 {% endif %}
 - {{ labels.multi_model_consensus_level_label }}: {{ localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language) }}
 {% for row in (multi_model.get('agreement_table') or [])[:3] %}
-- {{ row.get('model_id') or 'model' }}: {{ localize_strategy_signal(row.get('signal') or 'N/A', report_language) }}
+- {{ row.get('model_id') or 'model' }}: {{ localize_strategy_signal(row.get('signal'), report_language) if row.get('signal') else labels.multi_model_not_evaluated_label }}
 {% endfor %}
 {% if multi_model.get('degradation') %}
 - {{ labels.multi_model_degraded_label }}: {{ (multi_model.get('degradation') or {}).get('annotation') or (multi_model.get('degradation') or {}).get('reason') }}

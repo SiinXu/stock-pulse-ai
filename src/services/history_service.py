@@ -1449,16 +1449,22 @@ class HistoryService:
                 report_lines.append(
                     f"> ⚠️ {labels.get('multi_model_high_disagreement_banner', 'High multi-model disagreement')}"
                 )
+            not_evaluated = labels.get(
+                "multi_model_not_evaluated_label", "Not evaluated"
+            )
+            consensus_score = multi_model.get("consensus_score")
             report_lines.append(
                 f"- {labels.get('multi_model_status_label', 'Status')}: "
                 f"{multi_model.get('status', 'N/A')} | "
                 f"{labels.get('multi_model_consensus_level_label', 'Consensus')}: "
                 f"{localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language)} | "
                 f"{labels.get('multi_model_consensus_score_label', 'Agreement')}: "
-                f"{multi_model.get('consensus_score', 'N/A')}"
+                f"{consensus_score if consensus_score is not None else not_evaluated}"
             )
             degradation = multi_model.get("degradation")
-            if isinstance(degradation, dict) and (degradation.get("annotation") or degradation.get("reason")):
+            if isinstance(degradation, dict) and (
+                degradation.get("annotation") or degradation.get("reason")
+            ):
                 report_lines.append(
                     f"- {labels.get('multi_model_degraded_label', 'Degradation')}: "
                     f"{degradation.get('annotation') or degradation.get('reason')}"
@@ -1469,11 +1475,17 @@ class HistoryService:
             for row in (multi_model.get("agreement_table") or [])[:5]:
                 if not isinstance(row, dict):
                     continue
+                raw_signal = row.get("signal") or row.get("action")
+                localized_signal = (
+                    localize_strategy_signal(raw_signal, report_language)
+                    if raw_signal
+                    else not_evaluated
+                )
                 report_lines.append(
                     f"- `{row.get('model_id') or row.get('model_version') or 'model'}` "
                     f"({row.get('status') or 'n/a'}): "
-                    f"{localize_strategy_signal(row.get('signal') or row.get('action') or 'N/A', report_language)}"
-                    f" | {row.get('score_band') or 'N/A'}"
+                    f"{localized_signal}"
+                    f" | {row.get('score_band') or not_evaluated}"
                 )
             points = handling.get("points") if isinstance(handling, dict) else None
             if isinstance(points, list) and points:

@@ -1452,6 +1452,8 @@ CLI、Web、分析/自选 API、CSV/Excel/剪贴板智能导入以及 Bot 分析
 - 共识度 + 一致度（**不是**混合后的交易信号）
 - 分歧点使用与多 Agent 分歧处理一致的低敏 point 契约（`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`）
 - 硬规则：**不做多数表决**、**不对反向信号取平均**；高分歧必须可见；单模型失败降级为存活结果并标注 `single_model_fallback`
+- 少于两个可用结论时，一致度明确显示“未评估”，不输出误导性的 `0`；预算、置信度与快照中的 `NaN` / `±Inf` 会被拒绝
+- `brief` 仅保留 Decision Card、关键风险和显式省略提示；完整多模型对照仅进入 `standard` / `research`、历史导出及非 brief 通知，避免突破推送长度预算
 - 模型 id / 版本 / provider 写入 `dashboard.multi_model_comparison.trace`，诊断 LLM run 的 `call_type=multi_model_consensus`
 
 ```bash

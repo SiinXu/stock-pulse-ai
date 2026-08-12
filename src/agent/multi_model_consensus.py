@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -138,6 +139,8 @@ def resolve_consensus_models_for_run(
         max_cost = float(max_cost_raw)
     except (TypeError, ValueError):
         return models, budget
+    if not math.isfinite(max_cost):
+        raise ValueError("multi_model_consensus_max_cost_usd must be finite")
     budget["max_cost_usd"] = max_cost
     if max_cost <= 0:
         budget["budget_enforced"] = True
@@ -192,12 +195,13 @@ def build_model_stance(result: Any, *, requested_model: str) -> Dict[str, Any]:
     confidence = _confidence_to_unit(getattr(result, "confidence_level", None))
     risks = _extract_risks(result)
     catalysts = _extract_catalysts(result)
+    stance_status = "success" if decision_type else "unassessed"
 
     return {
         "model_id": requested_model,
         "model_version": wire_model or model_used or requested_model,
         "provider": provider or _provider_from_model(model_used or requested_model),
-        "status": "success",
+        "status": stance_status,
         "signal": decision_type,
         "decision_type": decision_type,
         "action": action,
@@ -208,7 +212,7 @@ def build_model_stance(result: Any, *, requested_model: str) -> Dict[str, Any]:
         "confidence": confidence,
         "key_risks": risks,
         "key_catalysts": catalysts,
-        "error_type": None,
+        "error_type": None if decision_type else "missing_decision_signal",
     }
 
 
@@ -228,8 +232,18 @@ def build_multi_model_comparison(
         medium_threshold = high_threshold
 
     models = [dict(item) for item in stances if isinstance(item, Mapping)]
-    successful = [m for m in models if m.get("status") == "success" and m.get("signal")]
-    failed = [m for m in models if m.get("status") != "success"]
+    _reject_non_finite_numbers(models, path="stances")
+    if budget is not None:
+        _reject_non_finite_numbers(budget, path="budget")
+    successful: List[Dict[str, Any]] = []
+    failed: List[Dict[str, Any]] = []
+    for model in models:
+        destination = (
+            successful
+            if model.get("status") == "success" and model.get("signal")
+            else failed
+        )
+        destination.append(model)
 
     points = _collect_model_points(successful)
     disagreement_score = _score_disagreement(points, successful, high_threshold)
@@ -248,7 +262,7 @@ def build_multi_model_comparison(
         resolution_status = RESOLUTION_UNRESOLVED
         escalation = ESCALATION_NONE
         explanation_key = "multi_model.insufficient"
-        applied_signal = "hold"
+        applied_signal = None
         pre_signal = None
     elif len(successful) == 1:
         only = successful[0]
@@ -272,7 +286,7 @@ def build_multi_model_comparison(
             else "multi_model.single_model"
         )
         pre_signal = only.get("signal")
-        applied_signal = pre_signal or "hold"
+        applied_signal = pre_signal
     else:
         status = "degraded_partial" if failed else "ok"
         degradation = (
@@ -301,14 +315,14 @@ def build_multi_model_comparison(
             escalation = ESCALATION_CROSS_VALIDATE if disagreement_score >= medium_threshold else ESCALATION_RECORD
             explanation_key = "multi_model.recorded"
             pre_signal = _primary_signal(successful)
-            applied_signal = pre_signal or "hold"
+            applied_signal = pre_signal
         else:
             verdict_mode = VERDICT_CONSENSUS
             resolution_status = RESOLUTION_RESOLVED
             escalation = ESCALATION_NONE
             explanation_key = "multi_model.aligned"
             pre_signal = _primary_signal(successful)
-            applied_signal = pre_signal or "hold"
+            applied_signal = pre_signal
 
     primary_model = None
     if successful:
@@ -374,7 +388,9 @@ def build_multi_model_comparison(
         "models": models,
         "agreement_table": agreement_table,
         "consensus_level": consensus_level,
-        "consensus_score": round(consensus_score, 4),
+        "consensus_score": (
+            round(consensus_score, 4) if consensus_score is not None else None
+        ),
         "primary_result_model": primary_model,
         "disagreement_handling": disagreement_handling,
         "shared_snapshot": {
@@ -401,6 +417,7 @@ def public_multi_model_comparison_payload(value: Any) -> Optional[Dict[str, Any]
         return None
     if value.get("enabled") is not True:
         return None
+    _reject_non_finite_numbers(value, path="multi_model_comparison")
 
     points: List[Dict[str, Any]] = []
     handling = value.get("disagreement_handling") if isinstance(value.get("disagreement_handling"), Mapping) else {}
@@ -474,7 +491,11 @@ def public_multi_model_comparison_payload(value: Any) -> Optional[Dict[str, Any]
         "degradation": degradation,
         "agreement_table": agreement_table,
         "consensus_level": str(value.get("consensus_level") or "insufficient"),
-        "consensus_score": _safe_float(value.get("consensus_score"), 0.0),
+        "consensus_score": (
+            _safe_float(value.get("consensus_score"), 0.0)
+            if value.get("consensus_score") is not None
+            else None
+        ),
         "primary_result_model": value.get("primary_result_model"),
         "disagreement_handling": public_handling,
         "shared_snapshot": dict(value.get("shared_snapshot") or {})
@@ -500,7 +521,10 @@ def fingerprint_shared_snapshot(context: Mapping[str, Any], news_context: Option
         else "",
         "context_pack": bool(context.get("analysis_context_pack") or context.get("analysis_context_pack_summary")),
     }
-    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    _reject_non_finite_numbers(payload, path="shared_snapshot")
+    raw = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, default=str, allow_nan=False
+    )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
@@ -551,12 +575,12 @@ def run_multi_model_consensus_analysis(
     # Freeze a shallow copy so each model sees the same top-level snapshot keys.
     shared_context = dict(context)
 
-    def _run_one(model_id: str) -> Tuple[str, Optional[Any], Optional[BaseException], int]:
+    def _run_one(model_id: str) -> Tuple[str, Optional[Any], Optional[Exception], int]:
         started = time.monotonic()
         if record_llm_run_started is not None:
             try:
                 record_llm_run_started(model=model_id, call_type="multi_model_consensus")
-            except Exception as exc:  # broad-exception: diagnostics fail-open
+            except Exception as exc:  # broad-exception: fallback_recorded - Diagnostic hook failure is logged and does not abort model analysis.
                 log_safe_exception(
                     logger,
                     "multi-model llm start diagnostic failed",
@@ -593,7 +617,7 @@ def run_multi_model_consensus_analysis(
                             else None
                         ),
                     )
-                except Exception as exc:  # broad-exception: diagnostics fail-open
+                except Exception as exc:  # broad-exception: fallback_recorded - Diagnostic hook failure is logged and does not abort model analysis.
                     log_safe_exception(
                         logger,
                         "multi-model llm diagnostic failed",
@@ -602,8 +626,16 @@ def run_multi_model_consensus_analysis(
                         level=logging.DEBUG,
                     )
             return model_id, result, None, duration_ms
-        except BaseException as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Per-model failure is recorded and isolated from remaining comparison models.
             duration_ms = int((time.monotonic() - started) * 1000)
+            log_safe_exception(
+                logger,
+                "multi-model analysis member failed",
+                exc,
+                error_code="multi_model_member_failed",
+                context={"model_id": model_id},
+                level=logging.WARNING,
+            )
             if record_llm_run is not None:
                 try:
                     record_llm_run(
@@ -614,7 +646,7 @@ def run_multi_model_consensus_analysis(
                         error_type=type(exc).__name__,
                         error_message=exc,
                     )
-                except Exception as diag_exc:  # broad-exception: diagnostics fail-open
+                except Exception as diag_exc:  # broad-exception: fallback_recorded - Diagnostic hook failure is logged and does not abort model analysis.
                     log_safe_exception(
                         logger,
                         "multi-model llm failure diagnostic failed",
@@ -624,14 +656,14 @@ def run_multi_model_consensus_analysis(
                     )
             return model_id, None, exc, duration_ms
 
-    outcomes: List[Tuple[str, Optional[Any], Optional[BaseException], int]] = []
+    outcomes: List[Tuple[str, Optional[Any], Optional[Exception], int]] = []
     if parallel and len(models) > 1:
         # Optional parallel path: serialize analyzer.analyze via a lock so a
         # shared non-thread-safe analyzer cannot corrupt internal state.
         analyze_lock = threading.Lock()
         original_run_one = _run_one
 
-        def _run_one_locked(model_id: str) -> Tuple[str, Optional[Any], Optional[BaseException], int]:
+        def _run_one_locked(model_id: str) -> Tuple[str, Optional[Any], Optional[Exception], int]:
             with analyze_lock:
                 return original_run_one(model_id)
 
@@ -643,7 +675,7 @@ def run_multi_model_consensus_analysis(
             for future in as_completed(futures):
                 try:
                     outcomes.append(future.result())
-                except Exception as exc:  # broad-exception: isolate worker failure
+                except Exception as exc:  # broad-exception: fallback_recorded - Worker failure is logged and isolated from remaining comparison models.
                     model_id = futures[future]
                     log_safe_exception(
                         logger,
@@ -928,10 +960,10 @@ def _consensus_level(
 def _consensus_score(
     successful: Sequence[Mapping[str, Any]],
     points: Sequence[Mapping[str, Any]],
-) -> float:
+) -> Optional[float]:
     """Agreement degree in [0, 1]. Not a blended trading signal."""
     if len(successful) < 2:
-        return 0.0
+        return None
     if not points:
         return 1.0
     if any(p.get("kind") == "directional_opposition" for p in points):
@@ -948,7 +980,7 @@ def _primary_signal(successful: Sequence[Mapping[str, Any]]) -> Optional[str]:
     return str(signal) if signal else None
 
 
-def _canonical_signal(value: Any) -> str:
+def _canonical_signal(value: Any) -> Optional[str]:
     text = str(value or "").strip().lower()
     aliases = {
         "强烈看多": "strong_buy",
@@ -996,7 +1028,7 @@ def _canonical_signal(value: Any) -> str:
     ):
         if needle in text:
             return mapped
-    return "hold"
+    return None
 
 
 def _side_for_signal(signal: Any) -> str:
@@ -1027,6 +1059,8 @@ def _confidence_to_unit(value: Any) -> Optional[float]:
         return None
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("confidence must be finite")
         if number > 1.0:
             number = number / 100.0
         return round(max(0.0, min(1.0, number)), 4)
@@ -1126,6 +1160,8 @@ def _clamp_unit(value: Any, default: float) -> float:
         number = float(value)
     except (TypeError, ValueError):
         return default
+    if not math.isfinite(number):
+        raise ValueError("threshold must be finite")
     return max(0.0, min(1.0, number))
 
 
@@ -1140,11 +1176,13 @@ def _clamp_int(value: Any, default: int, *, minimum: int, maximum: int) -> int:
 
 
 def _safe_int(value: Any) -> Optional[int]:
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("integer metric must be finite")
     try:
         if value is None or isinstance(value, bool):
             return None
         return int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -1152,9 +1190,28 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         if value is None or isinstance(value, bool):
             return default
-        return round(max(0.0, min(1.0, float(value))), 4)
+        number = float(value)
     except (TypeError, ValueError):
         return default
+    if not math.isfinite(number):
+        raise ValueError("numeric metric must be finite")
+    return round(max(0.0, min(1.0, number)), 4)
+
+
+def _reject_non_finite_numbers(value: Any, *, path: str) -> None:
+    if isinstance(value, bool) or value is None:
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{path} must not contain NaN or infinity")
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            _reject_non_finite_numbers(item, path=f"{path}.{key}")
+        return
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for index, item in enumerate(value):
+            _reject_non_finite_numbers(item, path=f"{path}[{index}]")
 
 
 __all__ = [

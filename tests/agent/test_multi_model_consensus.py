@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
+from unittest.mock import patch
 
+import pytest
+from src.config import Config
 from src.agent.multi_model_consensus import (
     VERDICT_SPLIT,
     build_model_stance,
@@ -109,6 +113,39 @@ def test_positive_budget_hard_caps_to_two_models():
     assert meta["skipped_for_budget"] == ["c"]
 
 
+@pytest.mark.parametrize("non_finite", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_runtime_budget_is_rejected(non_finite):
+    config = SimpleNamespace(
+        multi_model_consensus_models=["a", "b"],
+        multi_model_consensus_max_models=2,
+        multi_model_consensus_preset="",
+        multi_model_consensus_max_cost_usd=non_finite,
+    )
+    with pytest.raises(ValueError, match="must be finite"):
+        resolve_consensus_models_for_run(config)
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf"])
+def test_non_finite_budget_stops_config_loading(raw):
+    with patch("src.config.setup_env"), patch.object(
+        Config, "_parse_litellm_yaml", return_value=[]
+    ), patch.object(
+        Config, "_parse_stock_email_groups", return_value=[]
+    ), patch.dict(
+        os.environ,
+        {
+            "STOCK_LIST": "600519",
+            "MULTI_MODEL_CONSENSUS_MAX_COST_USD": raw,
+        },
+        clear=True,
+    ):
+        with pytest.raises(
+            ValueError,
+            match="MULTI_MODEL_CONSENSUS_MAX_COST_USD must be a finite number",
+        ):
+            Config._load_from_env()
+
+
 def test_directional_opposition_not_averaged():
     stances = [
         build_model_stance(_result(signal="buy", score=80, model="m1"), requested_model="m1"),
@@ -180,6 +217,48 @@ def test_single_model_failure_degrades_with_annotation():
     assert public is not None
     assert public["status"] == "degraded_single"
     assert public["disagreement_handling"]["policy"]["majority_vote_used"] is False
+
+
+def test_missing_model_conclusions_are_not_evaluated_without_numeric_score():
+    missing = build_model_stance(
+        _result(signal="", score=50, model="m1"),
+        requested_model="m1",
+    )
+    comparison = build_multi_model_comparison(
+        [missing],
+        requested_models=["m1", "m2"],
+    )
+
+    assert missing["signal"] is None
+    assert missing["status"] == "unassessed"
+    assert missing["error_type"] == "missing_decision_signal"
+    assert comparison["status"] == "insufficient"
+    assert comparison["degradation"]["failed_models"] == ["m1"]
+    assert comparison["consensus_score"] is None
+    assert comparison["disagreement_handling"]["policy"]["applied_final_signal"] is None
+
+
+@pytest.mark.parametrize("non_finite", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_model_metrics_and_snapshot_are_rejected(non_finite):
+    with pytest.raises(ValueError, match="confidence must be finite"):
+        build_model_stance(
+            _result(confidence=non_finite, model="m1"),
+            requested_model="m1",
+        )
+    with pytest.raises(ValueError, match="integer metric must be finite"):
+        build_model_stance(
+            _result(score=non_finite, model="m1"),
+            requested_model="m1",
+        )
+    stance = build_model_stance(
+        _result(confidence="high", model="m1"),
+        requested_model="m1",
+    )
+    stance["confidence"] = non_finite
+    with pytest.raises(ValueError, match="must not contain NaN or infinity"):
+        build_multi_model_comparison([stance], requested_models=["m1"])
+    with pytest.raises(ValueError, match="must not contain NaN or infinity"):
+        fingerprint_shared_snapshot({"code": "AAPL", "realtime": {"price": non_finite}})
 
 
 def test_shared_snapshot_fingerprint_stable():
@@ -323,6 +402,8 @@ def test_all_models_failed_returns_no_primary_result():
     assert result is None
     assert comparison is not None
     assert comparison["status"] == "insufficient"
+    assert comparison["consensus_score"] is None
+    assert comparison["disagreement_handling"]["policy"]["applied_final_signal"] is None
     assert comparison["degradation"]["annotation"] == "no_usable_model_result"
 
 
@@ -342,3 +423,18 @@ def test_public_payload_keeps_disagreement_points_for_products():
     assert public["disagreement_handling"]["policy"]["averaging_used"] is False
     assert public["agreement_table"]
     assert public["trace"]["model_identities"]
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_public_payload_rejects_non_finite_persisted_metrics(invalid):
+    comparison = build_multi_model_comparison(
+        [
+            build_model_stance(_result(signal="buy", model="m1"), requested_model="m1"),
+            build_model_stance(_result(signal="buy", model="m2"), requested_model="m2"),
+        ],
+        requested_models=["m1", "m2"],
+    )
+    comparison["agreement_table"][0]["confidence"] = invalid
+
+    with pytest.raises(ValueError, match="must not contain NaN or infinity"):
+        public_multi_model_comparison_payload(comparison)
