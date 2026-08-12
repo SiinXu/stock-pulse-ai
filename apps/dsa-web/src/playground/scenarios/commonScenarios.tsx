@@ -1068,12 +1068,15 @@ const ModalStory = () => {
 };
 
 
-const HelpKeyButtonStory = () => (
-  <Surface className="flex min-h-24 items-center justify-center gap-2 p-4">
-    <span className="text-sm text-secondary-text">Risk help</span>
-    <HelpKeyButton helpKey={EDUCATION_HELP_KEYS.riskLevelHigh} data-testid="playground-help-key-button" />
-  </Surface>
-);
+const HelpKeyButtonStory = () => {
+  const text = useSampleText();
+  return (
+    <Surface className="flex min-h-24 items-center justify-center gap-2 p-4">
+      <span className="text-sm text-secondary-text">{text.preview}</span>
+      <HelpKeyButton helpKey={EDUCATION_HELP_KEYS.riskLevelHigh} data-testid="playground-help-key-button" />
+    </Surface>
+  );
+};
 
 export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'analysis-phase-select': AnalysisPhaseSelectStory,
