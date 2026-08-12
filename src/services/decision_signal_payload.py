@@ -145,7 +145,7 @@ def build_decision_signal_payload_from_report(
                 metadata.update(debate_meta)
                 metadata["debate_summary"] = debate_meta.get("debate_summary")
                 metadata["debate_rounds"] = debate_meta.get("debate_rounds")
-        except Exception:  # broad-exception: fallback_recorded
+        except Exception:  # broad-exception: fallback_recorded - Optional debate metadata cannot invalidate an otherwise valid primary DecisionSignal.
             logger.debug("Skip debate metadata on decision signal payload", exc_info=True)
     score_metadata = score_band_metadata(score)
     if score_metadata:

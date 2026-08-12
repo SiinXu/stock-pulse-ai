@@ -501,10 +501,14 @@ class _PipelineMethods:
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
             if _debate.is_debate_stage(stage_name):
                 debate_record = _debate.get_debate_record(ctx)
+                staged_record = result.meta.get("bull_bear_debate")
+                if debate_record is None and isinstance(staged_record, dict):
+                    debate_record = dict(staged_record)
+                    ctx.meta[_debate.DEBATE_META_KEY] = debate_record
                 if debate_record is None:
                     debate_record = _debate.empty_debate_record(
                         status=(
-                            _debate.STATUS_FAILED
+                            _debate.STATUS_DATA_UNAVAILABLE
                             if result.status == StageStatus.FAILED
                             else _debate.STATUS_DEGRADED
                         ),

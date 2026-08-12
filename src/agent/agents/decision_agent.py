@@ -243,7 +243,9 @@ should sum to 100; all-zero means no effective signal and must not be faked.
                 "Treat debate synthesis and contention points as explicit multi-party "
                 "evidence. Do not invent majority consensus. Do not silently discard "
                 "unresolved opposition. Decision authority remains with this agent; "
-                "debate output is not a DecisionSignal."
+                "debate output is not a DecisionSignal. A data_unavailable status "
+                "means no debate evidence exists and must never be treated as hold, "
+                "consensus, or successful verification."
             )
             parts.append("")
 

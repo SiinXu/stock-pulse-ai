@@ -100,10 +100,10 @@ class AnalysisService:
         portfolio_context: Optional[Dict[str, Any]] = None,
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
-        enable_debate: Optional[bool] = None,
-        debate_max_rounds: Optional[int] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         strict_skill_selection: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """

@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import time
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Literal, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -48,6 +49,7 @@ STATUS_COMPLETED = "completed"
 STATUS_SKIPPED = "skipped"
 STATUS_DEGRADED = "degraded"
 STATUS_BUDGET_EXHAUSTED = "budget_exhausted"
+STATUS_DATA_UNAVAILABLE = "data_unavailable"
 STATUS_FAILED = "failed"
 
 BULL_PARTICIPANT = "bull_researcher"
@@ -73,21 +75,21 @@ REQUEST_DEBATE_MAX_ROUNDS = "debate_max_rounds"
 
 class _StanceOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    stance: str
+    stance: Literal["buy", "hold", "sell"]
     confidence: float = Field(ge=0.0, le=1.0)
-    arguments: List[str] = Field(default_factory=list)
-    evidence_refs: List[str] = Field(default_factory=list)
-    contention_topics: List[str] = Field(default_factory=list)
+    arguments: List[str]
+    evidence_refs: List[str]
+    contention_topics: List[str]
 
 
 class _SynthesisOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    final_lean: str
+    final_lean: Literal["buy", "hold", "sell"]
     confidence: float = Field(ge=0.0, le=1.0)
-    summary: str
-    winner: str
-    resolution_status: str
-    key_contentions: List[str] = Field(default_factory=list)
+    summary: str = Field(min_length=1, max_length=_MAX_ARG_LEN)
+    winner: Literal["bull", "bear", "draw", "inconclusive"]
+    resolution_status: Literal["resolved", "partially_resolved", "unresolved"]
+    key_contentions: List[str]
 
 
 def is_debate_stage(agent_name: Any) -> bool:
@@ -168,14 +170,20 @@ def public_debate_payload(value: Any) -> Optional[Dict[str, Any]]:
                 continue
             rounds_out.append(
                 {
-                    "round": int(item.get("round") or 0),
+                    "round": _safe_nonnegative_int(item.get("round")),
                     "bull": _public_side(item.get("bull")),
                     "bear": _public_side(item.get("bear")),
                     "contention_points": _public_points(item.get("contention_points")),
                 }
             )
 
-    synthesis = value.get("synthesis") if isinstance(value.get("synthesis"), Mapping) else {}
+    raw_synthesis = value.get("synthesis")
+    synthesis = (
+        raw_synthesis
+        if isinstance(raw_synthesis, Mapping)
+        and str(raw_synthesis.get("final_lean") or "") in {"buy", "hold", "sell"}
+        else None
+    )
     budget = value.get("budget") if isinstance(value.get("budget"), Mapping) else {}
     degradation = value.get("degradation") if isinstance(value.get("degradation"), Mapping) else {}
     settings = value.get("settings") if isinstance(value.get("settings"), Mapping) else {}
@@ -184,28 +192,32 @@ def public_debate_payload(value: Any) -> Optional[Dict[str, Any]]:
         "enabled": True,
         "schema_version": DEBATE_SCHEMA_VERSION,
         "status": str(value.get("status") or STATUS_FAILED),
-        "max_rounds": int(value.get("max_rounds") or 0),
-        "rounds_completed": int(value.get("rounds_completed") or 0),
+        "max_rounds": _safe_nonnegative_int(value.get("max_rounds")),
+        "rounds_completed": _safe_nonnegative_int(value.get("rounds_completed")),
         "rounds": rounds_out,
         "contention_points": _public_points(value.get("contention_points")),
         "disagreement_points": _public_points(value.get("disagreement_points")),
-        "synthesis": {
-            "final_lean": str(synthesis.get("final_lean") or "hold"),
-            "confidence": _clamp_unit(synthesis.get("confidence"), 0.0),
-            "summary": sanitize_agent_diagnostic(str(synthesis.get("summary") or ""))[:_MAX_ARG_LEN],
-            "winner": str(synthesis.get("winner") or "inconclusive"),
-            "resolution_status": str(synthesis.get("resolution_status") or RESOLUTION_UNRESOLVED),
-            "majority_vote_used": False,
-            "key_contentions": [
-                sanitize_agent_diagnostic(str(x))[:_MAX_ARG_LEN]
-                for x in (synthesis.get("key_contentions") or [])[:_MAX_ARGS]
-                if str(x).strip()
-            ],
-        },
+        "synthesis": (
+            {
+                "final_lean": str(synthesis.get("final_lean") or "hold"),
+                "confidence": _clamp_unit(synthesis.get("confidence"), 0.0),
+                "summary": sanitize_agent_diagnostic(str(synthesis.get("summary") or ""))[:_MAX_ARG_LEN],
+                "winner": str(synthesis.get("winner") or "inconclusive"),
+                "resolution_status": str(synthesis.get("resolution_status") or RESOLUTION_UNRESOLVED),
+                "majority_vote_used": False,
+                "key_contentions": [
+                    sanitize_agent_diagnostic(str(x))[:_MAX_ARG_LEN]
+                    for x in (synthesis.get("key_contentions") or [])[:_MAX_ARGS]
+                    if str(x).strip()
+                ],
+            }
+            if synthesis is not None
+            else None
+        ),
         "budget": {
-            "llm_turns_used": int(budget.get("llm_turns_used") or 0),
-            "llm_turns_limit": int(budget.get("llm_turns_limit") or 0),
-            "tokens_used": int(budget.get("tokens_used") or 0),
+            "llm_turns_used": _safe_nonnegative_int(budget.get("llm_turns_used")),
+            "llm_turns_limit": _safe_nonnegative_int(budget.get("llm_turns_limit")),
+            "tokens_used": _safe_nonnegative_int(budget.get("tokens_used")),
             "terminated_reason": budget.get("terminated_reason"),
         },
         "degradation": {
@@ -254,15 +266,7 @@ def empty_debate_record(*, status: str, settings: Mapping[str, Any], reason: str
         "rounds": [],
         "contention_points": [],
         "disagreement_points": [],
-        "synthesis": {
-            "final_lean": "hold",
-            "confidence": 0.0,
-            "summary": sanitize_agent_diagnostic(reason) if reason else "",
-            "winner": "inconclusive",
-            "resolution_status": RESOLUTION_UNRESOLVED,
-            "majority_vote_used": False,
-            "key_contentions": [],
-        },
+        "synthesis": None,
         "budget": {
             "llm_turns_used": 0,
             "llm_turns_limit": _llm_turn_limit(int(settings.get("max_rounds") or _DEFAULT_MAX_ROUNDS)),
@@ -273,7 +277,13 @@ def empty_debate_record(*, status: str, settings: Mapping[str, Any], reason: str
             ),
         },
         "degradation": {
-            "present": status in {STATUS_DEGRADED, STATUS_BUDGET_EXHAUSTED, STATUS_FAILED, STATUS_SKIPPED},
+            "present": status in {
+                STATUS_DEGRADED,
+                STATUS_BUDGET_EXHAUSTED,
+                STATUS_DATA_UNAVAILABLE,
+                STATUS_FAILED,
+                STATUS_SKIPPED,
+            },
             "reasons": reasons,
         },
         "settings": {
@@ -325,7 +335,7 @@ def build_contention_point(
         "sides": {"bullish": [BULL_PARTICIPANT], "bearish": [BEAR_PARTICIPANT]},
         "summary_key": f"debate.point.{clean_kind}",
         "topic": clean_topic,
-        "round": int(round_index),
+        "round": _safe_nonnegative_int(round_index),
         "bull_claim": sanitize_agent_diagnostic(bull_claim)[:_MAX_ARG_LEN],
         "bear_claim": sanitize_agent_diagnostic(bear_claim)[:_MAX_ARG_LEN],
     }
@@ -387,19 +397,13 @@ def synthesize_debate_deterministic(
 
 
 def parse_stance_output(raw_text: str, *, side: str) -> Optional[Dict[str, Any]]:
+    if side not in {"bull", "bear"}:
+        return None
     parsed = _parse_strict_json_object(raw_text)
     if not isinstance(parsed, dict):
         return None
     try:
-        model = _StanceOutput.model_validate(
-            {
-                "stance": normalize_decision_signal(parsed.get("stance") or "hold"),
-                "confidence": _clamp_unit(parsed.get("confidence"), 0.5),
-                "arguments": _bounded_str_list(parsed.get("arguments")),
-                "evidence_refs": _bounded_str_list(parsed.get("evidence_refs")),
-                "contention_topics": _bounded_str_list(parsed.get("contention_topics")),
-            }
-        )
+        model = _StanceOutput.model_validate(parsed)
     except (ValidationError, TypeError, ValueError):
         return None
     return {
@@ -407,9 +411,9 @@ def parse_stance_output(raw_text: str, *, side: str) -> Optional[Dict[str, Any]]
         "participant": BULL_PARTICIPANT if side == "bull" else BEAR_PARTICIPANT,
         "stance": model.stance,
         "confidence": float(model.confidence),
-        "arguments": list(model.arguments),
-        "evidence_refs": list(model.evidence_refs),
-        "contention_topics": list(model.contention_topics),
+        "arguments": _bounded_str_list(model.arguments),
+        "evidence_refs": _bounded_str_list(model.evidence_refs),
+        "contention_topics": _bounded_str_list(model.contention_topics),
     }
 
 
@@ -417,33 +421,18 @@ def parse_synthesis_output(raw_text: str) -> Optional[Dict[str, Any]]:
     parsed = _parse_strict_json_object(raw_text)
     if not isinstance(parsed, dict):
         return None
-    resolution = str(parsed.get("resolution_status") or RESOLUTION_UNRESOLVED).strip()
-    if resolution not in {RESOLUTION_RESOLVED, RESOLUTION_PARTIAL, RESOLUTION_UNRESOLVED}:
-        resolution = RESOLUTION_UNRESOLVED
-    winner = str(parsed.get("winner") or "inconclusive").strip().lower()
-    if winner not in {"bull", "bear", "draw", "inconclusive"}:
-        winner = "inconclusive"
     try:
-        model = _SynthesisOutput.model_validate(
-            {
-                "final_lean": normalize_decision_signal(parsed.get("final_lean") or "hold"),
-                "confidence": _clamp_unit(parsed.get("confidence"), 0.4),
-                "summary": str(parsed.get("summary") or "").strip()[:_MAX_ARG_LEN],
-                "winner": winner,
-                "resolution_status": resolution,
-                "key_contentions": _bounded_str_list(parsed.get("key_contentions")),
-            }
-        )
+        model = _SynthesisOutput.model_validate(parsed)
     except (ValidationError, TypeError, ValueError):
         return None
     return {
         "final_lean": model.final_lean,
         "confidence": float(model.confidence),
-        "summary": model.summary,
+        "summary": sanitize_agent_diagnostic(model.summary)[:_MAX_ARG_LEN],
         "winner": model.winner,
         "resolution_status": model.resolution_status,
         "majority_vote_used": False,
-        "key_contentions": list(model.key_contentions),
+        "key_contentions": _bounded_str_list(model.key_contentions),
     }
 
 
@@ -553,20 +542,23 @@ class BoundedBullBearDebateAgent(BaseAgent):
 
             for round_index in range(1, max_rounds + 1):
                 if cancelled_check is not None and cancelled_check():
+                    budget_state["terminated_reason"] = "cancelled"
                     degradation_reasons.append("cancelled")
                     break
                 if timeout_seconds is not None and timeout_seconds > 0 and time.time() - t0 >= float(timeout_seconds):
                     budget_state["terminated_reason"] = "timeout"
                     degradation_reasons.append("stage_timeout")
                     break
-                if budget_state["llm_turns_used"] + 2 > turn_limit or _mode_budget_blocked(ctx):
-                    budget_state["terminated_reason"] = "budget_turns"
+                mode_budget_reason = _mode_budget_block_reason(ctx, required_turns=2)
+                if budget_state["llm_turns_used"] + 2 > turn_limit or mode_budget_reason:
+                    budget_state["terminated_reason"] = mode_budget_reason or "budget_turns"
                     degradation_reasons.append("debate_turn_budget")
                     break
 
                 bull = self._run_side(
                     ctx, side="bull", round_index=round_index, evidence=evidence,
                     prior_transcript=prior_transcript, temperature=float(settings["temperature"]),
+                    model_name=str(settings.get("model") or ""),
                     timeout_seconds=_remaining_timeout(timeout_seconds, t0),
                     budget_state=budget_state, models_used=models_used,
                 )
@@ -574,8 +566,19 @@ class BoundedBullBearDebateAgent(BaseAgent):
                     degradation_reasons.append(f"bull_round_{round_index}_failed")
                     break
 
-                if budget_state["llm_turns_used"] + 1 > turn_limit or _mode_budget_blocked(ctx):
-                    budget_state["terminated_reason"] = "budget_turns"
+                if cancelled_check is not None and cancelled_check():
+                    budget_state["terminated_reason"] = "cancelled"
+                    degradation_reasons.append("cancelled")
+                    rounds.append({"round": round_index, "bull": bull, "bear": None, "contention_points": [], "incomplete": True})
+                    break
+                if timeout_seconds is not None and timeout_seconds > 0 and time.time() - t0 >= float(timeout_seconds):
+                    budget_state["terminated_reason"] = "timeout"
+                    degradation_reasons.append("stage_timeout")
+                    rounds.append({"round": round_index, "bull": bull, "bear": None, "contention_points": [], "incomplete": True})
+                    break
+                mode_budget_reason = _mode_budget_block_reason(ctx, required_turns=1)
+                if budget_state["llm_turns_used"] + 1 > turn_limit or mode_budget_reason:
+                    budget_state["terminated_reason"] = mode_budget_reason or "budget_turns"
                     degradation_reasons.append("debate_turn_budget_after_bull")
                     rounds.append({"round": round_index, "bull": bull, "bear": None, "contention_points": [], "incomplete": True})
                     break
@@ -584,6 +587,7 @@ class BoundedBullBearDebateAgent(BaseAgent):
                     ctx, side="bear", round_index=round_index, evidence=evidence,
                     prior_transcript=prior_transcript + [{"side": "bull", **bull}],
                     temperature=float(settings["temperature"]),
+                    model_name=str(settings.get("model") or ""),
                     timeout_seconds=_remaining_timeout(timeout_seconds, t0),
                     budget_state=budget_state, models_used=models_used,
                 )
@@ -598,17 +602,31 @@ class BoundedBullBearDebateAgent(BaseAgent):
                 prior_transcript.append({"side": "bull", **bull})
                 prior_transcript.append({"side": "bear", **bear})
 
+            complete_rounds = [item for item in rounds if not item.get("incomplete")]
             synthesis: Optional[Dict[str, Any]] = None
-            if rounds:
+            provider_failed = any(
+                str(reason).endswith("_failed")
+                for reason in degradation_reasons
+            )
+            if complete_rounds and not provider_failed:
+                mode_budget_reason = _mode_budget_block_reason(ctx, required_turns=1)
+                cancelled = cancelled_check is not None and cancelled_check()
+                timed_out = (
+                    timeout_seconds is not None
+                    and timeout_seconds > 0
+                    and time.time() - t0 >= float(timeout_seconds)
+                )
                 can_synthesize = (
                     budget_state["llm_turns_used"] < turn_limit
-                    and not _mode_budget_blocked(ctx)
-                    and (cancelled_check is None or not cancelled_check())
+                    and not mode_budget_reason
+                    and not cancelled
+                    and not timed_out
                 )
                 if can_synthesize:
                     synthesis = self._run_synthesis(
-                        ctx, rounds=rounds, contention_points=all_points,
+                        ctx, rounds=complete_rounds, contention_points=all_points,
                         temperature=float(settings["temperature"]),
+                        model_name=str(settings.get("model") or ""),
                         timeout_seconds=_remaining_timeout(timeout_seconds, t0),
                         budget_state=budget_state, models_used=models_used,
                     )
@@ -616,12 +634,26 @@ class BoundedBullBearDebateAgent(BaseAgent):
                         degradation_reasons.append("synthesis_llm_failed")
                 else:
                     if budget_state["terminated_reason"] is None:
-                        budget_state["terminated_reason"] = "budget_turns"
-                    degradation_reasons.append("synthesis_skipped_budget")
+                        budget_state["terminated_reason"] = (
+                            "cancelled"
+                            if cancelled
+                            else "timeout"
+                            if timed_out
+                            else mode_budget_reason or "budget_turns"
+                        )
+                    degradation_reasons.append(
+                        "cancelled"
+                        if cancelled
+                        else "stage_timeout"
+                        if timed_out
+                        else "synthesis_skipped_budget"
+                    )
 
-            if synthesis is None:
-                synthesis = synthesize_debate_deterministic(rounds, contention_points=all_points)
-                degradation_reasons.append("deterministic_synthesis")
+            if not complete_rounds:
+                # An incomplete one-sided provider response is diagnostic only. Do not
+                # expose it as debate evidence or let it bias DecisionAgent.
+                rounds = []
+                all_points = []
 
             status = _resolve_status(rounds=rounds, degradation_reasons=degradation_reasons, terminated_reason=budget_state.get("terminated_reason"))
             unique_points = _dedupe_points(all_points)[:_MAX_POINTS]
@@ -647,22 +679,32 @@ class BoundedBullBearDebateAgent(BaseAgent):
                 },
             }
             ctx.meta[DEBATE_META_KEY] = record
-            ctx.add_opinion(
-                AgentOpinion(
-                    agent_name=DEBATE_STAGE_NAME,
-                    signal=str(synthesis.get("final_lean") or "hold"),
-                    confidence=float(synthesis.get("confidence") or 0.0),
-                    reasoning=str(synthesis.get("summary") or ""),
-                    raw_data={
-                        "debate_status": status,
-                        "winner": synthesis.get("winner"),
-                        "resolution_status": synthesis.get("resolution_status"),
-                        "contention_count": len(unique_points),
-                        "majority_vote_used": False,
-                    },
+            if synthesis is not None:
+                ctx.add_opinion(
+                    AgentOpinion(
+                        agent_name=DEBATE_STAGE_NAME,
+                        signal=str(synthesis.get("final_lean")),
+                        confidence=float(synthesis.get("confidence") or 0.0),
+                        reasoning=str(synthesis.get("summary") or ""),
+                        raw_data={
+                            "debate_status": status,
+                            "winner": synthesis.get("winner"),
+                            "resolution_status": synthesis.get("resolution_status"),
+                            "contention_count": len(unique_points),
+                            "majority_vote_used": False,
+                        },
+                    )
                 )
+            result.status = (
+                StageStatus.COMPLETED
+                if status in {STATUS_COMPLETED, STATUS_DEGRADED}
+                else StageStatus.FAILED
             )
-            result.status = StageStatus.COMPLETED
+            if result.status == StageStatus.FAILED:
+                result.error = AGENT_EXECUTION_FAILURE_MESSAGE
+                result.failure_reason = _stage_failure_reason(
+                    budget_state.get("terminated_reason")
+                )
             result.meta["bull_bear_debate"] = public_debate_payload(record)
             result.meta["models_used"] = list(dict.fromkeys(models_used))
             result.tokens_used = int(budget_state.get("tokens_used") or 0)
@@ -674,9 +716,9 @@ class BoundedBullBearDebateAgent(BaseAgent):
                     "rounds_completed": record["rounds_completed"],
                     "contention_count": len(unique_points),
                 })
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - The optional stage records a typed unavailable result and never fabricates evidence.
             log_safe_exception(logger, "[Debate] stage failed", exc, error_code="agent_bull_bear_debate_failed", level=logging.WARNING)
-            record = empty_debate_record(status=STATUS_FAILED, settings=settings, reason=sanitize_agent_diagnostic(str(exc))[:_MAX_ARG_LEN])
+            record = empty_debate_record(status=STATUS_DATA_UNAVAILABLE, settings=settings, reason=sanitize_agent_diagnostic(str(exc))[:_MAX_ARG_LEN])
             record["budget"] = budget_state
             ctx.meta[DEBATE_META_KEY] = record
             result.status = StageStatus.FAILED
@@ -687,7 +729,7 @@ class BoundedBullBearDebateAgent(BaseAgent):
             result.duration_s = round(time.time() - t0, 2)
         return result
 
-    def _run_side(self, ctx, *, side, round_index, evidence, prior_transcript, temperature, timeout_seconds, budget_state, models_used):
+    def _run_side(self, ctx, *, side, round_index, evidence, prior_transcript, temperature, model_name, timeout_seconds, budget_state, models_used):
         role = "Bull Researcher" if side == "bull" else "Bear Researcher"
         mandate = (
             "Argue the strongest legitimate bullish case. Challenge complacent risks."
@@ -720,17 +762,30 @@ Never claim majority consensus.
             {"role": "system", "content": system},
             {"role": "user", "content": "Produce your structured debate stance for this round:\n" + json.dumps(user_payload, ensure_ascii=False, default=str)},
         ]
-        raw, tokens, model = self._call_llm(messages, temperature=temperature, max_tokens=_MAX_TOKENS_STANCE, timeout_seconds=timeout_seconds)
+        raw, tokens, model, cost_usd = self._call_llm(
+            messages,
+            temperature=temperature,
+            max_tokens=_MAX_TOKENS_STANCE,
+            timeout_seconds=timeout_seconds,
+            model_name=model_name,
+        )
         budget_state["llm_turns_used"] = int(budget_state.get("llm_turns_used") or 0) + 1
         budget_state["tokens_used"] = int(budget_state.get("tokens_used") or 0) + int(tokens or 0)
         if model:
             models_used.append(model)
-        _record_mode_budget_turn(ctx, tokens=int(tokens or 0), model=model or "")
+        budget_reason = _record_mode_budget_turn(
+            ctx,
+            tokens=int(tokens or 0),
+            cost_usd=cost_usd,
+            model=model or "",
+        )
+        if budget_reason and budget_state.get("terminated_reason") is None:
+            budget_state["terminated_reason"] = budget_reason
         if raw is None:
             return None
         return parse_stance_output(raw, side=side)
 
-    def _run_synthesis(self, ctx, *, rounds, contention_points, temperature, timeout_seconds, budget_state, models_used):
+    def _run_synthesis(self, ctx, *, rounds, contention_points, temperature, model_name, timeout_seconds, budget_state, models_used):
         system = f"""You are the Debate Synthesis clerk. Summarize Bull vs Bear debate for DecisionAgent.
 You do NOT issue a DecisionSignal or overwrite the primary decision.
 Rules:
@@ -753,37 +808,86 @@ Return only one JSON object:
             {"role": "system", "content": system},
             {"role": "user", "content": "Synthesize this debate transcript:\n" + json.dumps(payload, ensure_ascii=False, default=str)},
         ]
-        raw, tokens, model = self._call_llm(messages, temperature=min(temperature, 0.3), max_tokens=_MAX_TOKENS_SYNTHESIS, timeout_seconds=timeout_seconds)
+        raw, tokens, model, cost_usd = self._call_llm(
+            messages,
+            temperature=min(temperature, 0.3),
+            max_tokens=_MAX_TOKENS_SYNTHESIS,
+            timeout_seconds=timeout_seconds,
+            model_name=model_name,
+        )
         budget_state["llm_turns_used"] = int(budget_state.get("llm_turns_used") or 0) + 1
         budget_state["tokens_used"] = int(budget_state.get("tokens_used") or 0) + int(tokens or 0)
         if model:
             models_used.append(model)
-        _record_mode_budget_turn(ctx, tokens=int(tokens or 0), model=model or "")
+        budget_reason = _record_mode_budget_turn(
+            ctx,
+            tokens=int(tokens or 0),
+            cost_usd=cost_usd,
+            model=model or "",
+        )
+        if budget_reason and budget_state.get("terminated_reason") is None:
+            budget_state["terminated_reason"] = budget_reason
         if raw is None:
             return None
         return parse_synthesis_output(raw)
 
-    def _call_llm(self, messages, *, temperature, max_tokens, timeout_seconds):
+    def _call_llm(
+        self,
+        messages,
+        *,
+        temperature,
+        max_tokens,
+        timeout_seconds,
+        model_name="",
+    ):
         try:
             timeout = None
             if timeout_seconds is not None and timeout_seconds > 0:
-                timeout = max(1.0, float(timeout_seconds))
-            response = self.llm_adapter.call_text(messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
+                timeout = max(0.001, float(timeout_seconds))
+            if model_name:
+                call_model = getattr(self.llm_adapter, "_call_litellm_model", None)
+                if not callable(call_model):
+                    logger.warning(
+                        "[Debate] dedicated model route unavailable: model=%s",
+                        model_name,
+                    )
+                    return None, 0, "", 0.0
+                response = call_model(
+                    messages,
+                    [],
+                    model_name,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
+            else:
+                response = self.llm_adapter.call_text(
+                    messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
             if getattr(response, "provider", None) == "error":
-                return None, 0, ""
+                return None, 0, "", 0.0
             content = (getattr(response, "content", None) or "").strip()
             usage = getattr(response, "usage", None) or {}
             tokens = 0
             if isinstance(usage, Mapping):
                 try:
                     tokens = int(usage.get("total_tokens") or 0)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     tokens = 0
-            model = str(getattr(response, "model", "") or "")
-            return content or None, tokens, model
-        except Exception as exc:  # broad-exception: fallback_recorded
+            model = str(getattr(response, "model", "") or model_name or "")
+            from src.agent.runtime.mode_budget import estimate_usage_cost_usd
+
+            cost_usd = estimate_usage_cost_usd(
+                usage if isinstance(usage, Mapping) else {},
+                model,
+            )
+            return content or None, tokens, model, cost_usd
+        except Exception as exc:  # broad-exception: fallback_recorded - Provider failures are converted to data_unavailable by the stage boundary.
             log_safe_exception(logger, "[Debate] LLM call failed", exc, error_code="agent_bull_bear_debate_llm_failed", level=logging.WARNING)
-            return None, 0, ""
+            return None, 0, "", 0.0
 
 
 def _project_evidence(ctx: AgentContext) -> Dict[str, Any]:
@@ -813,6 +917,8 @@ def _resolve_status(*, rounds, degradation_reasons, terminated_reason):
     complete_rounds = [item for item in rounds if not item.get("incomplete")]
     if terminated_reason in {"budget_turns", "budget_tools", "budget_cost", "budget_tokens"}:
         return STATUS_BUDGET_EXHAUSTED
+    if any(str(reason).endswith("_failed") for reason in degradation_reasons):
+        return STATUS_DATA_UNAVAILABLE
     if not complete_rounds:
         return STATUS_FAILED
     if degradation_reasons or terminated_reason:
@@ -820,38 +926,94 @@ def _resolve_status(*, rounds, degradation_reasons, terminated_reason):
     return STATUS_COMPLETED
 
 
-def _mode_budget_blocked(ctx: AgentContext) -> bool:
+def _mode_budget_block_reason(
+    ctx: AgentContext,
+    *,
+    required_turns: int = 1,
+) -> Optional[str]:
     account = ctx.meta.get("mode_budget_account")
     if account is None:
-        return False
+        return None
     check = getattr(account, "check", None)
-    if callable(check):
-        try:
-            return check() is not None
-        except Exception:
-            return False
-    return getattr(account, "breach", None) is not None
+    try:
+        breach = check() if callable(check) else getattr(account, "breach", None)
+        if breach is not None:
+            return str(getattr(breach, "reason", None) or "budget_unavailable")
+        snapshot_method = getattr(account, "snapshot", None)
+        if callable(snapshot_method):
+            snapshot = snapshot_method()
+            limits = snapshot.get("limits") if isinstance(snapshot, Mapping) else {}
+            used = snapshot.get("used") if isinstance(snapshot, Mapping) else {}
+            if (limits or {}).get("enabled") is False:
+                return None
+            max_turns = _safe_nonnegative_int((limits or {}).get("max_llm_turns"))
+            used_turns = _safe_nonnegative_int((used or {}).get("llm_turns"))
+            if (
+                max_turns > 0
+                and used_turns + max(1, int(required_turns or 1)) > max_turns
+            ):
+                return "budget_turns"
+        return None
+    except Exception as exc:  # broad-exception: fallback_recorded - An unreadable shared budget must stop the optional provider work.
+        log_safe_exception(
+            logger,
+            "[Debate] mode budget check failed",
+            exc,
+            error_code="agent_debate_mode_budget_check_failed",
+            level=logging.WARNING,
+        )
+        return "budget_unavailable"
 
 
-def _record_mode_budget_turn(ctx: AgentContext, *, tokens: int = 0, model: str = "") -> None:
+def _record_mode_budget_turn(
+    ctx: AgentContext,
+    *,
+    tokens: int = 0,
+    cost_usd: float = 0.0,
+    model: str = "",
+) -> Optional[str]:
     account = ctx.meta.get("mode_budget_account")
     if account is None:
-        return
+        return None
     record = getattr(account, "record_llm_turn", None)
     if not callable(record):
-        return
+        return "budget_unavailable"
     try:
-        record(tokens=max(0, int(tokens or 0)), cost_usd=0.0, model=model or "")
-    except Exception as exc:  # broad-exception: fallback_recorded
+        breach = record(
+            tokens=max(0, int(tokens or 0)),
+            cost_usd=(cost_usd if math.isfinite(cost_usd) and cost_usd >= 0 else 0.0),
+            model=model or "",
+        )
+        return (
+            str(getattr(breach, "reason", None) or "budget_unavailable")
+            if breach is not None
+            else None
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - Failed accounting stops later debate work rather than bypassing the hard budget.
         log_safe_exception(logger, "[Debate] mode budget record failed", exc, error_code="agent_debate_mode_budget_record_failed", level=logging.DEBUG)
+        return "budget_unavailable"
+
+
+def _stage_failure_reason(reason: Any) -> StageFailureReason:
+    mapping = {
+        "budget_turns": StageFailureReason.BUDGET_TURNS,
+        "budget_tools": StageFailureReason.BUDGET_TOOLS,
+        "budget_cost": StageFailureReason.BUDGET_COST,
+        "budget_tokens": StageFailureReason.BUDGET_TOKENS,
+        "timeout": StageFailureReason.TIMEOUT,
+    }
+    return mapping.get(str(reason or ""), StageFailureReason.STAGE_FAILURE)
 
 
 def _public_side(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping):
         return None
+    stance = str(value.get("stance") or "").strip().lower()
+    if stance not in {"buy", "hold", "sell"}:
+        return None
     return {
         "participant": str(value.get("participant") or ""),
-        "stance": str(value.get("stance") or "hold"),
+        "stance": stance,
         "confidence": _clamp_unit(value.get("confidence"), 0.0),
         "arguments": [sanitize_agent_diagnostic(str(x))[:_MAX_ARG_LEN] for x in (value.get("arguments") or [])[:_MAX_ARGS] if str(x).strip()],
         "evidence_refs": [sanitize_agent_diagnostic(str(x))[:_MAX_ARG_LEN] for x in (value.get("evidence_refs") or [])[:_MAX_ARGS] if str(x).strip()],
@@ -879,7 +1041,7 @@ def _public_points(value: Any) -> List[Dict[str, Any]]:
             },
             "summary_key": str(item.get("summary_key") or ""),
             "topic": sanitize_agent_diagnostic(str(item.get("topic") or ""))[:_MAX_ARG_LEN],
-            "round": int(item.get("round") or 0),
+            "round": _safe_nonnegative_int(item.get("round")),
             "bull_claim": sanitize_agent_diagnostic(str(item.get("bull_claim") or ""))[:_MAX_ARG_LEN],
             "bear_claim": sanitize_agent_diagnostic(str(item.get("bear_claim") or ""))[:_MAX_ARG_LEN],
         })
@@ -892,7 +1054,12 @@ def _dedupe_points(points: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
     for point in points:
         if not isinstance(point, Mapping):
             continue
-        key = (str(point.get("kind") or ""), str(point.get("topic") or ""), int(point.get("round") or 0), str(point.get("severity") or ""))
+        key = (
+            str(point.get("kind") or ""),
+            str(point.get("topic") or ""),
+            _safe_nonnegative_int(point.get("round")),
+            str(point.get("severity") or ""),
+        )
         if key in seen:
             continue
         seen.add(key)
@@ -932,8 +1099,13 @@ def _parse_strict_json_object(raw_text: str) -> Optional[Dict[str, Any]]:
     if fenced is not None:
         candidate = fenced.group("body").strip()
     try:
-        parsed = json.loads(candidate)
-    except json.JSONDecodeError:
+        parsed = json.loads(
+            candidate,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                ValueError(f"non-finite JSON constant: {value}")
+            ),
+        )
+    except (json.JSONDecodeError, ValueError):
         return None
     return parsed if isinstance(parsed, dict) else None
 
@@ -960,7 +1132,7 @@ def _parse_optional_bool(value: Any) -> Optional[bool]:
 def _clamp_rounds(value: Any) -> int:
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return _DEFAULT_MAX_ROUNDS
     return max(_MIN_ROUNDS, min(_MAX_ROUNDS, number))
 
@@ -968,9 +1140,9 @@ def _clamp_rounds(value: Any) -> int:
 def _safe_temperature(value: Any) -> float:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return _DEFAULT_TEMPERATURE
-    if number != number:
+    if not math.isfinite(number):
         return _DEFAULT_TEMPERATURE
     return max(0.0, min(1.5, number))
 
@@ -980,9 +1152,21 @@ def _clamp_unit(value: Any, default: float = 0.0) -> float:
         if value is None or isinstance(value, bool):
             return default
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        return default
+    if not math.isfinite(number):
         return default
     return max(0.0, min(1.0, number))
+
+
+def _safe_nonnegative_int(value: Any) -> int:
+    try:
+        if value is None or isinstance(value, bool):
+            return 0
+        number = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return max(0, number)
 
 
 def _remaining_timeout(timeout_seconds: Optional[float], started_at: float) -> Optional[float]:
@@ -996,7 +1180,7 @@ __all__ = [
     "DEBATE_DASHBOARD_KEY", "DEBATE_META_KEY", "DEBATE_SCHEMA_VERSION", "DEBATE_STAGE_NAME",
     "REQUEST_DEBATE_MAX_ROUNDS", "REQUEST_ENABLE_DEBATE",
     "RESOLUTION_PARTIAL", "RESOLUTION_RESOLVED", "RESOLUTION_UNRESOLVED",
-    "STATUS_BUDGET_EXHAUSTED", "STATUS_COMPLETED", "STATUS_DEGRADED", "STATUS_FAILED", "STATUS_SKIPPED",
+    "STATUS_BUDGET_EXHAUSTED", "STATUS_COMPLETED", "STATUS_DATA_UNAVAILABLE", "STATUS_DEGRADED", "STATUS_FAILED", "STATUS_SKIPPED",
     "apply_debate_to_dashboard", "build_contention_point", "decision_signal_debate_metadata",
     "empty_debate_record", "extract_contention_points", "get_debate_record",
     "is_debate_enabled", "is_debate_stage", "parse_stance_output", "parse_synthesis_output",

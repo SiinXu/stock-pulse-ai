@@ -1399,7 +1399,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Adds up to 2*rounds+1 debate LLM turns before Decision and surfaces dashboard.bull_bear_debate.',
     ],
     notes: [
-      'Debate synthesis is non-authoritative; DecisionAgent remains final authority. Failures still write a product record.',
+      'Debate synthesis is non-authoritative; DecisionAgent remains final authority. Provider or budget failures write a data_unavailable product record.',
     ],
   },
   'settings.agent.DEBATE_MAX_ROUNDS': {
@@ -1416,15 +1416,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'Increase slightly for more diverse bull/bear arguments; keep moderate for stability.',
     valueNotes: ['Default 0.4. Range 0–1.5.'],
     impact: ['Affects stance diversity only; does not change stage enablement.'],
-    notes: ['Applied to debate call_text completions.'],
+    notes: ['Applied to all debate completions, including a configured debate-specific model route.'],
   },
   'settings.agent.DEBATE_MODEL': {
     title: 'Debate Model',
-    summary: 'Optional model name recorded for debate diagnostics.',
+    summary: 'Optional model name used for debate completions.',
     usage: 'Leave empty to use the agent primary LiteLLM route.',
     valueNotes: ['Empty default uses the shared agent route.'],
-    impact: ['Currently diagnostic/config surface; completion still uses the agent primary stack.'],
-    notes: ['Reserved for deployments that later pin a debate-specific model string.'],
+    impact: ['A non-empty value routes every debate turn through that LiteLLM model.'],
+    notes: ['Invalid or unavailable dedicated models fail closed to a data_unavailable debate record.'],
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',

@@ -135,6 +135,35 @@ class TestReportRenderer(unittest.TestCase):
         self.assertIn("作战计划", out)
         self.assertNotIn("盘中决策护栏", out)
 
+    def test_render_surfaces_debate_and_never_fakes_unavailable_synthesis(self) -> None:
+        debate = {
+            "enabled": True,
+            "status": "data_unavailable",
+            "rounds_completed": 0,
+            "max_rounds": 1,
+            "rounds": [],
+            "contention_points": [],
+            "synthesis": None,
+        }
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {"one_sentence": "Wait for evidence"},
+                "intelligence": {"risk_alerts": []},
+                "battle_plan": {"sniper_points": {"stop_loss": "110"}},
+                "bull_bear_debate": debate,
+            },
+            report_language="en",
+        )
+
+        markdown = render("markdown", [r], summary_only=False)
+        wechat = render("wechat", [r], summary_only=False)
+
+        self.assertIn("Bull-Bear Debate", markdown)
+        self.assertIn("data_unavailable", markdown)
+        self.assertIn("Bull-Bear Debate", wechat)
+        self.assertIn("data_unavailable", wechat)
+        self.assertNotIn("Synthesis: Hold", markdown)
+
     def test_render_surfaces_structured_risk_decision_near_decision_card(self) -> None:
         r = _make_result(
             decision_type="hold",

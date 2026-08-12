@@ -301,6 +301,33 @@ class TaskInfo:
         )
 
 
+def _normalize_optional_bool(value: Any) -> Optional[bool]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        if value in {0, 1}:
+            return bool(value)
+        return None
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _normalize_optional_debate_rounds(value: Any) -> Optional[int]:
+    if value is None or value == "" or isinstance(value, bool):
+        return None
+    try:
+        rounds = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return rounds if 1 <= rounds <= 3 else None
+
+
 @dataclass(frozen=True)
 class AnalysisTaskCoalescingContract:
     """Immutable result and side-effect contract for one stock analysis."""
@@ -313,12 +340,12 @@ class AnalysisTaskCoalescingContract:
     skills: Any
     report_language: Optional[str]
     use_memory: Optional[bool]
-    enable_debate: Optional[bool]
-    debate_max_rounds: Optional[int]
     portfolio_context: Any
     query_source: str
     context_bound: bool
     strict_skill_selection: bool = False
+    enable_debate: Optional[bool] = None
+    debate_max_rounds: Optional[int] = None
 
     @classmethod
     def from_metadata(
@@ -357,12 +384,10 @@ class AnalysisTaskCoalescingContract:
                 bool(raw_use_memory) if raw_use_memory is not None else None
             ),
             enable_debate=(
-                bool(raw_enable_debate) if raw_enable_debate is not None else None
+                _normalize_optional_bool(raw_enable_debate)
             ),
-            debate_max_rounds=(
-                int(raw_debate_max_rounds)
-                if raw_debate_max_rounds is not None and str(raw_debate_max_rounds).strip() != ""
-                else None
+            debate_max_rounds=_normalize_optional_debate_rounds(
+                raw_debate_max_rounds
             ),
             portfolio_context=deep_freeze(metadata.get("portfolio_context")),
             query_source=str(metadata.get("query_source") or "api"),
@@ -813,8 +838,8 @@ class AnalysisTaskQueue:
                 skills=copy.deepcopy(metadata.get("skills")),
                 report_language=metadata.get("report_language"),
                 use_memory=metadata.get("use_memory"),
-            enable_debate=metadata.get("enable_debate"),
-            debate_max_rounds=metadata.get("debate_max_rounds"),
+                enable_debate=metadata.get("enable_debate"),
+                debate_max_rounds=metadata.get("debate_max_rounds"),
                 request_context=None,
                 strict_skill_selection=bool(
                     metadata.get("strict_skill_selection", False)
@@ -1643,10 +1668,10 @@ class AnalysisTaskQueue:
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
-        enable_debate: Optional[bool] = None,
-        debate_max_rounds: Optional[int] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         strict_skill_selection: bool = False,
     ) -> TaskInfo:
         """
@@ -1710,10 +1735,10 @@ class AnalysisTaskQueue:
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
-        enable_debate: Optional[bool] = None,
-        debate_max_rounds: Optional[int] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         strict_skill_selection: bool = False,
     ) -> Tuple[List[TaskInfo], List[DuplicateTaskError]]:
         """

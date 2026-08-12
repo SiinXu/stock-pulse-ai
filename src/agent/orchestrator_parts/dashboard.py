@@ -555,7 +555,7 @@ class _DashboardMethods:
                 dashboard_block,
                 get_debate_record(ctx) or ctx.meta.get(DEBATE_META_KEY),
             )
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - Report projection failure is logged while the primary decision remains authoritative.
             log_safe_exception(
                 logger,
                 "[Orchestrator] bull-bear debate report section failed",
