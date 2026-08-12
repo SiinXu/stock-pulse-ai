@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -172,6 +173,21 @@ def test_optional_data_sources_info_when_absent(tmp_path: Path) -> None:
 
 def test_cli_main_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scripts import actions_config_check as cli
+    from src.services.actions_config_check import LEGACY_LLM_KEY_NAMES
+
+    # Isolate from ambient CI/Actions secrets so exit-code assertions stay deterministic.
+    for key in (
+        *LEGACY_LLM_KEY_NAMES,
+        "LITELLM_CONFIG",
+        "LITELLM_CONFIG_YAML",
+        "LLM_CHANNELS",
+        "LLM_ZHIPU_API_KEY",
+        "LLM_SILICONFLOW_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    for key in list(os.environ):
+        if key.startswith("LLM_") and key.endswith(("API_KEY", "API_KEYS")):
+            monkeypatch.delenv(key, raising=False)
 
     monkeypatch.setenv("STOCK_LIST", "600519")
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key-value-ok")
