@@ -432,7 +432,8 @@ async function openConnections(page: Page, reset = true) {
 
 async function addOpenAiConnectionThroughUi(page: Page, id: string, model: string) {
   await page.getByRole('button', { name: /添加模型来源/ }).first().click();
-  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  await page.getByTestId('source-type-cloud').click();
+  const dialog = page.getByRole('region', { name: '添加模型服务' });
   await dialog.getByLabel('选择模型服务商').click();
   await page.locator('[role="option"][data-value="openai"]').click();
   await dialog.getByRole('button', { name: '下一步' }).click();
@@ -461,7 +462,8 @@ async function addOpenAiConnectionThroughUi(page: Page, id: string, model: strin
 
 async function editConnectionAddModel(page: Page, id: string, model: string) {
   await page.getByTestId(`connection-card-${id}`).getByRole('button', { name: '编辑' }).click();
-  const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+  const dialog = page.getByRole('region', { name: '编辑模型服务' });
+  await expect(dialog).toBeVisible();
   const manualButton = dialog.getByRole('button', { name: /手动添加模型/ });
   if (await manualButton.isVisible().catch(() => false)) await manualButton.click();
   await dialog.getByLabel('手动添加模型').fill(model);
