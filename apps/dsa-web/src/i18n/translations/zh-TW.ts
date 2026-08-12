@@ -5337,6 +5337,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.library.sensitivityHint": "以下風險表述僅在所選情景下成立，不會改寫基線報告結論。",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.title": "情景庫（報告敏感性）",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.uncertainty": "不確定性",
+  "i18n.uiText.UI_TEXT.chat.whatIf.library.versionLabel": "版本 {version}",
   "i18n.uiText.UI_TEXT.chat.whatIf.resultBadge": "假設情景 · 不構成正式建議",
   "i18n.uiText.UI_TEXT.chat.whatIf.subtitle": "在結構化假設下推演；結果不會寫入正式訊號或記憶",
   "i18n.uiText.UI_TEXT.chat.whatIf.title": "What-if 情景分析",

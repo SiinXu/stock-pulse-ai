@@ -159,7 +159,7 @@ export function WhatIfScenarioPanel({ t, draft, onChange, disabled = false }: Wh
               <Library className="h-3.5 w-3.5 text-warning" aria-hidden />
               <span>{t('chat.whatIf.library.title')}</span>
               <span className="ml-auto text-muted-text" data-testid="chat-scenario-library-version">
-                v{SCENARIO_LIBRARY_VERSION}
+                {t('chat.whatIf.library.versionLabel', { version: SCENARIO_LIBRARY_VERSION })}
               </span>
             </div>
             <div data-testid="chat-scenario-library-select">

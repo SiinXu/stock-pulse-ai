@@ -501,6 +501,7 @@ const zh = {
   'chat.whatIf.library.scenarioName': '情景',
   'chat.whatIf.library.uncertainty': '不确定性',
   'chat.whatIf.library.positionSizing': '仓位口径',
+  'chat.whatIf.library.versionLabel': 'v{version}',
 
   'decisionSignals.action': '动作',
   'decisionSignals.active': '有效',
@@ -2499,6 +2500,7 @@ const en: Record<UiTextKey, string> = {
   'chat.whatIf.library.scenarioName': 'Scenario',
   'chat.whatIf.library.uncertainty': 'Uncertainty',
   'chat.whatIf.library.positionSizing': 'Position sizing',
+  'chat.whatIf.library.versionLabel': 'v{version}',
 
   'decisionSignals.action': 'Action',
   'decisionSignals.active': 'Active',
