@@ -33,6 +33,9 @@ const KIND_OPTIONS: Array<{ value: '' | NotificationInboxKind; labelKey: keyof t
   { value: 'alert_triggered', labelKey: 'kindAlert' },
   { value: 'scheduled_task_result', labelKey: 'kindScheduled' },
   { value: 'decision_signal', labelKey: 'kindSignal' },
+  { value: 'daily_brief', labelKey: 'kindDailyBrief' },
+  { value: 'high_disagreement', labelKey: 'kindHighDisagreement' },
+  { value: 'portfolio_health', labelKey: 'kindPortfolioHealth' },
 ];
 
 const NotificationCenterPage: React.FC = () => {
