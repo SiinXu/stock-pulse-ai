@@ -88,6 +88,7 @@ EXPECTED_PIPELINE_METHODS = (
     "_collect_strategy_synthesis",
     "_prepare_decision_context",
     "_record_critic_budget_skip",
+    "_record_debate_budget_skip",
     "_record_degraded_stage",
     "_record_degraded_event",
     "_record_pipeline_termination",
@@ -116,8 +117,8 @@ EXPECTED_DASHBOARD_METHODS = (
 EXPECTED_AST_HASHES = {
     "_ExecutionMethods": "874bde2ce8e46d268096bafa929a23c6532462fcde6e887f052f72f7ff2d6cde",
     "_ChatMethods": "1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d",
-    "_PipelineMethods": "4611d9230b5c31e916ef72fc5125fafd580a4f5ee002e3ddee8b615352c7914e",
-    "_DashboardMethods": "3aac353fb950aa588b71dc59eca0db793b131150949df7b8d08bf9731f5b611f",
+    "_PipelineMethods": "1dba2fab75e9200bc7869ec0d7a43eb029ed1b294095808f7f39ba0d71dae08b",
+    "_DashboardMethods": "9879f77aa22b802eca2f3d68d6cafd200b784937eeebf509621c2d83ab872cc9",
 }
 
 

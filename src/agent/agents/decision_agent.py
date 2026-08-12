@@ -227,6 +227,26 @@ should sum to 100; all-zero means no effective signal and must not be faked.
             )
             parts.append("")
 
+        debate_record = ctx.meta.get("bull_bear_debate")
+        if not self._is_chat_mode(ctx) and isinstance(debate_record, dict) and debate_record:
+            from src.agent.bull_bear_debate import public_debate_payload
+
+            debate_projection = public_debate_payload(debate_record) or {
+                "status": debate_record.get("status"),
+                "synthesis": debate_record.get("synthesis"),
+                "contention_points": debate_record.get("contention_points"),
+                "rounds_completed": debate_record.get("rounds_completed"),
+            }
+            parts.append("## Bull-Bear Debate Summary (structured multi-party evidence)")
+            parts.append(json.dumps(debate_projection, ensure_ascii=False, default=str))
+            parts.append(
+                "Treat debate synthesis and contention points as explicit multi-party "
+                "evidence. Do not invent majority consensus. Do not silently discard "
+                "unresolved opposition. Decision authority remains with this agent; "
+                "debate output is not a DecisionSignal."
+            )
+            parts.append("")
+
         # Feed risk flags
         if ctx.risk_flags:
             parts.append("## Risk Flags")

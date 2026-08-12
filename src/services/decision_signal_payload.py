@@ -135,6 +135,18 @@ def build_decision_signal_payload_from_report(
     }
     if has_canonical_risk_result:
         metadata["risk_manager"] = risk_gate_result
+    debate_payload = dashboard.get("bull_bear_debate")
+    if isinstance(debate_payload, Mapping) and debate_payload:
+        try:
+            from src.agent.bull_bear_debate import decision_signal_debate_metadata
+
+            debate_meta = decision_signal_debate_metadata(debate_payload)
+            if debate_meta:
+                metadata.update(debate_meta)
+                metadata["debate_summary"] = debate_meta.get("debate_summary")
+                metadata["debate_rounds"] = debate_meta.get("debate_rounds")
+        except Exception:  # broad-exception: fallback_recorded
+            logger.debug("Skip debate metadata on decision signal payload", exc_info=True)
     score_metadata = score_band_metadata(score)
     if score_metadata:
         metadata["score_scale"] = score_metadata

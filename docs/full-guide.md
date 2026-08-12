@@ -1900,6 +1900,8 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 `StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
 
 成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
+`DEBATE_ENABLED=false`（默认）保持现有行为。设为 `true` 时，仅 Native Multi 的非 Chat 分析在 Decision 前增加可选 Bull-Bear 结构化辩论（1–3 轮多方/空方立场 + 交锋点 + 非权威合成）。辩论结果写入 `dashboard.bull_bear_debate`、Markdown/WeChat 报告与 DecisionSignal metadata（`debate_summary`/`debate_rounds`），不得静默丢弃。受 `DEBATE_MAX_ROUNDS` 轮次上限、每轮 LLM turn 预算与 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余墙钟预算约束；与分歧记录契约对齐（`source=debate` 交锋点，不使用多数表决）。API/请求上下文可覆盖 `enable_debate`、`debate_max_rounds`。回滚：关闭或删除 `DEBATE_ENABLED`。
+
 
 ## Agent 运行时护栏
 

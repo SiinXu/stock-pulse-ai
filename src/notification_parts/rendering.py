@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
     from src.notification import (
         _append_strategy_synthesis_block,
+        _append_bull_bear_debate_block,
         _safe_float,
         display_action_fields_for_result,
         display_decision_type_for_result,
@@ -792,6 +793,8 @@ class _RenderingMethods:
                     dashboard.get('strategy_synthesis') if dashboard else None
                 )
                 _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
+                debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
+                _append_bull_bear_debate_block(report_lines, debate_payload, labels, report_language)
 
                 # Financial summary / shareholder returns / related sectors (hidden when data is missing)
                 self._append_fundamental_blocks(report_lines, result)
@@ -1354,6 +1357,8 @@ class _RenderingMethods:
             dashboard.get('strategy_synthesis') if dashboard else None
         )
         _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
+        debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
+        _append_bull_bear_debate_block(lines, debate_payload, labels, report_language)
 
         # Position recommendation
         pos_advice = core.get('position_advice', {}) if core else {}

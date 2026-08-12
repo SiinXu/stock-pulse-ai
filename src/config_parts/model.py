@@ -274,6 +274,11 @@ class Config:
     agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/specialist
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    # Optional structured Bull-Bear debate stage before Decision (Issue #117). Default off.
+    debate_enabled: bool = False
+    debate_max_rounds: int = 2
+    debate_temperature: float = 0.4
+    debate_model: str = ""  # Optional dedicated model; empty uses agent primary route
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
