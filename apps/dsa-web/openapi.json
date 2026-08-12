@@ -18765,6 +18765,41 @@
         "title": "PortfolioImportCommitResponse",
         "type": "object"
       },
+      "PortfolioImportFailedRow": {
+        "description": "One source row rejected during spreadsheet parse (correctable).",
+        "properties": {
+          "reason": {
+            "description": "Human-readable rejection reason",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "description": "Stable machine code for the rejection reason",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "row_number": {
+            "description": "1-based line number in the source file (header is 1)",
+            "title": "Row Number",
+            "type": "integer"
+          },
+          "source": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Non-empty original cells from the rejected row for download/correction",
+            "title": "Source",
+            "type": "object"
+          }
+        },
+        "required": [
+          "row_number",
+          "reason_code",
+          "reason"
+        ],
+        "title": "PortfolioImportFailedRow",
+        "type": "object"
+      },
       "PortfolioImportParseResponse": {
         "properties": {
           "broker": {
@@ -18780,6 +18815,14 @@
               "type": "string"
             },
             "title": "Errors",
+            "type": "array"
+          },
+          "failed_rows": {
+            "description": "Structured rejected rows with original cells for client download",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioImportFailedRow"
+            },
+            "title": "Failed Rows",
             "type": "array"
           },
           "record_count": {
@@ -42436,7 +42479,7 @@
             "description": "Internal Server Error"
           }
         },
-        "summary": "Parse broker CSV into normalized trade records",
+        "summary": "Parse broker CSV/XLSX into normalized trade records",
         "tags": [
           "Portfolio"
         ]

@@ -155,6 +155,62 @@ export function getCsvParseVariant(result: PortfolioImportParseResponse): Portfo
   return result.errorCount > 0 || result.skippedCount > 0 ? 'warning' : 'info';
 }
 
+
+/** Build a UTF-8 CSV (with BOM) of rejected import rows for offline correction. */
+export function buildFailedRowsCsv(
+  failedRows: readonly {
+    rowNumber: number;
+    reasonCode: string;
+    reason: string;
+    source?: Record<string, string>;
+  }[],
+): string {
+  const sourceKeys = new Set<string>();
+  for (const row of failedRows) {
+    const source = row.source ?? {};
+    for (const key of Object.keys(source)) {
+      sourceKeys.add(key);
+    }
+  }
+  const orderedSourceKeys = [...sourceKeys];
+  const headers = ['row_number', 'reason_code', 'reason', ...orderedSourceKeys];
+
+  const escapeCell = (value: string): string => {
+    if (/[",\n\r]/.test(value)) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  };
+
+  const lines = [headers.map(escapeCell).join(',')];
+  for (const row of failedRows) {
+    const source = row.source ?? {};
+    const cells = [
+      String(row.rowNumber),
+      row.reasonCode,
+      row.reason,
+      ...orderedSourceKeys.map((key) => source[key] ?? ''),
+    ];
+    lines.push(cells.map((cell) => escapeCell(String(cell))).join(','));
+  }
+  // BOM helps Excel open UTF-8 correctly for CJK headers from broker exports.
+  return `\uFEFF${lines.join('\n')}\n`;
+}
+
+export function downloadTextFile(filename: string, content: string, mimeType = 'text/csv;charset=utf-8'): void {
+  if (typeof document === 'undefined') return;
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = 'noopener';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function getCsvCommitVariant(result: PortfolioImportCommitResponse, isDryRun: boolean): PortfolioAlertVariant {
   if (isDryRun) return 'info';
   return result.failedCount > 0 || result.duplicateCount > 0 ? 'warning' : 'success';

@@ -117,9 +117,17 @@ const portfolioImportTradeItemSchema = z.object({
   fee: z.number(), tax: z.number(), dedupHash: z.string(), tradeUid: z.string().nullable().optional(),
   currency: z.string().nullable().optional(),
 }).passthrough();
+const portfolioImportFailedRowSchema = z.object({
+  rowNumber: z.number(),
+  reasonCode: z.string(),
+  reason: z.string(),
+  source: z.record(z.string(), z.string()).optional(),
+}).passthrough();
 const portfolioImportParseResponseSchema = z.object({
   broker: z.string(), recordCount: z.number(), skippedCount: z.number(), errorCount: z.number(),
-  records: z.array(portfolioImportTradeItemSchema).optional(), errors: z.array(z.string()).optional(),
+  records: z.array(portfolioImportTradeItemSchema).optional(),
+  errors: z.array(z.string()).optional(),
+  failedRows: z.array(portfolioImportFailedRowSchema).optional(),
 }).passthrough();
 const portfolioImportCommitResponseSchema = z.object({
   accountId: z.number(), recordCount: z.number(), insertedCount: z.number(), duplicateCount: z.number(),
@@ -456,7 +464,17 @@ export const portfolioApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     const parsed = parseCamelCasePayload<PortfolioImportParseResponse>(response.data, portfolioImportParseResponseSchema, 'PortfolioImportParseResponse');
-    return { ...parsed, records: Array.isArray(parsed.records) ? parsed.records : [], errors: Array.isArray(parsed.errors) ? parsed.errors : [] };
+    return {
+      ...parsed,
+      records: Array.isArray(parsed.records) ? parsed.records : [],
+      errors: Array.isArray(parsed.errors) ? parsed.errors : [],
+      failedRows: Array.isArray(parsed.failedRows)
+        ? parsed.failedRows.map((row) => ({
+          ...row,
+          source: row.source && typeof row.source === 'object' ? row.source : {},
+        }))
+        : [],
+    };
   },
 
   async commitCsvImport(

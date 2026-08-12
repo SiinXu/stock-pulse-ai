@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildFailedRowsCsv,
   buildFxRefreshFeedback,
   formatBrokerLabel,
   formatMoney,
@@ -53,6 +54,28 @@ describe('portfolioFormat', () => {
     expect(formatBrokerLabel('custom', ' 自定义 ')).toBe('custom（自定义）');
     expect(getCsvParseVariant({ broker: 'huatai', recordCount: 1, skippedCount: 1, errorCount: 0, records: [], errors: [] })).toBe('warning');
     expect(getCsvCommitVariant({ accountId: 1, recordCount: 1, insertedCount: 1, duplicateCount: 0, failedCount: 0, dryRun: false, errors: [] }, false)).toBe('success');
+  });
+
+  it('builds a downloadable failed-rows CSV with source columns and BOM', () => {
+    const csv = buildFailedRowsCsv([
+      {
+        rowNumber: 2,
+        reasonCode: 'invalid_side',
+        reason: 'Side must be buy or sell',
+        source: { 成交日期: '2026-01-02', 证券代码: '600519', 买卖标志: 'Asset Transfer' },
+      },
+      {
+        rowNumber: 3,
+        reasonCode: 'invalid_price',
+        reason: 'Price must be a positive number',
+        source: { 成交日期: '2026-01-03', 证券代码: '000001', 成交均价: '0' },
+      },
+    ]);
+    expect(csv.startsWith('\uFEFF')).toBe(true);
+    expect(csv).toContain('row_number,reason_code,reason');
+    expect(csv).toContain('invalid_side');
+    expect(csv).toContain('600519');
+    expect(csv).toContain('Asset Transfer');
   });
 
   it('builds FX refresh feedback from refresh outcomes', () => {
