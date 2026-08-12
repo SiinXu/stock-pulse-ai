@@ -1262,6 +1262,77 @@ export interface paths {
         patch: operations["updateDecisionSignalStatus"];
         trace?: never;
     };
+    "/api/v1/discover/screen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run bounded AI candidate discovery
+         * @description Natural-language or criteria-driven candidate discovery over an explicit paginated universe. Quotes go through data_provider with a hard provider-call budget. Research screening only — not trade instructions.
+         */
+        post: operations["runCandidateDiscovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit bounded AI candidate discovery task */
+        post: operations["startCandidateDiscoveryTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get candidate discovery task status */
+        get: operations["getCandidateDiscoveryTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a running candidate discovery task */
+        post: operations["cancelCandidateDiscoveryTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/focus/today": {
         parameters: {
             query?: never;
@@ -5744,6 +5815,244 @@ export interface components {
             prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+        };
+        /** CandidateDiscoveryCandidate */
+        CandidateDiscoveryCandidate: {
+            /** Amount */
+            amount?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Factor Scores */
+            factor_scores?: {
+                [key: string]: number;
+            };
+            /** Industry */
+            industry?: string | null;
+            /** Llm Thesis */
+            llm_thesis?: string | null;
+            /** Market */
+            market?: string | null;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Price */
+            price?: number | null;
+            /** Provider */
+            provider?: string | null;
+            /** Rank */
+            rank: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Reason Codes */
+            reason_codes?: string[];
+            /** Risk Level */
+            risk_level?: string | null;
+            /** Score */
+            score?: number | null;
+            /** Selection Source */
+            selection_source?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryCriteria */
+        CandidateDiscoveryCriteria: {
+            /**
+             * Exclude St
+             * @default true
+             */
+            exclude_st: boolean;
+            /** Keywords */
+            keywords?: string[];
+            /** Markets */
+            markets?: string[];
+            /** Max Change Pct */
+            max_change_pct?: number | null;
+            /** Min Amount */
+            min_amount?: number | null;
+            /** Min Change Pct */
+            min_change_pct?: number | null;
+        };
+        /** CandidateDiscoveryRequest */
+        CandidateDiscoveryRequest: {
+            /** Account Id */
+            account_id?: number | null;
+            /** Codes */
+            codes?: string[];
+            criteria?: components["schemas"]["CandidateDiscoveryCriteria"] | null;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Markets */
+            markets?: string[];
+            /**
+             * Max Provider Calls
+             * @default 20
+             */
+            max_provider_calls: number;
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 50
+             */
+            page_size: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /**
+             * Universe
+             * @description watchlist | portfolio | index | codes
+             * @default watchlist
+             */
+            universe: string;
+            /**
+             * Use Llm
+             * @default false
+             */
+            use_llm: boolean;
+        };
+        /** CandidateDiscoveryResponse */
+        CandidateDiscoveryResponse: {
+            /** Candidate Count */
+            candidate_count: number;
+            /** Candidates */
+            candidates?: components["schemas"]["CandidateDiscoveryCandidate"][];
+            /** Cost Contract */
+            cost_contract?: {
+                [key: string]: unknown;
+            };
+            /** Criteria */
+            criteria?: {
+                [key: string]: unknown;
+            };
+            /** Empty Message */
+            empty_message?: string | null;
+            /** Empty Reason */
+            empty_reason?: string | null;
+            /**
+             * Market
+             * @default cn
+             */
+            market: string;
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /** Pack Version */
+            pack_version: string;
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 50
+             */
+            page_size: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /**
+             * Research Disclaimer
+             * @default Research screening only. Not investment advice or trade instructions.
+             */
+            research_disclaimer: string;
+            /** Run Id */
+            run_id: string;
+            /** Status */
+            status: string;
+            /** Universe */
+            universe: string;
+            /** Universe Contract */
+            universe_contract?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryTaskAccepted */
+        CandidateDiscoveryTaskAccepted: {
+            /** Max Provider Calls */
+            max_provider_calls: number;
+            /** Max Results */
+            max_results: number;
+            /** Message */
+            message: string;
+            /**
+             * Message Code
+             * @default task.discovery.queued
+             */
+            message_code: string;
+            /** Message Params */
+            message_params?: {
+                [key: string]: unknown;
+            };
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string;
+            /** Trace Id */
+            trace_id: string;
+            /** Universe */
+            universe: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryTaskStatus */
+        CandidateDiscoveryTaskStatus: {
+            /** Error */
+            error?: string | null;
+            /** Message */
+            message?: string | null;
+            /** Message Code */
+            message_code?: string | null;
+            /** Message Params */
+            message_params?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Progress
+             * @default 0
+             */
+            progress: number;
+            result?: components["schemas"]["CandidateDiscoveryResponse"] | null;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string;
+            /** Trace Id */
+            trace_id?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * CapabilityListResponse
@@ -19652,6 +19961,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    runCandidateDiscovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    startCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskAccepted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskStatus"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancelCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskStatus"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
