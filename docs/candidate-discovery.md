@@ -59,8 +59,12 @@ Responses include:
 
 Research Discover (`/research/discover`) mode toggle:
 
-- **AI discovery** (default): NL/criteria panel, cancel, cost summary, analyze + add-to-watchlist
+- **AI discovery**: NL/criteria panel, cancel, cost summary, analyze + add-to-watchlist
 - **Strategy screen**: existing AlphaSift strategy flow (requires `ALPHASIFT_ENABLED`)
+
+Strategy screen remains the initial mode for backward compatibility. AI discovery is directly reachable from the mode control without enabling AlphaSift.
+
+Discovery UI copy uses a feature-owned inventory. The eight translated locale packs are loaded on demand, are real localized copy rather than identical-English baseline entries, and remain `PENDING_NATIVE_REVIEW` for financial-language review.
 
 The page header stays mode-aware: discovery mode reports “AI discovery ready (bounded)” and does **not** require AlphaSift to be enabled.
 

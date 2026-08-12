@@ -14,13 +14,13 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { buildDeepLink } from '../../utils/deepLink';
-import { Button, Select, Surface } from '../common';
-import type { ScreeningText } from './screeningText';
+import { Button, DataTable, Select, Surface, type DataTableColumn } from '../common';
+import type { DiscoveryScreeningText } from './screeningText';
 
 const POLL_MS = 1500;
 
 export type ScreeningDiscoveryPanelProps = {
-  text: ScreeningText;
+  text: DiscoveryScreeningText;
 };
 
 type RunState = 'idle' | 'submitting' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -191,6 +191,49 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
   const candidates = result?.candidates ?? [];
   const cost = result?.costContract ?? {};
   const universeContract = result?.universeContract ?? {};
+  const candidateColumns: readonly DataTableColumn<DiscoveryCandidate>[] = [
+    { id: 'rank', header: '#', width: 'compact', cell: (item) => item.rank },
+    {
+      id: 'code',
+      header: text.code,
+      rowHeader: true,
+      nowrap: true,
+      cell: (item) => <span className="font-mono font-semibold">{item.code}</span>,
+    },
+    { id: 'name', header: text.name, cell: (item) => item.name },
+    { id: 'score', header: text.score, cell: (item) => item.score ?? '-' },
+    {
+      id: 'change',
+      header: text.change,
+      cell: (item) => item.changePct == null ? '-' : `${Number(item.changePct).toFixed(2)}%`,
+    },
+    {
+      id: 'summary',
+      header: text.summary,
+      width: 'wide',
+      cell: (item) => <span className="leading-5 text-secondary-text">{item.reason}</span>,
+    },
+    {
+      id: 'actions',
+      header: text.details,
+      cell: (item) => (
+        <div className="flex flex-col gap-1">
+          <Button type="button" size="compact" variant="secondary" onClick={() => handleAnalyze(item)}>
+            {text.analyze}
+          </Button>
+          <Button
+            type="button"
+            size="compact"
+            variant="ghost"
+            disabled={watchlistBusy === item.code}
+            onClick={() => void handleAddWatchlist(item)}
+          >
+            {text.discoveryAddWatchlist}
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <Surface as="section" level="interactive" padding="none" className="space-y-4 p-4">
@@ -276,7 +319,7 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
       </label>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={() => void handleRun()} disabled={loading}>
+        <Button type="button" variant="primary" onClick={() => void handleRun()} disabled={loading}>
           {loading ? text.discoveryRunning : text.discoveryRun}
         </Button>
         {loading && taskId ? (
@@ -324,51 +367,16 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
               {result.emptyMessage || text.discoveryNoHits}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-xs text-secondary-text">
-                  <tr>
-                    <th className="px-2 py-1">#</th>
-                    <th className="px-2 py-1">{text.code}</th>
-                    <th className="px-2 py-1">{text.name}</th>
-                    <th className="px-2 py-1">{text.score}</th>
-                    <th className="px-2 py-1">{text.change}</th>
-                    <th className="px-2 py-1">{text.summary}</th>
-                    <th className="px-2 py-1">{text.details}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {candidates.map((item) => (
-                    <tr key={`${item.rank}-${item.code}`} className="border-t border-border/50 align-top">
-                      <td className="px-2 py-2">{item.rank}</td>
-                      <td className="px-2 py-2 font-mono font-semibold">{item.code}</td>
-                      <td className="px-2 py-2">{item.name}</td>
-                      <td className="px-2 py-2">{item.score ?? '-'}</td>
-                      <td className="px-2 py-2">
-                        {item.changePct == null ? '-' : `${Number(item.changePct).toFixed(2)}%`}
-                      </td>
-                      <td className="px-2 py-2 text-xs leading-5 text-secondary-text">{item.reason}</td>
-                      <td className="px-2 py-2">
-                        <div className="flex flex-col gap-1">
-                          <Button type="button" size="compact" variant="secondary" onClick={() => handleAnalyze(item)}>
-                            {text.analyze}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="compact"
-                            variant="ghost"
-                            disabled={watchlistBusy === item.code}
-                            onClick={() => void handleAddWatchlist(item)}
-                          >
-                            {text.discoveryAddWatchlist}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              caption={text.discoveryTitle}
+              columns={candidateColumns}
+              rows={candidates}
+              getRowKey={(item) => `${item.rank}-${item.code}`}
+              emptyState={{ title: text.discoveryNoHits }}
+              density="compact"
+              frame="embedded"
+              minWidth="wide"
+            />
           )}
           <p className="text-xs text-secondary-text">{result.researchDisclaimer || text.discoveryDisclaimer}</p>
         </div>

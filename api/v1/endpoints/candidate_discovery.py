@@ -107,15 +107,6 @@ def run_candidate_discovery(
         raise api_error(500, "candidate_discovery_failed", "Candidate discovery failed") from exc
 
 
-@router.post(
-    "/screen/tasks",
-    status_code=202,
-    response_model=CandidateDiscoveryTaskAccepted,
-    response_model_exclude_unset=True,
-    responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
-    summary="Submit bounded AI candidate discovery task",
-    operation_id="startCandidateDiscoveryTask",
-)
 def _is_discovery_cancel_requested(task_queue, task_id: str) -> bool:
     task = task_queue.get_task(task_id)
     if task is None:
@@ -176,6 +167,15 @@ def _cancelled_discovery_payload(request: CandidateDiscoveryRequest) -> Dict[str
     }
 
 
+@router.post(
+    "/screen/tasks",
+    status_code=202,
+    response_model=CandidateDiscoveryTaskAccepted,
+    response_model_exclude_unset=True,
+    responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+    summary="Submit bounded AI candidate discovery task",
+    operation_id="startCandidateDiscoveryTask",
+)
 def start_candidate_discovery_task(
     request: CandidateDiscoveryRequest,
     config: Config = Depends(get_config_dep),

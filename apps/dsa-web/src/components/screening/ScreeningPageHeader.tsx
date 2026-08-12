@@ -33,10 +33,10 @@ const ScreeningPageHeader: React.FC<ScreeningPageHeaderProps> = ({
           tabIndex={-1}
           className="text-2xl font-bold tracking-normal text-foreground"
         >
-          {title ?? text.pageTitle ?? text.title}
+          {title ?? text.title}
         </h1>
         <p className="mt-1 text-sm text-secondary-text">
-          {description ?? text.pageDescription ?? text.description}
+          {description ?? text.description}
         </p>
       </div>
     </div>

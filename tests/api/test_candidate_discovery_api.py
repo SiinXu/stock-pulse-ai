@@ -16,6 +16,17 @@ from src.services.task_queue import TaskStatus as QueueTaskStatus
 
 
 class CandidateDiscoveryApiTests(unittest.TestCase):
+    def test_start_task_route_keeps_request_in_the_json_body(self) -> None:
+        route = next(
+            item
+            for item in endpoint.router.routes
+            if item.path == "/screen/tasks" and "POST" in item.methods
+        )
+
+        self.assertIs(route.endpoint, endpoint.start_candidate_discovery_task)
+        self.assertEqual([param.name for param in route.dependant.query_params], [])
+        self.assertEqual([param.name for param in route.dependant.body_params], ["request"])
+
     def test_run_candidate_discovery_returns_service_payload(self) -> None:
         config = SimpleNamespace()
         request = endpoint.CandidateDiscoveryRequest(

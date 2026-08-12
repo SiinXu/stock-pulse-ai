@@ -19,12 +19,11 @@ import { AppPage } from '../components/common';
 import { ScreeningConfigurationModal } from '../components/screening/ScreeningConfigurationModal';
 import { ScreeningHotspotsSection } from '../components/screening/ScreeningHotspotsSection';
 import ScreeningPageAlerts from '../components/screening/ScreeningPageAlerts';
-import ScreeningPageHeader from '../components/screening/ScreeningPageHeader';
+import ScreeningModeShell, { type ScreeningMode } from '../components/screening/ScreeningModeShell';
 import { useRouteFocusTarget } from '../components/routing';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
-import ScreeningDiscoveryPanel from '../components/screening/ScreeningDiscoveryPanel';
 import { formatHotspotEmptyMessage } from '../components/screening/hotspotModel';
 import { getScreeningDegradationReasons } from '../components/screening/screeningDegradation';
 import createScreeningResultsEmptyState from '../components/screening/screeningResultsEmptyState';
@@ -38,7 +37,6 @@ import {
   type ScreeningSuccessfulRun,
 } from '../components/screening/screeningPageState';
 import { useScreeningCapability } from '../components/screening/useScreeningCapability';
-import { Button, Surface } from '../components/common';
 import {
   SCREEN_TASK_POLL_INTERVAL_MS,
   clearPersistedScreenTask,
@@ -67,6 +65,7 @@ import { buildDeepLink } from '../utils/deepLink';
 import { formatTaskMessage } from '../utils/taskMessage';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { useScreeningUrlState } from '../components/screening/useScreeningUrlState';
+import { useCandidateDiscoveryText } from '../components/screening/useCandidateDiscoveryText';
 
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
@@ -78,7 +77,9 @@ const StockScreeningPage: React.FC = () => {
     ready: true,
   });
   const configurationFormId = useId();
-  const text = SCREENING_TEXT[language];
+  const baseText = SCREENING_TEXT[language];
+  const discoveryText = useCandidateDiscoveryText(language);
+  const text = useMemo(() => ({ ...baseText, ...discoveryText }), [baseText, discoveryText]);
   const markets = useMemo(
     () => [{ id: RESEARCH_DISCOVER_MARKET_VALUES.china, label: text.marketCn }],
     [text.marketCn],
@@ -125,7 +126,7 @@ const StockScreeningPage: React.FC = () => {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(restoredTask?.taskId ?? null);
   const [taskProgress, setTaskProgress] = useState(restoredTask?.taskId ? 10 : 0);
   const [taskMessage, setTaskMessage] = useState(restoredTask?.taskId ? text.restoringTask : '');
-  const [screenMode, setScreenMode] = useState<'strategy' | 'discovery'>('discovery');
+  const [screenMode, setScreenMode] = useState<ScreeningMode>('strategy');
 
   const {
     expandedCode,
@@ -170,11 +171,6 @@ const StockScreeningPage: React.FC = () => {
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
-
-  const headerTitle = text.pageTitle ?? text.title;
-  const headerDescription = text.pageDescription ?? text.description;
-  const headerEnabled = screenMode === 'discovery' ? true : isScreeningEnabled;
-  const headerStatus = screenMode === 'discovery' ? text.discoveryStatusReady : statusText;
 
   const applyScreenResult = useCallback((result: AlphaSiftScreenResponse) => {
     const nextCandidates = result.candidates || [];
@@ -566,35 +562,14 @@ const StockScreeningPage: React.FC = () => {
 
   return (
     <AppPage className="space-y-6 pb-12 pt-6">
-      <ScreeningPageHeader
+      <ScreeningModeShell
         text={text}
-        enabled={headerEnabled}
-        status={headerStatus}
-        title={headerTitle}
-        description={headerDescription}
+        mode={screenMode}
+        strategyEnabled={isScreeningEnabled}
+        strategyStatus={statusText}
+        onModeChange={setScreenMode}
         headingRef={pageHeadingRef}
       />
-
-      <Surface as="section" level="interactive" padding="none" className="flex flex-wrap gap-2 p-3">
-        <Button
-          type="button"
-          size="compact"
-          variant={screenMode === 'discovery' ? 'primary' : 'secondary'}
-          onClick={() => setScreenMode('discovery')}
-        >
-          {text.modeDiscovery}
-        </Button>
-        <Button
-          type="button"
-          size="compact"
-          variant={screenMode === 'strategy' ? 'primary' : 'secondary'}
-          onClick={() => setScreenMode('strategy')}
-        >
-          {text.modeStrategy}
-        </Button>
-      </Surface>
-
-      {screenMode === 'discovery' ? <ScreeningDiscoveryPanel text={text} /> : null}
 
       {screenMode === 'strategy' ? (
       <>

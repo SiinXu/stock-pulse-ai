@@ -149,7 +149,12 @@ export type CandidateDiscoveryTaskStatus = {
 };
 
 function mapCandidate(raw: Record<string, unknown>): DiscoveryCandidate {
-  const parsed = candidateSchema.parse(raw);
+  const parsed = parseCamelCasePayload<z.infer<typeof candidateSchema>>(
+    raw,
+    candidateSchema,
+    'candidate discovery candidate',
+    'candidateDiscovery',
+  );
   return {
     rank: parsed.rank,
     code: parsed.code,
@@ -172,10 +177,14 @@ function mapCandidate(raw: Record<string, unknown>): DiscoveryCandidate {
 }
 
 function mapResponse(payload: unknown): CandidateDiscoveryResponse {
-  const parsed = discoveryResponseSchema.parse(parseCamelCasePayload(payload));
+  const parsed = parseCamelCasePayload<z.infer<typeof discoveryResponseSchema>>(
+    payload,
+    discoveryResponseSchema,
+    'candidate discovery response',
+    'candidateDiscovery',
+  );
   const candidates = (parsed.candidates || []).map((item) => {
-    const camel = parseCamelCasePayload(item) as Record<string, unknown>;
-    return mapCandidate(camel);
+    return mapCandidate(item);
   });
   return {
     packVersion: parsed.packVersion,
@@ -202,7 +211,12 @@ function mapResponse(payload: unknown): CandidateDiscoveryResponse {
 export const candidateDiscoveryApi = {
   startTask: async (body: CandidateDiscoveryRequest): Promise<CandidateDiscoveryTaskAccepted> => {
     const { data } = await apiClient.post('/api/v1/discover/screen/tasks', body);
-    const parsed = taskAcceptedSchema.parse(parseCamelCasePayload(data));
+    const parsed = parseCamelCasePayload<z.infer<typeof taskAcceptedSchema>>(
+      data,
+      taskAcceptedSchema,
+      'candidate discovery task accepted',
+      'candidateDiscovery',
+    );
     return {
       taskId: parsed.taskId,
       traceId: parsed.traceId,
@@ -218,7 +232,12 @@ export const candidateDiscoveryApi = {
 
   getTask: async (taskId: string): Promise<CandidateDiscoveryTaskStatus> => {
     const { data } = await apiClient.get(`/api/v1/discover/screen/tasks/${encodeURIComponent(taskId)}`);
-    const parsed = taskStatusSchema.parse(parseCamelCasePayload(data));
+    const parsed = parseCamelCasePayload<z.infer<typeof taskStatusSchema>>(
+      data,
+      taskStatusSchema,
+      'candidate discovery task status',
+      'candidateDiscovery',
+    );
     return {
       taskId: parsed.taskId,
       traceId: parsed.traceId,
@@ -232,7 +251,12 @@ export const candidateDiscoveryApi = {
 
   cancelTask: async (taskId: string): Promise<CandidateDiscoveryTaskStatus> => {
     const { data } = await apiClient.post(`/api/v1/discover/screen/tasks/${encodeURIComponent(taskId)}/cancel`);
-    const parsed = taskStatusSchema.parse(parseCamelCasePayload(data));
+    const parsed = parseCamelCasePayload<z.infer<typeof taskStatusSchema>>(
+      data,
+      taskStatusSchema,
+      'candidate discovery cancel status',
+      'candidateDiscovery',
+    );
     return {
       taskId: parsed.taskId,
       traceId: parsed.traceId,

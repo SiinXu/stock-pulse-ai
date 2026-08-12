@@ -57,8 +57,12 @@
 
 Research Discover 模式切换：
 
-- **AI 发现**（默认）：NL/条件面板、取消、成本摘要、分析 / 加入自选
+- **AI 发现**：NL/条件面板、取消、成本摘要、分析 / 加入自选
 - **策略选股**：既有 AlphaSift 策略流（需 `ALPHASIFT_ENABLED`）
+
+为保持向后兼容，页面初始仍为策略选股模式；用户无需启用 AlphaSift，即可通过模式控件直接进入 AI 发现。
+
+发现功能文案使用独立 inventory，八个翻译 locale 包按需加载；文案为实际本地化内容，不扩张 identical-to-English 基线，并统一保持 `PENDING_NATIVE_REVIEW`，等待金融语境母语审校。
 
 页头在 AI 发现模式下展示“AI 发现可用（有界）”，**不依赖** AlphaSift 开关。
 
