@@ -10,7 +10,30 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+import logging
+import random
+import time
+from datetime import datetime
+
 import pandas as pd
+
+from src.utils.sanitize import log_safe_exception
+
+# Facade free-name anchors for flake8 F821. Rebound methods resolve these from
+# ``data_provider.akshare_fetcher`` globals at runtime (ADR-006).
+logger = logging.getLogger("data_provider.akshare_fetcher")
+USER_AGENTS = []  # type: ignore[assignment]
+DataFetchError = Exception  # type: ignore[assignment,misc]
+RateLimitError = Exception  # type: ignore[assignment,misc]
+STANDARD_COLUMNS = ()  # type: ignore[assignment]
+_is_us_code = None  # type: ignore[assignment]
+_is_hk_code = None  # type: ignore[assignment]
+_is_etf_code = None  # type: ignore[assignment]
+_to_sina_tx_symbol = None  # type: ignore[assignment]
+_akshare_call_with_timeout = None  # type: ignore[assignment]
+is_bse_code = None  # type: ignore[assignment]
+normalize_stock_code = None  # type: ignore[assignment]
+retry = None  # type: ignore[assignment]
 
 _FACADE_RELOAD_HOOK: Optional[Callable[[], None]] = globals().get("_FACADE_RELOAD_HOOK")
 

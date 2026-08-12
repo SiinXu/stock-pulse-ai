@@ -8,9 +8,44 @@ Method bodies are rebound onto ``AkshareFetcher`` by the compatibility facade
 
 from __future__ import annotations
 
+import logging
+import random
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
+import requests
+
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger("data_provider.akshare_fetcher")
+USER_AGENTS = []  # type: ignore[assignment]
+SINA_REALTIME_ENDPOINT = ""
+TENCENT_REALTIME_ENDPOINT = ""
+UnifiedRealtimeQuote = None  # type: ignore[assignment,misc]
+RealtimeSource = None  # type: ignore[assignment,misc]
+safe_float = None  # type: ignore[assignment]
+safe_int = None  # type: ignore[assignment]
+get_realtime_circuit_breaker = None  # type: ignore[assignment]
+_is_etf_code = None  # type: ignore[assignment]
+_is_hk_code = None  # type: ignore[assignment]
+_to_sina_tx_symbol = None  # type: ignore[assignment]
+_normalize_tencent_volume = None  # type: ignore[assignment]
+_parse_tencent_amount = None  # type: ignore[assignment]
+_classify_realtime_http_error = None  # type: ignore[assignment]
+_build_realtime_failure_message = None  # type: ignore[assignment]
+get_a_share_snapshot_if_fresh = None  # type: ignore[assignment]
+store_a_share_snapshot = None  # type: ignore[assignment]
+get_etf_snapshot_if_fresh = None  # type: ignore[assignment]
+store_etf_snapshot = None  # type: ignore[assignment]
+get_hk_cache = None  # type: ignore[assignment]
+hk_refresh_lock = None  # type: ignore[assignment]
+lookup_hk_em_snapshot = None  # type: ignore[assignment]
+record_hk_refresh_success = None  # type: ignore[assignment]
+record_hk_refresh_failure = None  # type: ignore[assignment]
+_realtime_cache = None  # type: ignore[assignment]
+_etf_realtime_cache = None  # type: ignore[assignment]
+_is_us_code = None  # type: ignore[assignment]
 
 _FACADE_RELOAD_HOOK: Optional[Callable[[], None]] = globals().get("_FACADE_RELOAD_HOOK")
 

@@ -8,9 +8,22 @@ Method bodies are rebound onto ``AkshareFetcher`` by the compatibility facade
 
 from __future__ import annotations
 
+import logging
+import time
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
+
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger("data_provider.akshare_fetcher")
+safe_float = None  # type: ignore[assignment]
+safe_int = None  # type: ignore[assignment]
+normalize_stock_code = None  # type: ignore[assignment]
+is_bse_code = None  # type: ignore[assignment]
+is_kc_cy_stock = None  # type: ignore[assignment]
+is_st_stock = None  # type: ignore[assignment]
 
 _FACADE_RELOAD_HOOK: Optional[Callable[[], None]] = globals().get("_FACADE_RELOAD_HOOK")
 
