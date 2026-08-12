@@ -329,7 +329,7 @@ export const DataProviderRuntimeStatusPanel: React.FC<DataProviderRuntimeStatusP
       {status ? (
         <div className="space-y-4" data-testid="data-runtime-status">
           {status.partial || status.sourceState !== 'ok' ? (
-            <Surface level="interactive" className="border border-warning/40 px-4 py-3" data-testid="data-runtime-partial">
+            <Surface level="interactive" className="px-4 py-3" data-testid="data-runtime-partial">
               <div className="flex flex-wrap items-center gap-2">
                 <CircleAlert className="h-4 w-4 text-warning" aria-hidden="true" />
                 <Badge variant="warning" size="sm">
