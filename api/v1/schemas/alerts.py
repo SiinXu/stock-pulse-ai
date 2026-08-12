@@ -151,8 +151,8 @@ class AlertTriggerItem(BaseModel):
     id: int
     rule_id: Optional[int] = None
     target: str
-    observed_value: Optional[float] = None
-    threshold: Optional[float] = None
+    observed_value: Optional[float] = Field(None, allow_inf_nan=False)
+    threshold: Optional[float] = Field(None, allow_inf_nan=False)
     reason: Optional[str] = None
     data_source: Optional[str] = None
     data_timestamp: Optional[str] = None

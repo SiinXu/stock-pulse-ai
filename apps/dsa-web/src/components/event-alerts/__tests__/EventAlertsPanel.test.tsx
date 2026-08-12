@@ -47,6 +47,17 @@ describe('EventAlertsPanel', () => {
     expect(screen.getByText('No event alerts')).toBeInTheDocument();
   });
 
+  it('presents a missing impact conclusion as not evaluated', () => {
+    renderPanel(<EventAlertsPanel items={[{
+      ...fixtures[0],
+      id: 103,
+      impactGrade: 'unclassified',
+      impactProvenance: 'unavailable',
+    }]} embedded />);
+
+    expect(screen.getAllByText('Not evaluated')).toHaveLength(2);
+  });
+
   it('moves selection into the filtered dataset', () => {
     renderPanel(<EventAlertsPanel items={fixtures} embedded />);
     fireEvent.click(screen.getByTestId('event-alert-row-102'));

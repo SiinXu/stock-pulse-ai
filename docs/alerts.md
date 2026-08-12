@@ -548,11 +548,14 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 `corporate_event`、`volume_spike`、`price_change_percent`。
 
 分析通过 `AnalysisSubmissionService` 异步入队，**不会**在告警热路径内联跑完整分析。
+只有队列实际接受的任务才占用防抖与小时/每日预算；重复任务、空结果或入队失败会释放预留额度。
+规则数值、自然语言编译数值与触发记录一律拒绝 `NaN` / `+Inf` / `-Inf`。
 
 ### 上下文建议动作
 
 真实触发后 worker 写入有界 `suggested_action`（及可选 `auto_analysis` 状态）。公开投影
 对齐 #957 事件告警面：不泄露账户/数量等敏感持仓字段；深度链接为站内路径与可选 http(s) 来源 URL。
+缺少影响结论时，Web 明确显示“未评估”，不会把缺失状态呈现为通过。
 
 告警通知静默时段继续复用 `NOTIFICATION_QUIET_HOURS` / `NOTIFICATION_TIMEZONE`。
 
@@ -561,4 +564,3 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 `POST /api/v1/alerts/rules/compile-nl` 将白名单内自然语言编译为 Alert 创建载荷。
 结果：`success` | `need_clarification` | `rejected`。禁止任意代码执行。
 企业事件编译始终包含 `event_categories` / `lookback_hours` / `min_items`，防止编辑丢字段回归。
-

@@ -4,6 +4,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.services.event_triggered_analysis import (
     EventTriggerBudgetState,
     EventTriggeredAnalysisService,
@@ -99,6 +101,55 @@ class TestEventTriggeredAnalysisGates:
             notification_policy={"auto_analysis": True},
         )
         assert third.status == "budget_exceeded"
+
+    @pytest.mark.parametrize("invalid_now", [float("nan"), float("inf"), float("-inf")])
+    def test_non_finite_clock_is_rejected(self, invalid_now: float) -> None:
+        service = EventTriggeredAnalysisService(
+            state=EventTriggerBudgetState(),
+            now_provider=lambda: invalid_now,
+        )
+
+        with pytest.raises(ValueError, match="timestamp must be finite"):
+            service.maybe_submit(
+                config=_config(event_triggered_analysis_enabled=True),
+                stock_code="600519",
+                alert_type="corporate_event",
+                notification_policy={"auto_analysis": True},
+            )
+
+    def test_duplicate_or_empty_enqueue_releases_budget_and_cooldown(self) -> None:
+        submission = MagicMock()
+        submission.submit.side_effect = [
+            SimpleNamespace(accepted_tasks=()),
+            SimpleNamespace(accepted_tasks=(SimpleNamespace(task_id="accepted"),)),
+        ]
+        state = EventTriggerBudgetState()
+        service = EventTriggeredAnalysisService(
+            state=state,
+            submission_service=submission,
+            now_provider=lambda: 1_000_000.0,
+            security_audit_factory=lambda: MagicMock(),
+        )
+        config = _config(
+            event_triggered_analysis_enabled=True,
+            event_trigger_cooldown_minutes=30,
+            event_trigger_max_per_hour=1,
+            event_trigger_max_per_day=1,
+        )
+        kwargs = {
+            "config": config,
+            "stock_code": "600519",
+            "alert_type": "corporate_event",
+            "rule_id": 9,
+            "notification_policy": {"auto_analysis": True},
+        }
+
+        first = service.maybe_submit(**kwargs)
+        second = service.maybe_submit(**kwargs)
+
+        assert first.status == "duplicate_or_empty"
+        assert second.status == "submitted"
+        assert second.task_ids == ("accepted",)
 
 
 class TestSuggestedAction:

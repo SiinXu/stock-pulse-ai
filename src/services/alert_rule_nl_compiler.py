@@ -7,6 +7,7 @@ arbitrary code execution. Outcomes: success | need_clarification | rejected.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -210,7 +211,7 @@ def _extract_symbols(text: str) -> List[str]:
                 continue
         try:
             normalized = normalize_stock_code(raw)
-        except Exception:
+        except (TypeError, ValueError):
             continue
         if normalized and normalized not in found:
             found.append(normalized)
@@ -242,7 +243,10 @@ def _build_parameters(metric: str, source: str, lowered: str) -> Tuple[Dict[str,
         # Skip integers that are the stock code itself (e.g. 300750 volume spike 2.5x).
         if raw.isdigit() and (raw in symbols or any(raw in s for s in symbols)):
             continue
-        numbers.append(float(raw))
+        number = float(raw)
+        if not math.isfinite(number):
+            return {}, [], "numeric parameters must be finite"
+        numbers.append(number)
     if metric == "price_cross":
         direction = _detect_direction(lowered, for_price=True)
         if direction is None:

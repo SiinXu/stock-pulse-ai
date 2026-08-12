@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -422,9 +423,12 @@ class AlertWorker:
         if value is None:
             return None
         try:
-            return float(value)
+            number = float(value)
         except (TypeError, ValueError):
             return None
+        if not math.isfinite(number):
+            raise ValueError("alert trigger numeric values must be finite")
+        return number
 
     def _diagnostics_for_status(
         self,
@@ -435,9 +439,9 @@ class AlertWorker:
         if status == "triggered":
             payload = self._diagnostics_payload(result.get("diagnostics"))
             payload["analysis_visibility"] = self._build_analysis_visibility(runtime_rule, result)
-            # Keep compact evaluator + impact keys first so API sanitization
-            # truncation does not drop them behind large visibility packs.
-            ordered: Dict[str, Any] = {}
+            # Preserve evaluator diagnostics before optional presentation
+            # enrichments so API text limits cannot hide the trigger basis.
+            enrichments: Dict[str, Any] = {}
             for key in (
                 "impact_context",
                 "event_context",
@@ -446,9 +450,10 @@ class AlertWorker:
                 "decision_signal_summary",
             ):
                 if key in payload:
-                    ordered[key] = payload.pop(key)
+                    enrichments[key] = payload.pop(key)
             visibility = payload.pop("analysis_visibility", None)
-            ordered.update(payload)
+            ordered: Dict[str, Any] = dict(payload)
+            ordered.update(enrichments)
             if visibility is not None:
                 ordered["analysis_visibility"] = visibility
             return json.dumps(ordered, ensure_ascii=False)

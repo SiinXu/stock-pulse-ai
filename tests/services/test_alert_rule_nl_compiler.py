@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import pytest
+
 from src.services.alert_rule_nl_compiler import compile_alert_rule_nl
 
 
@@ -39,3 +41,11 @@ class TestAlertRuleNlCompiler:
         result = compile_alert_rule_nl("import os; os.system('rm -rf /')")
         assert result.outcome == "rejected"
         assert result.rejected_reason == "code_like_input"
+
+    @pytest.mark.parametrize("digits", ["9" * 400, "1" + "0" * 400])
+    def test_reject_non_finite_numeric_parameters(self, digits: str) -> None:
+        result = compile_alert_rule_nl(f"AAPL price above {digits}")
+
+        assert result.outcome == "rejected"
+        assert result.rejected_reason == "invalid_parameters"
+        assert result.message == "numeric parameters must be finite"

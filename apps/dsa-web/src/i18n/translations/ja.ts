@@ -3456,7 +3456,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.notes.1": "配信のサイレント時間は引き続き NOTIFICATION_QUIET_HOURS がアラート通知ルートに適用されます。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.summary": "オプトイン済みアラートが発火したときに深掘り分析を投入するマスタースイッチと予算上限です。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.title": "イベント駆動の深掘り分析",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.usage": "企業イベント／出来高／騰落率アラートで分析投入を意図する場合のみ EVENT_TRIGGERED_ANALYSIS_ENABLED=true にしてください。ルール側でも notification_policy.auto_analysis=true が必要です。クールダウンと時間／日次上限は引き続き適用されます。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.usage": "通常は EVENT_TRIGGERED_ANALYSIS_ENABLED=false のままにし、企業イベント／出来高／騰落率アラートで分析投入を意図する場合のみ true にしてください。ルール側でも notification_policy.auto_analysis=true が必要です。クールダウンと時間／日次上限は引き続き適用されます。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.valueNotes.0": "既定はオフ。設定のマスタースイッチとルールのオプトインの両方が明示的に必要です。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.valueNotes.1": "対象タイプ: corporate_event、volume_spike、price_change_percent。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_impact_context.notes.0": "ウォッチリスト・ポートフォリオ・インテリジェンスのコンテキストのみを使用し、リアルタイム更新は行いません。",

@@ -3456,7 +3456,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.notes.1": "전달 조용한 시간은 계속 NOTIFICATION_QUIET_HOURS가 알림 라우트에 적용됩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.summary": "옵트인된 알림 규칙이 발화할 때 심층 분석을 등록하는 마스터 스위치와 예산 한도입니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.title": "이벤트 트리거 심층 분석",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.usage": "기업 이벤트/거래량/등락률 알림으로 분석을 등록하려는 경우에만 EVENT_TRIGGERED_ANALYSIS_ENABLED=true 로 설정하세요. 규칙에도 notification_policy.auto_analysis=true 가 필요합니다. 쿨다운과 시간/일 한도는 그대로 적용됩니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.usage": "일반적으로 EVENT_TRIGGERED_ANALYSIS_ENABLED=false 를 유지하고, 기업 이벤트/거래량/등락률 알림으로 분석을 등록하려는 경우에만 true 로 설정하세요. 규칙에도 notification_policy.auto_analysis=true 가 필요합니다. 쿨다운과 시간/일 한도는 그대로 적용됩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.valueNotes.0": "기본 꺼짐. 설정 마스터 스위치와 규칙 옵트인을 모두 명시적으로 켜야 합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_triggered_analysis.valueNotes.1": "대상 유형: corporate_event, volume_spike, price_change_percent.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.event_impact_context.notes.0": "관심목록/포트폴리오/인텔리전스 컨텍스트만 사용하며 실시간 갱신은 하지 않습니다.",

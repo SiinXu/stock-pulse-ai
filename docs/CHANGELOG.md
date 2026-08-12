@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Added] Event-triggered deep analysis with explicit opt-in, debounce, and hourly/daily budget caps; contextual alert suggested actions/deep links reuse the corporate-event alert surface; whitelist-bounded NL rule compiler endpoint (Refs #129, #152, #1133).
+- [Added] Event-triggered deep analysis with explicit opt-in, accepted-task-only debounce/budget accounting, and finite numeric boundaries; contextual alert suggested actions/deep links reuse the corporate-event alert surface; whitelist-bounded NL rule compiler endpoint (Refs #129, #152, #1133).
+- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets for event-triggered analysis Settings help and alert action strings (Refs #129, #152, #1133).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).

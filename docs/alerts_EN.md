@@ -108,6 +108,10 @@ Rules must also set `notification_policy.auto_analysis=true`. Eligible alert typ
 
 Analysis is enqueued through `AnalysisSubmissionService` (async task queue). The alert
 hot path never runs a full analysis inline.
+Only tasks accepted by the queue consume debounce and hourly/daily budget slots;
+duplicate, empty, and failed enqueue attempts release their provisional reservations.
+Rule values, NL-compiled numeric values, and persisted trigger values reject `NaN`,
+`+Inf`, and `-Inf`.
 
 ### Contextual suggested actions
 
@@ -115,6 +119,8 @@ On real triggers the worker attaches a bounded `suggested_action` (and optional
 `auto_analysis` status) to diagnostics. Public API projection follows the #957 event
 alert surface: no raw portfolio quantities/account IDs; deep links are in-app paths
 plus optional http(s) source URLs only.
+When the impact conclusion is absent, the Web UI explicitly shows “Not evaluated”
+and never presents the missing state as a pass.
 
 Quiet hours for alert **delivery** continue to use `NOTIFICATION_QUIET_HOURS` /
 `NOTIFICATION_TIMEZONE` on the notification alert route.
@@ -125,4 +131,3 @@ Quiet hours for alert **delivery** continue to use `NOTIFICATION_QUIET_HOURS` /
 phrases into Alert create payloads. Outcomes: `success` | `need_clarification` |
 `rejected`. No arbitrary code execution. Corporate-event compiles always include
 `event_categories`, `lookback_hours`, and `min_items` to prevent field-loss regressions.
-

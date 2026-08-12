@@ -310,6 +310,13 @@ class AlertWorkerTestCase(unittest.TestCase):
                 )
                 self.assertEqual(AlertWorker._cooldown_seconds(runtime_rule), expected)
 
+    def test_trigger_numeric_values_must_be_finite(self) -> None:
+        self.assertEqual(AlertWorker._optional_float("42.5"), 42.5)
+        with self.assertRaisesRegex(ValueError, "must be finite"):
+            AlertWorker._optional_float(float("nan"))
+        with self.assertRaisesRegex(ValueError, "must be finite"):
+            AlertWorker._optional_float(float("inf"))
+
     def _triggers(self, **filters) -> list[dict]:
         return self.service.list_triggers(page_size=100, **filters)["items"]
 

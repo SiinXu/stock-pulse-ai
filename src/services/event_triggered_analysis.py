@@ -13,6 +13,7 @@ alert hot path.
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass, field
@@ -51,6 +52,7 @@ class EventTriggerBudgetState:
 
     lock: threading.Lock = field(default_factory=threading.Lock)
     last_submitted_at: Dict[str, float] = field(default_factory=dict)
+    last_submission_tokens: Dict[str, object] = field(default_factory=dict)
     hourly: List[float] = field(default_factory=list)
     daily: List[float] = field(default_factory=list)
 
@@ -357,6 +359,9 @@ class EventTriggeredAnalysisService:
 
         debounce_key = f"{rule_id or 0}:{symbol}:{alert_type_norm}"
         now = float(self.now_provider())
+        if not math.isfinite(now):
+            raise ValueError("event-triggered analysis timestamp must be finite")
+        reservation_token = object()
         with self.state.lock:
             self._prune_windows(now)
             last = self.state.last_submitted_at.get(debounce_key)
@@ -394,6 +399,7 @@ class EventTriggeredAnalysisService:
                     max_per_day=max_per_day,
                 )
             self.state.last_submitted_at[debounce_key] = now
+            self.state.last_submission_tokens[debounce_key] = reservation_token
             self.state.hourly.append(now)
             self.state.daily.append(now)
 
@@ -414,12 +420,7 @@ class EventTriggeredAnalysisService:
                 level=logging.WARNING,
                 context={"stock_code": symbol, "alert_type": alert_type_norm},
             )
-            with self.state.lock:
-                self.state.last_submitted_at.pop(debounce_key, None)
-                if self.state.hourly and abs(self.state.hourly[-1] - now) < 1e-6:
-                    self.state.hourly.pop()
-                if self.state.daily and abs(self.state.daily[-1] - now) < 1e-6:
-                    self.state.daily.pop()
+            self._release_reservation(debounce_key, now, reservation_token)
             return EventTriggerDecision(
                 status="failed",
                 stock_code=symbol,
@@ -432,6 +433,7 @@ class EventTriggeredAnalysisService:
             )
 
         if not task_ids:
+            self._release_reservation(debounce_key, now, reservation_token)
             return EventTriggerDecision(
                 status="duplicate_or_empty",
                 stock_code=symbol,
@@ -505,11 +507,30 @@ class EventTriggeredAnalysisService:
         stale = [key for key, ts in self.state.last_submitted_at.items() if ts < now - 7 * 86400]
         for key in stale:
             self.state.last_submitted_at.pop(key, None)
+            self.state.last_submission_tokens.pop(key, None)
+
+    def _release_reservation(
+        self,
+        debounce_key: str,
+        reserved_at: float,
+        reservation_token: object,
+    ) -> None:
+        """Release only this attempt's provisional cooldown and budget slots."""
+        with self.state.lock:
+            if self.state.last_submission_tokens.get(debounce_key) is reservation_token:
+                self.state.last_submitted_at.pop(debounce_key, None)
+                self.state.last_submission_tokens.pop(debounce_key, None)
+            for window in (self.state.hourly, self.state.daily):
+                try:
+                    window.remove(reserved_at)
+                except ValueError:
+                    pass
 
 
 def reset_event_trigger_budget_state_for_tests() -> None:
     """Clear process-local budget state (tests only)."""
     with _GLOBAL_STATE.lock:
         _GLOBAL_STATE.last_submitted_at.clear()
+        _GLOBAL_STATE.last_submission_tokens.clear()
         _GLOBAL_STATE.hourly.clear()
         _GLOBAL_STATE.daily.clear()

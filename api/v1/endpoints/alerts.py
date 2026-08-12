@@ -94,16 +94,13 @@ def compile_rule_nl(request: AlertRuleNlCompileRequest) -> AlertRuleNlCompileRes
     Returns success | need_clarification | rejected. Does not persist rules.
     Callers may POST the returned rule payload to /rules when outcome=success.
     """
-    try:
-        result = compile_alert_rule_nl(
-            request.text,
-            default_severity=request.default_severity,
-            default_enabled=request.default_enabled,
-            auto_analysis=request.auto_analysis,
-        )
-        return AlertRuleNlCompileResponse(**result.to_dict())
-    except Exception as exc:
-        raise _internal_error("Compile natural-language alert rule failed", exc)
+    result = compile_alert_rule_nl(
+        request.text,
+        default_severity=request.default_severity,
+        default_enabled=request.default_enabled,
+        auto_analysis=request.auto_analysis,
+    )
+    return AlertRuleNlCompileResponse(**result.to_dict())
 
 
 @router.get(

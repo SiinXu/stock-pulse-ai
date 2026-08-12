@@ -8,6 +8,7 @@ import base64
 import binascii
 import json
 import logging
+import math
 import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -1072,6 +1073,8 @@ class AlertService:
             number = float(value)
         except (TypeError, ValueError) as exc:
             raise AlertServiceError(f"invalid {field_name}: {value}") from exc
+        if not math.isfinite(number):
+            raise AlertServiceError(f"{field_name} must be finite")
         if number <= 0:
             raise AlertServiceError(f"{field_name} must be > 0")
         return number
