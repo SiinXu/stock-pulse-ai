@@ -455,7 +455,7 @@ def _lookup_model_pricing(model: str) -> Optional[Dict[str, Any]]:
             bare = wire.split("/", 1)[1]
             if bare in cost_map and isinstance(cost_map[bare], dict):
                 return cost_map[bare]
-    except Exception:
+    except Exception:  # broad-exception: optional_metadata - Pricing lookup is best-effort and must not abort budget accounting.
         return None
     return None
 
