@@ -35,7 +35,7 @@ manager。新建的 `DataFetcherManager` 拥有另一个数据源运行时，其
 （`application_services_not_initialized`）。技能配置或目录加载失败分别暴露为
 `skill_config_unavailable` 与 `skill_catalog_unavailable`。
 
-工具来源只观测已经构建的进程 `ToolRegistry`，绝不会为了清单去构造它。技能来源 generation 包含插件与声明式技能身份，因此等数量的目录替换也会推进 generation。管线阶段只有在 live `StockAnalysisPipeline` 暴露 stage runner 且已绑定方法引用该阶段时才算 bound；仅注册不会把 `healthy` 设为 `true`。
+工具来源只观测已经构建的进程 `ToolRegistry`，绝不会为了清单去构造它。技能来源 generation 包含插件身份，以及声明式技能所有记录可见字段（`name`、`source`、`enabled`、`display_name`、`required_tools`）的有界规范哈希，因此同名技能元数据变化和等数量目录替换都会推进 generation。管线阶段只有在 live `StockAnalysisPipeline` 暴露 stage runner 且已绑定方法引用该阶段时才算 bound；仅注册不会把 `healthy` 设为 `true`。
 
 所有者 generation 覆盖记录可暴露的每一处变化。工具条目是注册时捕获的冻结
 副本，因此事后原地修改活跃 `ToolDefinition` 不会改变已发布清单；真实变更必须
