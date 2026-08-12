@@ -762,6 +762,11 @@ function validateNativeReviewPipeline(audit) {
     if (!Number.isSafeInteger(pass.keyCount) || pass.keyCount <= 0) {
       fail(`${pass.id}.keyCount must be a positive integer`);
     }
+    if (!/^[0-9a-f]{64}$/.test(pass.inventoryKeySetSha256 ?? '')) {
+      fail(
+        `${pass.id}.inventoryKeySetSha256 must pin the high-risk key-set digest covered by this pass`,
+      );
+    }
     if (pass.kind === 'PRODUCT_SOURCE_SEMANTIC_PASS') {
       if (pass.claimsNativeApproval !== false) {
         fail(`${pass.id} product-source pass must set claimsNativeApproval=false`);
@@ -865,6 +870,12 @@ function validateKeyInventory(audit, expectedInventory, liveEntries) {
     if (pass.keyCount !== liveEntries.length) {
       fail(`${pass.id}.keyCount must equal the live high-risk key inventory count`);
     }
+    if (pass.inventoryKeySetSha256 !== expectedInventory.keySetSha256) {
+      fail(
+        `${pass.id}.inventoryKeySetSha256 no longer matches the live high-risk key set; `
+          + 'record a fresh review pass after intentional key-set changes',
+      );
+    }
   }
 }
 
@@ -945,7 +956,10 @@ async function run() {
     };
     await writeFile(AUDIT_PATH, `${JSON.stringify(audit, null, 2)}\n`);
     const stalePasses = (audit.reviewPasses ?? []).filter(
-      (pass) => pass.keyCount !== expectedInventory.count,
+      (pass) => (
+        pass.keyCount !== expectedInventory.count
+        || pass.inventoryKeySetSha256 !== expectedInventory.keySetSha256
+      ),
     );
     process.stdout.write(
       `Wrote high-risk key inventory: ${liveEntries.length} keys -> ${path.relative(REPOSITORY_ROOT, KEY_INVENTORY_PATH)}\n`
@@ -953,8 +967,9 @@ async function run() {
     );
     if (stalePasses.length > 0) {
       process.stdout.write(
-        `Note: ${stalePasses.length} review pass(es) still report a different keyCount; `
-          + `record a fresh review pass or update conclusions before the normal gate will pass.\n`,
+        `Note: ${stalePasses.length} review pass(es) no longer match the live key set `
+          + `(keyCount/inventoryKeySetSha256); record a fresh review pass or update conclusions `
+          + `before the normal gate will pass.\n`,
       );
     }
     return;

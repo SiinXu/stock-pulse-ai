@@ -142,7 +142,8 @@
       "Record or update a decisions[] entry when candidate wording changes; keep before/recommended digests in lockstep.",
       "Leave translated languageReview status at PENDING_NATIVE_REVIEW unless a real native financial reviewer is named with reviewedAt and reviewedSnapshotSha256.",
       "If a locale is NATIVE_REVIEWED and any high-risk bundle hash changes, demote it to PENDING_NATIVE_REVIEW or record a fresh native review pass; do not keep a stale approval.",
-      "Never claim native approval or NATIVE_REVIEWED without reviewer identity plus date plus snapshot pin."
+      "Never claim native approval or NATIVE_REVIEWED without reviewer identity plus date plus snapshot pin.",
+      "When the high-risk key set changes, record a fresh reviewPasses entry (or deliberately update keyCount, inventoryKeySetSha256, and conclusions); pointer refresh alone is not product-source or native sign-off."
     ]
   },
   "keyInventory": {
@@ -193,7 +194,8 @@
           "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
           "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
         }
-      ]
+      ],
+      "inventoryKeySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe"
     }
   ],
   "languageReview": {

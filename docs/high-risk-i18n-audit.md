@@ -62,7 +62,7 @@ Native review is a **status annotation**, not a human CI gate. `PENDING_NATIVE_R
 | --- | --- | --- |
 | `languageReview` | Locale-level `PRODUCT_SOURCE` / `PENDING_NATIVE_REVIEW` / `NATIVE_REVIEWED` | Integrity only: pending cannot name a reviewer; reviewed requires `reviewer` + `reviewedAt` + `reviewedSnapshotSha256` |
 | `high-risk-i18n-keys.json` | Full high-risk key list with categories, product-source verdict, decision link, and per-key `PENDING_NATIVE_REVIEW` marker | Must match live selectors; never claims key-level native approval |
-| `reviewPasses` | Recorded product-source or native financial review rounds with category conclusions | Provenance; product-source passes must set `claimsNativeApproval=false` |
+| `reviewPasses` | Recorded product-source or native financial review rounds with category conclusions, `keyCount`, and `inventoryKeySetSha256` | Provenance; product-source passes must set `claimsNativeApproval=false`; pin must match the live key set |
 | `nativeReviewPipeline` | Required evidence fields, CI vs non-CI gates, identical-baseline policy, contributor workflow | Documented contract checked by the guard |
 
 ### Required evidence to upgrade a locale
@@ -89,7 +89,7 @@ cd apps/dsa-web
 npm run i18n:high-risk -- --write-key-inventory
 ```
 
-`--write-key-inventory` rewrites `high-risk-i18n-keys.json` and refreshes the `keyInventory` pointer digests in `high-risk-i18n-audit.json`. It does **not** auto-bump `reviewPasses[].keyCount`: when the key set changes, record a fresh review pass (or deliberately update conclusions and `keyCount`) so coverage is not silently overclaimed. Category snapshots, decisions, and native-review status still need a deliberate human review when copy changes.
+`--write-key-inventory` rewrites `high-risk-i18n-keys.json` and refreshes the `keyInventory` pointer digests in `high-risk-i18n-audit.json`. It does **not** auto-bump `reviewPasses[].keyCount` or `inventoryKeySetSha256`: when the key set changes, record a fresh review pass (or deliberately update conclusions, `keyCount`, and `inventoryKeySetSha256`) so coverage is not silently overclaimed. Category snapshots, decisions, and native-review status still need a deliberate human review when copy changes.
 
 ### Product-source review pass (2026-08-12)
 
