@@ -456,7 +456,7 @@ def reflect_resolved_forecast(
                     validation_status = "invalid"
                     skip_reason = parsed.skip_reason
                     lessons = []
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - Post-mortem LLM failures are fail-soft and recorded.
                 log_safe_exception(
                     logger,
                     "Post-mortem LLM call failed",

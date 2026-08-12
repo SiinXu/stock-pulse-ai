@@ -231,7 +231,7 @@ def run_reflection_loop(
                     validation_status = "invalid"
                     skip_reason = parsed.skip_reason
                     lessons = []
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - Reflection LLM failures are fail-soft and recorded.
                 log_safe_exception(
                     logger,
                     "Reflection LLM call failed",
@@ -268,7 +268,7 @@ def run_reflection_loop(
             if did_revise:
                 revised = True
                 _emit("reflect_revise", {"revised": True})
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional revise failures are fail-soft and recorded.
             log_safe_exception(
                 logger,
                 "Reflection revise failed",
