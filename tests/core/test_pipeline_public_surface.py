@@ -57,6 +57,7 @@ EXPECTED_DELIVERY_METHODS = (
 
 EXPECTED_ANALYSIS_METHODS = (
     "analyze_stock",
+    "_fetch_dependency_free_market_inputs",
     "_enhance_context",
     "_attach_belong_boards_to_fundamental_context",
     "_attach_concept_rankings_to_fundamental_context",

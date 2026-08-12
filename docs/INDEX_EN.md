@@ -26,7 +26,7 @@ This is the entry point for project documentation. The README covers the project
 | Troubleshoot runtime issues | [FAQ (EN)](FAQ_EN.md) | [Changelog](CHANGELOG.md) |
 | Troubleshoot data-source failures | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | [FAQ (EN)](FAQ_EN.md), [Chinese version](data-source-stability.md) |
 | Review log/error/audit/trace secret handling | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | [Durable Security Audit](security-audit.md) / [中文](security-audit_zh.md), [Outbound HTTP Policy](security-outbound-policy.md) |
-| Contribute code or docs | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | [Business Architecture](business-architecture.md), [Technical Architecture](architecture-overview.md), [ADR Registry](adr/README.md), [API Spec](architecture/api_spec.json) |
+| Contribute code or docs | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md), [Business Architecture](business-architecture.md), [Technical Architecture](architecture-overview.md), [ADR Registry](adr/README.md), [API Spec](architecture/api_spec.json) |
 
 ## Getting Started
 
@@ -55,6 +55,7 @@ This is the entry point for project documentation. The README covers the project
 | [Local Model Catalog](local-model-catalog.md) | Curated local models, verified artifacts and licenses, RAM tiers, distribution status, and Ollama packaging guidance |
 | [StockPulse Model Packs](model-packs.md) | Versioned GGUF pack format, offline import, validation failures, build tooling, and release limits |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Market-aware provider order, bounded health learning, circuit control, stale degradation, and production/zero-cost profiles |
+| [Parallel dependency-free data pulls](parallel-data-fetch.md) | Single-stock parallel realtime/chip/money-flow/fundamental pulls with concurrency caps and serial fallback (Issue #1126) |
 | [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Provider presets, GitHub Actions mapping, error categories, and diagnostics |
 | [LiteLLM YAML Example](examples/litellm_config.example.yaml) | Example LiteLLM multi-provider configuration |
 | [Notification Baseline](notifications.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | WeChat Work, Feishu, Telegram, Discord, Slack, Email, and other notification channels |
@@ -103,17 +104,19 @@ This is the entry point for project documentation. The README covers the project
 | [Business Architecture](business-architecture.md) | Stakeholders, business capabilities, outcomes, and the value flow from evidence acquisition to notification |
 | [Technical Architecture](architecture-overview.md) | Current components, entrypoints, ownership boundaries, process modes, cache/fallback branches, and the eight-stage analysis data flow |
 | [Foundation Pipeline And Product Layer](foundation-product-architecture.md) | Responsibility tracks, interaction boundaries, contribution placement, upstream porting, and license provenance |
-| [Upstream Parity Checker](upstream-parity.md) | Weekly drift report, deliberately diverged path whitelist, `Ported-from` trailers, and triage flow |
+| [Upstream Parity Checker](upstream-parity.md) | Weekly drift report, path-presence inventory, deliberately diverged path whitelist, `Ported-from` trailers, triage flow, and governance cadence (#1002 / #1061) |
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [OpenAPI Web Types And Runtime Validation](openapi-web-types.md) | Generated web API types, CI drift gate, and stocks runtime-validation pilot |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
+| [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md) | Operational guide for parallel fix/merge trains: batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, and worktree safety ([中文](engineering-efficiency-playbook.md); `AGENTS.md` remains the contract) |
 | [Offline Test Gate (timeouts, coverage floor, markers)](testing-ci-gate.md) | Per-test timeout, faulthandler, measured coverage floor, strict markers, and manual benchmarks |
 | [Config-access ratchet](config-access-ratchet.md) | Shrink-only bare `get_config()` gate, preferred injection / composition-root path, and legitimate baseline changes (ADR-011 / issue #625) |
 | [Import-cycle ratchet](import-cycle-ratchet.md) | Shrink-only bidirectional package-pair gate, failure reading, and legitimate baseline path (ADR-010) |
 | [Offline Analysis Quality Panel](analysis-quality-panel.md) | Fixed-panel offline trust fixtures, extension guide, and non-claims (#617 Phase A) |
 | [Plugin Development Guide](plugin-development-guide.md) | Consolidated entry for the six extension points: what/why, trust model, 10-minute quickstart, official examples, and deep links ([中文](plugin-development-guide_zh.md)) |
 | [Offline Financial Agent Evaluation Benchmark](agent-eval-benchmark_EN.md) | Offline agent-run metrics (correctness, tool discipline, uncertainty honesty), baseline, and refresh flow (#252 V0) |
+| [Performance baselines & profiling](performance-baseline_EN.md) | Offline key-path baselines (data/analysis/report), opt-in spans, cProfile entry (#227) |
 | [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md) | Loadable example, manifest, `PLUGINS_DIR`, lifecycle diagnostics, compatibility, trust, and routing boundaries |
 | [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md) | Declarative-first boundary, `Skill` registration fields, catalog precedence, lifecycle, diagnostics, tests, and trust |
 | [Supply-Chain Maintenance](supply-chain-maintenance.md) | Dependency and GitHub Actions pinning, permissions, updates, exceptions, validation, and rollback policy |
