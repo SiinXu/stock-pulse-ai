@@ -446,6 +446,11 @@ class _StockAnalysisStageMixin:
             if use_agent:
                 logger.info("%s(%s) running analysis in Agent mode", stock_name, code)
                 self._emit_progress(58, f"{stock_name}：正在切换 Agent 分析链路")
+                market_regime_context = self._build_market_regime_context(
+                    code=code,
+                    market=market,
+                    trend_result=trend_result,
+                )
                 return self._analyze_with_agent(
                     code,
                     report_type,
@@ -460,6 +465,7 @@ class _StockAnalysisStageMixin:
                     daily_market_context=daily_market_context,
                     portfolio_context=portfolio_context,
                     market_structure_context=market_structure_context,
+                    market_regime_context=market_regime_context,
                 )
 
             # Step 4: Multi-Dimensional Intelligence Search (Latest News + Risk Assessment + Earnings Expectations)
@@ -693,6 +699,14 @@ class _StockAnalysisStageMixin:
                 enhanced_context["portfolio_context"] = dict(portfolio_context)
             if isinstance(market_structure_context, dict):
                 enhanced_context["market_structure_context"] = market_structure_context
+
+            market_regime_context = self._build_market_regime_context(
+                code=code,
+                market=market,
+                trend_result=trend_result,
+            )
+            if isinstance(market_regime_context, dict):
+                enhanced_context["market_regime_context"] = market_regime_context
 
             # Step 6.5: Historical decision memory & reflection (Issue #118).
             # Injects past signal outcomes for this stock into the prompt so the
@@ -940,6 +954,8 @@ class _StockAnalysisStageMixin:
                     result.fundamental_context = fundamental_context
                 if isinstance(market_structure_context, dict):
                     result.market_structure_context = market_structure_context
+                if isinstance(market_regime_context, dict):
+                    result.market_regime_context = market_regime_context
                 result.market_phase_summary = market_phase_summary
                 result.analysis_context_pack_overview = analysis_context_pack_overview
                 self._refresh_decision_action_for_final_result(

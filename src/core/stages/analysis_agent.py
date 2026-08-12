@@ -114,6 +114,7 @@ class _AgentAnalysisStageMixin:
         daily_market_context: Optional[DailyMarketContext] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
         market_structure_context: Optional[Dict[str, Any]] = None,
+        market_regime_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[AnalysisResult]:
         """
         使用 Agent 模式分析单只股票。
@@ -157,6 +158,8 @@ class _AgentAnalysisStageMixin:
                 initial_context["market_phase_context"] = market_phase_context
             if isinstance(market_structure_context, dict):
                 initial_context["market_structure_context"] = market_structure_context
+            if isinstance(market_regime_context, dict):
+                initial_context["market_regime_context"] = market_regime_context
             self._attach_daily_market_context(
                 initial_context,
                 daily_market_context,
@@ -479,6 +482,8 @@ class _AgentAnalysisStageMixin:
                     result.fundamental_context = fundamental_context
                 if isinstance(market_structure_context, dict):
                     result.market_structure_context = market_structure_context
+                if isinstance(market_regime_context, dict):
+                    result.market_regime_context = market_regime_context
                 result.market_phase_summary = market_phase_summary
                 result.analysis_context_pack_overview = analysis_context_pack_overview
                 self._refresh_decision_action_for_final_result(

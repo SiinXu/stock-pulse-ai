@@ -131,6 +131,9 @@ class _PersistenceStageMixin:
         market_structure_context = enhanced_context.get("market_structure_context")
         if isinstance(market_structure_context, dict):
             snapshot["market_structure_context"] = market_structure_context
+        market_regime_context = enhanced_context.get("market_regime_context")
+        if isinstance(market_regime_context, dict):
+            snapshot["market_regime_context"] = market_regime_context
         if news_content is not None:
             snapshot["news_retrieval_content"] = news_content
         if news_result_count is not None:
