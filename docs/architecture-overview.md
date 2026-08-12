@@ -116,6 +116,17 @@ decisions that must be tested. Response and service core fields validate
 strictly and fail closed; `extra="allow"` is reserved for documented
 forward-compatible extension fields and does not relax declared fields.
 
+Do not introduce Pydantic v1 APIs in new code (`@validator`, `@root_validator`,
+nested `class Config`, `.parse_obj`, `.dict()`, `.from_orm`). Prefer
+`field_validator` / `model_validator`, `ConfigDict`, and `model_dump` /
+`model_validate`. Dual `model_dump` then `.dict()` shims may remain only where
+foreign SDK objects are still untyped; they are not a model-definition style.
+
+Service-boundary examples: `src/schemas/request_context.py`
+(`AnalysisRequestContext`, `NotificationReplyTarget`) uses frozen Pydantic v2
+models with explicit `model_config`. LLM report boundaries stay on Pydantic
+(`src/schemas/report_schema.py`).
+
 Internal domain contracts can remain Pydantic models, dataclasses, or
 `TypedDict`s according to their boundary needs. This convention does not change
 the Native Agent production runtime or adopt PydanticAI as its orchestrator.
