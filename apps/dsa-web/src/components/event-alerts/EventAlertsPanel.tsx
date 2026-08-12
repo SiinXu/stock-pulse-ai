@@ -11,7 +11,7 @@ import { projectCorporateEventAlerts } from '../../utils/eventAlertContext';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { EVENT_ALERT_PAGE_TEXT } from '../../locales/eventAlerts';
 import { formatUiText } from '../../i18n/uiText';
-import { ApiErrorAlert, AppPage, Button, PageHeader, Select, Toolbar } from '../common';
+import { ApiErrorAlert, AppPage, Button, IconButton, PageHeader, Select, Toolbar } from '../common';
 import EventAlertDetail from './EventAlertDetail';
 import EventAlertList from './EventAlertList';
 
@@ -87,9 +87,16 @@ const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
     <Root className="max-w-none space-y-5" data-testid="event-alerts-panel">
       {!embedded ? (
         <PageHeader title={text.title} description={text.description} actions={(
-          <Button type="button" variant="secondary" size="default" onClick={() => { if (onRefresh) onRefresh(); else void loadRemote({ append: false }); }} isLoading={isLoading} loadingText={text.loading}>
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />{text.refresh}
-          </Button>
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="default"
+            aria-label={text.refresh}
+            isLoading={isLoading}
+            onClick={() => { if (onRefresh) onRefresh(); else void loadRemote({ append: false }); }}
+          >
+            <RefreshCw aria-hidden="true" />
+          </IconButton>
         )} />
       ) : null}
       <Toolbar aria-label={text.title} left={(
