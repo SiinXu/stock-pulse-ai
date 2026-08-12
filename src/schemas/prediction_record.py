@@ -30,7 +30,9 @@ from pydantic import (
     model_validator,
 )
 
-PREDICTION_RECORD_SCHEMA_VERSION = "prediction-record-v1"
+PREDICTION_RECORD_SCHEMA_VERSION: Literal["prediction-record-v1"] = (
+    "prediction-record-v1"
+)
 
 # Trading-day horizons used by later resolvers. Absolute expiry uses resolve_after.
 PREDICTION_HORIZON_TOKENS = frozenset({"1d", "3d", "5d", "10d", "20d"})
