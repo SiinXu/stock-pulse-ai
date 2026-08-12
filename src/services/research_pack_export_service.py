@@ -729,11 +729,18 @@ class ResearchPackExportService:
             )
 
         def _build_zip(meta_payload: Mapping[str, Any]) -> bytes:
+            # Fixed entry timestamps keep DEFLATE output deterministic across rebuilds
+            # so zip_byte_length can converge inside meta.json.
+            fixed_ts = (1980, 1, 1, 0, 0, 0)
             buffer = io.BytesIO()
             with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
                 for name, data in sorted(artifacts.items()):
-                    zf.writestr(f"{root}/{name}", data)
-                zf.writestr(f"{root}/meta.json", _json_bytes(meta_payload))
+                    info = zipfile.ZipInfo(filename=f"{root}/{name}", date_time=fixed_ts)
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    zf.writestr(info, data)
+                meta_info = zipfile.ZipInfo(filename=f"{root}/meta.json", date_time=fixed_ts)
+                meta_info.compress_type = zipfile.ZIP_DEFLATED
+                zf.writestr(meta_info, _json_bytes(meta_payload))
             return buffer.getvalue()
 
         def _base_meta(*, zip_included_flag: bool, progress: List[Dict[str, Any]]) -> Dict[str, Any]:
