@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 236063,
-      "measuredGzipBytes": 235863,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help inventory (PR #1161 / Refs #185); measured gzip + 200 B headroom."
+      "maxGzipBytes": 236687,
+      "measuredGzipBytes": 236087,
+      "note": "GitHub Actions Linux remeasure on PR #1277 (Refs #211 #242 #133); prior 200 B headroom was flaky across runners — use measured gzip + 600 B headroom."
     },
     {
       "id": "js-entry",
