@@ -14,7 +14,7 @@
   "module_count": 11,
   "modules": {
     "data_provider/akshare_fetcher.py": 2577,
-    "data_provider/base.py": 4733,
+    "data_provider/base.py": 4584,
     "src/market/analyzer.py": 2079,
     "src/services/history_service.py": 1608,
     "src/services/local_model_service.py": 1548,
