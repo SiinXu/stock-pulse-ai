@@ -119,7 +119,7 @@ EXPECTED_AST_HASHES = {
     "_ExecutionMethods": "03b1befb5752d439b5d2aeb35bcee5d50300c89eedb1ebd2aa7564c51f778e25",
     "_ChatMethods": "1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d",
     "_PipelineMethods": "4611d9230b5c31e916ef72fc5125fafd580a4f5ee002e3ddee8b615352c7914e",
-    "_DashboardMethods": "645f425d5e0c396b436b6199809a68144afdf07ae9f4e473bb0dd769957d21f3",
+    "_DashboardMethods": "ff34e9e19d7f997c00df30b9012dc282df5e6703968a82a169537dae80ae8f53",
 }
 
 

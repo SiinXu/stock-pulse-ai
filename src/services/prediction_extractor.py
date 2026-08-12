@@ -345,8 +345,12 @@ def _extract_prediction_record_impl(
         stock_code=symbol,
     )
 
-    status = "pending"
+    status = "error" if claim_errors else "pending"
     notes_parts: List[str] = [f"horizon_source={horizon_source}"]
+    if claim_errors:
+        # Do not silently score a partial subset when the producer declared an
+        # invalid claim alongside valid ones.
+        notes_parts.append("claim_errors=" + ";".join(claim_errors[:8]))
     if resolve_after is None:
         # Keep typed claims but do not invent a due time (A6 fail-closed).
         status = "error"
@@ -378,11 +382,14 @@ def _extract_prediction_record_impl(
         }
     )
     ready = record.is_verifiable() and record.status == "pending"
+    reason = None if ready else (
+        "claim_validation_failed" if claim_errors else "resolve_after_unavailable"
+    )
     return PredictionExtractionResult(
         record=record,
         verifiable=ready,
-        reason=None if ready else "resolve_after_unavailable",
-        error=resolve_error,
+        reason=reason,
+        error="; ".join(claim_errors) if claim_errors else resolve_error,
     )
 
 
@@ -436,6 +443,21 @@ def _coerce_source_mapping(source: ExtractionSource) -> Dict[str, Any]:
         return {}
     if isinstance(source, Mapping):
         return dict(source)
+
+    # AnalysisResult carries normalized presentation defaults (for example
+    # action=hold and confidence_level=medium). Trust only its preserved raw
+    # structured source; otherwise those defaults would become fake claims.
+    if hasattr(source, "prediction_source"):
+        structured = getattr(source, "prediction_source", None)
+        out = dict(structured) if isinstance(structured, Mapping) else {}
+        for key in ("code", "stock_code", "symbol", "name", "stock_name", "market"):
+            value = getattr(source, key, None)
+            if value is not None:
+                out.setdefault(key, value)
+        dashboard = getattr(source, "dashboard", None)
+        if isinstance(dashboard, Mapping):
+            out.setdefault("dashboard", dict(dashboard))
+        return out
 
     # Duck-typed AnalysisResult / similar objects.
     out: Dict[str, Any] = {}
@@ -576,7 +598,7 @@ def _clean_id(value: Any) -> Optional[str]:
     if not text or any(ch.isspace() for ch in text):
         return None
     if len(text) > 128:
-        return text[:128]
+        raise ValueError("identifier must contain at most 128 characters")
     return text
 
 

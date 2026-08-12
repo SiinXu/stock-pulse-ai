@@ -382,3 +382,173 @@ class TestReviewConvergence:
         assert result.record is not None
         assert result.record.horizon == "5d"
         assert "horizon_source=policy_default:5d" in (result.record.notes or "")
+
+    def test_real_analysis_parser_defaults_do_not_become_claims(self) -> None:
+        """Normalized hold/medium/action defaults are presentation, not provenance."""
+        import json
+
+        from src.analyzer import GeminiAnalyzer
+
+        analyzer = GeminiAnalyzer()
+        analyzer._get_runtime_config = lambda: SimpleNamespace(report_language="en")
+        parsed = analyzer._parse_response(
+            json.dumps({"analysis_summary": "Narrative only; no forecast fields."}),
+            "AAPL",
+            "Apple",
+        )
+
+        assert parsed.success is True
+        assert parsed.decision_type == "hold"
+        assert parsed.action == "hold"
+        assert parsed.confidence_level.lower() == "medium"
+        assert parsed.prediction_source == {
+            "analysis_summary": "Narrative only; no forecast fields."
+        }
+
+        extraction = extract_prediction_record(
+            parsed,
+            run_id="run-real-parser-defaults",
+            created_at=CREATED,
+            as_of=AS_OF,
+            mode="analysis",
+        )
+        assert extraction.verifiable is False
+        assert extraction.record is not None
+        assert extraction.record.status == "no_verifiable_claim"
+        assert extraction.record.claims == []
+
+    def test_real_analysis_parser_preserves_explicit_prediction_fields(
+        self, mock_resolve_after
+    ) -> None:
+        import json
+
+        from src.analyzer import GeminiAnalyzer
+
+        analyzer = GeminiAnalyzer()
+        analyzer._get_runtime_config = lambda: SimpleNamespace(report_language="en")
+        parsed = analyzer._parse_response(
+            json.dumps(
+                {
+                    "analysis_summary": "Structured forecast.",
+                    "decision_type": "buy",
+                    "confidence": 0.7,
+                }
+            ),
+            "AAPL",
+            "Apple",
+        )
+
+        extraction = extract_prediction_record(
+            parsed,
+            run_id="run-real-parser-explicit",
+            created_at=CREATED,
+            as_of=AS_OF,
+            mode="analysis",
+        )
+        assert extraction.verifiable is True
+        assert extraction.record is not None
+        assert extraction.record.claims[0].payload.direction == "up"
+        assert extraction.record.claims[0].confidence == 0.7
+
+    def test_agent_finalize_hook_rejects_synthesized_dashboard_defaults(self) -> None:
+        from src.agent.orchestrator_parts.dashboard import _DashboardMethods
+        from src.agent.protocols import AgentContext
+
+        orchestrator = _DashboardMethods()
+        orchestrator.config = SimpleNamespace(prediction_extract_enabled=True)
+        ctx = AgentContext(
+            stock_code="600519",
+            stock_name="Test",
+            session_id="agent-session",
+            meta={"response_mode": "dashboard"},
+        )
+
+        orchestrator._maybe_extract_prediction_on_finalize(
+            {
+                "decision_type": "hold",
+                "confidence_level": "medium",
+                "analysis_summary": "Finalizer fallback",
+            },
+            ctx,
+        )
+
+        extraction = ctx.meta["prediction_extraction"]
+        assert extraction["verifiable"] is False
+        assert extraction["record"]["status"] == "no_verifiable_claim"
+        assert extraction["record"]["claims"] == []
+
+    def test_agent_finalize_hook_does_not_truncate_overlong_run_id(self) -> None:
+        from src.agent.orchestrator_parts.dashboard import _DashboardMethods
+        from src.agent.protocols import AgentContext
+
+        orchestrator = _DashboardMethods()
+        orchestrator.config = SimpleNamespace(prediction_extract_enabled=True)
+        ctx = AgentContext(
+            stock_code="600519",
+            stock_name="Test",
+            session_id="r" * 129,
+        )
+
+        orchestrator._maybe_extract_prediction_on_finalize(
+            {"action": "buy", "confidence": 0.7},
+            ctx,
+        )
+
+        extraction = ctx.meta["prediction_extraction"]
+        assert extraction["verifiable"] is False
+        assert "record" not in extraction
+        assert extraction["reason"] == "extraction_exception"
+        assert extraction["error"] == "identifier must contain at most 128 characters"
+
+    def test_mixed_valid_and_invalid_claims_fail_closed(
+        self, mock_resolve_after
+    ) -> None:
+        extraction = extract_prediction_record(
+            {
+                "code": "600519",
+                "prediction_claims": [
+                    {
+                        "claim_id": "valid-direction",
+                        "type": "direction",
+                        "confidence": 0.7,
+                        "payload": {"direction": "up"},
+                    },
+                    {
+                        "claim_id": "invalid-direction",
+                        "type": "direction",
+                        "confidence": 0.8,
+                        "payload": {"direction": "moon"},
+                    },
+                ],
+            },
+            run_id="run-partial-claims",
+            created_at=CREATED,
+            as_of=AS_OF,
+        )
+
+        assert extraction.verifiable is False
+        assert extraction.reason == "claim_validation_failed"
+        assert extraction.error is not None
+        assert extraction.record is not None
+        assert extraction.record.status == "error"
+        assert [claim.claim_id for claim in extraction.record.claims] == [
+            "valid-direction"
+        ]
+        assert "claim_errors=" in (extraction.record.notes or "")
+
+    def test_overlong_run_id_is_rejected_instead_of_truncated(self) -> None:
+        extraction = extract_prediction_record(
+            {
+                "code": "600519",
+                "decision_type": "buy",
+                "confidence": 0.7,
+            },
+            run_id="r" * 129,
+            created_at=CREATED,
+            as_of=AS_OF,
+        )
+
+        assert extraction.record is None
+        assert extraction.verifiable is False
+        assert extraction.reason == "extraction_exception"
+        assert extraction.error == "identifier must contain at most 128 characters"

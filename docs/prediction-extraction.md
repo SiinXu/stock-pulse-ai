@@ -53,9 +53,11 @@
 | 主题 | 行为 |
 | --- | --- |
 | 置信度 | 仅结构化 `confidence` / `confidence_level`；**永不**发明 `0.5` |
+| 来源证明 | 流水线只读取解析器保留的 `AnalysisResult.prediction_source`；`action=hold` 等展示层归一化默认值不参与抽取 |
 | 期限 | 优先显式结构化 horizon；否则系统策略默认 `5d`，在 notes 记 `horizon_source=policy_default:5d`（非模型声明） |
 | Agent 模式 | 方向声明需要显式 `action` 或类型化 `prediction_claims`；单独的 `decision_type` 忽略（常被编排层合成） |
 | 分析模式 | 在具备结构化置信度时仍接受精确 `decision_type` buy/hold/sell |
+| 有效/无效声明混合 | 草稿标记为 `status=error` 且不可打分；不会静默丢弃无效声明后把残余子集作为 pending 记录 |
 | 双入口 | Agent finalize（`ctx.meta`）与历史保存（`result.prediction_extraction`）都可能挂草稿；A3 持久化必须去重 |
 
 ## 特性开关

@@ -158,6 +158,7 @@ class _PersistenceStageMixin:
         failure_reason: str,
         failure_message: str,
         failure_error_code: str,
+        prediction_mode: str = "analysis",
     ) -> PipelineStageResult[PipelinePersistValue]:
         """Persist one analysis once for a stable query and return its stage result."""
 
@@ -194,6 +195,7 @@ class _PersistenceStageMixin:
                         result=result,
                         query_id=query_id,
                         source_report_id=saved_history_id,
+                        mode=prediction_mode,
                     )
                     # Config-gated skill-opinion sample materialization from the
                     # just-saved report (samples require analysis_history_id FK).
@@ -287,6 +289,7 @@ class _PersistenceStageMixin:
         result: AnalysisResult,
         query_id: str,
         source_report_id: int,
+        mode: str,
         report_type: str,
         context_snapshot: Dict[str, Any],
         portfolio_context: Optional[Dict[str, Any]] = None,
@@ -355,12 +358,20 @@ class _PersistenceStageMixin:
                 maybe_extract_prediction_on_finalize,
             )
 
+            structured_source = getattr(result, "prediction_source", None)
+            source = dict(structured_source) if isinstance(structured_source, dict) else {}
+            source.setdefault("code", getattr(result, "code", None))
+            source.setdefault("stock_name", getattr(result, "name", None))
+            dashboard = getattr(result, "dashboard", None)
+            if isinstance(dashboard, dict):
+                source.setdefault("dashboard", dict(dashboard))
+
             extraction = maybe_extract_prediction_on_finalize(
-                result,
+                source,
                 config=getattr(self, "config", None),
                 run_id=str(query_id or ""),
                 source_decision_id=str(source_report_id),
-                mode=str(getattr(self, "query_source", None) or "analysis"),
+                mode=mode,
                 model_id=getattr(result, "model_used", None),
             )
             if extraction is None:

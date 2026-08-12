@@ -111,6 +111,7 @@ def test_persist_retry_does_not_duplicate_committed_history() -> None:
         save_analysis_history=MagicMock(side_effect=[0, 41]),
     )
     pipeline._extract_decision_signal_after_history_save = MagicMock()
+    pipeline._extract_prediction_after_history_save = MagicMock()
     result = SimpleNamespace(code="600519", diagnostic_context_snapshot=None)
     snapshots = MagicMock(side_effect=[{"attempt": 1}, {"attempt": 2}])
 
@@ -125,6 +126,7 @@ def test_persist_retry_does_not_duplicate_committed_history() -> None:
             failure_reason="Analysis history was not saved.",
             failure_message="Analysis history persistence failed",
             failure_error_code="pipeline_analysis_history_save_failed",
+            prediction_mode="agent",
         )
 
     first = _persist()
@@ -145,6 +147,12 @@ def test_persist_retry_does_not_duplicate_committed_history() -> None:
     assert pipeline.db.save_analysis_history.call_count == 2
     assert snapshots.call_count == 2
     pipeline._extract_decision_signal_after_history_save.assert_called_once()
+    pipeline._extract_prediction_after_history_save.assert_called_once_with(
+        result=result,
+        query_id="query-persist",
+        source_report_id=41,
+        mode="agent",
+    )
 
 
 class _PartialNotifier:

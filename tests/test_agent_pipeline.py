@@ -672,6 +672,10 @@ class TestAgentResultConversion(unittest.TestCase):
         self.assertEqual(result.decision_type, "hold")
         self.assertIn("agent:gemini", result.data_sources)
         self.assertIsNotNone(result.dashboard)
+        self.assertIsNot(result.prediction_source, dashboard)
+        self.assertEqual(result.prediction_source["decision_type"], "hold")
+        self.assertEqual(result.prediction_source["confidence_level"], "高")
+        self.assertNotIn("risk_manager", result.prediction_source)
 
     def test_convert_preserves_top_level_phase_decision_with_nested_dashboard(self):
         """Agent top-level phase_decision should survive nested dashboard unwrapping."""

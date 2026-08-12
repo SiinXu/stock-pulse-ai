@@ -1365,18 +1365,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加尽力而为的样本写入；后验评估仍需显式调用 API。'],
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
-  'settings.agent.PREDICTION_EXTRACT_ENABLED': {
-    title: '预测记录抽取',
-    summary: '在 finalize 后将结构化决策字段映射为 PredictionRecord 草稿。',
-    usage: '默认关闭。仅在验证预测核验研究链路时开启；只有类型化枚举与显式 claim 对象可进入核验。',
-    valueNotes: [
-      '默认关闭；开关不改变分析报告输出。',
-      '开启后，成功的 finalize / 历史保存路径会附加内存中的抽取草稿（持久化由后续阶段负责）。',
-      '纯散文载荷输出 status=no_verifiable_claim；散文不会被打成可验证声明。',
-    ],
-    impact: ['为质量运营附加尽力而为的抽取元数据；不改变报告或交易建议。'],
-    notes: ['抽取失败仅记日志，不会让分析失败。仅研究/质量运营定位，不是收益保证。'],
-  },
   'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
     title: '多策略合议',
     summary: '启用并发多策略专家调度，并在结果中给出最终分歧说明。',

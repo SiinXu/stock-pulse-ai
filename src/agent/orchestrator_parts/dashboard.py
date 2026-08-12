@@ -262,12 +262,20 @@ class _DashboardMethods:
                 source["stock_name"] = ctx.stock_name
 
             skill_ids = ctx.meta.get("skills_requested") or ctx.meta.get("skill_ids")
-            run_token = str(ctx.session_id or ctx.meta.get("run_id") or ctx.query or "").strip()
+            run_token = str(ctx.session_id or ctx.meta.get("run_id") or "").strip()
+            base_opinion = self._select_base_opinion(ctx)
+            if base_opinion is None:
+                # Dashboard finalization supplies a presentation-only 0.5
+                # fallback. It is not model confidence and must not mint a claim.
+                source.pop("confidence", None)
+                source.pop("confidence_level", None)
+            else:
+                source["confidence"] = base_opinion.confidence
             extraction = maybe_extract_prediction_on_finalize(
                 source,
                 config=getattr(self, "config", None),
-                run_id=run_token[:128] if run_token else None,
-                mode=str(ctx.meta.get("response_mode") or ctx.meta.get("mode") or "agent"),
+                run_id=run_token or None,
+                mode="agent",
                 soul_version=(
                     str(ctx.meta.get("soul_version")).strip()
                     if ctx.meta.get("soul_version")

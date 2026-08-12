@@ -53,9 +53,11 @@ Turn **structured** decision / dashboard fields into a `PredictionRecord` draft 
 | Topic | Behavior |
 | --- | --- |
 | Confidence | Structured `confidence` / `confidence_level` only; **never** invent `0.5` |
+| Provenance | Pipeline extraction reads the parser-preserved `AnalysisResult.prediction_source`; normalized display defaults such as `action=hold` are ignored |
 | Horizon | Explicit structured horizon preferred; otherwise system policy default `5d` recorded as `horizon_source=policy_default:5d` in notes (not a model claim) |
 | Agent mode | Direction requires explicit `action` or typed `prediction_claims`; `decision_type` alone is ignored (often orchestrator-synthesized) |
 | Analysis mode | Exact `decision_type` buy/hold/sell still accepted with structured confidence |
+| Mixed valid/invalid claims | The draft is `status=error` and is not scoreable; invalid declared claims are never silently dropped into a partial pending record |
 | Dual hooks | Agent finalize (`ctx.meta`) and history-save (`result.prediction_extraction`) may both attach drafts; A3 persistence must dedupe |
 
 ## Feature flag

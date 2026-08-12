@@ -101,6 +101,10 @@ class _AnalysisResultStageMixin:
 
         if agent_result.success and agent_result.dashboard:
             dash = agent_result.dashboard
+            # Preserve the pre-normalization structured dashboard for prediction
+            # extraction. AnalysisResult action/decision fields are later
+            # backfilled for presentation and are not claim provenance.
+            result.prediction_source = dict(dash)
             # Single-agent decision exit: mandatory Risk Manager gate when the
             # multi-agent path has not already evaluated risk override.
             runtime_facts = getattr(agent_result, "runtime_facts", None)
