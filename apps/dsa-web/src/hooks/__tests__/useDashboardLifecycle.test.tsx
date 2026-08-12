@@ -23,12 +23,14 @@ function createWrapper() {
 }
 
 /** Flush microtasks so TanStack Query's initial queryFn can settle under fake timers. */
-async function flushQueryMicrotasks() {
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+async function flushQueryMicrotasks(rounds = 1) {
+  for (let i = 0; i < rounds; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
 }
 
 const createTask = () => ({
@@ -147,6 +149,53 @@ describe('useDashboardLifecycle', () => {
     expect(loadInitialHistory).toHaveBeenCalledTimes(2);
     expect(refreshHistory).not.toHaveBeenCalled();
     expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('re-runs non-silent initial load when initial loader identities change', async () => {
+    const loadInitialHistoryA = vi.fn().mockResolvedValue(undefined);
+    const loadInitialHistoryB = vi.fn().mockResolvedValue(undefined);
+    const refreshHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
+    const loadStockBarA = vi.fn().mockResolvedValue(undefined);
+    const loadStockBarB = vi.fn().mockResolvedValue(undefined);
+
+    const { rerender } = renderHook(
+      ({ loadInitialHistory, loadStockBar }) => useDashboardLifecycle({
+        loadInitialHistory,
+        refreshHistory,
+        refreshActiveTasks,
+        loadStockBar,
+        refreshStockBar: vi.fn().mockResolvedValue(undefined),
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+      }),
+      {
+        wrapper: createWrapper(),
+        initialProps: {
+          loadInitialHistory: loadInitialHistoryA,
+          loadStockBar: loadStockBarA,
+        },
+      },
+    );
+
+    await flushQueryMicrotasks();
+    expect(loadInitialHistoryA).toHaveBeenCalledTimes(1);
+    expect(loadStockBarA).toHaveBeenCalledTimes(1);
+    expect(refreshHistory).not.toHaveBeenCalled();
+
+    rerender({
+      loadInitialHistory: loadInitialHistoryB,
+      loadStockBar: loadStockBarB,
+    });
+    await flushQueryMicrotasks(2);
+
+    // Parity with old mount-effect deps: identity change re-runs non-silent initial.
+    expect(loadInitialHistoryB).toHaveBeenCalledTimes(1);
+    expect(loadStockBarB).toHaveBeenCalledTimes(1);
+    expect(refreshHistory).not.toHaveBeenCalled();
   });
 
   it('cleans pending task removal timers on unmount', () => {
@@ -316,6 +365,8 @@ describe('useDashboardLifecycle', () => {
     );
 
     await flushQueryMicrotasks();
+    const afterInitial = refreshActiveTasks.mock.calls.length;
+    expect(afterInitial).toBeGreaterThanOrEqual(1);
 
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
 
@@ -323,7 +374,8 @@ describe('useDashboardLifecycle', () => {
       taskStreamOptions?.onConnected?.();
     });
 
-    expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
+    // onConnected must refresh active tasks beyond the schedule's initial load.
+    expect(refreshActiveTasks).toHaveBeenCalledTimes(afterInitial + 1);
   });
 
   it('polls known task ids while SSE is disconnected', () => {

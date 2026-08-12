@@ -40,13 +40,17 @@ function createMountScheduleId(): string {
  * - First vs silent is decided by Query cache for **this mount key only**:
  *   `previous === undefined` → initial; otherwise silent. Aborted first attempts
  *   leave cache empty, so retries stay on the initial path.
+ * - When `loadInitialHistory` / `loadStockBar` / `refreshActiveTasks` identities
+ *   change (old mount-effect deps), re-fire the non-silent initial loader bundle
+ *   directly (same as the previous useEffect re-run).
  * - Later interval ticks and visibility restores use silent history refresh +
  *   stock-bar refresh + active-task refresh + optional dashboard callback.
- * - Interval: 30s; visibility: explicit `visibilitychange` listener;
- *   `refetchOnWindowFocus: false`.
+ * - Interval: 30s; visibility: explicit `visibilitychange` listener on **active**
+ *   schedule queries only; `refetchOnWindowFocus: false`.
  * - Errors remain on the existing store / page surfaces (`retry: false`).
  * - Loader callbacks are read from a ref so interval/visibility ticks never use
  *   a stale closure from the first render.
+ * - Unmount removes this mount's schedule entry to avoid orphan cache rows.
  *
  * Task SSE + disconnected 2s polling stay in useDashboardLifecycle (custom).
  */
@@ -89,6 +93,13 @@ export function useDashboardDataRefreshQuery({
     onInitialStockBarSettled,
   };
 
+  // Track initial-path loader identities (parity with the old mount-effect deps).
+  const initialLoaderIdentitiesRef = useRef({
+    loadInitialHistory,
+    loadStockBar,
+    refreshActiveTasks,
+  });
+
   const query = useQuery({
     queryKey,
     enabled,
@@ -121,16 +132,52 @@ export function useDashboardDataRefreshQuery({
       return;
     }
 
+    const previous = initialLoaderIdentitiesRef.current;
+    const loadersChanged =
+      previous.loadInitialHistory !== loadInitialHistory
+      || previous.loadStockBar !== loadStockBar
+      || previous.refreshActiveTasks !== refreshActiveTasks;
+    initialLoaderIdentitiesRef.current = {
+      loadInitialHistory,
+      loadStockBar,
+      refreshActiveTasks,
+    };
+    if (!loadersChanged) {
+      return;
+    }
+
+    // Parity with old mount useEffect: identity change re-runs non-silent loaders.
+    const loaders = loadersRef.current;
+    void loaders.loadInitialHistory();
+    void loaders.refreshActiveTasks();
+    void loaders.loadStockBar().finally(() => {
+      loaders.onInitialStockBarSettled();
+    });
+  }, [enabled, loadInitialHistory, loadStockBar, refreshActiveTasks]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Partial key match refreshes the current mount schedule entry.
-        void queryClient.refetchQueries({ queryKey: DASHBOARD_DATA_REFRESH_QUERY_KEY });
+        void queryClient.refetchQueries({
+          queryKey: DASHBOARD_DATA_REFRESH_QUERY_KEY,
+          type: 'active',
+        });
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [enabled, queryClient]);
+
+  useEffect(() => {
+    return () => {
+      queryClient.removeQueries({ queryKey, exact: true });
+    };
+  }, [queryClient, queryKey]);
 
   return query;
 }
