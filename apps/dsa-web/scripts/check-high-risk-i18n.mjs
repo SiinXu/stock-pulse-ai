@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -16,6 +16,7 @@ const REPOSITORY_ROOT = path.resolve(WEB_ROOT, '..', '..');
 const SOURCE_ROOT = path.join(WEB_ROOT, 'src');
 const TRANSLATIONS_DIRECTORY = path.join(SOURCE_ROOT, 'i18n', 'translations');
 const AUDIT_PATH = path.join(SCRIPT_DIRECTORY, 'high-risk-i18n-audit.json');
+const KEY_INVENTORY_PATH = path.join(SCRIPT_DIRECTORY, 'high-risk-i18n-keys.json');
 const execFileAsync = promisify(execFile);
 const NON_TRANSLATABLE_PROPERTIES = new Set([
   'value',
@@ -43,9 +44,20 @@ const REQUIRED_CATEGORIES = new Set([
 const SOURCE_STATUS = 'PRODUCT_SOURCE';
 const PENDING_STATUS = 'PENDING_NATIVE_REVIEW';
 const REVIEWED_STATUS = 'NATIVE_REVIEWED';
+const PRODUCT_SOURCE_VERDICTS = new Set(['RETAIN_PRODUCT_SOURCE', 'REVISED_IN_DECISIONS']);
+const KEY_NATIVE_STATUSES = new Set([PENDING_STATUS, REVIEWED_STATUS]);
+const REVIEW_PASS_KINDS = new Set([
+  'PRODUCT_SOURCE_SEMANTIC_PASS',
+  'NATIVE_FINANCIAL_REVIEW',
+]);
 
 const argumentsSet = new Set(process.argv.slice(2));
-const supportedArguments = new Set(['--print-snapshot', '--verify-baseline']);
+const supportedArguments = new Set([
+  '--print-snapshot',
+  '--verify-baseline',
+  '--print-keys',
+  '--write-key-inventory',
+]);
 const unknownArguments = [...argumentsSet].filter((argument) => !supportedArguments.has(argument));
 
 if (unknownArguments.length > 0) {
@@ -54,6 +66,8 @@ if (unknownArguments.length > 0) {
 
 const shouldPrintSnapshot = argumentsSet.has('--print-snapshot');
 const shouldVerifyBaseline = argumentsSet.has('--verify-baseline');
+const shouldPrintKeys = argumentsSet.has('--print-keys');
+const shouldWriteKeyInventory = argumentsSet.has('--write-key-inventory');
 const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'stockpulse-high-risk-i18n-'));
 let bundleSequence = 0;
 
@@ -267,6 +281,13 @@ function validateAuditMetadata(audit, uiLanguages, additionalLanguages) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(review.reviewedAt ?? '')) {
         fail(`${language}.reviewedAt must use YYYY-MM-DD`);
       }
+      if (!/^[0-9a-f]{64}$/.test(review.reviewedSnapshotSha256 ?? '')) {
+        fail(
+          `${language}.reviewedSnapshotSha256 must pin the high-risk bundle fingerprint at native review time`,
+        );
+      }
+    } else if (review.reviewedSnapshotSha256 != null) {
+      fail(`${language} is not ${REVIEWED_STATUS} and cannot pin reviewedSnapshotSha256`);
     }
   }
 
@@ -623,6 +644,244 @@ function compareSnapshot(audit, actualSnapshot, uiLanguages) {
   }
 }
 
+
+function buildCategoryKeyMap(audit, allKeys) {
+  const keyToCategories = new Map();
+  for (const category of audit.categories) {
+    const keys = allKeys.filter((key) => category.selectors.some((selector, index) => (
+      selectorMatches(key, selector, `${category.id}.selectors[${index}]`)
+    )));
+    for (const key of keys) {
+      const categories = keyToCategories.get(key) ?? [];
+      categories.push(category.id);
+      keyToCategories.set(key, categories);
+    }
+  }
+  return keyToCategories;
+}
+
+function buildKeyInventoryEntries(audit, allKeys) {
+  const keyToCategories = buildCategoryKeyMap(audit, allKeys);
+  const decisionByKey = new Map(audit.decisions.map((decision) => [decision.key, decision.id]));
+  const sortedKeys = [...keyToCategories.keys()].sort((left, right) => left.localeCompare(right, 'en'));
+  return sortedKeys.map((key) => {
+    const decisionId = decisionByKey.get(key) ?? null;
+    return {
+      key,
+      categories: keyToCategories.get(key),
+      productSourceVerdict: decisionId ? 'REVISED_IN_DECISIONS' : 'RETAIN_PRODUCT_SOURCE',
+      decisionId,
+      nativeReviewStatus: PENDING_STATUS,
+    };
+  });
+}
+
+function buildKeyInventoryDocument(audit, entries) {
+  const categoryCounts = Object.fromEntries(audit.categories.map((category) => [
+    category.id,
+    entries.filter((entry) => entry.categories.includes(category.id)).length,
+  ]));
+  return {
+    schemaVersion: 1,
+    description:
+      'Annotated high-risk Web i18n key inventory for issue #882. nativeReviewStatus is a provenance marker, not a CI gate. PRODUCT_SOURCE locales (zh/en) are product provenance; translated locales stay PENDING_NATIVE_REVIEW until a named native financial reviewer + date are recorded in languageReview.',
+    generatedAt: audit.nativeReviewPipeline?.inventoryGeneratedAt ?? audit.auditBaseline?.auditedAt,
+    source: 'apps/dsa-web/scripts/high-risk-i18n-audit.json category selectors against live UI_TRANSLATION_KEYS',
+    count: entries.length,
+    sha256: canonicalDigest(entries.map((entry) => [
+      entry.key,
+      entry.categories,
+      entry.productSourceVerdict,
+      entry.decisionId,
+      entry.nativeReviewStatus,
+    ])),
+    keySetSha256: canonicalDigest(entries.map((entry) => entry.key)),
+    categoryCounts,
+    decisionLinkedCount: entries.filter((entry) => entry.decisionId).length,
+    keys: entries,
+  };
+}
+
+function localeReviewedSnapshotSha256(audit, language) {
+  return canonicalDigest(audit.categories.map((category) => [
+    category.id,
+    category.snapshot.bundleSha256[language],
+  ]));
+}
+
+function validateNativeReviewPipeline(audit) {
+  const pipeline = audit.nativeReviewPipeline;
+  if (!pipeline || typeof pipeline !== 'object') {
+    fail('nativeReviewPipeline must document the high-risk native-review process');
+  }
+  assertNonEmptyString(pipeline.version, 'nativeReviewPipeline.version');
+  assertNonEmptyString(pipeline.summary, 'nativeReviewPipeline.summary');
+  assertStringArray(pipeline.requiredEvidenceFields, 'nativeReviewPipeline.requiredEvidenceFields');
+  for (const field of ['reviewer', 'reviewedAt', 'reviewedSnapshotSha256']) {
+    if (!pipeline.requiredEvidenceFields.includes(field)) {
+      fail(`nativeReviewPipeline.requiredEvidenceFields must include ${field}`);
+    }
+  }
+  assertStringArray(pipeline.ciGates, 'nativeReviewPipeline.ciGates');
+  assertStringArray(pipeline.notCiGates, 'nativeReviewPipeline.notCiGates');
+  if (!pipeline.notCiGates.includes(PENDING_STATUS) || !pipeline.notCiGates.includes(REVIEWED_STATUS)) {
+    fail('nativeReviewPipeline.notCiGates must state that native review statuses are not CI gates');
+  }
+  if (pipeline.blocksCiOnPendingNativeReview !== false) {
+    fail('nativeReviewPipeline.blocksCiOnPendingNativeReview must be false');
+  }
+  assertNonEmptyString(pipeline.identicalBaselinePolicy, 'nativeReviewPipeline.identicalBaselinePolicy');
+  if (!/shrink-only/i.test(pipeline.identicalBaselinePolicy)) {
+    fail('nativeReviewPipeline.identicalBaselinePolicy must keep the identical-to-English baseline shrink-only');
+  }
+  assertNonEmptyString(pipeline.inventoryGeneratedAt, 'nativeReviewPipeline.inventoryGeneratedAt');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(pipeline.inventoryGeneratedAt)) {
+    fail('nativeReviewPipeline.inventoryGeneratedAt must use YYYY-MM-DD');
+  }
+  if (!Array.isArray(pipeline.changeWorkflow) || pipeline.changeWorkflow.length === 0) {
+    fail('nativeReviewPipeline.changeWorkflow must document the contributor workflow');
+  }
+
+  if (!Array.isArray(audit.reviewPasses) || audit.reviewPasses.length === 0) {
+    fail('reviewPasses must record at least one high-risk review pass');
+  }
+  const passIds = new Set();
+  for (const pass of audit.reviewPasses) {
+    assertNonEmptyString(pass.id, 'reviewPass.id');
+    if (passIds.has(pass.id)) fail(`Duplicate reviewPass id: ${pass.id}`);
+    passIds.add(pass.id);
+    if (!REVIEW_PASS_KINDS.has(pass.kind)) {
+      fail(`${pass.id}.kind must be one of ${[...REVIEW_PASS_KINDS].join(', ')}`);
+    }
+    assertNonEmptyString(pass.reviewer, `${pass.id}.reviewer`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pass.reviewedAt ?? '')) {
+      fail(`${pass.id}.reviewedAt must use YYYY-MM-DD`);
+    }
+    assertNonEmptyString(pass.scope, `${pass.id}.scope`);
+    assertNonEmptyString(pass.summary, `${pass.id}.summary`);
+    if (!Number.isSafeInteger(pass.keyCount) || pass.keyCount <= 0) {
+      fail(`${pass.id}.keyCount must be a positive integer`);
+    }
+    if (pass.kind === 'PRODUCT_SOURCE_SEMANTIC_PASS') {
+      if (pass.claimsNativeApproval !== false) {
+        fail(`${pass.id} product-source pass must set claimsNativeApproval=false`);
+      }
+    }
+    if (pass.kind === 'NATIVE_FINANCIAL_REVIEW') {
+      assertStringArray(pass.locales, `${pass.id}.locales`);
+      for (const language of pass.locales) {
+        const review = audit.languageReview?.[language];
+        if (!review || review.status !== REVIEWED_STATUS) {
+          fail(`${pass.id} claims native review for ${language} but languageReview is not ${REVIEWED_STATUS}`);
+        }
+      }
+    }
+    if (!Array.isArray(pass.categoryConclusions) || pass.categoryConclusions.length === 0) {
+      fail(`${pass.id}.categoryConclusions must not be empty`);
+    }
+    for (const conclusion of pass.categoryConclusions) {
+      assertNonEmptyString(conclusion.category, `${pass.id}.categoryConclusions.category`);
+      if (!REQUIRED_CATEGORIES.has(conclusion.category)) {
+        fail(`${pass.id} references unknown category ${conclusion.category}`);
+      }
+      assertNonEmptyString(conclusion.verdict, `${pass.id}.${conclusion.category}.verdict`);
+      assertNonEmptyString(conclusion.notes, `${pass.id}.${conclusion.category}.notes`);
+    }
+  }
+}
+
+function validateKeyInventory(audit, expectedInventory, liveEntries) {
+  const pointer = audit.keyInventory;
+  if (!pointer || typeof pointer !== 'object') {
+    fail('keyInventory pointer must be present in the audit manifest');
+  }
+  if (pointer.path !== 'apps/dsa-web/scripts/high-risk-i18n-keys.json') {
+    fail('keyInventory.path must point at apps/dsa-web/scripts/high-risk-i18n-keys.json');
+  }
+  if (pointer.count !== expectedInventory.count || pointer.count !== liveEntries.length) {
+    fail('keyInventory.count differs from the live high-risk key set');
+  }
+  if (pointer.sha256 !== expectedInventory.sha256) {
+    fail('keyInventory.sha256 differs from the annotated inventory evidence digest');
+  }
+  if (pointer.keySetSha256 !== expectedInventory.keySetSha256) {
+    fail('keyInventory.keySetSha256 differs from the live high-risk key set');
+  }
+  if (pointer.decisionLinkedCount !== expectedInventory.decisionLinkedCount) {
+    fail('keyInventory.decisionLinkedCount differs from the decision-linked inventory count');
+  }
+
+  if (expectedInventory.schemaVersion !== 1) fail('key inventory schemaVersion must be 1');
+  if (expectedInventory.count !== expectedInventory.keys?.length) {
+    fail('key inventory count differs from keys.length');
+  }
+  if (expectedInventory.sha256 !== canonicalDigest(expectedInventory.keys.map((entry) => [
+    entry.key,
+    entry.categories,
+    entry.productSourceVerdict,
+    entry.decisionId,
+    entry.nativeReviewStatus,
+  ]))) {
+    fail('key inventory sha256 no longer matches its annotated entries');
+  }
+  if (expectedInventory.keySetSha256 !== canonicalDigest(expectedInventory.keys.map((entry) => entry.key))) {
+    fail('key inventory keySetSha256 no longer matches its key list');
+  }
+
+  const liveByKey = new Map(liveEntries.map((entry) => [entry.key, entry]));
+  const seen = new Set();
+  for (const entry of expectedInventory.keys) {
+    assertNonEmptyString(entry.key, 'keyInventory.keys.key');
+    if (seen.has(entry.key)) fail(`Duplicate key inventory entry: ${entry.key}`);
+    seen.add(entry.key);
+    const live = liveByKey.get(entry.key);
+    if (!live) fail(`Key inventory contains unknown high-risk key: ${entry.key}`);
+    if (JSON.stringify(entry.categories) !== JSON.stringify(live.categories)) {
+      fail(`Key inventory categories drifted for ${entry.key}`);
+    }
+    if (!PRODUCT_SOURCE_VERDICTS.has(entry.productSourceVerdict)) {
+      fail(`Invalid productSourceVerdict for ${entry.key}`);
+    }
+    if (entry.productSourceVerdict !== live.productSourceVerdict) {
+      fail(`productSourceVerdict for ${entry.key} must match decision linkage`);
+    }
+    if (entry.decisionId !== live.decisionId) {
+      fail(`decisionId for ${entry.key} must match the decisions list`);
+    }
+    if (!KEY_NATIVE_STATUSES.has(entry.nativeReviewStatus)) {
+      fail(`Invalid nativeReviewStatus for ${entry.key}`);
+    }
+    if (entry.nativeReviewStatus === REVIEWED_STATUS) {
+      fail(
+        `${entry.key} is marked ${REVIEWED_STATUS} at key level; record native approval only on languageReview with reviewer+date+snapshot pin`,
+      );
+    }
+  }
+  for (const key of liveByKey.keys()) {
+    if (!seen.has(key)) fail(`Key inventory is missing live high-risk key: ${key}`);
+  }
+
+  for (const pass of audit.reviewPasses) {
+    if (pass.keyCount !== liveEntries.length) {
+      fail(`${pass.id}.keyCount must equal the live high-risk key inventory count`);
+    }
+  }
+}
+
+function validateReviewedLocaleSnapshots(audit, uiLanguages) {
+  for (const language of uiLanguages) {
+    const review = audit.languageReview[language];
+    if (review.status !== REVIEWED_STATUS) continue;
+    const expected = localeReviewedSnapshotSha256(audit, language);
+    if (review.reviewedSnapshotSha256 !== expected) {
+      fail(
+        `${language} is ${REVIEWED_STATUS} but reviewedSnapshotSha256 no longer matches the current high-risk bundles; `
+          + `demote to ${PENDING_STATUS} or record a fresh native review pass`,
+      );
+    }
+  }
+}
+
 async function run() {
   const audit = JSON.parse(await readFile(AUDIT_PATH, 'utf8'));
   const languageModule = await importBundle("export { UI_LANGUAGES, ADDITIONAL_UI_LANGUAGES } from './i18n/uiLanguages';");
@@ -630,6 +889,7 @@ async function run() {
   const additionalLanguages = [...languageModule.ADDITIONAL_UI_LANGUAGES];
   const sourceIds = validateAuditMetadata(audit, uiLanguages, additionalLanguages);
   validateDecisionEvidence(audit);
+  validateNativeReviewPipeline(audit);
   const sourceBundles = await extractSourceBundles(uiLanguages);
   const generated = await loadGeneratedBundles(additionalLanguages);
   const allKeys = [...generated.UI_TRANSLATION_KEYS];
@@ -663,17 +923,44 @@ async function run() {
     process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
     return;
   }
-  compareSnapshot(audit, snapshot, uiLanguages);
-  const distinctKeys = new Set();
-  for (const category of audit.categories) {
-    allKeys.filter((key) => category.selectors.some((selector, index) => (
-      selectorMatches(key, selector, `${category.id}.selectors[${index}]`)
-    ))).forEach((key) => distinctKeys.add(key));
+
+  const liveEntries = buildKeyInventoryEntries(audit, allKeys);
+  const expectedInventory = buildKeyInventoryDocument(audit, liveEntries);
+  if (shouldPrintKeys) {
+    process.stdout.write(`${JSON.stringify(expectedInventory, null, 2)}\n`);
+    return;
   }
+  if (shouldWriteKeyInventory) {
+    await writeFile(KEY_INVENTORY_PATH, `${JSON.stringify(expectedInventory, null, 2)}\n`);
+    process.stdout.write(
+      `Wrote high-risk key inventory: ${liveEntries.length} keys -> ${path.relative(REPOSITORY_ROOT, KEY_INVENTORY_PATH)}\n`,
+    );
+    return;
+  }
+
+  compareSnapshot(audit, snapshot, uiLanguages);
+  validateReviewedLocaleSnapshots(audit, uiLanguages);
+
+  let storedInventory;
+  try {
+    storedInventory = JSON.parse(await readFile(KEY_INVENTORY_PATH, 'utf8'));
+  } catch {
+    fail(`Missing key inventory at ${KEY_INVENTORY_PATH}; run with --write-key-inventory after reviewing the key set`);
+  }
+  if (canonicalDigest(storedInventory) !== canonicalDigest(expectedInventory)) {
+    fail(
+      'high-risk-i18n-keys.json is stale; run `npm run i18n:high-risk -- --write-key-inventory` after reviewing key-set changes',
+    );
+  }
+  validateKeyInventory(audit, storedInventory, liveEntries);
+
+  const distinctKeys = new Set(liveEntries.map((entry) => entry.key));
   const pendingCount = Object.values(audit.languageReview).filter((review) => review.status === PENDING_STATUS).length;
+  const pendingKeyCount = liveEntries.filter((entry) => entry.nativeReviewStatus === PENDING_STATUS).length;
   process.stdout.write(
     `High-risk i18n audit passed: ${audit.categories.length} categories, ${distinctKeys.size} stable keys, `
-      + `${uiLanguages.length} locales; ${pendingCount} locales remain ${PENDING_STATUS}.\n`,
+      + `${uiLanguages.length} locales; ${pendingCount} locales and ${pendingKeyCount} keys remain ${PENDING_STATUS}; `
+      + `${audit.reviewPasses.length} review pass(es) recorded.\n`,
   );
 }
 

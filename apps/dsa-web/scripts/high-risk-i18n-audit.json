@@ -114,6 +114,88 @@
     "localeValueCount": 517,
     "revisionSha256": "e7e31a9272a41219db270c7be78b9e4754b6c2182be6d6039bf06052a3c9f305"
   },
+  "nativeReviewPipeline": {
+    "version": "1",
+    "summary": "High-risk financial, risk, authentication, credential, error, and disclaimer copy stays explicitly marked until a named native financial reviewer records identity, date, and a bundle fingerprint. CI continues to gate resource integrity and semantic snapshots only; native-review status is provenance annotation and never a required human CI step.",
+    "requiredEvidenceFields": [
+      "reviewer",
+      "reviewedAt",
+      "reviewedSnapshotSha256"
+    ],
+    "ciGates": [
+      "i18n:resources key/source parity",
+      "i18n:high-risk category snapshots and decision digests",
+      "annotated high-risk key inventory parity",
+      "shrink-only identical-to-English ratchet"
+    ],
+    "notCiGates": [
+      "PENDING_NATIVE_REVIEW",
+      "NATIVE_REVIEWED",
+      "PRODUCT_SOURCE_SEMANTIC_PASS"
+    ],
+    "blocksCiOnPendingNativeReview": false,
+    "identicalBaselinePolicy": "shrink-only; high-risk review work must not grow identicalToEnglish.baseline.json",
+    "inventoryGeneratedAt": "2026-08-12",
+    "changeWorkflow": [
+      "Edit product source (zh/en) or a locale bundle for an audited high-risk key.",
+      "If the key set or selectors change, refresh category snapshots and regenerate high-risk-i18n-keys.json via npm run i18n:high-risk -- --write-key-inventory.",
+      "Record or update a decisions[] entry when candidate wording changes; keep before/recommended digests in lockstep.",
+      "Leave translated languageReview status at PENDING_NATIVE_REVIEW unless a real native financial reviewer is named with reviewedAt and reviewedSnapshotSha256.",
+      "If a locale is NATIVE_REVIEWED and any high-risk bundle hash changes, demote it to PENDING_NATIVE_REVIEW or record a fresh native review pass; do not keep a stale approval.",
+      "Never claim native approval or NATIVE_REVIEWED without reviewer identity plus date plus snapshot pin."
+    ]
+  },
+  "keyInventory": {
+    "path": "apps/dsa-web/scripts/high-risk-i18n-keys.json",
+    "count": 353,
+    "sha256": "a8f3472ea9ab2f3ea388ae537eb7c11dace7d6cd6a937c31a3394720d5d75763",
+    "keySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe",
+    "decisionLinkedCount": 95
+  },
+  "reviewPasses": [
+    {
+      "id": "product-source-high-risk-pass-2026-08-12",
+      "kind": "PRODUCT_SOURCE_SEMANTIC_PASS",
+      "reviewer": "issue-882-worker@stock-pulse-ai",
+      "reviewedAt": "2026-08-12",
+      "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
+      "summary": "353 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "claimsNativeApproval": false,
+      "keyCount": 353,
+      "categoryConclusions": [
+        {
+          "category": "trading_action",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Action/side labels keep informational buy/sell/hold/watch/avoid semantics. Product source is stable; translated labels stay PENDING_NATIVE_REVIEW and must not be presented as personalized trading instructions."
+        },
+        {
+          "category": "risk",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Risk, volume, turnover, drawdown, alert-severity, and score labels match the product contract after prior decision corrections. No additional product-source collapse found in this pass."
+        },
+        {
+          "category": "authentication",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Authentication keys describe login, session, password, and admin-auth conditions without implying investment outcomes. Product source retained; native phrasing still pending for the eight translated locales."
+        },
+        {
+          "category": "credential",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Credential/API-key/provider-key keys keep credential classes distinct from passwords and usage HMAC secrets. Prior decision-linked wording remains the candidate baseline pending native review."
+        },
+        {
+          "category": "error",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained; locale naturalness remains PENDING_NATIVE_REVIEW."
+        },
+        {
+          "category": "disclaimer",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
+        }
+      ]
+    }
+  ],
   "languageReview": {
     "zh": {
       "status": "PRODUCT_SOURCE",
