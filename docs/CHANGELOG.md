@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
+- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
+- [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
+- [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
+- [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
+- [Changed] Jinja stock reports use Decision Card-first layered reading (card → mode-density evidence strata → detail sections) for brief/standard/research, and `ReportType.BRIEF` notifications force `report_mode=brief` so push length budgets hold (Refs #861, #874).
+- [Changed] Split `data_provider/akshare_fetcher.py` into capability-domain modules under `data_provider/akshare_parts/` (symbols, timeout client, history, realtime quotes, market boards, enhanced data, pure Tencent parsers) behind an ADR-006 compatibility facade with stable re-exports and patch targets; no intentional provider fallback or cache behavior change (Refs #1068).
+- [Added] Strict PredictionRecord schema with typed verifiable claims, no_verifiable_claim path for unparseable prose, and finite-number rejection (Refs #1101, #1107).
+- [Tests] Offline provider fallback / circuit / cache contract suite covers multi-hop order, circuit open-close, cache hit and expiry, multi-provider stale degradation, and multi-symbol isolation (Refs #1069).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).
@@ -20,11 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Rebaseline Web locale gzip budgets after Agent three-layer progressive-disclosure copy (Refs #868).
 - [Changed] Expose Event Alerts production discovery from Event Calendar (and calendar back-link) so `/event-alerts` is not URL-only (Refs #1058, #1008).
 - [Added] Complete remaining data-validation gaps: pre-synthesis OHLCV finite checks with explicit degradation, PE/PB soft plausibility (suspect/keep), multi-provider cross-source divergence warnings with attribution, and ETF/edge false-positive calibration fixtures (Refs #185).
+- [Fixed] Settings AI overview task table stays horizontally scrollable at 320/390 instead of clipping under overflow-hidden (Refs #879 B3).
 - [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
 - [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
 - [Changed] Agent Behavior settings use Essentials · Behavior · Governance/Expert progressive disclosure, move expert JSON behind the expert layer, and add a default preset-to-ask path without changing config semantics (#868).
 - [Added] Render a top-of-report analysis delta section from history_comparison_service for both scheduled and manual report generation, distinguishing first analysis from no material change and rejecting non-finite values (Refs #148).
 - [Added] Expand offline OCR Agent tool coverage to filing pages, table-like statements, chart annotations, and embedded PDF page rasters with typed untrusted non-decision envelopes, BoundToolSession allowlist/runtime proofs, and follow-on fencing (Refs #196).
+- [Tests] Add Playwright product-surface smoke for Stock Details K-line and Portfolio risk heatmap (render/empty/loading/error and non-finite or out-of-range rejection) (Refs #142).
+- [Fixed] Signal Center mobile filters collapse basic and advanced fields behind one Filters control so results lead the first screen (Refs #879 B2).
 - [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
 - [Changed] Mount the interactive DCF sensitivity panel on Stock Details and reset its stock-bound estimate and assumptions when the canonical route stock changes (Refs #238, #1008).
 - [Changed] Mount watchlist AI scores and opt-in sorting on production Home watchlist groups, refetch on analysis or refresh lifecycle changes, and fail closed on score errors (Refs #147, #1008).

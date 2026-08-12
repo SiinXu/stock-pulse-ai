@@ -1189,6 +1189,28 @@ class _ConfigLoadingMethods:
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),
+            analysis_parallel_fetch_enabled=parse_env_bool(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_ENABLED'),
+                default=True,
+            ),
+            analysis_parallel_fetch_max_concurrent=parse_env_int(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT'),
+                3,
+                field_name='ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT',
+                minimum=1,
+            ),
+            analysis_parallel_fetch_per_provider_limit=parse_env_int(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT'),
+                1,
+                field_name='ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT',
+                minimum=1,
+            ),
+            analysis_parallel_fetch_budget_seconds=parse_env_float(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS'),
+                0.0,
+                field_name='ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS',
+                minimum=0.0,
+            ),
             debug=os.getenv('DEBUG', 'false').lower() == 'true',
             config_validate_mode=os.getenv('CONFIG_VALIDATE_MODE', 'warn').lower(),
             http_proxy=os.getenv('HTTP_PROXY'),
