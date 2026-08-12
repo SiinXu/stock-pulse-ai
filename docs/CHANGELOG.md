@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Rebaseline Web locale gzip budgets after Agent three-layer progressive-disclosure copy (Refs #868).
 - [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
 - [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
 - [Changed] Agent Behavior settings use Essentials · Behavior · Governance/Expert progressive disclosure, move expert JSON behind the expert layer, and add a default preset-to-ask path without changing config semantics (#868).
