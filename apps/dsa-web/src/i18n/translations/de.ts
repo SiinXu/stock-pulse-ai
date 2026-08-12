@@ -2115,6 +2115,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.watchlistScore.sortManual": "Manuelle Reihenfolge",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreDesc": "KI-Score hoch → niedrig",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreAsc": "KI-Score niedrig → hoch",
+  "i18n.uiText.UI_TEXT.watchlistScore.loadFailed": "KI-Bewertungen sind nicht verfügbar. Bewertungen bleiben ausgeblendet und die Sortierung danach bleibt deaktiviert, bis die Aktualisierung erfolgreich ist.",
   "i18n.uiText.UI_TEXT.watchlist.createGroup": "Gruppe erstellen",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupBadge": "Standard",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupName": "Standardgruppe",

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Changed] Mount watchlist AI scores and opt-in sorting on production Home watchlist groups, refetch on analysis or refresh lifecycle changes, and fail closed on score errors (Refs #147, #1008).
 - [Fixed] Capability inventory tool/skill/pipeline probes observe installed owners only, advance skill generation for every record-visible declarative field, and stop over-claiming healthy from registration (Refs #221).
 
 - [Fixed] Route the Home Today's Focus request through the versioned API so the panel loads without a persistent request-failure toast.

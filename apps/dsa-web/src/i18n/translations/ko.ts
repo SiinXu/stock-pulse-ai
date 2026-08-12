@@ -2115,6 +2115,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.watchlistScore.sortManual": "수동 정렬",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreDesc": "AI 점수 높음 → 낮음",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreAsc": "AI 점수 낮음 → 높음",
+  "i18n.uiText.UI_TEXT.watchlistScore.loadFailed": "AI 점수를 사용할 수 없습니다. 새로 고침에 성공할 때까지 점수를 숨기고 점수 정렬을 사용하지 않습니다.",
   "i18n.uiText.UI_TEXT.watchlist.createGroup": "그룹 만들기",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupBadge": "기본",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupName": "기본 그룹",
