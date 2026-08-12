@@ -97,6 +97,23 @@
 {% endfor %}
 {% endif %}
 
+{% set multi_model = dashboard.get('multi_model_comparison') if dashboard else none %}
+{% if multi_model and multi_model.get('enabled') %}
+🤝 **{{ labels.multi_model_comparison_heading }}**
+{% set mm_handling = multi_model.get('disagreement_handling') or {} %}
+{% if mm_handling.get('high_disagreement') %}
+⚠️ {{ labels.multi_model_high_disagreement_banner }}
+{% endif %}
+- {{ labels.multi_model_consensus_level_label }}: {{ localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language) }}
+{% for row in (multi_model.get('agreement_table') or [])[:3] %}
+- {{ row.get('model_id') or 'model' }}: {{ localize_strategy_signal(row.get('signal') or 'N/A', report_language) }}
+{% endfor %}
+{% if multi_model.get('degradation') %}
+- {{ labels.multi_model_degraded_label }}: {{ (multi_model.get('degradation') or {}).get('annotation') or (multi_model.get('degradation') or {}).get('reason') }}
+{% endif %}
+{{ labels.multi_model_no_majority_note }}
+{% endif %}
+
 {% set checklist = battle.get('action_checklist', []) if battle else [] %}
 {% set fc = failed_checks(checklist) %}
 {% if fc %}

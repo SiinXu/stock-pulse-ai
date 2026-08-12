@@ -275,6 +275,12 @@ class Config:
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
+    # Multi-model consensus comparison (#154). Default-off; cost-sensitive.
+    multi_model_consensus_enabled: bool = False
+    multi_model_consensus_models: List[str] = field(default_factory=list)
+    multi_model_consensus_preset: str = ""  # fast | quality | empty
+    multi_model_consensus_max_models: int = 3
+    multi_model_consensus_max_cost_usd: Optional[float] = None
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
     decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats

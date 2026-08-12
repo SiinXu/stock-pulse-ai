@@ -119,6 +119,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MEMORY_ENABLED` | `false` | 是 | 模板中注释; Memory and calibration system (tracks historical accuracy and automatically adjusts confidence) |
 | `AGENT_MODE` | `true` | 是 | 模板中注释; =================================== Agent strategy dialogue configuration (Web dialogue page) =======================... |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
+| `MULTI_MODEL_CONSENSUS_ENABLED` | `false` | 是 | 模板中注释; 传统分析路径多模型共识对比（默认关闭；Issue #154） |
+| `MULTI_MODEL_CONSENSUS_MODELS` | 空 | 是 | 模板中注释; 可选的逗号分隔 LiteLLM 模型列表 |
+| `MULTI_MODEL_CONSENSUS_PRESET` | 空 | 是 | 模板中注释; 模型列表为空时可选 `fast` / `quality` |
+| `MULTI_MODEL_CONSENSUS_MAX_MODELS` | `3` | 是 | 模板中注释; 单次对比最大模型数（2–5） |
+| `MULTI_MODEL_CONSENSUS_MAX_COST_USD` | 空 | 是 | 模板中注释; 多模型对比可选软成本预算标注 |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |

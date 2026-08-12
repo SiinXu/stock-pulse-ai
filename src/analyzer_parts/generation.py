@@ -976,8 +976,21 @@ class GeminiAnalyzer:
         requested_temperature = generation_config.get('temperature', 0.7)
         requested_timeout = generation_config.get("timeout")
 
-        models_to_try = [config.litellm_model] + (config.litellm_fallback_models or [])
+        model_override = str(generation_config.get("model_override") or "").strip()
+        disable_model_fallback = bool(generation_config.get("disable_model_fallback"))
+        if model_override:
+            models_to_try = [model_override]
+            if not disable_model_fallback:
+                models_to_try = models_to_try + list(config.litellm_fallback_models or [])
+        else:
+            models_to_try = [config.litellm_model] + (config.litellm_fallback_models or [])
         models_to_try = [m for m in models_to_try if m]
+        # Preserve order while dropping duplicates (override may equal primary).
+        deduped: List[str] = []
+        for model in models_to_try:
+            if model not in deduped:
+                deduped.append(model)
+        models_to_try = deduped
 
         use_channel_router = self._has_channel_config(config)
 

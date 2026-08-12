@@ -1435,6 +1435,64 @@ class HistoryService:
                 report_lines.append(f"- {invalid_text}")
             report_lines.append("")
 
+        # ========== Multi-model consensus comparison (#154) ==========
+        multi_model = dashboard.get("multi_model_comparison") if dashboard else None
+        if isinstance(multi_model, dict) and multi_model.get("enabled"):
+            handling = multi_model.get("disagreement_handling") or {}
+            report_lines.extend(
+                [
+                    f"### 🤝 {labels.get('multi_model_comparison_heading', 'Multi-Model Consensus')}",
+                    "",
+                ]
+            )
+            if handling.get("high_disagreement"):
+                report_lines.append(
+                    f"> ⚠️ {labels.get('multi_model_high_disagreement_banner', 'High multi-model disagreement')}"
+                )
+            report_lines.append(
+                f"- {labels.get('multi_model_status_label', 'Status')}: "
+                f"{multi_model.get('status', 'N/A')} | "
+                f"{labels.get('multi_model_consensus_level_label', 'Consensus')}: "
+                f"{localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language)} | "
+                f"{labels.get('multi_model_consensus_score_label', 'Agreement')}: "
+                f"{multi_model.get('consensus_score', 'N/A')}"
+            )
+            degradation = multi_model.get("degradation")
+            if isinstance(degradation, dict) and (degradation.get("annotation") or degradation.get("reason")):
+                report_lines.append(
+                    f"- {labels.get('multi_model_degraded_label', 'Degradation')}: "
+                    f"{degradation.get('annotation') or degradation.get('reason')}"
+                )
+            report_lines.append(
+                f"- {labels.get('multi_model_no_majority_note', 'Disagreement was not averaged')}"
+            )
+            for row in (multi_model.get("agreement_table") or [])[:5]:
+                if not isinstance(row, dict):
+                    continue
+                report_lines.append(
+                    f"- `{row.get('model_id') or row.get('model_version') or 'model'}` "
+                    f"({row.get('status') or 'n/a'}): "
+                    f"{localize_strategy_signal(row.get('signal') or row.get('action') or 'N/A', report_language)}"
+                    f" | {row.get('score_band') or 'N/A'}"
+                )
+            points = handling.get("points") if isinstance(handling, dict) else None
+            if isinstance(points, list) and points:
+                report_lines.append(
+                    f"**{labels.get('multi_model_disagreement_points_label', 'Disagreement points')}**"
+                )
+                for point in points[:8]:
+                    if not isinstance(point, dict):
+                        continue
+                    participants = ", ".join(
+                        str(p) for p in (point.get("participants") or []) if str(p).strip()
+                    )
+                    report_lines.append(
+                        f"- [{point.get('severity') or 'medium'}] "
+                        f"{point.get('kind') or 'unknown'}"
+                        f"{(' — ' + participants) if participants else ''}"
+                    )
+            report_lines.append("")
+
         # ========== If no dashboard, display traditional format ==========
         if not dashboard:
             # Reason for Operation

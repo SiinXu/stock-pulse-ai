@@ -1314,6 +1314,26 @@ CLI, Web, analysis/watchlist APIs, CSV/Excel/clipboard smart import, and Bot ana
 
 HK daily history skips efinance, pytdx, baostock, and other built-in providers that do not support HK daily data, avoiding mismatches between HK symbols and non-HK market data. AkShare/Tushare/YFinance/Longbridge continue to provide HK fallback paths. If Longbridge is inside its connection cooldown window, the route temporarily skips it and continues with the remaining HK-capable fallbacks.
 
+### Multi-Model Consensus Comparison (optional)
+
+Default **off**. When `MULTI_MODEL_CONSENSUS_ENABLED=true`, the legacy stock analysis path can run the **same shared data snapshot** across 2–3 models (explicit list, `fast`/`quality` preset, or primary + fallbacks), then attach a structured product payload:
+
+- Agreement table: action / score band / key risks per model
+- Consensus level + agreement score (not a blended trading signal)
+- Disagreement points using the same low-sensitivity point contract as multi-agent disagreement handling (`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`)
+- Hard honesty rules: **no majority vote**, **no averaging** of opposing directions; high disagreement stays visible; single-model failure degrades to the surviving result with `single_model_fallback` annotation
+- Model id / version / provider identities are recorded under `dashboard.multi_model_comparison.trace` and each LLM diagnostic run uses `call_type=multi_model_consensus`
+
+```bash
+MULTI_MODEL_CONSENSUS_ENABLED=true
+MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
+# or: MULTI_MODEL_CONSENSUS_PRESET=fast
+MULTI_MODEL_CONSENSUS_MAX_MODELS=3
+# MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+```
+
+Agent multi-agent mode is unchanged by this flag. Related multi-agent disagreement handling remains a separate surface (Issues #246 / #193 / PR #1205).
+
 ### Multi-Model Switching
 
 Configure multiple models, system auto-switches:

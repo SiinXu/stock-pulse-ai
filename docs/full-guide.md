@@ -1444,6 +1444,26 @@ CLI、Web、分析/自选 API、CSV/Excel/剪贴板智能导入以及 Bot 分析
 
 针对指数跟踪型 ETF 和美股指数（如 VOO、QQQ、SPY、510050、SPX、DJI、IXIC），分析仅关注**指数走势、跟踪误差、市场流动性**，不纳入基金管理人/发行方的公司层面风险（诉讼、声誉、高管变动等）。风险警报与业绩预期均基于指数成分股整体表现，避免将基金公司新闻误判为标的本身利空。详见 Issue #274。
 
+### 多模型共识对比（可选）
+
+默认**关闭**。当 `MULTI_MODEL_CONSENSUS_ENABLED=true` 时，传统股票分析路径可在**同一共享数据快照**上并行运行 2–3 个模型（显式列表、`fast`/`quality` 预设，或主模型 + 回退模型），并将结构化产物写入报告：
+
+- 模型对照表：各模型动作 / 分数带 / 关键风险
+- 共识度 + 一致度（**不是**混合后的交易信号）
+- 分歧点使用与多 Agent 分歧处理一致的低敏 point 契约（`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`）
+- 硬规则：**不做多数表决**、**不对反向信号取平均**；高分歧必须可见；单模型失败降级为存活结果并标注 `single_model_fallback`
+- 模型 id / 版本 / provider 写入 `dashboard.multi_model_comparison.trace`，诊断 LLM run 的 `call_type=multi_model_consensus`
+
+```bash
+MULTI_MODEL_CONSENSUS_ENABLED=true
+MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
+# 或：MULTI_MODEL_CONSENSUS_PRESET=fast
+MULTI_MODEL_CONSENSUS_MAX_MODELS=3
+# MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+```
+
+该开关不改变 Agent 多 Agent 路径。多 Agent 分歧处理仍是独立能力（Issues #246 / #193 / PR #1205）。
+
 ### 多模型切换
 
 配置多个模型，系统自动切换：

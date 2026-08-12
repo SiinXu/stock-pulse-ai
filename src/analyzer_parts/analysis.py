@@ -53,6 +53,8 @@ class GeminiAnalyzer:
         progress_callback: Optional[Callable[[int, str], None]] = None,
         stream_progress_callback: Optional[Callable[[int], None]] = None,
         analysis_context_pack_summary: Optional[str] = None,
+        model_override: Optional[str] = None,
+        disable_model_fallback: bool = False,
     ) -> AnalysisResult:
         """
         分析单只股票
@@ -248,8 +250,9 @@ class GeminiAnalyzer:
 
             config = self._get_runtime_config()
             backend_id, _fallback_backend_id = self._resolve_generation_backend_config()
-            model_name = config.litellm_model or "unknown"
-            if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS:
+            effective_model_override = str(model_override or "").strip() or None
+            model_name = effective_model_override or config.litellm_model or "unknown"
+            if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS and not effective_model_override:
                 model_name = backend_id
                 legacy_audit_context["transport"] = backend_id
             logger.info(f"========== AI 分析 {name}({code}) ==========")
@@ -271,6 +274,10 @@ class GeminiAnalyzer:
                 "temperature": config.llm_temperature,
                 "max_output_tokens": 8192,
             }
+            if effective_model_override:
+                generation_config["model_override"] = effective_model_override
+            if disable_model_fallback:
+                generation_config["disable_model_fallback"] = True
 
             logger.info(f"[LLM调用] 开始调用 {model_name}...")
             _emit_progress(68, f"{name}：LLM 已接收请求，等待响应")
