@@ -932,8 +932,9 @@ async function run() {
   }
   if (shouldWriteKeyInventory) {
     await writeFile(KEY_INVENTORY_PATH, `${JSON.stringify(expectedInventory, null, 2)}\n`);
-    // Keep the audit pointer digests and product-source review keyCount in lockstep so
-    // contributors are not forced into a second hand-edit after regenerating the inventory.
+    // Keep the audit pointer digests in lockstep with the regenerated inventory.
+    // Do NOT auto-bump reviewPasses[].keyCount: a changed key set requires a conscious
+    // product-source or native review pass so coverage is not silently overclaimed.
     // Mutate in place to preserve existing top-level key order in the audit manifest.
     audit.keyInventory = {
       path: 'apps/dsa-web/scripts/high-risk-i18n-keys.json',
@@ -942,19 +943,20 @@ async function run() {
       keySetSha256: expectedInventory.keySetSha256,
       decisionLinkedCount: expectedInventory.decisionLinkedCount,
     };
-    if (Array.isArray(audit.reviewPasses)) {
-      for (const pass of audit.reviewPasses) {
-        if (pass.kind === 'PRODUCT_SOURCE_SEMANTIC_PASS') {
-          pass.keyCount = expectedInventory.count;
-        }
-      }
-    }
     await writeFile(AUDIT_PATH, `${JSON.stringify(audit, null, 2)}\n`);
+    const stalePasses = (audit.reviewPasses ?? []).filter(
+      (pass) => pass.keyCount !== expectedInventory.count,
+    );
     process.stdout.write(
       `Wrote high-risk key inventory: ${liveEntries.length} keys -> ${path.relative(REPOSITORY_ROOT, KEY_INVENTORY_PATH)}\n`
-        + `Updated audit keyInventory pointer and PRODUCT_SOURCE_SEMANTIC_PASS keyCount in `
-        + `${path.relative(REPOSITORY_ROOT, AUDIT_PATH)}.\n`,
+        + `Updated audit keyInventory pointer in ${path.relative(REPOSITORY_ROOT, AUDIT_PATH)}.\n`,
     );
+    if (stalePasses.length > 0) {
+      process.stdout.write(
+        `Note: ${stalePasses.length} review pass(es) still report a different keyCount; `
+          + `record a fresh review pass or update conclusions before the normal gate will pass.\n`,
+      );
+    }
     return;
   }
 

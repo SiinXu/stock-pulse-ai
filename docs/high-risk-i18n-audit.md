@@ -89,7 +89,7 @@ cd apps/dsa-web
 npm run i18n:high-risk -- --write-key-inventory
 ```
 
-`--write-key-inventory` rewrites `high-risk-i18n-keys.json` and also refreshes the `keyInventory` pointer digests plus any `PRODUCT_SOURCE_SEMANTIC_PASS.keyCount` in `high-risk-i18n-audit.json`. Category snapshots, decisions, and native-review status still need a deliberate human review when copy changes.
+`--write-key-inventory` rewrites `high-risk-i18n-keys.json` and refreshes the `keyInventory` pointer digests in `high-risk-i18n-audit.json`. It does **not** auto-bump `reviewPasses[].keyCount`: when the key set changes, record a fresh review pass (or deliberately update conclusions and `keyCount`) so coverage is not silently overclaimed. Category snapshots, decisions, and native-review status still need a deliberate human review when copy changes.
 
 ### Product-source review pass (2026-08-12)
 
