@@ -11779,6 +11779,16 @@
             ],
             "title": "Free Form Rules"
           },
+          "research_stance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchStanceContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "risk_rules": {
             "items": {
               "maxLength": 1000,
@@ -22752,6 +22762,54 @@
           "stock_code"
         ],
         "title": "ResearchScheduledPayload",
+        "type": "object"
+      },
+      "ResearchStanceContent": {
+        "additionalProperties": false,
+        "description": "Optional research-tone stance on the personal investment framework.",
+        "properties": {
+          "custom_text": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Text"
+          },
+          "preferred_lens_skill_ids": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Preferred Lens Skill Ids",
+            "type": "array"
+          },
+          "preset_id": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rational_analyst",
+                  "risk_guardian",
+                  "long_term_compounder"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Id"
+          }
+        },
+        "title": "ResearchStanceContent",
         "type": "object"
       },
       "RollbackSystemConfigRequest": {

@@ -99,6 +99,26 @@ class _ChatMethods:
             skills_section=skills_section,
             language_section=_build_language_section(report_language, chat_mode=True),
         )
+        try:
+            from src.services.research_persona_prompt import (
+                append_research_persona_to_system_prompt,
+                inject_research_persona_into_analysis_context,
+            )
+
+            persona_context = dict(context or {})
+            inject_research_persona_into_analysis_context(
+                persona_context,
+                config=getattr(self, "config", None)
+                or getattr(getattr(self, "llm_adapter", None), "_config", None),
+                request_context=context,
+                report_language=report_language,
+            )
+            system_prompt = append_research_persona_to_system_prompt(
+                system_prompt,
+                context=persona_context,
+            )
+        except Exception:
+            pass
         system_prompt = _compose_agent_soul_prompt(system_prompt)
         soul_runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
 

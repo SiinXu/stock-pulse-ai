@@ -275,6 +275,8 @@ class Config:
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
+    agent_research_persona: str = ""  # Default-off research stance preset (#467)
+    agent_research_persona_custom: str = ""  # Optional custom stance text (#467)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
     decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats

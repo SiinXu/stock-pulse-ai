@@ -776,6 +776,27 @@ class _StockAnalysisStageMixin:
                     context={"stock_code": code},
                 )
 
+            try:
+                from src.services.research_persona_prompt import (
+                    inject_research_persona_into_analysis_context,
+                )
+
+                inject_research_persona_into_analysis_context(
+                    enhanced_context,
+                    config=self.config,
+                    request_context=enhanced_context,
+                    report_language=report_language,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Research persona is optional.
+                log_safe_exception(
+                    logger,
+                    "Research persona inject failed",
+                    exc,
+                    error_code="pipeline_research_persona_inject_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+
             # Step 7: Call AI Analysis (Pass in Enhanced Context and News)
             (
                 analysis_context_pack_summary,

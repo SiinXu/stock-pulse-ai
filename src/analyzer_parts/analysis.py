@@ -512,6 +512,9 @@ class GeminiAnalyzer:
         framework_prompt = context.get("personal_investment_framework_prompt")
         if isinstance(framework_prompt, str) and framework_prompt:
             prompt += framework_prompt
+        research_persona_prompt = context.get("research_persona_prompt")
+        if isinstance(research_persona_prompt, str) and research_persona_prompt:
+            prompt += research_persona_prompt
         prompt += f"""
 
 ## 📈 技术面数据

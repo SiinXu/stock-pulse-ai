@@ -98,6 +98,9 @@ instructions: |
 
 ## 投资委员会 Persona Skills（默认关闭）
 
+完整合同见 [Investor Personas](../docs/investor-personas_EN.md) / [投资者 Persona](../docs/investor-personas.md)（#119/#467）。人物名别名仅为风格参考。
+
+
 `personas/` 提供五个互补的研究视角：价值与护城河、心智模型、逆向深度价值、颠覆式成长和尾部风险。它们是普通 YAML Skill，会随内置 catalog 一起被发现，但全部声明 `default_active: false` 和 `default_router: false`，因此留空 `AGENT_SKILLS` 时仍只使用既有默认策略，不会改变默认分析结果。
 
 Persona 必须显式选择后才会运行。例如在手动路由下使用：

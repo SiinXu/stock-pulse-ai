@@ -13,6 +13,14 @@ export interface InvestmentFrameworkContent {
   riskRules?: string[];
   trackingCriteria?: string[];
   freeFormRules?: string | null;
+  researchStance?: InvestmentFrameworkResearchStance | null;
+}
+
+export interface InvestmentFrameworkResearchStance {
+  [key: string]: unknown;
+  presetId?: 'rational_analyst' | 'risk_guardian' | 'long_term_compounder' | null;
+  customText?: string | null;
+  preferredLensSkillIds?: string[];
 }
 
 export interface InvestmentFrameworkDecisionBranch {

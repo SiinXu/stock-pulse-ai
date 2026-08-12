@@ -240,6 +240,25 @@ class GeminiAnalyzer:
                         level=logging.WARNING,
                         context={"symbol": code},
                     )
+                try:
+                    from src.services.research_persona_prompt import (
+                        enrich_dashboard_research_persona,
+                    )
+
+                    dashboard = enrich_dashboard_research_persona(
+                        dashboard,
+                        config=self._get_runtime_config(),
+                        report_language=report_language,
+                    )
+                except Exception as persona_exc:  # broad-exception: fallback_recorded - persona label is optional
+                    log_safe_exception(
+                        logger,
+                        "Failed to enrich active research persona label",
+                        persona_exc,
+                        error_code="report_research_persona_enrich_failed",
+                        level=logging.WARNING,
+                        context={"symbol": code},
+                    )
             except Exception as strata_exc:  # broad-exception: fallback_recorded - strata attach must not block parse
                 log_safe_exception(
                     logger,
