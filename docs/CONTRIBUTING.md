@@ -105,6 +105,12 @@ docs: update the README deployment guide
 - 非直观逻辑使用英文注释
 - 新功能需要更新相关文档
 
+### 并行合并与工程效率操作
+
+大规模并行修复/合并时，优先阅读 [工程效率操作手册](engineering-efficiency-playbook.md)（[English](engineering-efficiency-playbook_EN.md)）：火车批次合并、冲突图分组、配置注册守卫、squash 误关 Issue 防线、自迭代验收闭环、单机资源上限与工作区防误删。
+
+**分工**：仓库根目录 `AGENTS.md` 是协作**合同**（硬规则与验证矩阵）；该手册是**操作指南**。二者冲突时以 `AGENTS.md` 为准。
+
 ### CI 自动检查
 
 提交 PR 后，CI 会自动运行以下检查：
