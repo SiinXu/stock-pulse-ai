@@ -1550,7 +1550,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "requirements-ocr.txt + system Tesseract, Agents may call "
             "extract_image_text after a process restart. Image bytes stay local; "
             "redacted, untrusted OCR text enters Agent context and may reach a remote "
-            "model unless LOCAL_ONLY_MODE=true. Supports document_kind targets (screenshot, filing/PDF page, table statement, chart annotation) as untrusted non-authoritative text; bounded raw-text "
+            "model unless LOCAL_ONLY_MODE=true. This phase is bounded raw-text "
             "extraction, not verified table parsing. See docs/agent-ocr-tool_EN.md."
         ),
         "category": "agent",
