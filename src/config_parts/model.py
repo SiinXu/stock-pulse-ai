@@ -125,6 +125,10 @@ class Config:
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
 
+    # === Read-only research API for stratified conclusions (Issue #1143) ===
+    research_api_enabled: bool = False
+    research_api_rate_limit_per_minute: int = 60
+
     # === Reasoning-trace export (Issue #135) — default off ===
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000

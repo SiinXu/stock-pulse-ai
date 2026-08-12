@@ -22640,6 +22640,407 @@
         "title": "ReportVersionRunListResponse",
         "type": "object"
       },
+      "ResearchConclusionBody": {
+        "additionalProperties": false,
+        "description": "Mode-density stratified conclusion body (no secrets, no raw_result dump).",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Label"
+          },
+          "analysis_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Summary"
+          },
+          "confidence_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Reason"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchGapItem"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "omitted_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Omitted Count",
+            "type": "integer"
+          },
+          "one_sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Sentence"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "position_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Advice"
+          },
+          "positive_catalysts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Catalysts"
+          },
+          "report_strata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mode-filtered report strata; null in brief mode",
+            "title": "Report Strata"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "signal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Type"
+          },
+          "time_sensitivity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Sensitivity"
+          },
+          "trend_prediction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend Prediction"
+          },
+          "truncation_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncation Notice"
+          }
+        },
+        "title": "ResearchConclusionBody",
+        "type": "object"
+      },
+      "ResearchConclusionMetadata": {
+        "additionalProperties": false,
+        "description": "Record-level metadata for embed/portal clients.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Best-effort data as-of timestamp from strata facts or record time",
+            "title": "As Of"
+          },
+          "confidence_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Level"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "evidence_counts": {
+            "$ref": "#/components/schemas/ResearchEvidenceCounts"
+          },
+          "evidence_refs": {
+            "description": "Bounded unique evidence reference ids (source_id values)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "minimum": 1.0,
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "report_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Language"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Type"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Name"
+          }
+        },
+        "required": [
+          "record_id",
+          "stock_code"
+        ],
+        "title": "ResearchConclusionMetadata",
+        "type": "object"
+      },
+      "ResearchConclusionResponse": {
+        "additionalProperties": false,
+        "description": "Compact stratified conclusion response for embed/portal use.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ResearchConclusionBody"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ResearchConclusionMetadata"
+          },
+          "mode": {
+            "enum": [
+              "brief",
+              "standard",
+              "research"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "research-conclusion-v1",
+            "default": "research-conclusion-v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "metadata",
+          "conclusion"
+        ],
+        "title": "ResearchConclusionResponse",
+        "type": "object"
+      },
+      "ResearchEvidenceCounts": {
+        "additionalProperties": false,
+        "description": "Counts derived from the mode-filtered strata projection.",
+        "properties": {
+          "evidence_refs": {
+            "default": 0,
+            "description": "Unique source_id / source_ids count",
+            "minimum": 0.0,
+            "title": "Evidence Refs",
+            "type": "integer"
+          },
+          "missing_or_conflicts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Missing Or Conflicts",
+            "type": "integer"
+          },
+          "model_inference": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Model Inference",
+            "type": "integer"
+          },
+          "risks_counter_evidence": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Risks Counter Evidence",
+            "type": "integer"
+          },
+          "verified_facts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Verified Facts",
+            "type": "integer"
+          }
+        },
+        "title": "ResearchEvidenceCounts",
+        "type": "object"
+      },
+      "ResearchGapItem": {
+        "additionalProperties": false,
+        "description": "One missing-data or conflict gap the client can render without full history.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "default": "missing",
+            "enum": [
+              "missing",
+              "conflict"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "ResearchGapItem",
+        "type": "object"
+      },
       "ResearchRequest": {
         "properties": {
           "question": {
@@ -44071,6 +44472,298 @@
         "summary": "List analysis runs for version comparison",
         "tags": [
           "ReportVersionCompare"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions": {
+      "get": {
+        "description": "Returns the newest analysis history row for stock_code as a mode-filtered stratified conclusion. Same governance as GET by record id. Default-off.",
+        "operationId": "getLatestResearchConclusion",
+        "parameters": [
+          {
+            "description": "Stock code",
+            "in": "query",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "description": "Stock code",
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing stock_code or invalid mode"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or no history for stock_code"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get latest stratified research conclusion for a stock code",
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions/{record_id}": {
+      "get": {
+        "description": "Authenticated read-only projection of stratified conclusions (brief / standard / research) plus metadata (as-of, confidence, evidence counts and refs). Default-off via RESEARCH_API_ENABLED; no write methods; reuses session auth, security audit, and sliding-window rate limits on the main API port.",
+        "operationId": "getResearchConclusionByRecordId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid mode or record_id"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or analysis record not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get stratified research conclusion by history record id",
+        "tags": [
+          "Research"
         ]
       }
     },

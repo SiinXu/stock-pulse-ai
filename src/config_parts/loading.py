@@ -1450,6 +1450,16 @@ class _ConfigLoadingMethods:
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
             ),
+            research_api_enabled=parse_env_bool(
+                os.getenv('RESEARCH_API_ENABLED'), default=False
+            ),
+            research_api_rate_limit_per_minute=parse_env_int(
+                os.getenv('RESEARCH_API_RATE_LIMIT_PER_MINUTE'),
+                60,
+                field_name='RESEARCH_API_RATE_LIMIT_PER_MINUTE',
+                minimum=1,
+                maximum=10_000,
+            ),
             reasoning_trace_export_enabled=parse_env_bool(
                 os.getenv('REASONING_TRACE_EXPORT_ENABLED'), default=False
             ),
