@@ -1359,7 +1359,7 @@ class TestDecisionFirstLayeredReading(unittest.TestCase):
         service._get_display_name = lambda r, _lang: r.name
 
         with patch("src.services.report_renderer.get_config", return_value=cfg), patch(
-            "src.notification_parts.rendering.get_config", return_value=cfg
+            "src.notification.get_config", return_value=cfg
         ), patch(
             "src.services.report_renderer.render_plugin_template", return_value=None
         ):
