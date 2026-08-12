@@ -2994,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "複製 Markdown 原始碼",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "複製純文字",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "匯出失敗",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "下載 HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML 匯出目前不可用",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "下載 Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "下載 PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF 匯出目前不可用",
