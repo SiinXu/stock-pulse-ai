@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 240657,
-      "measuredGzipBytes": 240257,
-      "note": "Merged budgets after main sync; maxGzipBytes=240657."
+      "maxGzipBytes": 244107,
+      "measuredGzipBytes": 241690,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "js-entry",
@@ -27,58 +27,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 156819,
-      "measuredGzipBytes": 156119,
-      "note": "Merged budgets after main sync; maxGzipBytes=156819."
+      "maxGzipBytes": 158826,
+      "measuredGzipBytes": 157253,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 150019,
-      "measuredGzipBytes": 149319,
-      "note": "Merged budgets after main sync; maxGzipBytes=150019."
+      "maxGzipBytes": 151925,
+      "measuredGzipBytes": 150420,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 150096,
-      "measuredGzipBytes": 149396,
-      "note": "Merged budgets after main sync; maxGzipBytes=150096."
+      "maxGzipBytes": 151964,
+      "measuredGzipBytes": 150459,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 150019,
-      "measuredGzipBytes": 149319,
-      "note": "Merged budgets after main sync; maxGzipBytes=150019."
+      "maxGzipBytes": 151808,
+      "measuredGzipBytes": 150304,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 145916,
-      "measuredGzipBytes": 145216,
-      "note": "Merged budgets after main sync; maxGzipBytes=145916."
+      "maxGzipBytes": 147678,
+      "measuredGzipBytes": 146215,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 142323,
-      "measuredGzipBytes": 141623,
-      "note": "Merged budgets after main sync; maxGzipBytes=142323."
+      "maxGzipBytes": 144083,
+      "measuredGzipBytes": 142656,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 135930,
-      "measuredGzipBytes": 135230,
-      "note": "Merged budgets after main sync; maxGzipBytes=135930."
+      "maxGzipBytes": 137577,
+      "measuredGzipBytes": 136214,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 136023,
-      "measuredGzipBytes": 135323,
-      "note": "Merged budgets after main sync; maxGzipBytes=136023."
+      "maxGzipBytes": 137662,
+      "measuredGzipBytes": 136299,
+      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "vendor-charts",
