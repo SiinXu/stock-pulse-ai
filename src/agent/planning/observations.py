@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from src.agent.planning.config import (
     MAX_OBSERVATION_ERROR_CODE_CHARS,
+    MAX_PLANNING_TRACE_EVENTS,
     MAX_RESULT_SUMMARY_CHARS,
     MAX_TOOL_NAME_CHARS,
     MAX_TRACE_STEPS,
@@ -253,8 +254,10 @@ class PlanExecutionResult:
         if self.plans:
             payload["plans"] = list(self.plans)[:MAX_TRACE_STEPS]
         if self.trace_events:
-            payload["trace_events"] = list(self.trace_events)[:MAX_TRACE_STEPS]
-            if len(self.trace_events) > MAX_TRACE_STEPS:
+            # Same bound as PlanningTraceRecorder — do not reuse MAX_TRACE_STEPS
+            # (step-observation cap) or reconstruction via metadata silently loses events.
+            payload["trace_events"] = list(self.trace_events)[:MAX_PLANNING_TRACE_EVENTS]
+            if len(self.trace_events) > MAX_PLANNING_TRACE_EVENTS:
                 payload["trace_events_truncated"] = True
         return payload
 

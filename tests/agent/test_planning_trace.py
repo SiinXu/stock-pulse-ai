@@ -293,3 +293,25 @@ def test_metadata_includes_trace_events() -> None:
     assert meta.get("planning_run_id") == result.planning_run_id
     assert meta.get("trace_events")
     assert meta["trace_events"][-1]["kind"] == "terminate"
+
+
+def test_metadata_trace_events_share_recorder_cap() -> None:
+    """Metadata must not silently shrink events with the step-observation cap."""
+    from src.agent.planning.config import MAX_PLANNING_TRACE_EVENTS, MAX_TRACE_STEPS
+
+    assert MAX_PLANNING_TRACE_EVENTS >= MAX_TRACE_STEPS
+    plan, tools = _plan([["get_realtime_quote"], []])
+
+    def invoker(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        return {"ok": True, "summary": "ok"}
+
+    result = execute_plan_loop(
+        plan=plan,
+        tool_invoker=invoker,
+        available_tools=tools,
+        settings=PlanExecutionSettings(max_observation_replans=0, on_step_failure="terminate"),
+    )
+    meta = result.to_metadata()
+    assert meta.get("trace_events") is not None
+    assert len(meta["trace_events"]) == len(result.trace_events)
+    assert len(result.trace_events) <= MAX_PLANNING_TRACE_EVENTS

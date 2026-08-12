@@ -22,6 +22,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+from src.agent.planning.config import MAX_PLANNING_TRACE_EVENTS
 from src.agent.observability import (
     AgentEventType,
     emit_agent_event,
@@ -33,8 +34,8 @@ from src.utils.sanitize import is_sensitive_key, log_safe_exception
 logger = logging.getLogger(__name__)
 
 # Local planning-trace schema version (attrs payload). Aligns with L0 agent events.
+# Event list bound lives in planning.config.MAX_PLANNING_TRACE_EVENTS (single authority).
 PLANNING_TRACE_SCHEMA_VERSION = 1
-MAX_PLANNING_TRACE_EVENTS = 200
 
 # Stable kind names used for reconstruction (mirror #1125 taxonomy).
 PLANNING_TRACE_KINDS = frozenset(
