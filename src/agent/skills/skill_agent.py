@@ -124,12 +124,23 @@ Return **only** a JSON object:
             logger.warning("[SkillAgent:%s] failed to parse opinion JSON", self.skill_id)
             return None
 
+        raw_data = dict(parsed) if isinstance(parsed, dict) else {"raw": parsed}
+        raw_data.setdefault("skill_id", self.skill_id)
+        skill_version = ""
+        if self._skill is not None:
+            skill_version = str(getattr(self._skill, "version", "") or "").strip()
+            content_hash = str(getattr(self._skill, "content_hash", "") or "").strip()
+            if content_hash:
+                raw_data.setdefault("skill_content_hash", content_hash)
+        if skill_version:
+            raw_data.setdefault("skill_version", skill_version)
+
         return AgentOpinion(
             agent_name=self.agent_name,
             signal=parsed.get("signal"),  # None if missing; do not silently default
             confidence=float(parsed.get("confidence", 0.5)),
             reasoning=parsed.get("reasoning", ""),
-            raw_data=parsed,
+            raw_data=raw_data,
         )
 
 

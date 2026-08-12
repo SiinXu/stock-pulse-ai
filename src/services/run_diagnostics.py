@@ -595,6 +595,8 @@ class RunDiagnosticContext:
     llm_attempt_index_by_type: Dict[str, int] = field(default_factory=dict)
     llm_pending_attempt_index_by_key: Dict[str, List[int]] = field(default_factory=dict)
     llm_pending_attempt_index_by_call_type: Dict[str, List[int]] = field(default_factory=dict)
+    # Skill / key-prompt version identity for the active run (issue #249).
+    prompt_artifact_versions: Optional[Dict[str, Any]] = None
 
     def record_provider_run(self, provider_run: ProviderRun) -> None:
         self.provider_runs.append(provider_run)
@@ -817,11 +819,106 @@ class RunDiagnosticContext:
                 "truncated": self.agent_events_dropped_count > 0,
             },
         }
-        return _redact_diagnostic_payload(payload)
+        redacted = _redact_diagnostic_payload(payload)
+        if isinstance(self.prompt_artifact_versions, dict):
+            public = _public_prompt_artifact_versions(self.prompt_artifact_versions)
+            redacted["prompt_artifact_versions"] = public
+            if public.get("prompt_version") is not None:
+                redacted["prompt_version"] = public["prompt_version"]
+            if public.get("skill_versions"):
+                redacted["skill_versions"] = dict(public["skill_versions"])
+        return redacted
 
 
 def get_current_diagnostic_context() -> Optional[RunDiagnosticContext]:
     return _CURRENT_CONTEXT.get()
+
+
+
+def _public_prompt_artifact_versions(trace: Mapping[str, Any]) -> Dict[str, Any]:
+    """Project low-sensitivity version identity safe for diagnostic snapshots.
+
+    Central redaction treats some ``*version*`` keys as sensitive; version
+    labels and content hashes are public run identity, so re-attach them
+    through this allowlisted projector after redaction.
+    """
+    def _text(value: Any, *, maximum: int = 128) -> Optional[str]:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        return text[:maximum]
+
+    skills: List[Dict[str, Any]] = []
+    for item in trace.get("skills") or []:
+        if not isinstance(item, Mapping):
+            continue
+        entry = {
+            "kind": _text(item.get("kind"), maximum=16) or "skill",
+            "artifact_id": _text(item.get("artifact_id")),
+            "version": _text(item.get("version"), maximum=64),
+            "content_hash": _text(item.get("content_hash"), maximum=80),
+            "lifecycle": _text(item.get("lifecycle"), maximum=16) or "active",
+        }
+        if entry["artifact_id"]:
+            skills.append(entry)
+
+    prompts: List[Dict[str, Any]] = []
+    for item in trace.get("prompts") or []:
+        if not isinstance(item, Mapping):
+            continue
+        entry = {
+            "kind": _text(item.get("kind"), maximum=16) or "prompt",
+            "artifact_id": _text(item.get("artifact_id")),
+            "version": _text(item.get("version"), maximum=64),
+            "content_hash": _text(item.get("content_hash"), maximum=80),
+            "lifecycle": _text(item.get("lifecycle"), maximum=16) or "active",
+        }
+        if entry["artifact_id"]:
+            prompts.append(entry)
+
+    active_ids = [
+        str(item).strip()[:128]
+        for item in (trace.get("active_skill_ids") or [])
+        if str(item).strip()
+    ]
+    skill_versions: Dict[str, str] = {}
+    raw_versions = trace.get("skill_versions")
+    if isinstance(raw_versions, Mapping):
+        for key, value in raw_versions.items():
+            kid = _text(key)
+            ver = _text(value, maximum=64)
+            if kid and ver:
+                skill_versions[kid] = ver
+
+    return {
+        "schema_version": _text(trace.get("schema_version"), maximum=16) or "1",
+        "skills": skills,
+        "prompts": prompts,
+        "active_skill_ids": active_ids,
+        "skill_versions": skill_versions,
+        "prompt_version": _text(trace.get("prompt_version"), maximum=64),
+    }
+
+
+def attach_prompt_artifact_versions(trace: Optional[Dict[str, Any]]) -> bool:
+    """Attach Skill/prompt version identity to the active diagnostic context."""
+    if not isinstance(trace, dict):
+        return False
+    context = get_current_diagnostic_context()
+    if context is None:
+        return False
+    try:
+        context.prompt_artifact_versions = _public_prompt_artifact_versions(trace)
+    except Exception as exc:  # broad-exception: optional_metadata - diagnostics must not raise.
+        log_safe_exception(
+            logger,
+            "Attach prompt artifact versions failed",
+            exc,
+            error_code="prompt_artifact_versions_attach_failed",
+            level=logging.DEBUG,
+        )
+        return False
+    return True
 
 
 def activate_run_diagnostic_context(
