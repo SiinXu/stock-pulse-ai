@@ -414,6 +414,8 @@ const ChatComposerStory = () => {
         contextCompressionSaving={false}
         contextCompressionError={null}
         onContextCompressionChange={() => undefined}
+        whatIfDraft={DEFAULT_WHAT_IF_DRAFT}
+        onWhatIfChange={() => undefined}
         skills={FIXTURE_SKILLS}
         selectedSkillIds={selectedSkillIds}
         selectedSkillIdSet={new Set(selectedSkillIds)}
