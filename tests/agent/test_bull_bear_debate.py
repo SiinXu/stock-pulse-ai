@@ -284,3 +284,53 @@ def test_decision_signal_payload_includes_debate_metadata():
     metadata = payload.get("metadata") or {}
     assert metadata.get("debate_summary") == "Debate summary for signal"
     assert metadata.get("debate_rounds") == 1
+
+
+def test_analysis_service_applies_debate_request_overrides(monkeypatch):
+    """Per-request enable_debate/debate_max_rounds must mutate a config copy only."""
+    import copy
+    from types import SimpleNamespace
+    from src.services.analysis_service import AnalysisService
+
+    calls = {}
+
+    class _FakePipeline:
+        def __init__(self, config=None, **kwargs):
+            calls["config"] = config
+            calls["kwargs"] = kwargs
+
+        def process_single_stock(self, **kwargs):
+            return None
+
+    shared = SimpleNamespace(
+        debate_enabled=False,
+        debate_max_rounds=2,
+        report_language="zh",
+        decision_memory_enabled=False,
+        validate=lambda: [],
+    )
+    # analysis_service imports get_config inside method
+    monkeypatch.setattr("src.config.get_config", lambda: shared)
+    monkeypatch.setattr("src.core.pipeline.StockAnalysisPipeline", _FakePipeline)
+
+    service = AnalysisService()
+    # Force early return path by making pipeline return None and swallow errors
+    try:
+        service.analyze_stock(
+            stock_code="600519",
+            enable_debate=True,
+            debate_max_rounds=3,
+            send_notification=False,
+        )
+    except Exception:
+        pass
+
+    # Shared singleton must remain unchanged
+    assert shared.debate_enabled is False
+    assert shared.debate_max_rounds == 2
+    # Pipeline received a mutated copy
+    cfg = calls.get("config")
+    assert cfg is not None
+    assert cfg is not shared
+    assert cfg.debate_enabled is True
+    assert cfg.debate_max_rounds == 3

@@ -1375,6 +1375,45 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.DEBATE_ENABLED': {
+    title: '结构化多空辩论',
+    summary: '可选的 Decision 前 Bull vs Bear 辩论阶段（Native Multi）。',
+    usage: '默认关闭。需要在最终产物中展示多方立场与交锋点时开启。',
+    valueNotes: [
+      '关闭时保持现有单程分析行为。',
+      '仅非 Chat 的 Native Multi 运行会进入该阶段。',
+    ],
+    impact: [
+      '最多增加 2*轮数+1 次辩论 LLM 调用，并写入 dashboard.bull_bear_debate。',
+    ],
+    notes: [
+      '辩论合成非权威结论，DecisionAgent 仍为最终决策权威；失败也会写入产物记录。',
+    ],
+  },
+  'settings.agent.DEBATE_MAX_ROUNDS': {
+    title: '辩论最大轮数',
+    summary: '启用辩论时的最大轮数（1–3）。',
+    usage: '仅在剩余墙钟与成本预算可承受多方+空方+合成调用时提高。',
+    valueNotes: ['默认 2，限制在 1–3。'],
+    impact: ['大约按 2*轮数+1 缩放辩论 LLM 调用次数。'],
+    notes: ['请求级 debate_max_rounds 可覆盖该值。'],
+  },
+  'settings.agent.DEBATE_TEMPERATURE': {
+    title: '辩论温度',
+    summary: '辩论 LLM 采样温度。',
+    usage: '略提高可增加多空论点多样性；保持中等更利于稳定。',
+    valueNotes: ['默认 0.4，范围 0–1.5。'],
+    impact: ['仅影响立场多样性，不改变阶段开关。'],
+    notes: ['应用于辩论 call_text 调用。'],
+  },
+  'settings.agent.DEBATE_MODEL': {
+    title: '辩论模型',
+    summary: '可选的辩论模型名（诊断记录）。',
+    usage: '留空则使用 Agent 主 LiteLLM 路由。',
+    valueNotes: ['默认空，使用共享 Agent 路由。'],
+    impact: ['当前为配置/诊断表面；实际补全仍走 Agent 主栈。'],
+    notes: ['预留给后续绑定辩论专用模型字符串的部署。'],
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',

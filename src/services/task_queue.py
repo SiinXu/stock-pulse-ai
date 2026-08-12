@@ -313,6 +313,8 @@ class AnalysisTaskCoalescingContract:
     skills: Any
     report_language: Optional[str]
     use_memory: Optional[bool]
+    enable_debate: Optional[bool]
+    debate_max_rounds: Optional[int]
     portfolio_context: Any
     query_source: str
     context_bound: bool
@@ -331,6 +333,8 @@ class AnalysisTaskCoalescingContract:
             return None
         raw_skills = metadata.get("skills")
         raw_use_memory = metadata.get("use_memory")
+        raw_enable_debate = metadata.get("enable_debate")
+        raw_debate_max_rounds = metadata.get("debate_max_rounds")
         raw_report_language = metadata.get("report_language")
         return cls(
             stock_code=stock_code,
@@ -351,6 +355,14 @@ class AnalysisTaskCoalescingContract:
             ),
             use_memory=(
                 bool(raw_use_memory) if raw_use_memory is not None else None
+            ),
+            enable_debate=(
+                bool(raw_enable_debate) if raw_enable_debate is not None else None
+            ),
+            debate_max_rounds=(
+                int(raw_debate_max_rounds)
+                if raw_debate_max_rounds is not None and str(raw_debate_max_rounds).strip() != ""
+                else None
             ),
             portfolio_context=deep_freeze(metadata.get("portfolio_context")),
             query_source=str(metadata.get("query_source") or "api"),
@@ -801,6 +813,8 @@ class AnalysisTaskQueue:
                 skills=copy.deepcopy(metadata.get("skills")),
                 report_language=metadata.get("report_language"),
                 use_memory=metadata.get("use_memory"),
+            enable_debate=metadata.get("enable_debate"),
+            debate_max_rounds=metadata.get("debate_max_rounds"),
                 request_context=None,
                 strict_skill_selection=bool(
                     metadata.get("strict_skill_selection", False)
@@ -1550,6 +1564,8 @@ class AnalysisTaskQueue:
         skills: Optional[List[str]],
         report_language: Optional[str],
         use_memory: Optional[bool] = None,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         strict_skill_selection: bool = False,
     ) -> TaskCommand:
@@ -1568,6 +1584,8 @@ class AnalysisTaskQueue:
             "strict_skill_selection": bool(strict_skill_selection),
             "report_language": report_language,
             "use_memory": use_memory,
+            "enable_debate": enable_debate,
+            "debate_max_rounds": debate_max_rounds,
             "context_bound": request_context is not None,
             "message": "任务已加入队列",
             "message_code": "task.queued",
@@ -1590,6 +1608,8 @@ class AnalysisTaskQueue:
                 strict_skill_selection=strict_skill_selection,
                 report_language=report_language,
                 use_memory=use_memory,
+                enable_debate=enable_debate,
+                debate_max_rounds=debate_max_rounds,
                 request_context=request_context,
             )
 
@@ -1623,6 +1643,8 @@ class AnalysisTaskQueue:
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
         strict_skill_selection: bool = False,
@@ -1665,6 +1687,8 @@ class AnalysisTaskQueue:
             strict_skill_selection=strict_skill_selection,
             report_language=report_language,
             use_memory=use_memory,
+            enable_debate=enable_debate,
+            debate_max_rounds=debate_max_rounds,
             request_context=request_context,
         )
         if duplicates:
@@ -1686,6 +1710,8 @@ class AnalysisTaskQueue:
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
         strict_skill_selection: bool = False,
@@ -1725,6 +1751,8 @@ class AnalysisTaskQueue:
                 strict_skill_selection=strict_skill_selection,
                 report_language=report_language,
                 use_memory=use_memory,
+                enable_debate=enable_debate,
+                debate_max_rounds=debate_max_rounds,
                 request_context=request_context,
             )
             for stock_code in canonical_codes
@@ -2179,6 +2207,8 @@ class AnalysisTaskQueue:
             portfolio_context=copy.deepcopy(metadata.get("portfolio_context")),
             report_language=metadata.get("report_language"),
             use_memory=metadata.get("use_memory"),
+            enable_debate=metadata.get("enable_debate"),
+            debate_max_rounds=metadata.get("debate_max_rounds"),
             request_context=request_context,
         )
         if result is None:

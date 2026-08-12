@@ -30,6 +30,8 @@ class AnalysisSubmissionCommand:
     report_language: str | None = None
     skills: tuple[str, ...] | None = None
     use_memory: bool | None = None
+    enable_debate: bool | None = None
+    debate_max_rounds: int | None = None
 
 
 @dataclass(frozen=True)
@@ -113,6 +115,10 @@ class AnalysisSubmissionService:
             submit_kwargs["skills"] = list(command.skills)
         if command.use_memory is not None:
             submit_kwargs["use_memory"] = command.use_memory
+        if command.enable_debate is not None:
+            submit_kwargs["enable_debate"] = command.enable_debate
+        if command.debate_max_rounds is not None:
+            submit_kwargs["debate_max_rounds"] = command.debate_max_rounds
 
         correlations = {
             stock_code: SecurityAuditService.new_correlation_id()
@@ -193,6 +199,8 @@ def build_submission_command(
     report_language: str | None = None,
     skills: Sequence[str] | None = None,
     use_memory: bool | None = None,
+    enable_debate: bool | None = None,
+    debate_max_rounds: int | None = None,
 ) -> AnalysisSubmissionCommand:
     """Snapshot caller-owned values before handing them to the queue."""
     return AnalysisSubmissionCommand(
@@ -207,4 +215,6 @@ def build_submission_command(
         report_language=report_language,
         skills=tuple(skills) if skills is not None else None,
         use_memory=use_memory,
+        enable_debate=enable_debate,
+        debate_max_rounds=debate_max_rounds,
     )
