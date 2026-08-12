@@ -1,9 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-/** Stable query key for Analysis Workbench dashboard data refresh schedule. */
+/** Stable query key root for Analysis Workbench dashboard data refresh schedule. */
 export const DASHBOARD_DATA_REFRESH_QUERY_KEY = ['dashboard', 'data-refresh'] as const;
 
 /** Matches the previous hand-rolled setInterval cadence in useDashboardLifecycle. */
@@ -25,14 +25,21 @@ type UseDashboardDataRefreshQueryOptions = {
   onInitialStockBarSettled: () => void;
 };
 
+function createMountScheduleId(): string {
+  return `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /**
  * TanStack Query schedule for Analysis Workbench dashboard data refresh.
  *
  * Behavior parity with the previous useDashboardLifecycle effects:
- * - First successful query run **on this mount** uses non-silent history load +
+ * - First successful query run **per mount** uses non-silent history load +
  *   stock-bar load + active-task refresh (parallel fire; stock-bar settlement
- *   tracked). Mount-local ref — not Query cache — decides first vs silent so a
- *   remount still runs the non-silent initial path even if cache retains `{ok}`.
+ *   tracked). The query key includes a mount-scoped id so remount always misses
+ *   cache and re-runs the non-silent path (same as mount useEffect).
+ * - First vs silent is decided by Query cache for **this mount key only**:
+ *   `previous === undefined` → initial; otherwise silent. Aborted first attempts
+ *   leave cache empty, so retries stay on the initial path.
  * - Later interval ticks and visibility restores use silent history refresh +
  *   stock-bar refresh + active-task refresh + optional dashboard callback.
  * - Interval: 30s; visibility: explicit `visibilitychange` listener;
@@ -54,8 +61,15 @@ export function useDashboardDataRefreshQuery({
   onInitialStockBarSettled,
 }: UseDashboardDataRefreshQueryOptions) {
   const queryClient = useQueryClient();
-  /** Mount-scoped: false until this hook instance has started its initial load. */
-  const hasStartedInitialLoadRef = useRef(false);
+  const mountScheduleIdRef = useRef<string | null>(null);
+  if (mountScheduleIdRef.current === null) {
+    mountScheduleIdRef.current = createMountScheduleId();
+  }
+  const queryKey = useMemo(
+    () => [...DASHBOARD_DATA_REFRESH_QUERY_KEY, mountScheduleIdRef.current] as const,
+    [],
+  );
+
   const loadersRef = useRef({
     loadInitialHistory,
     refreshHistory,
@@ -76,12 +90,12 @@ export function useDashboardDataRefreshQuery({
   };
 
   const query = useQuery({
-    queryKey: DASHBOARD_DATA_REFRESH_QUERY_KEY,
+    queryKey,
     enabled,
-    queryFn: async (): Promise<DashboardDataRefreshQueryResult> => {
+    queryFn: async ({ client }): Promise<DashboardDataRefreshQueryResult> => {
       const loaders = loadersRef.current;
-      if (!hasStartedInitialLoadRef.current) {
-        hasStartedInitialLoadRef.current = true;
+      const previous = client.getQueryData<DashboardDataRefreshQueryResult>(queryKey);
+      if (previous === undefined) {
         void loaders.loadInitialHistory();
         void loaders.refreshActiveTasks();
         try {
@@ -109,6 +123,7 @@ export function useDashboardDataRefreshQuery({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        // Partial key match refreshes the current mount schedule entry.
         void queryClient.refetchQueries({ queryKey: DASHBOARD_DATA_REFRESH_QUERY_KEY });
       }
     };

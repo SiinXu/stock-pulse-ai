@@ -109,16 +109,13 @@ describe('useDashboardLifecycle', () => {
   });
 
 
-  it('remount still runs non-silent initial load even when Query cache has data', async () => {
+  it('remount still runs non-silent initial load after a prior mount completed', async () => {
     const sharedClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false, refetchOnWindowFocus: false },
         mutations: { retry: false },
       },
     });
-    // Seed cache as if a previous mount already completed successfully.
-    sharedClient.setQueryData(['dashboard', 'data-refresh'], { ok: true });
-
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={sharedClient}>{children}</QueryClientProvider>
     );
@@ -126,26 +123,30 @@ describe('useDashboardLifecycle', () => {
     const loadInitialHistory = vi.fn().mockResolvedValue(undefined);
     const refreshHistory = vi.fn().mockResolvedValue(undefined);
     const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
+    const options = {
+      loadInitialHistory,
+      refreshHistory,
+      refreshActiveTasks,
+      syncTaskCreated: vi.fn(),
+      syncTaskUpdated: vi.fn(),
+      syncTaskFailed: vi.fn(),
+      removeTask: vi.fn(),
+      ...defaultMocks,
+    };
 
-    renderHook(() =>
-      useDashboardLifecycle({
-        loadInitialHistory,
-        refreshHistory,
-        refreshActiveTasks,
-        syncTaskCreated: vi.fn(),
-        syncTaskUpdated: vi.fn(),
-        syncTaskFailed: vi.fn(),
-        removeTask: vi.fn(),
-        ...defaultMocks,
-      }),
-      { wrapper },
-    );
-
+    const first = renderHook(() => useDashboardLifecycle(options), { wrapper });
     await flushQueryMicrotasks();
-    // Parity with mount useEffect: remount must use non-silent initial path.
     expect(loadInitialHistory).toHaveBeenCalledTimes(1);
     expect(refreshHistory).not.toHaveBeenCalled();
-    expect(refreshActiveTasks).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    // New mount must re-run non-silent initial load (mount useEffect parity),
+    // not silent-refresh solely because a prior mount left Query cache warm.
+    renderHook(() => useDashboardLifecycle(options), { wrapper });
+    await flushQueryMicrotasks();
+    expect(loadInitialHistory).toHaveBeenCalledTimes(2);
+    expect(refreshHistory).not.toHaveBeenCalled();
+    expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
   });
 
   it('cleans pending task removal timers on unmount', () => {
