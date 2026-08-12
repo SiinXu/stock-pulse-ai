@@ -674,7 +674,7 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False, "is_required": False, "is_editable": True,
         "default_value": "", "options": [], "validation": {"maxLength": 256},
         "display_order": 48, "help_key": "settings.system.TASK_ROUTING_PIN_REPORT",
-        "examples": ["TASK_ROUTING_PIN_REPORT=deepseek/deepseek-v4-pro"], "docs": [], "warning_codes": [],
+        "examples": ["TASK_ROUTING_PIN_REPORT=deepseek/deepseek-v4-pro"], "docs": [{"label": "Capability inventory", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-inventory.md"}], "warning_codes": [],
     },
     "TASK_ROUTING_PIN_AGENT": {
         "title": "Task Route Pin (Agent)",
@@ -683,7 +683,7 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False, "is_required": False, "is_editable": True,
         "default_value": "", "options": [], "validation": {"maxLength": 256},
         "display_order": 49, "help_key": "settings.system.TASK_ROUTING_PIN_AGENT",
-        "examples": [], "docs": [], "warning_codes": [],
+        "examples": ["TASK_ROUTING_PIN_AGENT=gemini/gemini-3.1-pro-preview"], "docs": [{"label": "Capability inventory", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-inventory.md"}], "warning_codes": [],
     },
     "TASK_ROUTING_PIN_VISION": {
         "title": "Task Route Pin (Vision)",
@@ -692,7 +692,7 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False, "is_required": False, "is_editable": True,
         "default_value": "", "options": [], "validation": {"maxLength": 256},
         "display_order": 50, "help_key": "settings.system.TASK_ROUTING_PIN_VISION",
-        "examples": [], "docs": [], "warning_codes": [],
+        "examples": ["TASK_ROUTING_PIN_VISION=openai/gpt-5.4-mini"], "docs": [{"label": "Capability inventory", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-inventory.md"}], "warning_codes": [],
     },
     "TASK_ROUTING_PIN_MARKET_REVIEW": {
         "title": "Task Route Pin (Market Review)",
@@ -701,7 +701,7 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False, "is_required": False, "is_editable": True,
         "default_value": "", "options": [], "validation": {"maxLength": 256},
         "display_order": 51, "help_key": "settings.system.TASK_ROUTING_PIN_MARKET_REVIEW",
-        "examples": [], "docs": [], "warning_codes": [],
+        "examples": ["TASK_ROUTING_PIN_MARKET_REVIEW=deepseek/deepseek-v4-pro"], "docs": [{"label": "Capability inventory", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-inventory.md"}], "warning_codes": [],
     },
     "TASK_ROUTING_PIN_CHEAP_SCAN": {
         "title": "Task Route Pin (Cheap Scan)",
@@ -710,7 +710,7 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False, "is_required": False, "is_editable": True,
         "default_value": "", "options": [], "validation": {"maxLength": 256},
         "display_order": 52, "help_key": "settings.system.TASK_ROUTING_PIN_CHEAP_SCAN",
-        "examples": [], "docs": [], "warning_codes": [],
+        "examples": ["TASK_ROUTING_PIN_CHEAP_SCAN=ollama/qwen3:8b"], "docs": [{"label": "Capability inventory", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-inventory.md"}], "warning_codes": [],
     },
     "TASK_ROUTING_PIN_DEEP_REASONING": {
         "title": "Task Route Pin (Deep Reasoning)",
@@ -719,7 +719,7 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False, "is_required": False, "is_editable": True,
         "default_value": "", "options": [], "validation": {"maxLength": 256},
         "display_order": 53, "help_key": "settings.system.TASK_ROUTING_PIN_DEEP_REASONING",
-        "examples": [], "docs": [], "warning_codes": [],
+        "examples": ["TASK_ROUTING_PIN_DEEP_REASONING=deepseek/deepseek-v4-pro"], "docs": [{"label": "Capability inventory", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-inventory.md"}], "warning_codes": [],
     },
     "TASK_ROUTING_PIN_CODING": {
         "title": "Task Route Pin (Coding)",
@@ -728,7 +728,7 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False, "is_required": False, "is_editable": True,
         "default_value": "", "options": [], "validation": {"maxLength": 256},
         "display_order": 54, "help_key": "settings.system.TASK_ROUTING_PIN_CODING",
-        "examples": [], "docs": [], "warning_codes": [],
+        "examples": ["TASK_ROUTING_PIN_CODING=deepseek/deepseek-v4-pro"], "docs": [{"label": "Capability inventory", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-inventory.md"}], "warning_codes": [],
     },
     "TRUST_X_FORWARDED_FOR": {
 
