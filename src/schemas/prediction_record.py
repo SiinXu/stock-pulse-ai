@@ -383,12 +383,22 @@ def build_no_verifiable_claim_record(
 
     This is the only supported path for unparseable / prose-only outputs.
     Callers must not synthesize directional or bucket claims from narrative text.
+
+    Naive ``created_at`` / ``resolve_after`` values are treated as UTC so the
+    helper stays usable for offline fixtures without inventing claim content.
     """
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    else:
+        created_at = created_at.astimezone(timezone.utc)
+
     if resolve_after is None:
-        if created_at.tzinfo is None:
-            resolve_after = created_at.replace(tzinfo=timezone.utc)
-        else:
-            resolve_after = created_at
+        resolve_after = created_at
+    elif resolve_after.tzinfo is None:
+        resolve_after = resolve_after.replace(tzinfo=timezone.utc)
+    else:
+        resolve_after = resolve_after.astimezone(timezone.utc)
+
     return PredictionRecord(
         prediction_id=prediction_id,
         run_id=run_id,

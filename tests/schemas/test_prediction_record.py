@@ -168,6 +168,20 @@ class TestNoVerifiableClaim:
         assert rec.no_verifiable_reason == "prose_only"
         assert rec.is_verifiable() is False
 
+    def test_builder_treats_naive_datetimes_as_utc(self) -> None:
+        rec = build_no_verifiable_claim_record(
+            prediction_id="pred-u-naive",
+            run_id="run-u-naive",
+            symbol="AAPL",
+            created_at=datetime(2026, 3, 15, 8, 0, 0),
+            as_of=AS_OF,
+            reason="unparseable_output",
+        )
+        assert rec.created_at.tzinfo == UTC
+        assert rec.resolve_after.tzinfo == UTC
+        assert rec.created_at.hour == 8
+        assert rec.is_verifiable() is False
+
     def test_prose_notes_are_not_claims(self) -> None:
         rec = build_no_verifiable_claim_record(
             prediction_id="pred-u2",
