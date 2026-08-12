@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Changed] Workspace chrome converges IconButton variants (Home refresh, notification bell, analysis history), replaces non-semantic popper elevation with shared tokens, and migrates Approvals proposal cards to Surface interactive (Refs #877, #878).
 - [Changed] Settings section chrome adopts density pad utilities, drops non-interactive card elevation shadows, and classifies Kronos/Generation Backend refresh as IconButton tools (Refs #877, #878).
 - [Added] Shared Web density tokens (`--density-*`), structural density utilities, semantic overlay elevation tokens, and a CI density contract guard; foundation Surface/PageHeader/Toolbar/Section/Modal/Drawer/Sheet/ConfirmDialog consume them (Refs #877, #878).
 - [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
