@@ -84,7 +84,12 @@ _MAX_TOOL_ARGUMENT_INSPECTION_NODES = 512
 _MAX_TOOL_CACHE_TEXT_CHARS = 16_384
 _MAX_UNTRUSTED_DOCUMENT_ARGUMENT_CHARS = 220_000
 _CACHE_VALUE_UNAVAILABLE = object()
-_UNTRUSTED_DOCUMENT_TOOL_NAMES = frozenset({"parse_earnings_transcript"})
+_UNTRUSTED_DOCUMENT_TOOL_NAMES = frozenset(
+    {
+        "parse_earnings_transcript",
+        "extract_image_text",
+    }
+)
 
 
 @dataclass
@@ -226,12 +231,19 @@ def _document_safe_result(tool_name: str, result: Any) -> Any:
     if not isinstance(parsed, dict):
         return {"result_redacted": True}
     source = parsed.get("source") if isinstance(parsed.get("source"), dict) else {}
+    content = parsed.get("content") if isinstance(parsed.get("content"), dict) else {}
+    text_char_count = parsed.get("text_char_count")
+    if text_char_count is None:
+        text_char_count = content.get("original_char_count")
+    if text_char_count is None and isinstance(parsed.get("text"), str):
+        text_char_count = len(parsed["text"])
     return {
         "schema_version": parsed.get("schema_version"),
         "status": parsed.get("status"),
         "reason_code": parsed.get("reason_code"),
-        "content_sha256": source.get("content_sha256"),
-        "text_char_count": parsed.get("text_char_count"),
+        "document_kind": parsed.get("document_kind") or source.get("document_kind"),
+        "content_sha256": source.get("content_sha256") or source.get("sha256"),
+        "text_char_count": text_char_count,
         "result_redacted": True,
     }
 

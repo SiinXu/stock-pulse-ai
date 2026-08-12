@@ -20,6 +20,7 @@ from src.services.ocr_extraction_service import (
     OCR_SCHEMA_VERSION,
     OcrExtractionService,
     assess_ocr_dependencies,
+    normalize_ocr_document_kind,
     normalize_ocr_langs,
 )
 
@@ -335,3 +336,85 @@ def test_real_tesseract_english_fixture_when_available(tmp_path: Path) -> None:
     if payload["status"] == "available":
         joined = payload["text"].upper()
         assert "AAPL" in joined or "600519" in joined or "STATEMENT" in joined
+
+
+def test_normalize_document_kind_defaults() -> None:
+    assert normalize_ocr_document_kind(None) == "screenshot"
+    assert normalize_ocr_document_kind("table_statement") == "table_statement"
+    assert normalize_ocr_document_kind("FILING-PAGE") == "filing_page"
+    assert normalize_ocr_document_kind("not-a-kind") == "screenshot"
+
+
+def test_document_kinds_carry_untrusted_non_decision_envelope(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    cases = [
+        ("sample_statement_en.png", "screenshot", "AAPL screenshot text"),
+        ("sample_filing_page.png", "filing_page", "Item 1A Risk Factors EXMP"),
+        ("sample_table_statement.png", "table_statement", "AAPL  120  198.50"),
+        ("sample_chart_annotation.png", "chart_annotation", "Support 175 Resistance 210"),
+        ("sample_pdf_page.pdf", "pdf_page", "SEC Form risk factors EXMP"),
+    ]
+    for fixture_name, kind, text in cases:
+        (root / fixture_name).write_bytes((FIXTURES / fixture_name).read_bytes())
+        payload = OcrExtractionService(
+            file_root=str(root),
+            engine=lambda *_a, **_k: text,
+        ).extract_path(fixture_name, document_kind=kind)
+        assert payload["status"] == "available", kind
+        assert payload["document_kind"] == kind
+        assert payload["schema_version"] == OCR_SCHEMA_VERSION
+        assert payload["trust"]["classification"] == "untrusted_user_document"
+        assert payload["trust"]["authoritative_for_decisions"] is False
+        assert payload["trust"]["may_authorize_decisions"] is False
+        assert payload["content"]["decision_authority"] is False
+        assert payload["structure"]["verified"] is False
+        assert payload["structure"]["decision_authority"] is False
+        if kind == "table_statement":
+            assert payload["structure"]["status"] == "unverified_candidates"
+            assert payload["structure"]["row_count"] >= 1
+        if kind == "chart_annotation":
+            assert payload["structure"]["not_chart_semantics"] is True
+        if kind == "pdf_page":
+            assert payload["source"]["container_mime_type"] == "application/pdf"
+            assert payload["source"]["pdf_page_index"] == 0
+
+
+def test_text_layer_pdf_without_embedded_image_degrades_explicitly(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    multi = Path(__file__).resolve().parents[1] / "fixtures" / "multimodal" / "sample_financial_report.pdf"
+    (root / "text_only.pdf").write_bytes(multi.read_bytes())
+    called = False
+
+    def engine(*_args) -> str:
+        nonlocal called
+        called = True
+        return "should-not-run"
+
+    payload = OcrExtractionService(file_root=str(root), engine=engine).extract_path(
+        "text_only.pdf",
+        document_kind="pdf_page",
+    )
+    assert payload["status"] == "unavailable"
+    assert payload["reason_code"] == "pdf_no_embedded_image"
+    assert called is False
+    assert payload["trust"]["authoritative_for_decisions"] is False
+
+
+def test_malformed_pdf_is_unavailable(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "bad.pdf").write_bytes(b"%PDF-not-really")
+    payload = OcrExtractionService(
+        file_root=str(root),
+        engine=lambda *_a, **_k: "x",
+    ).extract_path("bad.pdf", document_kind="pdf_page")
+    assert payload["status"] == "unavailable"
+    assert payload["reason_code"] in {
+        "malformed_pdf",
+        "pdf_empty",
+        "pdf_image_extract_failed",
+        "pdf_no_embedded_image",
+    }
+
