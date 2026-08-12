@@ -9,6 +9,7 @@ import json
 import math
 import re
 import threading
+import weakref
 from collections.abc import Callable
 
 from src.agent.tool_surface import validate_tool_parameter_value
@@ -312,14 +313,13 @@ def validate_agent_tool_definition(implementation: object) -> bool:
     return True
 
 
-_DEFERRED_BACKENDS: list[object] = []
+_DEFERRED_BACKENDS: weakref.WeakSet[object] = weakref.WeakSet()
 _DEFERRED_BACKENDS_LOCK = threading.RLock()
 
 
 def _register_deferred_backend(backend: object) -> None:
     with _DEFERRED_BACKENDS_LOCK:
-        if backend not in _DEFERRED_BACKENDS:
-            _DEFERRED_BACKENDS.append(backend)
+        _DEFERRED_BACKENDS.add(backend)
 
 
 def flush_deferred_agent_tool_registrations(registry: ToolRegistry) -> None:
@@ -346,6 +346,8 @@ class AgentToolRegistrationBackend:
     def __init__(
         self,
         registry: ToolRegistry | Callable[[], ToolRegistry],
+        *,
+        defer_until_process_registry: bool = False,
     ) -> None:
         if not isinstance(registry, ToolRegistry) and not callable(registry):
             raise TypeError("agent tool registry must be a ToolRegistry or provider")
@@ -355,7 +357,12 @@ class AgentToolRegistrationBackend:
         ] = {}
         self._deferred: list[tuple[str, ToolDefinition]] = []
         self._lock = threading.RLock()
-        if callable(registry):
+        self._defer_until_process_registry = defer_until_process_registry
+        if defer_until_process_registry:
+            if not callable(registry):
+                raise TypeError(
+                    "deferred agent tool registry must be provided as a callable"
+                )
             _register_deferred_backend(self)
 
     def _registry(self) -> ToolRegistry:
@@ -372,12 +379,17 @@ class AgentToolRegistrationBackend:
         if isinstance(candidate, ToolRegistry):
             return candidate
         if callable(candidate):
+            if not self._defer_until_process_registry:
+                return self._registry()
             from src.agent.runtime_assembly import peek_process_tool_registry
 
             peeked = peek_process_tool_registry()
-            if peeked is not None and isinstance(peeked, ToolRegistry):
-                return peeked
-            return None
+            if peeked is None:
+                return None
+            # The peek is only the no-construction readiness signal. Resolve
+            # through the injected provider once a process registry exists so
+            # test/application overrides keep their exact-registry contract.
+            return self._registry()
         return None
 
     def contains(self, registration_id: str) -> bool:
@@ -464,13 +476,18 @@ class AgentToolRegistrationBackend:
 
 def build_agent_tool_extension_contract(
     registry: ToolRegistry | Callable[[], ToolRegistry],
+    *,
+    defer_until_process_registry: bool = False,
 ) -> ExtensionContract:
     """Build the Agent Tool contract bound to one native registry."""
 
     return ExtensionContract(
         identity_resolver=lambda implementation: implementation.name,
         validator=validate_agent_tool_definition,
-        backend=AgentToolRegistrationBackend(registry),
+        backend=AgentToolRegistrationBackend(
+            registry,
+            defer_until_process_registry=defer_until_process_registry,
+        ),
     )
 
 
