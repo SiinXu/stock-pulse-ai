@@ -1209,7 +1209,10 @@ class GeminiAnalyzer:
             if isinstance(result, tuple):
                 text, model_used, usage = result
                 if should_persist_usage_telemetry(usage):
-                    persist_llm_usage(usage, model_used, call_type="market_review")
+                    persist_llm_usage(
+                        usage, model_used, call_type="market_review",
+                        stage="market_review", call_success=True,
+                    )
                 return text
             return result
         except GenerationError:

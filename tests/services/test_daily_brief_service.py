@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from src.services.daily_brief_service import (
     DAILY_BRIEF_HISTORY_CODE,
     DAILY_BRIEF_REPORT_TYPE,
+    MAX_DAILY_BRIEF_MARKDOWN_CHARS,
     DailyBriefService,
     resolve_daily_brief_config,
 )
@@ -75,9 +76,22 @@ class _OutcomeService:
 
     @staticmethod
     def aggregate_outcome_rows(rows: List[Any]) -> Dict[str, Any]:
-        from src.services.decision_signal_outcome_service import DecisionSignalOutcomeService
-
-        return DecisionSignalOutcomeService.aggregate_outcome_rows(rows)
+        hit = sum(1 for row in rows if getattr(row, "outcome", None) == "hit")
+        miss = sum(1 for row in rows if getattr(row, "outcome", None) == "miss")
+        decided = hit + miss
+        returns = []
+        for row in rows:
+            try:
+                returns.append(float(getattr(row, "stock_return_pct")))
+            except (TypeError, ValueError):
+                pass
+        return {
+            "hit": hit,
+            "miss": miss,
+            "completed": len(rows),
+            "hit_rate_pct": round(hit / decided * 100, 1) if decided else None,
+            "avg_stock_return_pct": round(sum(returns) / len(returns), 2) if returns else None,
+        }
 
 
 class _Notifier:
@@ -96,6 +110,19 @@ class _Notifier:
     def send(self, content: str, email_send_to_all: bool = False, route_type: str = "report") -> bool:
         self.sent.append(content)
         return True
+
+    def send_with_results(self, content: str, **_kwargs: Any) -> SimpleNamespace:
+        self.sent.append(content)
+        return SimpleNamespace(status="sent", success=True)
+
+
+
+def _empty_personal_deps():
+    return {
+        "portfolio_repository": type("P", (), {"list_cached_positions": staticmethod(lambda **_k: [])})(),
+        "todays_focus_service": type("F", (), {"build_focus": staticmethod(lambda **_k: {"status":"empty","items":[],"item_count":0,"empty_message":None,"sources_used":[],"degraded_sources":[]})})(),
+        "event_research_brief_service": type("E", (), {"build_briefs_for_universe": staticmethod(lambda **_k: [])})(),
+    }
 
 
 def _fixed_clock(local_iso: str = "2026-08-06T09:00:00+08:00"):
@@ -153,6 +180,8 @@ def test_no_history_accuracy_is_explicit_and_template_honest():
         }
     )
     service = DailyBriefService(
+        **_empty_personal_deps(),
+        
         analysis_repo=analysis_repo,
         decision_outcome_service=outcome_service,
         decision_signal_repo=signal_repo,
@@ -222,6 +251,8 @@ def test_rich_history_publishes_hit_rates_and_notables():
     }
     config = _base_config(daily_brief_min_samples=3, report_language="en")
     service = DailyBriefService(
+        **_empty_personal_deps(),
+        
         analysis_repo=SimpleNamespace(get_list=lambda **_kwargs: analyses),
         decision_outcome_service=_OutcomeService(outcomes),
         decision_signal_repo=SimpleNamespace(get=lambda sid: signals.get(sid)),
@@ -288,7 +319,9 @@ def test_rich_history_publishes_hit_rates_and_notables():
 
 def test_run_skips_when_disabled_and_notify_failure_does_not_abort():
     config = _base_config(daily_brief_enabled=False)
-    service = DailyBriefService(config_provider=lambda: config, clock=_fixed_clock())
+    service = DailyBriefService(
+        **_empty_personal_deps(),
+        config_provider=lambda: config, clock=_fixed_clock())
     skipped = service.run(force=False)
     assert skipped.skipped_reason == "disabled"
 
@@ -297,7 +330,7 @@ def test_run_skips_when_disabled_and_notify_failure_does_not_abort():
     def _boom(*_a, **_k):
         raise RuntimeError("channel down")
 
-    notifier.send = _boom  # type: ignore[method-assign]
+    notifier.send_with_results = _boom  # type: ignore[method-assign]
     enabled = _base_config(
         daily_brief_enabled=True,
         daily_brief_notify=True,
@@ -306,6 +339,8 @@ def test_run_skips_when_disabled_and_notify_failure_does_not_abort():
         daily_brief_min_samples=100,
     )
     service = DailyBriefService(
+        **_empty_personal_deps(),
+        
         analysis_repo=SimpleNamespace(get_list=lambda **_kwargs: []),
         decision_outcome_service=_OutcomeService([]),
         decision_signal_repo=SimpleNamespace(get=lambda _id: None),
@@ -326,6 +361,8 @@ def test_run_skips_when_disabled_and_notify_failure_does_not_abort():
 def test_should_run_now_respects_schedule_and_once_per_day():
     config = _base_config(daily_brief_schedule_time="10:00")
     service = DailyBriefService(
+        **_empty_personal_deps(),
+        
         analysis_repo=SimpleNamespace(get_list=lambda **_kwargs: []),
         config_provider=lambda: config,
         clock=_fixed_clock("2026-08-06T09:00:00+08:00"),
@@ -333,6 +370,8 @@ def test_should_run_now_respects_schedule_and_once_per_day():
     assert service.should_run_now(config=config) is False
 
     late = DailyBriefService(
+        **_empty_personal_deps(),
+        
         analysis_repo=SimpleNamespace(get_list=lambda **_kwargs: []),
         config_provider=lambda: config,
         clock=_fixed_clock("2026-08-06T10:05:00+08:00"),
@@ -358,3 +397,170 @@ def test_build_daily_brief_background_tasks_gated():
     assert len(on) == 1
     assert on[0]["name"] == "daily_brief"
     assert on[0]["interval_seconds"] >= 30
+
+def test_personal_sections_and_quiet_mode():
+    config = _base_config(report_language="en", daily_brief_notify=True, daily_brief_quiet_when_empty=True, daily_brief_min_samples=100)
+    portfolio_repo = type("P", (), {"list_cached_positions": staticmethod(lambda **_k: [{"symbol":"AAPL","market":"us","quantity":10,"market_value_base":2000,"account_id":1}])})()
+    focus = type("F", (), {"build_focus": staticmethod(lambda **_k: {"status":"ok","items":[{"code":"AAPL","name":"Apple","reason_code":"alert_triggered","reason_display":"Alert","secondary_reason_codes":[]}],"item_count":1,"empty_message":None,"sources_used":["alerts"],"degraded_sources":[]})})()
+    events = type("E", (), {"build_briefs_for_universe": staticmethod(lambda **_k: [{"stock_code":"AAPL","stock_name":"Apple","event_category":"earnings","what_happened":"Earnings","metrics_to_watch":[{"id":"eps","label":"EPS","why":"core"}],"post_event_checklist":[{"id":"verify_print","label":"Verify","status":"pending"}],"in_portfolio":True,"on_watchlist":True,"verify_hook":{"kind":"post_event_checklist","items":["verify_print"]},"trigger_id":1}])})()
+    yesterday = __import__("datetime").datetime(2026,8,5,4,0,0)
+    analyses=[_FakeAnalysis(code="AAPL", name="Apple", created_at=yesterday, operation_advice="Buy")]
+    service=DailyBriefService(
+        analysis_repo=type("A", (), {"get_list": staticmethod(lambda **_k: analyses)})(),
+        decision_outcome_service=_OutcomeService([]),
+        decision_signal_repo=type("S", (), {"get": staticmethod(lambda _id: None)})(),
+        backtest_service=type("B", (), {"get_summary": staticmethod(lambda **_k: None)})(),
+        skill_performance_service=type("K", (), {"get_stats": staticmethod(lambda **_k: {"buckets": []})})(),
+        portfolio_repository=portfolio_repo, todays_focus_service=focus, event_research_brief_service=events,
+        config_provider=lambda: config, clock=_fixed_clock(),
+    )
+    payload=service.build_payload(config=config)
+    assert payload["portfolio"]["total"]==1
+    assert payload["overnight_highlights"]["item_count"]==1
+    assert payload["event_foresight"]["count"]==1
+    assert payload["materiality"]["has_material_content"] is True
+    md=service.render_markdown(payload)
+    assert "Holdings" in md and "Overnight" in md and "AAPL" in md
+
+    # quiet when empty
+    empty_cfg=_base_config(report_language="en", daily_brief_notify=True, daily_brief_quiet_when_empty=True, daily_brief_min_samples=100, daily_brief_save_report_file=False)
+    notifier=_Notifier()
+    empty_svc=DailyBriefService(
+        analysis_repo=type("A", (), {"get_list": staticmethod(lambda **_k: [])})(),
+        decision_outcome_service=_OutcomeService([]),
+        decision_signal_repo=type("S", (), {"get": staticmethod(lambda _id: None)})(),
+        backtest_service=type("B", (), {"get_summary": staticmethod(lambda **_k: None)})(),
+        skill_performance_service=type("K", (), {"get_stats": staticmethod(lambda **_k: {"buckets": []})})(),
+        **_empty_personal_deps(), notifier=notifier, config_provider=lambda: empty_cfg, clock=_fixed_clock(),
+    )
+    result=empty_svc.run(force=True, persist_history=False, save_report_file=False)
+    assert result.notification_status=="quiet_skipped"
+    assert notifier.sent==[]
+
+
+def test_portfolio_membership_never_compares_cross_currency_values():
+    rows = [
+        {
+            "symbol": "MSFT",
+            "market": "us",
+            "market_value_base": 1_000_000,
+            "valuation_currency": "USD",
+            "quantity": float("nan"),
+            "account_id": 1,
+        },
+        {
+            "symbol": "AAPL",
+            "market": "us",
+            "market_value_base": float("inf"),
+            "valuation_currency": "HKD",
+            "quantity": 2,
+            "account_id": 2,
+        },
+        {
+            "symbol": "AAPL",
+            "market": "us",
+            "market_value_base": 3,
+            "valuation_currency": "USD",
+            "quantity": 4,
+            "account_id": 3,
+        },
+    ]
+    service = DailyBriefService(
+        portfolio_repository=SimpleNamespace(
+            list_cached_positions=lambda **_kwargs: rows
+        )
+    )
+
+    portfolio = service._build_portfolio_section()
+
+    assert portfolio["holdings"] == [
+        {"code": "AAPL", "market": "us"},
+        {"code": "MSFT", "market": "us"},
+    ]
+    assert all("market_value_base" not in row for row in portfolio["holdings"])
+    assert all("quantity" not in row and "account_id" not in row for row in portfolio["holdings"])
+
+
+def test_non_finite_accuracy_values_are_withheld_fail_closed():
+    outcomes = [
+        _FakeOutcome(signal_id=1, outcome="hit", stock_return_pct=float("nan")),
+        _FakeOutcome(signal_id=2, outcome="miss", stock_return_pct=float("inf")),
+    ]
+    config = _base_config(daily_brief_min_samples=2)
+    service = DailyBriefService(
+        **_empty_personal_deps(),
+        analysis_repo=SimpleNamespace(get_list=lambda **_kwargs: []),
+        decision_outcome_service=_OutcomeService(outcomes),
+        decision_signal_repo=SimpleNamespace(get=lambda _id: None),
+        backtest_service=SimpleNamespace(
+            get_summary=lambda **_kwargs: {
+                "completed_count": 10,
+                "direction_accuracy_pct": float("nan"),
+                "win_rate_pct": 55,
+            }
+        ),
+        skill_performance_service=SimpleNamespace(
+            get_stats=lambda: {
+                "buckets": [
+                    {
+                        "skill_id": "bad",
+                        "horizon": "5d",
+                        "evaluated": 20,
+                        "hit_rate_pct": float("inf"),
+                        "miss_rate_pct": 20,
+                        "sample_sufficient": True,
+                    }
+                ]
+            }
+        ),
+        config_provider=lambda: config,
+        clock=_fixed_clock(),
+    )
+
+    accuracy = service._build_accuracy_section(min_samples=2)
+
+    assert accuracy["decision_signals"]["hit_rate_pct"] == 50.0
+    assert accuracy["decision_signals"]["avg_return_pct"] is None
+    assert all(
+        item["return_pct"] is None
+        for item in accuracy["decision_signals"]["notable_hits"]
+        + accuracy["decision_signals"]["notable_misses"]
+    )
+    assert accuracy["backtest"]["status"] == "unavailable"
+    assert accuracy["skill_outcomes"]["status"] == "unavailable"
+    markdown = service.render_markdown(service.build_payload(config=config)).lower()
+    assert "nan%" not in markdown
+    assert "inf%" not in markdown
+
+
+def test_partial_notification_succeeds_without_hiding_channel_failure():
+    notifier = _Notifier()
+    notifier.send_with_results = lambda *_args, **_kwargs: SimpleNamespace(
+        status="partial_failed", success=True
+    )
+    service = DailyBriefService(notifier=notifier)
+
+    assert service._send_notification("brief") == ("degraded", True)
+
+
+def test_daily_markdown_obeys_length_budget():
+    service = DailyBriefService()
+    payload = {
+        "report_date": "2026-08-06",
+        "report_timestamp": "2026-08-06T09:00:00+08:00",
+        "report_language": "en",
+        "portfolio": {"status": "ok", "holdings": [], "empty": True},
+        "overnight_highlights": {"status": "empty", "items": [], "empty": True},
+        "event_foresight": {"status": "empty", "briefs": [], "empty": True},
+        "accuracy": {"status": "insufficient_history", "honesty_note": "insufficient"},
+        "yesterday_analyses": [
+            {"code": f"S{i}", "name": "X" * 200, "analysis_summary": "Y" * 500}
+            for i in range(100)
+        ],
+        "watchlist": {"empty": True},
+    }
+
+    markdown = service.render_markdown(payload)
+
+    assert len(markdown) <= MAX_DAILY_BRIEF_MARKDOWN_CHARS
+    assert "Content truncated to the report length budget" in markdown
