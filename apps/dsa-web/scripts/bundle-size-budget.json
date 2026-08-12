@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Budgets remeasured on GitHub Actions Linux after Home customizable dashboard layout (Refs #189 / PR #1158); raised locale chunks, HomeWatchlistGroupsSection, and vendor-icons using measured gzip + 200 B headroom where needed. Untouched budgets remain unchanged.",
+  "baselineNote": "Merged PR #1158 dashboard layout budgets with latest main (OCR/data-validation/route-focus). Per-asset max = max(ours,theirs,measured+200).",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -21,7 +21,8 @@
       "id": "js-entry",
       "match": "assets/index-*.js",
       "maxGzipBytes": 177591,
-      "measuredGzipBytes": 161446
+      "measuredGzipBytes": 161446,
+      "note": null
     },
     {
       "id": "locale-ja",
@@ -49,7 +50,7 @@
       "match": "assets/fr-*.js",
       "maxGzipBytes": 147384,
       "measuredGzipBytes": 146784,
-      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
     },
     {
       "id": "locale-es",
@@ -83,31 +84,36 @@
       "id": "vendor-charts",
       "match": "assets/vendor-charts-*.js",
       "maxGzipBytes": 122352,
-      "measuredGzipBytes": 111229
+      "measuredGzipBytes": 111229,
+      "note": null
     },
     {
       "id": "vendor-react",
       "match": "assets/vendor-react-*.js",
       "maxGzipBytes": 66666,
-      "measuredGzipBytes": 60605
+      "measuredGzipBytes": 60605,
+      "note": null
     },
     {
       "id": "vendor-markdown",
       "match": "assets/vendor-markdown-*.js",
       "maxGzipBytes": 48618,
-      "measuredGzipBytes": 44198
+      "measuredGzipBytes": 44198,
+      "note": null
     },
     {
       "id": "vendor-motion",
       "match": "assets/vendor-motion-*.js",
       "maxGzipBytes": 43373,
-      "measuredGzipBytes": 39430
+      "measuredGzipBytes": 39430,
+      "note": null
     },
     {
       "id": "vendor-router",
       "match": "assets/vendor-router-*.js",
       "maxGzipBytes": 33202,
-      "measuredGzipBytes": 30183
+      "measuredGzipBytes": 30183,
+      "note": null
     },
     {
       "id": "vendor-icons",
@@ -148,13 +154,15 @@
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
       "maxGzipBytes": 45391,
-      "measuredGzipBytes": 41264
+      "measuredGzipBytes": 41264,
+      "note": null
     },
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
       "maxGzipBytes": 46602,
-      "measuredGzipBytes": 42365
+      "measuredGzipBytes": 42365,
+      "note": null
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -174,37 +182,43 @@
       "id": "DecisionSignalsPage",
       "match": "assets/DecisionSignalsPage-*.js",
       "maxGzipBytes": 23042,
-      "measuredGzipBytes": 20947
+      "measuredGzipBytes": 20947,
+      "note": null
     },
     {
       "id": "ChatPage",
       "match": "assets/ChatPage-*.js",
       "maxGzipBytes": 18277,
-      "measuredGzipBytes": 16615
+      "measuredGzipBytes": 16615,
+      "note": null
     },
     {
       "id": "screening",
       "match": "assets/screening-*.js",
       "maxGzipBytes": 17866,
-      "measuredGzipBytes": 16241
+      "measuredGzipBytes": 16241,
+      "note": null
     },
     {
       "id": "BacktestPage",
       "match": "assets/BacktestPage-*.js",
       "maxGzipBytes": 15368,
-      "measuredGzipBytes": 13970
+      "measuredGzipBytes": 13970,
+      "note": null
     },
     {
       "id": "css-entry",
       "match": "assets/index-*.css",
       "maxGzipBytes": 28791,
-      "measuredGzipBytes": 26173
+      "measuredGzipBytes": 26173,
+      "note": null
     },
     {
       "id": "css-vendor",
       "match": "assets/vendor-*.css",
-      "maxGzipBytes": 576,
-      "measuredGzipBytes": 523
+      "maxGzipBytes": 723,
+      "measuredGzipBytes": 523,
+      "note": null
     }
   ]
 }
