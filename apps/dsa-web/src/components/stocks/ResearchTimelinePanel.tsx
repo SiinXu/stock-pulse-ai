@@ -288,7 +288,7 @@ const ResearchTimelinePanel: React.FC<ResearchTimelinePanelProps> = ({ stockCode
                 return (
                   <li
                     key={node.id}
-                    className={`rounded-lg border p-3 ${selected ? 'border-primary bg-primary/5' : 'border-border bg-surface'}`}
+                    className={`rounded-lg border p-3 ${selected ? 'border-primary bg-primary/5' : 'border-border bg-surface-muted/40'}`}
                     data-kind={node.kind}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
