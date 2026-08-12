@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-11",
-  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after Agent Behavior Essentials/Behavior/Governance disclosure copy (Refs #868 / PR #1166); failed locales use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
+  "measuredAt": "2026-08-12",
+  "baselineNote": "Locale and HomeWatchlistGroupsSection budgets remeasured on GitHub Actions Linux after Home customizable dashboard layout (Refs #189 / PR #1158); failed assets use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -54,30 +54,30 @@
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 142089,
-      "measuredGzipBytes": 141889,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 141889 B + 200 B headroom."
+      "maxGzipBytes": 142833,
+      "measuredGzipBytes": 142633,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 138632,
-      "measuredGzipBytes": 138432,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 138432 B + 200 B headroom."
+      "maxGzipBytes": 139407,
+      "measuredGzipBytes": 139207,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 132053,
-      "measuredGzipBytes": 131853,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 131853 B + 200 B headroom."
+      "maxGzipBytes": 132852,
+      "measuredGzipBytes": 132652,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 132128,
-      "measuredGzipBytes": 131928,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 131928 B + 200 B headroom."
+      "maxGzipBytes": 132876,
+      "measuredGzipBytes": 132676,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -128,6 +128,13 @@
       "maxGzipBytes": 73318,
       "measuredGzipBytes": 73118,
       "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
+    },
+    {
+      "id": "HomeWatchlistGroupsSection",
+      "match": "assets/HomeWatchlistGroupsSection-*.js",
+      "maxGzipBytes": 16367,
+      "measuredGzipBytes": 16167,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom. Chunk grew with dashboard layout board wiring on Home."
     },
     {
       "id": "PlaygroundRenderPage",

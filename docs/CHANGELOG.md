@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Rebaseline Web locale gzip budgets and HomeWatchlistGroupsSection chunk after Home dashboard layout copy (Refs #189).
 - [Added] Home customizable dashboard layout for watchlist, portfolio health, alerts, and recent reports with browser-profile preferences, revision CAS, keyboard and mobile non-drag controls (Refs #189).
 - [Chore] Rebaseline Web locale gzip budgets after Agent three-layer progressive-disclosure copy (Refs #868).
 - [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
