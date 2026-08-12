@@ -546,6 +546,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPORT_SUMMARY_ONLY` | `false` | 是 | 模板中注释; Only analyze the result summary: when set to true, it only pushes summaries, without individual stock details |
 | `REPORT_TEMPLATES_DIR` | `templates` | 是 | 模板中注释; Report Engine P0 (Jinja2 / integrity check / Historical comparison) |
 | `REPORT_TYPE` | `simple` | 是 | 模板中注释; Report type: simple (concise), full (complete), brief (3-5 sentence summary) In a Docker environment, if content is n... |
+| `RESEARCH_PACK_EXPORT_ENABLED` | `false` | 是 | 模板中注释; One-click research asset pack (report + decision card + evidence refs + redacted trace) |
+| `RESEARCH_PACK_MAX_ZIP_BYTES` | `25165824` | 是 | 模板中注释; clamped to 1 MiB . |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |
