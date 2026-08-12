@@ -1458,10 +1458,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.AGENT_CRITIC_MAX_ITERS': {
     title: 'Critic 最大修订轮次',
     summary: '限制 Critic 发现问题后的受控白名单修订轮次（默认 1，硬上限 2）。',
-    usage: 'Only raise above 1 when residual pipeline budget can absorb another whitelist revision.',
-    impact: ['Each additional round may add one whitelist stage rerun and an optional re-critic check.'],
-    notes: ['Revision diffs stay in critic_trace; failed convergence keeps Critic opinions in data_limitations; successful convergence keeps only a short revision note.'],
-    valueNotes: ['Default 1; hard cap 2.', 'Requires AGENT_CRITIC_ENABLED=true to take effect.'],
+    usage: '仅当剩余流水线预算和模式预算足以支持额外修订时才提高此值。',
+    impact: ['设为 2 时允许一次收敛复核；如仍需修订，可再重跑一个不同的白名单阶段。'],
+    notes: ['只有复核明确返回 pass 才标记收敛。证据发生变化不会伪造成功；未复核或收敛失败时，Critic 意见会保留在 data_limitations。'],
+    valueNotes: ['默认 1，硬上限 2。', '仅在 AGENT_CRITIC_ENABLED=true 时生效。'],
   },
 
   'settings.agent.AGENT_RISK_OVERRIDE': {

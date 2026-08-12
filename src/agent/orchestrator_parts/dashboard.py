@@ -554,7 +554,11 @@ class _DashboardMethods:
                 existing_limits = []
             merged = []
             seen = set()
-            for item in [*existing_limits, *critic_limitations]:
+            # Critic findings are authoritative runtime limitations. Reserve
+            # the bounded product slots for them before retaining any
+            # model-authored dashboard limitations, otherwise a full existing
+            # list could silently erase every failed-convergence finding.
+            for item in [*critic_limitations, *existing_limits]:
                 if not isinstance(item, str):
                     continue
                 cleaned = item.strip()

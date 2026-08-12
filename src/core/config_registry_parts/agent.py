@@ -626,7 +626,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "AGENT_CRITIC_MAX_ITERS": {
         "title": "Critic Max Revision Rounds",
-        "description": "Maximum controlled revision rounds after the Critic finds material gaps (default 1, hard cap 2). Each round may re-run one whitelist stage and records a revision diff in the Critic trace. Optional work still yields to Decision and per-mode budgets.",
+        "description": "Maximum controlled revision rounds after the Critic finds material gaps (default 1, hard cap 2). Each round may re-run one whitelist stage and records a revision diff in the Critic trace. Only an explicit recheck pass marks convergence; optional work yields to Decision and per-mode budgets.",
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",

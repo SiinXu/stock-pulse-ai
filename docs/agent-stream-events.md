@@ -77,8 +77,8 @@ so these additions do not expand the public Ask Stock Chat SSE payload.
 | `pipeline_budget_skipped` | multi-agent orchestrator | The orchestrator stopped before starting the next stage because the remaining budget was too low for useful work. | `stage`, `elapsed`, `timeout`, `remaining`, `minimum`, `reason`, `message` |
 | `turn_persisted` | single-agent loop, multi-agent orchestrator | The client-supplied user turn ID, message, selected Skills, and request context have committed before generation starts. | `turn_id`, `message_id` |
 | `critic_verdict` | enabled non-Chat multi-agent orchestrator | The bounded Critic produced a validated verdict, failed closed, or could not complete. | `stage`, `verdict`, `requested_verdict`, `reasons`, `missing_evidence`, `retry_targets_requested`, `retry_targets_executed`, `retry_budget_consumed`, `retry_budget_remaining`, `retry_status`, `validation_status`, `confidence_delta`, `iteration_max`, `iteration_consumed`, `convergence_status`, `revision_rounds` |
-| `critic_retry_start` | enabled non-Chat multi-agent orchestrator | The one-shot whitelist retry has consumed its run budget and started. | `stage`, `retry_target`, Critic verdict and budget fields |
-| `critic_retry_done` | enabled non-Chat multi-agent orchestrator | The whitelist retry completed or failed without opening another retry. | `stage`, `status`, `duration`, `retry_target`, Critic verdict and budget fields |
+| `critic_retry_start` | enabled non-Chat multi-agent orchestrator | A controlled whitelist revision has consumed one iteration-budget unit and started. | `stage`, `retry_target`, Critic verdict and budget fields |
+| `critic_retry_done` | enabled non-Chat multi-agent orchestrator | A controlled whitelist revision completed or failed. A second event pair may follow only within the configured hard cap. | `stage`, `status`, `duration`, `retry_target`, Critic verdict and budget fields |
 | `done` | SSE endpoint | The request completed. | `success`, `content`, `error`, `total_steps`, `session_id` |
 | `error` | SSE endpoint | The request failed before normal completion. | `message` |
 

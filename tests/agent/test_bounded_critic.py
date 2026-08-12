@@ -25,6 +25,7 @@ from src.agent.protocols import (
     StageStatus,
 )
 from src.agent.runtime.guards import RuntimeGuardPolicy, StageFailurePolicy
+from src.agent.runtime.mode_budget import ModeBudgetAccount, ModeBudgetLimits
 from src.agent.soul import AGENT_SOUL_MARKER, AGENT_SOUL_SYSTEM_BLOCK
 from src.agent.tools.registry import ToolRegistry
 from src.config import Config
@@ -75,6 +76,34 @@ class _FixtureCritic:
         )
 
 
+class _SequenceCritic:
+    agent_name = "critic"
+    max_steps = 1
+    tool_names: list[str] = []
+
+    def __init__(self, outputs: list[object], *, max_iters: int = 2) -> None:
+        self.outputs = outputs
+        self.max_iters = max_iters
+        self.calls = 0
+        self._post_process = critic.BoundedCriticAgent.post_process
+
+    def run(self, ctx: AgentContext, **_kwargs) -> StageResult:
+        raw_output = self.outputs[self.calls]
+        self.calls += 1
+        if isinstance(raw_output, BaseException):
+            raise raw_output
+        assert isinstance(raw_output, str)
+        holder = SimpleNamespace(
+            config=SimpleNamespace(agent_critic_max_iters=self.max_iters)
+        )
+        self._post_process(holder, ctx, raw_output)
+        return _stage_result(
+            "critic",
+            raw_text=raw_output,
+            model="test/critic",
+        )
+
+
 class _FixtureStage:
     max_steps = 1
 
@@ -88,9 +117,15 @@ class _FixtureStage:
         return self._run_callback(ctx, self.calls)
 
 
-def _orchestrator(*, enabled: bool, skill_manager=None) -> AgentOrchestrator:
+def _orchestrator(
+    *,
+    enabled: bool,
+    skill_manager=None,
+    max_iters: int = 1,
+) -> AgentOrchestrator:
     config = SimpleNamespace(
         agent_critic_enabled=enabled,
+        agent_critic_max_iters=max_iters,
         agent_orchestrator_timeout_s=0,
         agent_risk_override=True,
     )
@@ -1327,20 +1362,30 @@ def test_critic_config_defaults_off_loads_env_and_is_registered() -> None:
         default_config = Config._load_from_env()
     with patch.dict(
         os.environ,
-        {"STOCK_LIST": "600519", "AGENT_CRITIC_ENABLED": "true"},
+        {
+            "STOCK_LIST": "600519",
+            "AGENT_CRITIC_ENABLED": "true",
+            "AGENT_CRITIC_MAX_ITERS": "2",
+        },
         clear=True,
     ):
         enabled_config = Config._load_from_env()
 
     field = get_field_definition("AGENT_CRITIC_ENABLED")
+    iteration_field = get_field_definition("AGENT_CRITIC_MAX_ITERS")
     assert default_config.agent_critic_enabled is False
+    assert default_config.agent_critic_max_iters == 1
     assert enabled_config.agent_critic_enabled is True
+    assert enabled_config.agent_critic_max_iters == 2
     assert field["default_value"] == "false"
     assert field["data_type"] == "boolean"
     assert field["help_key"] == "settings.agent.AGENT_CRITIC_ENABLED"
+    assert iteration_field["default_value"] == "1"
+    assert iteration_field["data_type"] == "integer"
+    assert iteration_field["validation"] == {"min": 1, "max": 2}
 
 
-def test_revision_diff_recorded_and_product_limitations_kept(monkeypatch) -> None:
+def test_revision_without_recheck_is_not_claimed_as_converged(monkeypatch) -> None:
     orch = _orchestrator(enabled=True)
     ctx = AgentContext(query="Analyze", stock_code="600519")
 
@@ -1367,8 +1412,8 @@ def test_revision_diff_recorded_and_product_limitations_kept(monkeypatch) -> Non
         assert trace["retry_status"] == "completed"
         assert len(trace["revision_rounds"]) == 1
         assert trace["revision_rounds"][0]["revision_diff"]["evidence_changed"] is True
-        assert trace["convergence_status"] == "converged"
-        assert trace["verdict"] == "pass"
+        assert trace["convergence_status"] == "not_converged"
+        assert trace["verdict"] == "retry"
         run_ctx.set_data("final_dashboard_raw", "final")
         return _stage_result("decision", raw_text="final")
 
@@ -1380,9 +1425,225 @@ def test_revision_diff_recorded_and_product_limitations_kept(monkeypatch) -> Non
     limitations = critic.project_critic_product_limitations(ctx.meta["critic_trace"])
     joined = "\n".join(limitations)
     assert any("revision round" in line for line in limitations)
+    assert "converged after a controlled retry" not in joined
+    assert "Current intelligence is incomplete." in joined
+    assert "Latest issuer announcement." in joined
+
+
+def test_explicit_recheck_pass_is_the_only_convergence_signal(monkeypatch) -> None:
+    orch = _orchestrator(enabled=True, max_iters=2)
+    ctx = AgentContext(query="Analyze", stock_code="600519")
+
+    def _intel(run_ctx: AgentContext, call: int) -> StageResult:
+        run_ctx.add_opinion(AgentOpinion(
+            agent_name="intel",
+            signal="hold",
+            confidence=0.6 + call / 10,
+            reasoning=f"intelligence-{call}",
+        ))
+        return _stage_result("intel", raw_text=f"intel-{call}")
+
+    first = json.dumps({
+        "verdict": "retry",
+        "retry_targets": ["intelligence"],
+        "reasons": ["Current intelligence is incomplete."],
+        "missing_evidence": ["Latest issuer announcement."],
+    })
+    passed = json.dumps({
+        "verdict": "pass",
+        "retry_targets": [],
+        "reasons": ["The revision closed the material gap."],
+        "missing_evidence": [],
+    })
+    sequence_critic = _SequenceCritic([first, passed])
+    intel = _FixtureStage("intel", _intel)
+
+    def _decision(run_ctx: AgentContext, _call: int) -> StageResult:
+        trace = run_ctx.meta["critic_trace"]
+        assert trace["convergence_status"] == "converged"
+        assert trace["verdict"] == "pass"
+        assert trace["retry_targets_requested"] == ["intelligence"]
+        assert trace["revision_rounds"][0]["critic_reasons"] == [
+            "Current intelligence is incomplete."
+        ]
+        run_ctx.set_data("final_dashboard_raw", "final")
+        return _stage_result("decision", raw_text="final")
+
+    decision = _FixtureStage("decision", _decision)
+    events = []
+    monkeypatch.setattr(
+        critic,
+        "BoundedCriticAgent",
+        lambda **_kwargs: sequence_critic,
+    )
+    monkeypatch.setattr(orch, "_build_agent_chain", lambda _ctx: [intel, decision])
+
+    result = orch._execute_pipeline(
+        ctx,
+        parse_dashboard=False,
+        progress_callback=events.append,
+    )
+
+    assert result.success is True
+    assert sequence_critic.calls == 2
+    assert intel.calls == 2
+    assert [event["type"] for event in events].count("critic_verdict") == 2
+    limitations = critic.project_critic_product_limitations(
+        ctx.meta["critic_trace"]
+    )
+    joined = "\n".join(limitations)
     assert "converged after a controlled retry" in joined
     assert "Current intelligence is incomplete." not in joined
-    assert "Latest issuer announcement." not in joined
+
+
+def test_second_revision_is_bounded_audited_and_not_auto_converged(monkeypatch) -> None:
+    manager = SimpleNamespace(
+        get=lambda skill_id: object() if skill_id == "bull_trend" else None
+    )
+    orch = _orchestrator(
+        enabled=True,
+        max_iters=2,
+        skill_manager=manager,
+    )
+    ctx = AgentContext(query="Analyze", stock_code="600519")
+
+    def _intel(run_ctx: AgentContext, call: int) -> StageResult:
+        run_ctx.add_opinion(AgentOpinion(
+            agent_name="intel",
+            signal="hold",
+            confidence=0.5 + call / 10,
+            reasoning=f"intelligence-{call}",
+        ))
+        return _stage_result("intel", raw_text=f"intel-{call}")
+
+    def _skill(run_ctx: AgentContext, call: int) -> StageResult:
+        run_ctx.add_opinion(AgentOpinion(
+            agent_name="skill_bull_trend",
+            signal="buy",
+            confidence=0.6 + call / 10,
+            reasoning=f"skill-{call}",
+        ))
+        return _stage_result("skill_bull_trend", raw_text=f"skill-{call}")
+
+    first = json.dumps({
+        "verdict": "retry",
+        "retry_targets": ["intelligence"],
+        "reasons": ["Refresh issuer intelligence."],
+        "missing_evidence": ["Issuer filing."],
+    })
+    recheck = json.dumps({
+        "verdict": "retry",
+        "retry_targets": ["skill:bull_trend"],
+        "reasons": ["The strategy evidence remains incomplete."],
+        "missing_evidence": ["Updated strategy evidence."],
+    })
+    sequence_critic = _SequenceCritic([first, recheck])
+    intel = _FixtureStage("intel", _intel)
+    skill = _FixtureStage("skill_bull_trend", _skill)
+
+    def _decision(run_ctx: AgentContext, _call: int) -> StageResult:
+        trace = run_ctx.meta["critic_trace"]
+        assert trace["iteration_consumed"] == 2
+        assert trace["retry_budget_remaining"] == 0
+        assert trace["retry_targets_requested"] == [
+            "intelligence",
+            "skill:bull_trend",
+        ]
+        assert trace["retry_targets_executed"] == [
+            "intelligence",
+            "skill:bull_trend",
+        ]
+        assert trace["convergence_status"] == "not_converged"
+        assert trace["verdict"] == "retry"
+        run_ctx.set_data("final_dashboard_raw", "final")
+        return _stage_result("decision", raw_text="final")
+
+    decision = _FixtureStage("decision", _decision)
+    events = []
+    monkeypatch.setattr(
+        critic,
+        "BoundedCriticAgent",
+        lambda **_kwargs: sequence_critic,
+    )
+    monkeypatch.setattr(
+        orch,
+        "_build_agent_chain",
+        lambda _ctx: [intel, skill, decision],
+    )
+
+    result = orch._execute_pipeline(
+        ctx,
+        parse_dashboard=False,
+        progress_callback=events.append,
+    )
+
+    assert result.success is True
+    assert intel.calls == 2
+    assert skill.calls == 2
+    assert [stage.stage_name for stage in result.stats.stage_results] == [
+        "intel",
+        "skill_bull_trend",
+        "critic",
+        "intel",
+        "critic",
+        "skill_bull_trend",
+        "decision",
+    ]
+    assert [event["type"] for event in events].count("critic_retry_start") == 2
+    assert [event["type"] for event in events].count("critic_retry_done") == 2
+    limitations = "\n".join(
+        critic.project_critic_product_limitations(ctx.meta["critic_trace"])
+    )
+    assert "Refresh issuer intelligence." in limitations
+    assert "The strategy evidence remains incomplete." in limitations
+
+
+def test_recheck_exception_remains_unavailable_and_keeps_findings(monkeypatch) -> None:
+    orch = _orchestrator(enabled=True, max_iters=2)
+    ctx = AgentContext(query="Analyze", stock_code="600519")
+
+    def _intel(run_ctx: AgentContext, call: int) -> StageResult:
+        run_ctx.add_opinion(AgentOpinion(
+            agent_name="intel",
+            signal="hold",
+            confidence=0.5 + call / 10,
+            reasoning=f"intelligence-{call}",
+        ))
+        return _stage_result("intel", raw_text=f"intel-{call}")
+
+    first = json.dumps({
+        "verdict": "retry",
+        "retry_targets": ["intelligence"],
+        "reasons": ["Issuer evidence is incomplete."],
+        "missing_evidence": ["Issuer filing."],
+    })
+    sequence_critic = _SequenceCritic([first, RuntimeError("provider down")])
+    intel = _FixtureStage("intel", _intel)
+
+    def _decision(run_ctx: AgentContext, _call: int) -> StageResult:
+        trace = run_ctx.meta["critic_trace"]
+        assert trace["verdict"] == "fail_soft"
+        assert trace["convergence_status"] == "unavailable"
+        assert trace["validation_status"] == "recheck_unavailable"
+        run_ctx.set_data("final_dashboard_raw", "final")
+        return _stage_result("decision", raw_text="final")
+
+    decision = _FixtureStage("decision", _decision)
+    monkeypatch.setattr(
+        critic,
+        "BoundedCriticAgent",
+        lambda **_kwargs: sequence_critic,
+    )
+    monkeypatch.setattr(orch, "_build_agent_chain", lambda _ctx: [intel, decision])
+
+    result = orch._execute_pipeline(ctx, parse_dashboard=False)
+
+    assert result.success is True
+    limitations = "\n".join(
+        critic.project_critic_product_limitations(ctx.meta["critic_trace"])
+    )
+    assert "Issuer evidence is incomplete." in limitations
+    assert "Issuer filing." in limitations
 
 
 def test_failed_convergence_keeps_critic_opinions_in_dashboard_limitations(monkeypatch) -> None:
@@ -1401,7 +1662,14 @@ def test_failed_convergence_keeps_critic_opinions_in_dashboard_limitations(monke
             {
                 "decision_type": "hold",
                 "analysis_summary": "hold for now",
-                "dashboard": {"phase_decision": {"data_limitations": ["Existing limitation."]}},
+                "dashboard": {
+                    "phase_decision": {
+                        "data_limitations": [
+                            f"Existing limitation {index}."
+                            for index in range(12)
+                        ]
+                    }
+                },
             },
         )
         return _stage_result("decision", raw_text="final")
@@ -1416,6 +1684,7 @@ def test_failed_convergence_keeps_critic_opinions_in_dashboard_limitations(monke
     joined = "\n".join(str(x) for x in (phase.get("data_limitations") or []))
     assert "Issuer filings remain incomplete." in joined
     assert "Audited segment detail." in joined
+    assert "Existing limitation 0." in joined
     assert ctx.meta["critic_trace"]["convergence_status"] == "not_converged"
 
 
@@ -1423,12 +1692,16 @@ def test_mode_budget_blocks_revision_without_consuming_budget(monkeypatch) -> No
     orch = _orchestrator(enabled=True)
     ctx = AgentContext(query="Analyze", stock_code="600519")
 
-    class _Breached:
-        reason = "budget_turns"
-        def check(self):
-            return self
-
-    ctx.meta["mode_budget_account"] = _Breached()
+    account = ModeBudgetAccount(ModeBudgetLimits(
+        mode="standard",
+        enabled=True,
+        max_llm_turns=2,
+        max_tool_calls=0,
+        max_cost_usd=0.0,
+        max_tokens=0,
+    ))
+    assert account.record_llm_turn() is None
+    ctx.meta["mode_budget_account"] = account
 
     def _intel(run_ctx: AgentContext, call: int) -> StageResult:
         run_ctx.add_opinion(AgentOpinion(
@@ -1448,7 +1721,7 @@ def test_mode_budget_blocks_revision_without_consuming_budget(monkeypatch) -> No
         trace = run_ctx.meta["critic_trace"]
         assert trace["retry_status"] == "unavailable"
         assert trace["retry_budget_consumed"] == 0
-        assert "per-mode budget" in trace["reasons"][-1]
+        assert "cannot preserve Decision reserve" in trace["reasons"][-1]
         run_ctx.set_data("final_dashboard_raw", "final")
         return _stage_result("decision", raw_text="final")
 
@@ -1460,9 +1733,29 @@ def test_mode_budget_blocks_revision_without_consuming_budget(monkeypatch) -> No
     assert intel.calls == 1
 
 
+def test_mode_budget_probe_failure_skips_optional_work() -> None:
+    class _BrokenAccount:
+        def check(self):
+            raise RuntimeError("budget store unavailable")
+
+        def snapshot(self):
+            return {}
+
+    ctx = AgentContext(query="Analyze", stock_code="600519")
+    ctx.meta["mode_budget_account"] = _BrokenAccount()
+
+    allowed, reason = critic.mode_budget_allows_optional_work(ctx)
+
+    assert allowed is False
+    assert "probe failed" in reason
+
+
 def test_resolve_critic_max_iters_hard_cap() -> None:
     assert critic.resolve_critic_max_iters(SimpleNamespace(agent_critic_max_iters=99)) == 2
     assert critic.resolve_critic_max_iters(SimpleNamespace(agent_critic_max_iters=0)) == 1
+    assert critic.resolve_critic_max_iters(SimpleNamespace(agent_critic_max_iters=True)) == 1
+    assert critic.resolve_critic_max_iters(SimpleNamespace(agent_critic_max_iters=1.5)) == 1
+    assert critic.parse_critic_output("{}", max_iters=float("nan"))["iteration_max"] == 1
     assert critic.resolve_critic_max_iters(None) == 1
 
 
@@ -1472,6 +1765,23 @@ def test_build_revision_diff_detects_signal_change() -> None:
     diff = critic.build_revision_diff(before, after)
     assert diff["evidence_changed"] is True
     assert "signals" in diff["changed"]
+
+
+def test_evidence_snapshot_hashes_reasoning_without_retaining_prefix() -> None:
+    ctx = AgentContext(query="Analyze", stock_code="600519")
+    ctx.add_opinion(AgentOpinion(
+        agent_name="intel",
+        signal="x" * 1000,
+        confidence=0.5,
+        reasoning="confidential issuer evidence",
+    ))
+
+    snapshot = critic.snapshot_target_evidence(ctx, "intelligence")
+
+    fingerprint = snapshot["reasoning_fingerprints"][0]
+    assert len(snapshot["signals"][0]) == 300
+    assert fingerprint.startswith("28:")
+    assert "confidential" not in fingerprint
 
 
 def test_converged_product_limitations_drop_gap_reasons() -> None:
@@ -1491,7 +1801,7 @@ def test_converged_product_limitations_drop_gap_reasons() -> None:
         after={"target": "intelligence", "present": True, "signals": ["hold"], "confidence": [0.9], "reasoning_fingerprints": ["5:new"]},
         status="completed",
     )
-    trace = critic.finalize_convergence(ctx)
+    trace = critic.finalize_convergence(ctx, recheck_verdict="pass")
     assert trace["convergence_status"] == "converged"
     assert trace["verdict"] == "pass"
     lines = critic.project_critic_product_limitations(trace)
@@ -1541,4 +1851,3 @@ def test_recheck_fail_soft_does_not_get_overwritten_by_evidence_changed() -> Non
     again = critic.finalize_convergence(ctx)
     assert again["convergence_status"] == "not_converged"
     assert again["verdict"] == "fail_soft"
-

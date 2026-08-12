@@ -1430,8 +1430,8 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'Critic Max Revision Rounds',
     summary: 'Caps controlled whitelist revision rounds after Critic findings (default 1, hard cap 2).',
     usage: 'Only raise above 1 when residual pipeline budget can absorb another whitelist revision.',
-    impact: ['Each additional round may add one whitelist stage rerun and an optional re-critic check.'],
-    notes: ['Revision diffs stay in critic_trace; failed convergence keeps Critic opinions in data_limitations; successful convergence keeps only a short revision note.'],
+    impact: ['Raising to 2 permits one convergence recheck and, if needed, one second whitelist stage rerun.'],
+    notes: ['Only an explicit recheck pass marks convergence. Changed evidence alone never fabricates success; unverified or failed convergence keeps Critic opinions in data_limitations.'],
     valueNotes: ['Default 1; hard cap 2.', 'Requires AGENT_CRITIC_ENABLED=true to take effect.'],
   },
 

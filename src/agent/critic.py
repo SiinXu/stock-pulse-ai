@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import re
@@ -42,6 +43,7 @@ _CONVERGENCE_NOT_REQUIRED = "not_required"
 _CONVERGENCE_UNAVAILABLE = "unavailable"
 _CONVERGENCE_BUDGET_SKIPPED = "budget_skipped"
 _CONVERGENCE_STAGE_FAILED = "stage_failed"
+_MAX_PRODUCT_LIMITATIONS = 12
 
 
 class _CriticOutput(BaseModel):
@@ -69,21 +71,31 @@ def is_critic_stage(agent_name: Any) -> bool:
     return str(agent_name or "").strip().lower() == CRITIC_STAGE_NAME
 
 
-def resolve_critic_max_iters(config: Any = None) -> int:
-    """Return the hard-capped revision-iteration budget for this run."""
-    raw = getattr(config, "agent_critic_max_iters", CRITIC_MAX_ITERS_DEFAULT)
+def _bounded_iteration_budget(raw: Any) -> int:
+    """Normalize an iteration value without accepting booleans or fractions."""
+    if isinstance(raw, bool):
+        return CRITIC_MAX_ITERS_DEFAULT
     try:
         value = int(raw)
     except (TypeError, ValueError):
         value = CRITIC_MAX_ITERS_DEFAULT
+    if isinstance(raw, float) and raw != value:
+        return CRITIC_MAX_ITERS_DEFAULT
     if value < 1:
         return CRITIC_MAX_ITERS_DEFAULT
     return min(value, CRITIC_MAX_ITERS_HARD_CAP)
 
 
+def resolve_critic_max_iters(config: Any = None) -> int:
+    """Return the hard-capped revision-iteration budget for this run."""
+    return _bounded_iteration_budget(
+        getattr(config, "agent_critic_max_iters", CRITIC_MAX_ITERS_DEFAULT)
+    )
+
+
 def _empty_revision_fields(max_iters: int = CRITIC_MAX_ITERS_DEFAULT) -> Dict[str, Any]:
     """Shared revision/convergence fields for every critic_trace."""
-    bounded = max(1, min(int(max_iters or CRITIC_MAX_ITERS_DEFAULT), CRITIC_MAX_ITERS_HARD_CAP))
+    bounded = _bounded_iteration_budget(max_iters)
     return {
         "iteration_max": bounded,
         "iteration_consumed": 0,
@@ -101,7 +113,7 @@ def _fail_soft_trace(
     max_iters: int = CRITIC_MAX_ITERS_DEFAULT,
 ) -> Dict[str, Any]:
     """Build the fixed, bounded trace used for every fail-soft outcome."""
-    budget = max(1, min(int(max_iters or CRITIC_MAX_ITERS_DEFAULT), CRITIC_MAX_ITERS_HARD_CAP))
+    budget = _bounded_iteration_budget(max_iters)
     if validation_status == "budget_skipped":
         convergence = _CONVERGENCE_BUDGET_SKIPPED
     elif validation_status == "stage_failed":
@@ -134,7 +146,7 @@ def apply_iteration_budget(
     max_iters: int,
 ) -> Dict[str, Any]:
     """Stamp the configured iteration budget onto a validated critic_trace."""
-    budget = max(1, min(int(max_iters or CRITIC_MAX_ITERS_DEFAULT), CRITIC_MAX_ITERS_HARD_CAP))
+    budget = _bounded_iteration_budget(max_iters)
     updated = dict(trace)
     consumed = min(budget, max(0, int(updated.get("retry_budget_consumed") or 0)))
     updated["retry_budget_total"] = budget
@@ -155,16 +167,23 @@ def apply_iteration_budget(
     return updated
 
 
-def mode_budget_allows_optional_work(ctx: AgentContext) -> Tuple[bool, str]:
-    """Soft-align optional Critic revision with per-mode hard budgets (#1213)."""
+def mode_budget_allows_optional_work(
+    ctx: AgentContext,
+    *,
+    required_llm_turns: int = 1,
+    reserve_llm_turns: int = 1,
+) -> Tuple[bool, str]:
+    """Fail closed unless optional work fits before the Decision reserve."""
     account = ctx.meta.get("mode_budget_account")
     if account is None:
         return True, ""
     check = getattr(account, "check", None)
-    if not callable(check):
-        return True, ""
+    snapshot = getattr(account, "snapshot", None)
+    if not callable(check) or not callable(snapshot):
+        return False, "Critic revision was skipped because the mode-budget account was unavailable."
     try:
         breach = check()
+        budget_snapshot = snapshot()
     except Exception as exc:  # broad-exception: fallback_recorded - Optional budget probe must not stop Critic.
         log_safe_exception(
             logger,
@@ -173,14 +192,38 @@ def mode_budget_allows_optional_work(ctx: AgentContext) -> Tuple[bool, str]:
             error_code="agent_critic_mode_budget_probe_failed",
             level=logging.INFO,
         )
+        return False, "Critic revision was skipped because the mode-budget probe failed."
+    if breach is not None:
+        reason = (
+            getattr(breach, "reason", None)
+            or getattr(breach, "message", None)
+            or "mode_budget"
+        )
+        return False, (
+            "Critic revision was skipped because the per-mode budget was "
+            f"exhausted ({reason})."
+        )
+    if not isinstance(budget_snapshot, dict):
+        return False, "Critic revision was skipped because the mode-budget snapshot was invalid."
+    limits = budget_snapshot.get("limits")
+    used = budget_snapshot.get("used")
+    if not isinstance(limits, dict) or not isinstance(used, dict):
+        return False, "Critic revision was skipped because the mode-budget snapshot was invalid."
+    if not bool(limits.get("enabled", True)):
         return True, ""
-    if breach is None:
-        return True, ""
-    reason = getattr(breach, "reason", None) or getattr(breach, "message", None) or "mode_budget"
-    return False, (
-        "Critic revision was skipped because the per-mode budget was "
-        f"exhausted ({reason})."
-    )
+    try:
+        turn_limit = max(0, int(limits.get("max_llm_turns") or 0))
+        turns_used = max(0, int(used.get("llm_turns") or 0))
+        required = max(1, int(required_llm_turns))
+        reserve = max(1, int(reserve_llm_turns))
+    except (TypeError, ValueError):
+        return False, "Critic revision was skipped because the mode-budget snapshot was invalid."
+    if turn_limit > 0 and turn_limit - turns_used < required + reserve:
+        return False, (
+            "Critic revision was skipped because the per-mode LLM-turn budget "
+            f"cannot preserve Decision reserve ({turns_used}/{turn_limit} used)."
+        )
+    return True, ""
 
 
 def snapshot_target_evidence(ctx: AgentContext, target: str) -> Dict[str, Any]:
@@ -205,13 +248,14 @@ def snapshot_target_evidence(ctx: AgentContext, target: str) -> Dict[str, Any]:
     confidences: List[float] = []
     fingerprints: List[str] = []
     for opinion in opinions[:_MAX_TRACE_ITEMS]:
-        signals.append(str(opinion.signal or ""))
+        signals.append(sanitize_agent_diagnostic(str(opinion.signal or "")))
         try:
             confidences.append(round(float(opinion.confidence), 4))
         except (TypeError, ValueError):
             confidences.append(0.0)
         reasoning = sanitize_agent_diagnostic(str(opinion.reasoning or ""))
-        fingerprints.append(f"{len(reasoning)}:{reasoning[:48]}")
+        digest = hashlib.sha256(reasoning.encode("utf-8")).hexdigest()[:16]
+        fingerprints.append(f"{len(reasoning)}:{digest}")
     return {
         "target": target,
         "agent_name": agent_name,
@@ -271,8 +315,19 @@ def append_revision_round(
     round_index = len(rounds) + 1
     rounds.append({
         "round": round_index,
-        "target": target,
+        "target": sanitize_agent_diagnostic(str(target or "")),
         "status": status,
+        "critic_verdict": trace.get("verdict"),
+        "critic_reasons": [
+            sanitize_agent_diagnostic(item)
+            for item in list(trace.get("reasons") or [])[:_MAX_TRACE_ITEMS]
+            if isinstance(item, str) and item.strip()
+        ],
+        "missing_evidence": [
+            sanitize_agent_diagnostic(item)
+            for item in list(trace.get("missing_evidence") or [])[:_MAX_TRACE_ITEMS]
+            if isinstance(item, str) and item.strip()
+        ],
         "revision_diff": diff,
     })
     trace["revision_rounds"] = rounds
@@ -297,18 +352,13 @@ def finalize_convergence(
     retry_status = str(trace.get("retry_status") or "")
     validation = str(trace.get("validation_status") or "")
     rounds = list(trace.get("revision_rounds") or [])
-    evidence_changed = any(
-        isinstance(item, dict)
-        and (item.get("revision_diff") or {}).get("evidence_changed")
-        for item in rounds
-    )
 
     if validation == "budget_skipped":
         status = _CONVERGENCE_BUDGET_SKIPPED
     elif validation == "stage_failed":
         status = _CONVERGENCE_STAGE_FAILED
     elif recheck_verdict == "pass":
-        status = _CONVERGENCE_CONVERGED
+        status = _CONVERGENCE_CONVERGED if rounds else _CONVERGENCE_PASS
         trace["verdict"] = "pass"
         trace["retry_status"] = "completed"
     elif recheck_verdict in {"fail_soft", "retry"}:
@@ -319,14 +369,11 @@ def finalize_convergence(
         status = _CONVERGENCE_NOT_CONVERGED
     elif verdict == "pass" and not rounds:
         status = _CONVERGENCE_PASS
-    elif verdict == "pass" and rounds and retry_status == "completed":
-        status = _CONVERGENCE_CONVERGED if evidence_changed or rounds else _CONVERGENCE_PASS
-    elif retry_status == "completed" and recheck_verdict is None:
-        status = (
-            _CONVERGENCE_CONVERGED if evidence_changed else _CONVERGENCE_NOT_CONVERGED
-        )
-        if status == _CONVERGENCE_CONVERGED:
-            trace["verdict"] = "pass"
+    elif rounds and recheck_verdict is None:
+        # A changed evidence snapshot proves that a revision happened, not that
+        # the original material gap was closed. Only an explicit recheck pass
+        # may claim convergence.
+        status = _CONVERGENCE_NOT_CONVERGED
     elif retry_status in {"unavailable", "failed"}:
         status = _CONVERGENCE_NOT_CONVERGED
     elif verdict == "retry" and retry_status in {"requested", "running", "not_started"}:
@@ -335,6 +382,17 @@ def finalize_convergence(
         status = _CONVERGENCE_NOT_CONVERGED
 
     trace["convergence_status"] = status
+    ctx.meta["critic_trace"] = trace
+    return trace
+
+
+def mark_convergence_unavailable(ctx: AgentContext, reason: str) -> Dict[str, Any]:
+    """Fail soft when the post-revision convergence check cannot complete."""
+    trace = dict(get_critic_trace(ctx) or {})
+    trace["verdict"] = "fail_soft"
+    trace["validation_status"] = "recheck_unavailable"
+    trace["convergence_status"] = _CONVERGENCE_UNAVAILABLE
+    trace["reasons"] = _append_runtime_reason(trace, reason)
     ctx.meta["critic_trace"] = trace
     return trace
 
@@ -387,7 +445,7 @@ def project_critic_product_limitations(
     if convergence == _CONVERGENCE_CONVERGED:
         lines = ["Critic: evidence revision converged after a controlled retry."]
         lines.extend(_round_summaries())
-        return lines[: (_MAX_TRACE_ITEMS * 3)]
+        return lines[:_MAX_PRODUCT_LIMITATIONS]
 
     residual = (
         convergence in {
@@ -407,14 +465,39 @@ def project_critic_product_limitations(
         f"convergence={convergence or 'unknown'}; "
         f"retry_status={retry_status or 'none'}."
     ]
-    for reason in list(trace.get("reasons") or [])[:_MAX_TRACE_ITEMS]:
+    reason_values: List[Any] = []
+    missing_values: List[Any] = []
+    for round_item in rounds[:_MAX_REVISION_ROUNDS]:
+        if not isinstance(round_item, dict):
+            continue
+        reason_values.extend(list(round_item.get("critic_reasons") or []))
+        missing_values.extend(list(round_item.get("missing_evidence") or []))
+    reason_values.extend(list(trace.get("reasons") or []))
+    missing_values.extend(list(trace.get("missing_evidence") or []))
+
+    reason_findings: List[str] = []
+    missing_findings: List[str] = []
+    seen_findings = set()
+    for reason in reason_values:
         if isinstance(reason, str) and reason.strip():
-            lines.append(f"Critic reason: {sanitize_agent_diagnostic(reason)}")
-    for item in list(trace.get("missing_evidence") or [])[:_MAX_TRACE_ITEMS]:
+            cleaned = sanitize_agent_diagnostic(reason)
+            if cleaned not in seen_findings:
+                seen_findings.add(cleaned)
+                reason_findings.append(cleaned)
+    for item in missing_values:
         if isinstance(item, str) and item.strip():
-            lines.append(f"Critic missing evidence: {sanitize_agent_diagnostic(item)}")
+            cleaned = sanitize_agent_diagnostic(item)
+            if cleaned not in seen_findings:
+                seen_findings.add(cleaned)
+                missing_findings.append(cleaned)
+    if reason_findings:
+        lines.append("Critic reasons: " + " | ".join(reason_findings))
+    if missing_findings:
+        lines.append(
+            "Critic missing evidence: " + " | ".join(missing_findings)
+        )
     lines.extend(_round_summaries())
-    return lines[: (_MAX_TRACE_ITEMS * 3)]
+    return lines[:_MAX_PRODUCT_LIMITATIONS]
 
 
 def _validate_text_items(values: List[str], field_name: str) -> None:
@@ -477,7 +560,7 @@ def parse_critic_output(
     max_iters: int = CRITIC_MAX_ITERS_DEFAULT,
 ) -> Dict[str, Any]:
     """Parse one Critic response and fail closed without retaining raw output."""
-    budget = max(1, min(int(max_iters or CRITIC_MAX_ITERS_DEFAULT), CRITIC_MAX_ITERS_HARD_CAP))
+    budget = _bounded_iteration_budget(max_iters)
     parsed = _parse_strict_json_object(raw_text)
     if parsed is None:
         return _fail_soft_trace(
@@ -752,6 +835,9 @@ def trace_event_fields(trace: Dict[str, Any]) -> Dict[str, Any]:
             "round": item.get("round"),
             "target": item.get("target"),
             "status": item.get("status"),
+            "critic_verdict": item.get("critic_verdict"),
+            "critic_reasons": list(item.get("critic_reasons") or [])[:_MAX_TRACE_ITEMS],
+            "missing_evidence": list(item.get("missing_evidence") or [])[:_MAX_TRACE_ITEMS],
             "evidence_changed": bool(diff.get("evidence_changed")),
             "changed": list(diff.get("changed") or [])[:_MAX_DIFF_KEYS],
         })
@@ -860,25 +946,30 @@ or refusal rules.
         )
         prior = ctx.meta.get("critic_trace")
         if isinstance(prior, dict) and prior.get("iteration_max"):
-            try:
-                max_iters = max(1, min(int(prior["iteration_max"]), CRITIC_MAX_ITERS_HARD_CAP))
-            except (TypeError, ValueError):
-                pass
+            max_iters = _bounded_iteration_budget(prior["iteration_max"])
         prior_consumed = 0
+        prior_requested: List[str] = []
         prior_executed: List[str] = []
         prior_rounds: List[Dict[str, Any]] = []
         if isinstance(prior, dict):
             prior_consumed = max(0, int(prior.get("retry_budget_consumed") or 0))
+            prior_requested = list(prior.get("retry_targets_requested") or [])
             prior_executed = list(prior.get("retry_targets_executed") or [])
             if isinstance(prior.get("revision_rounds"), list):
                 prior_rounds = list(prior.get("revision_rounds") or [])
 
         trace = parse_critic_output(raw_text, max_iters=max_iters)
-        if prior_consumed or prior_executed or prior_rounds:
+        if prior_consumed or prior_requested or prior_executed or prior_rounds:
             total = max(1, int(trace.get("retry_budget_total") or max_iters))
             consumed = min(total, prior_consumed)
             trace["retry_budget_consumed"] = consumed
             trace["retry_budget_remaining"] = max(0, total - consumed)
+            if prior_requested:
+                requested = list(dict.fromkeys([
+                    *prior_requested,
+                    *list(trace.get("retry_targets_requested") or []),
+                ]))
+                trace["retry_targets_requested"] = requested[:_MAX_REVISION_ROUNDS]
             if prior_executed:
                 merged = list(dict.fromkeys([*prior_executed, *list(trace.get("retry_targets_executed") or [])]))
                 trace["retry_targets_executed"] = merged[:_MAX_REVISION_ROUNDS]
@@ -907,6 +998,7 @@ __all__ = [
     "get_critic_trace",
     "is_critic_enabled",
     "is_critic_stage",
+    "mark_convergence_unavailable",
     "mark_retry_unavailable",
     "mode_budget_allows_optional_work",
     "parse_critic_output",

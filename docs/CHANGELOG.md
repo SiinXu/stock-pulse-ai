@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Added] Complete the bounded Critic self-iteration loop: controlled revision rounds with round/budget caps (`AGENT_CRITIC_MAX_ITERS`, hard cap 2), revision diffs in critic trace, soft alignment with per-mode budgets, and product-side retention of Critic opinions when convergence fails (Refs #131).
-- [Fixed] Successful Critic revision convergence no longer re-projects original gap reasons into dashboard data_limitations; residual opinions remain only on non-converged paths (Refs #131).
+- [Added] Complete the bounded Critic self-iteration loop: controlled revision rounds with round/budget caps (`AGENT_CRITIC_MAX_ITERS`, hard cap 2), audited revision diffs and triggering findings, Decision-reserving mode-budget gates, and product-side retention of Critic opinions when convergence is unverified or fails (Refs #131).
+- [Fixed] Critic revisions now require an explicit post-revision `pass` before reporting convergence; changed evidence alone never fabricates success, while explicitly converged paths omit stale gap reasons from dashboard data_limitations (Refs #131).
 - [Added] Personal daily morning brief aggregates portfolio membership, overnight Today's Focus highlights, and observed earnings-event context with optional quiet notify; event research briefs ship bounded metrics and post-event checklists through the shared report notification route (Refs #149, #1131).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after observed-event Daily Brief and Event Research settings help (Refs #149, #1131).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
