@@ -24,30 +24,30 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 152852,
-      "measuredGzipBytes": 152478,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 152478 B, cap 152852 B (measured + \u2265200 B)."
+      "maxGzipBytes": 153581,
+      "measuredGzipBytes": 153381,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 146108,
-      "measuredGzipBytes": 145866,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145866 B, cap 146108 B (measured + \u2265200 B)."
+      "maxGzipBytes": 146870,
+      "measuredGzipBytes": 146670,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 146229,
-      "measuredGzipBytes": 145847,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145847 B, cap 146229 B (measured + \u2265200 B)."
+      "maxGzipBytes": 146795,
+      "measuredGzipBytes": 146595,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 146509,
-      "measuredGzipBytes": 146126,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 146126 B, cap 146509 B (measured + \u2265200 B)."
+      "maxGzipBytes": 146955,
+      "measuredGzipBytes": 146755,
+      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-es",
