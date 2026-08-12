@@ -5322,7 +5322,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.outcomeLabel": "決算結果",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.catalogVersion": "カタログバージョン",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.deleteAction": "カスタム削除",
-  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "プリセット（金利・為替・業種ショック）は what-if 実行経路を再利用します。結果は仮説であり、ベースライン結論と混ぜてはいけません。",
+  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "プリセット（金利・FX・業種ショック）は what-if 実行経路を再利用します。結果は仮説であり、ベースライン結論と混ぜてはいけません。",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.manual": "仮定を手動設定",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.positionSizing": "ポジション方針",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.saveAction": "保存して再利用",

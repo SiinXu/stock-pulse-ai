@@ -5322,7 +5322,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.outcomeLabel": "Resultat",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.catalogVersion": "Katalogversion",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.deleteAction": "Benutzerdefiniert löschen",
-  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "Voreinstellungen (Zinsen, Devisen, Branchenschock) nutzen den what-if-Kanal. Ergebnisse sind hypothetisch und dürfen nicht mit Basislinien-Schlussfolgerungen vermischt werden.",
+  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "Voreinstellungen (Zinsen, FX, Branchenschock) nutzen den what-if-Kanal. Ergebnisse sind hypothetisch und dürfen nicht mit Basislinien-Schlussfolgerungen vermischt werden.",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.manual": "Annahmen manuell festlegen",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.positionSizing": "Positionsgröße",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.saveAction": "Zur Wiederverwendung speichern",

@@ -29,6 +29,8 @@ export function ReportScenarioSensitivityPanel({
   const framing = projection.risk_framing;
   return (
     <div
+      role="region"
+      aria-label={t('chat.whatIf.library.sensitivityBadge')}
       className="space-y-2 rounded-lg border border-warning/40 bg-warning/5 p-3"
       data-testid="report-scenario-sensitivity-panel"
       data-hypothetical="true"
@@ -51,7 +53,7 @@ export function ReportScenarioSensitivityPanel({
         </div>
         <div>
           <dt className="text-muted-text">{t('chat.whatIf.library.scenarioName')}</dt>
-          <dd className="font-medium truncate" title={projection.scenario.name}>
+          <dd className="font-medium truncate">
             {projection.scenario.name}
           </dd>
         </div>

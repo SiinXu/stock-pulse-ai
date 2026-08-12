@@ -5322,7 +5322,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.outcomeLabel": "Resultat des earnings",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.catalogVersion": "Version du catalogue",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.deleteAction": "Supprimer le personnalisé",
-  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "Les préréglages (taux, change, choc sectoriel) réutilisent le canal what-if. Les résultats sont hypothétiques et ne doivent pas être mélangés aux conclusions de base.",
+  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "Les préréglages (taux, FX, choc sectoriel) réutilisent le canal what-if. Les résultats sont hypothétiques et ne doivent pas être mélangés aux conclusions de base.",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.manual": "Configurer les hypothèses manuellement",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.positionSizing": "Taille de position",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.saveAction": "Enregistrer pour réutiliser",

@@ -5322,7 +5322,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.chat.whatIf.outcomeLabel": "財報結果",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.catalogVersion": "情景目錄版本",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.deleteAction": "刪除自訂",
-  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "選擇預置情景（利率、匯率、行業衝擊）可複用 what-if 執行通道；結果僅為假設推演，不與基線結論混淆。",
+  "i18n.uiText.UI_TEXT.chat.whatIf.library.hint": "選擇預置情景（利率、FX、行業衝擊）可複用 what-if 執行通道；結果僅為假設推演，不與基線結論混淆。",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.manual": "手動設定假設",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.positionSizing": "倉位口徑",
   "i18n.uiText.UI_TEXT.chat.whatIf.library.saveAction": "儲存複用",
