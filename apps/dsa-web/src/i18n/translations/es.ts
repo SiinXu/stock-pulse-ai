@@ -5103,6 +5103,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Enrutamiento de lenguaje natural del agente",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Carga detallada de observabilidad del agente",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Eventos de observabilidad del agente",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_COLLECTION_ENABLED": "Recopilación de spans de rendimiento",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "Indicador cProfile de rendimiento",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "Modo de orquestación",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "Tiempo de espera del agente",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto del agente de riesgo",

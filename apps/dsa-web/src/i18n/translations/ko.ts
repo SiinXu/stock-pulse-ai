@@ -5103,6 +5103,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "에이전트 자연어 라우팅",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "에이전트 관측 상세 페이로드",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "에이전트 관측 이벤트",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_COLLECTION_ENABLED": "성능 스팬 수집",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "성능 cProfile 플래그",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "오케스트레이션 모드",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "에이전트 제한 시간",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "위험 에이전트 거부권",

@@ -5103,6 +5103,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "エージェントの自然言語ルーティング",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "エージェント可観測性の詳細ペイロード",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "エージェント可観測性イベント",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_COLLECTION_ENABLED": "パフォーマンス Span 収集",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "パフォーマンス cProfile フラグ",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "オーケストレーションモード",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "エージェントのタイムアウト",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "リスクエージェントの拒否権",

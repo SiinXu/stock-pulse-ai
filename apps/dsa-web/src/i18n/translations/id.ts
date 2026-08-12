@@ -5103,6 +5103,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Perutean bahasa alami Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Payload Mendalam Observabilitas Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Peristiwa Observabilitas Agen",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_COLLECTION_ENABLED": "Pengumpulan Span Performa",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "Bendera cProfile Performa",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "Mode orkestrasi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "Batas waktu Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto Agen Risiko",

@@ -5103,6 +5103,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Agent 自然語言路由",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Agent 可觀測性深度負載",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Agent 可觀測性事件",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_COLLECTION_ENABLED": "效能 Span 採集",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "效能 cProfile 開關",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "編排模式",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "Agent 逾時",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "風險 Agent 決策否決權",

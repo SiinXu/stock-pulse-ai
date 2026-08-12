@@ -5103,6 +5103,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Penghalaan Bahasa Semula Jadi Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Muatan Mendalam Kebolehcerapan Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Peristiwa Kebolehcerapan Ejen",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_COLLECTION_ENABLED": "Pengumpulan Span Prestasi",
+  "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "Bendera cProfile Prestasi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "Mod Pengatur",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "Had Masa Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto Ejen Risiko",
