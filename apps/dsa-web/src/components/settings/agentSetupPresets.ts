@@ -346,7 +346,7 @@ export function isAgentExpertJsonKey(key: string): boolean {
   return EXPERT_JSON_KEY_SET.has(upper) || upper.endsWith('_JSON');
 }
 
-/** Presentation-only layer resolver; unknown non-essential keys stay reachable under governance. */
+/** Presentation-only layer resolver; unknown non-essential keys stay reachable under governance (no value changes). */
 export function resolveAgentDisclosureLayer(key: string): AgentDisclosureLayer {
   const upper = key.toUpperCase();
   if (ESSENTIAL_KEY_SET.has(upper)) return 'essentials';
