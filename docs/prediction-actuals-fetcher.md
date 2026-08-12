@@ -41,11 +41,23 @@ service is the single actuals boundary for the forecast track:
 | `data_unavailable` | no | Timeout, local-missing, non-finite reject, invalid input |
 
 All non-`ok` statuses set `data_unavailable=True` and leave price fields unset
-(except diagnostic OHLC on `halted`). **Never** fabricates a hit-friendly price
+(except diagnostic OHLC on `halted`; even then `return_pct=None`). **Never** fabricates a hit-friendly price
 on failure.
 
 `retryable=True` for provider / timeout / unexpected failures so the resolver
 can back off and try again on a later tick.
+
+For a forward window (`end > as_of`), `ok` requires a real bar dated exactly
+`end`. A stale earlier bar is never substituted as a zero-return horizon
+actual. A missing end bar is `data_unavailable/no_bar_for_end` and retryable;
+an end date later than the fetcher's current UTC date is
+`data_unavailable/end_not_reached` without a provider call. A halted end bar is
+non-scoreable rather than a sideways return.
+
+Requested projections are complete-or-unavailable: `ohlc` requires complete,
+positive and internally consistent OHLC bars; `volume` requires finite,
+non-negative values; all returned numerics must be finite. The snapshot domain
+type independently rejects price bars/returns on provider-failure statuses.
 
 ### Cache and coalesce
 
@@ -57,9 +69,12 @@ actuals:{market}:{symbol}:{as_of}:{end}:{sorted_field_set}
 
 - Process-local short TTL (default 60s)
 - In-flight futures merge concurrent identical keys
-- `fetch_many` unique-s by cache key before the provider pass
+- `fetch_many` unique-s by cache key before the provider pass and isolates malformed requests so one bad symbol/window does not abort its neighbors
 
-Retryable failures are **not** cached so the next tick can re-attempt.
+All typed results, including retryable failures, use the short TTL. For failures
+this TTL is a retry cooldown: the shared timeout helper returns promptly but
+cannot kill its provider worker, so immediate retries would create overlapping
+calls. After TTL expiry the next tick can re-attempt.
 
 ## Governance boundaries
 
@@ -113,6 +128,9 @@ Mandatory counterexamples:
 1. Provider raises `DataFetchError` → `provider_down`, all prices `None`
 2. Same key twice (or concurrent) → one `get_daily_data` call
 3. Non-finite close → `data_unavailable` / `non_finite_values`, not `ok`
+4. Missing horizon-end bar / halted end session → non-scoreable, never stale `0%`
+5. Real `DataFetcherManager` fallback reaches the backup provider
+6. Timeout/retry cooldown starts only one provider call inside the TTL
 
 ## Rollback
 

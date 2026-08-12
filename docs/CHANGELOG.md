@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] ActualsFetcher service pulls prediction-scoring OHLC/return/volume through DataFetcherManager with short-TTL coalesce, typed provider_down/data_unavailable failures, and non-finite rejection (Refs #1110, #1107).
+- [Fixed] Require real horizon-end bars and complete finite projections, isolate malformed actuals batch items, and apply timeout/provider-failure cooldowns so unavailable data cannot become a stale hit or provider stampede (Refs #1110, #1107).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).

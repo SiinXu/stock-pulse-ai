@@ -15,13 +15,18 @@ from __future__ import annotations
 import math
 import threading
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any, List, Optional, Tuple
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from data_provider.base import DataFetchError, DataSourceUnavailableError
+from data_provider.base import (
+    DataFetchError,
+    DataFetcherManager,
+    DataSourceUnavailableError,
+)
+from data_provider.realtime_types import CircuitBreaker
 from src.schemas.prediction_actuals import (
     ACTUALS_STATUS_DATA_UNAVAILABLE,
     ACTUALS_STATUS_EMPTY,
@@ -32,8 +37,13 @@ from src.schemas.prediction_actuals import (
     FIELD_RETURN,
     FIELD_VOLUME,
     REASON_NON_FINITE,
+    REASON_END_NOT_REACHED,
+    REASON_INVALID_WINDOW,
+    REASON_NO_BAR_FOR_END,
     REASON_PROVIDER_FAILURE,
+    ActualsBar,
     ActualsRequest,
+    ActualsSnapshot,
 )
 from src.services.actuals_fetcher import ActualsFetcher
 
@@ -100,6 +110,22 @@ class _RecordingManager:
             raise self.error
         assert self.result is not None
         return self.result
+
+
+class _OfflineProvider:
+    """DataProvider-shaped stub used under the real manager fallback layer."""
+
+    def __init__(self, name: str, priority: int, outcome: Any) -> None:
+        self.name = name
+        self.priority = priority
+        self.outcome = outcome
+        self.calls = 0
+
+    def get_daily_data(self, **_kwargs):
+        self.calls += 1
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome.copy(deep=True)
 
 
 class ActualsFetcherSuccessTests(unittest.TestCase):
@@ -228,6 +254,67 @@ class ActualsFetcherFailureTests(unittest.TestCase):
         self.assertTrue(snapshot.data_unavailable)
         self.assertFalse(snapshot.ok)
         self.assertIsNotNone(snapshot.as_of_bar)
+        self.assertIsNone(snapshot.return_pct)
+
+    def test_missing_end_bar_is_retryable_not_stale_zero_return(self) -> None:
+        frame = _daily_frame(
+            [("2026-04-10", 10.0, 11.0, 9.5, 10.5, 1000.0)]
+        )
+        manager = _RecordingManager(result=(frame, "EfinanceFetcher"))
+        fetcher = ActualsFetcher(manager=manager)
+
+        snapshot = fetcher.fetch(
+            symbol="600519",
+            market="cn",
+            as_of=date(2026, 4, 10),
+            end=date(2026, 4, 13),
+        )
+
+        self.assertEqual(snapshot.status, ACTUALS_STATUS_DATA_UNAVAILABLE)
+        self.assertEqual(snapshot.reason, REASON_NO_BAR_FOR_END)
+        self.assertTrue(snapshot.retryable)
+        self.assertIsNone(snapshot.as_of_bar)
+        self.assertIsNone(snapshot.end_bar)
+        self.assertIsNone(snapshot.return_pct)
+
+    def test_halted_end_session_is_not_scored_as_sideways(self) -> None:
+        frame = _daily_frame(
+            [
+                ("2026-04-10", 10.0, 10.5, 9.8, 10.2, 2000.0),
+                ("2026-04-13", 10.2, 10.2, 10.2, 10.2, 0.0),
+            ]
+        )
+        manager = _RecordingManager(result=(frame, "TushareFetcher"))
+        fetcher = ActualsFetcher(manager=manager)
+
+        snapshot = fetcher.fetch(
+            symbol="600519",
+            market="cn",
+            as_of=date(2026, 4, 10),
+            end=date(2026, 4, 13),
+        )
+
+        self.assertEqual(snapshot.status, ACTUALS_STATUS_HALTED)
+        self.assertIsNone(snapshot.return_pct)
+        self.assertTrue(snapshot.data_unavailable)
+
+    def test_missing_requested_volume_fails_closed(self) -> None:
+        frame = _daily_frame(
+            [("2026-04-10", 10.0, 11.0, 9.5, 10.5, 1000.0)]
+        ).drop(columns=["volume"])
+        manager = _RecordingManager(result=(frame, "EfinanceFetcher"))
+        fetcher = ActualsFetcher(manager=manager)
+
+        snapshot = fetcher.fetch(
+            symbol="600519",
+            market="cn",
+            as_of=date(2026, 4, 10),
+            field_set=(FIELD_VOLUME,),
+        )
+
+        self.assertEqual(snapshot.status, ACTUALS_STATUS_DATA_UNAVAILABLE)
+        self.assertEqual(snapshot.reason, REASON_NON_FINITE)
+        self.assertIsNone(snapshot.as_of_bar)
 
 
 class ActualsFetcherCacheCoalesceTests(unittest.TestCase):
@@ -340,7 +427,7 @@ class ActualsFetcherCacheCoalesceTests(unittest.TestCase):
         self.assertEqual(results[1].status, ACTUALS_STATUS_OK)
         self.assertEqual(len(manager.calls), 1)
 
-    def test_retryable_provider_failure_not_cached(self) -> None:
+    def test_retryable_provider_failure_is_cached_as_short_cooldown(self) -> None:
         manager = _RecordingManager(
             error=DataFetchError("down", provider_failure_count=2)
         )
@@ -351,10 +438,69 @@ class ActualsFetcherCacheCoalesceTests(unittest.TestCase):
 
         self.assertEqual(first.status, ACTUALS_STATUS_PROVIDER_DOWN)
         self.assertEqual(second.status, ACTUALS_STATUS_PROVIDER_DOWN)
-        self.assertEqual(len(manager.calls), 2)
+        self.assertFalse(first.from_cache)
+        self.assertTrue(second.from_cache)
+        self.assertEqual(len(manager.calls), 1)
+
+    def test_timeout_does_not_start_overlapping_outer_retry(self) -> None:
+        frame = _daily_frame(
+            [("2026-04-10", 10.0, 11.0, 9.5, 10.5, 1000.0)]
+        )
+        started = threading.Event()
+        release = threading.Event()
+        manager = _RecordingManager(
+            result=(frame, "slow-provider"),
+            delay_event=started,
+            release_event=release,
+        )
+        fetcher = ActualsFetcher(
+            manager=manager,
+            request_timeout_seconds=0.01,
+            max_attempts=3,
+            cache_ttl_seconds=60.0,
+        )
+
+        first = fetcher.fetch(symbol="600519", as_of=date(2026, 4, 10))
+        self.assertTrue(started.is_set())
+        second = fetcher.fetch(symbol="600519", as_of=date(2026, 4, 10))
+        release.set()
+
+        self.assertEqual(first.status, ACTUALS_STATUS_DATA_UNAVAILABLE)
+        self.assertTrue(first.retryable)
+        self.assertTrue(second.from_cache)
+        self.assertEqual(len(manager.calls), 1)
 
 
 class ActualsFetcherContractTests(unittest.TestCase):
+    def test_real_manager_fallback_path_reaches_backup_provider(self) -> None:
+        frame = _daily_frame(
+            [("2026-04-10", 10.0, 11.0, 9.5, 10.5, 1000.0)]
+        )
+        primary = _OfflineProvider(
+            "EfinanceFetcher",
+            0,
+            TimeoutError("primary down"),
+        )
+        backup = _OfflineProvider("TencentFetcher", 1, frame)
+        manager = DataFetcherManager(fetchers=[primary, backup])
+        breaker = CircuitBreaker(
+            failure_threshold=99,
+            cooldown_seconds=60.0,
+            health_window_size=20,
+        )
+        fetcher = ActualsFetcher(manager=manager, max_attempts=1)
+
+        with patch.object(DataFetcherManager, "_daily_source_health", breaker):
+            snapshot = fetcher.fetch(
+                symbol="600519",
+                market="cn",
+                as_of=date(2026, 4, 10),
+            )
+
+        self.assertEqual(snapshot.status, ACTUALS_STATUS_OK)
+        self.assertEqual(snapshot.source, "TencentFetcher")
+        self.assertEqual((primary.calls, backup.calls), (1, 1))
+
     def test_uses_injected_manager_not_agent_tools(self) -> None:
         """Guardrail: ActualsFetcher must call manager.get_daily_data only."""
         frame = _daily_frame(
@@ -395,6 +541,70 @@ class ActualsFetcherContractTests(unittest.TestCase):
 
         self.assertEqual(snapshot.status, ACTUALS_STATUS_DATA_UNAVAILABLE)
         self.assertEqual(len(manager.calls), 0)
+
+    def test_invalid_batch_item_does_not_abort_valid_neighbor(self) -> None:
+        frame = _daily_frame(
+            [("2026-04-10", 1.0, 1.1, 0.9, 1.05, 10.0)]
+        )
+        manager = _RecordingManager(result=(frame, "provider"))
+        fetcher = ActualsFetcher(manager=manager)
+
+        results = fetcher.fetch_many(
+            [
+                {"symbol": "600519", "as_of": "not-a-date"},
+                ActualsRequest(
+                    symbol="600519",
+                    market="cn",
+                    as_of=datetime(2026, 4, 10, 12, 30),  # type: ignore[arg-type]
+                ),
+            ]
+        )
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].status, ACTUALS_STATUS_DATA_UNAVAILABLE)
+        self.assertEqual(results[0].reason, REASON_INVALID_WINDOW)
+        self.assertEqual(results[1].status, ACTUALS_STATUS_OK)
+        self.assertEqual(results[1].as_of, date(2026, 4, 10))
+        self.assertEqual(len(manager.calls), 1)
+
+    def test_future_end_is_retryable_without_provider_call(self) -> None:
+        manager = _RecordingManager(
+            result=(_daily_frame([("2026-04-10", 1, 1, 1, 1, 1)]), "x")
+        )
+        fetcher = ActualsFetcher(
+            manager=manager,
+            now_utc=lambda: datetime(2026, 4, 10, 12, tzinfo=timezone.utc),
+        )
+
+        snapshot = fetcher.fetch(
+            symbol="600519",
+            as_of=date(2026, 4, 10),
+            end=date(2026, 4, 11),
+        )
+
+        self.assertEqual(snapshot.status, ACTUALS_STATUS_DATA_UNAVAILABLE)
+        self.assertEqual(snapshot.reason, REASON_END_NOT_REACHED)
+        self.assertTrue(snapshot.retryable)
+        self.assertEqual(manager.calls, [])
+
+    def test_constructor_rejects_non_finite_limits(self) -> None:
+        with self.assertRaisesRegex(ValueError, "cache_ttl_seconds"):
+            ActualsFetcher(cache_ttl_seconds=float("nan"))
+        with self.assertRaisesRegex(ValueError, "request_timeout_seconds"):
+            ActualsFetcher(request_timeout_seconds=float("inf"))
+
+    def test_snapshot_contract_rejects_prices_on_provider_failure(self) -> None:
+        bar = ActualsBar(trade_date=date(2026, 4, 10), close=10.0)
+        with self.assertRaisesRegex(ValueError, "must not carry price bars"):
+            ActualsSnapshot(
+                symbol="600519",
+                market="cn",
+                as_of=date(2026, 4, 10),
+                end=date(2026, 4, 10),
+                status=ACTUALS_STATUS_PROVIDER_DOWN,
+                field_set=(FIELD_RETURN,),
+                as_of_bar=bar,
+            )
 
     def test_cache_key_formula(self) -> None:
         key = ActualsFetcher.build_cache_key(

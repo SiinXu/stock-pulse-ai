@@ -58,11 +58,13 @@ from src.schemas.prediction_actuals import (
     FIELD_VOLUME,
     REASON_DELISTED,
     REASON_EMPTY_FRAME,
+    REASON_END_NOT_REACHED,
     REASON_HALTED_SESSION,
     REASON_INVALID_SYMBOL,
     REASON_INVALID_WINDOW,
     REASON_LOCAL_DATA_MISSING,
     REASON_NO_BAR_FOR_AS_OF,
+    REASON_NO_BAR_FOR_END,
     REASON_NON_FINITE,
     REASON_PROVIDER_FAILURE,
     REASON_PROVIDER_TIMEOUT,
@@ -110,24 +112,52 @@ class ActualsFetcher:
         clock: Optional[Callable[[], float]] = None,
         now_utc: Optional[Callable[[], datetime]] = None,
     ) -> None:
-        if cache_ttl_seconds <= 0:
+        cache_ttl_value = float(cache_ttl_seconds)
+        cache_max_value = float(cache_max_entries)
+        timeout_value = float(request_timeout_seconds)
+        attempts_value = float(max_attempts)
+        lookback_value = float(lookback_calendar_days)
+        if (
+            isinstance(cache_ttl_seconds, bool)
+            or not math.isfinite(cache_ttl_value)
+            or cache_ttl_value <= 0
+        ):
             raise ValueError("cache_ttl_seconds must be positive")
-        if cache_max_entries <= 0:
+        if (
+            isinstance(cache_max_entries, bool)
+            or not math.isfinite(cache_max_value)
+            or cache_max_value <= 0
+            or not cache_max_value.is_integer()
+        ):
             raise ValueError("cache_max_entries must be positive")
-        if request_timeout_seconds <= 0:
+        if (
+            isinstance(request_timeout_seconds, bool)
+            or not math.isfinite(timeout_value)
+            or timeout_value <= 0
+        ):
             raise ValueError("request_timeout_seconds must be positive")
-        if max_attempts < 1:
+        if (
+            isinstance(max_attempts, bool)
+            or not math.isfinite(attempts_value)
+            or attempts_value < 1
+            or not attempts_value.is_integer()
+        ):
             raise ValueError("max_attempts must be >= 1")
-        if lookback_calendar_days < 0:
+        if (
+            isinstance(lookback_calendar_days, bool)
+            or not math.isfinite(lookback_value)
+            or lookback_value < 0
+            or not lookback_value.is_integer()
+        ):
             raise ValueError("lookback_calendar_days must be >= 0")
 
         self._manager = manager
         self._manager_factory = manager_factory
-        self._cache_ttl_seconds = float(cache_ttl_seconds)
-        self._cache_max_entries = int(cache_max_entries)
-        self._request_timeout_seconds = float(request_timeout_seconds)
-        self._max_attempts = int(max_attempts)
-        self._lookback_calendar_days = int(lookback_calendar_days)
+        self._cache_ttl_seconds = cache_ttl_value
+        self._cache_max_entries = int(cache_max_value)
+        self._request_timeout_seconds = timeout_value
+        self._max_attempts = int(attempts_value)
+        self._lookback_calendar_days = int(lookback_value)
         self._clock = clock or time.monotonic
         self._now_utc = now_utc or (lambda: datetime.now(timezone.utc))
 
@@ -151,13 +181,33 @@ class ActualsFetcher:
         field_set: Optional[Sequence[str]] = None,
     ) -> ActualsSnapshot:
         """Fetch one actuals snapshot for ``symbol`` over ``[as_of, end]``."""
-        request = ActualsRequest(
-            symbol=symbol,
-            market=market,
-            as_of=self._coerce_date(as_of, field_name="as_of"),
-            end=None if end is None else self._coerce_date(end, field_name="end"),
-            field_set=tuple(field_set) if field_set is not None else DEFAULT_FIELD_SET,
-        )
+        try:
+            request = ActualsRequest(
+                symbol=symbol,
+                market=market,
+                as_of=self._coerce_date(as_of, field_name="as_of"),
+                end=(
+                    None
+                    if end is None
+                    else self._coerce_date(end, field_name="end")
+                ),
+                field_set=(
+                    tuple(field_set) if field_set is not None else DEFAULT_FIELD_SET
+                ),
+            )
+        except (TypeError, ValueError):
+            fallback = self._now_utc().date()
+            return self._failure_snapshot(
+                symbol=str(symbol or "").strip(),
+                market=str(market or "").strip().lower() or "unknown",
+                as_of=fallback,
+                end=fallback,
+                field_set=DEFAULT_FIELD_SET,
+                status=ACTUALS_STATUS_DATA_UNAVAILABLE,
+                reason=REASON_INVALID_WINDOW,
+                retryable=False,
+                cache_key=None,
+            )
         return self._fetch_request(request)
 
     def fetch_many(
@@ -165,23 +215,47 @@ class ActualsFetcher:
         requests: Sequence[Union[ActualsRequest, Mapping[str, Any]]],
     ) -> List[ActualsSnapshot]:
         """Fetch many requests, coalescing identical cache keys to one provider call."""
-        normalized: List[ActualsRequest] = [
-            self._normalize_request(item) for item in requests
-        ]
         key_to_request: Dict[str, ActualsRequest] = {}
         ordered_keys: List[Optional[str]] = []
         early_results: Dict[int, ActualsSnapshot] = {}
 
-        for index, request in enumerate(normalized):
+        for index, item in enumerate(requests):
+            try:
+                request = self._normalize_request(item)
+            except (TypeError, ValueError):
+                fallback = self._now_utc().date()
+                raw = item if isinstance(item, Mapping) else {}
+                early_results[index] = self._failure_snapshot(
+                    symbol=str(raw.get("symbol") or "").strip(),
+                    market=str(raw.get("market") or "").strip().lower()
+                    or "unknown",
+                    as_of=fallback,
+                    end=fallback,
+                    field_set=self._safe_field_set(raw.get("field_set")),
+                    status=ACTUALS_STATUS_DATA_UNAVAILABLE,
+                    reason=REASON_INVALID_WINDOW,
+                    retryable=False,
+                    cache_key=None,
+                )
+                ordered_keys.append(None)
+                continue
             try:
                 prepared = self._prepare_request(request)
             except _ActualsPrepError as exc:
                 as_of_fallback = (
-                    request.as_of if isinstance(request.as_of, date) else date.today()
+                    request.as_of
+                    if isinstance(request.as_of, date)
+                    and not isinstance(request.as_of, datetime)
+                    else self._now_utc().date()
                 )
                 end_fallback = (
-                    request.end if isinstance(request.end, date) else as_of_fallback
+                    request.end
+                    if isinstance(request.end, date)
+                    and not isinstance(request.end, datetime)
+                    else as_of_fallback
                 )
+                if end_fallback < as_of_fallback:
+                    end_fallback = as_of_fallback
                 early_results[index] = self._failure_snapshot(
                     symbol=str(request.symbol or "").strip(),
                     market=str(request.market or "").strip().lower() or "unknown",
@@ -235,11 +309,19 @@ class ActualsFetcher:
             cache_key, prepared = self._prepare_request(request)
         except _ActualsPrepError as exc:
             as_of_fallback = (
-                request.as_of if isinstance(getattr(request, "as_of", None), date) else date.today()
+                request.as_of
+                if isinstance(getattr(request, "as_of", None), date)
+                and not isinstance(getattr(request, "as_of", None), datetime)
+                else self._now_utc().date()
             )
             end_fallback = (
-                request.end if isinstance(getattr(request, "end", None), date) else as_of_fallback
+                request.end
+                if isinstance(getattr(request, "end", None), date)
+                and not isinstance(getattr(request, "end", None), datetime)
+                else as_of_fallback
             )
+            if end_fallback < as_of_fallback:
+                end_fallback = as_of_fallback
             return self._failure_snapshot(
                 symbol=str(request.symbol or "").strip(),
                 market=str(request.market or "").strip().lower() or "unknown",
@@ -289,11 +371,10 @@ class ActualsFetcher:
 
         try:
             snapshot = self._resolve_from_provider(request, cache_key=cache_key)
-            # Cache successes and non-retryable failures briefly so a tick group
-            # does not re-hammer a known empty/halted symbol. Retryable failures
-            # are not cached so the next tick can re-attempt.
-            if snapshot.ok or not snapshot.retryable:
-                self._cache_put(cache_key, snapshot)
+            # Cache every typed result for the short TTL. This is also the
+            # retry cooldown: call_with_timeout cannot kill a hung provider
+            # thread, so immediately reissuing would create a stampede.
+            self._cache_put(cache_key, snapshot)
             future.set_result(snapshot)
             return snapshot
         except Exception as exc:  # broad-exception: fallback_recorded - owner never raises fabricated prices to waiters
@@ -316,6 +397,7 @@ class ActualsFetcher:
                 retryable=True,
                 cache_key=cache_key,
             )
+            self._cache_put(cache_key, snapshot)
             future.set_result(snapshot)
             return snapshot
         finally:
@@ -372,8 +454,8 @@ class ActualsFetcher:
                 )
             except TimeoutError as exc:
                 last_error = exc
-                if attempt < self._max_attempts:
-                    continue
+                # The timeout helper returns promptly but cannot kill its
+                # worker. Never start another overlapping outer attempt.
                 return self._failure_snapshot(
                     symbol=symbol,
                     market=market,
@@ -478,13 +560,16 @@ class ActualsFetcher:
     def _get_manager(self) -> Any:
         if self._manager is not None:
             return self._manager
-        if self._manager_factory is not None:
-            self._manager = self._manager_factory()
-            return self._manager
-        from data_provider import DataFetcherManager
+        with self._lock:
+            if self._manager is not None:
+                return self._manager
+            if self._manager_factory is not None:
+                self._manager = self._manager_factory()
+            else:
+                from data_provider import DataFetcherManager
 
-        self._manager = DataFetcherManager()
-        return self._manager
+                self._manager = DataFetcherManager()
+            return self._manager
 
     # ------------------------------------------------------------------
     # Projection / validation
@@ -547,8 +632,21 @@ class ActualsFetcher:
             )
 
         end_row = self._select_bar_on_or_before(normalized, end)
-        if end_row is None:
-            end_row = as_of_row
+        if end_row is None or (
+            end > as_of and self._coerce_bar_date(end_row.get("date")) != end
+        ):
+            return self._failure_snapshot(
+                symbol=symbol,
+                market=market,
+                as_of=as_of,
+                end=end,
+                field_set=field_set,
+                status=ACTUALS_STATUS_DATA_UNAVAILABLE,
+                reason=REASON_NO_BAR_FOR_END,
+                retryable=True,
+                cache_key=cache_key,
+                source=source or None,
+            )
 
         if self._looks_delisted(normalized, as_of_row):
             return self._failure_snapshot(
@@ -564,7 +662,7 @@ class ActualsFetcher:
                 source=source or None,
             )
 
-        if self._looks_halted(as_of_row):
+        if self._looks_halted(as_of_row) or self._looks_halted(end_row):
             as_of_bar, end_bar, return_pct, finite_ok = self._build_bars(
                 as_of_row=as_of_row,
                 end_row=end_row,
@@ -594,7 +692,7 @@ class ActualsFetcher:
                 retryable=False,
                 as_of_bar=as_of_bar,
                 end_bar=end_bar,
-                return_pct=return_pct,
+                return_pct=None,
                 source=source or None,
                 from_cache=False,
                 fetched_at=self._now_utc(),
@@ -667,11 +765,13 @@ class ActualsFetcher:
         as_of_bar = self._row_to_bar(
             as_of_row,
             include_ohlc=include_ohlc or include_return,
+            require_complete_ohlc=include_ohlc,
             include_volume=include_volume,
         )
         end_bar = self._row_to_bar(
             end_row,
             include_ohlc=include_ohlc or include_return,
+            require_complete_ohlc=include_ohlc,
             include_volume=include_volume,
         )
         if as_of_bar is None or end_bar is None:
@@ -707,6 +807,7 @@ class ActualsFetcher:
         row: pd.Series,
         *,
         include_ohlc: bool,
+        require_complete_ohlc: bool,
         include_volume: bool,
     ) -> Optional[ActualsBar]:
         trade_date = self._coerce_bar_date(row.get("date"))
@@ -719,13 +820,32 @@ class ActualsFetcher:
             high_v = self._finite_or_none(row.get("high"))
             low_v = self._finite_or_none(row.get("low"))
             close_v = self._finite_or_none(row.get("close"))
-            if close_v is None:
+            if close_v is None or (
+                require_complete_ohlc
+                and None in (open_v, high_v, low_v, close_v)
+            ):
                 return None
             for column in ("open", "high", "low"):
                 raw = row.get(column)
                 if raw is not None and not (isinstance(raw, float) and math.isnan(raw)):
                     if self._finite_or_none(raw) is None and not self._is_missing(raw):
                         return None
+            assert close_v is not None
+            prices = [
+                value
+                for value in (open_v, high_v, low_v, close_v)
+                if value is not None
+            ]
+            if min(prices) <= 0.0:
+                return None
+            if None not in (open_v, high_v, low_v, close_v):
+                assert open_v is not None
+                assert high_v is not None
+                assert low_v is not None
+                if low_v > min(open_v, close_v) or high_v < max(open_v, close_v):
+                    return None
+                if low_v > high_v:
+                    return None
 
         volume_v = None
         if include_volume:
@@ -736,6 +856,8 @@ class ActualsFetcher:
                 and not self._is_missing(raw_volume)
                 and volume_v is None
             ):
+                return None
+            if volume_v is None or volume_v < 0.0:
                 return None
 
         return ActualsBar(
@@ -886,14 +1008,10 @@ class ActualsFetcher:
             market = market_hint or detect_market(symbol)
 
         try:
-            as_of = (
-                request.as_of
-                if isinstance(request.as_of, date)
-                else self._coerce_date(request.as_of, field_name="as_of")
-            )
+            as_of = self._coerce_date(request.as_of, field_name="as_of")
             end = (
-                request.end
-                if request.end is None or isinstance(request.end, date)
+                None
+                if request.end is None
                 else self._coerce_date(request.end, field_name="end")
             )
         except ValueError as exc:
@@ -921,6 +1039,12 @@ class ActualsFetcher:
                 ACTUALS_STATUS_DATA_UNAVAILABLE,
                 REASON_INVALID_WINDOW,
                 retryable=False,
+            )
+        if effective_end > self._now_utc().date():
+            raise _ActualsPrepError(
+                ACTUALS_STATUS_DATA_UNAVAILABLE,
+                REASON_END_NOT_REACHED,
+                retryable=True,
             )
 
         field_set = self._normalize_field_set(request.field_set)
