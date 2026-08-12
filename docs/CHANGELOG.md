@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Extensions and Notifications settings panels deep-link each other for loaded notification-channel plugins, with honest empty states when adapters are inactive (Refs #870).
+- [Chore] Rebaseline Web locale gzip budgets after Extensions↔Notifications cross-link copy (Refs #870).
 - [Chore] Rebaseline Web locale gzip budgets after HTML report-export download chrome strings (Refs #163).
 - [Added] Report Markdown panel one-click HTML export uses history export capabilities so office-friendly HTML is user-reachable alongside Markdown and PDF (Refs #163).
 - [Chore] Rebaseline Web locale gzip budgets after Agent three-layer progressive-disclosure copy (Refs #868).

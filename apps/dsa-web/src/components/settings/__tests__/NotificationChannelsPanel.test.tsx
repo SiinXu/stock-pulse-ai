@@ -1,4 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SystemConfigItem } from '../../../types/systemConfig';
 import { NotificationChannelsPanel } from '../NotificationChannelsPanel';
@@ -10,10 +12,17 @@ import {
 import { buildNotificationEventRoutes } from '../notificationEventRoutes';
 
 const testNotificationChannel = vi.hoisted(() => vi.fn());
+const listPlugins = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../api/systemConfig', () => ({
   systemConfigApi: {
     testNotificationChannel,
+  },
+}));
+
+vi.mock('../../../api/plugins', () => ({
+  pluginsApi: {
+    list: listPlugins,
   },
 }));
 
@@ -41,10 +50,16 @@ function buildItem(overrides: Partial<SystemConfigItem> = {}): SystemConfigItem 
   };
 }
 
+function renderHub(ui: ReactElement, initialEntry = '/settings?section=notifications&view=channels') {
+  return render(<MemoryRouter initialEntries={[initialEntry]}>{ui}</MemoryRouter>);
+}
+
 describe('NotificationChannelsPanel', () => {
   beforeEach(() => {
     resetNotificationChannelTestStatusForTests();
     testNotificationChannel.mockReset();
+    listPlugins.mockReset();
+    listPlugins.mockResolvedValue({ total: 0, items: [] });
     testNotificationChannel.mockResolvedValue({
       success: true,
       message: 'ok',
@@ -57,7 +72,7 @@ describe('NotificationChannelsPanel', () => {
   });
 
   it('uses the backend authority instead of treating schema defaults as configured', () => {
-    render(
+    renderHub(
       <NotificationChannelsPanel
         items={[buildItem()]}
         configuredChannels={[]}
@@ -77,7 +92,7 @@ describe('NotificationChannelsPanel', () => {
   });
 
   it('shows only configured state for an authoritative masked channel', () => {
-    const { container } = render(
+    const { container } = renderHub(
       <NotificationChannelsPanel
         items={[buildItem({
           key: 'FEISHU_APP_SECRET',
@@ -105,7 +120,7 @@ describe('NotificationChannelsPanel', () => {
   });
 
   it('renders event routing overview and per-card event chips', () => {
-    render(
+    renderHub(
       <NotificationChannelsPanel
         items={[buildItem()]}
         configuredChannels={['feishu']}
@@ -128,7 +143,7 @@ describe('NotificationChannelsPanel', () => {
   });
 
   it('keeps saved effective routes authoritative while a draft is failed', () => {
-    render(
+    renderHub(
       <NotificationChannelsPanel
         items={[buildItem()]}
         configuredChannels={['feishu', 'email']}
@@ -163,7 +178,7 @@ describe('NotificationChannelsPanel', () => {
         options: [],
       },
     });
-    render(
+    renderHub(
       <NotificationChannelsPanel
         items={[webhookItem]}
         configuredChannels={['feishu']}
@@ -224,7 +239,7 @@ describe('NotificationChannelsPanel', () => {
       },
     });
 
-    const { container } = render(
+    const { container } = renderHub(
       <NotificationChannelsPanel
         items={[groupWebhook, signingSecret, appKey]}
         configuredChannels={['dingtalk']}
@@ -271,7 +286,7 @@ describe('NotificationChannelsPanel', () => {
       at: Date.now(),
     });
 
-    render(
+    renderHub(
       <NotificationChannelsPanel
         items={[item]}
         configuredChannels={['feishu']}
@@ -315,7 +330,7 @@ describe('NotificationChannelsPanel', () => {
       },
     });
 
-    render(
+    renderHub(
       <NotificationChannelsPanel
         items={[item]}
         configuredChannels={['custom']}
@@ -351,7 +366,7 @@ describe('NotificationChannelsPanel', () => {
         options: [],
       },
     });
-    render(
+    renderHub(
       <NotificationChannelsPanel
         items={[item]}
         configuredChannels={['feishu', 'email']}
@@ -376,5 +391,82 @@ describe('NotificationChannelsPanel', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /分析报告|Analysis report/ }));
     fireEvent.click(screen.getByTestId('notification-channel-bind-events'));
     expect(onBindEvents).toHaveBeenCalledWith('feishu', ['report']);
+  });
+
+  it('shows plugin-provided channels with a deep link back to Extensions', async () => {
+    listPlugins.mockResolvedValue({
+      total: 1,
+      items: [{
+        id: 'example-notification-channel',
+        name: 'Example Notification Channel',
+        version: '1.0.0',
+        source: 'external',
+        state: 'enabled',
+        desiredEnabled: true,
+        reloadable: true,
+        packageRoot: '/plugins/example-notification-channel',
+        extensionPoints: ['notification_channel'],
+        notificationChannels: ['example_log'],
+        description: '',
+        author: '',
+        settingsCount: 0,
+      }],
+    });
+
+    renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    expect(await screen.findByTestId('notification-plugin-channel-card-example_log')).toBeInTheDocument();
+    expect(screen.getByText(/Provided by plugin: Example Notification Channel|由插件提供：Example Notification Channel/)).toBeInTheDocument();
+    expect(screen.getByTestId('notification-plugin-channel-open-extension-example_log')).toHaveAttribute(
+      'href',
+      '/settings?section=system_security&view=extensions&plugin=example-notification-channel',
+    );
+  });
+
+  it('keeps an honest empty plugin-channel state when the roster has no adapters', async () => {
+    listPlugins.mockResolvedValue({ total: 0, items: [] });
+
+    renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    expect(await screen.findByTestId('notification-plugin-channels')).toBeInTheDocument();
+    expect(screen.getByText(/No plugin notification channels loaded|当前没有已加载的插件通知渠道/)).toBeInTheDocument();
+    expect(screen.queryByTestId(/notification-plugin-channel-card-/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('notification-plugin-channels-open-extensions')).toHaveAttribute(
+      'href',
+      '/settings?section=system_security&view=extensions',
+    );
+  });
+
+  it('does not invent plugin channels when the plugins list fails', async () => {
+    listPlugins.mockRejectedValue(new Error('plugins down'));
+
+    renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    expect(await screen.findByText(/Plugin roster unavailable|无法读取插件名册/)).toBeInTheDocument();
+    expect(screen.queryByTestId(/notification-plugin-channel-card-/)).not.toBeInTheDocument();
   });
 });

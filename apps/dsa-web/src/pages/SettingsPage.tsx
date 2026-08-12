@@ -309,6 +309,8 @@ const SettingsPage: React.FC = () => {
     next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
     next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacySub);
     next.delete(SETTINGS_ROUTE_QUERY_KEYS.source);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.channel);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.plugin);
     next.set(SETTINGS_ROUTE_QUERY_KEYS.section, section);
     const resolvedView = getSectionViews(section).some((entry) => entry.id === view)
       ? view

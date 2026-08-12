@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale budgets merge PR #1166 Linux rebaseline with HTML report-export chrome (Refs #163 / PR #1159); caps keep stack headroom for both key sets.",
+  "baselineNote": "Locale and IntelligenceSourcesPanel budgets refreshed for Refs #870 Extensions\u2194Notifications cross-link copy and OpenAPI field.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 233722,
-      "measuredGzipBytes": 233522,
-      "note": "GitHub Actions Linux measurement after the integrated Settings changes in PR #1050; measured 233522 B + 200 B headroom."
+      "maxGzipBytes": 234126,
+      "measuredGzipBytes": 233926,
+      "note": "GitHub Actions Linux baseline refresh after PluginInfo.notification_channels OpenAPI/types growth for Refs #870; local measured + \u2265200 B."
     },
     {
       "id": "js-entry",
@@ -26,23 +26,23 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 152852,
-      "measuredGzipBytes": 152478,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 152478 B, cap 152852 B (measured + \u2265200 B)."
+      "maxGzipBytes": 153104,
+      "measuredGzipBytes": 152904,
+      "note": "Refs #870 Extensions\u2194Notifications cross-link locale/copy growth; local measured + \u2265200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 146108,
-      "measuredGzipBytes": 145866,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145866 B, cap 146108 B (measured + \u2265200 B)."
+      "maxGzipBytes": 146467,
+      "measuredGzipBytes": 146267,
+      "note": "Refs #870 Extensions\u2194Notifications cross-link locale/copy growth; local measured + \u2265200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 146229,
-      "measuredGzipBytes": 145847,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145847 B, cap 146229 B (measured + \u2265200 B)."
+      "maxGzipBytes": 146434,
+      "measuredGzipBytes": 146234,
+      "note": "Refs #870 Extensions\u2194Notifications cross-link locale/copy growth; local measured + \u2265200 B headroom."
     },
     {
       "id": "locale-fr",
@@ -54,30 +54,30 @@
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 142289,
-      "measuredGzipBytes": 141915,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 141915 B, cap 142289 B (measured + \u2265200 B)."
+      "maxGzipBytes": 142510,
+      "measuredGzipBytes": 142310,
+      "note": "Refs #870 Extensions\u2194Notifications cross-link locale/copy growth; local measured + \u2265200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 138832,
-      "measuredGzipBytes": 138450,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 138450 B, cap 138832 B (measured + \u2265200 B)."
+      "maxGzipBytes": 139086,
+      "measuredGzipBytes": 138886,
+      "note": "Refs #870 Extensions\u2194Notifications cross-link locale/copy growth; local measured + \u2265200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 132253,
-      "measuredGzipBytes": 131875,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131875 B, cap 132253 B (measured + \u2265200 B)."
+      "maxGzipBytes": 132489,
+      "measuredGzipBytes": 132289,
+      "note": "Refs #870 Extensions\u2194Notifications cross-link locale/copy growth; local measured + \u2265200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 132328,
-      "measuredGzipBytes": 131950,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131950 B, cap 132328 B (measured + \u2265200 B)."
+      "maxGzipBytes": 132576,
+      "measuredGzipBytes": 132376,
+      "note": "Refs #870 Extensions\u2194Notifications cross-link locale/copy growth; local measured + \u2265200 B headroom."
     },
     {
       "id": "vendor-charts",

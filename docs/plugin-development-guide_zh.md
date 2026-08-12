@@ -161,6 +161,11 @@ Settings → System & Security → Extensions 提供生成式表单与持久化�
 密钥库**，因此必须保护数据目录。API 与 Web 表单会掩码敏感值；保持掩码不变即可
 保留已存值。
 
+当插件注册了活跃的 `notification_channel` 时，Extensions 名册会暴露规范渠道 ID，
+并可深链到 Settings → Notifications。Notifications 枢纽会列出这些插件渠道、显示
+提供方插件，并提供回到 Extensions 行的反向链接。已停用、失败或未加载的适配器保持
+空态，**不会**显示为已连接。
+
 为已启用插件保存设置会报告 `restart_required`。必须重新启用插件或重启应用后，
 才能认为运行实例已使用新值。省略的键会恢复声明默认值；未知键、错误类型、越界值、
 NaN 与正负 Infinity 都会 fail-closed，且不会改变持久化文件。
