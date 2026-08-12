@@ -76,6 +76,7 @@
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
+| [预测抽取](prediction-extraction.md) | 结构化决策 → PredictionRecord 草稿；散文反例；默认关闭的 finalize 钩子（[EN](prediction-extraction_EN.md)） |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
 | [资讯 / 情报源](intelligence-sources.md) | RSS/Atom 合规资讯源配置、测试、拉取、去重、存储、查询与安全边界 |
 | [分析上下文包契约、运行态消费与可见性](analysis-context-pack.md) | AnalysisContextPack 首版范围、字段质量状态、P1/P2 内部契约、P3 Prompt 摘要消费、P4 历史/API/Web 低敏可见性、P5 数据质量评分、P6 迁移回滚与源码锚点；完整指南补充 #1386 阶段感知分析、迁移与回滚入口 |

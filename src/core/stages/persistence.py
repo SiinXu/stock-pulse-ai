@@ -190,6 +190,11 @@ class _PersistenceStageMixin:
                         context_snapshot=context_snapshot,
                         portfolio_context=portfolio_context,
                     )
+                    self._extract_prediction_after_history_save(
+                        result=result,
+                        query_id=query_id,
+                        source_report_id=saved_history_id,
+                    )
                     # Config-gated skill-opinion sample materialization from the
                     # just-saved report (samples require analysis_history_id FK).
                     try:
@@ -324,6 +329,49 @@ class _PersistenceStageMixin:
                 "Decision signal extraction failed after history save",
                 exc,
                 error_code="pipeline_decision_signal_extraction_failed",
+                level=logging.WARNING,
+                context={
+                    "query_id": query_id,
+                    "stock_code": getattr(result, "code", None),
+                },
+            )
+
+
+    def _extract_prediction_after_history_save(
+        self,
+        *,
+        result: AnalysisResult,
+        query_id: str,
+        source_report_id: int,
+    ) -> None:
+        """Best-effort PredictionRecord extraction after analysis history is saved.
+
+        Default-off via ``PREDICTION_EXTRACT_ENABLED``. Drafts are attached to the
+        in-memory result only; durable persistence is owned by later issues.
+        Failures never block history persistence or user-visible analysis.
+        """
+        try:
+            from src.services.prediction_extractor import (
+                maybe_extract_prediction_on_finalize,
+            )
+
+            extraction = maybe_extract_prediction_on_finalize(
+                result,
+                config=getattr(self, "config", None),
+                run_id=str(query_id or ""),
+                source_decision_id=str(source_report_id),
+                mode=str(getattr(self, "query_source", None) or "analysis"),
+                model_id=getattr(result, "model_used", None),
+            )
+            if extraction is None:
+                return
+            setattr(result, "prediction_extraction", extraction.to_dict())
+        except Exception as exc:  # broad-exception: fallback_recorded - Prediction extraction must never fail history persistence.
+            log_safe_exception(
+                logger,
+                "Prediction extraction failed after history save",
+                exc,
+                error_code="pipeline_prediction_extraction_failed",
                 level=logging.WARNING,
                 context={
                     "query_id": query_id,

@@ -236,7 +236,62 @@ class _DashboardMethods:
         if dashboard is None:
             return None
         ctx.set_data("final_dashboard", dashboard)
+        self._maybe_extract_prediction_on_finalize(dashboard, ctx)
         return dashboard
+
+
+    def _maybe_extract_prediction_on_finalize(
+        self,
+        dashboard: Dict[str, Any],
+        ctx: AgentContext,
+    ) -> None:
+        """Feature-flagged PredictionRecord extraction after successful finalize.
+
+        Default-off. Attaches a draft extraction summary to ``ctx.meta`` only;
+        does not persist rows (A3) and never fails the agent run.
+        """
+        try:
+            from src.services.prediction_extractor import (
+                maybe_extract_prediction_on_finalize,
+            )
+
+            source = dict(dashboard)
+            if ctx.stock_code and not source.get("stock_code") and not source.get("code"):
+                source["stock_code"] = ctx.stock_code
+            if ctx.stock_name and not source.get("stock_name") and not source.get("name"):
+                source["stock_name"] = ctx.stock_name
+
+            skill_ids = ctx.meta.get("skills_requested") or ctx.meta.get("skill_ids")
+            run_token = str(ctx.session_id or ctx.meta.get("run_id") or ctx.query or "").strip()
+            extraction = maybe_extract_prediction_on_finalize(
+                source,
+                config=getattr(self, "config", None),
+                run_id=run_token[:128] if run_token else None,
+                mode=str(ctx.meta.get("response_mode") or ctx.meta.get("mode") or "agent"),
+                soul_version=(
+                    str(ctx.meta.get("soul_version")).strip()
+                    if ctx.meta.get("soul_version")
+                    else None
+                ),
+                skill_ids=skill_ids if isinstance(skill_ids, (list, tuple)) else None,
+                model_id=(
+                    str(ctx.meta.get("model_id") or ctx.meta.get("model_used") or "").strip()
+                    or None
+                ),
+                source_decision_id=str(ctx.meta.get("decision_id") or "").strip() or None,
+            )
+            if extraction is None:
+                return
+            ctx.meta["prediction_extraction"] = extraction.to_dict()
+        except Exception as exc:  # broad-exception: fallback_recorded - never fail finalize
+            log_safe_exception(
+                logger,
+                "Prediction extraction after agent finalize failed",
+                exc,
+                error_code="agent_prediction_extraction_failed",
+                level=logging.WARNING,
+                context={"stock_code": getattr(ctx, "stock_code", None)},
+            )
 
     def _prepare_dashboard_payload(
         self,
