@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Production-isomorphic sandbox traces for agent-variant comparison.
+"""Production-comparable sandbox traces for agent-variant comparison.
 
-Trace shape intentionally mirrors the production agent-trajectory / L0 event
-fields so sandbox vs production runs can be diffed field-by-field. Sandbox
-traces always carry simulation labels and never imply production authority.
+Trace shape intentionally mirrors production agent-trajectory / L0 event fields
+so sandbox vs production runs can be diffed field-by-field. Strict trajectory
+projections omit sandbox-only keys (``TrajectoryRunInput`` forbids extras);
+simulation metadata lives on the enclosing trace / side-car projection.
+Sandbox traces always carry simulation labels and never imply production
+authority.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ SANDBOX_TRACE_SCHEMA_VERSION = "sandbox-trace-v1"
 
 @dataclass(frozen=True)
 class SandboxTraceEvent:
-    """One bounded, redaction-friendly sandbox event (production-isomorphic)."""
+    """One bounded, redaction-friendly sandbox event (production-comparable)."""
 
     event_type: str
     name: str

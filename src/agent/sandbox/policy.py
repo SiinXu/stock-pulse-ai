@@ -23,8 +23,9 @@ SIMULATION_BANNER_ZH = (
 
 # Hard isolation contract. Values are intentional and must stay fail-closed.
 # Enforcement in batch-1 (see docs/agent-sandbox.md):
-# - persist_analysis_history / persist_decision_signal / send_real_notifications
-#   are wired at authoritative production write entry points.
+# - persist_analysis_history / persist_decision_signal / persist_decision_memory
+#   / send_real_notifications are wired at authoritative production write entry
+#   points.
 # - persist_agent_memory / place_real_orders / write_production_portfolio are
 #   declared intent for promotion receipts; write fences land in later batches.
 # - FakeClock is context-local, not a process-wide wall-clock patch.
@@ -42,6 +43,7 @@ SANDBOX_ISOLATION_POLICY: Dict[str, Any] = {
     "enforced_in_batch1": (
         "persist_analysis_history",
         "persist_decision_signal",
+        "persist_decision_memory",
         "send_real_notifications",
         "auto_promote_to_production",
     ),

@@ -24,7 +24,7 @@ Passing a sandbox or backtest run **never** becomes automatic execution authorit
    - `SandboxRunner` / `run_agent_variant_in_sandbox` / `compare_variants`
    - Production-comparable traces (`sandbox-trace-v1`) project to strict `agent-trajectory-input-v1` via `trajectory_compatible_runs()` (no extra keys; simulation metadata stays on the `SandboxTrace` / `trajectory_projection()` side-car)
 3. **Hard no-write fence**
-   - Active sandbox refuses production DecisionSignal writes, analysis-history persistence (authoritative `save_analysis_history` boundary), and real notification dispatch
+   - Active sandbox refuses production DecisionSignal writes, decision-memory flag upserts, analysis-history persistence (authoritative `save_analysis_history` boundary), and real notification dispatch
    - Blocked effects are recorded for promotion receipts
    - Counterexample tests in `tests/agent/test_agent_sandbox.py`
 
@@ -94,6 +94,7 @@ Schema: `sandbox-promotion-receipt-v1`. Required fields include:
 | Path | Fence |
 | --- | --- |
 | `DecisionSignalService.create_signal*` | `EFFECT_DECISION_SIGNAL` |
+| `DecisionSignalMemoryFlagRepository.upsert` | `EFFECT_DECISION_MEMORY` |
 | `DatabaseManager.save_analysis_history` (all callers) | `EFFECT_ANALYSIS_HISTORY` |
 | `NotificationService.send_with_results` | `EFFECT_NOTIFICATION` |
 
@@ -104,5 +105,5 @@ Fences raise `SandboxExternalEffectBlocked` only while a `SandboxContext` is act
 - Issue #247 (parent safe sandbox)
 - Issue #202 (research sandbox)
 - Issue #442 (sandbox enhancement / multi-scenario)
-- `docs/agent-observability.md` (production L0 events; sandbox traces stay isomorphic)
+- `docs/agent-observability.md` (production L0 events; sandbox traces stay field-comparable)
 - Backtest UI manual: `docs/ui-manual/09-backtest.md`

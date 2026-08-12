@@ -30,6 +30,7 @@ from src.agent.sandbox import (
 from src.agent.sandbox.clock import FakeClock
 from src.agent.sandbox.effects import (
     EFFECT_ANALYSIS_HISTORY,
+    EFFECT_DECISION_MEMORY,
     EFFECT_DECISION_SIGNAL,
     EFFECT_NOTIFICATION,
 )
@@ -53,8 +54,10 @@ def test_isolation_policy_fail_closed():
     assert policy["place_real_orders"] is False
     assert policy["auto_promote_to_production"] is False
     assert "persist_decision_signal" in policy["enforced_in_batch1"]
+    assert "persist_decision_memory" in policy["enforced_in_batch1"]
     assert "persist_analysis_history" in policy["enforced_in_batch1"]
     assert "place_real_orders" in policy["declared_not_yet_enforced"]
+    assert "persist_decision_memory" not in policy["declared_not_yet_enforced"]
 
 
 def test_fake_clock_is_deterministic_and_advances():
@@ -304,6 +307,25 @@ def test_counterexample_analysis_history_write_blocked_under_sandbox():
                 news_content=None,
             )
     assert raised.value.effect == EFFECT_ANALYSIS_HISTORY
+
+
+def test_counterexample_decision_memory_flag_write_blocked_under_sandbox():
+    """Decision-memory flag upserts must not land under an active sandbox."""
+    from src.repositories.decision_signal_memory_flag_repo import (
+        DecisionSignalMemoryFlagRepository,
+    )
+
+    mock_db = MagicMock()
+    repo = DecisionSignalMemoryFlagRepository(db_manager=mock_db)
+    ctx = SandboxContext.create(fixed_now=FIXED_NOW)
+    with active_sandbox_context(ctx):
+        with pytest.raises(SandboxExternalEffectBlocked) as raised:
+            repo.upsert(
+                {"signal_id": 1, "memorable": True, "ignored": False}
+            )
+    assert raised.value.effect == EFFECT_DECISION_MEMORY
+    # Session path must not start under sandbox.
+    mock_db.get_session.assert_not_called()
 
 
 def test_production_path_unblocked_when_sandbox_inactive():
