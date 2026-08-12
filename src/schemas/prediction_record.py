@@ -24,6 +24,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationError,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -428,7 +429,7 @@ def try_validate_prediction_record(
     """Validate without raising; return (record, None) or (None, error)."""
     try:
         return validate_prediction_record(payload), None
-    except Exception as exc:  # noqa: BLE001 — surface validation text only
+    except ValidationError as exc:
         return None, str(exc)
 
 
