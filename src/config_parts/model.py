@@ -88,6 +88,11 @@ class Config:
     data_validation_strict_scopes: str = "*/*"
     data_validation_instrument_overrides: str = ""
     data_validation_upper_layer_mode: str = "warn"
+    # Soft fundamental plausibility bounds (WARN/suspect; values are kept).
+    data_validation_fund_pe_suspect_abs: float = 200.0
+    data_validation_fund_pb_suspect_abs: float = 50.0
+    # Multi-provider relative divergence threshold (WARN with attribution).
+    data_validation_cross_source_rel_threshold: float = 0.05
     plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
