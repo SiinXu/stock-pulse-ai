@@ -7,7 +7,7 @@
 | 我想要 | 先看 | 继续看 |
 | --- | --- | --- |
 | 快速了解项目能做什么 | [README](../README.md) | [完整配置与部署指南](full-guide.md) |
-| **了解 StockPulse 的定位与能力** | [English README · Why StockPulse](../README.md#why-stockpulse) | [简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
+| **了解 StockPulse 的定位与能力** | [English README · Why StockPulse](../README.md#why-stockpulse) | [竞品格局（本地优先金融 AI）](competitive-landscape_CN.md)（[English](competitive-landscape.md)）、[简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
 | 第一次把项目跑起来 | [小白客户端安装与配置](beginner-client-setup.md)（[English](beginner-client-setup_EN.md)） | [README · 定位与亮点](../README.md#why-stockpulse)、[安全基线 · 运维边界](security-baseline.md#operator-security-boundaries)、[完整配置与部署指南](full-guide.md) |
 | **学习 Web / 桌面界面怎么用** | [界面操作手册](ui-manual/README.md) | 各模块分册（分析、信号、持仓等） |
 | 配置大模型渠道 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | [LLM 服务商配置指南](llm-providers.md) |
@@ -29,6 +29,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [README（英文默认）](../README.md) | 项目定位、差异化、核心能力、快速开始（GitHub 首页） |
+| [竞品格局（本地优先金融 AI）](competitive-landscape_CN.md) | 诚实竞品对照、StockPulse 差异点、已交付/规划/缺口（[English](competitive-landscape.md)；Refs #799、#1063） |
 | [README（简体中文）](README_CN.md) | 同上中文版 |
 | [小白客户端安装与配置](beginner-client-setup.md) | 面向不会代码用户的客户端下载、Anspire Open / AIHubMix 模型配置、新闻源配置和常见问题；[English](beginner-client-setup_EN.md) |
 | [助手引导配置](agent-guided-onboarding.md) | 画像采集、规则配置计划、非密钥应用、L0–L3 路径；[English](agent-guided-onboarding_EN.md) |
