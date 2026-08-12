@@ -388,6 +388,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_SILICONFLOW_PROVIDER` | `siliconflow` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_TEMPERATURE` | `0.7` | 是 | 模板中注释; Sampling temperature (0.0-2.0, default 0.7; 0 is most deterministic and 2 is most random) |
 | `LLM_TIMEOUT_SEC` | `60` | 是 | 模板中注释; The timeout seconds for a single LLM request; AlphaSift stock selection reuses DSA configuration, downgrades to non-L... |
+| `LLM_COST_PRICING_PATH` | `空` | 是 | 模板中注释; Optional JSON path of per-model token rates for estimated_cost_usd |
+| `LLM_USAGE_ATTRIBUTION_ENABLED` | `true` | 是 | 模板中注释; Fine-grained cost attribution and routing quality on llm_usage |
 | `LLM_USAGE_HMAC_KEY_VERSION` | `local-v1` | 是 | 模板中注释 |
 | `LLM_USAGE_HMAC_SECRET` | `空` | 是 | 模板中注释; LLM usage telemetry message HMAC configuration (optional) |
 | `LLM_VOLCENGINE_API_KEY` | `xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -540,6 +542,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PYTDX_PRIORITY` | `2` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PYTDX_SERVERS` | `192.168.1.100:7709,10.0.0.1:7709` | 是 | 模板中注释; Comma-separated ip:port list; overrides PYTDX_HOST/PYTDX_PORT when set. |
 | `REALTIME_SOURCE_PRIORITY` | `tencent,akshare_sina,efinance,akshare_em` | 是 | 模板中注释 |
+| `READINESS_CHECK_TIMEOUT_SECONDS` | `1.0` | 是 | 模板中注释; 结构化就绪/自检单检查超时（GET /api/v1/system/readiness；仅按需；钳制 0.1–5.0；超时不得报就绪） |
 | `REASONING_TRACE_EXPORT_ENABLED` | `false` | 是 | 模板中注释; Reasoning-trace export (Issue #135): default off |
 | `REASONING_TRACE_EXPORT_MAX_CHARS` | `500000` | 是 | 模板中注释; clamped to 10000..2000000 |
 | `REPORT_EXPORT_PDF_FONT_PATH` | `空` | 是 | 模板中注释; Report export (optional PDF) |
@@ -574,6 +577,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SHARE_IMAGE_XIAOHONGSHU_QR_PATH` | `src/assets/share_image/xiaohongshu_qr.jpg` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SHARE_IMAGE_XIAOHONGSHU_URL` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | `10` | 是 | 模板中注释; Buckets below this decided sample render as insufficient_data |
+| `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; 分层结论只读研究 API（Issue #1143；默认关闭；仅主 API 端口） |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释; 研究 API 每主体滑动窗口限流 |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | `false` | 是 | 模板中注释; Public signal scorecard (Issue #379; default off so self-hosted stays private) Exposes an aggregated, non-sensitive n... |
 | `SINGLE_STOCK_NOTIFY` | `false` | 是 | 模板中注释; =================================== (Optional) Single stock push configuration =================================== Si... |
 | `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` | `false` | 是 | 模板中注释; Default-off Bayesian outcome weights for skill aggregation (issue #714) |
