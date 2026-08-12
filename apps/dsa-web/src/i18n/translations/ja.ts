@@ -4108,7 +4108,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.notes.0": "時刻指定で配信するにはスケジュールモードが必要です。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.summary": "過去のブリーフ判断の的中率レビューを含む、スケジュール実行のデイリーブリーフです。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.title": "デイリーブリーフ",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.usage": "DAILY_BRIEF_ENABLED は機能をオンにします。 DAILY_BRIEF_SCHEDULE_TIME と DAILY_BRIEF_TIMEZONE はスケジュールのタイミングを制御します。 DAILY_BRIEF_MIN_SAMPLES は、精度統計が表示される前の最小サンプルを設定します。 DAILY_BRIEF_NOTIFY は、ブリーフィングが成功した後のチャネル プッシュを制御します。 DAILY_BRIEF_PERSIST_HISTORY にはレビュー履歴が保存されます。 DAILY_BRIEF_SAVE_REPORT_FILE は、レポート ディレクトリにレポート ファイルを書き込みます。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.usage": "DAILY_BRIEF_ENABLED は機能をオンにします。SCHEDULE_TIME/TIMEZONE はスケジュールのタイミングを制御します。MIN_SAMPLES は精度統計表示前の最小サンプルを設定します。NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE は配信を制御します。QUIET_WHEN_EMPTY は実質的な内容がない場合に通知をスキップします。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.valueNotes.0": "既定はオフで、既存のスケジュールは変更されません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.valueNotes.1": "的中率レビューは参考情報であり、自動売買は行いません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.DEBUG.impact.0": "ログの詳細や実行時の挙動に影響を与えます。",

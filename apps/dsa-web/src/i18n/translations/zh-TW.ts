@@ -4108,7 +4108,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.notes.0": "定時推送需要啟用排程模式。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.summary": "排程執行的每日簡報，並回顧先前簡報判斷的歷史準確率。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.title": "每日簡報",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.usage": "DAILY_BRIEF_ENABLED 開啟此功能。 DAILY_BRIEF_SCHEDULE_TIME 和 DAILY_BRIEF_TIMEZONE 控制計劃時間。 DAILY_BRIEF_MIN_SAMPLES 設定顯示準確度統計資料之前的最小樣本。 DAILY_BRIEF_NOTIFY 控製成功簡報後的頻道推送。 DAILY_BRIEF_PERSIST_HISTORY 保留評論歷史。 DAILY_BRIEF_SAVE_REPORT_FILE 在報告目錄下寫入報告檔。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.usage": "DAILY_BRIEF_ENABLED 開啟此功能。SCHEDULE_TIME/TIMEZONE 控制計劃時間。MIN_SAMPLES 設定顯示準確度統計前的最小樣本。NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE 控制投遞。QUIET_WHEN_EMPTY 在無實質內容時跳過推送。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.valueNotes.0": "預設關閉，不會改動既有排程。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.daily_brief.valueNotes.1": "準確率回顧僅供參考，不會自動下單交易。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.DEBUG.impact.0": "影響日誌詳細程度和執行時行為。",
