@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Added] A-share ETF analysis path: identify liquid ETFs, inject tracking-target / premium / holdings-exposure context, mark PE and company fundamentals as not_applicable, and keep the shared decision-dashboard report structure (Refs #173).
 - [Fixed] Wire optional ETF IOPV/NAV through realtime quotes into analysis context for premium/discount, label pure indices as `index` (not `etf`), and mark chip distribution not_applicable on the ETF/index path (Refs #173).
+- [Fixed] Include IOPV/NAV in realtime quote field supplementation and drop equity chip context for ETF/index instruments (Refs #173).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any, Dict
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -304,6 +304,121 @@ def test_format_prompt_uses_etf_path_and_marks_pe_na() -> None:
     # Chip must not use equity health framing on the ETF path.
     assert "70-90%时警惕" not in prompt
     assert "筹码" in prompt and ("不适用" in prompt or "not_applicable" in prompt)
+
+
+def test_akshare_etf_realtime_maps_iopv_nav() -> None:
+    """AkShare ETF spot should map IOPV/NAV aliases onto UnifiedRealtimeQuote."""
+    import pandas as pd
+    from data_provider.akshare_fetcher import AkshareFetcher
+    from data_provider.akshare_parts import realtime_cache as etf_cache
+
+    fetcher = AkshareFetcher.__new__(AkshareFetcher)
+    fetcher._set_random_user_agent = lambda: None
+    fetcher._enforce_rate_limit = lambda: None
+
+    frame = pd.DataFrame(
+        [
+            {
+                "代码": "510300",
+                "名称": "沪深300ETF",
+                "最新价": 4.12,
+                "涨跌幅": 0.5,
+                "涨跌额": 0.02,
+                "成交量": 1000,
+                "成交额": 4000.0,
+                "量比": 1.0,
+                "换手率": 0.5,
+                "振幅": 1.0,
+                "开盘价": 4.1,
+                "最高价": 4.15,
+                "最低价": 4.08,
+                "总市值": 1e10,
+                "流通市值": 1e10,
+                "52周最高": 4.5,
+                "52周最低": 3.5,
+                "IOPV": 4.10,
+                "单位净值": 4.09,
+            }
+        ]
+    )
+    # Bypass network: seed the process-local ETF snapshot cache.
+    etf_cache.store_etf_snapshot(frame, now=1e12)
+    try:
+        with patch(
+            "data_provider.akshare_fetcher.get_realtime_circuit_breaker"
+        ) as mock_cb:
+            mock_cb.return_value.record_success = MagicMock()
+            mock_cb.return_value.record_failure = MagicMock()
+            mock_cb.return_value.is_available = MagicMock(return_value=True)
+            # Freeze time so the seeded cache is considered fresh.
+            with patch("data_provider.akshare_fetcher.time.time", return_value=1e12):
+                quote = fetcher._get_etf_realtime_quote("510300")
+        assert quote is not None
+        assert quote.price == 4.12
+        assert quote.iopv == 4.10
+        assert quote.nav == 4.09
+    finally:
+        etf_cache._etf_realtime_cache["data"] = None
+        etf_cache._etf_realtime_cache["timestamp"] = 0.0
+
+
+def test_quote_supplement_includes_iopv_nav() -> None:
+    from data_provider.base import DataFetcherManager
+    from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+
+    assert "iopv" in DataFetcherManager._SUPPLEMENT_FIELDS
+    assert "nav" in DataFetcherManager._SUPPLEMENT_FIELDS
+    primary = UnifiedRealtimeQuote(
+        code="510300", name="etf", source=RealtimeSource.EFINANCE, price=4.12
+    )
+    secondary = UnifiedRealtimeQuote(
+        code="510300",
+        name="etf",
+        source=RealtimeSource.AKSHARE_EM,
+        price=4.12,
+        iopv=4.10,
+        nav=4.09,
+    )
+    filled = DataFetcherManager._merge_quote_fields(primary, secondary)
+    assert "iopv" in filled and "nav" in filled
+    assert primary.iopv == 4.10
+    assert primary.nav == 4.09
+
+
+def test_enhance_context_drops_chip_for_etf() -> None:
+    pytest.importorskip("litellm")
+    from src.core.stages.analysis_context import _AnalysisContextStageMixin
+
+    class _Chip:
+        profit_ratio = 0.8
+        avg_cost = 1.0
+        concentration_90 = 0.1
+        concentration_70 = 0.05
+
+        def get_chip_status(self, _price):
+            return "集中"
+
+    class _Harness(_AnalysisContextStageMixin):
+        def __init__(self) -> None:
+            self.fetcher_manager = SimpleNamespace(
+                build_failed_fundamental_context=lambda code, msg: {
+                    "status": "failed",
+                    "code": code,
+                    "message": msg,
+                }
+            )
+            self.config = SimpleNamespace(report_language="zh")
+            self.search_service = SimpleNamespace(news_window_days=3)
+
+    enhanced = _Harness()._enhance_context(
+        {"code": "510300", "today": {"close": 4.1}},
+        realtime_quote=None,
+        chip_data=_Chip(),
+        trend_result=None,
+        stock_name="沪深300ETF",
+    )
+    assert enhanced["instrument_type"] == "etf"
+    assert "chip" not in enhanced
 
 
 def test_format_prompt_marks_chip_na_for_index() -> None:

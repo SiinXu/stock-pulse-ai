@@ -360,6 +360,8 @@ class _AnalysisContextStageMixin:
                 if instrument_type in {"etf", "index"}:
                     enhanced["instrument_type"] = instrument_type
                     enhanced["is_index_etf"] = True
+                    # Equity chip distribution does not apply; drop if a provider still returned it.
+                    enhanced.pop("chip", None)
                 else:
                     enhanced.setdefault("instrument_type", "equity")
             else:
