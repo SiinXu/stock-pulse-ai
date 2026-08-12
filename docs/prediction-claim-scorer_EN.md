@@ -56,16 +56,19 @@ Optional A1 `confidence` ∈ [0, 1] participates in aggregate calibration only; 
 
 * **Direction sideways band**: `|return_fraction| <= sideways_epsilon` is sideways (inclusive; default `0.001` = 0.1%). Config key `flat_epsilon` is an accepted alias. Predicting sideways vs a non-sideways move (or the reverse) is `partial`; opposite directions are `miss`.
 * **Return bucket**: honors payload `inclusive_low` / `inclusive_high` (A1 default half-open `[low, high)`). Distance to the interval within `bucket_partial_margin_pct` (default `1.0` percentage point) is `partial`. Bound value `0.0` is a valid finite bound.
+  * **Exclusive bound under default margin**: a realized return *exactly* on an exclusive edge has distance `0`. With the default `bucket_partial_margin_pct=1.0` that scores **`partial`**; it is **`miss` only when the margin is `0`**.
 * **Level break**: absolute price or `pct_from_as_of_close`. `high >= level` (above) or `low <= level` (below) is `hit`. Near-touch within `level_touch_epsilon * |level|` is `partial`.
-* **Vol regime**: exact label match is `hit`; adjacent pair among `low`↔`normal`↔`high`↔`elevated` is `partial`.
+* **Vol regime**: exact canonical label match is `hit`; adjacent pair among `low`↔`normal`↔`high`↔`elevated` is `partial`. Missing label → `missing_vol_regime`. Non-canonical garbage label (e.g. fetcher typo) → `invalid_vol_regime` / `data_unavailable` — **not** miss.
 * **Custom**: deterministic operators `eq|ne|gt|gte|lt|lte|in_range` over `actuals.metrics`. `in_range` is half-open `[expected, expected_high)`.
+
+Invalid claim payloads (A1 validation failure) score as `miss` with `reason=invalid_claim` and a truncated `details.validation_error` string for diagnostics — still never a hit.
 
 ## Aggregate + confidence calibration
 
 Over scored claims (`hit`/`partial`/`miss` only):
 
 * `mean_score`, `hit_rate`
-* When confidence is present: `brier_score` against targets `{hit:1, partial:0.5, miss:0}`, `expected_calibration_error` (equal-width bins on `[0,1]`), and mean confidence on hit vs miss
+* When confidence is present: **soft-label** `brier_score` against targets `{hit:1, partial:0.5, miss:0}` (not classical binary Brier), plus `expected_calibration_error` (equal-width bins on `[0,1]`), and mean confidence on hit vs miss
 
 `data_unavailable` rows never inflate hit rate or calibration denominators.
 

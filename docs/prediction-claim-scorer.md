@@ -52,9 +52,14 @@ ClaimScorer.score(claims, actuals, config) → claim_results + aggregate
 
 * **方向 sideways 带**：`|收益小数| <= sideways_epsilon`（含边界；默认 0.1%）。`flat_epsilon` 为别名。
 * **收益桶**：遵循 A1 的 inclusive 标志（默认半开 `[low, high)`）。`0.0` 是合法有限边界。
+  * **开区间上界 + 默认 margin**：恰落在 exclusive 边界时距离为 0；默认 `bucket_partial_margin_pct=1.0` 记为 **partial**，仅当 margin 为 `0` 时为 **miss**。
 * **关键位突破**：绝对价或相对 as_of 收盘百分比；近触碰为 partial。
-* **波动体制**：精确匹配 hit；`low`↔`normal`↔`high`↔`elevated` 相邻为 partial。
+* **波动体制**：规范标签精确匹配为 hit；`low`↔`normal`↔`high`↔`elevated` 相邻为 partial。缺失 → `missing_vol_regime`；非规范脏标签 → `invalid_vol_regime` / `data_unavailable`（**不是** miss）。
 * **custom**：`eq|ne|gt|gte|lt|lte|in_range`；`in_range` 为半开区间。
+
+非法 claim（A1 校验失败）为 `miss` + `reason=invalid_claim`，并在 `details.validation_error` 中保留截断诊断信息，仍永不 hit。
+
+聚合校准中的 `brier_score` 为 soft-label（partial 目标 `0.5`），不是经典二元 Brier。
 
 ## 明确非目标
 

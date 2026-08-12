@@ -47,14 +47,17 @@ DEFAULT_LEVEL_TOUCH_EPSILON = 0.002
 # Equal-width bins for expected calibration error over confidences in [0, 1].
 DEFAULT_CALIBRATION_BIN_COUNT = 10
 
-# Adjacent vol-regime partial matrix (research-only labels).
+# Canonical vol-regime labels (must match A1 VolRegimeValue).
 VOL_REGIME_ORDER: Tuple[str, ...] = ("low", "normal", "high", "elevated")
+CANONICAL_VOL_REGIMES = frozenset(VOL_REGIME_ORDER)
 # Treat elevated as adjacent to high only.
 _VOL_REGIME_ADJACENT = {
     frozenset({"low", "normal"}),
     frozenset({"normal", "high"}),
     frozenset({"high", "elevated"}),
 }
+# Cap validation diagnostic text kept on claim results (resolver logs / tests).
+MAX_VALIDATION_DETAIL_CHARS = 500
 
 
 @dataclass(frozen=True)
@@ -197,8 +200,19 @@ def outcome_numeric_score(outcome: str) -> Optional[float]:
     return OUTCOME_NUMERIC_SCORE.get(outcome)
 
 
+def is_canonical_vol_regime(value: str) -> bool:
+    """Return True when ``value`` is an A1-canonical vol-regime label."""
+    return value in CANONICAL_VOL_REGIMES
+
+
 def vol_regimes_adjacent(a: str, b: str) -> bool:
-    """Return True when two vol-regime labels are adjacent for partial credit."""
+    """Return True when two *distinct* canonical labels are adjacent for partial.
+
+    Callers must already reject non-canonical labels. Equal labels are not
+    adjacent (exact match is handled as hit before this helper is used).
+    """
     if a == b:
-        return True
+        return False
+    if not (is_canonical_vol_regime(a) and is_canonical_vol_regime(b)):
+        return False
     return frozenset({a, b}) in _VOL_REGIME_ADJACENT

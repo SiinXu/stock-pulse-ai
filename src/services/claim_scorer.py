@@ -21,17 +21,22 @@ Boundary conventions
   to the interval within ``bucket_partial_margin_pct`` → partial.
 * Level break: absolute level or ``pct_from_as_of_close``; ``high >= level`` /
   ``low <= level``; near-touch within ``level_touch_epsilon * |level|`` → partial.
-* Vol regime: exact label hit; adjacent labels (low↔normal↔high↔elevated) partial.
+* Vol regime: exact canonical label hit; adjacent labels partial; non-canonical
+  actual labels → ``data_unavailable`` (``invalid_vol_regime``), never miss.
 * Custom: deterministic operator over ``actuals.metrics[metric]``.
+* Invalid claims: ``miss`` with truncated ``details.validation_error``.
 """
 
 from __future__ import annotations
 
 import math
-from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+
+from pydantic import ValidationError
 
 from src.schemas.prediction_claim_scoring import (
     CLAIM_SCORER_VERSION,
+    MAX_VALIDATION_DETAIL_CHARS,
     ClaimActuals,
     ClaimScoreAggregate,
     ClaimScoreConfig,
@@ -41,6 +46,7 @@ from src.schemas.prediction_claim_scoring import (
     OUTCOME_HIT,
     OUTCOME_MISS,
     OUTCOME_PARTIAL,
+    is_canonical_vol_regime,
     outcome_numeric_score,
     vol_regimes_adjacent,
 )
@@ -85,7 +91,7 @@ class ClaimScorer:
         act = ClaimActuals.from_mapping(actuals)
         results: List[ClaimScoreResult] = []
         for raw in claims:
-            claim = self._coerce_claim(raw)
+            claim, coerce_details = self._coerce_claim(raw)
             if claim is None:
                 results.append(
                     ClaimScoreResult(
@@ -95,7 +101,10 @@ class ClaimScorer:
                         score=0.0,
                         reason="invalid_claim",
                         confidence=None,
-                        details={"error": "claim_validation_failed"},
+                        details=dict(
+                            coerce_details
+                            or {"error": "claim_validation_failed"}
+                        ),
                     )
                 )
                 continue
@@ -113,15 +122,43 @@ class ClaimScorer:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _coerce_claim(raw: ClaimLike) -> Optional[PredictionClaim]:
+    def _coerce_claim(
+        raw: ClaimLike,
+    ) -> Tuple[Optional[PredictionClaim], Optional[Dict[str, Any]]]:
+        """Validate a claim mapping into A1 ``PredictionClaim``.
+
+        Returns ``(claim, None)`` on success. On failure returns
+        ``(None, details)`` with a truncated validation diagnostic so resolvers
+        can log *why* the claim was unscored as hit — still outcome=miss.
+        """
         if isinstance(raw, PredictionClaim):
-            return raw
+            return raw, None
         if not isinstance(raw, Mapping):
-            return None
+            return None, {
+                "error": "claim_validation_failed",
+                "validation_error": "claim must be a mapping or PredictionClaim",
+            }
         try:
-            return PredictionClaim.model_validate(dict(raw))
-        except Exception:  # noqa: BLE001 — invalid claim becomes miss, not hit
-            return None
+            return PredictionClaim.model_validate(dict(raw)), None
+        except ValidationError as exc:
+            return None, {
+                "error": "claim_validation_failed",
+                "validation_error": ClaimScorer._truncate_detail(str(exc)),
+            }
+        except Exception as exc:  # noqa: BLE001 — still miss, never hit
+            return None, {
+                "error": "claim_validation_failed",
+                "validation_error": ClaimScorer._truncate_detail(
+                    f"{type(exc).__name__}: {exc}"
+                ),
+            }
+
+    @staticmethod
+    def _truncate_detail(text: str) -> str:
+        cleaned = str(text or "").strip()
+        if len(cleaned) <= MAX_VALIDATION_DETAIL_CHARS:
+            return cleaned
+        return cleaned[: MAX_VALIDATION_DETAIL_CHARS - 3] + "..."
 
     @staticmethod
     def _raw_claim_id(raw: ClaimLike) -> str:
@@ -413,6 +450,18 @@ class ClaimScorer:
                 claim,
                 reason="missing_vol_regime",
                 confidence=confidence,
+            )
+        # Non-canonical labels are incomplete actuals, not a directional miss:
+        # a bad ActualsFetcher must not poison hit-rate / calibration.
+        if not is_canonical_vol_regime(actual):
+            return self._unavailable(
+                claim,
+                reason="invalid_vol_regime",
+                confidence=confidence,
+                details={
+                    "predicted_regime": payload.regime,
+                    "actual_regime": actual,
+                },
             )
         predicted = payload.regime
         if predicted == actual:

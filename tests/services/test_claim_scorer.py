@@ -209,6 +209,11 @@ def test_invalid_claim_mapping_is_miss_not_hit() -> None:
     assert result.outcome == OUTCOME_MISS
     assert result.reason == "invalid_claim"
     assert result.score == 0.0
+    assert result.details.get("error") == "claim_validation_failed"
+    # Validation diagnostics must surface for resolver logs (review #1188).
+    validation_error = result.details.get("validation_error")
+    assert isinstance(validation_error, str) and validation_error
+    assert "direction" in validation_error.lower() or "payload" in validation_error.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -428,6 +433,24 @@ def test_vol_regime_missing_is_unavailable() -> None:
     )
     assert result.outcome == OUTCOME_DATA_UNAVAILABLE
     assert result.reason == "missing_vol_regime"
+
+
+def test_vol_regime_garbage_label_is_unavailable_not_miss() -> None:
+    """Fetcher typos must not poison hit-rate as miss (review #1188)."""
+    result, report = _single(
+        _claim("v", "vol_regime", {"regime": "high"}, confidence=0.9),
+        {
+            "start_price": 100.0,
+            "end_price": 101.0,
+            "vol_regime": "hihg",  # non-canonical
+        },
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "invalid_vol_regime"
+    assert result.score is None
+    assert report.aggregate.miss_count == 0
+    assert report.aggregate.data_unavailable_count == 1
+    assert report.aggregate.calibrated_claims == 0
 
 
 @pytest.mark.parametrize(
