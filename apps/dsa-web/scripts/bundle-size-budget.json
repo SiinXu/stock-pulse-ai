@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 239676,
-      "measuredGzipBytes": 239276,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=239676."
+      "maxGzipBytes": 242701,
+      "measuredGzipBytes": 240298,
+      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
     },
     {
       "id": "js-entry",
@@ -27,30 +27,30 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 156261,
-      "measuredGzipBytes": 155561,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=156261."
+      "maxGzipBytes": 157957,
+      "measuredGzipBytes": 156393,
+      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 149582,
-      "measuredGzipBytes": 148882,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=149582."
+      "maxGzipBytes": 151185,
+      "measuredGzipBytes": 149688,
+      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 149416,
-      "measuredGzipBytes": 148716,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=149416."
+      "maxGzipBytes": 151009,
+      "measuredGzipBytes": 149513,
+      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 149473,
-      "measuredGzipBytes": 148773,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=149473."
+      "maxGzipBytes": 151067,
+      "measuredGzipBytes": 149571,
+      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-es",
@@ -62,9 +62,9 @@
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 141962,
-      "measuredGzipBytes": 141262,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=141962."
+      "maxGzipBytes": 143469,
+      "measuredGzipBytes": 142048,
+      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-ms",
@@ -76,9 +76,9 @@
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 135522,
-      "measuredGzipBytes": 134822,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=135522."
+      "maxGzipBytes": 136882,
+      "measuredGzipBytes": 135526,
+      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
     },
     {
       "id": "vendor-charts",
