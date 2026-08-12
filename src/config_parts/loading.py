@@ -857,6 +857,94 @@ class _ConfigLoadingMethods:
                 field_name='AGENT_ORCHESTRATOR_TIMEOUT_S',
                 minimum=0,
             ),
+            agent_mode_budget_enabled=parse_env_bool(
+                os.getenv('AGENT_MODE_BUDGET_ENABLED'),
+                True,
+            ),
+            agent_mode_budget_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_MAX_LLM_TURNS'),
+                0,
+                field_name='AGENT_MODE_BUDGET_MAX_LLM_TURNS',
+                minimum=0,
+            ),
+            agent_mode_budget_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_MAX_TOOL_CALLS'),
+                0,
+                field_name='AGENT_MODE_BUDGET_MAX_TOOL_CALLS',
+                minimum=0,
+            ),
+            agent_mode_budget_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_MAX_COST_USD'),
+                0.0,
+                field_name='AGENT_MODE_BUDGET_MAX_COST_USD',
+                minimum=0.0,
+            ),
+            agent_mode_budget_max_tokens=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_MAX_TOKENS'),
+                0,
+                field_name='AGENT_MODE_BUDGET_MAX_TOKENS',
+                minimum=0,
+            ),
+            agent_mode_budget_quick_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_quick_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_quick_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_standard_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_standard_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_standard_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_full_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_full_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_full_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_specialist_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_specialist_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_specialist_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_chat_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_chat_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_chat_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_COST_USD', minimum=0.0,
+            ),
             agent_critic_enabled=parse_env_bool(
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
@@ -1030,6 +1118,8 @@ class _ConfigLoadingMethods:
             agent_context_protected_turns=agent_context_protected_turns,
             agent_observability_enabled=os.getenv('AGENT_OBSERVABILITY_ENABLED', 'true').lower() == 'true',
             agent_observability_deep_payload=os.getenv('AGENT_OBSERVABILITY_DEEP_PAYLOAD', 'false').lower() == 'true',
+            perf_collection_enabled=os.getenv('PERF_COLLECTION_ENABLED', 'false').lower() == 'true',
+            perf_profile_enabled=os.getenv('PERF_PROFILE_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_enabled=os.getenv('AGENT_EVENT_MONITOR_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_interval_minutes=parse_env_int(
                 os.getenv('AGENT_EVENT_MONITOR_INTERVAL_MINUTES'),
@@ -1199,6 +1289,28 @@ class _ConfigLoadingMethods:
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),
+            analysis_parallel_fetch_enabled=parse_env_bool(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_ENABLED'),
+                default=True,
+            ),
+            analysis_parallel_fetch_max_concurrent=parse_env_int(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT'),
+                3,
+                field_name='ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT',
+                minimum=1,
+            ),
+            analysis_parallel_fetch_per_provider_limit=parse_env_int(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT'),
+                1,
+                field_name='ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT',
+                minimum=1,
+            ),
+            analysis_parallel_fetch_budget_seconds=parse_env_float(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS'),
+                0.0,
+                field_name='ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS',
+                minimum=0.0,
+            ),
             debug=os.getenv('DEBUG', 'false').lower() == 'true',
             config_validate_mode=os.getenv('CONFIG_VALIDATE_MODE', 'warn').lower(),
             http_proxy=os.getenv('HTTP_PROXY'),
@@ -1504,6 +1616,28 @@ class _ConfigLoadingMethods:
             ),
             daily_brief_save_report_file=parse_env_bool(
                 os.getenv('DAILY_BRIEF_SAVE_REPORT_FILE'), default=True
+            ),
+            daily_brief_quiet_when_empty=parse_env_bool(
+                os.getenv('DAILY_BRIEF_QUIET_WHEN_EMPTY'), default=False
+            ),
+            event_research_brief_enabled=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_ENABLED'), default=False
+            ),
+            event_research_brief_notify=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_NOTIFY'), default=True
+            ),
+            event_research_brief_persist_history=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_PERSIST_HISTORY'), default=True
+            ),
+            event_research_brief_save_report_file=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE'), default=True
+            ),
+            event_research_brief_lookback_hours=parse_env_int(
+                os.getenv('EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS'), 48,
+                field_name='EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS', minimum=1,
+            ),
+            event_research_brief_categories=(
+                os.getenv('EVENT_RESEARCH_BRIEF_CATEGORIES', 'earnings').strip() or 'earnings'
             ),
             paper_portfolio_initial_cash=parse_env_float(
                 os.getenv('PAPER_PORTFOLIO_INITIAL_CASH'), 1_000_000.0, field_name='PAPER_PORTFOLIO_INITIAL_CASH', minimum=0.0

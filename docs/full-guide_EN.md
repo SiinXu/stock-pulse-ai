@@ -433,10 +433,12 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | Scorecard buckets below this decided sample (hit+miss) render as `insufficient_data` instead of a rate | `10` |
-| `DAILY_BRIEF_ENABLED` | Opt-in daily brief with historical accuracy review (decision-signal outcomes, backtest summary, skill-opinion performance). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
+| `DAILY_BRIEF_ENABLED` | Opt-in personal morning brief (holdings, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, accuracy review). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | Local `HH:MM` after which the enabled brief may fire (at most once per local day) | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | IANA timezone for schedule and “yesterday” mapping | `Asia/Shanghai` |
 | `DAILY_BRIEF_MIN_SAMPLES` | Minimum completed samples before publishing an accuracy percentage; below this the brief states insufficient history | `10` |
+| `DAILY_BRIEF_QUIET_WHEN_EMPTY` | Skip notification when there is no material overnight/event/yesterday content (generation/persistence still run) | `false` |
+| `EVENT_RESEARCH_BRIEF_ENABLED` | Opt-in standalone earnings event research briefs. Default off. See [event-research-brief_EN.md](event-research-brief_EN.md) | `false` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | Initial cash seeded (as a cash-in ledger entry) when a paper portfolio is created; simulated fills use the latest available close at the trade date, fees/slippage are ignored in the MVP, and buys are validated against available cash | `1000000` |
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), hk (HK stocks), us (US stocks), jp (JP stocks), kr (KR stocks), both (all five markets) | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | Index change color style in market reviews: `green_up` = green gains/red losses (default), `red_up` = red gains/green losses | `green_up` |
@@ -1763,6 +1765,10 @@ The global Critic retry budget is fixed at one per run, and the same target cann
 `StrategyEngine` remains the sole owner of Skill evidence partitioning and `strategy_synthesis` at the existing Decision boundary. The Critic is read-only, has no ToolSurface, and cannot author the final investment decision. Its verdict, reasons, missing evidence, requested/executed targets, budget consumption, and retry status are recorded in internal `AgentContext.meta`, `StageResult.meta`, and `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events. This does not expand persisted runtime facts or public Chat metadata.
 
 Cost boundary: an eligible enabled Multi run adds at most one Critic LLM call. Only a `retry` verdict adds at most one whitelist-stage LLM/tool rerun. Both remain bounded by the existing `AGENT_ORCHESTRATOR_TIMEOUT_S` remaining budget, and their timeouts exclude the minimum reserved for Decision. Disable or remove `AGENT_CRITIC_ENABLED` to roll back; no data migration or cleanup is required.
+### Hard per-mode budgets (#1121 / #125)
+
+Each run mode (`quick` / `standard` / `full` / `specialist` / chat) has hard caps for LLM turns, tool calls, and estimated USD cost (optional token ceiling via `AGENT_MODE_BUDGET_MAX_TOKENS`). Consumption is tracked on a shared `mode_budget` account and exposed in diagnostics (`ctx.meta["mode_budget"]` / `result.budget_snapshot`). On breach the run terminates with `success=false` and an explicit reason (`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`). Existing residual wall-clock skips remain `budget_skip` / `timeout` and record into the same snapshot — there is a single budget concept, not a parallel system. Configure via `AGENT_MODE_BUDGET_*` (see `.env.example`).
+
 
 ## Agent Runtime Guards
 

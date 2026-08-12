@@ -501,10 +501,12 @@ stock-pulse-ai/
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据。可在 Web 设置 → 系统与安全 → 系统设置中编辑；运营预览使用同一公开路由，关闭时返回 404 | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | 计分卡中低于该“已判定”样本数（命中+偏离）的分桶返回 `insufficient_data` 而非比率 | `10` |
-| `DAILY_BRIEF_ENABLED` | 可选每日简报（历史准确率复盘：决策信号 outcome / 回测汇总 / 技能观点表现）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
+| `DAILY_BRIEF_ENABLED` | 可选个人晨报（持仓 / 隔夜要点 / 近期财报事件上下文 / 昨日分析 / 自选 / 历史准确率复盘）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | 本地 `HH:MM`，开启后在该时刻之后可触发（每个本地自然日最多一次） | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | 日程与「昨天」映射使用的 IANA 时区 | `Asia/Shanghai` |
 | `DAILY_BRIEF_MIN_SAMPLES` | 发布准确率百分比前的最小完成样本；不足时简报明确写出样本不足 | `10` |
+| `DAILY_BRIEF_QUIET_WHEN_EMPTY` | 无隔夜/事件/昨日等实质内容时跳过推送（仍可生成与落库） | `false` |
+| `EVENT_RESEARCH_BRIEF_ENABLED` | 可选独立财报类事件研究简报调度。默认关闭。详见 [event-research-brief.md](event-research-brief.md) | `false` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | 新建模拟组合（paper portfolio）时播种的初始现金（作为一笔现金流入记账）；模拟成交按交易时点最新可得收盘价成交，MVP 忽略费用与滑点，买入按可用现金校验 | `1000000` |
 | `MARKET_REVIEW_REGION` | 大盘复盘市场区域：cn(A股)、hk(港股)、us(美股)、jp(日股)、kr(韩股)、both(五市场)，us/jp/kr 适合仅关注单区域用户 | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | 大盘复盘指数涨跌颜色：`green_up`=绿涨红跌（默认），`red_up`=红涨绿跌 | `green_up` |
@@ -1900,6 +1902,10 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 `StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
 
 成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
+### 按模式硬预算（#1121 / #125）
+
+每种运行模式（`quick` / `standard` / `full` / `specialist` / chat）对 LLM 轮次、工具调用与估算 USD 成本设有硬上限（可选 token 上限见 `AGENT_MODE_BUDGET_MAX_TOKENS`）。消耗记录在共享的 `mode_budget` 账户中，并可在诊断中查看（`ctx.meta["mode_budget"]` / `result.budget_snapshot`）。超限时以 `success=false` 明确终止并给出原因码（`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`）。既有的剩余墙钟预算跳过仍使用 `budget_skip` / `timeout`，并写入同一快照——预算概念统一，不另造并行体系。配置项为 `AGENT_MODE_BUDGET_*`（见 `.env.example`）。
+
 
 ## Agent 运行时护栏
 
