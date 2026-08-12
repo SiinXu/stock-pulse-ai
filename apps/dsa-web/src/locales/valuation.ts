@@ -66,7 +66,11 @@ const zh = {
   emptyPeersTitle: '尚未生成同业画布',
   emptyPeersDescription: '输入同业代码后生成对比表。行业来源会解析并展示行业标签，但不会编造同业成分。',
   peersRequired: '需要至少一个同业代码',
-  heatmapTitle: '倍数热力（复用图表组件）',
+  heatmapTitle: '倍数热力（复用图表组件，仅可视化）',
+  heatmapNote: '热力分仅为倍数软映射可视化，不是组合风险分；数值以表格为准。',
+  metricPeShort: '市盈率',
+  metricPbShort: '市净率',
+  notApplicable: '不适用',
 } as const;
 
 const en = {
@@ -137,7 +141,11 @@ const en = {
   emptyPeersDescription:
     'Enter peer codes and build the comparison grid. Industry source resolves and displays the industry label but never invents constituents.',
   peersRequired: 'At least one peer code is required',
-  heatmapTitle: 'Multiple heatmap (reuses chart component)',
+  heatmapTitle: 'Multiple heatmap (reuses chart component; visualization only)',
+  heatmapNote: 'Heatmap scores are a soft multiple scale, not portfolio risk scores. Use the table for numeric values.',
+  metricPeShort: 'P/E',
+  metricPbShort: 'P/B',
+  notApplicable: 'N/A',
 } as const;
 
 export type ValuationText = { readonly [Key in keyof typeof en]: string };

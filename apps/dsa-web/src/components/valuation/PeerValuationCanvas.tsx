@@ -377,7 +377,8 @@ export const PeerValuationCanvas: React.FC<PeerValuationCanvasProps> = ({
 
               {(medians.peMedian != null || medians.pbMedian != null) && (
                 <div className="text-sm text-content-muted" data-testid="peer-canvas-medians">
-                  {text.medians}: P/E {formatMultiple(asNumber(medians.peMedian) ?? null)} · P/B{' '}
+                  {text.medians}: {text.metricPeShort}{' '}
+                  {formatMultiple(asNumber(medians.peMedian) ?? null)} · {text.metricPbShort}{' '}
                   {formatMultiple(asNumber(medians.pbMedian) ?? null)}
                 </div>
               )}
@@ -398,6 +399,7 @@ export const PeerValuationCanvas: React.FC<PeerValuationCanvasProps> = ({
               {heatmapCells.length > 0 && (
                 <div data-testid="peer-canvas-heatmap">
                   <h3 className="mb-2 text-sm font-medium text-content">{text.heatmapTitle}</h3>
+                  <p className="mb-2 text-xs text-content-muted">{text.heatmapNote}</p>
                   <RiskHeatmap cells={heatmapCells} />
                 </div>
               )}

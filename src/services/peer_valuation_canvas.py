@@ -217,11 +217,18 @@ def _identity_fx(
 
 
 def _portfolio_fx_converter() -> FxConvertFn:
+    """Lazy-create one PortfolioService and reuse it for all conversions."""
+
+    service_holder: dict[str, Any] = {"service": None}
+
     def convert(amount: float, from_currency: str, to_currency: str) -> Mapping[str, Any]:
         try:
             from src.services.portfolio_service import PortfolioService
 
-            service = PortfolioService()
+            service = service_holder["service"]
+            if service is None:
+                service = PortfolioService()
+                service_holder["service"] = service
             return service.convert_amount_with_provenance(
                 amount=amount,
                 from_currency=from_currency,
@@ -249,7 +256,18 @@ def _metric_cell(
     native_currency: str,
     base_currency: str,
     fx_convert: FxConvertFn,
+    applicable: bool = True,
+    not_applicable_reason: Optional[str] = None,
 ) -> dict[str, Any]:
+    if not applicable:
+        return {
+            "value": None,
+            "status": "not_applicable",
+            "missing_reason": not_applicable_reason or "not_applicable",
+            "currency": base_currency if metric in CURRENCY_METRICS else None,
+            "native_value": None,
+            "native_currency": native_currency if metric in CURRENCY_METRICS else None,
+        }
     if native_value is None:
         return {
             "value": None,
@@ -309,8 +327,15 @@ def _metric_cell(
 
 
 def _row_data_status(metrics: Mapping[str, Mapping[str, Any]]) -> str:
-    statuses = [str(cell.get("status") or "missing") for cell in metrics.values()]
-    if statuses and all(s == "ok" for s in statuses):
+    """Completeness over applicable metrics only (not_applicable is ignored)."""
+    statuses = [
+        str(cell.get("status") or "missing")
+        for cell in metrics.values()
+        if str(cell.get("status") or "") != "not_applicable"
+    ]
+    if not statuses:
+        return "missing"
+    if all(s == "ok" for s in statuses):
         return "ok"
     if any(s in {"ok", "fx_stale"} for s in statuses):
         return "partial"
@@ -325,7 +350,14 @@ def _build_row(
     native_currency: str,
     base_currency: str,
     fx_convert: FxConvertFn,
+    not_applicable: Optional[Mapping[str, str]] = None,
 ) -> dict[str, Any]:
+    """Build one canvas row.
+
+    ``not_applicable`` maps metric → reason for out-of-scope cells (for example
+    peer equity_value when per-peer DCF is not recomputed). Those cells use
+    status ``not_applicable`` and never count as silent missing data.
+    """
     native_metrics: dict[str, Optional[float]] = {
         "pe_ratio": _safe_float(raw.get("pe_ratio")),
         "pb_ratio": _safe_float(raw.get("pb_ratio")),
@@ -336,16 +368,23 @@ def _build_row(
         "net_debt": _safe_float(raw.get("net_debt")),
         "equity_value": _safe_float(raw.get("equity_value")),
     }
+    na_map = dict(not_applicable or {})
     metrics: dict[str, Any] = {}
     for metric in CANVAS_METRICS:
+        applicable = metric not in na_map
         metrics[metric] = _metric_cell(
             metric=metric,
             native_value=native_metrics.get(metric),
             native_currency=native_currency,
             base_currency=base_currency,
             fx_convert=fx_convert,
+            applicable=applicable,
+            not_applicable_reason=na_map.get(metric),
         )
     missing = [name for name, cell in metrics.items() if cell.get("status") == "missing"]
+    not_applicable_metrics = [
+        name for name, cell in metrics.items() if cell.get("status") == "not_applicable"
+    ]
     return {
         "stock_code": stock_code,
         "role": role,
@@ -354,11 +393,16 @@ def _build_row(
         "metrics": metrics,
         "data_status": _row_data_status(metrics),
         "missing_metrics": missing,
+        "not_applicable_metrics": not_applicable_metrics,
     }
 
 
 def _heatmap_cells(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Project unitless multiples into RiskHeatmap-compatible cells."""
+    """Project unitless multiples into RiskHeatmap-compatible cells.
+
+    Scores are a soft visualization scale only (not portfolio risk scores).
+    The comparison table remains the numeric source of truth.
+    """
     cells: list[dict[str, Any]] = []
     for row in rows:
         code = str(row.get("stock_code") or "")
@@ -506,6 +550,7 @@ class PeerValuationCanvasService:
                 "source_label": "custom",
                 "explanation": "Caller-supplied peer codes (manual set).",
                 "industry_label": resolved_industry,
+                "membership": "caller_supplied",
                 "requested_codes": list(requested),
                 "auto_resolved": False,
             }
@@ -556,11 +601,13 @@ class PeerValuationCanvasService:
                 "source": PEER_SOURCE_INDUSTRY,
                 "source_label": resolved_industry,
                 "explanation": (
-                    f"Industry-constrained peer set for '{resolved_industry}'. "
-                    "Peer codes are caller-supplied under this industry label; "
-                    "missing peer metrics are kept and annotated."
+                    f"Industry-constrained peer set labeled '{resolved_industry}'. "
+                    "Peer codes are caller-supplied and caller-asserted under this "
+                    "label; membership is not auto-validated against constituents. "
+                    "Missing peer metrics are kept and annotated."
                 ),
                 "industry_label": resolved_industry,
+                "membership": "caller_asserted",
                 "requested_codes": list(requested),
                 "auto_resolved": (not bool(industry_label)) and bool(resolved_industry),
             }
@@ -619,6 +666,11 @@ class PeerValuationCanvasService:
             "net_debt": snapshot.get("net_debt"),
             "equity_value": dcf.get("equity_value") if dcf.get("status") == "ok" else None,
         }
+        target_na: dict[str, str] = {}
+        # DCF equity is only applicable when valuation service produced an ok DCF.
+        if dcf.get("status") != "ok":
+            target_na["equity_value"] = "dcf_not_available_no_recompute"
+
         rows: list[dict[str, Any]] = [
             _build_row(
                 stock_code=code,
@@ -627,21 +679,46 @@ class PeerValuationCanvasService:
                 native_currency=target_native_ccy,
                 base_currency=base,
                 fx_convert=self._fx_convert,
+                not_applicable=target_na,
             )
         ]
 
+        # Peer equity_value is intentionally out of scope: canvas reuses estimate
+        # multiples/medians and does not recompute per-peer DCF.
+        peer_na = {
+            "equity_value": "peer_dcf_not_recomputed",
+        }
+
         for peer in requested:
             detail = details_by_code.get(peer.upper(), {})
-            peer_fundamentals = self._load_fundamentals(peer)
-            peer_quote = self._load_quote(peer)
-            peer_ccy = _extract_native_currency(peer, peer_fundamentals, peer_quote)
+            # Prefer currency already carried on valuation peer_details to avoid
+            # a second fundamental/quote round-trip when present.
+            peer_ccy_hint = None
+            if detail:
+                peer_ccy_hint = detail.get("currency") or detail.get("quote_currency")
+            if peer_ccy_hint:
+                peer_ccy = _normalize_currency(
+                    str(peer_ccy_hint),
+                    fallback=default_currency_for_stock(peer),
+                )
+                peer_quote: Mapping[str, Any] = {}
+                if detail.get("current_price") is None and detail.get("price") is None:
+                    peer_quote = self._load_quote(peer)
+            else:
+                peer_fundamentals = self._load_fundamentals(peer)
+                peer_quote = self._load_quote(peer)
+                peer_ccy = _extract_native_currency(peer, peer_fundamentals, peer_quote)
             if detail:
                 peer_raw = {
                     "pe_ratio": detail.get("pe_ratio"),
                     "pb_ratio": detail.get("pb_ratio"),
                     "ev_ebitda": detail.get("ev_ebitda"),
                     "market_cap": detail.get("market_cap"),
-                    "current_price": _safe_float(peer_quote.get("price")),
+                    "current_price": (
+                        _safe_float(detail.get("current_price"))
+                        or _safe_float(detail.get("price"))
+                        or _safe_float(peer_quote.get("price"))
+                    ),
                     "ebitda": detail.get("ebitda"),
                     "net_debt": detail.get("net_debt"),
                     "equity_value": None,
@@ -665,6 +742,7 @@ class PeerValuationCanvasService:
                     native_currency=peer_ccy,
                     base_currency=base,
                     fx_convert=self._fx_convert,
+                    not_applicable=peer_na,
                 )
             )
 
@@ -710,6 +788,21 @@ class PeerValuationCanvasService:
             "assumptions": relative.get("assumptions") or {},
         }
 
+        # Primary canvas contract is unitless multiples + price/market_cap.
+        # Optional EV stack (ebitda/net_debt/ev_ebitda) may be partial without
+        # failing a multiples-complete comparison.
+        core_metrics = ("pe_ratio", "pb_ratio", "market_cap", "current_price")
+
+        def _row_core_status(row: Mapping[str, Any]) -> str:
+            metrics = row.get("metrics") if isinstance(row.get("metrics"), Mapping) else {}
+            core_cells = {
+                name: metrics[name]
+                for name in core_metrics
+                if isinstance(metrics.get(name), Mapping)
+                and str(metrics[name].get("status") or "") != "not_applicable"
+            }
+            return _row_data_status(core_cells)
+
         usable_multiple_rows = sum(
             1
             for row in rows
@@ -720,12 +813,15 @@ class PeerValuationCanvasService:
                 for m in MULTIPLE_METRICS
             )
         )
+        core_statuses = [_row_core_status(row) for row in rows]
         if usable_multiple_rows == 0:
             status = "partial" if rows else INSUFFICIENT_FUNDAMENTALS
-        elif any(row.get("data_status") != "ok" for row in rows):
+        elif core_statuses and all(s == "ok" for s in core_statuses):
+            status = "ok"
+        elif any(s in {"ok", "partial"} for s in core_statuses):
             status = "partial"
         else:
-            status = "ok"
+            status = "partial" if rows else INSUFFICIENT_FUNDAMENTALS
         if fx_stale and status == "ok":
             status = "partial"
 
@@ -739,10 +835,25 @@ class PeerValuationCanvasService:
             "metrics": list(CANVAS_METRICS),
             "multiple_metrics": list(MULTIPLE_METRICS),
             "currency_metrics": list(CURRENCY_METRICS),
+            "core_metrics": list(core_metrics),
             "rows": rows,
             "medians": medians,
             "relative_summary": relative_summary,
             "heatmap_cells": _heatmap_cells(rows),
+            "heatmap_note": (
+                "Heatmap scores are a soft visualization of multiples only; "
+                "they are not portfolio risk scores. Use table metric values."
+            ),
+            "claim_policy": {
+                "policy_version": "peer-relative-claim-policy-v1",
+                "guidance": (
+                    "Relative-value language must cite canvas cells "
+                    "(canvas.rows[i].metrics.<metric>, cite:<metric>@CODE, "
+                    "or peer_canvas). Without citations, claims should be "
+                    "downgraded via evaluate_relative_claims()."
+                ),
+                "evaluator": "src.services.peer_relative_claim_policy.evaluate_relative_claims",
+            },
             "valuation_status": estimate.get("status"),
             "disclaimer": estimate.get("disclaimer") or VALUATION_DISCLAIMER,
         }

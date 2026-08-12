@@ -158,6 +158,7 @@ def test_canvas_builds_for_sample_universe_custom_peers() -> None:
     )
     assert canvas["schema_version"] == PEER_CANVAS_SCHEMA_VERSION
     assert canvas["status"] in {"ok", "partial"}
+    # Missing-data peer may keep overall status partial; complete peers mark equity N/A.
     assert canvas["peer_set"]["source"] == "custom"
     assert "Caller-supplied" in canvas["peer_set"]["explanation"]
     codes = [row["stock_code"] for row in canvas["rows"]]
@@ -309,3 +310,73 @@ def test_no_relative_language_is_ok_without_canvas() -> None:
     )
     assert decision["status"] == "ok"
     assert decision["action"] == "none"
+
+
+def test_canvas_status_ok_when_core_metrics_present() -> None:
+    """Review counterexample: healthy PE/PB peers must not stay forced-partial
+    solely because peer equity_value is out of scope.
+    """
+    service = _service()
+    canvas = service.build(
+        "600519",
+        peer_source="custom",
+        peer_codes=["000858", "000568"],
+        base_currency="CNY",
+    )
+    peer_rows = [row for row in canvas["rows"] if row["role"] == "peer"]
+    assert peer_rows
+    for row in peer_rows:
+        assert row["metrics"]["equity_value"]["status"] == "not_applicable"
+        assert "equity_value" not in row["missing_metrics"]
+        assert "equity_value" in row["not_applicable_metrics"]
+    # Core multiples + price/market_cap present for all rows in fixture → ok
+    assert canvas["status"] == "ok"
+    assert canvas["claim_policy"]["policy_version"] == "peer-relative-claim-policy-v1"
+
+
+def test_industry_membership_is_caller_asserted() -> None:
+    service = _service()
+    canvas = service.build(
+        "600519",
+        peer_source="industry",
+        peer_codes=["000858"],
+    )
+    assert canvas["peer_set"]["membership"] == "caller_asserted"
+    assert "caller-asserted" in canvas["peer_set"]["explanation"]
+
+
+def test_fx_converter_reuses_single_service_instance(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review counterexample: PortfolioService must not be reconstructed per cell."""
+    import sys
+    import types
+
+    calls = {"n": 0}
+
+    class FakePortfolio:
+        def __init__(self) -> None:
+            calls["n"] += 1
+
+        def convert_amount_with_provenance(self, **kwargs):  # type: ignore[no-untyped-def]
+            amount = float(kwargs["amount"])
+            return {
+                "converted_amount": amount * 7.0,
+                "rate": 7.0,
+                "is_stale": False,
+                "method": "direct_rate",
+                "source": "test",
+                "rate_date": None,
+            }
+
+    fake_mod = types.ModuleType("src.services.portfolio_service")
+    fake_mod.PortfolioService = FakePortfolio  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "src.services.portfolio_service", fake_mod)
+
+    from src.services.peer_valuation_canvas import _portfolio_fx_converter
+
+    convert = _portfolio_fx_converter()
+    first = convert(10.0, "USD", "CNY")
+    second = convert(20.0, "HKD", "CNY")
+    assert first["converted_amount"] == pytest.approx(70.0)
+    assert second["converted_amount"] == pytest.approx(140.0)
+    assert calls["n"] == 1, f"expected one PortfolioService, got {calls['n']}"
+
