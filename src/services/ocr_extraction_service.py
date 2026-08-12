@@ -666,6 +666,11 @@ def _extract_pdf_page_image(
     try:
         from pypdf import PdfReader  # type: ignore[import-not-found]
     except Exception as exc:  # broad-exception: fallback_recorded - optional path
+        logger.debug(
+            "OCR PDF reader unavailable error_code=pdf_reader_unavailable "
+            "exception_type=%s",
+            type(exc).__name__,
+        )
         raise ValueError("pdf_reader_unavailable") from exc
 
     try:
@@ -701,6 +706,11 @@ def _extract_pdf_page_image(
     try:
         image_bytes = bytes(getattr(first, "data", b"") or b"")
     except Exception as exc:  # broad-exception: fallback_recorded - image payload edge cases
+        logger.debug(
+            "OCR PDF image payload failed error_code=pdf_image_extract_failed "
+            "exception_type=%s",
+            type(exc).__name__,
+        )
         raise ValueError("pdf_image_extract_failed") from exc
     if not image_bytes:
         raise ValueError("pdf_no_embedded_image")

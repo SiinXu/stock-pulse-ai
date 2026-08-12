@@ -362,6 +362,108 @@ def test_run_agent_loop_denies_ocr_absent_from_registry_catalog(
     assert result.tool_calls_log[0]["success"] is False
 
 
+
+
+def test_namespaced_bypass_names_rejected(tmp_path: Path, monkeypatch) -> None:
+    _enable_silent_audit(monkeypatch)
+    tool = _build_enabled_ocr_tool(tmp_path)
+    registry = ToolRegistry()
+    registry.register(tool)
+    session = _session(registry, allowed_tools=[OCR_TOOL_NAME])
+    for spoof in (
+        "builtin.ocr:extract_image_text",
+        "ocr.extract_image_text",
+        "EXTRACT_IMAGE_TEXT",
+    ):
+        denied = session.execute(spoof, {"file_path": "shot.png"})
+        assert denied["ok"] is False
+        assert denied["error"]["code"] in {
+            "invalid_tool_name",
+            "tool_not_found",
+            "tool_not_allowed",
+        }
+
+
+def test_runner_bridge_enforces_allowlist(tmp_path: Path, monkeypatch) -> None:
+    from src.agent.tools.execution import execute_runner_tool_call_via_session
+
+    _enable_silent_audit(monkeypatch)
+    tool = _build_enabled_ocr_tool(tmp_path)
+    registry = ToolRegistry()
+    registry.register(tool)
+    registry.register(
+        ToolDefinition(
+            name="echo_safe",
+            description="Echo",
+            parameters=[ToolParameter(name="message", type="string", description="m")],
+            handler=lambda message: {"message": message},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
+        )
+    )
+    session = _session(registry, allowed_tools=["echo_safe"])
+    tool_call = ToolCall(
+        id="call-1",
+        name=OCR_TOOL_NAME,
+        arguments={"file_path": "shot.png", "document_kind": "table_statement"},
+    )
+    _tc, res_str, ok, _dur, _cached, _guard = execute_runner_tool_call_via_session(
+        tool_call, session
+    )
+    assert ok is False
+    payload = json.loads(res_str)
+    assert payload.get("code") == "tool_not_allowed" or "allowlist" in str(payload).lower()
+
+
+def test_ocr_audit_diagnostics_do_not_store_full_ocr_body(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """OCR result text must not appear verbatim in ToolSurface audit summaries."""
+    _enable_silent_audit(monkeypatch)
+    secret = "UNIQUE_OCR_AUDIT_BODY_TOKEN_9f3a"
+    tool = _build_enabled_ocr_tool(tmp_path, text=f"{secret}\nAccount: 123456789")
+    registry = ToolRegistry()
+    registry.register(tool)
+    session = _session(registry, allowed_tools=[OCR_TOOL_NAME])
+    result = session.execute(
+        OCR_TOOL_NAME,
+        {"file_path": "shot.png", "document_kind": "table_statement"},
+    )
+    assert result["ok"] is True
+    audit_blob = json.dumps(result.get("audit") or {}, ensure_ascii=False)
+    diag_blob = json.dumps(result.get("diagnostics") or {}, ensure_ascii=False)
+    assert secret not in audit_blob
+    assert secret not in diag_blob
+    assert "123456789" not in audit_blob
+    assert result["result"]["trust"]["authoritative_for_decisions"] is False
+
+
+def test_document_kinds_via_real_session(tmp_path: Path, monkeypatch) -> None:
+    _enable_silent_audit(monkeypatch)
+    kinds = {
+        "screenshot": "plain screenshot AAPL",
+        "filing_page": "FORM 10-K filing text",
+        "table_statement": "Symbol Qty\nAAPL 10",
+        "chart_annotation": "Support 185.00 Resistance 205.50",
+    }
+    for kind, text in kinds.items():
+        tool = _build_enabled_ocr_tool(tmp_path, text=text)
+        registry = ToolRegistry()
+        registry.register(tool)
+        session = _session(registry, allowed_tools=[OCR_TOOL_NAME])
+        result = session.execute(
+            OCR_TOOL_NAME,
+            {"file_path": "shot.png", "document_kind": kind, "langs": "eng"},
+        )
+        assert result["ok"] is True, (kind, result)
+        payload = result["result"]
+        assert payload["document_kind"] == kind
+        assert payload["trust"]["classification"] == "untrusted_user_document"
+        assert payload["trust"]["authoritative_for_decisions"] is False
+
+
 def test_agent_executor_dispatches_ocr_through_real_session(
     tmp_path: Path, monkeypatch
 ) -> None:
