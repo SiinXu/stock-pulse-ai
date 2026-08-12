@@ -28,6 +28,8 @@ English: [api-error-taxonomy_EN.md](api-error-taxonomy_EN.md)
 
 实现位置：`api/v1/error_taxonomy.py`、`apps/dsa-web/src/api/error/taxonomy.ts`、`resolveErrorRemediation`、`ApiErrorAlert`。
 
+分类严重度控制 Toast 的视觉 tone，但 API 操作失败仍使用 assertive `alert` 通知。普通 warning/info Toast 继续使用 polite `status`；视觉颜色不能静默降低错误的可访问性语义。
+
 ## 新增错误码
 
 1. 稳定 snake_case `error` 码  

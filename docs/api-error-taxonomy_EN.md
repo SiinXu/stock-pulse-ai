@@ -47,6 +47,10 @@ Chinese: [api-error-taxonomy.md](api-error-taxonomy.md)
 | `docs` | Open related documentation (GitHub docs path) in a new tab |
 | `none` | Guidance text only; no primary CTA |
 
+Taxonomy severity controls the visual toast tone, while API operation failures
+remain assertive `alert` announcements. Generic warning/info toasts remain polite
+`status` announcements; visual tone must not silently downgrade error semantics.
+
 Source of truth:
 
 - Backend registry: `api/v1/error_taxonomy.py`

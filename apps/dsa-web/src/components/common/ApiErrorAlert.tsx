@@ -111,6 +111,7 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
         </>
       ),
       tone: toastTone,
+      role: 'alert',
       durationMs: 0,
       closeLabel: dismissLabel ?? t('common.close'),
       action: hasAction ? {

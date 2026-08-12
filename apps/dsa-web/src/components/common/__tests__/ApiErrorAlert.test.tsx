@@ -182,7 +182,8 @@ describe('ApiErrorAlert', () => {
         })}
       />,
     );
-    expect(document.querySelector('[data-toast-tone="warning"]')).not.toBeNull();
+    const warningError = screen.getByRole('alert');
+    expect(warningError).toHaveAttribute('data-toast-tone', 'warning');
     unmount();
 
     render(
