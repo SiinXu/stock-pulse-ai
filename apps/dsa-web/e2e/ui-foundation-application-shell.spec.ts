@@ -175,19 +175,19 @@ test.describe('application shell foundation', () => {
     const opener = page.getByRole('button', { name: 'Open navigation' });
     await opener.click();
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
-    const chatLink = drawer.getByRole('link', { name: 'Agent' });
-    await expect(chatLink).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:agent');
-    await expect(chatLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
-    await chatLink.focus();
-    await chatLink.click({ modifiers: ['Control'] });
+    const signalsLink = drawer.getByRole('link', { name: 'Signal Center' });
+    await expect(signalsLink).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:signals');
+    await expect(signalsLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
+    await signalsLink.focus();
+    await signalsLink.click({ modifiers: ['Control'] });
     await expect(drawer).toBeVisible();
     await expect(page).toHaveURL(/\/e2e\/application-shell-fixture\.html$/);
-    await expect(chatLink).toBeFocused();
-    await chatLink.click();
+    await expect(signalsLink).toBeFocused();
+    await signalsLink.click();
 
     await expect(drawer).toBeHidden();
-    await expect(page).toHaveURL(/\/chat$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Route /chat' })).toBeFocused();
+    await expect(page).toHaveURL(/\/signals$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Route /signals' })).toBeFocused();
     await expect(opener).toHaveAttribute('data-route-focus-key', 'shell:mobile-navigation');
 
     await opener.click();
@@ -197,7 +197,7 @@ test.describe('application shell foundation', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Route /portfolio' })).toBeFocused();
 
     await page.goBack();
-    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page).toHaveURL(/\/signals$/);
     await expect(opener).toBeFocused();
 
     await page.goBack();
@@ -351,11 +351,11 @@ test.describe('application shell foundation', () => {
     const compactSearch = sidebar.getByRole('button', { name: 'Search', exact: true });
     await compactSearch.focus();
     await expect(page.getByRole('tooltip', { name: 'Search' })).toBeVisible();
-    const compactHome = sidebar.getByRole('link', { name: 'Home' });
+    const compactHome = sidebar.getByRole('link', { name: 'Today' });
     await compactHome.focus();
     await expect(compactHome).not.toHaveAttribute('aria-haspopup');
     await compactHome.press('ArrowRight');
-    const homeMenu = page.getByRole('menu', { name: 'Home' });
+    const homeMenu = page.getByRole('menu', { name: 'Today' });
     await expect(homeMenu).toHaveCount(0);
     await expect(compactHome).toBeFocused();
 
