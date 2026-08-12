@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Merged concurrent rebaselines for Agent three-layer disclosure (#868) and Data Sources Hub runtime projection (#867); locale conflicts take the larger measured value + 200 B headroom. Untouched budgets remain unchanged.",
+  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after capability write registry / task-routing Settings help inventory (Refs #221 / #204); failed locales use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 152852,
-      "measuredGzipBytes": 152478,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 152478 B, cap 152852 B (measured + \u2265200 B)."
+      "maxGzipBytes": 153597,
+      "measuredGzipBytes": 153397,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 153397 B + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 146108,
-      "measuredGzipBytes": 145866,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145866 B, cap 146108 B (measured + \u2265200 B)."
+      "maxGzipBytes": 146968,
+      "measuredGzipBytes": 146768,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 146768 B + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 146229,
-      "measuredGzipBytes": 145847,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145847 B, cap 146229 B (measured + \u2265200 B)."
+      "maxGzipBytes": 146942,
+      "measuredGzipBytes": 146742,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 146742 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 146509,
-      "measuredGzipBytes": 146126,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 146126 B, cap 146509 B (measured + \u2265200 B)."
+      "maxGzipBytes": 147208,
+      "measuredGzipBytes": 147008,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 147008 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 142289,
-      "measuredGzipBytes": 141915,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 141915 B, cap 142289 B (measured + \u2265200 B)."
+      "maxGzipBytes": 142985,
+      "measuredGzipBytes": 142785,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 142785 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 138832,
-      "measuredGzipBytes": 138450,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 138450 B, cap 138832 B (measured + \u2265200 B)."
+      "maxGzipBytes": 139499,
+      "measuredGzipBytes": 139299,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 139299 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 132253,
-      "measuredGzipBytes": 131875,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131875 B, cap 132253 B (measured + \u2265200 B)."
+      "maxGzipBytes": 132906,
+      "measuredGzipBytes": 132706,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 132706 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 132328,
-      "measuredGzipBytes": 131950,
-      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131950 B, cap 132328 B (measured + \u2265200 B)."
+      "maxGzipBytes": 132960,
+      "measuredGzipBytes": 132760,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 132760 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
