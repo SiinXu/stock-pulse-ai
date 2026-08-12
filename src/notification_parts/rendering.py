@@ -1214,7 +1214,8 @@ class _RenderingMethods:
         resolved_report_type = (
             report_type
             if report_type is not None
-            else getattr(get_config(), "report_type", "simple")
+            else getattr(getattr(self, "_config", None), "report_type", None)
+            or "simple"
         )
         signal_text, signal_emoji, _ = self._get_signal_level(result)
         dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
