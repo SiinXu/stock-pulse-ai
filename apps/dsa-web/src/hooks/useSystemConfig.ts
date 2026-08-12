@@ -379,16 +379,27 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setValidationIssues([]);
     setSaveError(null);
     setConflictState(null);
-  }, [serverItems]);
+    // Drop session-only CSS preview from abandoned MARKET_REVIEW_COLOR_SCHEME drafts.
+    if (next.MARKET_REVIEW_COLOR_SCHEME !== undefined) {
+      themeAppearance?.syncPriceDirectionFromChangeColorPref(
+        next.MARKET_REVIEW_COLOR_SCHEME,
+        { persist: false },
+      );
+    }
+  }, [serverItems, themeAppearance]);
 
   const resetDraftKeys = useCallback((keys: string[]) => {
     const keySet = new Set(keys.map((key) => key.toUpperCase()));
+    let restoredColorScheme: string | undefined;
     setDraftValues((previous) => {
       const next = { ...previous };
       for (const key of keySet) {
         const item = serverItemByKeyRef.current[key];
         if (item) {
           next[key] = item.value;
+          if (key === 'MARKET_REVIEW_COLOR_SCHEME') {
+            restoredColorScheme = item.value;
+          }
         }
       }
       return next;
@@ -402,7 +413,10 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       return fields.length > 0 ? { ...previous, fields } : null;
     });
     setSaveError(null);
-  }, []);
+    if (restoredColorScheme !== undefined) {
+      themeAppearance?.syncPriceDirectionFromChangeColorPref(restoredColorScheme, { persist: false });
+    }
+  }, [themeAppearance]);
 
   const applyPartialUpdate = useCallback((updatedItems: Array<{ key: string; value: string }>) => {
     setDraftValues((prevDraft) => {
@@ -712,27 +726,37 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     }
     if (choice === 'server') {
       setDraftValues((prev) => ({ ...prev, [key]: field.server }));
+      if (key === 'MARKET_REVIEW_COLOR_SCHEME') {
+        themeAppearance?.syncPriceDirectionFromChangeColorPref(field.server, { persist: false });
+      }
     }
     const remaining = conflictState.fields.filter((entry) => entry.key !== key);
     setConflictState(remaining.length > 0 ? { ...conflictState, fields: remaining } : null);
     if (remaining.length === 0) {
       setSaveError(null);
     }
-  }, [conflictState]);
+  }, [conflictState, themeAppearance]);
 
   const resolveAllConflicts = useCallback((choice: 'server' | 'local') => {
     if (choice === 'server' && conflictState) {
+      let restoredColorScheme: string | undefined;
       setDraftValues((prev) => {
         const next = { ...prev };
         for (const field of conflictState.fields) {
           next[field.key] = field.server;
+          if (field.key === 'MARKET_REVIEW_COLOR_SCHEME') {
+            restoredColorScheme = field.server;
+          }
         }
         return next;
       });
+      if (restoredColorScheme !== undefined) {
+        themeAppearance?.syncPriceDirectionFromChangeColorPref(restoredColorScheme, { persist: false });
+      }
     }
     setConflictState(null);
     setSaveError(null);
-  }, [conflictState]);
+  }, [conflictState, themeAppearance]);
 
   const dismissConflicts = useCallback(() => {
     setConflictState(null);
