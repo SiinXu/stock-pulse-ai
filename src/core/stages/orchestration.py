@@ -23,6 +23,10 @@ from src.core.trading_calendar import (
     get_market_for_stock,
 )
 from src.enums import ReportType
+from src.core.outbound_delivery import (
+    reset_outbound_notifications_enabled as _reset_outbound_notifications_enabled,
+    set_outbound_notifications_enabled as _set_outbound_notifications_enabled,
+)
 from src.services.run_diagnostics import (
     PIPELINE_STAGE_NAMES,
     PipelineStageObservation,
@@ -296,18 +300,17 @@ class _OrchestrationStageMixin:
             report_type: 报告类型枚举（从配置读取，Issue #119）
             current_time: 本轮运行冻结的参考时间，用于统一断点续传目标交易日判断
             send_notification: Optional explicit outbound delivery intent for this
-                call (API/CLI no-notify). When set, updates
-                ``outbound_notifications_enabled`` used by report push and
-                high-disagreement alerts. When omitted, keeps the pipeline flag
-                already set by ``run()`` or the caller.
+                call (API/CLI no-notify). The value is isolated to this execution
+                context so concurrent requests cannot change each other's alerts.
 
         Returns:
             AnalysisResult 或 None
         """
         from src.plugins.event_hooks import dispatch_analysis_event
 
-        if send_notification is not None:
-            self.outbound_notifications_enabled = bool(send_notification)
+        outbound_token = _set_outbound_notifications_enabled(
+            send_notification if isinstance(send_notification, bool) else True
+        )
 
         logger.info("========== Processing %s ==========", code)
 
@@ -367,19 +370,19 @@ class _OrchestrationStageMixin:
             reset_run_diagnostic_context(diag_token)
             if frozen_target_token is not None:
                 reset_frozen_target_date(frozen_target_token)
+            _reset_outbound_notifications_enabled(outbound_token)
             raise
 
         analysis_event_started = not skip_analysis
-        if analysis_event_started:
-            dispatch_analysis_event(
-                "analysis.started",
-                task_id=effective_query_id,
-                trace_id=effective_trace_id,
-                stock_code=code,
-                trigger_source=getattr(self, "query_source", None) or "system",
-            )
-
         try:
+            if analysis_event_started:
+                dispatch_analysis_event(
+                    "analysis.started",
+                    task_id=effective_query_id,
+                    trace_id=effective_trace_id,
+                    stock_code=code,
+                    trigger_source=getattr(self, "query_source", None) or "system",
+                )
             self._emit_progress(12, f"{code}：正在准备分析任务")
             # Step 1: Get and save data
             with observe_pipeline_stage(
@@ -571,6 +574,7 @@ class _OrchestrationStageMixin:
             reset_run_diagnostic_context(diag_token)
             if frozen_target_token is not None:
                 reset_frozen_target_date(frozen_target_token)
+            _reset_outbound_notifications_enabled(outbound_token)
 
     def _process_single_stock_for_batch(
         self,
@@ -630,10 +634,8 @@ class _OrchestrationStageMixin:
             "data-only" if dry_run else "full-analysis",
         )
 
-        # Align report push and high-disagreement alerts (#134) with the same
-        # delivery intent (CLI --no-notify / API send_notification=false / dry-run).
-        self.outbound_notifications_enabled = bool(send_notification) and not bool(
-            dry_run
+        stock_outbound_notifications_enabled = (
+            send_notification is True and dry_run is False
         )
 
         # Freeze the unified reference time for this round of running to avoid using the same stocks across market closing boundaries with different target trading days.
@@ -717,6 +719,7 @@ class _OrchestrationStageMixin:
                     report_type=report_type,  # Issue #119: Pass report type
                     analysis_query_id=uuid.uuid4().hex,
                     current_time=resume_reference_time,
+                    send_notification=stock_outbound_notifications_enabled,
                 ): code
                 for code in stock_codes
             }

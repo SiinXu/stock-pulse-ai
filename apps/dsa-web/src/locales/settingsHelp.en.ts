@@ -2074,27 +2074,11 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
     title: 'High Disagreement Alerts',
     summary:
-      'Emit a dedicated alert when multi-agent structured disagreement exceeds the threshold.',
-    usage:
-      'Default on. Requires a structured disagreement_handling record from multi-agent disagreement handling. Routes through NOTIFICATION_ALERT_CHANNELS. Does not recompute disagreement scores. Honors --no-notify / send_notification=false the same way as report push.',
-    valueNotes: [
-      'Off: never emit high-disagreement alerts.',
-      'On: emit when disagreement_score >= HIGH_DISAGREEMENT_THRESHOLD (score-primary).',
-    ],
-    impact: [
-      'Adds an alert-route notification with disagreement points and a history entry link.',
-      'Single channel failure never interrupts analysis.',
-    ],
-    notes: [
-      'Consumes disagreement_handling records only; single-pass analyses without that record are unaffected.',
-    ],
+      'Default on; routes existing structured high-disagreement records through alert channels while honoring no-notify.',
   },
   'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
     title: 'High Disagreement Alert Threshold',
-    summary: 'Score threshold (0-1) for high-disagreement alerts.',
-    usage:
-      'Default 0.6. When disagreement_score is present, only score >= threshold alerts (high_disagreement alone does not bypass). When score is absent, falls back to high_disagreement=true.',
-    impact: ['Controls how sensitive high-disagreement alert emission is.'],
+    summary: 'Score threshold from 0 to 1 for high-disagreement alerts; defaults to 0.6.',
   },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: 'Paper Portfolio Initial Cash',

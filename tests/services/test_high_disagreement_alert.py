@@ -94,6 +94,23 @@ class ExtractRecordTests(unittest.TestCase):
         )
         self.assertIsNone(extract_disagreement_handling_record(result))
 
+    def test_missing_enabled_marker_is_not_authoritative(self) -> None:
+        record = _sample_record()
+        record.pop("enabled")
+        result = SimpleNamespace(dashboard={"disagreement_handling": record})
+        self.assertIsNone(extract_disagreement_handling_record(result))
+
+    def test_bounded_raw_result_walk_handles_nested_and_cyclic_mappings(self) -> None:
+        record = _sample_record(score=0.84)
+        nested = {"raw_result": {"dashboard": {"disagreement_handling": record}}}
+        self.assertEqual(
+            extract_disagreement_handling_record(nested)["disagreement_score"],
+            0.84,
+        )
+        cyclic: Dict[str, Any] = {}
+        cyclic["raw_result"] = cyclic
+        self.assertIsNone(extract_disagreement_handling_record(cyclic))
+
 
 class ThresholdPolicyTests(unittest.TestCase):
     def test_score_at_or_above_threshold_triggers(self) -> None:
@@ -122,6 +139,14 @@ class ThresholdPolicyTests(unittest.TestCase):
 
     def test_missing_record_does_not_trigger(self) -> None:
         self.assertFalse(should_emit_high_disagreement_alert(None, threshold=0.6))
+
+    def test_non_finite_values_use_deterministic_policy(self) -> None:
+        record = _sample_record(score=0.59, high_disagreement=False)
+        self.assertFalse(should_emit_high_disagreement_alert(record, threshold=float("nan")))
+        self.assertFalse(should_emit_high_disagreement_alert(record, threshold=float("inf")))
+        record["disagreement_score"] = float("inf")
+        record["high_disagreement"] = "true"
+        self.assertFalse(should_emit_high_disagreement_alert(record, threshold=0.6))
 
 
 class AlertContentTests(unittest.TestCase):
@@ -171,6 +196,46 @@ class AlertContentTests(unittest.TestCase):
             "/research/analysis?segment=history&recordId=7",
         )
 
+    def test_history_href_rejects_unsafe_origins_and_invalid_ports(self) -> None:
+        for host, port in (
+            ("evil.example/path", 8000),
+            ("user@example.com", 8000),
+            ("good.example\n.evil", 8000),
+            ("localhost", 70000),
+            ("localhost", True),
+        ):
+            config = SimpleNamespace(webui_host=host, webui_port=port)
+            self.assertEqual(
+                build_history_entry_href(7, config=config),
+                "/research/analysis?segment=history&recordId=7",
+            )
+        ipv6 = SimpleNamespace(webui_host="::1", webui_port=8000)
+        self.assertEqual(
+            build_history_entry_href(7, config=ipv6),
+            "http://[::1]:8000/research/analysis?segment=history&recordId=7",
+        )
+
+    def test_alert_text_bounds_untrusted_record_fields(self) -> None:
+        record = _sample_record()
+        record["verdict_mode"] = "v" * 10_000
+        record["points"] = [
+            {
+                "source": "s" * 10_000,
+                "kind": "k" * 10_000,
+                "severity": "x" * 10_000,
+                "participants": ["p" * 10_000] * 100,
+            }
+        ] * 100
+        text = build_high_disagreement_alert_text(
+            stock_code="A" * 10_000,
+            stock_name="N" * 10_000,
+            record=record,
+            report_language="en",
+        )
+        self.assertLess(len(text), 12_000)
+        self.assertNotIn("A" * 33, text)
+        self.assertNotIn("N" * 129, text)
+
 
 class EmitAlertTests(unittest.TestCase):
     def _result(self, record: Optional[Dict[str, Any]] = None) -> SimpleNamespace:
@@ -211,6 +276,28 @@ class EmitAlertTests(unittest.TestCase):
         self.assertIn("recordId=99", calls[0]["content"])
         self.assertIn("directional_opposition", calls[0]["content"])
 
+    def test_real_composed_config_properties_are_consumed(self) -> None:
+        from src.config import Config
+
+        notifier = MagicMock()
+        notifier.send_with_results.return_value = SimpleNamespace(
+            success=True,
+            status="sent",
+        )
+        config = Config(
+            high_disagreement_alerts_enabled=True,
+            high_disagreement_threshold=0.6,
+        )
+        self.assertTrue(
+            maybe_send_high_disagreement_alert(
+                self._result(_sample_record(score=0.8)),
+                history_id=12,
+                config=config,
+                notifier=notifier,
+            )
+        )
+        notifier.send_with_results.assert_called_once()
+
     def test_skips_when_alerts_disabled(self) -> None:
         notifier = MagicMock()
         config = SimpleNamespace(
@@ -226,6 +313,32 @@ class EmitAlertTests(unittest.TestCase):
         self.assertFalse(ok)
         notifier.send_with_results.assert_not_called()
         notifier.send.assert_not_called()
+
+    def test_non_boolean_config_and_delivery_values_fail_closed(self) -> None:
+        notifier = MagicMock()
+        config = SimpleNamespace(
+            high_disagreement_alerts_enabled="true",
+            high_disagreement_threshold=0.6,
+        )
+        self.assertFalse(
+            maybe_send_high_disagreement_alert(
+                self._result(_sample_record()),
+                history_id=1,
+                config=config,
+                notifier=notifier,
+            )
+        )
+        config.high_disagreement_alerts_enabled = True
+        self.assertFalse(
+            maybe_send_high_disagreement_alert(
+                self._result(_sample_record()),
+                history_id=1,
+                config=config,
+                notifier=notifier,
+                outbound_notifications_enabled=1,
+            )
+        )
+        notifier.send_with_results.assert_not_called()
 
     def test_skips_when_no_disagreement_record(self) -> None:
         notifier = MagicMock()

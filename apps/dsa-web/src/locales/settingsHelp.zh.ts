@@ -2102,25 +2102,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
     title: '高分歧告警',
-    summary: '当多智能体结构化分歧超过阈值时，通过既有告警通知路由发送专用告警。',
-    usage:
-      '默认开启。仅消费多智能体分歧处理产出的 disagreement_handling 记录，不重新计算分歧分数；走 NOTIFICATION_ALERT_CHANNELS。与报告推送一致，遵守 --no-notify / send_notification=false。',
-    valueNotes: [
-      '关闭：从不发送高分歧告警。',
-      '开启：当 disagreement_score ≥ HIGH_DISAGREEMENT_THRESHOLD 时发送（分数优先）。',
-    ],
-    impact: [
-      '额外发送含分歧要点与历史入口链接的告警路由通知。',
-      '单渠道失败不会中断分析。',
-    ],
-    notes: ['无 disagreement_handling 记录的单程分析不受影响。'],
+    summary: '默认开启；通过告警渠道发送已有的结构化高分歧记录，并遵守不通知选项。',
   },
   'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
     title: '高分歧告警阈值',
-    summary: '高分歧告警的分数阈值（0-1）。',
-    usage:
-      '默认 0.6。存在 disagreement_score 时仅当分数 ≥ 阈值才告警（high_disagreement 不能旁路阈值）；分数缺失时回退到 high_disagreement=true。',
-    impact: ['控制高分歧告警的敏感度。'],
+    summary: '高分歧告警的分数阈值，范围为 0 到 1，默认值为 0.6。',
   },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: '纸面组合初始资金',

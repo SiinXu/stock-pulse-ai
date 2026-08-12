@@ -15,7 +15,11 @@ Ownership boundaries:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+import inspect
+import ipaddress
+import math
+import re
+from typing import Any, Dict, List, Mapping, Optional
 
 from src.utils.sanitize import log_safe_exception
 
@@ -23,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_HIGH_DISAGREEMENT_THRESHOLD = 0.6
 _MAX_ALERT_POINTS = 5
+_MAX_PARTICIPANTS = 12
+_MAX_LABEL_LENGTH = 96
+_MAX_STOCK_NAME_LENGTH = 128
+_MAX_STOCK_CODE_LENGTH = 32
+_MAX_QUERY_ID_LENGTH = 128
+_MAX_RAW_RESULT_DEPTH = 4
 _HISTORY_ENTRY_HREF_TEMPLATE = (
     "/research/analysis?segment=history&recordId={record_id}"
 )
@@ -40,39 +50,44 @@ def extract_disagreement_handling_record(source: Any) -> Optional[Dict[str, Any]
     Returns ``None`` when no authoritative record is available. Does not invent
     disagreement from raw agent opinions or conflict_severity alone.
     """
-    candidates: List[Any] = []
-
-    if isinstance(source, Mapping):
-        candidates.append(source.get("disagreement_handling"))
-        dashboard = source.get("dashboard")
-        if isinstance(dashboard, Mapping):
-            candidates.append(dashboard.get("disagreement_handling"))
-            synthesis = dashboard.get("strategy_synthesis")
+    current = source
+    visited: set[int] = set()
+    for _ in range(_MAX_RAW_RESULT_DEPTH + 1):
+        if id(current) in visited:
+            return None
+        visited.add(id(current))
+        candidates: List[Any] = []
+        if isinstance(current, Mapping):
+            candidates.append(current.get("disagreement_handling"))
+            dashboard = current.get("dashboard")
+            if isinstance(dashboard, Mapping):
+                candidates.append(dashboard.get("disagreement_handling"))
+                synthesis = dashboard.get("strategy_synthesis")
+                if isinstance(synthesis, Mapping):
+                    candidates.append(synthesis.get("disagreement_handling"))
+            synthesis = current.get("strategy_synthesis")
             if isinstance(synthesis, Mapping):
                 candidates.append(synthesis.get("disagreement_handling"))
-        synthesis = source.get("strategy_synthesis")
-        if isinstance(synthesis, Mapping):
-            candidates.append(synthesis.get("disagreement_handling"))
-        raw_result = source.get("raw_result")
-        if isinstance(raw_result, Mapping):
-            nested = extract_disagreement_handling_record(raw_result)
-            if nested is not None:
-                return nested
-    else:
-        dashboard = getattr(source, "dashboard", None)
-        if isinstance(dashboard, Mapping):
-            candidates.append(dashboard.get("disagreement_handling"))
-            synthesis = dashboard.get("strategy_synthesis")
-            if isinstance(synthesis, Mapping):
-                candidates.append(synthesis.get("disagreement_handling"))
-        # Optional runtime attachment used by some pipeline paths.
-        meta_handling = getattr(source, "disagreement_handling", None)
-        candidates.append(meta_handling)
+        else:
+            dashboard = getattr(current, "dashboard", None)
+            if isinstance(dashboard, Mapping):
+                candidates.append(dashboard.get("disagreement_handling"))
+                synthesis = dashboard.get("strategy_synthesis")
+                if isinstance(synthesis, Mapping):
+                    candidates.append(synthesis.get("disagreement_handling"))
+            candidates.append(getattr(current, "disagreement_handling", None))
 
-    for candidate in candidates:
-        normalized = _normalize_record(candidate)
-        if normalized is not None:
-            return normalized
+        for candidate in candidates:
+            normalized = _normalize_record(candidate)
+            if normalized is not None:
+                return normalized
+
+        if not isinstance(current, Mapping):
+            break
+        raw_result = current.get("raw_result")
+        if not isinstance(raw_result, Mapping):
+            break
+        current = raw_result
     return None
 
 
@@ -90,14 +105,14 @@ def should_emit_high_disagreement_alert(
     """
     if not isinstance(record, Mapping) or not record:
         return False
-    if record.get("enabled") is False:
+    if record.get("enabled") is not True:
         return False
 
     threshold_value = _clamp_unit(threshold, DEFAULT_HIGH_DISAGREEMENT_THRESHOLD)
     score = _safe_float(record.get("disagreement_score"))
     if score is not None:
         return score >= threshold_value
-    return bool(record.get("high_disagreement"))
+    return record.get("high_disagreement") is True
 
 
 def build_history_entry_href(
@@ -130,13 +145,15 @@ def build_high_disagreement_alert_text(
     to avoid importing the full notification facade for pure text construction.
     """
     labels = _alert_labels(report_language)
-    code = (stock_code or "").strip() or "unknown"
-    name = (stock_name or "").strip() or code
+    code = _safe_text(stock_code, _MAX_STOCK_CODE_LENGTH, "unknown")
+    name = _safe_text(stock_name, _MAX_STOCK_NAME_LENGTH, code)
     score = _safe_float(record.get("disagreement_score"))
     score_text = f"{score * 100:.0f}%" if score is not None else "n/a"
-    verdict = str(record.get("verdict_mode") or "").strip() or "unknown"
-    escalation = str(record.get("escalation") or "").strip() or "unknown"
-    resolution = str(record.get("resolution_status") or "").strip() or "unknown"
+    verdict = _safe_text(record.get("verdict_mode"), _MAX_LABEL_LENGTH, "unknown")
+    escalation = _safe_text(record.get("escalation"), _MAX_LABEL_LENGTH, "unknown")
+    resolution = _safe_text(
+        record.get("resolution_status"), _MAX_LABEL_LENGTH, "unknown"
+    )
 
     lines: List[str] = [
         f"{labels['stock']}: {name} ({code})",
@@ -192,7 +209,7 @@ def maybe_send_high_disagreement_alert(
     ``send_notification=false`` / dry-run delivery skip), no alert is sent.
     """
     try:
-        if not bool(outbound_notifications_enabled):
+        if outbound_notifications_enabled is not True:
             return False
 
         if config is None:
@@ -200,22 +217,26 @@ def maybe_send_high_disagreement_alert(
 
             config = get_config()
 
-        if not bool(getattr(config, "high_disagreement_alerts_enabled", True)):
+        if _static_config_value(
+            config, "high_disagreement_alerts_enabled", True
+        ) is not True:
             return False
 
         record = extract_disagreement_handling_record(result)
         if record is None:
             return False
 
-        threshold = getattr(
+        threshold = _static_config_value(
             config,
             "high_disagreement_threshold",
             DEFAULT_HIGH_DISAGREEMENT_THRESHOLD,
         )
-        if not should_emit_high_disagreement_alert(record, threshold=float(threshold)):
+        if not should_emit_high_disagreement_alert(record, threshold=threshold):
             return False
 
-        stock_code = str(getattr(result, "code", None) or "").strip() or "unknown"
+        stock_code = _safe_text(
+            getattr(result, "code", None), _MAX_STOCK_CODE_LENGTH, "unknown"
+        )
         stock_name = getattr(result, "name", None)
         report_language = getattr(result, "report_language", None) or getattr(
             config, "report_language", "zh"
@@ -223,10 +244,10 @@ def maybe_send_high_disagreement_alert(
         query_id = getattr(result, "query_id", None)
         alert_text = build_high_disagreement_alert_text(
             stock_code=stock_code,
-            stock_name=str(stock_name) if stock_name else None,
+            stock_name=stock_name,
             record=record,
             history_id=history_id,
-            report_language=str(report_language or "zh"),
+            report_language=_safe_text(report_language, 16, "zh"),
             config=config,
         )
 
@@ -238,7 +259,7 @@ def maybe_send_high_disagreement_alert(
             notification_service = notifier
         dedup_key = (
             f"high_disagreement:{stock_code}:"
-            f"{history_id or query_id or 'unknown'}"
+            f"{history_id or _safe_text(query_id, _MAX_QUERY_ID_LENGTH, 'unknown')}"
         )
         send_kwargs = {
             "route_type": "alert",
@@ -294,7 +315,7 @@ def _normalize_record(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping) or not value:
         return None
     # Authoritative product record from #1205 always sets enabled=True when active.
-    if value.get("enabled") is False:
+    if value.get("enabled") is not True:
         return None
     has_score = _safe_float(value.get("disagreement_score")) is not None
     has_flag = "high_disagreement" in value
@@ -305,27 +326,29 @@ def _normalize_record(value: Any) -> Optional[Dict[str, Any]]:
 
 
 def _public_points(raw_points: Any) -> List[Dict[str, Any]]:
-    if not isinstance(raw_points, Sequence) or isinstance(raw_points, (str, bytes)):
+    if not isinstance(raw_points, list):
         return []
     points: List[Dict[str, Any]] = []
-    for item in list(raw_points)[:_MAX_ALERT_POINTS]:
+    for item in raw_points[:_MAX_ALERT_POINTS]:
         if not isinstance(item, Mapping):
             continue
         participants_raw = item.get("participants")
         participants: List[str] = []
-        if isinstance(participants_raw, Sequence) and not isinstance(
-            participants_raw, (str, bytes)
-        ):
+        if isinstance(participants_raw, list):
             participants = [
-                str(p).strip()
+                _safe_text(p, _MAX_LABEL_LENGTH, "")
                 for p in participants_raw
-                if str(p).strip()
-            ][:12]
+                if _safe_text(p, _MAX_LABEL_LENGTH, "")
+            ][:_MAX_PARTICIPANTS]
         points.append(
             {
-                "source": str(item.get("source") or "unknown"),
-                "kind": str(item.get("kind") or "unknown"),
-                "severity": str(item.get("severity") or "medium"),
+                "source": _safe_text(
+                    item.get("source"), _MAX_LABEL_LENGTH, "unknown"
+                ),
+                "kind": _safe_text(item.get("kind"), _MAX_LABEL_LENGTH, "unknown"),
+                "severity": _safe_text(
+                    item.get("severity"), _MAX_LABEL_LENGTH, "medium"
+                ),
                 "participants": participants,
             }
         )
@@ -339,7 +362,7 @@ def _safe_float(value: Any) -> Optional[float]:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    if number != number:  # NaN
+    if not math.isfinite(number):
         return None
     return number
 
@@ -355,18 +378,68 @@ def _public_web_base(config: Any) -> Optional[str]:
     """Return an absolute origin when WEBUI_HOST is a usable non-bind-all host."""
     if config is None:
         return None
-    host = str(getattr(config, "webui_host", "") or "").strip()
+    host = _safe_text(_static_config_value(config, "webui_host", ""), 253, "")
     if not host or host in {"0.0.0.0", "::", "[::]"}:
         return None
-    port_raw = getattr(config, "webui_port", None)
+    formatted_host = _validated_web_host(host)
+    if formatted_host is None:
+        return None
+    port_raw = _static_config_value(config, "webui_port", None)
+    if isinstance(port_raw, bool):
+        return None
     try:
         port = int(port_raw) if port_raw is not None else 8000
     except (TypeError, ValueError):
-        port = 8000
-    if port <= 0:
+        return None
+    if not 1 <= port <= 65535:
         return None
     # Local WebUI is HTTP-only; do not invent TLS settings.
-    return f"http://{host}:{port}"
+    return f"http://{formatted_host}:{port}"
+
+
+def _static_config_value(config: Any, name: str, default: Any) -> Any:
+    """Read declared config only, without accepting dynamic mock attributes."""
+    if config is None:
+        return default
+    try:
+        declared = inspect.getattr_static(config, name)
+    except AttributeError:
+        return default
+    if isinstance(declared, property):
+        try:
+            return declared.__get__(config, type(config))
+        except (AttributeError, TypeError):
+            return default
+    return declared
+
+
+def _safe_text(value: Any, max_length: int, default: str) -> str:
+    """Return bounded, single-line text without invoking arbitrary containers."""
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return default
+    if isinstance(value, float) and not math.isfinite(value):
+        return default
+    text = " ".join(str(value).split()).strip()
+    if not text:
+        return default
+    return text[:max_length]
+
+
+def _validated_web_host(host: str) -> Optional[str]:
+    """Return an origin-safe host, bracketing IPv6 addresses when needed."""
+    candidate = host[1:-1] if host.startswith("[") and host.endswith("]") else host
+    try:
+        address = ipaddress.ip_address(candidate)
+    except ValueError:
+        if len(candidate) > 253 or not re.fullmatch(
+            r"(?=.{1,253}\Z)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*",
+            candidate,
+        ):
+            return None
+        return candidate
+    if address.is_unspecified:
+        return None
+    return f"[{candidate}]" if address.version == 6 else candidate
 
 
 def _alert_labels(report_language: str) -> Dict[str, str]:

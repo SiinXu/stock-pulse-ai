@@ -111,6 +111,11 @@ from src.core.pipeline_stage_results import (
     PipelineStageRunner,
     PipelineStageStatus,
 )
+from src.core.outbound_delivery import (
+    outbound_notifications_enabled as _outbound_notifications_enabled,
+    reset_outbound_notifications_enabled as _reset_outbound_notifications_enabled,
+    set_outbound_notifications_enabled as _set_outbound_notifications_enabled,
+)
 from src.core.stages.analysis import _AnalysisStageMixin
 from src.core.stages.delivery import (
     _DeliveryStageMixin,
@@ -197,6 +202,9 @@ _PIPELINE_COMPAT_EXPORTS = (
     TrendAnalysisResult,
     uuid,
     _persistence_symbol_scope_lookup_values,
+    _outbound_notifications_enabled,
+    _reset_outbound_notifications_enabled,
+    _set_outbound_notifications_enabled,
     _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD,
 )
 
@@ -310,10 +318,6 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         self._pipeline_stage_runner = PipelineStageRunner()
         self._concept_rankings_cache_lock = threading.Lock()
         self._concept_rankings_cache: Dict[str, Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]] = {}
-        # Shared outbound delivery intent for report push and high-disagreement
-        # alerts (#134). Callers set False for --no-notify / send_notification=false.
-        self.outbound_notifications_enabled: bool = True
-        
         # Initialize the search service (optional, failure should not block the main analysis process)
         try:
             self.search_service = SearchService(

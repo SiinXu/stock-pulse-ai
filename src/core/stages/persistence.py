@@ -17,6 +17,9 @@ from src.core.pipeline_stage_results import (
     PipelineStageResult,
     PipelineStageStatus,
 )
+from src.core.outbound_delivery import (
+    outbound_notifications_enabled as _outbound_notifications_enabled,
+)
 from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY
 from src.services.analysis_context_builder import (
     AnalysisContextBuilder,
@@ -223,12 +226,8 @@ class _PersistenceStageMixin:
                             history_id=int(saved_history_id),
                             config=getattr(self, "config", None),
                             notifier=getattr(self, "notifier", None),
-                            outbound_notifications_enabled=bool(
-                                getattr(
-                                    self,
-                                    "outbound_notifications_enabled",
-                                    True,
-                                )
+                            outbound_notifications_enabled=(
+                                _outbound_notifications_enabled()
                             ),
                         )
                     except Exception as alert_exc:  # broad-exception: fallback_recorded - High-disagreement alerts must never fail history persistence.

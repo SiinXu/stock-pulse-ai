@@ -1542,7 +1542,7 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "true",
         "options": [],
         "validation": {},
-        "display_order": 71,
+        "display_order": 73,
         "help_key": "settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED",
         "examples": [
             "HIGH_DISAGREEMENT_ALERTS_ENABLED=true",
@@ -1573,7 +1573,7 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "0.6",
         "options": [],
         "validation": {"min": 0, "max": 1},
-        "display_order": 71,
+        "display_order": 74,
         "help_key": "settings.notification.HIGH_DISAGREEMENT_THRESHOLD",
         "examples": [
             "HIGH_DISAGREEMENT_THRESHOLD=0.6",
