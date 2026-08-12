@@ -1,11 +1,17 @@
 /**
  * Structured what-if scenario helpers for Agent Chat (Issue #130).
+ * Issue #1136 reuses this channel for the report sensitivity scenario library.
  * Free-text assumptions are intentionally out of scope for v1.
  */
 export const HYPOTHETICAL_ASSUMPTION_MARKER = '[HYPOTHETICAL ASSUMPTION]';
 export const HYPOTHETICAL_RESULT_MARKER = '[HYPOTHETICAL SCENARIO]';
 export const DEFAULT_WHAT_IF_MAX_TURNS = 5;
-export type WhatIfDimension = 'index_move' | 'fx_rate' | 'interest_rate' | 'earnings';
+export type WhatIfDimension =
+  | 'index_move'
+  | 'fx_rate'
+  | 'interest_rate'
+  | 'earnings'
+  | 'sector_shock';
 export type WhatIfDirection = 'up' | 'down' | 'beat' | 'miss' | 'inline';
 export interface WhatIfAssumption {
   dimension: WhatIfDimension;
@@ -19,6 +25,9 @@ export interface WhatIfScenarioPayload {
   turn_index: number;
   max_turns: number;
   assumptions: WhatIfAssumption[];
+  scenario_id?: string;
+  catalog_version?: string;
+  scenario_hash?: string;
 }
 export interface WhatIfDraftState {
   enabled: boolean;
@@ -27,6 +36,8 @@ export interface WhatIfDraftState {
   magnitude: string;
   currencyPair: string;
   turnCount: number;
+  /** Optional library scenario id applied via the #1136 scenario library. */
+  scenarioId?: string | null;
 }
 export const DEFAULT_WHAT_IF_DRAFT: WhatIfDraftState = {
   enabled: false,
@@ -35,6 +46,7 @@ export const DEFAULT_WHAT_IF_DRAFT: WhatIfDraftState = {
   magnitude: '50',
   currencyPair: 'USD/CNY',
   turnCount: 0,
+  scenarioId: null,
 };
 export function contentHasHypotheticalMarker(content: string | undefined | null): boolean {
   if (!content) return false;
@@ -62,7 +74,18 @@ export function buildWhatIfAssumption(draft: WhatIfDraftState): WhatIfAssumption
 export function buildWhatIfContextPayload(draft: WhatIfDraftState): WhatIfScenarioPayload | null {
   const assumption = buildWhatIfAssumption(draft);
   if (!assumption || draft.turnCount >= DEFAULT_WHAT_IF_MAX_TURNS) return null;
-  return { enabled: true, turn_index: draft.turnCount + 1, max_turns: DEFAULT_WHAT_IF_MAX_TURNS, assumptions: [assumption] };
+  const payload: WhatIfScenarioPayload = {
+    enabled: true,
+    turn_index: draft.turnCount + 1,
+    max_turns: DEFAULT_WHAT_IF_MAX_TURNS,
+    assumptions: [assumption],
+  };
+  if (draft.scenarioId) {
+    payload.scenario_id = draft.scenarioId;
+    // Catalog version is filled by the scenario library helper when present.
+    payload.catalog_version = '1.0.0';
+  }
+  return payload;
 }
 export function isWhatIfLimitReached(draft: WhatIfDraftState): boolean {
   return draft.enabled && draft.turnCount >= DEFAULT_WHAT_IF_MAX_TURNS;
