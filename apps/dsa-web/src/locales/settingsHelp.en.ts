@@ -2288,7 +2288,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'education.risk.level.low': {
     title: 'Low risk level',
     summary: 'A relative score band under 25 on a 0–100 scale used in portfolio risk heatmaps.',
-    usage: 'Shown when weight, stop-loss proximity, or drawdown pressure is still mild versus other holdings.',
+    usage: 'Shown when weight, stop-loss proximity, or from-peak loss pressure is still mild versus other holdings.',
     impact: [
       'Treat this as a quieter structural reading, not a guarantee of safety or a buy signal.',
     ],
@@ -2299,7 +2299,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'education.risk.level.medium': {
     title: 'Medium risk level',
     summary: 'A mid band (about 25–49) on the 0–100 portfolio risk score scale.',
-    usage: 'Appears when concentration, stop-loss distance, or drawdown is elevated but not extreme.',
+    usage: 'Appears when concentration, stop-loss distance, or from-peak loss is elevated but not extreme.',
     impact: [
       'Worth a second look: size, stop levels, and diversification may need attention before adding risk.',
     ],
@@ -2315,7 +2315,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'education.risk.level.critical': {
     title: 'High risk level',
     summary: 'The top band (about 75–100) on the 0–100 portfolio risk score scale.',
-    usage: 'Reserved for the strongest structural pressure in the heatmap (weight, stop-loss, or drawdown).',
+    usage: 'Reserved for the strongest structural pressure in the heatmap (weight, stop-loss, or from-peak loss).',
     impact: [
       'Treat as a priority review: do not ignore size, stops, or correlation with the rest of the book.',
     ],

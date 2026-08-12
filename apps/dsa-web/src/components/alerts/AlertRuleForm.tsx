@@ -727,13 +727,10 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
 
         {alertType === 'ma_price_cross' ? (
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-1 text-xs text-muted-text">
-              <span>MA</span>
-              <HelpKeyButton
-                helpKey={EDUCATION_HELP_KEYS.indicatorMa}
-                data-testid="alert-ma-help"
-              />
-            </div>
+            <HelpKeyButton
+              helpKey={EDUCATION_HELP_KEYS.indicatorMa}
+              data-testid="alert-ma-help"
+            />
             <div className="grid gap-4 md:grid-cols-2">
               <Select
                 label={text.maDirection}
@@ -760,13 +757,10 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
 
         {alertType === 'rsi_threshold' ? (
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-1 text-xs text-muted-text">
-              <span>RSI</span>
-              <HelpKeyButton
-                helpKey={EDUCATION_HELP_KEYS.indicatorRsi}
-                data-testid="alert-rsi-help"
-              />
-            </div>
+            <HelpKeyButton
+              helpKey={EDUCATION_HELP_KEYS.indicatorRsi}
+              data-testid="alert-rsi-help"
+            />
             <div className="grid gap-4 md:grid-cols-3">
               <Select
                 label={text.thresholdDirection}
@@ -805,13 +799,10 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
 
         {alertType === 'macd_cross' ? (
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-1 text-xs text-muted-text">
-              <span>MACD</span>
-              <HelpKeyButton
-                helpKey={EDUCATION_HELP_KEYS.indicatorMacd}
-                data-testid="alert-macd-help"
-              />
-            </div>
+            <HelpKeyButton
+              helpKey={EDUCATION_HELP_KEYS.indicatorMacd}
+              data-testid="alert-macd-help"
+            />
             <div className="grid gap-4 md:grid-cols-4">
               <Select
                 label={text.crossDirection}
