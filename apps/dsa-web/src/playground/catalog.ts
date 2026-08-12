@@ -198,6 +198,8 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('runFlow', 'run-flow-node-details', 'RunFlowNodeDetails', 'components/run-flow/RunFlowNodeDetails.tsx', ['default', 'empty']),
   entry('runFlow', 'run-flow-panel', 'RunFlowPanel', 'components/run-flow/RunFlowPanel.tsx', ['default', 'loading', 'error']),
   entry('runFlow', 'run-flow-summary-bar', 'RunFlowSummaryBar', 'components/run-flow/RunFlowSummaryBar.tsx'),
+  entry('runFlow', 'process-timeline', 'ProcessTimeline', 'components/run-flow/ProcessTimeline.tsx', ['default', 'empty']),
+  entry('reports', 'report-process-timeline', 'ReportProcessTimeline', 'components/report/ReportProcessTimeline.tsx', ['default', 'empty']),
 
   entry('settings', 'ai-overview-matrix', 'AiOverviewMatrix', 'components/settings/AiOverviewMatrix.tsx', ['default', 'states']),
   entry('settings', 'agent-behavior-panel', 'AgentBehaviorPanel', 'components/settings/AgentBehaviorPanel.tsx', ['interactive', 'states', 'empty', 'error']),

@@ -152,32 +152,36 @@ export const ProcessTimeline: React.FC<ProcessTimelineProps> = ({
   if (!model.hasAgentEvents) {
     if (hideWhenEmpty) return null;
     return (
-      <Surface level="interactive" padding="none" className={`p-3 ${className || ''}`} data-testid="process-timeline-empty">
-        <div className="flex items-center gap-2">
-          <ListOrdered className="h-4 w-4 text-muted-text" aria-hidden="true" />
-          <p className="text-sm text-secondary-text">{t('runFlow.events.empty')}</p>
-        </div>
-      </Surface>
+      <div className={className || undefined}>
+        <Surface level="interactive" padding="none" className="p-3" data-testid="process-timeline-empty">
+          <div className="flex items-center gap-2">
+            <ListOrdered className="h-4 w-4 text-muted-text" aria-hidden="true" />
+            <p className="text-sm text-secondary-text">{t('runFlow.events.empty')}</p>
+          </div>
+        </Surface>
+      </div>
     );
   }
 
   return (
-    <Surface level="interactive" padding="none" className={`p-3 ${className || ''}`} data-testid="process-timeline" data-trace-source={model.source}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="label-uppercase">{t('chat.thinkingProcess')}</p>
-          <p className="mt-1 text-xs text-muted-text">{t('runFlow.events.count', { count: model.items.length })}</p>
+    <div className={className || undefined}>
+      <Surface level="interactive" padding="none" className="p-3" data-testid="process-timeline" data-trace-source={model.source}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="label-uppercase">{t('chat.thinkingProcess')}</p>
+            <p className="mt-1 text-xs text-muted-text">{t('runFlow.events.count', { count: model.items.length })}</p>
+          </div>
         </div>
-      </div>
-      <ol className="relative mt-3 space-y-2 border-l border-border pl-4">
-        {model.items.map((item) => (
-          <li key={item.id} className="relative">
-            <span className="absolute -left-[1.3rem] top-3 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary/70" aria-hidden="true" />
-            <TimelineRow item={item} language={language} t={t} onSelectNode={onSelectNode} />
-          </li>
-        ))}
-      </ol>
-    </Surface>
+        <ol className="relative mt-3 space-y-2 border-l border-border pl-4">
+          {model.items.map((item) => (
+            <li key={item.id} className="relative">
+              <span className="absolute -left-[1.3rem] top-3 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary/70" aria-hidden="true" />
+              <TimelineRow item={item} language={language} t={t} onSelectNode={onSelectNode} />
+            </li>
+          ))}
+        </ol>
+      </Surface>
+    </div>
   );
 };
 
