@@ -82,23 +82,52 @@ def is_a_share_etf_code(stock_code: Optional[str]) -> bool:
         return code.isdigit() and len(code) == 6 and code.startswith(_A_SHARE_ETF_PREFIXES)
 
 
+def is_market_index_code(stock_code: Optional[str]) -> bool:
+    """True for pure market index codes (e.g. SPX), not ETF tickers."""
+    try:
+        from data_provider.us_index_mapping import is_us_index_code
+
+        return bool(is_us_index_code(stock_code or ""))
+    except Exception:
+        return False
+
+
 def is_etf_instrument(
     stock_code: Optional[str],
     stock_name: Optional[str] = None,
 ) -> bool:
-    """True when analysis should use the ETF instrument path.
+    """True when the symbol is an ETF (not a pure market index).
 
     Prefers the shared A-share ETF code rule; falls back to the existing
-    index/ETF news heuristic for offshore names (SPY, VOO, etc.).
+    offshore name heuristic (SPY, VOO, etc.) while excluding pure index codes.
     """
     if is_a_share_etf_code(stock_code):
         return True
+    if is_market_index_code(stock_code):
+        return False
     try:
         from src.search_service import SearchService
 
         return bool(SearchService.is_index_or_etf(stock_code or "", stock_name or ""))
     except Exception:
         return False
+
+
+def classify_instrument_type(
+    stock_code: Optional[str],
+    stock_name: Optional[str] = None,
+    *,
+    is_index_etf: Optional[bool] = None,
+) -> str:
+    """Return ``etf``, ``index``, or ``equity`` for analysis routing."""
+    if is_a_share_etf_code(stock_code) or is_etf_instrument(stock_code, stock_name):
+        return "etf"
+    if is_market_index_code(stock_code):
+        return "index"
+    if is_index_etf is True:
+        # Legacy #274 flag: treat unresolved index/ETF hits as index, not equity.
+        return "index"
+    return "equity"
 
 
 def _normalize_code(stock_code: Optional[str]) -> str:
@@ -285,40 +314,63 @@ def build_etf_analysis_context(
     realtime: Optional[Mapping[str, Any]] = None,
     is_index_etf: Optional[bool] = None,
 ) -> Dict[str, Any]:
-    """Build the structured ETF analysis projection for pipeline context.
+    """Build the structured ETF/index analysis projection for pipeline context.
 
-    Non-ETF symbols return ``status=not_applicable`` so callers can attach the
-    block unconditionally without branching report schemas.
+    Equity symbols return ``status=not_applicable`` so callers can attach the
+    block unconditionally without branching report schemas. Pure market indices
+    use ``instrument_type=index`` (not ``etf``) while sharing the same N/A
+    equity-metric and focus path as ETFs.
     """
     code = _normalize_code(stock_code)
     name = str(stock_name or "").strip()
     realtime = realtime if isinstance(realtime, Mapping) else {}
 
-    etf = is_etf_instrument(code or stock_code, name)
-    if is_index_etf is True:
-        etf = True
-    if not etf:
+    instrument_type = classify_instrument_type(
+        code or stock_code,
+        name,
+        is_index_etf=is_index_etf,
+    )
+    if instrument_type == "equity":
         return {
             "schema_version": ETF_ANALYSIS_SCHEMA_VERSION,
             "status": _NOT_APPLICABLE,
             "instrument_type": "equity",
             "is_etf": False,
+            "is_index": False,
             "code": code or str(stock_code or "").strip(),
             "name": name or None,
         }
 
+    is_etf = instrument_type == "etf"
     a_share = is_a_share_etf_code(code or stock_code)
     tracking = infer_tracking_target(code or stock_code, name)
+    if instrument_type == "index" and tracking.get("status") != "ok":
+        # Pure indices are themselves the tracking target.
+        tracking = {
+            "status": "ok",
+            "label": name or code or str(stock_code or "").strip(),
+            "source": "index_identity",
+            "confidence": "high",
+        }
     premium = compute_premium_discount(
         price=realtime.get("price"),
         iopv=realtime.get("iopv") or realtime.get("IOPV"),
         nav=realtime.get("nav") or realtime.get("unit_nav") or realtime.get("净值"),
     )
+    if instrument_type == "index":
+        # Premium/discount is an ETF secondary-market concept, not a pure-index metric.
+        premium = {
+            "status": _NOT_APPLICABLE,
+            "premium_discount_pct": None,
+            "reference": None,
+            "reference_kind": None,
+            "note": "premium_not_applicable_for_pure_index",
+        }
     holdings = infer_holdings_exposure(code or stock_code, name, tracking)
     missing: List[str] = []
     if tracking.get("status") != "ok":
         missing.append("tracking_target")
-    if premium.get("status") != "ok":
+    if is_etf and premium.get("status") != "ok":
         missing.append("premium_discount")
     if holdings.get("constituents_status") != "ok":
         missing.append("holdings_constituents")
@@ -326,8 +378,9 @@ def build_etf_analysis_context(
     return {
         "schema_version": ETF_ANALYSIS_SCHEMA_VERSION,
         "status": "ok",
-        "instrument_type": "etf",
-        "is_etf": True,
+        "instrument_type": instrument_type,
+        "is_etf": is_etf,
+        "is_index": instrument_type == "index",
         "is_a_share_etf": a_share,
         "code": code or str(stock_code or "").strip(),
         "name": name or None,
@@ -337,7 +390,7 @@ def build_etf_analysis_context(
         "equity_metrics": equity_metrics_applicability(),
         "analysis_focus": [
             "tracking_index_or_theme",
-            "premium_discount_to_iopv_or_nav",
+            "premium_discount_to_iopv_or_nav" if is_etf else "index_level_path",
             "liquidity_and_turnover",
             "holdings_theme_exposure",
             "index_constituent_news_not_issuer_ops",
@@ -360,10 +413,10 @@ def format_etf_metric_display(
     language = normalize_report_language(language)
     if is_etf and metric in ETF_INAPPLICABLE_EQUITY_METRICS:
         if language == "en":
-            return "not_applicable (ETF)"
+            return "not_applicable (ETF/index)"
         if language == "ko":
-            return "해당 없음 (ETF)"
-        return "不适用（ETF）"
+            return "해당 없음 (ETF/지수)"
+        return "不适用（ETF/指数）"
     if value is None or value == "":
         return "N/A"
     return str(value)
@@ -378,7 +431,13 @@ def format_etf_analysis_prompt_section(
         return ""
     if context.get("schema_version") != ETF_ANALYSIS_SCHEMA_VERSION:
         return ""
-    if not context.get("is_etf") or context.get("status") == _NOT_APPLICABLE:
+    instrument_type = str(context.get("instrument_type") or "").strip()
+    is_basket_path = bool(
+        context.get("is_etf")
+        or context.get("is_index")
+        or instrument_type in {"etf", "index"}
+    )
+    if not is_basket_path or context.get("status") == _NOT_APPLICABLE:
         return ""
 
     language = normalize_report_language(report_language)
@@ -392,33 +451,41 @@ def format_etf_analysis_prompt_section(
         if isinstance(raw_missing, Sequence) and not isinstance(raw_missing, (str, bytes)):
             missing = [str(item) for item in raw_missing if str(item).strip()]
 
+    type_label = instrument_type.upper() if instrument_type in {"etf", "index"} else "ETF"
     tracking_label = tracking.get("label") or (
         "unavailable" if language == "en" else ("없음" if language == "ko" else "不可用")
     )
     tracking_status = tracking.get("status") or _NOT_AVAILABLE
     premium_status = premium.get("status") or _NOT_AVAILABLE
     premium_pct = premium.get("premium_discount_pct")
-    premium_text = (
-        f"{premium_pct}%"
-        if premium_status == "ok" and premium_pct is not None
-        else ("not_available" if language == "en" else ("불가" if language == "ko" else "不可用"))
-    )
+    if premium_status == "ok" and premium_pct is not None:
+        premium_text = f"{premium_pct}%"
+    elif premium_status == _NOT_APPLICABLE:
+        premium_text = (
+            "not_applicable"
+            if language == "en"
+            else ("해당 없음" if language == "ko" else "不适用")
+        )
+    else:
+        premium_text = (
+            "not_available" if language == "en" else ("불가" if language == "ko" else "不可用")
+        )
     exposure_class = holdings.get("exposure_class") or "unknown"
     theme_label = holdings.get("theme_label") or tracking_label
 
     if language == "en":
         lines = [
             "",
-            "## ETF Analysis Path",
-            f"- Instrument type: **ETF** (`{context.get('code', '')}`)",
+            f"## {type_label} Analysis Path",
+            f"- Instrument type: **{type_label}** (`{context.get('code', '')}`)",
             f"- Tracking target: {tracking_label} (status={tracking_status})",
             f"- Premium/discount vs IOPV/NAV: {premium_text} (status={premium_status})",
             f"- Holdings exposure class: {exposure_class}; theme={theme_label}",
             f"- Full holdings look-through: {holdings.get('constituents_status', _NOT_AVAILABLE)}",
             "- Equity-only metrics (PE/PB/ROE/earnings/financial report/company fundamentals/"
             "chip distribution/Dragon Tiger list): **not_applicable** — do not invent or hard-calculate.",
-            "- Focus: index/theme path, tracking quality, premium/discount, liquidity, and "
-            "constituent-basket news. Do not treat fund-manager lawsuits or issuer ops as ETF risk.",
+            "- Focus: index/theme path, tracking quality, premium/discount (ETF only), liquidity, and "
+            "constituent-basket news. Do not treat fund-manager lawsuits or issuer ops as instrument risk.",
             "- Report structure: keep the same decision-dashboard JSON schema as single-stock reports.",
         ]
         if missing:
@@ -428,16 +495,16 @@ def format_etf_analysis_prompt_section(
     if language == "ko":
         lines = [
             "",
-            "## ETF 분석 경로",
-            f"- 상품 유형: **ETF** (`{context.get('code', '')}`)",
+            f"## {type_label} 분석 경로",
+            f"- 상품 유형: **{type_label}** (`{context.get('code', '')}`)",
             f"- 추적 대상: {tracking_label} (status={tracking_status})",
             f"- IOPV/NAV 대비 괴리율: {premium_text} (status={premium_status})",
             f"- 보유 노출 유형: {exposure_class}; theme={theme_label}",
             f"- 전체 보유 종목 관통: {holdings.get('constituents_status', _NOT_AVAILABLE)}",
             "- 주식 전용 지표(PE/PB/ROE/실적/재무제표/회사 펀더멘털/칩 분포 등): "
             "**해당 없음(not_applicable)** — 추정·강제 계산 금지.",
-            "- 초점: 지수/테마 경로, 추적 품질, 괴리율, 유동성, 구성 종목 바스켓 뉴스. "
-            "운용사 소송·발행사 경영 이슈를 ETF 리스크로 쓰지 말 것.",
+            "- 초점: 지수/테마 경로, 추적 품질, 괴리율(ETF), 유동성, 구성 종목 바스켓 뉴스. "
+            "운용사 소송·발행사 경영 이슈를 상품 리스크로 쓰지 말 것.",
             "- 보고서 구조: 개별 주식과 동일한 decision-dashboard JSON 스키마 유지.",
         ]
         if missing:
@@ -446,16 +513,16 @@ def format_etf_analysis_prompt_section(
 
     lines = [
         "",
-        "## ETF 专属分析路径",
-        f"- 品种类型：**ETF**（`{context.get('code', '')}`）",
+        f"## {type_label} 专属分析路径",
+        f"- 品种类型：**{type_label}**（`{context.get('code', '')}`）",
         f"- 跟踪标的：{tracking_label}（status={tracking_status}）",
         f"- 相对 IOPV/净值溢价率：{premium_text}（status={premium_status}）",
         f"- 持仓暴露类型：{exposure_class}；主题={theme_label}",
         f"- 完整持仓穿透：{holdings.get('constituents_status', _NOT_AVAILABLE)}",
         "- 个股专属指标（PE/PB/ROE/财报/公司基本面/筹码分布/龙虎榜）："
         "**不适用（not_applicable）**，禁止编造或硬算。",
-        "- 分析焦点：跟踪指数/主题、跟踪质量、溢价折价、流动性、成分篮子新闻；"
-        "不得将基金管理人诉讼或发行方经营风险当作 ETF 本身利空。",
+        "- 分析焦点：跟踪指数/主题、跟踪质量、溢价折价（仅 ETF）、流动性、成分篮子新闻；"
+        "不得将基金管理人诉讼或发行方经营风险当作标的本身利空。",
         "- 报告结构：与个股共用同一决策仪表盘 JSON 结构，不另起报告模板。",
     ]
     if missing:

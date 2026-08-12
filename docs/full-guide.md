@@ -1452,9 +1452,10 @@ A 股 ETF 在分析链路中按**独立品种**识别并进入 ETF 专属路径�
 | --- | --- |
 | 识别 | 代码前缀 `51/52/56/58/15/16/18`（与 `data_provider` ETF 路由一致）；名称含 ETF 语义的海外标的仍走既有 `is_index_or_etf` 启发 |
 | 跟踪标的 | 优先使用高流动性 bootstrap 映射（如 `510300→沪深300`、`159915→创业板指`），否则从名称启发式提取主题标签；无法解析时 `not_available` |
-| 溢价率 | 当实时上下文提供价格 + IOPV/净值时计算溢价/折价；缺失参考价时 `not_available`，不编造 |
+| 溢价率 | 实时链路映射 IOPV/净值到分析上下文后计算；provider 未返回时 `not_available`，不编造；纯指数标 `not_applicable` |
 | 持仓暴露 | 给出粗粒度 `broad_index` / `sector_theme` 暴露类型；完整成分穿透不在公共 provider 合同内，标记 `not_available` |
-| 不适用指标 | PE/PB/ROE/公司财报/筹码/龙虎榜等个股口径显式 **`not_applicable`**，禁止硬算；与校验层“缺失不报错”（#185）职责分离 |
+| 不适用指标 | PE/PB/ROE/公司财报/筹码/龙虎榜等个股口径显式 **`not_applicable`**（含筹码健康标准），禁止硬算；与校验层“缺失不报错”（#185）职责分离 |
+| 指数 vs ETF | 纯市场指数（如 SPX）`instrument_type=index`，A 股/海外 ETF 为 `etf`，不再把指数硬标为 ETF |
 | 报告结构 | 与个股共用决策仪表盘 JSON；不另起 ETF 模板 |
 
 代表性回归代码：`510300`、`510050`、`159915`、`159919`、`512880`。数据校验层的 ETF 误报校准见 `docs/data-validation-layer.md` 与 Issue #185。

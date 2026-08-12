@@ -1326,9 +1326,10 @@ A-share ETFs are identified as a distinct instrument type and take the **ETF ana
 | --- | --- |
 | Identification | Code prefixes `51/52/56/58/15/16/18` (aligned with `data_provider` ETF routing); offshore names still use the existing `is_index_or_etf` heuristic |
 | Tracking target | Liquid bootstrap map first (e.g. `510300→CSI 300`, `159915→ChiNext`), else name heuristics; unresolved → `not_available` |
-| Premium/discount | Computed when realtime context has price + IOPV/NAV; otherwise `not_available` (never invented) |
+| Premium/discount | Computed after realtime maps IOPV/NAV into analysis context when providers expose them; otherwise `not_available` (never invented). Pure indices use `not_applicable`. |
 | Holdings exposure | Coarse `broad_index` / `sector_theme` class; full constituent look-through is outside the public provider contract → `not_available` |
-| Inapplicable metrics | PE/PB/ROE/company financials/chip/Dragon Tiger lists are explicit **`not_applicable`** — do not hard-calculate; separate from validation-layer missing-field calibration (#185) |
+| Inapplicable metrics | PE/PB/ROE/company financials/chip/Dragon Tiger lists are explicit **`not_applicable`** (including equity-style chip health framing) — do not hard-calculate; separate from validation-layer missing-field calibration (#185) |
+| Index vs ETF | Pure market indices (e.g. SPX) use `instrument_type=index`; A-share/offshore ETFs use `etf` |
 | Report structure | Shared decision-dashboard JSON with equities; no separate ETF template |
 
 Representative regression codes: `510300`, `510050`, `159915`, `159919`, `512880`. Validation-layer ETF false-positive calibration is documented in `docs/data-validation-layer.md` and Issue #185.

@@ -13,6 +13,7 @@ from src.services.etf_analysis import (
     ETF_ANALYSIS_SCHEMA_VERSION,
     LIQUID_A_SHARE_ETF_TRACKING,
     build_etf_analysis_context,
+    classify_instrument_type,
     compute_premium_discount,
     format_etf_analysis_prompt_section,
     format_etf_focus_points,
@@ -21,6 +22,7 @@ from src.services.etf_analysis import (
     infer_tracking_target,
     is_a_share_etf_code,
     is_etf_instrument,
+    is_market_index_code,
 )
 
 
@@ -43,6 +45,22 @@ def test_liquid_a_share_etfs_are_identified(code: str, name: str) -> None:
 def test_equity_codes_are_not_etf() -> None:
     assert is_a_share_etf_code("600519") is False
     assert is_etf_instrument("600519", "贵州茅台") is False
+    assert classify_instrument_type("600519", "贵州茅台") == "equity"
+
+
+def test_pure_index_is_not_labeled_etf() -> None:
+    assert is_market_index_code("SPX") is True
+    assert is_etf_instrument("SPX", "S&P 500") is False
+    assert classify_instrument_type("SPX", "S&P 500", is_index_etf=True) == "index"
+    ctx = build_etf_analysis_context("SPX", "S&P 500", is_index_etf=True)
+    assert ctx["status"] == "ok"
+    assert ctx["instrument_type"] == "index"
+    assert ctx["is_etf"] is False
+    assert ctx["is_index"] is True
+    assert ctx["premium_discount"]["status"] == "not_applicable"
+    section = format_etf_analysis_prompt_section(ctx, report_language="en")
+    assert "INDEX Analysis Path" in section
+    assert "Instrument type: **INDEX**" in section
 
 
 @pytest.mark.parametrize(
@@ -126,6 +144,47 @@ def test_format_metric_display_marks_pe_not_applicable_for_etf() -> None:
     )
     # Equity path keeps the raw value.
     assert format_etf_metric_display("pe_ratio", 12.3, is_etf=False, language="zh") == "12.3"
+
+
+def test_enhance_context_passes_iopv_into_premium_path() -> None:
+    """Realtime IOPV must reach etf_analysis_context for premium computation."""
+    pytest.importorskip("litellm")
+    from src.core.stages.analysis_context import _AnalysisContextStageMixin
+    from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+
+    class _Harness(_AnalysisContextStageMixin):
+        def __init__(self) -> None:
+            self.fetcher_manager = SimpleNamespace(
+                build_failed_fundamental_context=lambda code, msg: {
+                    "status": "failed",
+                    "code": code,
+                    "message": msg,
+                }
+            )
+            self.config = SimpleNamespace(report_language="zh")
+            self.search_service = SimpleNamespace(news_window_days=3)
+
+    quote = UnifiedRealtimeQuote(
+        code="510300",
+        name="沪深300ETF",
+        source=RealtimeSource.AKSHARE_EM,
+        price=4.12,
+        iopv=4.10,
+        nav=4.09,
+    )
+    harness = _Harness()
+    enhanced = harness._enhance_context(
+        {"code": "510300", "today": {"close": 4.1}},
+        realtime_quote=quote,
+        chip_data=None,
+        trend_result=None,
+        stock_name="沪深300ETF",
+    )
+    assert enhanced["realtime"]["iopv"] == 4.10
+    assert enhanced["realtime"]["nav"] == 4.09
+    premium = enhanced["etf_analysis_context"]["premium_discount"]
+    assert premium["status"] == "ok"
+    assert premium["premium_discount_pct"] == pytest.approx(0.4878, rel=1e-3)
 
 
 def test_prompt_section_contains_etf_path_and_na_metrics() -> None:
@@ -235,10 +294,45 @@ def test_format_prompt_uses_etf_path_and_marks_pe_na() -> None:
         report_language="zh",
     )
     assert "品种类型" in prompt and "etf" in prompt
-    assert "ETF 专属分析路径" in prompt
-    assert "不适用（ETF）" in prompt
-    assert "公司财报" in prompt or "ETF 口径" in prompt
+    assert "ETF 专属分析路径" in prompt or "专属分析路径" in prompt
+    assert "不适用" in prompt
+    assert "公司财报" in prompt or "口径" in prompt
     # Must not present the hard PE value as a usable equity multiple.
     assert "| 市盈率(动态) | 99.0 |" not in prompt
     assert "跟踪" in prompt
     assert "决策仪表盘" in prompt
+    # Chip must not use equity health framing on the ETF path.
+    assert "70-90%时警惕" not in prompt
+    assert "筹码" in prompt and ("不适用" in prompt or "not_applicable" in prompt)
+
+
+def test_format_prompt_marks_chip_na_for_index() -> None:
+    pytest.importorskip("litellm")
+    from src.analyzer import GeminiAnalyzer
+
+    analyzer = GeminiAnalyzer.__new__(GeminiAnalyzer)
+    analyzer._get_skill_prompt_sections = MagicMock(return_value=("", "", True))
+    analyzer._format_volume = lambda v: str(v) if v is not None else "N/A"
+    analyzer._format_amount = lambda v: str(v) if v is not None else "N/A"
+    idx_ctx = build_etf_analysis_context("SPX", "S&P 500", is_index_etf=True)
+    context: Dict[str, Any] = {
+        "code": "SPX",
+        "stock_name": "S&P 500",
+        "date": "2026-08-12",
+        "today": {"close": 5000.0, "pct_chg": 0.1, "volume": 1, "amount": 1},
+        "is_index_etf": True,
+        "instrument_type": "index",
+        "etf_analysis_context": idx_ctx,
+        "chip": {
+            "profit_ratio": 0.8,
+            "avg_cost": 1.0,
+            "concentration_90": 0.1,
+            "concentration_70": 0.05,
+            "chip_status": "集中",
+        },
+        "news_window_days": 3,
+    }
+    prompt = analyzer._format_prompt(context, name="S&P 500", report_language="zh")
+    assert "品种类型" in prompt and "index" in prompt
+    assert "70-90%时警惕" not in prompt
+    assert "不适用" in prompt

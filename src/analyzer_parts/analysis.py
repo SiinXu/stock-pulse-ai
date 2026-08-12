@@ -479,16 +479,33 @@ class GeminiAnalyzer:
         etf_analysis_context = (
             context.get("etf_analysis_context") if isinstance(context, dict) else None
         )
+        instrument_type = context.get("instrument_type")
+        if (
+            not instrument_type
+            and isinstance(etf_analysis_context, dict)
+            and etf_analysis_context.get("instrument_type")
+        ):
+            instrument_type = etf_analysis_context.get("instrument_type")
+        # Basket path: ETF or pure index share N/A equity metrics (#173 / #274).
         is_etf_path = bool(
             context.get("is_index_etf")
             or (
                 isinstance(etf_analysis_context, dict)
-                and etf_analysis_context.get("is_etf")
+                and (
+                    etf_analysis_context.get("is_etf")
+                    or etf_analysis_context.get("is_index")
+                    or etf_analysis_context.get("instrument_type") in {"etf", "index"}
+                )
             )
+            or instrument_type in {"etf", "index"}
         )
-        instrument_type = context.get("instrument_type")
         if not instrument_type:
-            instrument_type = "etf" if is_etf_path else "equity"
+            instrument_type = (
+                "index"
+                if isinstance(etf_analysis_context, dict)
+                and etf_analysis_context.get("is_index")
+                else ("etf" if is_etf_path else "equity")
+            )
 
         # ========== Input for Building Decision Dashboard Format ==========
         prompt = f"""# 决策仪表盘分析请求
@@ -573,9 +590,32 @@ class GeminiAnalyzer:
                 pb_display = format_etf_metric_display(
                     "pb_ratio", rt.get("pb_ratio"), is_etf=is_etf_path, language=report_language
                 )
-            except Exception:
-                pe_display = "不适用（ETF）" if is_etf_path else str(rt.get("pe_ratio", "N/A"))
-                pb_display = "不适用（ETF）" if is_etf_path else str(rt.get("pb_ratio", "N/A"))
+            except Exception as exc:  # broad-exception: fallback_recorded - isolate ETF metric labels
+                log_safe_exception(
+                    logger,
+                    "ETF metric display failed",
+                    exc,
+                    error_code="analyzer_etf_metric_display_failed",
+                )
+                pe_display = (
+                    "not_applicable (ETF/index)"
+                    if is_etf_path and report_language == "en"
+                    else ("不适用（ETF/指数）" if is_etf_path else str(rt.get("pe_ratio", "N/A")))
+                )
+                pb_display = (
+                    "not_applicable (ETF/index)"
+                    if is_etf_path and report_language == "en"
+                    else ("不适用（ETF/指数）" if is_etf_path else str(rt.get("pb_ratio", "N/A")))
+                )
+            iopv_display = rt.get("iopv", "N/A") if not is_etf_path or instrument_type == "etf" else "N/A"
+            nav_display = rt.get("nav", "N/A") if not is_etf_path or instrument_type == "etf" else "N/A"
+            if is_etf_path and instrument_type == "etf":
+                premium_row = (
+                    f"| IOPV | {iopv_display} | 有价格+IOPV 时可估溢价 |\n"
+                    f"| 单位净值 | {nav_display} | 次选溢价参考 |\n"
+                )
+            else:
+                premium_row = ""
             prompt += f"""
 ### 实时行情增强数据
 | 指标 | 数值 | 解读 |
@@ -585,7 +625,7 @@ class GeminiAnalyzer:
 | **换手率** | **{rt.get('turnover_rate', 'N/A')}%** | |
 | 市盈率(动态) | {pe_display} | |
 | 市净率 | {pb_display} | |
-| 总市值 | {self._format_amount(rt.get('total_mv'))} | |
+{premium_row}| 总市值 | {self._format_amount(rt.get('total_mv'))} | |
 | 流通市值 | {self._format_amount(rt.get('circ_mv'))} | |
 | 60日涨跌幅 | {rt.get('change_60d', 'N/A')}% | 中期表现 |
 """
@@ -593,20 +633,25 @@ class GeminiAnalyzer:
         # Add financial reports and dividends (value investment perspective)
         fundamental_context = context.get("fundamental_context") if isinstance(context, dict) else None
         if is_etf_path:
-            # ETF has no company financial statements; mark explicitly rather than hard-calculate.
+            # ETF/index has no company financial statements; mark explicitly rather than hard-calculate.
+            path_tag = "ETF" if instrument_type == "etf" else ("index" if instrument_type == "index" else "ETF/index")
             na_label = (
-                "not_applicable (ETF)"
+                f"not_applicable ({path_tag})"
                 if report_language == "en"
-                else ("해당 없음 (ETF)" if report_language == "ko" else "不适用（ETF）")
+                else (
+                    f"해당 없음 ({path_tag})"
+                    if report_language == "ko"
+                    else f"不适用（{path_tag}）"
+                )
             )
             prompt += f"""
-### 财报与分红（ETF 口径）
+### 财报与分红（{path_tag} 口径）
 | 指标 | 数值 | 说明 |
 |------|------|------|
-| 公司财报 / PE/PB/ROE | {na_label} | ETF 无发行人财报语义，禁止硬算 |
-| 跟踪标的/溢价率/持仓暴露 | 见上方 ETF 专属分析路径 | 使用可得证据，缺失写 not_available |
+| 公司财报 / PE/PB/ROE | {na_label} | 无发行人财报语义，禁止硬算 |
+| 跟踪标的/溢价率/持仓暴露 | 见上方专属分析路径 | 使用可得证据，缺失写 not_available |
 
-> ETF 不得套用个股价值投资财报口径；缺失≠0，不适用≠数据错误。
+> 不得套用个股价值投资财报口径；缺失≠0，不适用≠数据错误。
 """
         else:
             earnings_block = (
@@ -759,8 +804,26 @@ class GeminiAnalyzer:
 > 三大法人是台股的筹码过滤器（相当于 A 股主力资金/龙虎榜的角色，但口径不同、不可混用）：外资与投信同向净买支持价格、同向净卖压制价格。请据此判断台股筹码结构，不要在有本数据时写“筹码结构：数据缺失”。
 """
 
-        # Add chip-distribution data.
-        if 'chip' in context:
+        # Add chip-distribution data (equity-only health framing).
+        if is_etf_path:
+            chip_na = (
+                "not_applicable (ETF/index — no single-name chip distribution)"
+                if report_language == "en"
+                else (
+                    "해당 없음 (ETF/지수 — 개별 종목 칩 분포 없음)"
+                    if report_language == "ko"
+                    else "不适用（ETF/指数无个股筹码分布语义）"
+                )
+            )
+            prompt += f"""
+### 筹码分布数据（效率指标）
+| 指标 | 数值 | 说明 |
+|------|------|------|
+| 获利比例 / 平均成本 / 集中度 | {chip_na} | 禁止套用个股筹码健康标准或硬算 |
+
+> ETF/指数分析请关注跟踪篮子与流动性，不要输出个股式筹码结构判断。
+"""
+        elif 'chip' in context:
             chip = context['chip']
             profit_ratio = chip.get('profit_ratio', 0)
             prompt += f"""

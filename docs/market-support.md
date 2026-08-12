@@ -58,7 +58,7 @@ A 股 ETF 在个股分析入口中被识别为独立品种，并进入 **ETF 专
 | 代码识别 | 前缀 `51/52/56/58/15/16/18`（沪深 ETF） | 不按 ETF 路径分析 |
 | 日线 / 实时 | 既有 AkShare / efinance ETF 路由 | 明确数据缺失，不阻断整批 |
 | 跟踪标的 | 高流动性 bootstrap + 名称启发式 | `not_available`，禁止臆造指数 ID |
-| 溢价 / 折价 | 有价格且有 IOPV 或净值时计算 | `not_available` |
+| 溢价 / 折价 | 实时行情映射 IOPV/净值（AkShare/efinance 有字段时写入 `UnifiedRealtimeQuote`，再注入分析上下文）后计算；纯指数为 `not_applicable` | 缺 IOPV/净值 → `not_available` |
 | 持仓暴露 | 粗粒度 broad_index / sector_theme | 完整成分穿透 `not_available` |
 | 个股基本面指标 | PE/PB/ROE/财报等标为 `not_applicable` | 不得硬算或当作数据错误 |
 
