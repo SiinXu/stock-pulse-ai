@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Changed] Mount watchlist AI score column and score API on the analysis workspace watchlist view with opt-in score sort (Refs #147, #1008).
+- [Fixed] Capability inventory tool/skill/pipeline probes observe installed owners only, advance skill generation for every record-visible declarative field, and stop over-claiming healthy from registration (Refs #221).
 
 - [Fixed] Route the Home Today's Focus request through the versioned API so the panel loads without a persistent request-failure toast.
 - [Chore] Run path-selective backend tests on pull requests and duration-balanced full-suite shards with combined coverage on pushes to main.
