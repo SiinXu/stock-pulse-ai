@@ -474,16 +474,17 @@ class PipelineStageObservation:
         if self._finished:
             return
         self._finished = True
+        duration_ms = max(
+            0,
+            int((time.monotonic() - self._started_monotonic) * 1000),
+        )
         try:
             record_pipeline_stage(
                 stage=self.stage,
                 status=status,
                 input_summary=self.input_summary,
                 output_summary=output_summary,
-                duration_ms=max(
-                    0,
-                    int((time.monotonic() - self._started_monotonic) * 1000),
-                ),
+                duration_ms=duration_ms,
                 degradation_reason=degradation_reason,
                 retryable=self.retryable if retryable is None else bool(retryable),
                 error_type=type(error).__name__ if error is not None else None,
@@ -499,6 +500,19 @@ class PipelineStageObservation:
                 level=logging.WARNING,
                 context={"stage": self.stage},
             )
+        # Opt-in perf baseline mirror (Issue #227). No-op when collection is off
+        # or no collector is active — must never affect pipeline control flow.
+        try:
+            from src.perf.collector import record_span
+
+            record_span(
+                f"pipeline.{self.stage}",
+                float(duration_ms),
+                category="pipeline_stage",
+                attrs={"status": str(status or "success")},
+            )
+        except Exception:  # broad-exception: fallback_recorded - Perf mirror must not break diagnostics.
+            pass
 
     def __enter__(self) -> "PipelineStageObservation":
         """Return this observation for explicit status completion."""

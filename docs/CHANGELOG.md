@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Strict PredictionRecord schema with typed verifiable claims, no_verifiable_claim path for unparseable prose, and finite-number rejection (Refs #1101, #1107).
 - [Tests] Offline provider fallback / circuit / cache contract suite covers multi-hop order, circuit open-close, cache hit and expiry, multi-provider stale degradation, and multi-symbol isolation (Refs #1069).
 - [Added] Unified hard per-mode Agent budgets (LLM turns, tool calls, estimated cost, optional tokens) with explicit terminate reason codes and diagnostic snapshots; residual wall-clock budget_skip/timeout share the same budget account (Refs #1121, #125).
+- [Added] Offline key-path performance baselines and opt-in profiling infrastructure (data fetch, analysis, report generation) with comparable baseline artifacts (Refs #227).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).
