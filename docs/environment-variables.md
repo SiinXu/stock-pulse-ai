@@ -600,3 +600,24 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `YFINANCE_PRIORITY` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 
 <!-- config-env-inventory:end -->
+
+## Prediction batch resolution (Issue #1104)
+
+Operational concurrency caps for the agent prediction verification batch layer. Research/quality-ops only; scheduler gate defaults off. See `docs/agent-prediction-resolution.md`.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PREDICTION_RESOLVE_ENABLED` | `false` | Scheduler enable gate for the resolve loop |
+| `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | Max due rows claimed per tick (backpressure) |
+| `PREDICTION_RESOLVE_FETCH_CONCURRENCY` | `4` | Parallel actuals-fetch groups |
+| `PREDICTION_RESOLVE_POSTMORTEM_CONCURRENCY` | `1` | Documented LLM post-mortem drain concurrency |
+| `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | Max miss post-mortems enqueued per tick |
+| `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | Exclusive resolving lease TTL |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | Bound for data_unavailable retries |
+| `PREDICTION_RESOLVE_RETRY_BASE_SECONDS` | `30` | Exponential backoff base |
+| `PREDICTION_RESOLVE_RETRY_MAX_SECONDS` | `3600` | Exponential backoff cap |
+| `PREDICTION_RESOLVE_RETRY_JITTER_RATIO` | `0.1` | Retry jitter fraction |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD` | `5` | Provider errors before circuit opens |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS` | `60` | Circuit open duration |
+| `PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK` | `5` | Claim cap while circuit is open |
+
