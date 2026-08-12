@@ -228,6 +228,8 @@ class OrchestratorResult:
     runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
+    budget_snapshot: Optional[Dict[str, Any]] = None
+    failure_reason: Optional[str] = None
 
 
 class _StageProgressFence:
@@ -294,6 +296,11 @@ class AgentOrchestrator:
         )
         self.runtime_guard_policy = (
             runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)
+        )
+        from src.agent.runtime.mode_budget import resolve_mode_budget_limits
+
+        self.mode_budget_limits = resolve_mode_budget_limits(
+            config, mode=self.mode
         )
 
 _EXECUTION_METHOD_NAMES = _bind_facade_methods(

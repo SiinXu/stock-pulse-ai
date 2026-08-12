@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Report mode contract: brief / standard / research + hard length limits (#861 Phase 2).
+"""Report mode contract: brief / standard / research + hard length limits (#861/#874).
 
 Presentation-layer only. Modes select which sections render and apply deterministic
-hard limits (list counts / field character caps). The Decision Card is never
-dropped when content is truncated; omitted content is annotated explicitly.
+hard limits (list counts / field character caps). Layered reading order in Jinja
+templates is Decision Card first, then mode-density evidence strata, then long-form
+detail sections. The Decision Card is never dropped when content is truncated;
+omitted content is annotated explicitly.
+
+Notification ``ReportType.BRIEF`` always renders with ``report_mode=brief`` so push
+length budgets are independent of the global ``REPORT_MODE`` setting.
 """
 
 from __future__ import annotations
