@@ -339,6 +339,34 @@ class _AnalysisContextStageMixin:
             context.get('code', ''), enhanced.get('stock_name', stock_name)
         )
 
+        # ETF analysis semantics (Issue #173): tracking target, premium, N/A equity metrics
+        try:
+            from src.services.etf_analysis import build_etf_analysis_context
+
+            etf_analysis_context = build_etf_analysis_context(
+                context.get("code", ""),
+                enhanced.get("stock_name", stock_name),
+                realtime=enhanced.get("realtime")
+                if isinstance(enhanced.get("realtime"), dict)
+                else None,
+                is_index_etf=bool(enhanced.get("is_index_etf")),
+            )
+            enhanced["etf_analysis_context"] = etf_analysis_context
+            if isinstance(etf_analysis_context, dict) and etf_analysis_context.get("is_etf"):
+                enhanced["instrument_type"] = "etf"
+                enhanced["is_index_etf"] = True
+            else:
+                enhanced.setdefault("instrument_type", "equity")
+        except Exception as exc:  # broad-exception: fallback_recorded - ETF semantics fail-open
+            log_safe_exception(
+                logger,
+                "ETF analysis context build failed",
+                exc,
+                error_code="pipeline_etf_analysis_context_failed",
+                level=logging.DEBUG,
+            )
+            enhanced.setdefault("instrument_type", "equity")
+
         # P0: append unified fundamental block; keep as additional context only
         enhanced["fundamental_context"] = (
             fundamental_context

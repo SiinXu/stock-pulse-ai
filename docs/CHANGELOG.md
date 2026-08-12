@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] A-share ETF analysis path: identify liquid ETFs, inject tracking-target / premium / holdings-exposure context, mark PE and company fundamentals as not_applicable, and keep the shared decision-dashboard report structure (Refs #173).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Changed] Jinja stock reports use Decision Card-first layered reading (card → mode-density evidence strata → detail sections) for brief/standard/research, and `ReportType.BRIEF` notifications force `report_mode=brief` so push length budgets hold (Refs #861, #874).

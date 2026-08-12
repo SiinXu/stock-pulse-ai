@@ -476,6 +476,20 @@ class GeminiAnalyzer:
         )
         quote_rows_text = "\n".join(quote_rows)
 
+        etf_analysis_context = (
+            context.get("etf_analysis_context") if isinstance(context, dict) else None
+        )
+        is_etf_path = bool(
+            context.get("is_index_etf")
+            or (
+                isinstance(etf_analysis_context, dict)
+                and etf_analysis_context.get("is_etf")
+            )
+        )
+        instrument_type = context.get("instrument_type")
+        if not instrument_type:
+            instrument_type = "etf" if is_etf_path else "equity"
+
         # ========== Input for Building Decision Dashboard Format ==========
         prompt = f"""# 决策仪表盘分析请求
 
@@ -484,10 +498,27 @@ class GeminiAnalyzer:
 |------|------|
 | 股票代码 | **{code}** |
 | 股票名称 | **{stock_name}** |
+| 品种类型 | **{instrument_type}** |
 | 分析日期 | {context.get('date', unknown_text)} |
 
 ---
 """
+        try:
+            from src.services.etf_analysis import format_etf_analysis_prompt_section
+
+            etf_section = format_etf_analysis_prompt_section(
+                etf_analysis_context,
+                report_language=report_language,
+            )
+            if etf_section:
+                prompt += etf_section
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate ETF prompt section
+            log_safe_exception(
+                logger,
+                "ETF analysis prompt section failed",
+                exc,
+                error_code="analyzer_etf_prompt_section_failed",
+            )
         prompt += format_market_phase_prompt_section(
             context.get("market_phase_context"),
             report_language=report_language,
@@ -533,6 +564,18 @@ class GeminiAnalyzer:
         # Add real-time market data (volume ratio, turnover rate, etc.)
         if 'realtime' in context:
             rt = context['realtime']
+            try:
+                from src.services.etf_analysis import format_etf_metric_display
+
+                pe_display = format_etf_metric_display(
+                    "pe_ratio", rt.get("pe_ratio"), is_etf=is_etf_path, language=report_language
+                )
+                pb_display = format_etf_metric_display(
+                    "pb_ratio", rt.get("pb_ratio"), is_etf=is_etf_path, language=report_language
+                )
+            except Exception:
+                pe_display = "不适用（ETF）" if is_etf_path else str(rt.get("pe_ratio", "N/A"))
+                pb_display = "不适用（ETF）" if is_etf_path else str(rt.get("pb_ratio", "N/A"))
             prompt += f"""
 ### 实时行情增强数据
 | 指标 | 数值 | 解读 |
@@ -540,8 +583,8 @@ class GeminiAnalyzer:
 | 当前价格 | {rt.get('price', 'N/A')} 元 | |
 | **量比** | **{rt.get('volume_ratio', 'N/A')}** | {rt.get('volume_ratio_desc', '')} |
 | **换手率** | **{rt.get('turnover_rate', 'N/A')}%** | |
-| 市盈率(动态) | {rt.get('pe_ratio', 'N/A')} | |
-| 市净率 | {rt.get('pb_ratio', 'N/A')} | |
+| 市盈率(动态) | {pe_display} | |
+| 市净率 | {pb_display} | |
 | 总市值 | {self._format_amount(rt.get('total_mv'))} | |
 | 流通市值 | {self._format_amount(rt.get('circ_mv'))} | |
 | 60日涨跌幅 | {rt.get('change_60d', 'N/A')}% | 中期表现 |
@@ -549,47 +592,64 @@ class GeminiAnalyzer:
 
         # Add financial reports and dividends (value investment perspective)
         fundamental_context = context.get("fundamental_context") if isinstance(context, dict) else None
-        earnings_block = (
-            fundamental_context.get("earnings", {})
-            if isinstance(fundamental_context, dict)
-            else {}
-        )
-        earnings_data = (
-            earnings_block.get("data", {})
-            if isinstance(earnings_block, dict)
-            else {}
-        )
-        financial_report = (
-            earnings_data.get("financial_report", {})
-            if isinstance(earnings_data, dict)
-            else {}
-        )
-        dividend_metrics = (
-            earnings_data.get("dividend", {})
-            if isinstance(earnings_data, dict)
-            else {}
-        )
-        if isinstance(financial_report, dict) or isinstance(dividend_metrics, dict):
-            financial_report = financial_report if isinstance(financial_report, dict) else {}
-            dividend_metrics = dividend_metrics if isinstance(dividend_metrics, dict) else {}
-            ttm_yield = dividend_metrics.get("ttm_dividend_yield_pct", "N/A")
-            ttm_cash = dividend_metrics.get("ttm_cash_dividend_per_share", "N/A")
-            ttm_count = dividend_metrics.get("ttm_event_count", "N/A")
-            # Issue #235: facts-only financial statements section with recency honesty
-            try:
-                from src.services.financial_reports_service import (
-                    format_financial_report_prompt_section,
-                )
+        if is_etf_path:
+            # ETF has no company financial statements; mark explicitly rather than hard-calculate.
+            na_label = (
+                "not_applicable (ETF)"
+                if report_language == "en"
+                else ("해당 없음 (ETF)" if report_language == "ko" else "不适用（ETF）")
+            )
+            prompt += f"""
+### 财报与分红（ETF 口径）
+| 指标 | 数值 | 说明 |
+|------|------|------|
+| 公司财报 / PE/PB/ROE | {na_label} | ETF 无发行人财报语义，禁止硬算 |
+| 跟踪标的/溢价率/持仓暴露 | 见上方 ETF 专属分析路径 | 使用可得证据，缺失写 not_available |
 
-                prompt_lang = "en" if report_language in ("en", "ko") else "zh"
-                prompt += "\n" + format_financial_report_prompt_section(
-                    financial_report,
-                    language=prompt_lang,
-                )
-            except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
-                log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
-                report_date = financial_report.get("report_date", "N/A")
-                prompt += f"""
+> ETF 不得套用个股价值投资财报口径；缺失≠0，不适用≠数据错误。
+"""
+        else:
+            earnings_block = (
+                fundamental_context.get("earnings", {})
+                if isinstance(fundamental_context, dict)
+                else {}
+            )
+            earnings_data = (
+                earnings_block.get("data", {})
+                if isinstance(earnings_block, dict)
+                else {}
+            )
+            financial_report = (
+                earnings_data.get("financial_report", {})
+                if isinstance(earnings_data, dict)
+                else {}
+            )
+            dividend_metrics = (
+                earnings_data.get("dividend", {})
+                if isinstance(earnings_data, dict)
+                else {}
+            )
+            if isinstance(financial_report, dict) or isinstance(dividend_metrics, dict):
+                financial_report = financial_report if isinstance(financial_report, dict) else {}
+                dividend_metrics = dividend_metrics if isinstance(dividend_metrics, dict) else {}
+                ttm_yield = dividend_metrics.get("ttm_dividend_yield_pct", "N/A")
+                ttm_cash = dividend_metrics.get("ttm_cash_dividend_per_share", "N/A")
+                ttm_count = dividend_metrics.get("ttm_event_count", "N/A")
+                # Issue #235: facts-only financial statements section with recency honesty
+                try:
+                    from src.services.financial_reports_service import (
+                        format_financial_report_prompt_section,
+                    )
+
+                    prompt_lang = "en" if report_language in ("en", "ko") else "zh"
+                    prompt += "\n" + format_financial_report_prompt_section(
+                        financial_report,
+                        language=prompt_lang,
+                    )
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate provider/service failure for merge
+                    log_safe_exception(logger, "operation failed", exc, error_code="internal_error")
+                    report_date = financial_report.get("report_date", "N/A")
+                    prompt += f"""
 ### 财报与分红（价值投资口径）
 | 指标 | 数值 | 说明 |
 |------|------|------|
@@ -601,7 +661,7 @@ class GeminiAnalyzer:
 
 > 若上述字段为 N/A 或缺失，请明确写“数据缺失，无法判断”，禁止编造。
 """
-            prompt += f"""
+                prompt += f"""
 ### 分红（价值投资口径）
 | 指标 | 数值 | 说明 |
 |------|------|------|
@@ -961,13 +1021,15 @@ class GeminiAnalyzer:
 
 请为 **{stock_name}({code})** 生成【决策仪表盘】，严格按照 JSON 格式输出。
 """
-        if context.get('is_index_etf'):
+        if is_etf_path:
             prompt += """
 > ⚠️ **指数/ETF 分析约束**：该标的为指数跟踪型 ETF 或市场指数。
-> - 风险分析仅关注：**指数走势、跟踪误差、市场流动性**
+> - 风险分析仅关注：**跟踪标的走势、溢价/折价、持仓主题暴露、跟踪误差、市场流动性**
 > - 严禁将基金公司的诉讼、声誉、高管变动纳入风险警报
-> - 业绩预期基于**指数成分股整体表现**，而非基金公司财报
+> - 业绩预期基于**指数成分股/主题篮子整体表现**，而非基金公司财报
+> - PE/PB/ROE/公司财报等个股指标必须标注 **不适用（not_applicable）**，禁止硬算
 > - `risk_alerts` 中不得出现基金管理人相关的公司经营风险
+> - 报告结构与个股共用决策仪表盘 JSON，不切换模板
 
 """
         prompt += f"""
@@ -975,7 +1037,26 @@ class GeminiAnalyzer:
 正确的股票名称格式为“股票名称（股票代码）”，例如“贵州茅台（600519）”。
 如果上方显示的股票名称为"股票{code}"或不正确，请在分析开头**明确输出该股票的正确中文全称**。
 """
-        if use_legacy_default_prompt:
+        if is_etf_path:
+            try:
+                from src.services.etf_analysis import format_etf_focus_points
+
+                prompt += format_etf_focus_points(report_language)
+            except Exception as exc:  # broad-exception: fallback_recorded - ETF focus fallback
+                log_safe_exception(
+                    logger,
+                    "ETF focus points failed",
+                    exc,
+                    error_code="analyzer_etf_focus_points_failed",
+                )
+                prompt += """
+
+### 重点关注（ETF 路径 — 必须明确回答）：
+1. ❓ 跟踪标的/主题是什么？
+2. ❓ 溢价折价与流动性是否可交易？
+3. ❓ 持仓主题暴露与成分消息是否支持结论？
+"""
+        elif use_legacy_default_prompt:
             prompt += f"""
 
 ### 重点关注（必须明确回答）：
