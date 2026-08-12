@@ -13,7 +13,7 @@ export type ServiceWorkerRegistrationLike = {
 export type ServiceWorkerContainerLike = {
   register: (
     scriptURL: string,
-    options?: { scope?: string },
+    options?: { scope?: string; updateViaCache?: 'all' | 'imports' | 'none' },
   ) => Promise<ServiceWorkerRegistrationLike>;
 };
 
@@ -60,8 +60,11 @@ export async function registerServiceWorker(
   }
 
   try {
+    // updateViaCache: 'none' forces the browser to revalidate sw.js instead of
+    // reusing a stale HTTP-cached worker script after deploys.
     return await container.register(options.scriptUrl ?? '/sw.js', {
       scope: options.scope ?? '/',
+      updateViaCache: 'none',
     });
   } catch (error) {
     options.onError?.(error);

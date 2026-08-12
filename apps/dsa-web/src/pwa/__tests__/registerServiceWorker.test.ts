@@ -20,7 +20,10 @@ describe('registerServiceWorker', () => {
       container: { register },
     });
     expect(result).toEqual({ scope: '/' });
-    expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
+    expect(register).toHaveBeenCalledWith('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    });
   });
 
   it('swallows registration failures and reports them', async () => {

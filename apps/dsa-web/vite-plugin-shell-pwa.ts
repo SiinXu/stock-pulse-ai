@@ -120,8 +120,8 @@ self.addEventListener('fetch', (event) => {
   const strategy = decideStrategy(request);
 
   if (strategy === 'network-only') {
-    // Do not call respondWith for pass-through when we only need default fetch;
-    // still intercept so never-cache paths cannot be served from other SW caches.
+    // Always go to the network for API/market/non-shell traffic so a previous
+    // cache entry can never satisfy these requests.
     event.respondWith(fetch(request));
     return;
   }
