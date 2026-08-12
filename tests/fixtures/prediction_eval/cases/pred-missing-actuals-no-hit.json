@@ -1,0 +1,30 @@
+{
+  "id": "pred-missing-actuals-no-hit",
+  "profile": "missing_data",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "claim_type": "direction",
+      "direction": "down"
+    }
+  ],
+  "actuals": {
+    "start_price": null,
+    "end_price": null
+  },
+  "resolution": {
+    "outcome": "data_unavailable",
+    "reason": "missing_prices"
+  },
+  "expected": {
+    "outcome": "data_unavailable"
+  },
+  "episode": {
+    "run_id": "run-pred-missing-1",
+    "symbol": "hk00700",
+    "market": "hk",
+    "success": true,
+    "soul_hash": "abcdef0123456789",
+    "trajectory_summary": []
+  }
+}

@@ -42,47 +42,68 @@ class _RunMethods:
         Returns:
             AgentResult with parsed dashboard or error.
         """
-        # Opt-in plan→act→observe product path (#199). Default-off via Config.
-        from src.agent.planning.product import try_run_with_planning
+        from datetime import datetime, timezone
 
-        planned = try_run_with_planning(
-            self,
-            task=task,
-            context=context,
-            cancelled_check=cancelled_check,
+        from src.config import get_config
+        from src.services.agent_episode_service import (
+            try_record_agent_episode_from_result,
         )
-        if planned is not None:
-            if planned.runtime_facts is None:
-                # Keep soul runtime facts even when planning short-circuits.
-                scope_resolution = resolve_stock_scope(task, context)
-                system_prompt, _, _ = self.build_run_messages(
-                    task,
-                    scope_resolution.effective_context,
+
+        started_at = datetime.now(timezone.utc)
+        result: Optional[AgentResult] = None
+        try:
+            # Opt-in plan→act→observe product path (#199). Default-off via Config.
+            from src.agent.planning.product import try_run_with_planning
+
+            planned = try_run_with_planning(
+                self,
+                task=task,
+                context=context,
+                cancelled_check=cancelled_check,
+            )
+            if planned is not None:
+                if planned.runtime_facts is None:
+                    # Keep soul runtime facts even when planning short-circuits.
+                    scope_resolution = resolve_stock_scope(task, context)
+                    system_prompt, _, _ = self.build_run_messages(
+                        task,
+                        scope_resolution.effective_context,
+                    )
+                    planned.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
+                result = planned
+                return planned
+
+            scope_resolution = resolve_stock_scope(task, context)
+            system_prompt, user_message, tool_decls = self.build_run_messages(
+                task,
+                scope_resolution.effective_context,
+            )
+
+            # Initialize conversation
+            messages: List[Dict[str, Any]] = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            result = self._run_loop(
+                messages,
+                tool_decls,
+                parse_dashboard=True,
+                stock_scope=scope_resolution.stock_scope,
+                cancelled_check=cancelled_check,
+            )
+            result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
+            return result
+        finally:
+            # Evolution episode log (#1090): fail-soft; never abort the user path.
+            if result is not None:
+                try_record_agent_episode_from_result(
+                    result=result,
+                    config=getattr(self, "config", None) or get_config(),
+                    mode="single",
+                    context=context,
+                    started_at=started_at,
                 )
-                planned.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
-            return planned
-
-        scope_resolution = resolve_stock_scope(task, context)
-        system_prompt, user_message, tool_decls = self.build_run_messages(
-            task,
-            scope_resolution.effective_context,
-        )
-
-        # Initialize conversation
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
-
-        result = self._run_loop(
-            messages,
-            tool_decls,
-            parse_dashboard=True,
-            stock_scope=scope_resolution.stock_scope,
-            cancelled_check=cancelled_check,
-        )
-        result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
-        return result
 
     def build_run_messages(
         self, task: str, context: Optional[Dict[str, Any]] = None

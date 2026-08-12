@@ -31,6 +31,10 @@
 
 场景只**引用**既有 agent_runtime fixture，不重冻、不改 AR-01 基线；主 `manifest.json` 保持不动。
 
+## CI 回归门（#1092）
+
+CI job `agent-eval-gate` 以 `--strict-baseline` 运行离线评测，并包含预测核验套件（阈值固定 0.0，不得为绿放宽）。详见英文版。
+
 ## 如何运行
 
 ```bash

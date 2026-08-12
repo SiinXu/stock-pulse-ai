@@ -600,3 +600,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `YFINANCE_PRIORITY` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 
 <!-- config-env-inventory:end -->
+
+### Agent episode log
+
+- `AGENT_EPISODE_LOG_ENABLED` (default false)
+- `AGENT_EPISODE_RETENTION_DAYS` (default 90)
+- `AGENT_EPISODE_MAX_ROWS` (default 50000)

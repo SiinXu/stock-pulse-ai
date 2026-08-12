@@ -149,7 +149,7 @@ payload, so identical identities always serialize identically.
 | Score drop vs committed baseline | **Visible** in the markdown report; default CLI exit code stays 0 |
 | Hard-fail on drop | Only with `--strict-baseline` (opt-in) |
 
-Score drops are diagnostics for maintainers, not a required CI gate in V0. Scheduled workflow wiring under `.github/workflows/**` is intentionally a **follow-up** (owned by separate CI work).
+Score drops remain diagnostics unless `--strict-baseline` is used. Issue [#1092](https://github.com/SiinXu/stock-pulse-ai/issues/1092) adds a **blocking** CI job `agent-eval-gate` that runs `python scripts/run_agent_benchmark.py --strict-baseline` and enforces the offline prediction-verification suite with regression threshold **0.0** (deterministic frozen fixtures; do not relax the threshold to keep CI green). Anti-tests inject degradation and assert the gate fails.
 
 ## Refreshing the baseline
 
@@ -192,3 +192,16 @@ Commit `tests/agent/benchmark/baselines/v0.json` with an English changelog note 
 | AR-01 agent_runtime fixtures | Read-only source transcripts for replay |
 | Output-quality eval service | [agent-eval-dimensions_EN.md](agent-eval-dimensions_EN.md) scores single output artifacts (`agent_eval_service`) and is invoked by this canonical runner in a separate score bucket |
 | CI merge queue / workflow ownership | Do not wire scheduled jobs into `.github/workflows/**` in this PR |
+
+
+## Prediction verification offline suite (#1092 / #1107)
+
+Integrated into the same runner as `prediction_verification_evaluation`:
+
+| Path | Role |
+| --- | --- |
+| `tests/fixtures/prediction_eval/` | Frozen integrity fixtures (success, provider failure, missing data, overclaim, seeded miss lessons, tool discipline) |
+| `src/services/prediction_eval_service.py` | Deterministic integrity + trajectory replay via owned `evaluate_agent_trajectory` |
+| `tests/agent/benchmark/baselines/prediction_v0.json` | Committed baseline (threshold 0.0) |
+
+Provider failure fixtures must resolve to `data_unavailable` and never a fabricated hit.
