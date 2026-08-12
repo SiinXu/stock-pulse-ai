@@ -162,6 +162,17 @@ class _AgentAnalysisStageMixin:
                 daily_market_context,
                 report_language=report_language,
             )
+            checkpoint_session = getattr(self, "_analysis_checkpoint_session", None)
+            if checkpoint_session is not None:
+                from src.services.analysis_stage_checkpoint import (
+                    META_ANNOTATION_KEY,
+                    META_REPRO_KEY,
+                    META_SESSION_KEY,
+                )
+
+                initial_context[META_SESSION_KEY] = checkpoint_session
+                initial_context[META_ANNOTATION_KEY] = checkpoint_session.annotation
+                initial_context[META_REPRO_KEY] = checkpoint_session.repro_snapshot
 
             if realtime_quote:
                 initial_context["realtime_quote"] = self._safe_to_dict(realtime_quote)

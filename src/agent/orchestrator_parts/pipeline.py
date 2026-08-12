@@ -85,6 +85,36 @@ class _PipelineMethods:
         stage_entry_counts: Dict[str, int] = {}
         index = 0
 
+        # Stage-level exact-replay resume (Issues #121 / #136).
+        from src.services.analysis_stage_checkpoint import (
+            agent_stage_name,
+            capture_agent_stage_payload,
+            restore_agent_context_from_session,
+            session_from_agent_context,
+        )
+
+        checkpoint_session = session_from_agent_context(ctx)
+        restored_agent_stages: set = set()
+        if checkpoint_session is not None and checkpoint_session.enabled:
+            restored_agent_stages = set(
+                restore_agent_context_from_session(checkpoint_session, ctx)
+            )
+            if restored_agent_stages:
+                logger.info(
+                    "[Orchestrator] exact-replay resume restored agent stages: %s",
+                    ",".join(sorted(restored_agent_stages)),
+                )
+            _base_agent_names = {
+                "technical",
+                "intel",
+                "risk",
+                "decision",
+                "critic",
+                _critic.CRITIC_STAGE_NAME,
+            }
+            if any(name not in _base_agent_names for name in restored_agent_stages):
+                specialist_agents_inserted = True
+
         # Minimum seconds required for a stage to do useful work.  Starting
         # a stage with less budget virtually guarantees a timeout that wastes
         # an LLM billing cycle.  Only enforced after at least one stage has
@@ -104,6 +134,34 @@ class _PipelineMethods:
         while index < len(agents):
             agent = agents[index]
             elapsed_s = time.time() - t0
+            stage_name_for_resume = str(getattr(agent, "agent_name", "") or "")
+
+            # Exact-replay: skip agent stages already restored from checkpoint.
+            if stage_name_for_resume in restored_agent_stages:
+                logger.info(
+                    "[Orchestrator] skipping restored agent stage '%s' (exact-replay)",
+                    stage_name_for_resume,
+                )
+                skip_result = StageResult(
+                    stage_name=stage_name_for_resume,
+                    status=StageStatus.SKIPPED,
+                    duration_s=0.0,
+                    meta={
+                        "checkpoint_restored": True,
+                        "consistency": "exact_replay",
+                    },
+                )
+                stats.record_stage(skip_result)
+                if progress_callback:
+                    progress_callback(stream_event(
+                        "stage_done",
+                        stage=stage_name_for_resume,
+                        status=StageStatus.SKIPPED.value,
+                        duration=0.0,
+                        checkpoint_restored=True,
+                    ))
+                index += 1
+                continue
 
             # Cancellation wins over timeout / degradation: probe before any
             # other pre-stage gate so a cancelled run terminates as CANCELLED
@@ -259,6 +317,28 @@ class _PipelineMethods:
                             "completed_skill_count": sum(1 for item in batch.stage_results if item.success),
                             "invalid_skill_count": len(batch.invalid_records),
                         }
+                        if checkpoint_session is not None and checkpoint_session.enabled:
+                            for stage_result in batch.stage_results:
+                                if stage_result.status != StageStatus.COMPLETED:
+                                    continue
+                                try:
+                                    checkpoint_session.save_stage(
+                                        agent_stage_name(stage_result.stage_name),
+                                        capture_agent_stage_payload(
+                                            ctx,
+                                            stage_name=stage_result.stage_name,
+                                            stage_result=stage_result,
+                                        ),
+                                    )
+                                except Exception as exc:  # broad-exception: fallback_recorded
+                                    log_safe_exception(
+                                        logger,
+                                        "[Orchestrator] specialist stage checkpoint save failed",
+                                        exc,
+                                        error_code="agent_specialist_checkpoint_save_failed",
+                                        level=logging.WARNING,
+                                        context={"stage": stage_result.stage_name},
+                                    )
                         continue
                     agents[index:index] = specialist_agents
                     continue
@@ -375,6 +455,25 @@ class _PipelineMethods:
                     raise TypeError("Stage agent returned an invalid result")
                 if result.status == StageStatus.COMPLETED:
                     self._commit_stage_context(ctx, staged_ctx)
+                    if checkpoint_session is not None and checkpoint_session.enabled:
+                        try:
+                            checkpoint_session.save_stage(
+                                agent_stage_name(stage_name),
+                                capture_agent_stage_payload(
+                                    ctx,
+                                    stage_name=stage_name,
+                                    stage_result=result,
+                                ),
+                            )
+                        except Exception as exc:  # broad-exception: fallback_recorded
+                            log_safe_exception(
+                                logger,
+                                "[Orchestrator] stage checkpoint save failed",
+                                exc,
+                                error_code="agent_stage_checkpoint_save_failed",
+                                level=logging.WARNING,
+                                context={"stage": stage_name},
+                            )
             except TimeoutError as exc:
                 log_safe_exception(
                     logger,
