@@ -43,6 +43,9 @@ from src.capability_registry import (
 )
 from src.capability_registry.resolution import CapabilityResolutionError
 from src.capability_registry.write_models import WriteCapabilityEntry
+from src.capability_registry.write_service import (
+    CapabilityWriteAuditCompletionUnavailable,
+)
 from src.capability_registry.write_store import WriteRegistryStoreError
 from src.services.security_audit_service import SecurityAuditUnavailable
 from src.utils.sanitize import log_safe_exception
@@ -248,6 +251,21 @@ def register_capability(request: WriteCapabilityEntryRequest) -> WriteCapability
         )
     except CapabilityWriteError as exc:
         raise _map_write_error(exc) from None
+
+    except CapabilityWriteAuditCompletionUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": (
+                    "Capability mutation was persisted, but audit completion "
+                    "could not be persisted"
+                ),
+                "operation_completed": True,
+                "capability_id": exc.entry.capability_id,
+                "status": exc.entry.status,
+            },
+        ) from None
     except SecurityAuditUnavailable:
         raise HTTPException(
             status_code=503,
@@ -279,6 +297,21 @@ def update_capability(
         )
     except CapabilityWriteError as exc:
         raise _map_write_error(exc) from None
+
+    except CapabilityWriteAuditCompletionUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": (
+                    "Capability mutation was persisted, but audit completion "
+                    "could not be persisted"
+                ),
+                "operation_completed": True,
+                "capability_id": exc.entry.capability_id,
+                "status": exc.entry.status,
+            },
+        ) from None
     except SecurityAuditUnavailable:
         raise HTTPException(
             status_code=503,
@@ -306,6 +339,21 @@ def retire_capability(capability_id: str) -> WriteCapabilityEntryResponse:
         )
     except CapabilityWriteError as exc:
         raise _map_write_error(exc) from None
+
+    except CapabilityWriteAuditCompletionUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": (
+                    "Capability mutation was persisted, but audit completion "
+                    "could not be persisted"
+                ),
+                "operation_completed": True,
+                "capability_id": exc.entry.capability_id,
+                "status": exc.entry.status,
+            },
+        ) from None
     except SecurityAuditUnavailable:
         raise HTTPException(
             status_code=503,

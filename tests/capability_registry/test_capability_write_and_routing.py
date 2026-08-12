@@ -285,3 +285,32 @@ def test_resolve_many_missing_id(tmp_path: Path) -> None:
     results = resolve_many(["does-not-exist"], write_snapshot=service.list_entries())
     assert results[0].reason_code == "capability_not_found"
     assert results[0].ready is False
+
+
+def test_audit_completion_failure_after_write_is_distinct(tmp_path: Path) -> None:
+    store = CapabilityWriteStore(tmp_path / "registry.json", clock=lambda: FIXED_NOW)
+
+    class FlakyRecorder:
+        def __init__(self) -> None:
+            self.attempts = 0
+
+        def record_attempt(self, **fields):
+            self.attempts += 1
+            return None
+
+        def record_completion(self, **fields):
+            raise RuntimeError("completion down")
+
+    from src.capability_registry.write_service import (
+        CapabilityWriteAuditCompletionUnavailable,
+    )
+
+    service = CapabilityWriteService(
+        store=store,
+        auditor=CapabilityWriteAuditor(recorder=FlakyRecorder()),
+        clock=lambda: FIXED_NOW,
+    )
+    with pytest.raises(CapabilityWriteAuditCompletionUnavailable):
+        service.register(_llm_payload(capability_id="llm:written"))
+    # Mutation must have persisted even though completion audit failed.
+    assert store.get("llm:written") is not None

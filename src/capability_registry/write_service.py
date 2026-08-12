@@ -31,6 +31,14 @@ class CapabilityWriteError(Exception):
         self.message = message or error_code
 
 
+class CapabilityWriteAuditCompletionUnavailable(RuntimeError):
+    """Raised when the durable mutation succeeded but audit completion failed."""
+
+    def __init__(self, entry: WriteCapabilityEntry) -> None:
+        super().__init__("security_audit_unavailable")
+        self.entry = entry
+
+
 class CapabilityWriteService:
     def __init__(
         self,
@@ -49,6 +57,37 @@ class CapabilityWriteService:
 
     def _now_iso(self) -> str:
         return self._clock().astimezone(timezone.utc).isoformat()
+
+    def _complete_success(
+        self,
+        *,
+        capability_id: str,
+        operation: str,
+        correlation_id: str,
+        entry: WriteCapabilityEntry,
+        metadata: Mapping[str, Any] | None = None,
+        actor_type: str,
+        actor_id: str,
+    ) -> None:
+        """Persist success audit; surface write-done/audit-failed distinctly."""
+
+        try:
+            self._auditor.complete(
+                capability_id=capability_id,
+                operation=operation,
+                success=True,
+                correlation_id=correlation_id,
+                metadata=metadata,
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - map to completion-unavailable
+            from src.services.security_audit_service import SecurityAuditUnavailable
+
+            if isinstance(exc, SecurityAuditUnavailable):
+                raise CapabilityWriteAuditCompletionUnavailable(entry) from None
+            raise CapabilityWriteAuditCompletionUnavailable(entry) from exc
+
 
     def list_entries(
         self,
@@ -146,11 +185,11 @@ class CapabilityWriteService:
                 actor_id=actor_id,
             )
             raise
-        self._auditor.complete(
+        self._complete_success(
             capability_id=entry.capability_id,
             operation="register",
-            success=True,
             correlation_id=correlation_id,
+            entry=entry,
             metadata={"version": entry.version, "domain": entry.domain},
             actor_type=actor_type,
             actor_id=actor_id,
