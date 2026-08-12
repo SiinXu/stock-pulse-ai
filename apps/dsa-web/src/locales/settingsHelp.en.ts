@@ -1474,6 +1474,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Gates GET /api/v1/reasoning-trace/{record_id} and related export service behavior.'],
     notes: ['See docs/reasoning-trace-export_EN.md for the contract and rollback steps.'],
   },
+  'settings.agent.evidence_chain_export': {
+    title: 'Evidence Chain & Audit Package',
+    summary: 'Conclusion→evidence chain projection and redacted auditable report-package export from persisted history.',
+    usage: 'EVIDENCE_CHAIN_ENABLED (default true) builds evidence-chain-v1. AUDIT_EXPORT_ENABLED (default false) gates ZIP/JSON audit package export and requires administrator authentication. AUDIT_INCLUDE_RAW_ARTIFACTS (default false) keeps raw intermediates out of the package.',
+    valueNotes: [
+      'Missing evidence is marked missing and never invented or silently omitted.',
+      'Exports reuse reasoning-trace redaction and the security-audit attempt/completion trail.',
+      'The service does not store export files; operators must delete downloaded copies separately.',
+    ],
+    impact: ['Gates GET /api/v1/history/{record_id}/evidence-chain and /evidence-pack (and /analysis aliases).'],
+    notes: ['See docs/evidence-chain-audit-package_EN.md for the contract and rollback steps.'],
+  },
   'settings.agent.observability': {
     title: 'Agent Observability',
     summary: 'Lightweight structured agent run events with trace/span ids for the run-flow view.',

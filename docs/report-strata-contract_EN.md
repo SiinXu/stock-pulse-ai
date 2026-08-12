@@ -53,7 +53,7 @@ Offline fixtures live under `tests/fixtures/report_strata/`:
 
 ## Out of scope
 
-- Exportable audit zip / evidence package remainder (#127)  
+- Exportable audit zip / full evidence package: delivered under #127 / #986 (`docs/evidence-chain-audit-package_EN.md`); strata remain presentation-only  
 - Multi-tenant ownership  
 - Guarantees of trading accuracy or alpha  
 - Forcing LLM extractor prompt rewrites beyond additive schema acceptance  

@@ -1503,6 +1503,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
     notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
   },
+  'settings.agent.evidence_chain_export': {
+    title: '证据链与可审计报告包',
+    summary: '从已落盘历史投影「结论→证据」链，并支持脱敏可审计报告包导出。',
+    usage: 'EVIDENCE_CHAIN_ENABLED（默认 true）构建 evidence-chain-v1。AUDIT_EXPORT_ENABLED（默认 false）控制 ZIP/JSON 审计包导出，且需要管理员认证。AUDIT_INCLUDE_RAW_ARTIFACTS（默认 false）默认不包含原始中间产物。',
+    valueNotes: [
+      '缺失证据显式标注为 missing，不会捏造或静默省略。',
+      '导出复用 reasoning-trace 脱敏与安全审计 attempt/completion 链路。',
+      '服务不保存导出文件；已下载副本需运营自行删除。',
+    ],
+    impact: ['控制 GET /api/v1/history/{record_id}/evidence-chain 与 /evidence-pack（以及 /analysis 别名）。'],
+    notes: ['契约与回滚见 docs/evidence-chain-audit-package.md。'],
+  },
   'settings.agent.observability': {
     title: 'Agent 可观测性',
     summary: '为运行流提供带 trace/span 的轻量 Agent 结构化事件。',

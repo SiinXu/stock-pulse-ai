@@ -40,6 +40,6 @@ Issue #616 要求分析报告以**固定证据分层**呈现内容，避免把�
 
 ## 范围外
 
-- #127 审计 zip
+- #127 / #986 可导出审计包见 docs/evidence-chain-audit-package.md；分层仍仅负责呈现
 - 多租户
 - 交易 alpha 保证

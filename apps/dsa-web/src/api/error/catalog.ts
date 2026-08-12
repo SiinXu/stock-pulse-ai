@@ -57,6 +57,18 @@ export const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
       message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.',
     },
   }),
+  audit_export_disabled: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.audit_export_disabled", {
+    zh: { title: '可审计报告包导出未启用', message: '请在设置 → Agent 行为 → 执行中开启「可审计报告包导出」（AUDIT_EXPORT_ENABLED），保存后重试。' },
+    en: { title: 'Audit package export is disabled', message: 'Enable Audit Package Export (AUDIT_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.' },
+  }),
+  evidence_chain_disabled: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.evidence_chain_disabled", {
+    zh: { title: '证据链未启用', message: '请在设置 → Agent 行为 → 执行中开启「证据链」（EVIDENCE_CHAIN_ENABLED），保存后重试。' },
+    en: { title: 'Evidence chain is disabled', message: 'Enable Evidence Chain (EVIDENCE_CHAIN_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.' },
+  }),
+  audit_export_auth_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.audit_export_auth_required", {
+    zh: { title: '可审计报告包导出需要管理员认证', message: '管理员认证未启用时无法导出可审计报告包（HTTP 403）。请先启用认证并登录。' },
+    en: { title: 'Audit package export requires administrator authentication', message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.' },
+  }),
   password_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.password_required", {
     zh: { title: '请输入密码', message: '填写所需密码后再试。' },
     en: { title: 'Password required', message: 'Enter the required password and try again.' },

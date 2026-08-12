@@ -1441,6 +1441,15 @@ class _ConfigLoadingMethods:
                 minimum=10_000,
                 maximum=2_000_000,
             ),
+            evidence_chain_enabled=parse_env_bool(
+                os.getenv('EVIDENCE_CHAIN_ENABLED'), default=True
+            ),
+            audit_export_enabled=parse_env_bool(
+                os.getenv('AUDIT_EXPORT_ENABLED'), default=False
+            ),
+            audit_include_raw_artifacts=parse_env_bool(
+                os.getenv('AUDIT_INCLUDE_RAW_ARTIFACTS'), default=False
+            ),
             security_audit_retention_days=parse_env_int(
                 os.getenv('SECURITY_AUDIT_RETENTION_DAYS'),
                 90,

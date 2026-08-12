@@ -124,6 +124,11 @@ class Config:
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
 
+    # === Evidence chain + audit package (Issues #986 / #127) ===
+    evidence_chain_enabled: bool = True
+    audit_export_enabled: bool = False
+    audit_include_raw_artifacts: bool = False
+
     # === Durable security-audit trail (Issue #535) ===
     # Time retention and hard row capacity for privileged-operation events.
     security_audit_retention_days: int = 90
