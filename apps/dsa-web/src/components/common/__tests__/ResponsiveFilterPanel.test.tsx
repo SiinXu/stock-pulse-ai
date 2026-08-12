@@ -1,8 +1,25 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { ResponsiveFilterPanel } from '../ResponsiveFilterPanel';
+
+function setMobileViewport(isMobile: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: isMobile && query.includes('max-width'),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
 function Harness({
   onApply = () => undefined,
@@ -39,16 +56,40 @@ function Harness({
 }
 
 describe('ResponsiveFilterPanel', () => {
-  it('submits the desktop form and exposes the mobile advanced-filter count', () => {
+  beforeEach(() => {
+    // Default setupTests matchMedia always returns matches:false → desktop layout.
+    setMobileViewport(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('submits the desktop form and keeps basic filters inline on large viewports', () => {
     const onApply = vi.fn();
     render(<Harness onApply={onApply} />);
 
-    expect(screen.getByRole('button', { name: 'More filters (2)' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('textbox', { name: 'Market' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More filters (2)' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(onApply).toHaveBeenCalledTimes(1);
   });
 
+  it('collapses basic filters behind a single Filters control on narrow viewports (#879 B2)', () => {
+    setMobileViewport(true);
+    render(<Harness />);
+
+    expect(screen.queryByRole('textbox', { name: 'Market' })).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'More filters (2)' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: 'Advanced filters' });
+    expect(within(dialog).getByRole('textbox', { name: 'Market' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox', { name: 'Status' })).toBeInTheDocument();
+  });
+
   it('preserves controlled advanced values across drawer close and reopen', () => {
+    setMobileViewport(true);
     const onApply = vi.fn();
     render(<Harness onApply={onApply} />);
 
@@ -69,13 +110,18 @@ describe('ResponsiveFilterPanel', () => {
   });
 
   it('shares disabled and loading state between desktop and mobile actions', () => {
-    const { rerender } = render(<Harness applyDisabled />);
+    const desktop = render(<Harness applyDisabled />);
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+    desktop.unmount();
 
+    setMobileViewport(true);
+    const mobile = render(<Harness applyDisabled />);
     fireEvent.click(screen.getByRole('button', { name: 'More filters (2)' }));
     expect(within(screen.getByRole('dialog', { name: 'Advanced filters' })).getByRole('button', { name: 'Apply' })).toBeDisabled();
+    mobile.unmount();
 
-    rerender(<Harness isApplying />);
+    setMobileViewport(false);
+    render(<Harness isApplying />);
     expect(screen.getByRole('button', { name: 'Apply' })).toHaveAttribute('aria-busy', 'true');
   });
 });
