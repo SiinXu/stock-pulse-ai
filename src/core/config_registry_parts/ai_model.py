@@ -1261,7 +1261,12 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 48,
         "help_key": "settings.ai_model.TASK_ROUTING_PIN_REPORT",
         "examples": ["TASK_ROUTING_PIN_REPORT="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Capability write registry",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-write-registry.md",
+            },
+        ],
         "warning_codes": [],
     },
     "TASK_ROUTING_PIN_AGENT": {
@@ -1279,7 +1284,12 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 49,
         "help_key": "settings.ai_model.TASK_ROUTING_PIN_AGENT",
         "examples": ["TASK_ROUTING_PIN_AGENT="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Capability write registry",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-write-registry.md",
+            },
+        ],
         "warning_codes": [],
     },
     "TASK_ROUTING_PIN_VISION": {
@@ -1297,7 +1307,12 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 50,
         "help_key": "settings.ai_model.TASK_ROUTING_PIN_VISION",
         "examples": ["TASK_ROUTING_PIN_VISION="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Capability write registry",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-write-registry.md",
+            },
+        ],
         "warning_codes": [],
     },
 
@@ -1316,7 +1331,12 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 51,
         "help_key": "settings.ai_model.TASK_ROUTING_PIN_MARKET_REVIEW",
         "examples": ["TASK_ROUTING_PIN_MARKET_REVIEW="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Capability write registry",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-write-registry.md",
+            },
+        ],
         "warning_codes": [],
     },
 
@@ -1335,7 +1355,12 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 52,
         "help_key": "settings.ai_model.TASK_ROUTING_PIN_CHEAP_SCAN",
         "examples": ["TASK_ROUTING_PIN_CHEAP_SCAN="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Capability write registry",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-write-registry.md",
+            },
+        ],
         "warning_codes": [],
     },
 
@@ -1354,7 +1379,12 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 53,
         "help_key": "settings.ai_model.TASK_ROUTING_PIN_DEEP_REASONING",
         "examples": ["TASK_ROUTING_PIN_DEEP_REASONING="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Capability write registry",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-write-registry.md",
+            },
+        ],
         "warning_codes": [],
     },
 
@@ -1373,7 +1403,12 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 54,
         "help_key": "settings.ai_model.TASK_ROUTING_PIN_CODING",
         "examples": ["TASK_ROUTING_PIN_CODING="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Capability write registry",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/capability-write-registry.md",
+            },
+        ],
         "warning_codes": [],
     },
 
