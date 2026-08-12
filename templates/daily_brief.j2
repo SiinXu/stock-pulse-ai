@@ -1,7 +1,32 @@
-{# Daily brief with historical accuracy review (Issue #466).
-   Honesty rule: when accuracy.status != ok, never invent hit-rate numbers.
-#}
+{# Personal daily morning brief (#149) + accuracy review (#466) + event foresight (#1131). #}
 # 📋 {{ brief.report_date }} {{ labels.title }}
+
+## 💼 {{ labels.portfolio_heading }}
+{% set portfolio = brief.portfolio or {} %}
+{% if portfolio.status == 'unavailable' %}{{ labels.portfolio_unavailable }}
+{% elif portfolio.empty %}{{ labels.portfolio_empty }}
+{% else %}{% for item in portfolio.holdings or [] %}- **`{{ item.code }}`**
+{% endfor %}{% endif %}
+
+## 🌙 {{ labels.overnight_heading }}
+{% set overnight = brief.overnight_highlights or {} %}
+{% if overnight.status == 'unavailable' %}{{ labels.overnight_unavailable }}
+{% elif overnight.empty %}{{ labels.overnight_empty }}
+{% else %}{% for item in overnight.items or [] %}- **{{ item.name or item.code }}** ({{ item.code }}) — {{ item.reason_display or item.reason_code }}
+{% endfor %}{% endif %}
+
+## 📌 {{ labels.event_heading }}
+{% set events = brief.event_foresight or {} %}
+{% if events.status == 'unavailable' %}{{ labels.event_unavailable }}
+{% elif events.empty %}{{ labels.event_empty }}
+{% else %}{% for eb in events.briefs or [] %}### {{ eb.stock_name or eb.stock_code }} ({{ eb.stock_code }}) · {{ eb.event_category }}{% if eb.in_portfolio %} · ★{% endif %}
+{% if eb.what_happened %}{{ eb.what_happened }}
+{% endif %}{% if eb.metrics_to_watch %}**{{ labels.metrics_label }}:**
+{% for metric in eb.metrics_to_watch %}- {{ metric.label }}
+{% endfor %}{% endif %}{% if eb.post_event_checklist %}**{{ labels.checklist_label }}:**
+{% for item in eb.post_event_checklist %}- [ ] {{ item.label }}
+{% endfor %}{% endif %}
+{% endfor %}{% endif %}
 
 {% set accuracy = brief.accuracy or {} %}
 ## 📊 {{ labels.accuracy_heading }}
@@ -71,7 +96,7 @@
 {% set analyses = brief.yesterday_analyses or [] %}
 {% if analyses %}
 {% for item in analyses %}
-- **{{ item.name or item.code }}** ({{ item.code }}){% if item.operation_advice %} · {{ item.operation_advice }}{% endif %}{% if item.sentiment_score is not none %} · score {{ item.sentiment_score }}{% endif %}{% if item.on_watchlist %} · ★{% endif %}
+- **{{ item.name or item.code }}** ({{ item.code }}){% if item.operation_advice %} · {{ item.operation_advice }}{% endif %}{% if item.sentiment_score is not none %} · score {{ item.sentiment_score }}{% endif %}{% if item.in_portfolio %} · ★ {{ labels.in_portfolio }}{% elif item.on_watchlist %} · ★{% endif %}
 {% if item.analysis_summary %}
   {{ item.analysis_summary }}
 {% endif %}
@@ -88,7 +113,7 @@
 {{ labels.watchlist_covered }}: {{ watchlist.with_yesterday_analysis }} · {{ labels.watchlist_missing }}: {{ watchlist.without_yesterday_analysis }} · total: {{ watchlist.total }}
 
 {% for entry in watchlist.entries or [] %}
-- `{{ entry.code }}`{% if entry.had_yesterday_analysis %} · {{ labels.watchlist_covered }}{% else %} · {{ labels.watchlist_missing }}{% endif %}
+- `{{ entry.code }}`{% if entry.in_portfolio %} · ★ {{ labels.in_portfolio }}{% endif %}{% if entry.had_yesterday_analysis %} · {{ labels.watchlist_covered }}{% else %} · {{ labels.watchlist_missing }}{% endif %}
 {% endfor %}
 {% endif %}
 

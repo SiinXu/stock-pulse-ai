@@ -1,17 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Daily brief with historical accuracy review (Issue #466).
+"""Daily brief: personal morning push + historical accuracy review.
 
-Assembles a scannable morning brief from:
-
-1. Yesterday's analysis history (watchlist-relevant when possible)
-2. Today's configured watchlist context
-3. A historical-accuracy section computed from **existing** stores only:
-   decision-signal outcomes, backtest summaries, and skill-opinion
-   performance read APIs
-
-This module does **not** introduce a new evaluation engine. Hit rates and
-accuracy numbers are either taken from authoritative aggregates or reported
-as insufficient history — never fabricated.
+Assembles a scannable morning brief from portfolio holdings (#149), overnight
+Today's Focus highlights (#149), earnings event foresight (#1131), yesterday
+analyses, watchlist context, and historical accuracy (#466). Optional quiet
+mode skips notify when no material content is present. Section failures fail-open.
 """
 
 from __future__ import annotations
@@ -22,7 +15,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from src.utils.sanitize import log_safe_exception
@@ -57,6 +50,7 @@ class DailyBriefConfigView:
     notify: bool = True
     persist_history: bool = True
     save_report_file: bool = True
+    quiet_when_empty: bool = False
 
 
 @dataclass
@@ -113,6 +107,7 @@ def resolve_daily_brief_config(config: Any = None) -> DailyBriefConfigView:
         notify=bool(getattr(config, "daily_brief_notify", True)),
         persist_history=bool(getattr(config, "daily_brief_persist_history", True)),
         save_report_file=bool(getattr(config, "daily_brief_save_report_file", True)),
+        quiet_when_empty=bool(getattr(config, "daily_brief_quiet_when_empty", False)),
     )
 
 
@@ -163,6 +158,9 @@ class DailyBriefService:
         decision_signal_repo: Any = None,
         backtest_service: Any = None,
         skill_performance_service: Any = None,
+        portfolio_repository: Any = None,
+        todays_focus_service: Any = None,
+        event_research_brief_service: Any = None,
         notifier: Any = None,
         config_provider: Optional[Callable[[], Any]] = None,
         clock: Optional[Callable[[], datetime]] = None,
@@ -172,6 +170,9 @@ class DailyBriefService:
         self._decision_signal_repo = decision_signal_repo
         self._backtest_service = backtest_service
         self._skill_performance_service = skill_performance_service
+        self._portfolio_repository = portfolio_repository
+        self._todays_focus_service = todays_focus_service
+        self._event_research_brief_service = event_research_brief_service
         self._notifier = notifier
         self._config_provider = config_provider
         self._clock = clock or (lambda: datetime.now(timezone.utc))
@@ -240,6 +241,38 @@ class DailyBriefService:
 
             self._notifier = NotificationService()
         return self._notifier
+
+    @property
+    def portfolio_repository(self) -> Any:
+        if self._portfolio_repository is None:
+            try:
+                from src.repositories.portfolio_repo import PortfolioRepository
+                self._portfolio_repository = PortfolioRepository()
+            except Exception as exc:  # broad-exception: fallback_recorded
+                log_safe_exception(logger, "Daily brief portfolio repository unavailable", exc,
+                                   error_code="daily_brief_portfolio_unavailable", level=logging.WARNING)
+                self._portfolio_repository = False
+        return self._portfolio_repository if self._portfolio_repository is not False else None
+
+    @property
+    def todays_focus_service(self) -> Any:
+        if self._todays_focus_service is None:
+            from src.services.todays_focus_service import TodaysFocusService
+            self._todays_focus_service = TodaysFocusService(
+                config_provider=self._config_provider or (lambda: self._config()),
+                clock=self._clock,
+            )
+        return self._todays_focus_service
+
+    @property
+    def event_research_brief_service(self) -> Any:
+        if self._event_research_brief_service is None:
+            from src.services.event_research_brief_service import EventResearchBriefService
+            self._event_research_brief_service = EventResearchBriefService(
+                config_provider=self._config_provider or (lambda: self._config()),
+                clock=self._clock,
+            )
+        return self._event_research_brief_service
 
     # ------------------------------------------------------------------
     # Public entry points
@@ -325,6 +358,11 @@ class DailyBriefService:
             do_persist = view.persist_history if persist_history is None else bool(persist_history)
             do_save_file = view.save_report_file if save_report_file is None else bool(save_report_file)
             do_notify = view.notify if notify is None else bool(notify)
+            material = bool((payload.get("materiality") or {}).get("has_material_content"))
+            if do_notify and view.quiet_when_empty and not material:
+                do_notify = False
+                result.notification_status = "quiet_skipped"
+                result.skipped_reason = result.skipped_reason or "quiet_when_empty"
 
             if do_save_file and markdown:
                 try:
@@ -356,6 +394,8 @@ class DailyBriefService:
                 result.notification_status, result.notification_ok = self._send_notification(
                     markdown
                 )
+            elif result.notification_status == "quiet_skipped":
+                pass
             elif not do_notify:
                 result.notification_status = "not_requested"
 
@@ -386,17 +426,32 @@ class DailyBriefService:
         report_language = str(getattr(runtime, "report_language", "zh") or "zh")
 
         watchlist = self._watchlist_codes(runtime)
+        portfolio = self._build_portfolio_section()
+        portfolio_codes = {
+            str(item.get("code") or "").upper()
+            for item in (portfolio.get("holdings") or [])
+            if item.get("code")
+        }
         yesterday_analyses = self._load_yesterday_analyses(
             yesterday=yesterday,
             timezone_name=resolved.timezone_name,
             watchlist=watchlist,
+            portfolio_codes=portfolio_codes,
         )
         watchlist_context = self._build_watchlist_context(
             watchlist=watchlist,
             recent_analyses=yesterday_analyses,
+            portfolio_codes=portfolio_codes,
+        )
+        overnight = self._build_overnight_section(runtime=runtime, report_language=report_language)
+        event_briefs = self._build_event_foresight_section(
+            runtime=runtime, watchlist=watchlist, portfolio_codes=portfolio_codes,
         )
         accuracy = self._build_accuracy_section(min_samples=resolved.min_samples)
-
+        materiality = self._assess_materiality(
+            portfolio=portfolio, overnight=overnight, event_briefs=event_briefs,
+            yesterday_analyses=yesterday_analyses,
+        )
         return {
             "pack_version": DAILY_BRIEF_PACK_VERSION,
             "query_id": query_id or f"daily_brief_{local_date.isoformat()}",
@@ -405,9 +460,13 @@ class DailyBriefService:
             "timezone": resolved.timezone_name,
             "report_language": report_language,
             "yesterday_date": yesterday.isoformat(),
+            "portfolio": portfolio,
+            "overnight_highlights": overnight,
+            "event_foresight": event_briefs,
             "yesterday_analyses": yesterday_analyses,
             "watchlist": watchlist_context,
             "accuracy": accuracy,
+            "materiality": materiality,
             "honesty": {
                 "min_samples": resolved.min_samples,
                 "fabricated_metrics": False,
@@ -470,94 +529,136 @@ class DailyBriefService:
                 break
         return codes
 
-    def _load_yesterday_analyses(
-        self,
-        *,
-        yesterday: date,
-        timezone_name: str,
-        watchlist: Sequence[str],
-    ) -> List[Dict[str, Any]]:
-        """Load analyses whose local calendar day is *yesterday*."""
+    def _load_yesterday_analyses(self, *, yesterday: date, timezone_name: str, watchlist: Sequence[str], portfolio_codes: Optional[Set[str]] = None) -> List[Dict[str, Any]]:
         try:
             rows = self.analysis_repo.get_list(code=None, days=3, limit=200)
-        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
-            log_safe_exception(
-                logger,
-                "Daily brief yesterday analysis load failed",
-                exc,
-                error_code="daily_brief_yesterday_load_failed",
-                level=logging.WARNING,
-            )
+        except Exception as exc:  # broad-exception: fallback_recorded
+            log_safe_exception(logger, "Daily brief yesterday analysis load failed", exc, error_code="daily_brief_yesterday_load_failed", level=logging.WARNING)
             return []
-
         watch_set = {c.upper() for c in watchlist}
+        hold_set = {c.upper() for c in (portfolio_codes or set()) if c}
         items: List[Dict[str, Any]] = []
         for row in rows:
             report_type = str(getattr(row, "report_type", None) or "").strip().lower()
             code = str(getattr(row, "code", None) or "").strip().upper()
-            if not code:
-                continue
-            if code in {DAILY_BRIEF_HISTORY_CODE, "MARKET"} or report_type in {
-                DAILY_BRIEF_REPORT_TYPE,
-                "market_review",
-            }:
+            if not code or code in {DAILY_BRIEF_HISTORY_CODE, "MARKET", "EVENT_BRIEF"} or report_type in {DAILY_BRIEF_REPORT_TYPE, "market_review", "event_research_brief"}:
                 continue
             created = getattr(row, "created_at", None)
             if not isinstance(created, datetime):
                 continue
-            local_created = self._to_local_date(created, timezone_name)
-            if local_created != yesterday:
+            if self._to_local_date(created, timezone_name) != yesterday:
                 continue
-            items.append(
-                {
-                    "code": code,
-                    "name": str(getattr(row, "stock_name", None) or code),
-                    "operation_advice": getattr(row, "operation_advice", None),
-                    "sentiment_score": getattr(row, "sentiment_score", None),
-                    "trend_prediction": getattr(row, "trend_prediction", None),
-                    "analysis_summary": _clip(
-                        getattr(row, "analysis_summary", None), 120
-                    ),
-                    "report_type": report_type or None,
-                    "created_at": created.isoformat(),
-                    "on_watchlist": code in watch_set if watch_set else False,
-                    "query_id": getattr(row, "query_id", None),
-                }
-            )
-
-        # Prefer watchlist names, then recency (already desc from repo).
-        items.sort(key=lambda item: (not item["on_watchlist"], item.get("created_at") or ""))
+            items.append({
+                "code": code, "name": str(getattr(row, "stock_name", None) or code),
+                "operation_advice": getattr(row, "operation_advice", None),
+                "sentiment_score": getattr(row, "sentiment_score", None),
+                "trend_prediction": getattr(row, "trend_prediction", None),
+                "analysis_summary": _clip(getattr(row, "analysis_summary", None), 120),
+                "report_type": report_type or None, "created_at": created.isoformat(),
+                "on_watchlist": code in watch_set if watch_set else False,
+                "in_portfolio": code in hold_set if hold_set else False,
+                "query_id": getattr(row, "query_id", None),
+            })
+        items.sort(key=lambda item: (not item["in_portfolio"], not item["on_watchlist"], item.get("created_at") or ""))
         return items[:MAX_YESTERDAY_ANALYSES]
 
-    def _build_watchlist_context(
-        self,
-        *,
-        watchlist: Sequence[str],
-        recent_analyses: Sequence[Mapping[str, Any]],
-    ) -> Dict[str, Any]:
-        recent_codes = {
-            str(item.get("code") or "").upper()
-            for item in recent_analyses
-            if item.get("code")
-        }
-        entries = []
-        for code in list(watchlist)[:MAX_WATCHLIST_PREVIEW]:
-            entries.append(
-                {
-                    "code": code,
-                    "had_yesterday_analysis": code in recent_codes,
-                }
-            )
+    def _build_watchlist_context(self, *, watchlist: Sequence[str], recent_analyses: Sequence[Mapping[str, Any]], portfolio_codes: Optional[Set[str]] = None) -> Dict[str, Any]:
+        recent_codes = {str(item.get("code") or "").upper() for item in recent_analyses if item.get("code")}
+        hold_set = {c.upper() for c in (portfolio_codes or set()) if c}
+        entries = [{"code": code, "had_yesterday_analysis": code in recent_codes, "in_portfolio": code in hold_set} for code in list(watchlist)[:MAX_WATCHLIST_PREVIEW]]
+        entries.sort(key=lambda e: (not e["in_portfolio"], e["code"]))
         covered = sum(1 for e in entries if e["had_yesterday_analysis"])
-        return {
-            "codes": list(watchlist)[:MAX_WATCHLIST_PREVIEW],
-            "total": len(watchlist),
-            "previewed": len(entries),
-            "with_yesterday_analysis": covered,
-            "without_yesterday_analysis": max(0, len(entries) - covered),
-            "entries": entries,
-            "empty": len(watchlist) == 0,
-        }
+        return {"codes": list(watchlist)[:MAX_WATCHLIST_PREVIEW], "total": len(watchlist), "previewed": len(entries),
+                "with_yesterday_analysis": covered, "without_yesterday_analysis": max(0, len(entries) - covered),
+                "entries": entries, "empty": len(watchlist) == 0}
+
+    def _build_portfolio_section(self) -> Dict[str, Any]:
+        repo = self.portfolio_repository
+        if repo is None:
+            return {"status": "unavailable", "holdings": [], "total": 0, "empty": True, "message": "Portfolio position cache unavailable."}
+        try:
+            rows = repo.list_cached_positions(account_id=None, cost_method="fifo")
+        except Exception as exc:  # broad-exception: fallback_recorded
+            log_safe_exception(logger, "Daily brief portfolio load failed", exc, error_code="daily_brief_portfolio_load_failed", level=logging.WARNING)
+            return {"status": "unavailable", "holdings": [], "total": 0, "empty": True, "message": "Portfolio position cache read failed."}
+        holdings: List[Dict[str, Any]] = []
+        seen: Set[str] = set()
+        for row in rows or []:
+            if not isinstance(row, Mapping):
+                continue
+            symbol = str(row.get("symbol") or "").strip().upper()
+            if not symbol or symbol in seen:
+                continue
+            seen.add(symbol)
+            try:
+                qty = float(row.get("quantity")) if row.get("quantity") is not None else None
+            except (TypeError, ValueError):
+                qty = None
+            try:
+                mv = float(row.get("market_value_base")) if row.get("market_value_base") is not None else None
+            except (TypeError, ValueError):
+                mv = None
+            holdings.append({"code": symbol, "market": str(row.get("market") or "").strip().lower() or None,
+                             "quantity": qty, "market_value_base": mv, "account_id": row.get("account_id")})
+            if len(holdings) >= MAX_WATCHLIST_PREVIEW:
+                break
+        holdings.sort(key=lambda i: (-(i["market_value_base"] if i.get("market_value_base") is not None else -1.0), i["code"]))
+        return {"status": "ok", "holdings": holdings, "total": len(holdings), "empty": len(holdings) == 0, "message": None}
+
+    def _build_overnight_section(self, *, runtime: Any, report_language: str) -> Dict[str, Any]:
+        try:
+            focus = self.todays_focus_service.build_focus(max_items=8, language=report_language)
+        except Exception as exc:  # broad-exception: fallback_recorded
+            log_safe_exception(logger, "Daily brief overnight focus load failed", exc, error_code="daily_brief_overnight_failed", level=logging.WARNING)
+            return {"status": "unavailable", "items": [], "item_count": 0, "empty": True, "message": "Overnight highlights unavailable.", "sources_used": [], "degraded_sources": ["todays_focus"]}
+        items = []
+        for raw in focus.get("items") or []:
+            if isinstance(raw, Mapping):
+                items.append({"code": raw.get("code"), "name": raw.get("name") or raw.get("code"),
+                              "reason_code": raw.get("reason_code"), "reason_display": raw.get("reason_display"),
+                              "secondary_reason_codes": list(raw.get("secondary_reason_codes") or [])})
+        return {"status": str(focus.get("status") or "empty"), "items": items, "item_count": len(items), "empty": len(items) == 0,
+                "message": focus.get("empty_message"), "sources_used": list(focus.get("sources_used") or []),
+                "degraded_sources": list(focus.get("degraded_sources") or [])}
+
+    def _build_event_foresight_section(self, *, runtime: Any, watchlist: Sequence[str], portfolio_codes: Set[str]) -> Dict[str, Any]:
+        universe = list(dict.fromkeys([*portfolio_codes, *list(watchlist)]))
+        try:
+            briefs = self.event_research_brief_service.build_briefs_for_universe(codes=universe or None, config=runtime, max_briefs=5)
+        except Exception as exc:  # broad-exception: fallback_recorded
+            log_safe_exception(logger, "Daily brief event foresight load failed", exc, error_code="daily_brief_event_foresight_failed", level=logging.WARNING)
+            return {"status": "unavailable", "briefs": [], "count": 0, "empty": True, "message": "Event foresight unavailable."}
+        compact = []
+        for brief in briefs or []:
+            if not isinstance(brief, Mapping):
+                continue
+            compact.append({
+                "stock_code": brief.get("stock_code"), "stock_name": brief.get("stock_name"),
+                "event_category": brief.get("event_category"), "what_happened": brief.get("what_happened"),
+                "why_it_matters": brief.get("why_it_matters"), "on_watchlist": brief.get("on_watchlist"),
+                "in_portfolio": brief.get("in_portfolio"),
+                "metrics_to_watch": list(brief.get("metrics_to_watch") or [])[:4],
+                "surprise_criteria": brief.get("surprise_criteria"),
+                "post_event_checklist": list(brief.get("post_event_checklist") or [])[:5],
+                "verify_hook": brief.get("verify_hook"), "trigger_id": brief.get("trigger_id"),
+                "observed_at": brief.get("observed_at"),
+            })
+        return {"status": "ok" if compact else "empty", "briefs": compact, "count": len(compact), "empty": len(compact) == 0,
+                "message": None if compact else "No recent earnings-class events in universe."}
+
+    @staticmethod
+    def _assess_materiality(*, portfolio, overnight, event_briefs, yesterday_analyses) -> Dict[str, Any]:
+        reasons = []
+        if overnight.get("item_count"):
+            reasons.append("overnight_highlights")
+        if event_briefs.get("count"):
+            reasons.append("event_foresight")
+        if yesterday_analyses:
+            reasons.append("yesterday_analyses")
+        holdings = list(portfolio.get("holdings") or [])
+        if holdings and any(i.get("in_portfolio") for i in yesterday_analyses):
+            reasons.append("portfolio_analysis")
+        return {"has_material_content": bool(reasons), "reasons": reasons, "portfolio_only": bool(holdings) and not reasons}
 
     def _build_accuracy_section(self, *, min_samples: int) -> Dict[str, Any]:
         """Aggregate accuracy from existing stores with explicit insufficiency."""
@@ -602,9 +703,12 @@ class DailyBriefService:
 
     def _decision_signal_accuracy(self, *, min_samples: int) -> Dict[str, Any]:
         try:
-            from src.services.decision_signal_outcome_service import (
-                DECISION_SIGNAL_OUTCOME_ENGINE_VERSION,
-            )
+            try:
+                from src.services.decision_signal_outcome_service import (
+                    DECISION_SIGNAL_OUTCOME_ENGINE_VERSION,
+                )
+            except Exception:  # broad-exception: fallback_recorded - optional engine version for offline tests
+                DECISION_SIGNAL_OUTCOME_ENGINE_VERSION = None
 
             rows = self.decision_outcome_service.repo.list_stats_rows(
                 engine_version=DECISION_SIGNAL_OUTCOME_ENGINE_VERSION,
@@ -912,6 +1016,10 @@ class DailyBriefService:
                 "daily_brief_payload": {
                     "yesterday_count": len(payload.get("yesterday_analyses") or []),
                     "watchlist_total": (payload.get("watchlist") or {}).get("total"),
+                    "portfolio_total": (payload.get("portfolio") or {}).get("total"),
+                    "overnight_count": (payload.get("overnight_highlights") or {}).get("item_count"),
+                    "event_foresight_count": (payload.get("event_foresight") or {}).get("count"),
+                    "material": (payload.get("materiality") or {}).get("has_material_content"),
                     "accuracy_status": accuracy.get("status"),
                     "min_samples": accuracy.get("min_samples"),
                 },
@@ -981,126 +1089,103 @@ class DailyBriefService:
     def _labels(report_language: str) -> Dict[str, str]:
         if str(report_language or "").lower().startswith("en"):
             return {
-                "title": "Daily Brief",
-                "yesterday_heading": "Yesterday's analyses",
-                "yesterday_empty": "No analyses were stored for yesterday.",
-                "watchlist_heading": "Today's watchlist",
+                "title": "Daily Brief", "portfolio_heading": "Holdings", "portfolio_empty": "No cached portfolio holdings.",
+                "portfolio_unavailable": "Portfolio cache unavailable", "overnight_heading": "Overnight highlights",
+                "overnight_empty": "No fresh overnight alerts, events, or analysis changes.",
+                "overnight_unavailable": "Overnight highlights unavailable", "event_heading": "Event foresight (earnings)",
+                "event_empty": "No recent earnings-class events on holdings/watchlist.", "event_unavailable": "Event foresight unavailable",
+                "metrics_label": "Watch", "checklist_label": "Post-event check", "yesterday_heading": "Yesterday's analyses",
+                "yesterday_empty": "No analyses were stored for yesterday.", "watchlist_heading": "Today's watchlist",
                 "watchlist_empty": "Watchlist is empty — configure STOCK_LIST to personalize this section.",
-                "watchlist_covered": "with yesterday analysis",
-                "watchlist_missing": "no yesterday analysis",
-                "accuracy_heading": "Historical accuracy review",
-                "accuracy_insufficient": "Insufficient history",
-                "accuracy_unavailable": "Accuracy stores unavailable",
-                "signals_heading": "Decision-signal outcomes",
-                "backtest_heading": "Backtest summary",
-                "skills_heading": "Skill-opinion performance",
-                "hit_rate": "Hit rate",
-                "direction_accuracy": "Direction accuracy",
-                "win_rate": "Win rate",
-                "samples": "Samples",
-                "notable_hits": "Notable correct calls",
-                "notable_misses": "Notable misses",
-                "none": "None",
-                "disclaimer": (
-                    "Research input only — not investment advice. "
-                    "Accuracy numbers are never invented when history is thin."
-                ),
+                "watchlist_covered": "with yesterday analysis", "watchlist_missing": "no yesterday analysis",
+                "accuracy_heading": "Historical accuracy review", "accuracy_insufficient": "Insufficient history",
+                "accuracy_unavailable": "Accuracy stores unavailable", "signals_heading": "Decision-signal outcomes",
+                "backtest_heading": "Backtest summary", "skills_heading": "Skill-opinion performance",
+                "hit_rate": "Hit rate", "direction_accuracy": "Direction accuracy", "win_rate": "Win rate",
+                "samples": "Samples", "notable_hits": "Notable correct calls", "notable_misses": "Notable misses",
+                "none": "None", "in_portfolio": "holding",
+                "disclaimer": "Research input only — not investment advice. Accuracy numbers are never invented when history is thin.",
             }
         return {
-            "title": "每日简报",
-            "yesterday_heading": "昨日分析回顾",
-            "yesterday_empty": "昨日暂无已存储的分析记录。",
-            "watchlist_heading": "今日关注列表",
-            "watchlist_empty": "关注列表为空 — 请配置 STOCK_LIST 以个性化本节。",
-            "watchlist_covered": "昨日已有分析",
-            "watchlist_missing": "昨日无分析",
-            "accuracy_heading": "历史准确率复盘",
-            "accuracy_insufficient": "历史样本不足",
-            "accuracy_unavailable": "准确率数据源不可用",
-            "signals_heading": "决策信号结果",
-            "backtest_heading": "回测汇总",
-            "skills_heading": "技能观点表现",
-            "hit_rate": "命中率",
-            "direction_accuracy": "方向准确率",
-            "win_rate": "胜率",
-            "samples": "样本数",
-            "notable_hits": "值得一提的正确判断",
-            "notable_misses": "值得一提的失误",
-            "none": "无",
-            "disclaimer": (
-                "仅供研究参考，不构成投资建议。"
-                "在历史样本不足时，本简报不会编造准确率数字。"
-            ),
+            "title": "每日简报", "portfolio_heading": "持仓要点", "portfolio_empty": "暂无缓存持仓。",
+            "portfolio_unavailable": "持仓缓存不可用", "overnight_heading": "隔夜要点",
+            "overnight_empty": "暂无新鲜的隔夜告警、事件或分析变化。", "overnight_unavailable": "隔夜要点不可用",
+            "event_heading": "事件前瞻（财报）", "event_empty": "自选/持仓近期无财报类事件。",
+            "event_unavailable": "事件前瞻不可用", "metrics_label": "关注", "checklist_label": "事后核对",
+            "yesterday_heading": "昨日分析回顾", "yesterday_empty": "昨日暂无已存储的分析记录。",
+            "watchlist_heading": "今日关注列表", "watchlist_empty": "关注列表为空 — 请配置 STOCK_LIST 以个性化本节。",
+            "watchlist_covered": "昨日已有分析", "watchlist_missing": "昨日无分析",
+            "accuracy_heading": "历史准确率复盘", "accuracy_insufficient": "历史样本不足",
+            "accuracy_unavailable": "准确率数据源不可用", "signals_heading": "决策信号结果",
+            "backtest_heading": "回测汇总", "skills_heading": "技能观点表现", "hit_rate": "命中率",
+            "direction_accuracy": "方向准确率", "win_rate": "胜率", "samples": "样本数",
+            "notable_hits": "值得一提的正确判断", "notable_misses": "值得一提的失误", "none": "无",
+            "in_portfolio": "持仓",
+            "disclaimer": "仅供研究参考，不构成投资建议。在历史样本不足时，本简报不会编造准确率数字。",
         }
 
     def _fallback_markdown(self, payload: Mapping[str, Any]) -> str:
         labels = self._labels(str(payload.get("report_language") or "zh"))
+        lines = [f"# {labels['title']} · {payload.get('report_date') or ''}", "", f"## {labels['portfolio_heading']}"]
+        portfolio = payload.get("portfolio") or {}
+        if portfolio.get("status") == "unavailable":
+            lines.append(labels["portfolio_unavailable"])
+        elif portfolio.get("empty"):
+            lines.append(labels["portfolio_empty"])
+        else:
+            for item in portfolio.get("holdings") or []:
+                lines.append(f"- `{item.get('code')}`")
+        lines += ["", f"## {labels['overnight_heading']}"]
+        overnight = payload.get("overnight_highlights") or {}
+        if overnight.get("empty") or overnight.get("status") == "unavailable":
+            lines.append(labels["overnight_empty"] if overnight.get("empty") else labels["overnight_unavailable"])
+        else:
+            for item in overnight.get("items") or []:
+                lines.append(f"- **{item.get('name') or item.get('code')}** ({item.get('code')}): {item.get('reason_display') or item.get('reason_code')}")
+        lines += ["", f"## {labels['event_heading']}"]
+        events = payload.get("event_foresight") or {}
+        if events.get("empty") or events.get("status") == "unavailable":
+            lines.append(labels["event_empty"] if events.get("empty") else labels["event_unavailable"])
+        else:
+            for b in events.get("briefs") or []:
+                lines.append(f"- **{b.get('stock_name') or b.get('stock_code')}** ({b.get('stock_code')}) · {b.get('event_category')}")
         accuracy = payload.get("accuracy") or {}
-        lines = [
-            f"# {labels['title']} · {payload.get('report_date') or ''}",
-            "",
-            f"## {labels['accuracy_heading']}",
-            str(accuracy.get("honesty_note") or labels["accuracy_insufficient"]),
-            "",
-            f"## {labels['yesterday_heading']}",
-        ]
+        lines += ["", f"## {labels['accuracy_heading']}", str(accuracy.get("honesty_note") or labels["accuracy_insufficient"]), "", f"## {labels['yesterday_heading']}"]
         analyses = list(payload.get("yesterday_analyses") or [])
         if not analyses:
             lines.append(labels["yesterday_empty"])
         else:
             for item in analyses:
-                score = item.get("sentiment_score")
-                score_part = f" | score {score}" if score is not None else ""
-                lines.append(
-                    f"- **{item.get('name') or item.get('code')}** "
-                    f"({item.get('code')}) {item.get('operation_advice') or ''}"
-                    f"{score_part}"
-                )
-        lines.extend(["", f"## {labels['watchlist_heading']}"])
+                hold = f" · {labels['in_portfolio']}" if item.get("in_portfolio") else ""
+                lines.append(f"- **{item.get('name') or item.get('code')}** ({item.get('code')}) {item.get('operation_advice') or ''}{hold}")
+        lines += ["", f"## {labels['watchlist_heading']}"]
         watchlist = payload.get("watchlist") or {}
-        if watchlist.get("empty"):
-            lines.append(labels["watchlist_empty"])
-        else:
-            codes = ", ".join(watchlist.get("codes") or []) or labels["none"]
-            lines.append(codes)
-        lines.extend(["", f"*{labels['disclaimer']}*", ""])
+        lines.append(labels["watchlist_empty"] if watchlist.get("empty") else (", ".join(watchlist.get("codes") or []) or labels["none"]))
+        lines += ["", f"*{labels['disclaimer']}*", ""]
         return "\n".join(lines)
 
 
-def build_daily_brief_background_tasks(
-    config: Any,
-    *,
-    config_provider: Callable[[], Any],
-    service: Optional[DailyBriefService] = None,
-) -> List[Dict[str, Any]]:
-    """Build scheduler background tasks when the daily brief is enabled."""
+def build_daily_brief_background_tasks(config: Any, *, config_provider: Callable[[], Any], service: Optional[DailyBriefService] = None) -> List[Dict[str, Any]]:
     view = resolve_daily_brief_config(config)
     if not view.enabled:
         return []
-
     brief_service = service or DailyBriefService(config_provider=config_provider)
 
     def daily_brief_task() -> None:
-        result = brief_service.maybe_run(force=False)
+        try:
+            result = brief_service.maybe_run(force=False)
+        except Exception as exc:  # broad-exception: fallback_recorded
+            log_safe_exception(logger, "Daily brief scheduled run failed; other notifications continue", exc,
+                               error_code="daily_brief_scheduled_run_failed", level=logging.WARNING)
+            return
         if result is None:
             return
-        if result.skipped_reason:
+        if result.skipped_reason and result.notification_status != "quiet_skipped":
             logger.debug("[DailyBrief] skipped reason=%s", result.skipped_reason)
             return
-        logger.info(
-            "[DailyBrief] scheduled run complete query_id=%s notify=%s",
-            result.query_id,
-            result.notification_status,
-        )
+        logger.info("[DailyBrief] scheduled run complete query_id=%s notify=%s", result.query_id, result.notification_status)
 
-    return [
-        {
-            "task": daily_brief_task,
-            "interval_seconds": DAILY_BRIEF_POLL_INTERVAL_SECONDS,
-            "run_immediately": True,
-            "name": "daily_brief",
-        }
-    ]
+    return [{"task": daily_brief_task, "interval_seconds": DAILY_BRIEF_POLL_INTERVAL_SECONDS, "run_immediately": True, "name": "daily_brief"}]
 
 
 def _clip(value: Any, max_len: int) -> str:
