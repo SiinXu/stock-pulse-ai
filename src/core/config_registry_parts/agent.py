@@ -2249,9 +2249,11 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "MULTI_MODEL_CONSENSUS_MAX_COST_USD": {
         "title": "Multi-Model Consensus Max Cost USD",
         "description": (
-            "Optional soft budget annotation for multi-model comparison. "
-            "Empty means no extra cost ceiling beyond max models. "
-            "Does not invent majority consensus under budget pressure."
+            "Optional USD budget constraint for multi-model comparison. "
+            "Empty: no USD constraint (MAX_MODELS only). "
+            "0 or negative: multi-model fan-out is closed. "
+            "Positive (without live pricing): hard-cap fan-out to 2 models and "
+            "record skipped models. Never invents majority consensus under budget pressure."
         ),
         "category": "agent",
         "data_type": "number",

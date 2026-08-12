@@ -13,6 +13,7 @@ from src.agent.multi_model_consensus import (
     is_multi_model_consensus_enabled,
     public_multi_model_comparison_payload,
     resolve_consensus_models,
+    resolve_consensus_models_for_run,
     run_multi_model_consensus_analysis,
 )
 
@@ -74,6 +75,38 @@ def test_resolve_models_explicit_and_preset():
 
     config.multi_model_consensus_preset = "quality"
     assert resolve_consensus_models(config) == ["primary", "fb1", "fb2"]
+
+
+def test_budget_zero_closes_multi_model_fanout():
+    config = SimpleNamespace(
+        multi_model_consensus_models=["a", "b", "c"],
+        multi_model_consensus_max_models=3,
+        multi_model_consensus_preset="",
+        multi_model_consensus_max_cost_usd=0.0,
+        litellm_model="a",
+        litellm_fallback_models=["b"],
+    )
+    models, meta = resolve_consensus_models_for_run(config)
+    assert models == []
+    assert meta["budget_enforced"] is True
+    assert meta["budget_reason"] == "budget_closed"
+    assert meta["skipped_for_budget"] == ["a", "b", "c"]
+
+
+def test_positive_budget_hard_caps_to_two_models():
+    config = SimpleNamespace(
+        multi_model_consensus_models=["a", "b", "c"],
+        multi_model_consensus_max_models=3,
+        multi_model_consensus_preset="",
+        multi_model_consensus_max_cost_usd=0.05,
+        litellm_model="a",
+        litellm_fallback_models=["b", "c"],
+    )
+    models, meta = resolve_consensus_models_for_run(config)
+    assert models == ["a", "b"]
+    assert meta["budget_enforced"] is True
+    assert meta["budget_reason"] == "max_cost_usd_budget_mode_cap"
+    assert meta["skipped_for_budget"] == ["c"]
 
 
 def test_directional_opposition_not_averaged():

@@ -232,6 +232,75 @@ def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, 
     lines.append("")
 
 
+def _append_multi_model_comparison_block(
+    lines: List[str],
+    multi_model: Any,
+    labels: Dict[str, str],
+    report_language: str,
+) -> None:
+    """Append multi-model consensus comparison when present (#154)."""
+    if not isinstance(multi_model, dict) or not multi_model.get("enabled"):
+        return
+    handling = multi_model.get("disagreement_handling") or {}
+    if not isinstance(handling, dict):
+        handling = {}
+    lines.extend(
+        [
+            f"### 🤝 {labels.get('multi_model_comparison_heading', 'Multi-Model Consensus')}",
+            "",
+        ]
+    )
+    if handling.get("high_disagreement"):
+        lines.append(
+            f"> ⚠️ {labels.get('multi_model_high_disagreement_banner', 'High multi-model disagreement')}"
+        )
+    lines.append(
+        f"- {labels.get('multi_model_status_label', 'Status')}: "
+        f"{multi_model.get('status', 'N/A')} | "
+        f"{labels.get('multi_model_consensus_level_label', 'Consensus')}: "
+        f"{localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language)} | "
+        f"{labels.get('multi_model_consensus_score_label', 'Agreement')}: "
+        f"{multi_model.get('consensus_score', 'N/A')}"
+    )
+    degradation = multi_model.get("degradation")
+    if isinstance(degradation, dict) and (
+        degradation.get("annotation") or degradation.get("reason")
+    ):
+        lines.append(
+            f"- {labels.get('multi_model_degraded_label', 'Degradation')}: "
+            f"{degradation.get('annotation') or degradation.get('reason')}"
+        )
+    lines.append(
+        f"- {labels.get('multi_model_no_majority_note', 'Disagreement was not averaged')}"
+    )
+    for row in (multi_model.get("agreement_table") or [])[:5]:
+        if not isinstance(row, dict):
+            continue
+        lines.append(
+            f"- `{row.get('model_id') or row.get('model_version') or 'model'}` "
+            f"({row.get('status') or 'n/a'}): "
+            f"{localize_strategy_signal(row.get('signal') or row.get('action') or 'N/A', report_language)}"
+            f" | {row.get('score_band') or 'N/A'}"
+        )
+    points = handling.get("points")
+    if isinstance(points, list) and points:
+        lines.append(
+            f"**{labels.get('multi_model_disagreement_points_label', 'Disagreement points')}**"
+        )
+        for point in points[:8]:
+            if not isinstance(point, dict):
+                continue
+            participants = ", ".join(
+                str(p) for p in (point.get("participants") or []) if str(p).strip()
+            )
+            lines.append(
+                f"- [{point.get('severity') or 'medium'}] "
+                f"{point.get('kind') or 'unknown'}"
+                f"{(' — ' + participants) if participants else ''}"
+            )
+    lines.append("")
+
+
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
 

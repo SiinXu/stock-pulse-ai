@@ -1460,6 +1460,8 @@ MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
 # 或：MULTI_MODEL_CONSENSUS_PRESET=fast
 MULTI_MODEL_CONSENSUS_MAX_MODELS=3
 # MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+# 预算规则：空 = 仅 MAX_MODELS；0 = 关闭多模型扇出；
+# 正值（尚无实时计价）= 硬限制最多 2 个模型并记录被跳过的模型。
 ```
 
 该开关不改变 Agent 多 Agent 路径。多 Agent 分歧处理仍是独立能力（Issues #246 / #193 / PR #1205）。

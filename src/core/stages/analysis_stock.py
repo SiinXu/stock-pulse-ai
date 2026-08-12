@@ -873,14 +873,17 @@ class _StockAnalysisStageMixin:
             from src.agent.multi_model_consensus import (
                 is_multi_model_consensus_enabled,
                 public_multi_model_comparison_payload,
-                resolve_consensus_models,
+                resolve_consensus_models_for_run,
                 run_multi_model_consensus_analysis,
             )
 
             multi_model_enabled = is_multi_model_consensus_enabled(self.config)
-            multi_model_candidates = (
-                resolve_consensus_models(self.config) if multi_model_enabled else []
-            )
+            multi_model_candidates: list = []
+            multi_model_budget_meta: dict = {}
+            if multi_model_enabled:
+                multi_model_candidates, multi_model_budget_meta = (
+                    resolve_consensus_models_for_run(self.config)
+                )
             use_multi_model = multi_model_enabled and len(multi_model_candidates) >= 2
 
             active_stage = observe_pipeline_stage(
@@ -892,6 +895,11 @@ class _StockAnalysisStageMixin:
                     "context_pack_available": bool(analysis_context_pack_summary),
                     "multi_model_consensus": bool(use_multi_model),
                     "multi_model_count": len(multi_model_candidates) if use_multi_model else 0,
+                    "multi_model_budget_enforced": bool(
+                        multi_model_budget_meta.get("budget_enforced")
+                    )
+                    if multi_model_enabled
+                    else False,
                 },
                 retryable=True,
             )

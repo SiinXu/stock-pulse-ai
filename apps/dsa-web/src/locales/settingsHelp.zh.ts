@@ -2157,10 +2157,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.MULTI_MODEL_CONSENSUS_MAX_COST_USD': {
     title: '多模型共识成本上限（USD）',
-    summary: '多模型对比的可选软成本预算标注。',
-    usage: '留空表示除最大模型数外无额外成本上限。设置后预算会写入产物；预算压力下也不会用平均化抹平分歧。',
-    valueNotes: ['仅作软标注，不会发明多数共识。'],
-    impact: ['在 dashboard.multi_model_comparison.budget 上展示预算元数据。'],
+    summary: '多模型对比的可选 USD 预算约束。',
+    usage: '留空仅受最大模型数约束。设为 0 关闭多模型扇出。正值启用预算模式（在无实时计价前硬限制最多 2 个模型），并在产物中记录被跳过的模型。',
+    valueNotes: [
+      '空：无 USD 约束。',
+      '0 / 负数：关闭多模型扇出。',
+      '正值：最多 2 个模型；跳过的模型写入 budget.skipped_for_budget。',
+      '预算压力下不会用平均化抹平分歧。',
+    ],
+    impact: ['可减少多模型扇出或关闭该能力；预算元数据写入对比产物。'],
   },
 
 

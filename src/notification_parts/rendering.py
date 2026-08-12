@@ -793,6 +793,15 @@ class _RenderingMethods:
                 )
                 _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
 
+                from src.notification import _append_multi_model_comparison_block
+
+                _append_multi_model_comparison_block(
+                    report_lines,
+                    dashboard.get("multi_model_comparison") if dashboard else None,
+                    labels,
+                    report_language,
+                )
+
                 # Financial summary / shareholder returns / related sectors (hidden when data is missing)
                 self._append_fundamental_blocks(report_lines, result)
 
@@ -1360,6 +1369,15 @@ class _RenderingMethods:
             dashboard.get('strategy_synthesis') if dashboard else None
         )
         _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
+
+        from src.notification import _append_multi_model_comparison_block
+
+        _append_multi_model_comparison_block(
+            lines,
+            dashboard.get("multi_model_comparison") if dashboard else None,
+            labels,
+            report_language,
+        )
 
         # Position recommendation
         pos_advice = core.get('position_advice', {}) if core else {}

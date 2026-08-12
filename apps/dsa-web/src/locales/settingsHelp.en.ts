@@ -1349,10 +1349,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.agent.MULTI_MODEL_CONSENSUS_MAX_COST_USD': {
     title: 'Multi-Model Consensus Max Cost USD',
-    summary: 'Optional soft cost budget annotation for multi-model comparison.',
-    usage: 'Leave empty for no extra cost ceiling beyond max models. When set, the budget is recorded on the product payload; disagreement is never averaged away under budget pressure.',
-    valueNotes: ['Soft annotation only; does not invent majority consensus.'],
-    impact: ['Surfaces budget metadata on dashboard.multi_model_comparison.budget.'],
+    summary: 'Optional USD budget constraint for multi-model comparison.',
+    usage: 'Leave empty for MAX_MODELS only. Set 0 to close multi-model fan-out. Any positive value enables budget mode (hard-cap 2 models until live pricing exists) and records skipped models on the product.',
+    valueNotes: [
+      'Empty: no USD constraint.',
+      '0 / negative: multi-model fan-out closed.',
+      'Positive: hard-cap to 2 models; skipped models are listed under budget.skipped_for_budget.',
+      'Never invents majority consensus under budget pressure.',
+    ],
+    impact: ['Can reduce multi-model fan-out or disable it; budget metadata is attached to the comparison payload.'],
   },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',

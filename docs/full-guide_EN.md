@@ -1330,6 +1330,8 @@ MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
 # or: MULTI_MODEL_CONSENSUS_PRESET=fast
 MULTI_MODEL_CONSENSUS_MAX_MODELS=3
 # MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+# Budget rules: empty = MAX_MODELS only; 0 = close multi-model fan-out;
+# positive (no live pricing yet) = hard-cap to 2 models and record skipped models.
 ```
 
 Agent multi-agent mode is unchanged by this flag. Related multi-agent disagreement handling remains a separate surface (Issues #246 / #193 / PR #1205).

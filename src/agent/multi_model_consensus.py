@@ -75,6 +75,8 @@ def resolve_consensus_models(config: Any) -> List[str]:
     1. Explicit ``multi_model_consensus_models`` list
     2. Preset (``fast`` / ``quality``) over primary + fallbacks
     3. Primary ``litellm_model`` + ``litellm_fallback_models`` (capped)
+
+    Does **not** apply USD budget caps; use :func:`resolve_consensus_models_for_run`.
     """
     max_models = _clamp_int(
         getattr(config, "multi_model_consensus_max_models", None),
@@ -103,6 +105,51 @@ def resolve_consensus_models(config: Any) -> List[str]:
     if preset == PRESET_QUALITY and candidates:
         return candidates[:max_models]
     return candidates[:max_models]
+
+
+# When USD budget is configured without live provider pricing, hard-cap fan-out
+# to this many models (conservative). Zero/negative budget closes multi-model.
+_BUDGET_MODE_MODEL_CAP = 2
+
+
+def resolve_consensus_models_for_run(
+    config: Any,
+) -> Tuple[List[str], Dict[str, Any]]:
+    """Resolve models and apply hard budget constraints for one analysis run.
+
+    Budget rules (``MULTI_MODEL_CONSENSUS_MAX_COST_USD``):
+    - unset / None: no USD constraint (only ``MAX_MODELS`` applies)
+    - <= 0: multi-model fan-out closed (empty model list)
+    - > 0 without live pricing: hard-cap to ``_BUDGET_MODE_MODEL_CAP`` models and
+      record skipped models under ``skipped_for_budget``
+    """
+    models = resolve_consensus_models(config)
+    max_cost_raw = getattr(config, "multi_model_consensus_max_cost_usd", None)
+    budget: Dict[str, Any] = {
+        "max_cost_usd": None,
+        "budget_enforced": False,
+        "budget_reason": None,
+        "skipped_for_budget": [],
+        "models_before_budget": list(models),
+    }
+    if max_cost_raw is None or isinstance(max_cost_raw, bool):
+        return models, budget
+    try:
+        max_cost = float(max_cost_raw)
+    except (TypeError, ValueError):
+        return models, budget
+    budget["max_cost_usd"] = max_cost
+    if max_cost <= 0:
+        budget["budget_enforced"] = True
+        budget["budget_reason"] = "budget_closed"
+        budget["skipped_for_budget"] = list(models)
+        return [], budget
+    if len(models) > _BUDGET_MODE_MODEL_CAP:
+        budget["budget_enforced"] = True
+        budget["budget_reason"] = "max_cost_usd_budget_mode_cap"
+        budget["skipped_for_budget"] = list(models[_BUDGET_MODE_MODEL_CAP:])
+        models = models[:_BUDGET_MODE_MODEL_CAP]
+    return models, budget
 
 
 def build_model_stance(result: Any, *, requested_model: str) -> Dict[str, Any]:
@@ -479,23 +526,26 @@ def run_multi_model_consensus_analysis(
     assumed thread-safe; ``parallel=True`` is accepted for callers that inject a
     thread-safe facade, but the stock pipeline keeps sequential execution.
     """
-    models = resolve_consensus_models(config)
+    models, budget_meta = resolve_consensus_models_for_run(config)
     if len(models) < 2:
         logger.info(
-            "[multi_model_consensus] fewer than 2 models resolved; skipping multi-model path"
+            "[multi_model_consensus] fewer than 2 models after budget resolution; "
+            "skipping multi-model path (budget_enforced=%s reason=%s)",
+            budget_meta.get("budget_enforced"),
+            budget_meta.get("budget_reason"),
         )
         return None, None
 
-    max_cost = getattr(config, "multi_model_consensus_max_cost_usd", None)
     budget: Dict[str, Any] = {
         "max_models": len(models),
         "models_requested": list(models),
-        "max_cost_usd": max_cost if isinstance(max_cost, (int, float)) else None,
-        "skipped_for_budget": [],
+        "max_cost_usd": budget_meta.get("max_cost_usd"),
+        "budget_enforced": bool(budget_meta.get("budget_enforced")),
+        "budget_reason": budget_meta.get("budget_reason"),
+        "skipped_for_budget": list(budget_meta.get("skipped_for_budget") or []),
+        "models_before_budget": list(budget_meta.get("models_before_budget") or []),
         "execution": "parallel" if parallel else "sequential",
     }
-    # Soft budget annotation only: hard abort is intentionally not done here so
-    # partial model failures still degrade to annotated single-model results.
 
     fingerprint = fingerprint_shared_snapshot(context, news_context)
     # Freeze a shallow copy so each model sees the same top-level snapshot keys.
@@ -1115,5 +1165,6 @@ __all__ = [
     "is_multi_model_consensus_enabled",
     "public_multi_model_comparison_payload",
     "resolve_consensus_models",
+    "resolve_consensus_models_for_run",
     "run_multi_model_consensus_analysis",
 ]
