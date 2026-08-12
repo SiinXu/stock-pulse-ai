@@ -1,0 +1,1 @@
+- [Chore] Replace shared docs/CHANGELOG.md edits with docs/changelog.d fragments and a collector so concurrent PRs stop marking each other DIRTY (Refs #1284).
