@@ -2,6 +2,10 @@ import type React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { createApiError, createParsedApiError } from '../../api/error';
@@ -350,6 +354,11 @@ async function waitForInitialLoad() {
   await waitForPortfolioLoad();
 }
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 describe('PortfolioPage FX refresh', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -477,7 +486,11 @@ describe('PortfolioPage FX refresh', () => {
       [{ path: '/portfolio', element: <PortfolioPage /> }],
       { initialEntries: [initialEntry] },
     );
-    render(wrapWithQueryClient(<RouterProvider router={router} />));
+    render(wrapWithQueryClient(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <RouterProvider router={router} />
+      </RouteFocusRegistrationContext.Provider>,
+    ));
     return router;
   }
 
@@ -489,9 +502,11 @@ describe('PortfolioPage FX refresh', () => {
     );
     render(
       wrapWithQueryClient(
+        <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <UiLanguageProvider>
           <RouterProvider router={router} />
-        </UiLanguageProvider>,
+        </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>,
       ),
     );
   }

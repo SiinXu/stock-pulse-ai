@@ -7,6 +7,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
 import { BriefcaseBusiness, Inbox } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useRouteFocusTarget } from '../routing';
 import { readParams, writeParams } from '../../utils/urlState';
 import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
@@ -51,6 +52,7 @@ import { buildDecisionActionLabelMap } from '../../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../../utils/decisionSignalPresentation';
 import { parseDeepLink } from '../../utils/deepLink';
 import {
+  APP_ROUTE_PATHS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
   buildSignalCenterHref,
@@ -89,6 +91,12 @@ const PortfolioWorkspaceTabs = lazy(() => import('./PortfolioWorkspaceTabs'));
 const PortfolioWorkspace: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.portfolio,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const text = PORTFOLIO_TEXT[language];
   const fileText = PORTFOLIO_FILE_TEXT[language];
   const decisionActionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
@@ -907,6 +915,7 @@ const PortfolioWorkspace: React.FC = () => {
       <>
       <section className="space-y-3">
         <PageHeader
+          ref={pageHeadingRef}
           title={text.title}
           description={text.description}
           actions={(

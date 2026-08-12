@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
+import { APP_ROUTE_PATHS } from '../routing/routes';
 import { History } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -59,6 +61,12 @@ const CHAT_UNKNOWN_CONTEXT_STATE = 'unknown';
 const CHAT_DESKTOP_RAIL_QUERY = '(min-width: 1280px)';
 const ChatPage: React.FC = () => {
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.agent,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlSessionIdRef = useRef(
     searchParams.get(CHAT_SESSION_QUERY_KEY)?.trim() || undefined,
@@ -907,7 +915,7 @@ const ChatPage: React.FC = () => {
       <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         <header className="mb-4 flex-shrink-0 space-y-3">
           <div className="flex items-start justify-between gap-4">
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <h1 ref={pageHeadingRef} tabIndex={-1} className="text-2xl font-bold text-foreground flex items-center gap-2">
               <IconButton
                 onClick={() => setSidebarPresentationOpen(true)}
                 size="navigation"
