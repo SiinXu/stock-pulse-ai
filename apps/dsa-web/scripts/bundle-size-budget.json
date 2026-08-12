@@ -139,8 +139,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45391,
-      "measuredGzipBytes": 41264
+      "maxGzipBytes": 45965,
+      "measuredGzipBytes": 45765,
+      "note": "GitHub Actions Linux measurement after OpenAPI client migration Zod boundaries on configProfiles and related Settings-loaded modules (PR #1242 / Refs #721); measured gzip + 200 B headroom."
     },
     {
       "id": "AlertsWorkspace",
