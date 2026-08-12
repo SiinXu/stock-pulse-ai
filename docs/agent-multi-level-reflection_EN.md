@@ -39,6 +39,10 @@ On observation-driven replan, the planning loop records
 `replan_reason_kinds` from the shared taxonomy and, when step critique is
 enabled, attaches `step_critique_result` for episode linkage.
 
+The production AgentExecutor path (`src/agent/planning/product.py`) binds the
+resolved Config onto `context["config"]` so `AGENT_STEP_CRITIQUE_ENABLED` is
+honored on real runs (not only library callers that hand-build context).
+
 ## Meta-review sample threshold
 
 `AGENT_META_REVIEW_MIN_EPISODES` (default **30**). Below the threshold the job

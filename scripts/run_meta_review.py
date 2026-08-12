@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 
 def _load_episodes(path: Path) -> List[Dict[str, Any]]:
@@ -23,6 +23,46 @@ def _load_episodes(path: Path) -> List[Dict[str, Any]]:
     if isinstance(raw, dict) and isinstance(raw.get("episodes"), list):
         return [item for item in raw["episodes"] if isinstance(item, dict)]
     raise SystemExit("episodes JSON must be a list or {\"episodes\": [...]}")
+
+
+def resolve_cli_runtime(
+    *,
+    force: bool,
+    min_episodes: Optional[int],
+    get_config: Optional[Callable[[], Any]] = None,
+) -> Any:
+    """Resolve the config object used by the CLI.
+
+    ``force`` is a real gate: when false, the job respects
+    ``AGENT_META_REVIEW_ENABLED`` on live config (or falls back to disabled).
+    When true, ``run_meta_review(..., force=True)`` bypasses the enable flag.
+    """
+    force = bool(force)
+    # Fallback only used when live config cannot be loaded.
+    config: Any = SimpleNamespace(
+        agent_meta_review_enabled=False,
+        agent_meta_review_min_episodes=int(min_episodes or 30),
+        agent_meta_review_llm_budget=0,
+    )
+    loader = get_config
+    if loader is None:
+        try:
+            from src.config import get_config as _default_get_config
+
+            loader = _default_get_config
+        except Exception:
+            loader = None
+    if loader is not None:
+        try:
+            config = loader()
+        except Exception:
+            pass
+    # Attach force for callers that want to inspect CLI intent.
+    try:
+        setattr(config, "_meta_review_cli_force", force)
+    except Exception:
+        pass
+    return config
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -60,29 +100,31 @@ def main(argv: List[str] | None = None) -> int:
     from src.agent.evolution.meta_review import run_meta_review, write_meta_review_report
 
     episodes = _load_episodes(Path(args.episodes))
-    config = SimpleNamespace(
-        agent_meta_review_enabled=True if args.force else False,
-        agent_meta_review_min_episodes=args.min_episodes or 30,
-        agent_meta_review_llm_budget=0,
+    force = bool(args.force)
+    config = resolve_cli_runtime(
+        force=force,
+        min_episodes=args.min_episodes,
     )
-    # Prefer live config when available.
-    try:
-        from src.config import get_config
-
-        live = get_config()
-        config = live
-    except Exception:
-        pass
 
     report = run_meta_review(
         episodes,
         config=config,
         min_episodes=args.min_episodes,
         min_kind_count=args.min_kind_count,
-        force=args.force or True,
+        force=force,
     )
     paths = write_meta_review_report(report, args.output_dir)
-    print(json.dumps({"status": report.status, "paths": paths, "sample_count": report.sample_count}, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "status": report.status,
+                "paths": paths,
+                "sample_count": report.sample_count,
+                "force": force,
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0 if report.status in {"completed", "threshold_not_met", "disabled"} else 1
 
 

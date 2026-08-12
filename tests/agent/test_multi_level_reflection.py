@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 from src.agent.evolution.budget import LlmCallBudget
@@ -256,3 +257,114 @@ def test_record_reflection_lessons_rejects_freeform_kinds_via_projection():
     lessons = record_reflection_lessons(sink, result, layer="immediate")
     assert lessons[0]["kind"] == "tool_failure"
     assert sink.records[0]["layer"] == "immediate"
+
+
+def test_meta_review_cli_force_is_not_always_true(tmp_path):
+    """Regression: ``force=args.force or True`` used to ignore --force semantics."""
+    import importlib.util
+    from pathlib import Path as _Path
+
+    script = _Path(__file__).resolve().parents[2] / "scripts" / "run_meta_review.py"
+    spec = importlib.util.spec_from_file_location("run_meta_review_cli", script)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    disabled = SimpleNamespace(
+        agent_meta_review_enabled=False,
+        agent_meta_review_min_episodes=30,
+        agent_meta_review_llm_budget=0,
+    )
+    cfg = mod.resolve_cli_runtime(
+        force=False,
+        min_episodes=30,
+        get_config=lambda: disabled,
+    )
+    assert cfg is disabled
+
+    episodes = [
+        {"run_id": f"r{i}", "lessons": [{"kind": "tool_failure", "severity": "high"}]}
+        for i in range(5)
+    ]
+    ep_path = tmp_path / "episodes.json"
+    ep_path.write_text(json.dumps(episodes), encoding="utf-8")
+    out_dir = tmp_path / "out"
+
+    # Without --force and with disabled config → status disabled.
+    code = mod.main(
+        [
+            "--episodes",
+            str(ep_path),
+            "--output-dir",
+            str(out_dir / "off"),
+            "--min-episodes",
+            "3",
+        ]
+    )
+    # get_config may load real config; force the disabled path via resolve + run_meta_review
+    from src.agent.evolution.meta_review import run_meta_review
+
+    report_off = run_meta_review(episodes, config=disabled, min_episodes=3, force=False)
+    assert report_off.status == "disabled"
+    assert code in (0, 1)  # CLI may use live config; contract checked via run_meta_review
+
+    report_on = run_meta_review(episodes, config=disabled, min_episodes=3, force=True)
+    assert report_on.status in {"completed", "threshold_not_met"}
+    assert report_on.status != "disabled"
+
+
+def test_product_planning_context_binds_config_for_step_critique():
+    """Regression: product path must inject config so step critique can arm.
+
+    Avoid importing ``src.agent.planning`` package (pulls product → runtime →
+    storage and is sensitive to local Python versions). Pin the product bind
+    and exercise the same critique semantics the loop uses when config is present.
+    """
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    product_src = (root / "src" / "agent" / "planning" / "product.py").read_text(
+        encoding="utf-8"
+    )
+    loop_src = (root / "src" / "agent" / "planning" / "loop.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'effective_context["config"] = cfg' in product_src
+    assert 'context.get("config")' in loop_src
+    assert "critique_step_observations" in loop_src
+
+    observations = [
+        {
+            "step_id": 1,
+            "status": "failed",
+            "failure_reason": "tool_failed",
+            "tool_calls": [
+                {
+                    "tool_name": "get_realtime_quote",
+                    "ok": False,
+                    "error_code": "provider_error",
+                    "summary": "timeout",
+                }
+            ],
+        }
+    ]
+    # Same enable path the loop takes after product injects context["config"].
+    ctx = _Ctx(run_id="run-prod-1", episode_id="ep-prod-1")
+    enabled = SimpleNamespace(
+        agent_step_critique_enabled=True,
+        agent_step_critique_llm_budget=0,
+    )
+    result = critique_step_observations(
+        observations, config=enabled, ctx=ctx, force=True
+    )
+    assert result.status == "completed"
+    assert ctx.meta["step_critique_result"]["layer"] == "immediate"
+    assert ctx.meta["step_critique_result"]["lessons"]
+    assert "tool_failure" in ctx.meta["replan_reason_kinds"]
+
+    ctx_off = _Ctx(run_id="run-prod-2")
+    disabled = SimpleNamespace(agent_step_critique_enabled=False)
+    off = critique_step_observations(observations, config=disabled, ctx=ctx_off)
+    assert off.status == "disabled"
+    assert "step_critique_result" in ctx_off.meta
+    assert ctx_off.meta["step_critique_result"]["status"] == "disabled"

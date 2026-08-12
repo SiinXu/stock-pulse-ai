@@ -22,6 +22,8 @@
 
 跨运行默认样本阈值 `AGENT_META_REVIEW_MIN_EPISODES=30`；不足时返回 `threshold_not_met`，不编造建议。
 
+生产规划路径会把 Config 写入 `context["config"]`，因此 `AGENT_STEP_CRITIQUE_ENABLED` 在真实 AgentExecutor 跑通时生效。离线 meta CLI 仅在传入 `--force` 或配置开启时才绕过/启用门闩（默认不强制）。
+
 离线命令：
 
 ```bash

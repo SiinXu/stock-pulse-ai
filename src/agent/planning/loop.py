@@ -630,7 +630,13 @@ def _step_critique_replan_reasons(
 
     if isinstance(context, dict):
         context["replan_reason_kinds"] = list(reason_codes)
-        config = context.get("config")
+        # Product path binds Config at context["config"] (see planning/product.py).
+        # Also accept a few aliases so library callers are not forced into one key.
+        config = (
+            context.get("config")
+            or context.get("agent_config")
+            or context.get("cfg")
+        )
         if getattr(config, "agent_step_critique_enabled", False) is True:
 
             class _Ctx:
@@ -642,6 +648,8 @@ def _step_critique_replan_reasons(
                 "episode_id": context.get("episode_id"),
             }
             try:
+                # force=True: we are already on a failed-step replan path, so the
+                # observation trigger is satisfied; still respect enable + budget.
                 critique_step_observations(
                     observations,
                     config=config,
@@ -652,7 +660,9 @@ def _step_critique_replan_reasons(
                 if isinstance(step_payload, dict):
                     context[STEP_CRITIQUE_META_KEY] = step_payload
                     if step_payload.get("replan_reasons"):
-                        context["replan_reason_kinds"] = list(step_payload["replan_reasons"])
+                        context["replan_reason_kinds"] = list(
+                            step_payload["replan_reasons"]
+                        )
                         reason_codes = list(step_payload["replan_reasons"])
             except Exception as exc:  # broad-exception: fallback_recorded - step critique is advisory
                 log_safe_exception(

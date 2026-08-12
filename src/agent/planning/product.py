@@ -148,6 +148,10 @@ def run_with_planning(
     started = time.perf_counter()
     scope_resolution = resolve_stock_scope(task, context)
     effective_context = dict(scope_resolution.effective_context or {})
+    # Bind the resolved product Config so multi-level reflection (Issue #1094)
+    # can read enable flags on the real AgentExecutor planning path. Without
+    # this, step critique stays library-only even when AGENT_STEP_CRITIQUE_* is on.
+    effective_context["config"] = cfg
     available_tools = list(executor.tool_registry.list_names())
 
     try:
