@@ -3,11 +3,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_ESSENTIAL_KEYS,
+  AGENT_GOVERNANCE_EXPERT_KEYS,
   AGENT_PRESET_MANAGED_KEYS,
   AGENT_SETUP_PRESETS,
   buildAgentPresetUpdates,
   diffAgentPreset,
+  isAgentExpertJsonKey,
   matchesAgentPreset,
+  resolveAgentDisclosureLayer,
   resolveAgentPresetStatus,
 } from '../agentSetupPresets';
 
@@ -95,5 +98,26 @@ describe('agentSetupPresets', () => {
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_DEEP_RESEARCH_TIMEOUT');
     expect(AGENT_PRESET_MANAGED_KEYS).toContain('AGENT_FEATURES_ACKNOWLEDGED_OFF');
     expect(AGENT_PRESET_MANAGED_KEYS.every((key) => !/(API_KEY|TOKEN|PASSWORD|SECRET)/.test(key))).toBe(true);
+  });
+
+  it('classifies progressive-disclosure layers without changing preset values', () => {
+    for (const key of AGENT_ESSENTIAL_KEYS) {
+      expect(resolveAgentDisclosureLayer(key)).toBe('essentials');
+    }
+    expect(resolveAgentDisclosureLayer('AGENT_SKILL_ROUTING')).toBe('behavior');
+    expect(resolveAgentDisclosureLayer('AGENT_MEMORY_ENABLED')).toBe('behavior');
+    expect(resolveAgentDisclosureLayer('AGENT_FEATURES_ACKNOWLEDGED_OFF')).toBe('behavior');
+    for (const key of AGENT_GOVERNANCE_EXPERT_KEYS) {
+      expect(resolveAgentDisclosureLayer(key)).toBe('governance');
+    }
+    expect(isAgentExpertJsonKey('AGENT_EVENT_ALERT_RULES_JSON')).toBe(true);
+    expect(isAgentExpertJsonKey('AGENT_RISK_OVERRIDE')).toBe(false);
+    expect(resolveAgentDisclosureLayer('AGENT_EVENT_ALERT_RULES_JSON')).toBe('governance');
+
+    // Preset values remain the historical contract (presentation-only layering).
+    const standard = AGENT_SETUP_PRESETS.find((preset) => preset.id === 'standard_research')!;
+    expect(standard.values.AGENT_MAX_STEPS).toBe('10');
+    expect(standard.values.AGENT_ARCH).toBe('multi');
+    expect(standard.values.AGENT_MEMORY_ENABLED).toBe('false');
   });
 });
