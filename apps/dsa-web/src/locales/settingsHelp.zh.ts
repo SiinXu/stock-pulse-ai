@@ -1275,6 +1275,47 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 推理深度、耗时和 token 消耗。'],
     notes: ['设为 0 或极低值可能导致推理不完整。'],
   },
+  'settings.agent.AGENT_MODE_BUDGET_ENABLED': {
+    title: '启用按模式硬预算',
+    summary: '启用按模式的 Agent 硬预算（轮次/工具/成本）。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS': {
+    title: '模式预算最大 LLM 轮次（全局）',
+    summary: '全局收紧各模式 LLM 轮次上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS': {
+    title: '模式预算最大工具调用（全局）',
+    summary: '全局收紧各模式工具调用上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_COST_USD': {
+    title: '模式预算最大成本 USD（全局）',
+    summary: '全局收紧估算成本上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOKENS': {
+    title: '模式预算最大 Token（全局）',
+    summary: '可选全局 token 上限；0 关闭 token 维度。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+
   'settings.agent.AGENT_SKILLS': {
     title: 'Agent 策略列表',
     summary: '指定 Agent 使用的策略技能列表。',
@@ -1568,6 +1609,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['为多步骤 Agent 排障提供低开销时间线细节。'],
     notes: ['隐私与开销说明见 docs/agent-observability.md。'],
+  },
+  'settings.agent.performance': {
+    title: '性能基线',
+    summary: '为关键分析路径提供可关闭的性能 span 采集与离线剖析入口。',
+    usage: 'PERF_COLLECTION_ENABLED 在 collector 激活时记录轻量 span（默认关闭）。PERF_PROFILE_ENABLED 仅表达离线 cProfile 意图，不会自动包装生产请求。',
+    valueNotes: [
+      '关闭时为 no-op，生产路径开销接近零。',
+      '离线基线与可选 cProfile 请使用 scripts/run_perf_baseline.py。',
+    ],
+    impact: ['在不改变默认运行时行为的前提下，支持本地基线对比与 pipeline 阶段耗时镜像。'],
+    notes: ['workload、CI 影响与刷新方式见 docs/performance-baseline.md。'],
   },
   'settings.agent.event_monitor': {
     title: '事件监控',
@@ -1890,6 +1942,26 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['影响分析总耗时和 API 调用频率。'],
     notes: ['并发过高可能导致 API 返回限流错误。'],
+  },
+  'settings.system.ANALYSIS_PARALLEL_FETCH': {
+    title: '分析内并行取数',
+    summary:
+      '在单只股票分析内，对无依赖的行情输入（实时行情、筹码、资金流、基本面）并发拉取。',
+    usage:
+      'ANALYSIS_PARALLEL_FETCH_ENABLED 控制并行/串行；MAX_CONCURRENT 为全局并发上限；PER_PROVIDER_LIMIT 限制同一逻辑 provider key 的并发；BUDGET_SECONDS 为可选墙钟预算（0 关闭），未启动分支会以 budget_skipped 缺口返回。',
+    valueNotes: [
+      '仍走 DataFetcherManager（故障切换、缓存、熔断、校验），并行层不是旁路 HTTP。',
+      '默认并发 3、单源 1，在重叠无依赖能力的同时降低踩限流风险。',
+      '排查数据源问题时可关闭开关，强制按声明顺序串行。',
+    ],
+    impact: [
+      '影响单股分析延迟，以及单次运行内对数据源的峰值并发。',
+      '不改变跨股票队列的 MAX_WORKERS 并发语义。',
+    ],
+    notes: [
+      '写入 stage IO / AgentContext 的合并顺序按声明 key，不按完成先后。',
+      '与预测 ActualsFetcher 的 coalesce 兼容：重叠标的仍经 provider manager 路径。',
+    ],
   },
   'settings.system.ANALYSIS_DELAY': {
     title: '分析间隔',

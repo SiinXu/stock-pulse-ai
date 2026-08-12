@@ -122,23 +122,37 @@ class StageStatus(str, Enum):
 
 
 class StageFailureReason(str, Enum):
-    """Canonical internal reasons for an incomplete Agent stage."""
+    """Canonical internal reasons for an incomplete Agent stage.
+
+    Budget family (unified with mode hard budgets + residual wall-clock skips):
+    - ``timeout`` — wall-clock hard limit exhausted
+    - ``budget_skip`` — residual wall-clock too low for the next stage/step
+    - ``budget_turns`` — LLM turn / max-steps hard cap
+    - ``budget_tools`` — tool-call hard cap
+    - ``budget_cost`` — estimated USD cost hard cap
+    - ``budget_tokens`` — token hard cap
+    """
 
     STAGE_FAILURE = "stage_failure"
     TIMEOUT = "timeout"
     BUDGET_SKIP = "budget_skip"
+    BUDGET_TURNS = "budget_turns"
+    BUDGET_TOOLS = "budget_tools"
+    BUDGET_COST = "budget_cost"
+    BUDGET_TOKENS = "budget_tokens"
     LOOP_DETECTED = "loop_detected"
 
 
 def normalize_stage_failure_reason(reason: Any) -> StageFailureReason:
     """Return a safe canonical failure reason for internal runtime facts."""
     normalized = str(getattr(reason, "value", reason) or "").strip().lower()
-    if normalized == StageFailureReason.TIMEOUT.value:
-        return StageFailureReason.TIMEOUT
-    if normalized == StageFailureReason.BUDGET_SKIP.value:
-        return StageFailureReason.BUDGET_SKIP
-    if normalized == StageFailureReason.LOOP_DETECTED.value:
-        return StageFailureReason.LOOP_DETECTED
+    for candidate in StageFailureReason:
+        if normalized == candidate.value:
+            return candidate
+    if normalized in {"budget_exhausted", "max_tool_calls_exceeded"}:
+        return StageFailureReason.BUDGET_TOOLS
+    if normalized in {"max_steps_exceeded", "max_llm_turns_exceeded"}:
+        return StageFailureReason.BUDGET_TURNS
     return StageFailureReason.STAGE_FAILURE
 
 

@@ -107,6 +107,12 @@ docs: update README deployment section
 - Add English comments for non-obvious logic.
 - Update relevant documentation when adding new features.
 
+### Parallel Merges And Engineering Efficiency Operations
+
+For large parallel fix/merge trains, read the [Engineering Efficiency Playbook](engineering-efficiency-playbook_EN.md) ([中文](engineering-efficiency-playbook.md)): train-batch merges, conflict-graph grouping, config registration guards, squash false-close defense, self-iteration acceptance loops, single-host resource limits, and worktree deletion safety.
+
+**Division of labor**: repository-root `AGENTS.md` is the collaboration **contract** (hard rules and verification matrix); the playbook is the **operational guide**. When they conflict, `AGENTS.md` wins.
+
 ### CI Checks
 
 After opening a PR, CI will automatically run the following PR checks:
