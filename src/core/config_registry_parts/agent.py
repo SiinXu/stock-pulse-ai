@@ -354,12 +354,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
-        "AGENT_MODE_BUDGET_ENABLED": {
+    "AGENT_MODE_BUDGET_ENABLED": {
         "title": "Mode Hard Budget Enabled",
         "description": "Enable hard per-mode budgets for LLM turns, tool calls, and estimated cost. On breach the run terminates with an explicit budget reason (never silent success). Residual wall-clock skips remain budget_skip under the same diagnostic snapshot.",
         "category": "agent",
         "data_type": "boolean",
-        "ui_control": "toggle",
+        "ui_control": "switch",
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
@@ -394,7 +394,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "0",
         "options": [],
-        "validation": {'min': 0, 'max': 100},
+        "validation": {"min": 0, "max": 100},
         "display_order": 352,
         "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS",
         "examples": [
@@ -423,7 +423,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "0",
         "options": [],
-        "validation": {'min': 0, 'max': 500},
+        "validation": {"min": 0, "max": 500},
         "display_order": 353,
         "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS",
         "examples": [
@@ -452,7 +452,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "0",
         "options": [],
-        "validation": {'min': 0},
+        "validation": {"min": 0},
         "display_order": 354,
         "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_COST_USD",
         "examples": [
@@ -481,7 +481,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "0",
         "options": [],
-        "validation": {'min': 0},
+        "validation": {"min": 0},
         "display_order": 355,
         "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_TOKENS",
         "examples": [
