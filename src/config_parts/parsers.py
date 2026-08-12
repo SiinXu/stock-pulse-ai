@@ -46,11 +46,12 @@ def parse_risk_gate_profile(value: Optional[str]) -> str:
 
 def parse_quality_gate_failure_policy(value: Optional[str]) -> str:
     """Parse analysis quality-gate failure policy (annotate|intercept)."""
-    from src.services.analysis_quality_gate import (
-        parse_quality_gate_failure_policy as _parse,
-    )
-
-    return _parse(value)
+    normalized = str(value or "annotate").strip().lower()
+    if normalized not in {"annotate", "intercept"}:
+        raise ValueError(
+            "ANALYSIS_QUALITY_GATE_ON_FAILURE must be one of: annotate, intercept"
+        )
+    return normalized
 
 
 def parse_env_int(

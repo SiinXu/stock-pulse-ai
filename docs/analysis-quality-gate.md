@@ -10,8 +10,8 @@
 
 分析产出结论后，管线运行确定性质量门：**事实性陈述必须能绑定到输入证据**，否则不得作为已核实事实发布。门会：
 
-1. 将管线证据投影为 `FinancialFact`
-2. 将结论中的事实声明（结构化 `dashboard.claims` 与含数值的 `report_strata.verified_facts`）投影为 `FinancialClaim`
+1. 将有界的行情、基本面与技术指标输入投影为 `FinancialFact`；公开 context overview 只提供状态与来源信息，绝不作为数值证据
+2. 将结论中的事实声明（分析器真实产出的 `dashboard.data_perspective` 数值字段、可选结构化 `dashboard.claims` 与含数值的 `report_strata.verified_facts`）投影为 `FinancialClaim`
 3. 使用与离线 agent-eval 相同的规则评分器打分
 4. 把判定写入 `quality_gate_result` / `dashboard.quality_gate`（trace 与 raw_result）
 5. 按可配置策略处理失败
@@ -29,10 +29,12 @@
 
 | `ANALYSIS_QUALITY_GATE_ON_FAILURE` | 行为 |
 | --- | --- |
-| `annotate`（**默认**） | 将未绑定的 verified_facts 降级为 `model_inference`（观点），分析仍成功 |
+| `annotate`（**默认**） | 将未绑定的 verified_facts 降级为 `model_inference`，并隔离失败的结构化声明；分析仍成功 |
 | `intercept` | `success=false`，`error_code=quality_gate_intercept` |
 
-门自身异常**不得静默放行**：一律 fail-closed 到 `annotate`，`verdict=gate_error` 且 `fail_closed=true`（即使配置为 `intercept`）。
+门自身异常**不得静默放行**：返回 `verdict=gate_error`、`fail_closed=true` 前，会移除所有未经核验的结构化声明并降级所有 verified_facts。若连该处置也无法完成，异常会继续向上抛出，防止管线发布未经检查的成功结果。
+
+对于已经是 `success=false` 的分析结果，质量门记录 `skipped_failed_analysis`，不会把 provider 或分析失败重新判定为质量检查成功。
 
 ## 配置
 

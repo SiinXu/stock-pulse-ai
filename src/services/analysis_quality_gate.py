@@ -34,8 +34,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
+from inspect import getattr_static
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from src.config_parts.parsers import parse_quality_gate_failure_policy
 from src.schemas.report_strata import (
     ensure_report_strata,
     resolve_report_strata,
@@ -68,6 +70,12 @@ DEFAULT_GATE_DIMENSIONS: Tuple[str, ...] = (
 _MAX_TRACE_CHECKS = 32
 _MAX_TRACE_DETAIL = 300
 _MAX_UNGROUNDED = 20
+_MAX_INPUT_FACTS = 256
+_MAX_STRUCTURED_CLAIMS = 128
+_MAX_VERIFIED_FACTS = 128
+_MAX_NUMBERS_PER_STATEMENT = 16
+_MAX_SCAN_CHARS = 20_000
+_MAX_ID_CHARS = 128
 _NUMBER_RE = re.compile(
     r"(?<![\w./])(?P<sign>[-+]?)(?P<body>\d{1,3}(?:,\d{3})+|\d+)(?P<frac>\.\d+)?(?P<pct>%)?"
 )
@@ -80,6 +88,39 @@ _KNOWN_FIELD_HINTS: Tuple[Tuple[str, str, str], ...] = (
     ("change_pct|涨跌幅|pct|%|涨幅|跌幅", "quote.change_pct", "percent"),
     ("pe|市盈率", "fundamentals.pe", "ratio"),
     ("pb|市净率", "fundamentals.pb", "ratio"),
+)
+
+# Numeric dashboard fields emitted by both the legacy analyzer and Agent path.
+# These are actual runtime consumers, unlike optional test/eval-only claim arrays.
+_DASHBOARD_NUMERIC_CLAIMS: Tuple[Tuple[str, Tuple[str, ...], str], ...] = (
+    (
+        "data_perspective.price_position.current_price",
+        ("quote.price", "technical.current_price"),
+        "price",
+    ),
+    ("data_perspective.price_position.ma5", ("technical.ma5",), "price"),
+    ("data_perspective.price_position.ma10", ("technical.ma10",), "price"),
+    ("data_perspective.price_position.ma20", ("technical.ma20",), "price"),
+    (
+        "data_perspective.price_position.bias_ma5",
+        ("technical.bias_ma5",),
+        "percent",
+    ),
+    (
+        "data_perspective.price_position.support_level",
+        ("technical.support_levels.",),
+        "price",
+    ),
+    (
+        "data_perspective.price_position.resistance_level",
+        ("technical.resistance_levels.",),
+        "price",
+    ),
+    (
+        "data_perspective.volume_analysis.volume_ratio",
+        ("technical.volume_ratio_5d",),
+        "ratio",
+    ),
 )
 
 
@@ -170,41 +211,39 @@ class AnalysisQualityGateResult:
         }
 
 
-def parse_quality_gate_failure_policy(value: Optional[str]) -> str:
-    """Parse failure policy; reject unknown values at config load time."""
-    normalized = str(value or QualityGateFailurePolicy.ANNOTATE.value).strip().lower()
-    if normalized not in {
-        QualityGateFailurePolicy.ANNOTATE.value,
-        QualityGateFailurePolicy.INTERCEPT.value,
-    }:
-        raise ValueError(
-            "ANALYSIS_QUALITY_GATE_ON_FAILURE must be one of: annotate, intercept"
-        )
-    return normalized
-
-
 def resolve_quality_gate_config(config: Any = None) -> Tuple[bool, QualityGateFailurePolicy]:
     """Return (enabled, failure_policy). Defaults: enabled=True, annotate."""
     if config is None:
         return True, QualityGateFailurePolicy.ANNOTATE
-    enabled_raw = getattr(config, "analysis_quality_gate_enabled", True)
-    enabled = enabled_raw is True if isinstance(enabled_raw, bool) else bool(enabled_raw)
-    policy_raw = getattr(
-        config,
-        "analysis_quality_gate_on_failure",
-        QualityGateFailurePolicy.ANNOTATE.value,
-    )
+    try:
+        getattr_static(config, "analysis_quality_gate_enabled")
+    except AttributeError:
+        enabled_raw = True
+    else:
+        enabled_raw = getattr(config, "analysis_quality_gate_enabled")
+    if type(enabled_raw) is not bool:
+        raise ValueError("analysis_quality_gate_enabled must be a boolean")
+
+    try:
+        getattr_static(config, "analysis_quality_gate_on_failure")
+    except AttributeError:
+        policy_raw = QualityGateFailurePolicy.ANNOTATE.value
+    else:
+        policy_raw = getattr(config, "analysis_quality_gate_on_failure")
     policy = QualityGateFailurePolicy(
         parse_quality_gate_failure_policy(str(policy_raw or "annotate"))
     )
-    return enabled, policy
+    return enabled_raw, policy
 
 
 def _finite_float(value: Any) -> Optional[float]:
     if value is None or isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
-        number = float(value)
+        try:
+            number = float(value)
+        except (OverflowError, ValueError):
+            return None
         return number if math.isfinite(number) else None
     if isinstance(value, str):
         cleaned = value.strip().replace(",", "").replace("%", "")
@@ -216,6 +255,14 @@ def _finite_float(value: Any) -> Optional[float]:
             return None
         return number if math.isfinite(number) else None
     return None
+
+
+def _bounded_text(value: Any, *, default: str = "", limit: int = _MAX_ID_CHARS) -> str:
+    """Return stripped, bounded metadata without accepting container reprs."""
+    if value is None or isinstance(value, (Mapping, list, tuple, set)):
+        return default
+    text = str(value).strip()
+    return text[:limit] if text else default
 
 
 def _as_of_now() -> str:
@@ -269,19 +316,22 @@ def _append_fact(
     as_of: str,
     source_id: str,
 ) -> None:
+    if len(facts) >= _MAX_INPUT_FACTS:
+        return
     number = _finite_float(value)
     if number is None:
         return
-    if any(item.get("fact_id") == fact_id for item in facts):
+    bounded_id = _bounded_text(fact_id, default=f"fact-{len(facts)}")
+    if any(item.get("fact_id") == bounded_id for item in facts):
         return
     facts.append(
         {
-            "fact_id": fact_id,
-            "field_path": field_path,
+            "fact_id": bounded_id,
+            "field_path": _bounded_text(field_path, default="unknown"),
             "value": number,
-            "unit": unit,
-            "as_of": as_of,
-            "source_id": source_id,
+            "unit": _bounded_text(unit, default="unknown", limit=32),
+            "as_of": _bounded_text(as_of, default=_as_of_now(), limit=64),
+            "source_id": _bounded_text(source_id, default="pipeline"),
         }
     )
 
@@ -292,6 +342,7 @@ def project_facts_from_evidence(
     analysis_context_pack_overview: Optional[Mapping[str, Any]] = None,
     market_snapshot: Optional[Mapping[str, Any]] = None,
     fundamental_context: Optional[Mapping[str, Any]] = None,
+    technical_context: Any = None,
     current_price: Any = None,
     change_pct: Any = None,
     as_of: Optional[str] = None,
@@ -299,24 +350,27 @@ def project_facts_from_evidence(
 ) -> List[Dict[str, Any]]:
     """Project pipeline evidence into agent-eval ``FinancialFact`` dicts."""
     facts: List[Dict[str, Any]] = []
-    stamp = (as_of or _as_of_now()).strip() or _as_of_now()
-    src = (source_id or "pipeline").strip() or "pipeline"
+    stamp = _bounded_text(as_of, default=_as_of_now(), limit=64)
+    src = _bounded_text(source_id, default="pipeline")
 
     if isinstance(evidence_context, Mapping):
         raw_facts = evidence_context.get("facts")
         if isinstance(raw_facts, list):
-            for item in raw_facts:
+            for item in raw_facts[:_MAX_INPUT_FACTS]:
                 if not isinstance(item, Mapping):
                     continue
                 _append_fact(
                     facts,
-                    fact_id=str(item.get("fact_id") or "").strip()
-                    or f"ctx-{len(facts)}",
-                    field_path=str(item.get("field_path") or "unknown"),
+                    fact_id=_bounded_text(
+                        item.get("fact_id"), default=f"ctx-{len(facts)}"
+                    ),
+                    field_path=_bounded_text(
+                        item.get("field_path"), default="unknown"
+                    ),
                     value=item.get("value"),
-                    unit=str(item.get("unit") or "unknown"),
-                    as_of=str(item.get("as_of") or stamp),
-                    source_id=str(item.get("source_id") or src),
+                    unit=_bounded_text(item.get("unit"), default="unknown", limit=32),
+                    as_of=_bounded_text(item.get("as_of"), default=stamp, limit=64),
+                    source_id=_bounded_text(item.get("source_id"), default=src),
                 )
 
     def _from_mapping(
@@ -340,42 +394,11 @@ def project_facts_from_evidence(
                 source_id=src,
             )
 
-    overview = analysis_context_pack_overview
-    if isinstance(overview, Mapping):
-        for block_name in ("quote", "fundamentals", "daily_bars", "technical"):
-            block = overview.get(block_name)
-            items = None
-            if isinstance(block, Mapping):
-                items = block.get("items") if isinstance(block.get("items"), Mapping) else block
-            if not isinstance(items, Mapping):
-                continue
-            for item_key, item_val in items.items():
-                value = item_val
-                item_source = src
-                item_as_of = stamp
-                if isinstance(item_val, Mapping):
-                    value = item_val.get("value")
-                    if item_val.get("source"):
-                        item_source = str(item_val.get("source"))
-                    if item_val.get("timestamp"):
-                        item_as_of = str(item_val.get("timestamp"))[:64]
-                field_path = f"{block_name}.{item_key}"
-                unit = "ratio" if item_key in {"pe", "pb", "roe"} else (
-                    "percent"
-                    if "pct" in str(item_key).lower() or "change" in str(item_key).lower()
-                    else "number"
-                )
-                if item_key in {"price", "close", "last", "current_price"}:
-                    unit = "price"
-                _append_fact(
-                    facts,
-                    fact_id=f"pack-{block_name}-{item_key}",
-                    field_path=field_path,
-                    value=value,
-                    unit=unit,
-                    as_of=item_as_of,
-                    source_id=item_source,
-                )
+    # The public AnalysisContextPack overview intentionally contains statuses,
+    # counts, and provenance only. It has no raw item values, so it must not be
+    # treated as a factual-value source. It is consumed separately by the
+    # boundary-honesty check below.
+    del analysis_context_pack_overview
 
     _from_mapping(
         market_snapshot if isinstance(market_snapshot, Mapping) else None,
@@ -398,6 +421,54 @@ def project_facts_from_evidence(
         ),
         prefix="fund",
     )
+
+    technical_keys: Tuple[Tuple[str, str, str], ...] = (
+        ("current_price", "technical.current_price", "price"),
+        ("ma5", "technical.ma5", "price"),
+        ("ma10", "technical.ma10", "price"),
+        ("ma20", "technical.ma20", "price"),
+        ("ma60", "technical.ma60", "price"),
+        ("bias_ma5", "technical.bias_ma5", "percent"),
+        ("bias_ma10", "technical.bias_ma10", "percent"),
+        ("bias_ma20", "technical.bias_ma20", "percent"),
+        ("volume_ratio_5d", "technical.volume_ratio_5d", "ratio"),
+        ("macd_dif", "technical.macd_dif", "number"),
+        ("macd_dea", "technical.macd_dea", "number"),
+        ("macd_bar", "technical.macd_bar", "number"),
+        ("rsi_6", "technical.rsi_6", "ratio"),
+        ("rsi_12", "technical.rsi_12", "ratio"),
+        ("rsi_24", "technical.rsi_24", "ratio"),
+    )
+    if isinstance(technical_context, Mapping):
+        technical_mapping: Mapping[str, Any] = technical_context
+    else:
+        technical_mapping = {
+            key: getattr(technical_context, key, None)
+            for key, _path, _unit in technical_keys
+        }
+    _from_mapping(
+        technical_mapping,
+        keys=technical_keys,
+        prefix="technical",
+    )
+    for level_name in ("support_levels", "resistance_levels"):
+        levels = (
+            technical_context.get(level_name)
+            if isinstance(technical_context, Mapping)
+            else getattr(technical_context, level_name, None)
+        )
+        if not isinstance(levels, Sequence) or isinstance(levels, (str, bytes)):
+            continue
+        for index, value in enumerate(list(levels)[:10]):
+            _append_fact(
+                facts,
+                fact_id=f"technical-{level_name}-{index}",
+                field_path=f"technical.{level_name}.{index}",
+                value=value,
+                unit="price",
+                as_of=stamp,
+                source_id=src,
+            )
 
     _append_fact(
         facts,
@@ -423,7 +494,7 @@ def project_facts_from_evidence(
 def _extract_numbers(text: str) -> List[Tuple[float, str]]:
     """Return (value, unit_hint) pairs from free text."""
     found: List[Tuple[float, str]] = []
-    for match in _NUMBER_RE.finditer(text or ""):
+    for match in _NUMBER_RE.finditer((text or "")[:_MAX_SCAN_CHARS]):
         body = f"{match.group('sign') or ''}{match.group('body')}{match.group('frac') or ''}"
         cleaned = body.replace(",", "")
         try:
@@ -434,7 +505,17 @@ def _extract_numbers(text: str) -> List[Tuple[float, str]]:
             continue
         unit = "percent" if match.group("pct") else "number"
         found.append((number, unit))
+        if len(found) >= _MAX_NUMBERS_PER_STATEMENT:
+            break
     return found
+
+
+def _statement_has_marker(statement: str, marker: str) -> bool:
+    if not marker:
+        return False
+    if marker == "%" or any(ord(char) > 127 for char in marker):
+        return marker in statement
+    return re.search(rf"(?<![a-z0-9_]){re.escape(marker)}(?![a-z0-9_])", statement) is not None
 
 
 def _find_matching_fact(
@@ -453,8 +534,6 @@ def _find_matching_fact(
     ]
     if not candidates:
         return None
-    if len(candidates) == 1:
-        return candidates[0]
 
     if unit_hint == "percent":
         percentish = [
@@ -463,10 +542,14 @@ def _find_matching_fact(
             if str(c.get("unit") or "") in {"percent", "pct", "ratio"}
             or "pct" in str(c.get("field_path") or "")
         ]
-        if len(percentish) == 1:
-            return percentish[0]
+        if not percentish:
+            return None
+        candidates = percentish
     for markers, field_path, _unit in _KNOWN_FIELD_HINTS:
-        if any(token and token in statement_l for token in markers.split("|")):
+        if any(
+            _statement_has_marker(statement_l, token)
+            for token in markers.split("|")
+        ):
             path_hits = [
                 c
                 for c in candidates
@@ -475,7 +558,37 @@ def _find_matching_fact(
             ]
             if path_hits:
                 return path_hits[0]
-    return candidates[0]
+            return None
+    if len(candidates) == 1:
+        return candidates[0]
+    # Equal values in different fields are ambiguous without a field marker.
+    # Binding to the first candidate would turn insertion order into evidence.
+    return None
+
+
+def _find_dashboard_fact(
+    facts: Sequence[Mapping[str, Any]],
+    *,
+    value: float,
+    accepted_paths: Sequence[str],
+) -> Optional[Mapping[str, Any]]:
+    for fact in facts:
+        fact_value = _finite_float(fact.get("value"))
+        if fact_value is None or not math.isclose(
+            fact_value,
+            value,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        ):
+            continue
+        field_path = _bounded_text(fact.get("field_path"))
+        if any(
+            field_path == accepted
+            or (accepted.endswith(".") and field_path.startswith(accepted))
+            for accepted in accepted_paths
+        ):
+            return fact
+    return None
 
 
 def project_claims_from_result(
@@ -501,35 +614,79 @@ def project_claims_from_result(
     ):
         if isinstance(source, list):
             structured.extend(source)
-    seen_ids: set[str] = set()
-    for index, raw in enumerate(structured):
+    for index, raw in enumerate(structured[:_MAX_STRUCTURED_CLAIMS]):
         if not isinstance(raw, Mapping):
             continue
-        claim_id = str(raw.get("claim_id") or f"structured-{index}").strip()
-        if not claim_id or claim_id in seen_ids:
-            claim_id = f"structured-{index}"
-        seen_ids.add(claim_id)
+        claim_id = _bounded_text(
+            raw.get("claim_id"), default=f"structured-{index}"
+        )
         claim = {
             "claim_id": claim_id,
-            "source_fact_id": str(raw.get("source_fact_id") or "").strip() or "__missing__",
-            "field_path": str(raw.get("field_path") or "unknown"),
+            "source_fact_id": _bounded_text(
+                raw.get("source_fact_id"), default="__missing__"
+            ),
+            "field_path": _bounded_text(raw.get("field_path"), default="unknown"),
             "value": raw.get("value"),
-            "unit": str(raw.get("unit") or "unknown"),
-            "as_of": str(raw.get("as_of") or stamp),
-            "source_id": str(raw.get("source_id") or "output"),
+            "unit": _bounded_text(raw.get("unit"), default="unknown", limit=32),
+            "as_of": _bounded_text(raw.get("as_of"), default=stamp, limit=64),
+            "source_id": _bounded_text(raw.get("source_id"), default="output"),
         }
         number = _finite_float(claim["value"])
         if number is None:
             continue
         claim["value"] = number
         claims.append(claim)
-        statements[claim_id] = str(
-            raw.get("statement") or f"{claim['field_path']}={number}"
-        )[:_MAX_TRACE_DETAIL]
+        statements[claim_id] = _bounded_text(
+            raw.get("statement"),
+            default=f"{claim['field_path']}={number}",
+            limit=_MAX_SCAN_CHARS,
+        )
+
+    dashboard = getattr(result, "dashboard", None)
+    if isinstance(dashboard, Mapping):
+        for output_path, accepted_paths, unit in _DASHBOARD_NUMERIC_CLAIMS:
+            number = _finite_float(_dig(dashboard, output_path))
+            if number is None:
+                continue
+            claim_id = f"dashboard:{output_path}"
+            matched = _find_dashboard_fact(
+                facts,
+                value=number,
+                accepted_paths=accepted_paths,
+            )
+            if matched is None:
+                claim = {
+                    "claim_id": claim_id,
+                    "source_fact_id": "__missing__",
+                    "field_path": f"dashboard.{output_path}",
+                    "value": number,
+                    "unit": unit,
+                    "as_of": stamp,
+                    "source_id": "dashboard",
+                }
+                ungrounded.append(claim_id)
+            else:
+                claim = {
+                    "claim_id": claim_id,
+                    "source_fact_id": str(matched["fact_id"]),
+                    "field_path": str(matched["field_path"]),
+                    "value": float(matched["value"]),
+                    "unit": str(matched["unit"]),
+                    "as_of": str(matched["as_of"]),
+                    "source_id": str(matched["source_id"]),
+                }
+            claims.append(claim)
+            statements[claim_id] = f"dashboard.{output_path}={number}"
 
     strata = resolve_report_strata(result, ensure=False)
     if strata is not None:
-        for index, fact_line in enumerate(strata.verified_facts or []):
+        for index, fact_line in enumerate(
+            list(strata.verified_facts or [])[:_MAX_VERIFIED_FACTS]
+        ):
+            if len(claims) >= _MAX_STRUCTURED_CLAIMS + (
+                _MAX_VERIFIED_FACTS * _MAX_NUMBERS_PER_STATEMENT
+            ):
+                break
             statement = str(getattr(fact_line, "statement", "") or "").strip()
             if not statement:
                 continue
@@ -565,7 +722,7 @@ def project_claims_from_result(
                         "source_id": str(matched["source_id"]),
                     }
                 claims.append(claim)
-                statements[claim_id] = statement[:_MAX_TRACE_DETAIL]
+                statements[claim_id] = statement
 
     return claims, ungrounded, statements
 
@@ -602,11 +759,17 @@ def _core_quote_missing(
         return True
     if not isinstance(analysis_context_pack_overview, Mapping):
         return False
-    quote = analysis_context_pack_overview.get("quote")
-    if isinstance(quote, Mapping):
-        status = str(quote.get("status") or "").strip().lower()
-        if status in {"missing", "fetch_failed", "not_supported"}:
-            return True
+    blocks = analysis_context_pack_overview.get("blocks")
+    if isinstance(blocks, list):
+        for block in blocks[:32]:
+            if not isinstance(block, Mapping):
+                continue
+            if _bounded_text(block.get("key"), limit=32).lower() != "quote":
+                continue
+            status = _bounded_text(block.get("status"), limit=32).lower()
+            if status in {"missing", "fetch_failed", "not_supported"}:
+                return True
+            break
     quality = analysis_context_pack_overview.get("data_quality")
     if isinstance(quality, Mapping):
         level = str(quality.get("level") or "").strip().lower()
@@ -614,6 +777,18 @@ def _core_quote_missing(
             # Only when quote price evidence is also absent.
             return not _has_price_evidence(facts)
     return False
+
+
+def _normalize_gate_dimensions(dimensions: Sequence[str]) -> Tuple[str, ...]:
+    if isinstance(dimensions, (str, bytes)):
+        raise ValueError("quality gate dimensions must be a sequence of names")
+    normalized = tuple(dict.fromkeys(str(item).strip() for item in dimensions))
+    unknown = [item for item in normalized if item not in DEFAULT_GATE_DIMENSIONS]
+    if unknown:
+        raise ValueError(f"unsupported quality gate dimensions: {unknown}")
+    if "factuality" not in normalized:
+        raise ValueError("quality gate dimensions must include factuality")
+    return normalized
 
 
 def evaluate_analysis_quality(
@@ -637,6 +812,7 @@ def evaluate_analysis_quality(
     ``(checks, overall_rule_score, failure_rule_score, advisory_rule_score)``.
     Only checks under ``failure_dimensions`` should drive annotate/intercept.
     """
+    dimensions = _normalize_gate_dimensions(dimensions)
     failure_dim_set = set(failure_dimensions)
     advisory_dim_set = set(advisory_dimensions)
     context: Dict[str, Any] = {
@@ -727,14 +903,20 @@ def _demote_ungrounded_strata(
     ungrounded_set = {s.strip() for s in ungrounded_statements if s and s.strip()}
     kept_facts = []
     demoted: List[str] = []
+    matched_statements: set[str] = set()
     for item in strata_model.verified_facts or []:
         statement = str(getattr(item, "statement", "") or "").strip()
         if statement in ungrounded_set:
+            matched_statements.add(statement)
             demoted.append(
                 statement if statement.startswith(prefix) else f"{prefix}{statement}"
             )
         else:
             kept_facts.append(item)
+    for statement in ungrounded_set - matched_statements:
+        demoted.append(
+            statement if statement.startswith(prefix) else f"{prefix}{statement}"
+        )
     if not demoted:
         return "none"
     inference = list(strata_model.model_inference or [])
@@ -751,7 +933,123 @@ def _demote_ungrounded_strata(
     dashboard = dict(dashboard)
     dashboard["report_strata"] = public
     result.dashboard = dashboard
-    return "demote_verified_facts_to_inference"
+    return (
+        "demote_verified_facts_to_inference"
+        if matched_statements
+        else "annotate_ungrounded_claims_as_inference"
+    )
+
+
+def _quarantine_failed_structured_claims(
+    result: Any,
+    *,
+    failed_claim_ids: Sequence[str],
+) -> bool:
+    """Remove failed structured claims from conclusion-facing claim arrays."""
+    failed = {item for item in failed_claim_ids if item}
+    if not failed:
+        return False
+    changed = False
+
+    def _filtered(raw_claims: Any) -> Any:
+        nonlocal changed
+        if not isinstance(raw_claims, list):
+            return raw_claims
+        kept = []
+        for item in raw_claims:
+            claim_id = (
+                _bounded_text(item.get("claim_id"))
+                if isinstance(item, Mapping)
+                else ""
+            )
+            if claim_id and claim_id in failed:
+                changed = True
+                continue
+            kept.append(item)
+        return kept
+
+    direct_claims = getattr(result, "claims", None)
+    if isinstance(direct_claims, list):
+        result.claims = _filtered(direct_claims)
+    dashboard = getattr(result, "dashboard", None)
+    if isinstance(dashboard, dict):
+        dashboard = dict(dashboard)
+        for key in ("claims", "quality_claims", "eval_claims"):
+            if isinstance(dashboard.get(key), list):
+                dashboard[key] = _filtered(dashboard[key])
+        for claim_id in failed:
+            prefix = "dashboard:"
+            if claim_id.startswith(prefix):
+                changed = _clear_nested_dashboard_value(
+                    dashboard,
+                    claim_id[len(prefix) :],
+                ) or changed
+        result.dashboard = dashboard
+    return changed
+
+
+def _clear_nested_dashboard_value(dashboard: Dict[str, Any], path: str) -> bool:
+    """Copy and clear one known numeric dashboard claim path."""
+    parts = path.split(".")
+    if not parts or any(not part for part in parts):
+        return False
+    current: Dict[str, Any] = dashboard
+    for part in parts[:-1]:
+        child = current.get(part)
+        if not isinstance(child, dict):
+            return False
+        copied = dict(child)
+        current[part] = copied
+        current = copied
+    leaf = parts[-1]
+    if leaf not in current or current[leaf] is None:
+        return False
+    current[leaf] = None
+    return True
+
+
+def _quarantine_all_structured_claims(result: Any) -> bool:
+    """Remove every structured claim when the gate cannot validate them."""
+    changed = False
+    direct_claims = getattr(result, "claims", None)
+    if isinstance(direct_claims, list) and direct_claims:
+        result.claims = []
+        changed = True
+    dashboard = getattr(result, "dashboard", None)
+    if isinstance(dashboard, dict):
+        dashboard = dict(dashboard)
+        for key in ("claims", "quality_claims", "eval_claims"):
+            if isinstance(dashboard.get(key), list) and dashboard[key]:
+                dashboard[key] = []
+                changed = True
+        for output_path, _accepted_paths, _unit in _DASHBOARD_NUMERIC_CLAIMS:
+            changed = (
+                _clear_nested_dashboard_value(dashboard, output_path) or changed
+            )
+        result.dashboard = dashboard
+    return changed
+
+
+def _demote_all_verified_facts(result: Any, *, language: Optional[str]) -> str:
+    """Fail closed by removing every claimed verified fact after a gate error."""
+    strata_model = resolve_report_strata(result, language=language, ensure=True)
+    if strata_model is None:
+        strata_model = ensure_report_strata(None, language=language)
+    statements = [
+        str(getattr(item, "statement", "") or "").strip()
+        for item in strata_model.verified_facts or []
+    ]
+    statements = [statement for statement in statements if statement]
+    if not statements:
+        return "gate_error_no_verified_facts"
+    action = _demote_ungrounded_strata(
+        result,
+        ungrounded_statements=statements,
+        language=language,
+    )
+    if action == "none":
+        raise RuntimeError("quality gate could not demote verified facts after error")
+    return "gate_error_demote_all_verified_facts"
 
 
 def _attach_gate_to_result(result: Any, gate: AnalysisQualityGateResult) -> None:
@@ -831,12 +1129,14 @@ def apply_analysis_quality_gate(
     analysis_context_pack_overview: Optional[Mapping[str, Any]] = None,
     market_snapshot: Optional[Mapping[str, Any]] = None,
     fundamental_context: Optional[Mapping[str, Any]] = None,
+    technical_context: Any = None,
     dimensions: Sequence[str] = DEFAULT_GATE_DIMENSIONS,
 ) -> AnalysisQualityGateResult:
     """Evaluate and apply the pipeline quality gate.
 
-    Never raises to the caller for gate-internal failures: exceptions fail
-    closed to annotate and still attach a trace payload.
+    Gate-internal failures demote every verified fact before returning an
+    annotate trace. If that enforcement itself cannot be applied, the error is
+    allowed to propagate so an unchecked result cannot be published.
     """
     enabled, failure_policy = resolve_quality_gate_config(config)
     if result is None:
@@ -855,6 +1155,25 @@ def apply_analysis_quality_gate(
             action_taken="none",
             detail="no analysis result",
         )
+
+    if getattr(result, "success", True) is not True:
+        gate = _build_result(
+            verdict=QualityGateVerdict.SKIPPED,
+            failure_policy=failure_policy,
+            enabled=enabled,
+            passed=False,
+            rule_score=None,
+            dimensions=dimensions,
+            checks=(),
+            ungrounded_claim_ids=(),
+            ungrounded_statements=(),
+            fact_count=0,
+            claim_count=0,
+            action_taken="skipped_failed_analysis",
+            detail="analysis result already failed",
+        )
+        _attach_gate_to_result(result, gate)
+        return gate
 
     if not enabled:
         gate = _build_result(
@@ -875,7 +1194,9 @@ def apply_analysis_quality_gate(
         _attach_gate_to_result(result, gate)
         return gate
 
+    gate_dimensions = DEFAULT_GATE_DIMENSIONS
     try:
+        gate_dimensions = _normalize_gate_dimensions(dimensions)
         overview = analysis_context_pack_overview
         if overview is None:
             overview = getattr(result, "analysis_context_pack_overview", None)
@@ -895,6 +1216,7 @@ def apply_analysis_quality_gate(
             fundamental_context=fundamentals
             if isinstance(fundamentals, Mapping)
             else None,
+            technical_context=technical_context,
             current_price=getattr(result, "current_price", None),
             change_pct=getattr(result, "change_pct", None),
         )
@@ -913,7 +1235,7 @@ def apply_analysis_quality_gate(
             analysis_context_pack_overview=overview
             if isinstance(overview, Mapping)
             else None,
-            dimensions=dimensions,
+            dimensions=gate_dimensions,
             failure_dimensions=DEFAULT_GATE_FAILURE_DIMENSIONS,
             advisory_dimensions=DEFAULT_GATE_ADVISORY_DIMENSIONS,
         )
@@ -1000,6 +1322,28 @@ def apply_analysis_quality_gate(
                     ungrounded_statements=ungrounded_statements,
                     language=language,
                 )
+                invalid_factuality = any(
+                    check.status == "invalid" for check in factuality_failures
+                )
+                quarantined = (
+                    _quarantine_all_structured_claims(result)
+                    if invalid_factuality
+                    else _quarantine_failed_structured_claims(
+                        result,
+                        failed_claim_ids=failed_ids,
+                    )
+                )
+                if quarantined:
+                    action_taken = (
+                        f"{action_taken}_and_quarantine_"
+                        f"{'all_' if invalid_factuality else ''}structured_claims"
+                        if action_taken != "none"
+                        else (
+                            "quarantine_all_structured_claims"
+                            if invalid_factuality
+                            else "quarantine_structured_claims"
+                        )
+                    )
                 if action_taken == "none":
                     action_taken = "annotate_trace_only"
                 detail = (
@@ -1007,7 +1351,7 @@ def apply_analysis_quality_gate(
                     f"factuality failure(s) "
                     f"[{', '.join(reason_codes) or 'ungrounded_claim'}]"
                 )
-                if action_taken == "demote_verified_facts_to_inference":
+                if action_taken != "annotate_trace_only":
                     dashboard = getattr(result, "dashboard", None)
                     if isinstance(dashboard, dict):
                         notes = dashboard.get("quality_annotations")
@@ -1036,7 +1380,7 @@ def apply_analysis_quality_gate(
             enabled=True,
             passed=passed,
             rule_score=rule_score,
-            dimensions=dimensions,
+            dimensions=gate_dimensions,
             checks=checks,
             ungrounded_claim_ids=failed_ids,
             ungrounded_statements=ungrounded_statements,
@@ -1064,23 +1408,19 @@ def apply_analysis_quality_gate(
                 "stock_code": getattr(result, "code", None),
             },
         )
-        try:
-            action = _demote_ungrounded_strata(
-                result,
-                ungrounded_statements=(),
-                language=getattr(result, "report_language", None),
-            )
-        except Exception:  # broad-exception: fallback_recorded - demote best-effort only
-            action = "gate_error_annotate"
-        if action == "none":
-            action = "gate_error_annotate"
+        action = _demote_all_verified_facts(
+            result,
+            language=getattr(result, "report_language", None),
+        )
+        if _quarantine_all_structured_claims(result):
+            action = f"{action}_and_quarantine_all_structured_claims"
         gate = _build_result(
             verdict=QualityGateVerdict.GATE_ERROR,
             failure_policy=QualityGateFailurePolicy.ANNOTATE,
             enabled=True,
             passed=False,
             rule_score=0.0,
-            dimensions=dimensions,
+            dimensions=gate_dimensions,
             checks=(),
             ungrounded_claim_ids=(),
             ungrounded_statements=(),
@@ -1093,13 +1433,7 @@ def apply_analysis_quality_gate(
             ),
             fail_closed=True,
         )
-        try:
-            _attach_gate_to_result(result, gate)
-        except Exception:  # broad-exception: fallback_recorded - last-resort attach
-            try:
-                result.quality_gate_result = gate.to_trace_dict()
-            except Exception:
-                pass
+        _attach_gate_to_result(result, gate)
         return gate
 
 

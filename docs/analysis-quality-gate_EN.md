@@ -10,8 +10,8 @@
 
 After analysis produces a conclusion, the pipeline runs a deterministic quality gate so **factual claims cannot be published as verified facts unless they bind to input evidence**. The gate:
 
-1. Projects pipeline evidence into `FinancialFact` records
-2. Projects conclusion fact claims (structured `dashboard.claims` and numeric `report_strata.verified_facts`) into `FinancialClaim` records
+1. Projects bounded quote, fundamental, and technical inputs into `FinancialFact` records; the public context overview supplies status/provenance only and is never treated as a value source
+2. Projects conclusion fact claims (the analyzer's numeric `dashboard.data_perspective` fields, optional structured `dashboard.claims`, and numeric `report_strata.verified_facts`) into `FinancialClaim` records
 3. Scores them with the same rule scorers used by the offline agent-eval suite
 4. Records the verdict under `quality_gate_result` / `dashboard.quality_gate` (trace + raw_result)
 5. Applies a configurable failure policy
@@ -29,10 +29,12 @@ Soft `data_quality.limitations` (for example a partial news window) do **not** m
 
 | `ANALYSIS_QUALITY_GATE_ON_FAILURE` | Behavior |
 | --- | --- |
-| `annotate` (**default**) | Demote ungrounded verified-fact lines into `model_inference` (opinion), keep analysis success |
+| `annotate` (**default**) | Demote ungrounded verified-fact lines into `model_inference` and quarantine failed structured claims, while keeping analysis success |
 | `intercept` | Set `success=false`, `error_code=quality_gate_intercept` |
 
-Gate-internal exceptions **never pass silently**: they fail closed to `annotate` with `verdict=gate_error` and `fail_closed=true`, even when the configured policy is `intercept`.
+Gate-internal exceptions **never pass silently**: they remove every unchecked structured claim and demote every verified-fact line before returning `verdict=gate_error` and `fail_closed=true`, even when the configured policy is `intercept`. If that enforcement cannot be applied, the exception propagates so the pipeline cannot publish an unchecked success.
+
+Results that already have `success=false` are recorded as `skipped_failed_analysis`; the gate never reclassifies a provider or analysis failure as a successful quality verdict.
 
 ## Configuration
 

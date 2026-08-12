@@ -603,6 +603,7 @@ class _AgentAnalysisStageMixin:
                     fundamental_context=fundamental_context
                     if isinstance(fundamental_context, dict)
                     else None,
+                    technical_context=trend_result,
                 )
                 if quality_gate.verdict.value not in {"pass", "skipped"}:
                     logger.info(

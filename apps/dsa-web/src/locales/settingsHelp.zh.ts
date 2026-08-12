@@ -1445,24 +1445,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
     title: '分析质量门',
     summary: '用与离线 agent-eval 相同的维度，把结论中的事实性声明绑定到输入证据。',
-    usage: '正常运行保持开启；仅在排查投影或本地夹具时关闭。',
-    valueNotes: [
-      '默认开启；复用 agent-eval 的 factuality 与 boundary_honesty。',
-      '判定写入 quality_gate_result 与 dashboard.quality_gate。',
-    ],
-    impact: ['影响未绑定数值是留在已核实事实，还是被降级/拦截。'],
-    notes: ['门自身异常 fail-closed 到标注，绝不静默放行。'],
   },
   'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
     title: '质量门失败策略',
     summary: '发现未绑定事实时选择 annotate（默认）或 intercept。',
-    usage: 'annotate 将未核验事实降级为模型观点；intercept 使分析失败。',
-    valueNotes: [
-      '可选值：annotate、intercept；非法值会阻止配置加载。',
-      '即使选择 intercept，门内部错误也一律 fail-closed 到 annotate。',
-    ],
-    impact: ['控制质量检查失败时是仅标注报告还是阻断发布。'],
-    notes: ['不替代离线 agent-eval 基准，也不另立评分标准。'],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',

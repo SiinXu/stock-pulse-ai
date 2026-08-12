@@ -801,7 +801,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
-        "AGENT_MULTI_STRATEGY_DELIBERATION": {
+    "AGENT_MULTI_STRATEGY_DELIBERATION": {
         "title": "Multi-Strategy Deliberation",
         "description": "Enable multi-strategy deliberation, concurrent specialist scheduling, and final disagreement explanation. Default off preserves Phase-1 synthesis byte-for-byte.",
         "category": "agent",
