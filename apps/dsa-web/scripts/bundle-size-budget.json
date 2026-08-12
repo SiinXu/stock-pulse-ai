@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after AGENT_MODE_BUDGET_* Settings help/title inventory keys (Refs #1121 / #125).",
+  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after AGENT_MODE_BUDGET_* inventory on current main (Refs #1121 / #125).",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 236953,
-      "measuredGzipBytes": 236753,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 238501,
+      "measuredGzipBytes": 238101,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "js-entry",
@@ -26,23 +26,23 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 154460,
-      "measuredGzipBytes": 153860,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 155316,
+      "measuredGzipBytes": 154616,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 147839,
-      "measuredGzipBytes": 147239,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 148660,
+      "measuredGzipBytes": 147960,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 147731,
-      "measuredGzipBytes": 147131,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 148539,
+      "measuredGzipBytes": 147839,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-fr",
@@ -54,30 +54,30 @@
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 143803,
-      "measuredGzipBytes": 143203,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 144564,
+      "measuredGzipBytes": 143864,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 140306,
-      "measuredGzipBytes": 139706,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 141061,
+      "measuredGzipBytes": 140361,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 133828,
-      "measuredGzipBytes": 133228,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 134565,
+      "measuredGzipBytes": 133865,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 133927,
-      "measuredGzipBytes": 133327,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 134702,
+      "measuredGzipBytes": 134002,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "vendor-charts",
