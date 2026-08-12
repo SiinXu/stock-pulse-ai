@@ -49,6 +49,8 @@ _FRONTEND_ASSET_MEDIA_TYPES = {
     ".css": "text/css",
     ".js": "text/javascript",
     ".mjs": "text/javascript",
+    # PWA install surface (Refs #234).
+    ".webmanifest": "application/manifest+json",
 }
 _SAFE_MISSING_ASSET_MEDIA_TYPES = frozenset(_FRONTEND_ASSET_MEDIA_TYPES.values())
 _FRONTEND_INDEX_NO_CACHE_HEADERS = {

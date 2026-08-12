@@ -112,6 +112,8 @@
 | [Analysis Strategy 插件作者指南（英文）](analysis-strategy-plugin-authoring.md) | 声明式优先边界、`Skill` 注册字段、catalog 优先级、生命周期、诊断、测试与信任模型 |
 | [供应链维护策略](supply-chain-maintenance.md) | 依赖与 GitHub Actions 的固定、权限、更新、例外、验证和回滚契约（英文） |
 | [Web UI 基础控件契约](web-ui-foundation.md) | Button、IconButton、Input、Field、Textarea 的语义、尺寸、命中区、守卫和迁移边界 |
+| [Web 响应式断点矩阵](web-responsive-breakpoints.md) | 320/768/1024 支持矩阵、页面差距清单与分批计划（#146 / #234；英文正文） |
+| [Web PWA（仅外壳缓存）](web-pwa.md) | 可安装 PWA、保守外壳缓存边界、不缓存分析/行情数据（#234；英文正文） |
 | [导航信息架构提案](navigation-ia-proposal_zh.md) | 路由/导航现状审计、遗留重定向、孤儿项与 #368 目标选项（**需要决策**；[English](navigation-ia-proposal.md)） |
 | [多语言金融术语指导](financial-terminology-guide.md) | 十语言 UI 金融术语单一治理源：语义边界、术语表、已知译文漂移、风险表达、格式化与审查流程 |
 | [高风险 i18n 语义审计](high-risk-i18n-audit.md) | 交易动作、风险、认证、Credential、错误与免责声明的来源、审查状态、code/display 边界和机器快照 |
