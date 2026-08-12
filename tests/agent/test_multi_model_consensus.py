@@ -268,6 +268,31 @@ def test_run_multi_model_partial_failure_keeps_single_success():
     assert public["degradation"]["annotation"] == "single_model_fallback"
 
 
+def test_all_models_failed_returns_no_primary_result():
+    class FakeAnalyzer:
+        def analyze(self, context, **kwargs):
+            raise RuntimeError("all down")
+
+    result, comparison = run_multi_model_consensus_analysis(
+        analyzer=FakeAnalyzer(),
+        config=SimpleNamespace(
+            multi_model_consensus_enabled=True,
+            multi_model_consensus_models=["model-a", "model-b"],
+            multi_model_consensus_max_models=3,
+            multi_model_consensus_preset="",
+            multi_model_consensus_max_cost_usd=None,
+            litellm_model="model-a",
+            litellm_fallback_models=[],
+        ),
+        context={"code": "600519"},
+        parallel=False,
+    )
+    assert result is None
+    assert comparison is not None
+    assert comparison["status"] == "insufficient"
+    assert comparison["degradation"]["annotation"] == "no_usable_model_result"
+
+
 def test_public_payload_keeps_disagreement_points_for_products():
     comparison = build_multi_model_comparison(
         [

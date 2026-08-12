@@ -917,9 +917,13 @@ class _StockAnalysisStageMixin:
                         record_llm_run=record_llm_run,
                         record_llm_run_started=record_llm_run_started,
                     )
-                    if result is None:
-                        # Budget/model resolution edge: fall back to single-model path.
+                    if multi_model_comparison is None:
+                        # Models could not be resolved; fall back to single-model path.
                         use_multi_model = False
+                    elif result is None:
+                        # Multi-model was attempted and every model failed: do not spend
+                        # another full single-model call on top of the failed fan-out.
+                        use_multi_model = True
 
                 if not use_multi_model:
                     record_llm_run_started(
@@ -961,6 +965,19 @@ class _StockAnalysisStageMixin:
                             dashboard = {}
                             result.dashboard = dashboard
                         dashboard["multi_model_comparison"] = public_payload
+                        # Preserve honesty flags the runner already stamped.
+                        handling = public_payload.get("disagreement_handling") or {}
+                        if handling.get("high_disagreement"):
+                            dashboard["multi_model_high_disagreement"] = True
+                        degradation = public_payload.get("degradation")
+                        if isinstance(degradation, dict) and degradation.get("annotation"):
+                            dashboard["multi_model_degradation"] = {
+                                "annotation": degradation.get("annotation"),
+                                "reason": degradation.get("reason"),
+                                "failed_models": list(
+                                    degradation.get("failed_models") or []
+                                )[:5],
+                            }
             except Exception as exc:
                 record_llm_run(
                     success=False,

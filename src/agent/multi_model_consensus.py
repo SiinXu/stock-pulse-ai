@@ -243,6 +243,9 @@ def build_multi_model_comparison(
             escalation = ESCALATION_SPLIT
             explanation_key = "multi_model.high_split"
             # Honesty: do not invent a majority/averaged signal.
+            # applied_final_signal=hold is the *comparison policy* recommendation only;
+            # the primary AnalysisResult keeps the primary model direction and is
+            # honesty-annotated via confidence dampening + risk note (not blended).
             pre_signal = _primary_signal(successful)
             applied_signal = "hold"
         elif points:
