@@ -254,7 +254,11 @@ class TestFailureAndFlag:
     def test_feature_flag_on_invokes_extract(self, mock_resolve_after) -> None:
         config = SimpleNamespace(prediction_extract_enabled=True)
         out = maybe_extract_prediction_on_finalize(
-            {"code": "600519", "decision_type": "sell", "confidence_level": "low"},
+            {
+                "code": "600519",
+                "action": "sell",
+                "confidence_level": "low",
+            },
             config=config,
             run_id="run-flag-on",
             created_at=CREATED,
@@ -291,3 +295,90 @@ class TestFailureAndFlag:
         assert out.verifiable is True
         assert out.record is not None
         assert out.record.claims[0].payload.direction == "sideways"
+
+
+class TestReviewConvergence:
+    """Regressions for PR review: no invented confidence; agent path discipline."""
+
+    def test_missing_confidence_does_not_invent_default(
+        self, mock_resolve_after
+    ) -> None:
+        result = extract_prediction_record(
+            {"code": "600519", "decision_type": "buy"},
+            run_id="run-no-conf",
+            created_at=CREATED,
+            as_of=AS_OF,
+            mode="analysis",
+        )
+        assert result.verifiable is False
+        assert result.record is not None
+        assert result.record.claims == []
+        assert result.record.status == "no_verifiable_claim"
+        assert result.error is None or "confidence" in (result.error or "")
+        # Reason may be missing_structured_fields after direction skip.
+        assert result.record.no_verifiable_reason in {
+            "missing_structured_fields",
+            "unparseable_output",
+            "prose_only",
+            "empty_decision",
+            "unsupported_shape",
+        }
+
+    def test_agent_mode_ignores_decision_type_without_action(
+        self, mock_resolve_after
+    ) -> None:
+        result = extract_prediction_record(
+            {
+                "code": "600519",
+                "decision_type": "buy",
+                "confidence_level": "高",
+            },
+            run_id="run-agent-synth",
+            created_at=CREATED,
+            as_of=AS_OF,
+            mode="agent",
+        )
+        assert result.verifiable is False
+        assert result.record is not None
+        assert result.record.claims == []
+        assert result.record.status == "no_verifiable_claim"
+
+    def test_agent_mode_accepts_explicit_action(
+        self, mock_resolve_after
+    ) -> None:
+        result = extract_prediction_record(
+            {
+                "code": "600519",
+                "action": "buy",
+                "decision_type": "hold",
+                "confidence": 0.7,
+            },
+            run_id="run-agent-action",
+            created_at=CREATED,
+            as_of=AS_OF,
+            mode="agent",
+        )
+        assert result.verifiable is True
+        assert result.record is not None
+        assert result.record.claims[0].payload.direction == "up"
+        assert result.record.claims[0].confidence == 0.7
+        assert "horizon_source=" in (result.record.notes or "")
+
+    def test_policy_default_horizon_recorded_in_notes(
+        self, mock_resolve_after
+    ) -> None:
+        result = extract_prediction_record(
+            {
+                "code": "600519",
+                "decision_type": "sell",
+                "confidence_level": "中",
+            },
+            run_id="run-horizon-policy",
+            created_at=CREATED,
+            as_of=AS_OF,
+            mode="analysis",
+        )
+        assert result.verifiable is True
+        assert result.record is not None
+        assert result.record.horizon == "5d"
+        assert "horizon_source=policy_default:5d" in (result.record.notes or "")

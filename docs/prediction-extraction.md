@@ -47,6 +47,17 @@
 - 枚举缺失时的默认方向
 - 行情 / 日历失败时的伪造命中（`resolve_after` 失败封闭 → 保留 claims 但 `status=error`，不伪造 pending 到期时间）
 
+
+## 抽取语义（评审收敛）
+
+| 主题 | 行为 |
+| --- | --- |
+| 置信度 | 仅结构化 `confidence` / `confidence_level`；**永不**发明 `0.5` |
+| 期限 | 优先显式结构化 horizon；否则系统策略默认 `5d`，在 notes 记 `horizon_source=policy_default:5d`（非模型声明） |
+| Agent 模式 | 方向声明需要显式 `action` 或类型化 `prediction_claims`；单独的 `decision_type` 忽略（常被编排层合成） |
+| 分析模式 | 在具备结构化置信度时仍接受精确 `decision_type` buy/hold/sell |
+| 双入口 | Agent finalize（`ctx.meta`）与历史保存（`result.prediction_extraction`）都可能挂草稿；A3 持久化必须去重 |
+
 ## 特性开关
 
 | 键 | 默认 | 效果 |

@@ -10,7 +10,12 @@ Product rules:
   short_term_outlook, free-form operation_advice text, trend_prediction copy,
   markdown) is never regex-parsed into a verifiable claim.
 - Missing required structure → ``status=no_verifiable_claim`` with an explicit
-  reason, never invented direction/default claims.
+  reason; never invent direction or confidence defaults.
+- Horizon may use the documented system policy default (``DEFAULT_DECISION_HORIZON``)
+  only when typed claims already exist; notes record ``horizon_source=policy_default``.
+- Agent mode does not mint direction from ``decision_type`` alone (often
+  orchestrator-synthesized); require explicit ``action`` or ``prediction_claims``.
+- Analysis and agent finalize may both attach drafts; persistence (A3) must dedupe.
 - Extraction failures are recorded and never fail the user-visible analysis.
 - Feature-flagged via ``PREDICTION_EXTRACT_ENABLED`` (default off).
 """
@@ -294,8 +299,8 @@ def _extract_prediction_record_impl(
             reason="missing_structured_fields",
         )
 
-    horizon = _extract_horizon(payload, default=default_horizon)
-    claims, claim_errors = _extract_claims(payload)
+    horizon, horizon_source = _extract_horizon(payload, default=default_horizon)
+    claims, claim_errors = _extract_claims(payload, mode=mode)
 
     if not claims:
         reason = _no_claim_reason(payload, claim_errors)
@@ -341,19 +346,19 @@ def _extract_prediction_record_impl(
     )
 
     status = "pending"
-    notes: Optional[str] = None
+    notes_parts: List[str] = [f"horizon_source={horizon_source}"]
     if resolve_after is None:
         # Keep typed claims but do not invent a due time (A6 fail-closed).
         status = "error"
         resolve_after = created
-        notes = f"resolve_after_unavailable:{resolve_error or 'unknown'}"
+        notes_parts.append(f"resolve_after_unavailable:{resolve_error or 'unknown'}")
 
     if resolve_meta:
-        # Attach calendar provenance under model_meta via config_version notes path
-        # without inventing new schema fields (A1 forbids extra keys on the record).
-        existing_notes = notes
-        cal_note = f"resolve_calendar_approx={bool(resolve_meta.get('calendar_approx'))}"
-        notes = f"{existing_notes}; {cal_note}" if existing_notes else cal_note
+        # Attach calendar provenance without inventing new A1 schema fields.
+        notes_parts.append(
+            f"resolve_calendar_approx={bool(resolve_meta.get('calendar_approx'))}"
+        )
+    notes = "; ".join(notes_parts)
 
     record = validate_prediction_record(
         {
@@ -660,7 +665,12 @@ def _extract_horizon(
     payload: Mapping[str, Any],
     *,
     default: PredictionHorizon,
-) -> PredictionHorizon:
+) -> tuple[PredictionHorizon, str]:
+    """Return (horizon, source). Source is structured|policy_default.
+
+    The policy default is a documented system horizon for decision forecasts
+    (not a model claim). It is only used after typed claims already exist.
+    """
     for candidate in (
         payload.get("horizon"),
         (payload.get("forecast") or {}).get("horizon")
@@ -672,14 +682,16 @@ def _extract_horizon(
     ):
         if candidate is None:
             continue
-        text = str(candidate).strip().lower()
-        if text in PREDICTION_HORIZON_TOKENS:
-            return text  # type: ignore[return-value]
-    return default
+        token = str(candidate).strip().lower()
+        if token in PREDICTION_HORIZON_TOKENS:
+            return token, "structured"  # type: ignore[return-value]
+    return default, f"policy_default:{default}"
 
 
 def _extract_claims(
     payload: Mapping[str, Any],
+    *,
+    mode: Optional[str] = None,
 ) -> tuple[List[PredictionClaim], List[str]]:
     """Build claims strictly from structured fields; collect skip reasons."""
     claims: List[PredictionClaim] = []
@@ -720,9 +732,12 @@ def _extract_claims(
     confidence = _extract_confidence(payload)
 
     # 2) Direction from strict enums only (never from operation_advice prose).
+    # Require structured confidence — do not invent 0.5.
     if not any(c.type == "direction" for c in claims):
-        direction = _extract_direction_from_enums(payload)
-        if direction is not None:
+        direction = _extract_direction_from_enums(payload, mode=mode)
+        if direction is not None and confidence is None:
+            errors.append("direction:missing_structured_confidence")
+        elif direction is not None and confidence is not None:
             claim_id = "direction-0"
             if claim_id not in seen_ids:
                 claims.append(
@@ -750,7 +765,18 @@ def _extract_claims(
             raw = payload["forecast"].get(field_name)
         if raw is None:
             continue
-        claim, err = builder(raw, confidence=confidence, claim_id=f"{field_name}-0")
+        if confidence is None:
+            # Object payloads may carry their own confidence; try that first.
+            nested_conf = None
+            if isinstance(raw, Mapping):
+                nested_conf = _coerce_confidence(raw.get("confidence"))
+            if nested_conf is None:
+                errors.append(f"{field_name}:missing_structured_confidence")
+                continue
+            use_conf = nested_conf
+        else:
+            use_conf = confidence
+        claim, err = builder(raw, confidence=use_conf, claim_id=f"{field_name}-0")
         if claim is None:
             if err:
                 errors.append(err)
@@ -784,14 +810,32 @@ def _validate_explicit_claim(
         return None, f"{origin}[{index}]:{exc}"
 
 
-def _extract_direction_from_enums(payload: Mapping[str, Any]) -> Optional[str]:
-    """Map only exact structured enums; never parse free-text advice."""
+def _is_agent_mode(mode: Optional[str]) -> bool:
+    """Return True for agent finalize paths (decision_type often synthesized)."""
+    token = str(mode or "").strip().lower()
+    return token == "agent" or token.startswith("agent")
+
+
+def _extract_direction_from_enums(
+    payload: Mapping[str, Any],
+    *,
+    mode: Optional[str] = None,
+) -> Optional[str]:
+    """Map only exact structured enums; never parse free-text advice.
+
+    Agent mode rejects ``decision_type`` alone because orchestrator finalize
+    often inserts a synthesized three-state label. Prefer explicit ``action``
+    or typed ``prediction_claims`` on that path.
+    """
     action_raw = payload.get("action")
     if action_raw is None and isinstance(payload.get("dashboard"), Mapping):
         action_raw = payload["dashboard"].get("action")
     action_key = _strict_token(action_raw)
     if action_key in _ACTION_DIRECTION:
         return _ACTION_DIRECTION[action_key]
+
+    if _is_agent_mode(mode):
+        return None
 
     decision_raw = payload.get("decision_type")
     if decision_raw is None and isinstance(payload.get("dashboard"), Mapping):
@@ -823,7 +867,8 @@ def _strict_token(value: Any) -> Optional[str]:
     return text
 
 
-def _extract_confidence(payload: Mapping[str, Any]) -> float:
+def _extract_confidence(payload: Mapping[str, Any]) -> Optional[float]:
+    """Return structured confidence only; never invent a default."""
     for key in ("confidence", "confidence_level"):
         raw = payload.get(key)
         if raw is None and isinstance(payload.get("dashboard"), Mapping):
@@ -831,7 +876,7 @@ def _extract_confidence(payload: Mapping[str, Any]) -> float:
         conf = _coerce_confidence(raw)
         if conf is not None:
             return conf
-    return 0.5
+    return None
 
 
 def _coerce_confidence(value: Any) -> Optional[float]:
