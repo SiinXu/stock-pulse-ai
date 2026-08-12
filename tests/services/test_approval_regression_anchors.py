@@ -227,3 +227,102 @@ def test_regression_pipeline_deadline_stops_wait_without_authorizing(database) -
     assert pending[0].consumed_at is None
     # Lifetime still future: deadline abort is independent of expires_at.
     assert pending[0].expires_at > now
+
+
+def test_regression_await_approve_consumes_once_with_injectable_clock(
+    database,
+) -> None:
+    """Anchor: await path approve → CAS consume is one-shot under fixed clock."""
+    now = datetime(2026, 7, 26, tzinfo=timezone.utc)
+    repository = ApprovalRepository(database)
+    repository.put_rule(
+        owner="local_admin",
+        enabled=True,
+        risk_sources=[ApprovalRiskSource.RISK_VETO],
+        expires_in_seconds=300,
+        expected_version=0,
+        now=now,
+    )
+    service: ApprovalService
+
+    def approve_on_first_sleep(_seconds: float) -> None:
+        items = service.list_proposals(
+            status=ApprovalStatus.PENDING, page=1, page_size=10
+        ).items
+        if not items:
+            return
+        service.decide(
+            items[0].id,
+            decision=ApprovalDecision.APPROVED,
+            expected_version=items[0].version,
+            owner="local_admin",
+        )
+
+    service = ApprovalService(
+        repository,
+        SecurityAuditService(SecurityAuditRepository(database)),
+        clock=lambda: now,
+        sleeper=approve_on_first_sleep,
+        poll_interval_seconds=1.0,
+    )
+
+    consumed = service.await_risk_control_bypass(
+        execution_id="regression-await-approve",
+        context=_context(),
+        owner="local_admin",
+    )
+    assert consumed is not None
+    assert consumed.status is ApprovalStatus.APPROVED
+    assert consumed.consumed_at is not None
+
+    # Same execution cannot re-consume; await fails closed on reuse.
+    assert (
+        service.await_risk_control_bypass(
+            execution_id="regression-await-approve",
+            context=_context(),
+            owner="local_admin",
+        )
+        is None
+    )
+
+
+def test_regression_await_proposal_lifetime_timeout_expires_fail_closed(
+    database,
+) -> None:
+    """Anchor: advancing the injectable clock past expires_at ends await as None."""
+    now = datetime(2026, 7, 26, tzinfo=timezone.utc)
+    clock = [now]
+    repository = ApprovalRepository(database)
+    repository.put_rule(
+        owner="local_admin",
+        enabled=True,
+        risk_sources=[ApprovalRiskSource.RISK_VETO],
+        expires_in_seconds=30,
+        expected_version=0,
+        now=now,
+    )
+
+    def advance_past_lifetime(_seconds: float) -> None:
+        clock[0] = clock[0] + timedelta(seconds=31)
+
+    service = ApprovalService(
+        repository,
+        SecurityAuditService(SecurityAuditRepository(database)),
+        clock=lambda: clock[0],
+        sleeper=advance_past_lifetime,
+        poll_interval_seconds=1.0,
+    )
+
+    result = service.await_risk_control_bypass(
+        execution_id="regression-await-lifetime-timeout",
+        context=_context(),
+        owner="local_admin",
+    )
+    assert result is None
+
+    expired = service.list_proposals(
+        status=ApprovalStatus.EXPIRED, page=1, page_size=10
+    ).items
+    assert len(expired) == 1
+    assert expired[0].status is ApprovalStatus.EXPIRED
+    assert expired[0].consumed_at is None

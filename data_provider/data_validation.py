@@ -36,7 +36,18 @@ CODE_FUND_PB_INVALID_TYPE = "dv_fund_pb_invalid_type"
 CODE_FUND_PB_NON_FINITE = "dv_fund_pb_non_finite"
 CODE_FUND_PB_EXTREME = "dv_fund_pb_out_of_range"
 CODE_FUND_PE_NEGATIVE = "dv_fund_pe_negative"
+CODE_FUND_PE_SUSPECT = "dv_fund_pe_suspect"
+CODE_FUND_PB_SUSPECT = "dv_fund_pb_suspect"
 CODE_EMPTY_PAYLOAD = "dv_payload_empty"
+CODE_INDICATOR_INPUT_INSUFFICIENT = "dv_indicator_input_insufficient"
+CODE_CROSS_SOURCE_DIVERGENCE = "dv_cross_source_divergence"
+
+# Soft fundamental plausibility defaults (WARN/suspect; values are kept).
+DEFAULT_PE_SUSPECT_ABS = 200.0
+DEFAULT_PB_SUSPECT_ABS = 50.0
+# Multi-provider relative divergence threshold (WARN with attribution).
+DEFAULT_CROSS_SOURCE_REL_THRESHOLD = 0.05
+DEFAULT_CROSS_SOURCE_ABS_FLOOR = 1e-9
 
 _MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
 _INSTRUMENT_TYPES = frozenset({"equity", "etf", "index"})
@@ -48,7 +59,29 @@ _TECHNICAL_CONTRACTS: Mapping[str, Tuple[Optional[float], Optional[float]]] = {
     "bias_ma10": (-100.0, None),
     "trend_strength": (0.0, 100.0),
     "signal_score": (0.0, 100.0),
+    "current_price": (0.0, None),
 }
+_INDICATOR_INPUT_COLUMNS: Tuple[str, ...] = (
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+)
+_INDICATOR_INPUT_REQUIRED = frozenset({"close", "volume"})
+_CROSS_SOURCE_FIELDS: Tuple[str, ...] = (
+    "price",
+    "open_price",
+    "high",
+    "low",
+    "pre_close",
+    "volume",
+    "amount",
+    "change_pct",
+    "pe_ratio",
+    "pb_ratio",
+)
 _SEVERITY_RANK = {"pass": 0, "warn": 1, "reject": 2}
 
 
@@ -357,6 +390,54 @@ def upper_layer_rejection_enabled() -> bool:
         getattr(_validation_config(), "data_validation_upper_layer_mode", "warn")
         == "reject"
     )
+
+
+def fund_pe_suspect_abs() -> float:
+    """Soft PE absolute bound: finite values above this are WARN/suspect, not discarded."""
+    raw = getattr(
+        _validation_config(),
+        "data_validation_fund_pe_suspect_abs",
+        DEFAULT_PE_SUSPECT_ABS,
+    )
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_PE_SUSPECT_ABS
+    if not math.isfinite(value) or value <= 0:
+        return DEFAULT_PE_SUSPECT_ABS
+    return value
+
+
+def fund_pb_suspect_abs() -> float:
+    """Soft PB absolute bound: finite values above this are WARN/suspect, not discarded."""
+    raw = getattr(
+        _validation_config(),
+        "data_validation_fund_pb_suspect_abs",
+        DEFAULT_PB_SUSPECT_ABS,
+    )
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_PB_SUSPECT_ABS
+    if not math.isfinite(value) or value <= 0:
+        return DEFAULT_PB_SUSPECT_ABS
+    return value
+
+
+def cross_source_rel_threshold() -> float:
+    """Relative divergence threshold for multi-provider field comparison."""
+    raw = getattr(
+        _validation_config(),
+        "data_validation_cross_source_rel_threshold",
+        DEFAULT_CROSS_SOURCE_REL_THRESHOLD,
+    )
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_CROSS_SOURCE_REL_THRESHOLD
+    if not math.isfinite(value) or value <= 0 or value > 1.0:
+        return DEFAULT_CROSS_SOURCE_REL_THRESHOLD
+    return value
 
 
 def classify_numeric(value: Any) -> Tuple[NumericKind, Optional[float]]:
@@ -813,10 +894,11 @@ def validate_fundamental_metrics(
                     ValidationSeverity.WARN,
                     "negative PE can represent a loss-making issuer",
                     field="pe_ratio",
-                    detail={"value": pe},
+                    detail={"value": pe, "kept": True},
                 )
             )
-        if abs(pe) >= PE_ABS_EXTREME:
+        pe_abs = abs(pe)
+        if pe_abs >= PE_ABS_EXTREME:
             result.add(
                 _issue(
                     CODE_FUND_PE_EXTREME,
@@ -826,6 +908,22 @@ def validate_fundamental_metrics(
                     detail={"value": pe, "absolute_limit": PE_ABS_EXTREME},
                 )
             )
+        else:
+            pe_suspect = fund_pe_suspect_abs()
+            if pe_abs >= pe_suspect:
+                result.add(
+                    _issue(
+                        CODE_FUND_PE_SUSPECT,
+                        ValidationSeverity.WARN,
+                        "pe_ratio is outside the soft plausibility band",
+                        field="pe_ratio",
+                        detail={
+                            "value": pe,
+                            "suspect_abs": pe_suspect,
+                            "kept": True,
+                        },
+                    )
+                )
     pb_kind, pb = classify_numeric(pb_raw)
     if pb_kind not in {NumericKind.MISSING, NumericKind.FINITE}:
         result.add(
@@ -836,16 +934,34 @@ def validate_fundamental_metrics(
                 field="pb_ratio",
             )
         )
-    elif pb is not None and abs(pb) >= PB_ABS_EXTREME:
-        result.add(
-            _issue(
-                CODE_FUND_PB_EXTREME,
-                ValidationSeverity.REJECT,
-                "pb_ratio is outside the accepted feed range",
-                field="pb_ratio",
-                detail={"value": pb, "absolute_limit": PB_ABS_EXTREME},
+    elif pb is not None:
+        pb_abs = abs(pb)
+        if pb_abs >= PB_ABS_EXTREME:
+            result.add(
+                _issue(
+                    CODE_FUND_PB_EXTREME,
+                    ValidationSeverity.REJECT,
+                    "pb_ratio is outside the accepted feed range",
+                    field="pb_ratio",
+                    detail={"value": pb, "absolute_limit": PB_ABS_EXTREME},
+                )
             )
-        )
+        else:
+            pb_suspect = fund_pb_suspect_abs()
+            if pb_abs >= pb_suspect:
+                result.add(
+                    _issue(
+                        CODE_FUND_PB_SUSPECT,
+                        ValidationSeverity.WARN,
+                        "pb_ratio is outside the soft plausibility band",
+                        field="pb_ratio",
+                        detail={
+                            "value": pb,
+                            "suspect_abs": pb_suspect,
+                            "kept": True,
+                        },
+                    )
+                )
     return result
 
 
@@ -930,6 +1046,56 @@ def validate_fundamental_context(
     return result
 
 
+def _collect_numeric_paths(
+    value: Any,
+    *,
+    prefix: str = "",
+    depth: int = 0,
+) -> List[Tuple[str, Any]]:
+    """Collect int/float leaves (including non-finite) with dotted paths."""
+    if depth > 4:
+        return []
+    if isinstance(value, Mapping):
+        found: List[Tuple[str, Any]] = []
+        for key, item in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            found.extend(_collect_numeric_paths(item, prefix=path, depth=depth + 1))
+        return found
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        found = []
+        for index, item in enumerate(list(value)[:64]):
+            path = f"{prefix}[{index}]" if prefix else f"[{index}]"
+            found.extend(_collect_numeric_paths(item, prefix=path, depth=depth + 1))
+        return found
+    # Booleans are rejected as invalid numeric indicator values when present.
+    if prefix and isinstance(value, bool):
+        return [(prefix, value)]
+    if prefix and isinstance(value, (int, float)) and not isinstance(value, bool):
+        return [(prefix, value)]
+    return []
+
+
+def _scrub_non_finite(value: Any, *, depth: int = 0) -> Any:
+    """Replace non-finite numeric leaves with None; preserve structure otherwise."""
+    if depth > 4:
+        return value
+    if isinstance(value, Mapping):
+        return {
+            key: _scrub_non_finite(item, depth=depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_scrub_non_finite(item, depth=depth + 1) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_scrub_non_finite(item, depth=depth + 1) for item in value)
+    kind, number = classify_numeric(value)
+    if kind == NumericKind.NON_FINITE:
+        return None
+    if kind == NumericKind.FINITE:
+        return number
+    return value
+
+
 def validate_technical_indicators(
     indicators: Any,
     *,
@@ -950,9 +1116,12 @@ def validate_technical_indicators(
     if not payload:
         result.add(_issue(CODE_EMPTY_PAYLOAD, ValidationSeverity.WARN, "technical indicators are empty"))
         return result
+    checked_top_level: set = set()
     for field_name, (minimum, maximum) in _TECHNICAL_CONTRACTS.items():
         if field_name not in payload:
             continue
+        checked_top_level.add(field_name)
+        exclusive = field_name.startswith("ma") or field_name == "current_price"
         _validate_numeric_field(
             result,
             namespace="technical",
@@ -960,9 +1129,211 @@ def validate_technical_indicators(
             raw_value=payload.get(field_name),
             minimum=minimum,
             maximum=maximum,
-            minimum_exclusive=field_name.startswith("ma"),
+            minimum_exclusive=exclusive and minimum is not None,
+        )
+    # Reject non-finite / boolean values on every numeric leaf, not only the contract set.
+    for path, raw_value in _collect_numeric_paths(payload):
+        top = path.split(".", 1)[0].split("[", 1)[0]
+        if top in checked_top_level and "." not in path and "[" not in path:
+            continue
+        kind, _number = classify_numeric(raw_value)
+        if kind in {NumericKind.MISSING, NumericKind.FINITE}:
+            continue
+        result.add(
+            _issue(
+                _numeric_code(
+                    "technical",
+                    path.replace(".", "_").replace("[", "_").replace("]", ""),
+                    kind.value,
+                ),
+                ValidationSeverity.REJECT,
+                (
+                    f"{path} is not finite"
+                    if kind == NumericKind.NON_FINITE
+                    else f"{path} is not a finite number"
+                ),
+                field=path,
+                detail={"kind": kind.value},
+            )
         )
     return result
+
+
+def validate_indicator_inputs(
+    frame: Any,
+    *,
+    market: Optional[str] = None,
+    asset_type: Optional[str] = None,
+    stock_code: Optional[str] = None,
+) -> ValidationResult:
+    """Validate OHLCV inputs before technical-indicator synthesis.
+
+    Non-finite required fields reject the affected row. The analyzer must not
+    synthesize indicators from dirty inputs.
+    """
+    instrument_type = infer_instrument_type(stock_code, explicit=asset_type)
+    result = ValidationResult(
+        context={
+            "market": canonical_market(market),
+            "instrument_type": instrument_type,
+            "stock_code": stock_code,
+            "data_type": "indicator_inputs",
+        }
+    )
+    if frame is None or (hasattr(frame, "empty") and bool(frame.empty)):
+        result.add(
+            _issue(
+                CODE_EMPTY_PAYLOAD,
+                ValidationSeverity.REJECT,
+                "indicator input frame is empty",
+            )
+        )
+        return result
+    if not hasattr(frame, "columns"):
+        result.add(
+            _issue(
+                CODE_EMPTY_PAYLOAD,
+                ValidationSeverity.REJECT,
+                "indicator input type is unsupported",
+            )
+        )
+        return result
+
+    row_count = int(len(frame))
+    dirty_rows = 0
+    for index in range(row_count):
+        row = frame.iloc[index]
+        row_dirty = False
+        for column in _INDICATOR_INPUT_COLUMNS:
+            if column not in frame.columns:
+                continue
+            raw_value = row.get(column) if hasattr(row, "get") else row[column]
+            kind, _number = classify_numeric(raw_value)
+            if kind == NumericKind.MISSING:
+                if column in _INDICATOR_INPUT_REQUIRED:
+                    result.add(
+                        _issue(
+                            _numeric_code("indicator_input", column, "missing"),
+                            ValidationSeverity.REJECT,
+                            f"{column} is missing in indicator input",
+                            field=column,
+                            row_index=index,
+                        )
+                    )
+                    row_dirty = True
+                continue
+            if kind == NumericKind.INVALID_TYPE:
+                result.add(
+                    _issue(
+                        _numeric_code("indicator_input", column, "invalid_type"),
+                        ValidationSeverity.REJECT,
+                        f"{column} is not numeric in indicator input",
+                        field=column,
+                        row_index=index,
+                    )
+                )
+                row_dirty = True
+                continue
+            if kind == NumericKind.NON_FINITE:
+                result.add(
+                    _issue(
+                        _numeric_code("indicator_input", column, "non_finite"),
+                        ValidationSeverity.REJECT,
+                        f"{column} is not finite in indicator input",
+                        field=column,
+                        row_index=index,
+                    )
+                )
+                row_dirty = True
+        if row_dirty:
+            dirty_rows += 1
+    clean_rows = row_count - dirty_rows
+    result.context.update(
+        {
+            "row_count": row_count,
+            "dirty_rows": dirty_rows,
+            "clean_rows": clean_rows,
+        }
+    )
+    if clean_rows == 0:
+        result.add(
+            _issue(
+                CODE_INDICATOR_INPUT_INSUFFICIENT,
+                ValidationSeverity.REJECT,
+                "no finite OHLCV rows remain for indicator synthesis",
+            )
+        )
+    elif dirty_rows > 0:
+        result.add(
+            _issue(
+                CODE_INDICATOR_INPUT_INSUFFICIENT,
+                ValidationSeverity.WARN,
+                "some indicator input rows were rejected as non-finite",
+                detail={"dirty_rows": dirty_rows, "clean_rows": clean_rows},
+            )
+        )
+    return result
+
+
+def prepare_indicator_inputs(
+    frame: Any,
+    *,
+    market: Optional[str] = None,
+    asset_type: Optional[str] = None,
+    stock_code: Optional[str] = None,
+    provider: str = "indicator_synthesis",
+) -> Tuple[Any, ValidationResult]:
+    """Validate inputs, drop dirty rows, and record explicit degradation evidence.
+
+    Returns the cleaned frame (may be empty) and the validation result. Callers
+    must degrade when the cleaned frame is empty rather than synthesizing from
+    non-finite values.
+    """
+    if not is_validation_enabled():
+        return frame, ValidationResult(
+            context={
+                "data_type": "indicator_inputs",
+                "enabled": False,
+                "stock_code": stock_code,
+            }
+        )
+    result = validate_indicator_inputs(
+        frame,
+        market=market,
+        asset_type=asset_type,
+        stock_code=stock_code,
+    )
+    cleaned = frame
+    if frame is not None and hasattr(frame, "columns") and not (
+        hasattr(frame, "empty") and bool(frame.empty)
+    ):
+        drop_indices: List[int] = []
+        for index in range(int(len(frame))):
+            row = frame.iloc[index]
+            for column in _INDICATOR_INPUT_COLUMNS:
+                if column not in frame.columns:
+                    continue
+                raw_value = row.get(column) if hasattr(row, "get") else row[column]
+                kind, _number = classify_numeric(raw_value)
+                required_missing = (
+                    kind == NumericKind.MISSING and column in _INDICATOR_INPUT_REQUIRED
+                )
+                if kind in {NumericKind.NON_FINITE, NumericKind.INVALID_TYPE} or required_missing:
+                    drop_indices.append(index)
+                    break
+        if drop_indices:
+            cleaned = frame.drop(index=list(frame.index[drop_indices])).reset_index(drop=True)
+            result.context["dropped_row_indices"] = drop_indices[:MAX_EVIDENCE_ISSUES]
+    log_validation_result(
+        result,
+        data_type="indicator_inputs",
+        stock_code=stock_code,
+        provider=provider,
+        market=market,
+        instrument_type=infer_instrument_type(stock_code, explicit=asset_type),
+        rejected=result.has_reject and int(result.context.get("clean_rows") or 0) == 0,
+    )
+    return cleaned, result
 
 
 def project_technical_indicators(
@@ -973,14 +1344,50 @@ def project_technical_indicators(
     stock_code: Optional[str] = None,
     provider: str = "StockTrendAnalyzer",
 ) -> Dict[str, Any]:
-    """Validate, record, and return the finite synthesis projection."""
+    """Validate outputs, strip non-finite leaves, and return a clean projection.
+
+    Non-finite indicator values are never returned. Rejection and scrubbing are
+    recorded through run diagnostics so degradation is never silent.
+    """
     payload = _mapping_from_value(indicators)
+    if not is_validation_enabled():
+        return payload
     result = validate_technical_indicators(
         payload,
         market=market,
         asset_type=instrument_type,
         stock_code=stock_code,
     )
+    rejected_fields = {
+        issue.field
+        for issue in result.issues
+        if (
+            issue.severity == ValidationSeverity.REJECT
+            and issue.field
+            and "." not in issue.field
+            and "[" not in issue.field
+        )
+    }
+    projected: Dict[str, Any] = {
+        key: value for key, value in payload.items() if key not in rejected_fields
+    }
+    scrubbed = _scrub_non_finite(projected)
+    if not isinstance(scrubbed, dict):
+        scrubbed = {}
+    # Drop top-level keys that were non-finite so consumers never see NaN/inf.
+    for key, original in list(projected.items()):
+        kind, _ = classify_numeric(original)
+        if kind == NumericKind.NON_FINITE:
+            if key not in rejected_fields:
+                result.add(
+                    _issue(
+                        _numeric_code("technical", key, "non_finite"),
+                        ValidationSeverity.REJECT,
+                        f"{key} is not finite",
+                        field=key,
+                    )
+                )
+            scrubbed.pop(key, None)
     log_validation_result(
         result,
         data_type="technical_indicators",
@@ -989,13 +1396,142 @@ def project_technical_indicators(
         market=market,
         instrument_type=instrument_type,
         rejected=False,
+        provenance={"scrubbed_non_finite": bool(result.has_reject or result.has_warn)},
     )
-    rejected_fields = {
-        issue.field
-        for issue in result.issues
-        if issue.severity == ValidationSeverity.REJECT and issue.field
-    }
-    return {key: value for key, value in payload.items() if key not in rejected_fields}
+    return scrubbed
+
+
+def compare_cross_source_fields(
+    observations: Mapping[str, Mapping[str, Any]],
+    *,
+    fields: Optional[Sequence[str]] = None,
+    relative_threshold: Optional[float] = None,
+    market: Optional[str] = None,
+    asset_type: Optional[str] = None,
+    stock_code: Optional[str] = None,
+) -> ValidationResult:
+    """Compare the same field across multiple providers.
+
+    Differences above the relative threshold produce WARN findings with
+    provider attribution. Values are never discarded. A single observation is a
+    no-op so one provider failure cannot interrupt analysis.
+    """
+    instrument_type = infer_instrument_type(stock_code, explicit=asset_type)
+    result = ValidationResult(
+        context={
+            "market": canonical_market(market),
+            "instrument_type": instrument_type,
+            "stock_code": stock_code,
+            "data_type": "cross_source",
+            "provider_count": len(observations),
+        }
+    )
+    if not observations or len(observations) < 2:
+        result.context["compared"] = False
+        return result
+    threshold = (
+        float(relative_threshold)
+        if relative_threshold is not None
+        else cross_source_rel_threshold()
+    )
+    if not math.isfinite(threshold) or threshold <= 0:
+        threshold = DEFAULT_CROSS_SOURCE_REL_THRESHOLD
+    target_fields = tuple(fields) if fields else _CROSS_SOURCE_FIELDS
+    providers = [str(name) for name in observations.keys()]
+    for field_name in target_fields:
+        finite_values: List[Tuple[str, float]] = []
+        for provider_name in providers:
+            payload = observations.get(provider_name) or {}
+            if not isinstance(payload, Mapping):
+                continue
+            kind, number = classify_numeric(payload.get(field_name))
+            if kind == NumericKind.FINITE and number is not None:
+                finite_values.append((provider_name, number))
+        if len(finite_values) < 2:
+            continue
+        values_only = [item[1] for item in finite_values]
+        min_value = min(values_only)
+        max_value = max(values_only)
+        scale = max(abs(min_value), abs(max_value), DEFAULT_CROSS_SOURCE_ABS_FLOOR)
+        relative = abs(max_value - min_value) / scale
+        if relative > threshold:
+            result.add(
+                _issue(
+                    CODE_CROSS_SOURCE_DIVERGENCE,
+                    ValidationSeverity.WARN,
+                    f"{field_name} diverges across providers",
+                    field=field_name,
+                    detail={
+                        "relative_difference": relative,
+                        "threshold": threshold,
+                        "values": [
+                            {"provider": provider, "value": value}
+                            for provider, value in finite_values
+                        ],
+                        "kept": True,
+                    },
+                )
+            )
+    result.context["compared"] = True
+    result.context["fields_checked"] = list(target_fields)
+    return result
+
+
+def compare_cross_source_quotes(
+    primary: Any,
+    secondary: Any,
+    *,
+    primary_provider: str,
+    secondary_provider: str,
+    market: Optional[str] = None,
+    asset_type: Optional[str] = None,
+    stock_code: Optional[str] = None,
+    relative_threshold: Optional[float] = None,
+    log: bool = True,
+) -> ValidationResult:
+    """Compare two quote-like objects and optionally record diagnostic evidence."""
+    if not is_validation_enabled():
+        return ValidationResult(
+            context={
+                "data_type": "cross_source",
+                "enabled": False,
+                "stock_code": stock_code,
+            }
+        )
+    primary_payload = _mapping_from_value(primary)
+    secondary_payload = _mapping_from_value(secondary)
+    # Prefer attribute-level price when to_dict is sparse.
+    for obj, payload in ((primary, primary_payload), (secondary, secondary_payload)):
+        for field_name in _CROSS_SOURCE_FIELDS:
+            if field_name in payload and payload.get(field_name) is not None:
+                continue
+            if hasattr(obj, field_name):
+                payload[field_name] = getattr(obj, field_name)
+    result = compare_cross_source_fields(
+        {
+            str(primary_provider or "primary"): primary_payload,
+            str(secondary_provider or "secondary"): secondary_payload,
+        },
+        relative_threshold=relative_threshold,
+        market=market,
+        asset_type=asset_type,
+        stock_code=stock_code,
+    )
+    if log and not result.ok:
+        log_validation_result(
+            result,
+            data_type="cross_source",
+            stock_code=stock_code,
+            provider=f"{primary_provider}|{secondary_provider}",
+            market=market,
+            instrument_type=infer_instrument_type(stock_code, explicit=asset_type),
+            rejected=False,
+            provenance={
+                "primary_provider": _bounded_text(primary_provider, 120),
+                "secondary_provider": _bounded_text(secondary_provider, 120),
+            },
+        )
+    return result
 
 
 def attach_validation_to_frame(frame: Any, result: ValidationResult) -> Any:
@@ -1102,6 +1638,32 @@ def validate_and_annotate(
             asset_type=resolved_instrument,
             stock_code=stock_code,
         )
+    elif data_type == "indicator_inputs":
+        result = validate_indicator_inputs(
+            data,
+            market=market,
+            asset_type=resolved_instrument,
+            stock_code=stock_code,
+        )
+    elif data_type == "cross_source":
+        if isinstance(data, Mapping):
+            result = compare_cross_source_fields(
+                data,  # type: ignore[arg-type]
+                market=market,
+                asset_type=resolved_instrument,
+                stock_code=stock_code,
+            )
+        else:
+            result = ValidationResult(
+                context={"data_type": data_type, "stock_code": stock_code}
+            )
+            result.add(
+                _issue(
+                    CODE_EMPTY_PAYLOAD,
+                    ValidationSeverity.WARN,
+                    "cross-source observations must be a provider-to-fields mapping",
+                )
+            )
     else:
         result = ValidationResult(
             context={"data_type": data_type, "stock_code": stock_code}
