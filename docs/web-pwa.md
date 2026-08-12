@@ -70,3 +70,7 @@ test -f ../../static/sw.js
 - #234 — mobile experience and PWA support (this document)
 - #146 — responsive multi-device optimization (layout; separate from cache policy)
 - #218 / #990 — offline analysis / local-first data (out of scope here)
+
+## CI note
+
+Docker web-builder typechecks browser sources; Node-only imports in unit tests must use `@ts-expect-error` under `tsconfig.app.json`.
