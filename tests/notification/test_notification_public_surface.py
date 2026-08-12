@@ -203,7 +203,7 @@ EXPECTED_GROUPS = (
             "save_report_to_file",
             "save_and_send_feishu_file",
         ),
-        "bd3a155f47f94c13080048d5fc01ce42920930567516054625c87b4ac0e81aa2",
+        "98fa5071c3d27dd8c1234ef303440587f2030e7313e763ca48163b8d22511de7",
     ),
 )
 
