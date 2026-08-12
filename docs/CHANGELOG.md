@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Localize market badge aria-labels and retarget ReportOverview design-guard allowlist lines after multi-market format adoption (Refs #881, #889).
 - [Fixed] Extend marketFormat for crypto: identities and wire CN/US/HK/crypto currency, change-color, market badge, and timezone labels on Stock Details and Report Overview, with cross-market boundary tests (Refs #881, #889).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
