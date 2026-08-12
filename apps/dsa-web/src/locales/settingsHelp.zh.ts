@@ -2289,6 +2289,16 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '限制单次分析成本。',
     ],
   },
+  'settings.ai_model.TASK_ROUTING_ENABLED': { summary: '启用基于写入侧能力注册表的任务感知模型路由。', valueNotes: ['默认关闭。TASK_ROUTING_PIN_* 始终优先。'] },
+  'settings.ai_model.TASK_ROUTING_POLICY': { summary: '评分策略：quality / cost / local_first。', valueNotes: ['仅在 TASK_ROUTING_ENABLED=true 时生效。'] },
+  'settings.ai_model.CAPABILITY_WRITE_REGISTRY_PATH': { summary: 'capability_write_registry.json 的可选路径。', valueNotes: ['留空则使用数据库目录。'] },
+  'settings.ai_model.TASK_ROUTING_PIN_REPORT': { summary: '报告任务可选模型固定选择。', valueNotes: ['设置后始终覆盖自动路由。'] },
+  'settings.ai_model.TASK_ROUTING_PIN_AGENT': { summary: 'Agent 任务可选模型固定选择。', valueNotes: ['设置后始终覆盖自动路由。'] },
+  'settings.ai_model.TASK_ROUTING_PIN_VISION': { summary: '视觉任务可选模型固定选择。', valueNotes: ['设置后始终覆盖自动路由。'] },
+  'settings.ai_model.TASK_ROUTING_PIN_MARKET_REVIEW': { summary: '市场复盘任务可选模型固定选择。', valueNotes: [] },
+  'settings.ai_model.TASK_ROUTING_PIN_CHEAP_SCAN': { summary: '廉价扫描任务可选模型固定选择。', valueNotes: [] },
+  'settings.ai_model.TASK_ROUTING_PIN_DEEP_REASONING': { summary: '深度推理任务可选模型固定选择。', valueNotes: [] },
+  'settings.ai_model.TASK_ROUTING_PIN_CODING': { summary: '编码任务可选模型固定选择。', valueNotes: [] }
 };
 
 export default settingsHelpZhCN;

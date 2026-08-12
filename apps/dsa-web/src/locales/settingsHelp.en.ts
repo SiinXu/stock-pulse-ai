@@ -2247,6 +2247,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Bounds per-call analysis cost.',
     ],
   },
+  'settings.ai_model.TASK_ROUTING_ENABLED': { summary: 'Enable task-aware model routing from the write-side capability registry.', valueNotes: ['Default off. Explicit TASK_ROUTING_PIN_* always wins.'] },
+  'settings.ai_model.TASK_ROUTING_POLICY': { summary: 'Scoring policy: quality, cost, or local_first.', valueNotes: ['Used only when TASK_ROUTING_ENABLED=true.'] },
+  'settings.ai_model.CAPABILITY_WRITE_REGISTRY_PATH': { summary: 'Optional path for capability_write_registry.json.', valueNotes: ['Empty uses the database directory.'] },
+  'settings.ai_model.TASK_ROUTING_PIN_REPORT': { summary: 'Optional report task model pin.', valueNotes: ['Always overrides automatic selection when set.'] },
+  'settings.ai_model.TASK_ROUTING_PIN_AGENT': { summary: 'Optional Agent task model pin.', valueNotes: ['Always overrides automatic selection when set.'] },
+  'settings.ai_model.TASK_ROUTING_PIN_VISION': { summary: 'Optional vision task model pin.', valueNotes: ['Always overrides automatic selection when set.'] },
+  'settings.ai_model.TASK_ROUTING_PIN_MARKET_REVIEW': { summary: 'Optional market-review task model pin.', valueNotes: [] },
+  'settings.ai_model.TASK_ROUTING_PIN_CHEAP_SCAN': { summary: 'Optional cheap-scan task model pin.', valueNotes: [] },
+  'settings.ai_model.TASK_ROUTING_PIN_DEEP_REASONING': { summary: 'Optional deep-reasoning task model pin.', valueNotes: [] },
+  'settings.ai_model.TASK_ROUTING_PIN_CODING': { summary: 'Optional coding task model pin.', valueNotes: [] }
 };
 
 export default settingsHelpEnUS;
