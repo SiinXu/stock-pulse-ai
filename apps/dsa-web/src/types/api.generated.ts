@@ -16196,6 +16196,8 @@ export interface components {
             multiple_metrics?: string[] | null;
             /** Currency Metrics */
             currency_metrics?: string[] | null;
+            /** Core Metrics */
+            core_metrics?: string[] | null;
             /** Rows */
             rows?: {
                 [key: string]: unknown;
@@ -16212,6 +16214,12 @@ export interface components {
             heatmap_cells?: {
                 [key: string]: unknown;
             }[] | null;
+            /** Heatmap Note */
+            heatmap_note?: string | null;
+            /** Claim Policy */
+            claim_policy?: {
+                [key: string]: unknown;
+            } | null;
             /** Valuation Status */
             valuation_status?: string | null;
             /** Disclaimer */
@@ -27323,7 +27331,7 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Valuation estimate failed */
+            /** @description Peer canvas build failed */
             500: {
                 headers: {
                     [name: string]: unknown;
