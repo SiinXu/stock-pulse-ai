@@ -536,11 +536,11 @@ describe('ChatPage', () => {
     fireEvent.click(whatIfButton);
     expect(whatIfButton).toHaveAttribute('aria-pressed', 'true');
     const whatIfConfiguration = await screen.findByRole('region', { name: 'What-if 情景分析' });
-    expect(within(whatIfConfiguration).getByTestId('chat-what-if-panel')).toBeInTheDocument();
+    expect(await within(whatIfConfiguration).findByRole('switch', { name: '启用 what-if 情景模式' })).toBeInTheDocument();
     expect(screen.getByTestId('chat-composer-input').parentElement).toContainElement(whatIfConfiguration);
     expect(whatIfConfiguration).not.toHaveClass('absolute', 'fixed');
     expect(within(whatIfConfiguration).getByTestId('chat-what-if-fields')).toHaveClass('grid-cols-2');
-    expect(within(whatIfConfiguration).getByRole('combobox', { name: '预置 / 已保存情景' })).toBeInTheDocument();
+    expect(await within(whatIfConfiguration).findByRole('combobox', { name: '预置 / 已保存情景' })).toBeInTheDocument();
     expect(within(whatIfConfiguration).getByRole('combobox', { name: '假设维度' })).toBeInTheDocument();
     expect(within(whatIfConfiguration).getByRole('combobox', { name: '方向' })).toBeInTheDocument();
   });
@@ -550,7 +550,7 @@ describe('ChatPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'What-if 情景分析' }));
     const whatIfConfiguration = await screen.findByRole('region', { name: 'What-if 情景分析' });
-    const scenarioSelect = within(whatIfConfiguration).getByRole('combobox', { name: '预置 / 已保存情景' });
+    const scenarioSelect = await within(whatIfConfiguration).findByRole('combobox', { name: '预置 / 已保存情景' });
 
     fireEvent.click(scenarioSelect);
     fireEvent.click(await screen.findByRole('option', { name: 'Policy rates +100bp' }));

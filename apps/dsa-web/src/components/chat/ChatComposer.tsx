@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { ChevronDown, FlaskConical, Minimize2, RefreshCw, Send, SlidersHorizontal, Square } from 'lucide-react';
 import type { SkillInfo } from '../../api/agent';
 import type { ParsedApiError } from '../../api/error';
@@ -8,13 +8,17 @@ import {
   Checkbox,
   IconButton,
   InlineAlert,
+  Loading,
   Tooltip,
 } from '../common';
 import { cn } from '../../utils/cn';
 import { getStrategyDisplay } from '../../utils/strategyDisplay';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
-import { WhatIfScenarioPanel } from './WhatIfScenarioPanel';
 import type { WhatIfDraftState } from './whatIfScenario';
+
+const WhatIfScenarioPanel = lazy(() =>
+  import('./WhatIfScenarioPanel').then((module) => ({ default: module.WhatIfScenarioPanel })),
+);
 
 type Translate = (key: UiTextKey, params?: Record<string, string | number>) => string;
 
@@ -183,12 +187,14 @@ export function ChatComposer({
             data-testid="chat-what-if-configuration"
           >
             <div className="[&_[role=switch]]:h-9 [&_[role=switch]]:w-9 [&_[role=switch]>span]:scale-75">
-              <WhatIfScenarioPanel
-                t={t}
-                draft={whatIfDraft}
-                onChange={onWhatIfChange}
-                disabled={loading || sessionLoading || isSkillsLoading}
-              />
+              <Suspense fallback={<Loading label={t('common.loading')} />}>
+                <WhatIfScenarioPanel
+                  t={t}
+                  draft={whatIfDraft}
+                  onChange={onWhatIfChange}
+                  disabled={loading || sessionLoading || isSkillsLoading}
+                />
+              </Suspense>
             </div>
           </div>
         ) : null}
