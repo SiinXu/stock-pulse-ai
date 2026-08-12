@@ -5261,6 +5261,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_SUMMARY_ONLY": "報告僅顯示摘要",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TEMPLATES_DIR": "報告範本目錄",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TYPE": "報告類型",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_ENABLED": "唯讀研究 API",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_RATE_LIMIT_PER_MINUTE": "研究 API 速率限制（次/分鐘）",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FEED_URLS": "RSS/Atom 新聞源 URL",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FETCH_TIMEOUT_SEC": "RSS/Atom 擷取逾時（秒）",
   "utils.systemConfigI18n.fieldTitleMaps.RUN_IMMEDIATELY": "立即執行",

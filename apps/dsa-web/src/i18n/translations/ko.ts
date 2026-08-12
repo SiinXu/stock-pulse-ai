@@ -5261,6 +5261,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_SUMMARY_ONLY": "보고서에 요약만 표시",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TEMPLATES_DIR": "보고서 템플릿 디렉터리",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TYPE": "보고서 유형",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_ENABLED": "읽기 전용 리서치 API",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_RATE_LIMIT_PER_MINUTE": "리서치 API 속도 제한",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FEED_URLS": "RSS/Atom 뉴스 피드 URL",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FETCH_TIMEOUT_SEC": "RSS/Atom 가져오기 제한 시간(초)",
   "utils.systemConfigI18n.fieldTitleMaps.RUN_IMMEDIATELY": "즉시 실행",

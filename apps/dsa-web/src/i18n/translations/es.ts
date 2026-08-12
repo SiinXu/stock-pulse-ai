@@ -5261,6 +5261,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_SUMMARY_ONLY": "Solo resumen del informe",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TEMPLATES_DIR": "Directorio de plantillas de informes",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TYPE": "Tipo de informe",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_ENABLED": "API de investigación de solo lectura",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_RATE_LIMIT_PER_MINUTE": "Límite de tasa de la API de investigación",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FEED_URLS": "URL de feeds RSS/Atom de noticias",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FETCH_TIMEOUT_SEC": "Tiempo de espera de obtención RSS/Atom (s)",
   "utils.systemConfigI18n.fieldTitleMaps.RUN_IMMEDIATELY": "Ejecutar inmediatamente",

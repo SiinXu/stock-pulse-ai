@@ -5261,6 +5261,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_SUMMARY_ONLY": "Ringkasan Laporan Sahaja",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TEMPLATES_DIR": "Direktori Templat Laporan",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_TYPE": "Jenis Laporan",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_ENABLED": "API Penyelidikan Baca Sahaja",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_API_RATE_LIMIT_PER_MINUTE": "Had Kadar API Penyelidikan",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FEED_URLS": "URL suapan berita RSS/Atom",
   "utils.systemConfigI18n.fieldTitleMaps.RSS_NEWS_FETCH_TIMEOUT_SEC": "Tamat masa ambil RSS/Atom (saat)",
   "utils.systemConfigI18n.fieldTitleMaps.RUN_IMMEDIATELY": "Jalankan Serta-merta",
