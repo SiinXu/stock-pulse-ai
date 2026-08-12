@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-11",
-  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after Agent Behavior Essentials/Behavior/Governance disclosure copy (Refs #868 / PR #1166); failed locales use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
+  "measuredAt": "2026-08-12",
+  "baselineNote": "Locale budgets merge PR #1166 Linux rebaseline with HTML report-export chrome (Refs #163 / PR #1159); caps keep stack headroom for both key sets.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 152652,
-      "measuredGzipBytes": 152452,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 152452 B + 200 B headroom."
+      "maxGzipBytes": 152852,
+      "measuredGzipBytes": 152478,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 152478 B, cap 152852 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 146022,
-      "measuredGzipBytes": 145822,
-      "note": "Remeasured after the integration rebuild translation additions; measured 145822 B + 200 B headroom."
+      "maxGzipBytes": 146108,
+      "measuredGzipBytes": 145866,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145866 B, cap 146108 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 146029,
-      "measuredGzipBytes": 145829,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 145829 B + 200 B headroom."
+      "maxGzipBytes": 146229,
+      "measuredGzipBytes": 145847,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145847 B, cap 146229 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 146309,
-      "measuredGzipBytes": 146109,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 146109 B + 200 B headroom."
+      "maxGzipBytes": 146509,
+      "measuredGzipBytes": 146126,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 146126 B, cap 146509 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 142089,
-      "measuredGzipBytes": 141889,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 141889 B + 200 B headroom."
+      "maxGzipBytes": 142289,
+      "measuredGzipBytes": 141915,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 141915 B, cap 142289 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 138632,
-      "measuredGzipBytes": 138432,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 138432 B + 200 B headroom."
+      "maxGzipBytes": 138832,
+      "measuredGzipBytes": 138450,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 138450 B, cap 138832 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 132053,
-      "measuredGzipBytes": 131853,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 131853 B + 200 B headroom."
+      "maxGzipBytes": 132253,
+      "measuredGzipBytes": 131875,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131875 B, cap 132253 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 132128,
-      "measuredGzipBytes": 131928,
-      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 131928 B + 200 B headroom."
+      "maxGzipBytes": 132328,
+      "measuredGzipBytes": 131950,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131950 B, cap 132328 B (measured + \u2265200 B)."
     },
     {
       "id": "vendor-charts",

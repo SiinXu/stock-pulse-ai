@@ -2992,6 +2992,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Copier la source Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Copier le texte brut",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Échec de l'export",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Télécharger HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "L'export HTML n'est pas disponible",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Télécharger Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Télécharger PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "L'export PDF n'est pas disponible",

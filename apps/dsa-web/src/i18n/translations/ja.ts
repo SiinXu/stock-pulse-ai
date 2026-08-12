@@ -2992,6 +2992,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Markdownソースをコピー",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "プレーンテキストをコピー",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "エクスポートに失敗しました",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "HTML をダウンロード",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML エクスポートは利用できません",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Markdown をダウンロード",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "PDF をダウンロード",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF エクスポートは利用できません",
