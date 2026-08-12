@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
 - [Changed] Agent Behavior settings use Essentials · Behavior · Governance/Expert progressive disclosure, move expert JSON behind the expert layer, and add a default preset-to-ask path without changing config semantics (#868).
 - [Added] Render a top-of-report analysis delta section from history_comparison_service for both scheduled and manual report generation, distinguishing first analysis from no material change and rejecting non-finite values (Refs #148).
+- [Changed] Expose the Event Calendar production entry from Research navigation and the Research overview cards so users can reach `/events` without typing the URL (Refs #153, #1008, #1058).
 - [Added] Expand offline OCR Agent tool coverage to filing pages, table-like statements, chart annotations, and embedded PDF page rasters with typed untrusted non-decision envelopes, BoundToolSession allowlist/runtime proofs, and follow-on fencing (Refs #196).
 - [Tests] Add Playwright product-surface smoke for Stock Details K-line and Portfolio risk heatmap (render/empty/loading/error and non-finite or out-of-range rejection) (Refs #142).
 - [Fixed] Signal Center mobile filters collapse basic and advanced fields behind one Filters control so results lead the first screen (Refs #879 B2).
