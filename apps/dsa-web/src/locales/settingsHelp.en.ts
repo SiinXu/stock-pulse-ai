@@ -1390,6 +1390,33 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects Agent confidence calibration and long-term analysis quality.'],
     notes: ['Works best when combined with the backtest feature.'],
   },
+  'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
+    title: 'Agent Episode Log',
+    summary: 'Append compact agent evolution episodes (trajectory summary, lessons, optional outcome labels).',
+    usage: 'Default off. When enabled, single-run AgentExecutor writes a fail-soft episode after each run; failures never abort analysis. Does not store secrets or full Soul charter text.',
+    valueNotes: [
+      'Requires factory-injected executor config.',
+      'Retention and capacity are controlled by AGENT_EPISODE_RETENTION_DAYS and AGENT_EPISODE_MAX_ROWS.',
+    ],
+    impact: ['Enables offline eval and post-mortem inputs for the prediction verification loop (#1107).'],
+    notes: ['Planning issue #449 maps to Epic #1107 for this framework; do not build a parallel tracker.'],
+  },
+  'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
+    title: 'Agent Episode Retention Days',
+    summary: 'Maximum age for agent evolution episode rows before retention purge.',
+    usage: 'Applied best-effort after successful episode appends when the episode log is enabled.',
+    valueNotes: ['Valid range is 1–3650 days; default 90.'],
+    impact: ['Bounds disk growth for agent_episodes.'],
+    notes: ['Does nothing while AGENT_EPISODE_LOG_ENABLED is false.'],
+  },
+  'settings.agent.AGENT_EPISODE_MAX_ROWS': {
+    title: 'Agent Episode Max Rows',
+    summary: 'Hard capacity for agent evolution episode rows; oldest rows are dropped first.',
+    usage: 'Applied best-effort after successful episode appends when the episode log is enabled.',
+    valueNotes: ['Valid range is 100–1000000; default 50000.'],
+    impact: ['Bounds table size independent of retention days.'],
+    notes: ['Does nothing while AGENT_EPISODE_LOG_ENABLED is false.'],
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent Planning Loop',
     summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',

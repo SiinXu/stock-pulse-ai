@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Refresh config-registry contract freezes and register Agent Episode settings titles/help for #1210 (Refs #1090, #449).
 - [Fixed] Inject AgentExecutor config for episode log (no bare get_config), record compact failure episodes, and split episode retention/max-rows help keys (Refs #1090, #1210, #449).
 - [Fixed] Classify fail-soft broad handlers in agent episode log and optional ClaimScorer offline eval so backend-gate broad-exception ratchet passes (Refs #1090, #1092, #1107, #449).
 - [Docs] Document #449 Prediction vs Actual framework as superseded by Epic #1107 delivery; residual display/adapters stay on child issues (Refs #449, #1107).
