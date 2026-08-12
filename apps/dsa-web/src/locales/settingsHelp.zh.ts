@@ -1354,6 +1354,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 分析的最大等待时间。'],
     notes: ['超时不影响其他股票的分析流程。'],
   },
+  'settings.agent.PREDICTION_EXTRACT_ENABLED': {
+    title: '预测记录抽取',
+    summary: '在 finalize 后将结构化决策字段映射为 PredictionRecord 草稿。',
+    usage: '默认关闭。仅在验证预测核验研究链路时开启；只有类型化枚举与显式 claim 对象可进入核验。',
+    valueNotes: [
+      '默认关闭；开关不改变分析报告输出。',
+      '开启后，成功的 finalize / 历史保存路径会附加内存中的抽取草稿（持久化由后续阶段负责）。',
+      '纯散文载荷输出 status=no_verifiable_claim；散文不会被打成可验证声明。',
+    ],
+    impact: ['为质量运营附加尽力而为的抽取元数据；不改变报告或交易建议。'],
+    notes: ['抽取失败仅记日志，不会让分析失败。仅研究/质量运营定位，不是收益保证。'],
+  },
   'settings.agent.SKILL_OPINION_RECORDING_ENABLED': {
     title: '技能观点样本记录',
     summary: '将个体技能观点写入离线后验评估存储。',

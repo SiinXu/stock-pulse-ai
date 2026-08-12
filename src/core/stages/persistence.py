@@ -289,7 +289,6 @@ class _PersistenceStageMixin:
         result: AnalysisResult,
         query_id: str,
         source_report_id: int,
-        mode: str,
         report_type: str,
         context_snapshot: Dict[str, Any],
         portfolio_context: Optional[Dict[str, Any]] = None,

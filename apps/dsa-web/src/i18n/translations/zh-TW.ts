@@ -6135,4 +6135,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取數全域並行上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取數單源並行上限",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_EXTRACT_ENABLED": "預測記錄抽取",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.impact.0": "Adds best-effort extraction metadata for quality-ops; does not change reports or trading advice.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.notes.0": "Extraction failures are logged and never fail analysis. Research/quality-ops only — not a returns guarantee.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.summary": "Map structured decision fields into PredictionRecord drafts after finalize.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.title": "Prediction Extraction",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.usage": "Keep off unless you are validating the forecast-verification research loop. Only typed enums and explicit claim objects become claims.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.valueNotes.0": "Disabled by default; analysis output is unchanged either way.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.valueNotes.1": "When enabled, successful finalize/history-save paths attach an in-memory extraction draft (persistence is a later stage).",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.valueNotes.2": "Narrative-only payloads yield status=no_verifiable_claim; prose is never scored as a claim.",
 } as const;

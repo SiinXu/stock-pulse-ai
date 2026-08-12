@@ -1313,6 +1313,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the maximum wait time for Agent analysis.'],
     notes: ['Timeout does not affect other stocks in the analysis pipeline.'],
   },
+  'settings.agent.PREDICTION_EXTRACT_ENABLED': {
+    title: 'Prediction Extraction',
+    summary: 'Map structured decision fields into PredictionRecord drafts after finalize.',
+    usage: 'Keep off unless you are validating the forecast-verification research loop. Only typed enums and explicit claim objects become claims.',
+    valueNotes: [
+      'Disabled by default; analysis output is unchanged either way.',
+      'When enabled, successful finalize/history-save paths attach an in-memory extraction draft (persistence is a later stage).',
+      'Narrative-only payloads yield status=no_verifiable_claim; prose is never scored as a claim.',
+    ],
+    impact: ['Adds best-effort extraction metadata for quality-ops; does not change reports or trading advice.'],
+    notes: ['Extraction failures are logged and never fail analysis. Research/quality-ops only — not a returns guarantee.'],
+  },
   'settings.agent.SKILL_OPINION_RECORDING_ENABLED': {
     title: 'Skill Opinion Recording',
     summary: 'Record individual skill opinions into the offline outcome-evaluation store.',
