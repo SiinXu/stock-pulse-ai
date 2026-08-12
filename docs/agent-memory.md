@@ -66,3 +66,7 @@ Issues #250 and #198 stay open until production ownership and UX land.
 ## Rollback
 
 Revert modules/tests/docs/config fields and changelog line. Collection default-off; no production hook.
+
+## Related: error-pattern encyclopedia
+
+Human-editable error-pattern cards clustered from reflection/post-mortem lessons: [agent-error-pattern-encyclopedia_EN.md](agent-error-pattern-encyclopedia_EN.md) (Issue #1138). Lessons are input; the encyclopedia is the aggregation layer. This is distinct from the outcome-pattern memory layer on this page.

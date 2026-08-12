@@ -296,6 +296,10 @@ class Config:
     layered_memory_vector_enabled: bool = False
     layered_memory_max_records_per_principal: int = 200
     layered_memory_audit_enabled: bool = True
+    # Error-pattern encyclopedia from lessons (Issue #1138); default off
+    agent_error_pattern_enabled: bool = False
+    agent_error_pattern_inject_top_k: int = 3
+    agent_error_pattern_inject_char_budget: int = 2000
     # Opt-in plan→act→observe production path on AgentExecutor.run (#199). Default off.
     agent_planning_enabled: bool = False
     agent_planning_strategy: str = "template"  # template | llm

@@ -944,6 +944,24 @@ class _ConfigLoadingMethods:
                 os.getenv('LAYERED_MEMORY_AUDIT_ENABLED'),
                 default=True,
             ),
+            agent_error_pattern_enabled=parse_env_bool(
+                os.getenv('AGENT_ERROR_PATTERN_ENABLED'),
+                default=False,
+            ),
+            agent_error_pattern_inject_top_k=parse_env_int(
+                os.getenv('AGENT_ERROR_PATTERN_INJECT_TOP_K'),
+                3,
+                field_name='AGENT_ERROR_PATTERN_INJECT_TOP_K',
+                minimum=0,
+                maximum=3,
+            ),
+            agent_error_pattern_inject_char_budget=parse_env_int(
+                os.getenv('AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET'),
+                2000,
+                field_name='AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET',
+                minimum=0,
+                maximum=8000,
+            ),
             agent_planning_enabled=parse_env_bool(
                 os.getenv('AGENT_PLANNING_ENABLED'),
                 False,
