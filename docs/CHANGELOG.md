@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Settings AI overview task table stays horizontally scrollable at 320/390 instead of clipping under overflow-hidden (Refs #879 B3).
 - [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
 - [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
 - [Changed] Mount the interactive DCF sensitivity panel on Stock Details and reset its stock-bound estimate and assumptions when the canonical route stock changes (Refs #238, #1008).
