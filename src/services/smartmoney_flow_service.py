@@ -163,6 +163,48 @@ MONEY_FLOW_VIEW_DISCLAIMER = (
 )
 
 
+def _bounded_text(value: Any, max_length: int) -> Optional[str]:
+    if type(value) is not str:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    return text[:max_length]
+
+
+def _project_source_chain(value: Any) -> list[Dict[str, Any]]:
+    """Expose only the bounded provider-attempt contract used by the UI."""
+    if not isinstance(value, list):
+        return []
+    projected: list[Dict[str, Any]] = []
+    for item in value[:16]:
+        if not isinstance(item, dict):
+            continue
+        provider = _bounded_text(item.get("provider") or item.get("source"), 160)
+        status = _bounded_text(item.get("status"), 64)
+        if provider is None or status is None:
+            continue
+        attempt: Dict[str, Any] = {"provider": provider, "status": status}
+        for key in ("latency_ms", "provider_date", "error_code"):
+            if item.get(key) is not None:
+                attempt[key] = item[key]
+        projected.append(attempt)
+    return projected
+
+
+def _project_warnings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    warnings = [
+        text
+        for item in value
+        if (text := _bounded_text(item, 200)) is not None
+    ]
+    if len(warnings) <= 16:
+        return warnings
+    return warnings[:15] + ["money_flow_warnings_truncated"]
+
+
 def build_money_flow_view(
     stock_code: str,
     *,
@@ -227,8 +269,7 @@ def build_money_flow_view(
 
     snapshot = context.get("snapshot")
     snapshot = dict(snapshot) if isinstance(snapshot, dict) else None
-    source_chain = context.get("source_chain")
-    source_chain = source_chain if isinstance(source_chain, list) else []
+    source_chain = _project_source_chain(context.get("source_chain"))
     source = None
     if snapshot and snapshot.get("source"):
         source = str(snapshot.get("source"))
@@ -259,14 +300,14 @@ def build_money_flow_view(
             "source_chain": source_chain,
             "market": context.get("market"),
             "error_code": context.get("error_code"),
-            "warnings": [
-                str(item) for item in (context.get("warnings") or []) if item
-            ],
+            "warnings": _project_warnings(context.get("warnings")),
             "cache_state": context.get("cache_state"),
-            "fallback_from": context.get("fallback_from"),
+            "fallback_from": _bounded_text(context.get("fallback_from"), 160),
             "snapshot": snapshot,
         }
     )
+    if snapshot is not None:
+        snapshot.pop("raw_field_map", None)
     if status in {"not_supported", "fetch_failed", "empty"}:
         reason = base.get("error_code") or status
         base["message"] = f"Money-flow data unavailable ({reason})."

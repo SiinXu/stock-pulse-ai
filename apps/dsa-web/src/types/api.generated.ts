@@ -9374,6 +9374,100 @@ export interface components {
             task_id: string;
         };
         /**
+         * MoneyFlowSnapshotResponse
+         * @description Strict finite snapshot exposed by the Stock Details API.
+         */
+        MoneyFlowSnapshotResponse: {
+            /**
+             * Amount Scale
+             * @enum {string}
+             */
+            amount_scale: "unknown" | "yuan" | "thousand_yuan" | "ten_thousand_yuan" | "million_yuan";
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /**
+             * Attitude
+             * @enum {string}
+             */
+            attitude: "inflow" | "outflow" | "neutral" | "unknown";
+            /** Bucket Definition */
+            bucket_definition: string;
+            /** Calibration Note */
+            calibration_note: string;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Close */
+            close?: number | null;
+            /** Code */
+            code: string;
+            /**
+             * Completeness
+             * @enum {string}
+             */
+            completeness: "complete" | "partial";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Large Net Inflow */
+            large_net_inflow?: number | null;
+            /** Large Net Inflow Ratio */
+            large_net_inflow_ratio?: number | null;
+            /** Main Net Inflow */
+            main_net_inflow?: number | null;
+            /** Main Net Inflow 10D */
+            main_net_inflow_10d?: number | null;
+            /** Main Net Inflow 5D */
+            main_net_inflow_5d?: number | null;
+            /** Main Net Inflow Ratio */
+            main_net_inflow_ratio?: number | null;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "cn" | "hk" | "us" | "jp" | "kr" | "tw";
+            /** Medium Net Inflow */
+            medium_net_inflow?: number | null;
+            /** Medium Net Inflow Ratio */
+            medium_net_inflow_ratio?: number | null;
+            /** Observed Days */
+            observed_days: number;
+            /** Requested Days */
+            requested_days: number;
+            /** Small Net Inflow */
+            small_net_inflow?: number | null;
+            /** Small Net Inflow Ratio */
+            small_net_inflow_ratio?: number | null;
+            /** Source */
+            source: string;
+            /** Super Large Net Inflow */
+            super_large_net_inflow?: number | null;
+            /** Super Large Net Inflow Ratio */
+            super_large_net_inflow_ratio?: number | null;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * MoneyFlowSourceAttempt
+         * @description Bounded public projection of one provider attempt.
+         */
+        MoneyFlowSourceAttempt: {
+            /** Error Code */
+            error_code?: string | null;
+            /** Latency Ms */
+            latency_ms?: number | null;
+            /** Provider */
+            provider: string;
+            /** Provider Date */
+            provider_date?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
          * MoneyFlowViewResponse
          * @description User-facing SmartMoney / main-force money-flow view (Issue #989).
          */
@@ -9385,52 +9479,34 @@ export interface components {
             age_days?: number | null;
             /**
              * As Of
-             * @description Observation as-of timestamp (ISO 8601)
+             * @description Observation as-of timestamp
              */
             as_of?: string | null;
-            /**
-             * Cache State
-             * @description miss | fresh | stale
-             */
-            cache_state?: string | null;
-            /**
-             * Disclaimer
-             * @description Honesty disclaimer for research use
-             */
+            /** Cache State */
+            cache_state?: ("miss" | "fresh" | "stale") | null;
+            /** Disclaimer */
             disclaimer: string;
             /**
              * Enabled
              * @description Whether SMARTMONEY_ENABLED is on
              */
             enabled: boolean;
-            /**
-             * Error Code
-             * @description Machine-readable failure code
-             */
+            /** Error Code */
             error_code?: string | null;
-            /**
-             * Fallback From
-             * @description Fallback provenance when applicable
-             */
+            /** Fallback From */
             fallback_from?: string | null;
             /**
              * Fetched At
-             * @description UTC fetch timestamp (ISO 8601)
+             * @description UTC fetch timestamp
              */
             fetched_at?: string | null;
-            /**
-             * Market
-             * @description Market tag (cn/hk/us/...)
-             */
-            market?: string | null;
-            /**
-             * Message
-             * @description Human-readable degradation note
-             */
+            /** Market */
+            market?: ("cn" | "hk" | "us" | "jp" | "kr" | "tw") | null;
+            /** Message */
             message?: string | null;
             /**
              * Provider Date
-             * @description Provider session date YYYY-MM-DD
+             * @description Provider session date
              */
             provider_date?: string | null;
             /**
@@ -9440,42 +9516,28 @@ export interface components {
             requested_days: number;
             /**
              * Schema Version
-             * @description money_flow_view schema version
+             * @constant
              */
-            schema_version: string;
-            /**
-             * Snapshot
-             * @description Normalized bucket ratios/amounts when data-bearing
-             */
-            snapshot?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Source
-             * @description Primary data source label
-             */
+            schema_version: "money_flow_view/1.0";
+            snapshot?: components["schemas"]["MoneyFlowSnapshotResponse"] | null;
+            /** Source */
             source?: string | null;
             /**
              * Source Chain
              * @description Provider attempt chain
              */
-            source_chain?: {
-                [key: string]: unknown;
-            }[];
+            source_chain?: components["schemas"]["MoneyFlowSourceAttempt"][];
             /**
              * Status
-             * @description disabled | available | partial | not_supported | fetch_failed | empty | stale | fallback
+             * @enum {string}
              */
-            status: string;
+            status: "disabled" | "available" | "partial" | "not_supported" | "fetch_failed" | "empty" | "stale" | "fallback";
             /**
              * Stock Code
              * @description Canonical stock code
              */
             stock_code: string;
-            /**
-             * Warnings
-             * @description Quality / calibration warnings
-             */
+            /** Warnings */
             warnings?: string[];
         };
         /**

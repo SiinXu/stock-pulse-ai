@@ -111,3 +111,41 @@ def test_view_not_supported_is_honest():
 def test_view_rejects_empty_stock_code():
     with pytest.raises(ValueError, match="stock_code"):
         build_money_flow_view("", config=SimpleNamespace(smartmoney_enabled=False))
+
+
+def test_view_bounds_public_provider_diagnostics_and_warnings():
+    outcome = _partial_outcome()
+    outcome.source_chain = [
+        {
+            "provider": "akshare",
+            "status": "success",
+            "latency_ms": 12,
+            "provider_date": "2026-08-08",
+            "private_debug_metric": float("nan"),
+        }
+    ]
+    outcome.warnings = [f"warning_{index}" for index in range(20)]
+
+    class _Manager:
+        def get_money_flow(self, stock_code: str, days: int = 5):
+            return outcome
+
+        def close(self):
+            return None
+
+    view = build_money_flow_view(
+        "600519",
+        manager=_Manager(),
+        config=SimpleNamespace(smartmoney_enabled=True),
+    )
+    assert view["source_chain"] == [
+        {
+            "provider": "akshare",
+            "status": "success",
+            "latency_ms": 12,
+            "provider_date": "2026-08-08",
+        }
+    ]
+    assert len(view["warnings"]) == 16
+    assert view["warnings"][-1] == "money_flow_warnings_truncated"
+    assert "raw_field_map" not in view["snapshot"]

@@ -104,6 +104,12 @@ provider route, and calibration identity; stale cache use is explicit fallback.
 | Success body | `schema_version=money_flow_view/1.0`, `status`, `as_of`, `provider_date`, `source`, `source_chain`, `warnings`, optional `snapshot` (ratios / calibrated amounts only), `disclaimer` |
 | Degradation | `not_supported` / `fetch_failed` / `empty` / `stale` / `fallback` / `partial` keep explicit `message` and never invent bucket numbers |
 
+The response contract is strict across OpenAPI and the generated Web client:
+status/cache/market values are enumerated, all numerics must be finite and within
+the provider-domain bounds, and provider attempts/warnings have hard count and
+text limits. Uncontracted diagnostics are not exposed. Invalid internal output
+fails as a sanitized server error; it is not mislabeled as invalid user input.
+
 Absolute amount fields are omitted unless the provider calibrates both currency
 and scale. The Web panel therefore prioritizes **ratio** fields and shows unit /
 amount_scale / bucket_definition for honesty.

@@ -112,7 +112,11 @@ class StockMoneyFlowApiTests(unittest.TestCase):
 
     def test_enabled_partial_outcome_preserves_as_of_and_source(self) -> None:
         config = SimpleNamespace(smartmoney_enabled=True)
-        with patch("api.v1.endpoints.stocks.get_config", return_value=config), patch(
+        services = SimpleNamespace(config=config)
+        with patch(
+            "api.v1.endpoints.stocks.get_application_services",
+            return_value=services,
+        ), patch(
             "src.services.smartmoney_flow_service.fetch_money_flow",
             return_value=_partial_outcome(),
         ):
@@ -123,7 +127,7 @@ class StockMoneyFlowApiTests(unittest.TestCase):
         self.assertEqual(payload["status"], "partial")
         self.assertEqual(payload["source"], "akshare:stock_individual_fund_flow")
         self.assertEqual(payload["provider_date"], "2026-08-08")
-        self.assertEqual(payload["as_of"], "2026-08-08T08:00:00+00:00")
+        self.assertEqual(payload["as_of"], "2026-08-08T08:00:00Z")
         self.assertIsNotNone(payload["snapshot"])
         self.assertEqual(payload["snapshot"]["main_net_inflow_ratio"], 1.5)
         self.assertEqual(payload["snapshot"]["attitude"], "inflow")
@@ -139,3 +143,40 @@ class StockMoneyFlowApiTests(unittest.TestCase):
     def test_invalid_stock_code_returns_400(self) -> None:
         resp = self.client.get("/api/v1/stocks/!!!/money-flow")
         self.assertEqual(resp.status_code, 400)
+
+    def test_invalid_internal_payload_is_sanitized_500_not_input_error(self) -> None:
+        config = SimpleNamespace(smartmoney_enabled=True)
+        services = SimpleNamespace(config=config)
+        invalid_payload = {
+            "schema_version": "money_flow_view/1.0",
+            "stock_code": "600519",
+            "enabled": True,
+            "status": "partial",
+            "requested_days": 5,
+            "fetched_at": "2026-08-08T08:01:00+00:00",
+            "as_of": "2026-08-08T08:00:00+00:00",
+            "provider_date": "2026-08-08",
+            "age_days": 0,
+            "source": "test",
+            "source_chain": [],
+            "market": "cn",
+            "error_code": None,
+            "warnings": [],
+            "cache_state": "miss",
+            "fallback_from": None,
+            "snapshot": {"main_net_inflow_ratio": float("nan")},
+            "message": "degraded",
+            "disclaimer": "Research evidence only.",
+        }
+        with patch(
+            "api.v1.endpoints.stocks.get_application_services",
+            return_value=services,
+        ), patch(
+            "api.v1.endpoints.stocks.build_money_flow_view",
+            return_value=invalid_payload,
+        ):
+            resp = self.client.get("/api/v1/stocks/600519/money-flow")
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp.json()["error"], "internal_error")
+        self.assertNotIn("nan", resp.text.lower())
+        self.assertNotIn("validation", resp.text.lower())

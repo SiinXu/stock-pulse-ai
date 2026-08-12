@@ -473,13 +473,15 @@ def get_stock_money_flow(
     try:
         code = _validate_and_normalize_stock_code(stock_code)
         days = validate_history_days(days)
+    except HTTPException:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise api_error(400, "validation_error", str(exc)) from exc
+
+    try:
         config = get_application_services().config
         payload = build_money_flow_view(code, days=days, config=config)
         return MoneyFlowViewResponse.model_validate(payload)
-    except ValueError as exc:
-        raise api_error(400, "validation_error", str(exc)) from exc
-    except HTTPException:
-        raise
     except Exception as exc:  # broad-exception: fallback_recorded - map unexpected money-flow view failures to a sanitized API error
         log_safe_exception(
             logger,
