@@ -89,7 +89,7 @@ cd apps/dsa-web
 npm run i18n:high-risk -- --write-key-inventory
 ```
 
-Then keep the `keyInventory` pointer digests in `high-risk-i18n-audit.json` aligned with the inventory file.
+`--write-key-inventory` rewrites `high-risk-i18n-keys.json` and also refreshes the `keyInventory` pointer digests plus any `PRODUCT_SOURCE_SEMANTIC_PASS.keyCount` in `high-risk-i18n-audit.json`. Category snapshots, decisions, and native-review status still need a deliberate human review when copy changes.
 
 ### Product-source review pass (2026-08-12)
 
@@ -195,7 +195,7 @@ npm run i18n:high-risk -- --write-key-inventory
 npm run i18n:high-risk -- --verify-baseline
 ```
 
-Copy the reviewed snapshot into `high-risk-i18n-audit.json`, align the `keyInventory` pointer with `high-risk-i18n-keys.json`, run the normal guard, and keep translated locales pending unless a real native financial reviewer is identified with a review date and `reviewedSnapshotSha256`. Do not grow `identicalToEnglish.baseline.json` as part of high-risk review work.
+Copy the reviewed category snapshot into `high-risk-i18n-audit.json`, run `--write-key-inventory` to refresh the annotated inventory and pointer digests, run the normal guard, and keep translated locales pending unless a real native financial reviewer is identified with a review date and `reviewedSnapshotSha256`. Do not grow `identicalToEnglish.baseline.json` as part of high-risk review work.
 
 ## Deferred to UIUX
 
