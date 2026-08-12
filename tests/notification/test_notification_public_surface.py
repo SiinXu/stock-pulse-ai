@@ -95,6 +95,7 @@ EXPECTED_UNRESOLVED_HINT_METHODS = frozenset(
         "_get_display_operation_advice",
         "_get_fundamental_blocks",
         "_get_history_compare_context",
+        "_prepend_report_delta_section",
         "_get_signal_level",
         "_public_market_status_line",
         "_public_phase_pack_excerpt",
@@ -118,6 +119,7 @@ EXPECTED_GROUPS = (
             "_get_labels",
             "_get_display_name",
             "_get_history_compare_context",
+            "_prepend_report_delta_section",
             "generate_aggregate_report",
             "_collect_models_used",
             "_public_phase_pack_excerpt",
@@ -125,7 +127,7 @@ EXPECTED_GROUPS = (
             "_append_market_status_line",
             "_should_show_llm_model",
         ),
-        "2b2ae6b5437065cff1cba53b5a9897c4bcafe6937586171fa07739b0c68ec79c",
+        "e43757976154d28c970d1a9e385f980d0b5735459ff4834014aa8728668bcd82",
     ),
     (
         "_RoutingMethods",
@@ -185,7 +187,7 @@ EXPECTED_GROUPS = (
             "_append_institutional_flow",
             "_append_related_boards",
         ),
-        "8354d7d3976ce5bc42bd8af959d226da4e54df254107efb1d9e4bb3511cbbb0e",
+        "e335af202c52212c23c73975eafa8eeda474774ee8f051e5ed315b9af0d1c3e9",
     ),
     (
         "_DispatchMethods",
@@ -363,7 +365,7 @@ def test_notification_method_order_matches_pre_split_contract():
         )
     )
 
-    assert len(expected_names) == 67
+    assert len(expected_names) == 68
     assert actual_names == expected_names
 
 

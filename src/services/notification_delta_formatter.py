@@ -1,4 +1,8 @@
-"""Render bounded analysis deltas ahead of outbound notification content."""
+"""Render bounded analysis deltas for reports and outbound notifications.
+
+The presentation layer reads structured ``AnalysisDelta`` values from
+``history_comparison_service`` only. It never recomputes field diffs.
+"""
 
 from __future__ import annotations
 
@@ -29,7 +33,7 @@ _COPY = {
         "unsafe": "Material changes were detected, but no safe values are available.",
         "added": "New {field}",
         "removed": "Removed {field}",
-        "more": "Additional changes omitted from this compact notification.",
+        "more": "Additional changes omitted from this compact section.",
     },
     "zh": {
         "heading": "较上次分析的变化",
@@ -39,7 +43,7 @@ _COPY = {
         "unsafe": "检测到变化，但没有可安全展示的值。",
         "added": "新增{field}",
         "removed": "移除{field}",
-        "more": "其余变化已从本次精简通知中省略。",
+        "more": "其余变化已从本次精简段落中省略。",
     },
     "ko": {
         "heading": "이전 분석 대비 변경 사항",
@@ -49,7 +53,7 @@ _COPY = {
         "unsafe": "변경 사항이 감지되었지만 안전하게 표시할 값이 없습니다.",
         "added": "새 {field}",
         "removed": "제거된 {field}",
-        "more": "추가 변경 사항은 간단 알림에서 생략되었습니다.",
+        "more": "추가 변경 사항은 이 요약 섹션에서 생략되었습니다.",
     },
 }
 
@@ -145,7 +149,13 @@ def _value_change_line(change: Any, language: str) -> Optional[str]:
         rendered_delta = _safe_text(delta)
         if rendered_delta is None:
             return None
-        prefix = "+" if float(delta) > 0 else ""
+        try:
+            numeric_delta = float(delta)
+        except (OverflowError, TypeError, ValueError):
+            return None
+        if not math.isfinite(numeric_delta):
+            return None
+        prefix = "+" if numeric_delta > 0 else ""
         delta_text = f" ({prefix}{rendered_delta})"
     return f"- {_field_label(str(getattr(change, 'field', '')), language)}: {base} -> {target}{delta_text}"
 
@@ -183,46 +193,112 @@ def _render_delta(delta: AnalysisDelta, language: str) -> Sequence[str]:
     return tuple(lines)
 
 
-def format_delta_first_notification(
-    report_content: str,
+def _resolve_language(results: Sequence[Any]) -> str:
+    first_result = results[0] if results else None
+    return normalize_report_language(
+        getattr(first_result, "report_language", None) if first_result is not None else None
+    )
+
+
+def build_delta_section_markdown(
     results: Sequence[Any],
     report_type: Any,
     *,
-    delta_loader: Callable[[str, str], AnalysisDelta] = get_latest_delta,
+    delta_loader: Optional[Callable[[str, str], AnalysisDelta]] = None,
+    error_code: str = "analysis_delta_comparison_unavailable",
+    log_message: str = "Analysis delta comparison unavailable",
 ) -> str:
-    """Prepend compact persisted deltas without allowing comparison failure to block delivery."""
-    if not report_content or not results:
-        return report_content
-    first_result = results[0]
-    language = normalize_report_language(getattr(first_result, "report_language", None))
+    """Build the top-of-report delta section from persisted history only."""
+    if not results:
+        return ""
+    loader = delta_loader or get_latest_delta
+    language = _resolve_language(results)
     copy = _COPY[language]
     normalized_report_type = str(getattr(report_type, "value", report_type) or "").strip()
     sections = [f"## {copy['heading']}", ""]
+    stock_count = 0
 
     for result in results[:MAX_STOCKS]:
         code = _safe_text(getattr(result, "code", None))
         if not code:
             continue
+        stock_count += 1
         sections.extend([f"### {code}", ""])
         try:
-            delta = delta_loader(code, normalized_report_type)
+            delta = loader(code, normalized_report_type)
             sections.extend(_render_delta(delta, language))
-        except Exception as exc:  # broad-exception: fallback_recorded - comparison cannot block notification delivery
+        except Exception as exc:  # broad-exception: fallback_recorded - comparison cannot block report/notification delivery
             log_safe_exception(
                 logger,
-                "Notification delta comparison unavailable",
+                log_message,
                 exc,
-                error_code="notification_delta_comparison_unavailable",
+                error_code=error_code,
                 level=logging.WARNING,
                 context={"stock_code": code},
             )
             sections.append(f"- {copy['unavailable'].format(status='error')}")
         sections.append("")
 
-    if len(sections) == 2:
+    if stock_count == 0:
+        return ""
+    return "\n".join(sections).rstrip() + "\n"
+
+
+def prepend_report_delta_section(
+    report_content: str,
+    results: Sequence[Any],
+    report_type: Any,
+    *,
+    delta_loader: Optional[Callable[[str, str], AnalysisDelta]] = None,
+    error_code: str = "report_delta_comparison_unavailable",
+    log_message: str = "Report delta comparison unavailable",
+) -> str:
+    """Prepend the report-top delta section without blocking report generation.
+
+    Idempotent when the report already begins with the delta heading (for example
+    when opt-in notification delta-first runs after the report body already
+    included the section).
+    """
+    if not report_content or not results:
         return report_content
-    sections.extend(["---", "", report_content])
-    return "\n".join(sections)
+    language = _resolve_language(results)
+    heading = f"## {_COPY[language]['heading']}"
+    stripped = report_content.lstrip()
+    if stripped.startswith(heading):
+        return report_content
+
+    section = build_delta_section_markdown(
+        results,
+        report_type,
+        delta_loader=delta_loader or get_latest_delta,
+        error_code=error_code,
+        log_message=log_message,
+    )
+    if not section:
+        return report_content
+    return f"{section}\n---\n\n{report_content}"
 
 
-__all__ = ["format_delta_first_notification"]
+def format_delta_first_notification(
+    report_content: str,
+    results: Sequence[Any],
+    report_type: Any,
+    *,
+    delta_loader: Optional[Callable[[str, str], AnalysisDelta]] = None,
+) -> str:
+    """Prepend compact persisted deltas without allowing comparison failure to block delivery."""
+    return prepend_report_delta_section(
+        report_content,
+        results,
+        report_type,
+        delta_loader=delta_loader or get_latest_delta,
+        error_code="notification_delta_comparison_unavailable",
+        log_message="Notification delta comparison unavailable",
+    )
+
+
+__all__ = [
+    "build_delta_section_markdown",
+    "format_delta_first_notification",
+    "prepend_report_delta_section",
+]

@@ -10,7 +10,11 @@ from src.services.history_comparison_service import (
     ListChange,
     ValueChange,
 )
-from src.services.notification_delta_formatter import format_delta_first_notification
+from src.services.notification_delta_formatter import (
+    build_delta_section_markdown,
+    format_delta_first_notification,
+    prepend_report_delta_section,
+)
 
 
 def _result(code: str = "AAPL", language: str = "en") -> SimpleNamespace:
@@ -50,6 +54,8 @@ def test_first_analysis_and_no_change_are_distinct() -> None:
     assert "### MSFT" in rendered
     assert "No material changes since the previous analysis." in rendered
     assert rendered.endswith("# Full report")
+    assert "First analysis" not in rendered.split("### MSFT", 1)[1]
+    assert "No material changes" not in rendered.split("### AAPL", 1)[0]
 
 
 def test_material_delta_renders_bounded_safe_changes() -> None:
@@ -127,3 +133,37 @@ def test_incomparable_and_loader_failure_remain_visible_without_dropping_report(
 
 def test_empty_results_leave_original_report_unchanged() -> None:
     assert format_delta_first_notification("original", [], "simple") == "original"
+
+
+def test_prepend_report_delta_section_is_idempotent() -> None:
+    once = prepend_report_delta_section(
+        "# Body",
+        [_result()],
+        "simple",
+        delta_loader=lambda _code, _report_type: _delta(
+            has_baseline=False,
+            baseline_status=BASELINE_MISSING_HISTORY,
+        ),
+    )
+    twice = prepend_report_delta_section(
+        once,
+        [_result()],
+        "simple",
+        delta_loader=lambda _code, _report_type: _delta(),
+    )
+    assert once.count("## Changes since previous analysis") == 1
+    assert twice == once
+
+
+def test_build_delta_section_markdown_zh_first_analysis_copy() -> None:
+    section = build_delta_section_markdown(
+        [_result(language="zh")],
+        "simple",
+        delta_loader=lambda _code, _report_type: _delta(
+            has_baseline=False,
+            baseline_status=BASELINE_MISSING_HISTORY,
+        ),
+    )
+    assert "## 较上次分析的变化" in section
+    assert "首次分析：暂无可用的历史基线。" in section
+    assert "无实质变化" not in section

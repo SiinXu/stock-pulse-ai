@@ -465,6 +465,7 @@ class NotificationService(
     _get_labels = None
     _get_display_name = None
     _get_history_compare_context = None
+    _prepend_report_delta_section = None
     generate_aggregate_report = None
     _collect_models_used = None
     _public_phase_pack_excerpt = None
