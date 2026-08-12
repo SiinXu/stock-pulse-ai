@@ -289,7 +289,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
     },
     {
       id: 'route',
-      header: t('usage.table.route'),
+      header: t('usage.table.routeOutcome'),
       nowrap: true,
       cell: (item) => item.routeOutcome || '—',
     },
