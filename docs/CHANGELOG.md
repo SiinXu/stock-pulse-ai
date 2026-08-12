@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Chore] Rebaseline IntelligenceSourcesPanel gzip budget after capability write registry help inventory growth (Refs #221, #204).
+- [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).
 - [Added] Data Sources Hub runtime projection: live primary/fallback daily routing, process-local provider health, cache quality, and enhancer configured state under Settings → Data sources (Refs #867).
 - [Chore] Rebaseline Web locale gzip budgets after HTML report-export download chrome strings (Refs #163).
 - [Added] Report Markdown panel one-click HTML export uses history export capabilities so office-friendly HTML is user-reachable alongside Markdown and PDF (Refs #163).

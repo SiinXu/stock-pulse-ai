@@ -6,6 +6,10 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { LegacyRouteRedirect } from '../../routing/LegacyRedirectRoute';
 import {
@@ -97,6 +101,11 @@ function LocationProbe() {
   );
 }
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 function renderPage({
   embedded = false,
   initialEntry = APP_ROUTE_PATHS.settings,
@@ -105,12 +114,14 @@ function renderPage({
   initialEntry?: string;
 } = {}) {
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <UiLanguageProvider>
-        <TokenUsagePage embedded={embedded} />
-        <LocationProbe />
-      </UiLanguageProvider>
-    </MemoryRouter>
+    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <UiLanguageProvider>
+          <TokenUsagePage embedded={embedded} />
+          <LocationProbe />
+        </UiLanguageProvider>
+      </MemoryRouter>
+    </RouteFocusRegistrationContext.Provider>,
   );
 }
 
@@ -126,12 +137,14 @@ describe('TokenUsagePage', () => {
     document.title = 'Settings host';
     const { container } = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
+        <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <UiLanguageProvider>
           <main>
             <h1>系统设置</h1>
             <TokenUsagePage embedded />
           </main>
         </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>
       </MemoryRouter>,
     );
 
@@ -467,6 +480,7 @@ describe('TokenUsagePage', () => {
 
     render(
       <MemoryRouter initialEntries={[`${LEGACY_ROUTE_PATHS.usage}?period=today&keep=yes`]}>
+        <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <UiLanguageProvider>
           <Routes>
             <Route
@@ -491,6 +505,7 @@ describe('TokenUsagePage', () => {
             />
           </Routes>
         </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>
       </MemoryRouter>,
     );
 

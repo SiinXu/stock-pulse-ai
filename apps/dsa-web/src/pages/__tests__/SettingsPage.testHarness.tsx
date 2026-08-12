@@ -2,6 +2,15 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
+
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
 import type { ParsedApiError } from '../../api/error';
 import type { LlmConnectionFieldSchema } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
@@ -815,7 +824,11 @@ async function expectConnectionDraftAutosaveBlockedBySchema(
 
   vi.useFakeTimers();
   try {
-    render(<SettingsPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <SettingsPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });

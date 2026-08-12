@@ -20,6 +20,7 @@ import { ScreeningConfigurationModal } from '../components/screening/ScreeningCo
 import { ScreeningHotspotsSection } from '../components/screening/ScreeningHotspotsSection';
 import ScreeningPageAlerts from '../components/screening/ScreeningPageAlerts';
 import ScreeningPageHeader from '../components/screening/ScreeningPageHeader';
+import { useRouteFocusTarget } from '../components/routing';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
@@ -51,6 +52,7 @@ import {
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import {
+  APP_ROUTE_PATHS,
   RESEARCH_DISCOVER_LIMITS,
   RESEARCH_DISCOVER_MARKET_VALUES,
   buildSettingsHref,
@@ -67,6 +69,12 @@ import { useScreeningUrlState } from '../components/screening/useScreeningUrlSta
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.researchDiscover,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const configurationFormId = useId();
   const text = SCREENING_TEXT[language];
   const markets = useMemo(
@@ -548,7 +556,12 @@ const StockScreeningPage: React.FC = () => {
 
   return (
     <AppPage className="space-y-6 pb-12 pt-6">
-      <ScreeningPageHeader text={text} enabled={isScreeningEnabled} status={statusText} />
+      <ScreeningPageHeader
+        text={text}
+        enabled={isScreeningEnabled}
+        status={statusText}
+        headingRef={pageHeadingRef}
+      />
 
       <ScreeningPageAlerts
         text={text}
