@@ -3,6 +3,15 @@
 The Web route `/events` provides a read-only calendar projection of the
 corporate-event alert contract owned by the alerts subsystem.
 
+## Production discovery
+
+Users can open the calendar from:
+
+- Research sidebar navigation (**Event calendar**)
+- Research overview cards (**Open Event calendar**)
+
+Typed navigation to `/events` remains supported; discovery no longer depends on it.
+
 ## Contract boundary
 
 - The calendar reads `GET /api/v1/alerts/triggers` with

@@ -7,13 +7,14 @@ const test = require('node:test');
 const desktopRoot = path.resolve(__dirname, '..');
 const packageJson = require('../package.json');
 
-test('desktop package pins the upgraded electron stack from issue #615', () => {
-  // Runtime: Electron 43.3.0 is outside the 39.x-42.x vulnerable ranges for the
-  // 2026 Electron GHSA/CVE series (e.g. GHSA-9f4c-93c8-jc8g / CVE-2026-70608).
+test('desktop package pins the upgraded electron stack from issue #1060 / #615', () => {
+  // Runtime: Electron 43.4.0 (supported 43-x-y latest) is outside the 39.x-42.x
+  // vulnerable ranges for the 2026 Electron GHSA/CVE series
+  // (e.g. GHSA-9f4c-93c8-jc8g / CVE-2026-70608).
   // Updater: 6.8.9 is above GHSA-9jxc-qjr9-vjxq / CVE-2024-39698 (<=6.3.0-alpha.5).
   // Builder: 26.15.7 replaces the audited-high 24.x packaging graph.
   assert.equal(packageJson.dependencies['electron-updater'], '6.8.9');
-  assert.equal(packageJson.devDependencies.electron, '43.3.0');
+  assert.equal(packageJson.devDependencies.electron, '43.4.0');
   assert.equal(packageJson.devDependencies['electron-builder'], '26.15.7');
   // tar 7.5.22 is past GHSA-23hp-3jrh-7fpw / GHSA-r292-9mhp-454m and related 7.5.x pins.
   assert.equal(packageJson.overrides['app-builder-lib'].tar, '7.5.22');
