@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Rebaseline Web locale gzip budgets after Agent three-layer progressive-disclosure copy (Refs #868).
 - [Changed] Expose Event Alerts production discovery from Event Calendar (and calendar back-link) so `/event-alerts` is not URL-only (Refs #1058, #1008).
 - [Added] Complete remaining data-validation gaps: pre-synthesis OHLCV finite checks with explicit degradation, PE/PB soft plausibility (suspect/keep), multi-provider cross-source divergence warnings with attribution, and ETF/edge false-positive calibration fixtures (Refs #185).
+- [Fixed] Settings AI overview task table stays horizontally scrollable at 320/390 instead of clipping under overflow-hidden (Refs #879 B3).
 - [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
 - [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
 - [Changed] Agent Behavior settings use Essentials · Behavior · Governance/Expert progressive disclosure, move expert JSON behind the expert layer, and add a default preset-to-ask path without changing config semantics (#868).
