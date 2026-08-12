@@ -72,3 +72,7 @@ is shipped in this slice. Track remaining work on #204.
 ## Chinese
 
 See [`docs/capability-write-registry_CN.md`](capability-write-registry_CN.md).
+
+## Operators
+
+Administrator authentication is required for write mutations when `ADMIN_AUTH_ENABLED=true`.
