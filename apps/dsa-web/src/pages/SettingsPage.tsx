@@ -1,12 +1,15 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
 import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
+  AGENT_SETTINGS_ESSENTIALS_SOURCE,
+  APP_ROUTE_PATHS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
@@ -143,6 +146,12 @@ function parseSetupStockList(value: unknown) {
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
   const { language: uiLanguage, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.settings,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1381,6 +1390,10 @@ const SettingsPage: React.FC = () => {
     || (isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0)
     || (activeCategory === 'data_source' && activeSubCategory !== 'providers')
   );
+  const agentEssentialsFocus = (
+    searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.source) === AGENT_SETTINGS_ESSENTIALS_SOURCE
+  );
+
   const activeConfigPanel = (
     <SettingsActiveConfigPanel
       panelKey={`${activeSection}:${activeView}`}
@@ -1413,6 +1426,7 @@ const SettingsPage: React.FC = () => {
       resetDraftKeys={resetDraftKeys}
       activeSaveStatus={groupSaveStates[activeCategory]?.status ?? 'idle'}
       agentModelSummary={agentModelSummary}
+      agentEssentialsFocus={agentEssentialsFocus}
       readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
       activeCategory={activeCategory}
       maskToken={maskToken}
@@ -1480,6 +1494,7 @@ const SettingsPage: React.FC = () => {
     <AppPage className="settings-page pb-6">
       <div className="mb-4">
         <PageHeader
+          ref={pageHeadingRef}
           title={t('settings.pageTitle')}
           description={t('settings.pageDescription')}
           actions={settingsSaveActions}

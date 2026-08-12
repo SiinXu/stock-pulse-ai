@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -170,9 +171,48 @@ def test_optional_data_sources_info_when_absent(tmp_path: Path) -> None:
     assert "config.datasource.tickflow_api_key.absent" in codes
 
 
+def _clear_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove ambient LLM credentials so CLI hard-fail is deterministic.
+
+    GitHub Actions injects repository secrets into the job environment. The CLI
+    reads ``os.environ`` directly, so any leftover OPENAI/ANTHROPIC/channel key
+    would keep exit code 0 after only deleting GEMINI_API_KEY.
+    """
+    from src.services.actions_config_check import LEGACY_LLM_KEY_NAMES
+
+    for key in LEGACY_LLM_KEY_NAMES:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("LITELLM_CONFIG", raising=False)
+    monkeypatch.delenv("LITELLM_CONFIG_YAML", raising=False)
+    monkeypatch.delenv("LLM_CHANNELS", raising=False)
+    # Channel-style LLM_<NAME>_API_KEY(S) and recommended LLM_* keys.
+    for key in list(os.environ):
+        upper = key.upper()
+        if upper.startswith("LLM_") and (
+            upper.endswith("_API_KEY") or upper.endswith("_API_KEYS")
+        ):
+            monkeypatch.delenv(key, raising=False)
+
+
 def test_cli_main_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scripts import actions_config_check as cli
+    from src.services.actions_config_check import LEGACY_LLM_KEY_NAMES
 
+    # Isolate from ambient CI/Actions secrets so exit-code assertions stay deterministic.
+    for key in (
+        *LEGACY_LLM_KEY_NAMES,
+        "LITELLM_CONFIG",
+        "LITELLM_CONFIG_YAML",
+        "LLM_CHANNELS",
+        "LLM_ZHIPU_API_KEY",
+        "LLM_SILICONFLOW_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    for key in list(os.environ):
+        if key.startswith("LLM_") and key.endswith(("API_KEY", "API_KEYS")):
+            monkeypatch.delenv(key, raising=False)
+
+    _clear_llm_env(monkeypatch)
     monkeypatch.setenv("STOCK_LIST", "600519")
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key-value-ok")
     monkeypatch.delenv("WECHAT_WEBHOOK_URL", raising=False)
@@ -184,7 +224,8 @@ def test_cli_main_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert "Config Check" in body
     assert "test-gemini-key-value-ok" not in body
 
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("STOCK_LIST", "600519")
     code = cli.main(["--no-text"])
     assert code == 1
 

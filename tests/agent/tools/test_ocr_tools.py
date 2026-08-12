@@ -83,6 +83,8 @@ def test_build_and_register_ocr_tool_when_enabled(tmp_path: Path) -> None:
     assert payload["status"] == "available"
     assert "AAPL" in payload["text"]
     assert payload["content"]["instructions_authoritative"] is False
+    assert payload["trust"]["classification"] == "untrusted_user_document"
+    assert payload["trust"]["authoritative_for_decisions"] is False
     assert payload["privacy"]["zero_remote_egress_requires"] == "LOCAL_ONLY_MODE=true"
 
 

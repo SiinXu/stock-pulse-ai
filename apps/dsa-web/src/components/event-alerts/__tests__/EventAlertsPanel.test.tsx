@@ -1,11 +1,29 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { ReactElement } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { APP_ROUTE_PATHS } from '../../../routing/routes';
 import type { EventAlertDisplayItem } from '../../../types/eventAlerts';
 import EventAlertsPanel from '../EventAlertsPanel';
 import { chooseOption } from '../../../test-utils';
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-path">{location.pathname}</div>;
+}
+
+function renderPanel(ui: ReactElement) {
+  return render(
+    <MemoryRouter>
+      <UiLanguageProvider initialLanguage="en">
+        {ui}
+      </UiLanguageProvider>
+    </MemoryRouter>,
+  );
+}
 
 const why = 'Earnings events can reprice profit expectations and valuation anchors.';
 const reg = 'Regulatory events may imply penalties, operating limits, or sentiment shocks.';
@@ -17,11 +35,7 @@ const fixtures: EventAlertDisplayItem[] = [
 
 describe('EventAlertsPanel', () => {
   it('renders backend why text and updates detail on row activate', () => {
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <EventAlertsPanel items={fixtures} embedded />
-      </UiLanguageProvider>,
-    );
+    renderPanel(<EventAlertsPanel items={fixtures} embedded />);
     expect(screen.getByTestId('event-alert-why-101')).toHaveTextContent(reg);
     expect(screen.getByTestId('event-alert-why-it-matters')).toHaveTextContent(reg);
     fireEvent.click(screen.getByTestId('event-alert-row-102'));
@@ -29,20 +43,12 @@ describe('EventAlertsPanel', () => {
   });
 
   it('shows empty state when there are no event alerts', () => {
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <EventAlertsPanel items={[]} embedded />
-      </UiLanguageProvider>,
-    );
+    renderPanel(<EventAlertsPanel items={[]} embedded />);
     expect(screen.getByText('No event alerts')).toBeInTheDocument();
   });
 
   it('moves selection into the filtered dataset', () => {
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <EventAlertsPanel items={fixtures} embedded />
-      </UiLanguageProvider>,
-    );
+    renderPanel(<EventAlertsPanel items={fixtures} embedded />);
     fireEvent.click(screen.getByTestId('event-alert-row-102'));
     expect(screen.getByTestId('event-alert-why-it-matters')).toHaveTextContent(why);
 
@@ -50,5 +56,31 @@ describe('EventAlertsPanel', () => {
 
     expect(screen.queryByTestId('event-alert-row-102')).not.toBeInTheDocument();
     expect(screen.getByTestId('event-alert-why-it-matters')).toHaveTextContent(reg);
+  });
+
+  it('mounts a production back-link to the event calendar on the full page', () => {
+    render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.eventAlerts]}>
+        <UiLanguageProvider initialLanguage="en">
+          <Routes>
+            <Route
+              path={APP_ROUTE_PATHS.eventAlerts}
+              element={(
+                <>
+                  <EventAlertsPanel items={fixtures} />
+                  <LocationProbe />
+                </>
+              )}
+            />
+            <Route path={APP_ROUTE_PATHS.eventCalendar} element={<LocationProbe />} />
+          </Routes>
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+    const openCalendar = screen.getByTestId('event-alerts-open-calendar');
+    expect(openCalendar).toHaveTextContent('Corporate event calendar');
+    expect(screen.getByTestId('event-alerts-panel')).toBeInTheDocument();
+    fireEvent.click(openCalendar);
+    expect(screen.getByTestId('location-path')).toHaveTextContent(APP_ROUTE_PATHS.eventCalendar);
   });
 });

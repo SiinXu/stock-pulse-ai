@@ -157,7 +157,7 @@ class _PartialNotifier:
     def is_available(self) -> bool:
         return True
 
-    def generate_single_stock_report(self, result) -> str:
+    def generate_single_stock_report(self, result, report_type=None) -> str:
         content = f"report:{result.code}:{result.query_id}"
         self.rendered.append(content)
         return content
