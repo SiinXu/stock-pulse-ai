@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Complete the bounded Critic self-iteration loop: controlled revision rounds with round/budget caps (`AGENT_CRITIC_MAX_ITERS`, hard cap 2), revision diffs in critic trace, soft alignment with per-mode budgets, and product-side retention of Critic opinions when convergence fails (Refs #131).
+- [Fixed] Successful Critic revision convergence no longer re-projects original gap reasons into dashboard data_limitations; residual opinions remain only on non-converged paths (Refs #131).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).

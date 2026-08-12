@@ -858,6 +858,13 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            agent_critic_max_iters=parse_env_int(
+                os.getenv('AGENT_CRITIC_MAX_ITERS'),
+                1,
+                field_name='AGENT_CRITIC_MAX_ITERS',
+                minimum=1,
+                maximum=2,
+            ),
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,

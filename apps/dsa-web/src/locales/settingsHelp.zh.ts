@@ -1375,6 +1375,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
+    title: 'Critic 最大修订轮次',
+    summary: '限制 Critic 发现问题后的受控白名单修订轮次（默认 1，硬上限 2）。',
+    usage: 'Only raise above 1 when residual pipeline budget can absorb another whitelist revision.',
+    impact: ['Each additional round may add one whitelist stage rerun and an optional re-critic check.'],
+    notes: ['Revision diffs stay in critic_trace; failed convergence keeps Critic opinions in data_limitations; successful convergence keeps only a short revision note.'],
+    valueNotes: ['Default 1; hard cap 2.', 'Requires AGENT_CRITIC_ENABLED=true to take effect.'],
+  },
+
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',

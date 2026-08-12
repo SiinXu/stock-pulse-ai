@@ -1346,6 +1346,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
+    title: 'Critic Max Revision Rounds',
+    summary: 'Caps controlled whitelist revision rounds after Critic findings (default 1, hard cap 2).',
+    usage: 'Only raise above 1 when residual pipeline budget can absorb another whitelist revision.',
+    impact: ['Each additional round may add one whitelist stage rerun and an optional re-critic check.'],
+    notes: ['Revision diffs stay in critic_trace; failed convergence keeps Critic opinions in data_limitations; successful convergence keeps only a short revision note.'],
+    valueNotes: ['Default 1; hard cap 2.', 'Requires AGENT_CRITIC_ENABLED=true to take effect.'],
+  },
+
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',

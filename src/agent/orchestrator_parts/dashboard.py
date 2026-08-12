@@ -7,6 +7,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from src.agent import critic as _critic
 from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.protocols import AgentContext, normalize_decision_signal
 from src.agent.committee_mode import META_COMMITTEE_MODE as _META_COMMITTEE_MODE
@@ -538,6 +539,33 @@ class _DashboardMethods:
                 error_code="agent_committee_report_section_failed",
                 level=logging.WARNING,
             )
+
+        critic_limitations = _critic.project_critic_product_limitations(
+            ctx.meta.get("critic_trace") if isinstance(ctx.meta, dict) else None
+        )
+        if critic_limitations:
+            phase_decision = dashboard_block.get("phase_decision")
+            if not isinstance(phase_decision, dict):
+                phase_decision = {}
+            else:
+                phase_decision = dict(phase_decision)
+            existing_limits = phase_decision.get("data_limitations")
+            if not isinstance(existing_limits, list):
+                existing_limits = []
+            merged = []
+            seen = set()
+            for item in [*existing_limits, *critic_limitations]:
+                if not isinstance(item, str):
+                    continue
+                cleaned = item.strip()
+                if not cleaned or cleaned in seen:
+                    continue
+                seen.add(cleaned)
+                merged.append(cleaned)
+                if len(merged) >= 12:
+                    break
+            phase_decision["data_limitations"] = merged
+            dashboard_block["phase_decision"] = phase_decision
 
         dashboard_block["core_conclusion"] = core
         dashboard_block["intelligence"] = intelligence
