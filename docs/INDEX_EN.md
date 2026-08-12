@@ -106,6 +106,7 @@ This is the entry point for project documentation. The README covers the project
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [OpenAPI Web Types And Runtime Validation](openapi-web-types.md) | Generated web API types, CI drift gate, and stocks runtime-validation pilot |
+| [API Error Taxonomy](api-error-taxonomy_EN.md) | Stable error codes mapped to category, severity, default user action, and Web remediation ([中文](api-error-taxonomy.md)) |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
 | [Offline Test Gate (timeouts, coverage floor, markers)](testing-ci-gate.md) | Per-test timeout, faulthandler, measured coverage floor, strict markers, and manual benchmarks |
 | [Config-access ratchet](config-access-ratchet.md) | Shrink-only bare `get_config()` gate, preferred injection / composition-root path, and legitimate baseline changes (ADR-011 / issue #625) |

@@ -101,6 +101,7 @@
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [OpenAPI Web 类型与运行时校验（英文）](openapi-web-types.md) | 从 OpenAPI 生成 Web 类型、CI 漂移门禁与 stocks 运行时校验试点 |
+| [API 错误分类学](api-error-taxonomy.md) | 稳定 error 码的类别/严重度/默认动作与 Web 可行动指引（[English](api-error-taxonomy_EN.md)） |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
 | [离线测试门禁（超时、覆盖率下限、marker）](testing-ci-gate.md) | 单测超时、faulthandler、实测覆盖率下限、严格 marker，以及手动 benchmark 说明（英文专题；中英流程一致） |
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |

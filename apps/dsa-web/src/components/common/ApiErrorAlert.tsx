@@ -3,13 +3,24 @@
 import type React from 'react';
 import { useContext, useEffect, useMemo, useRef } from 'react';
 import {
+  classifyParsedApiError,
   localizeParsedApiError,
   resolveErrorRemediation,
   type ParsedApiError,
+  type TaxonomySeverity,
 } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { ToastProvider } from './ToastProvider';
 import { ToastContext, useToast } from './toastContext';
+
+
+function taxonomySeverityToToastTone(
+  severity: TaxonomySeverity | string | undefined,
+): 'info' | 'warning' | 'danger' {
+  if (severity === 'info') return 'info';
+  if (severity === 'warning') return 'warning';
+  return 'danger';
+}
 
 interface ApiErrorAlertProps {
   error: ParsedApiError;
@@ -38,6 +49,10 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
   const remediation = resolveErrorRemediation(localizedError, language, {
     onRetry: onAction,
   });
+  const classification = classifyParsedApiError(localizedError);
+  const toastTone = taxonomySeverityToToastTone(
+    remediation?.severity ?? classification.severity,
+  );
   const hasRemediation = remediation !== null;
   const remediationHref = remediation?.href;
   const remediationKind = remediation?.actionKind;
@@ -95,7 +110,7 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
           {remediation?.hint ? <p className="mt-1">{remediation.hint}</p> : null}
         </>
       ),
-      tone: 'danger',
+      tone: toastTone,
       durationMs: 0,
       closeLabel: dismissLabel ?? t('common.close'),
       action: hasAction ? {
@@ -118,6 +133,7 @@ const ApiErrorToast: React.FC<ApiErrorAlertProps> = ({
     resolvedActionLabel,
     showToast,
     t,
+    toastTone,
   ]);
 
   return null;

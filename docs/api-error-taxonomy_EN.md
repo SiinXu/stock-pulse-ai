@@ -74,3 +74,12 @@ cd apps/dsa-web && npm run test -- src/api/error/__tests__/taxonomy.test.ts src/
 `apps/dsa-web/src/utils/apiReasonMapper.ts` maps codes/reasons to
 `ActionableErrorClass` for inline analysis/settings UX. The taxonomy is the
 broader category/severity/action registry; both preserve the stable `error` code.
+
+## CI guard
+
+`scripts/check_error_taxonomy.py` runs in `./scripts/ci_gate.sh deterministic` and
+asserts:
+
+1. every Web `STABLE_ERROR_TEXT` code is registered in the backend taxonomy;
+2. backend and Web `ERROR_CODE_TAXONOMY` share the same codes and
+   `(category, severity, default_action)` triples.

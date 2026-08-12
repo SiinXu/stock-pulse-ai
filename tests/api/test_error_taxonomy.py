@@ -110,3 +110,36 @@ def test_api_error_detail_includes_taxonomy() -> None:
     assert exc.detail["error"] == "validation_error"
     assert exc.detail["category"] == "validation"
     assert exc.detail["severity"] == "error"
+
+
+def test_backend_and_web_error_code_taxonomy_align() -> None:
+    """Full dual-registry parity: same codes and classification triples."""
+    import re
+
+    web_path = REPO_ROOT / "apps" / "dsa-web" / "src" / "api" / "error" / "taxonomy.ts"
+    text = web_path.read_text(encoding="utf-8")
+    start = text.find("export const ERROR_CODE_TAXONOMY")
+    end = text.find("export const UNKNOWN_ERROR_CLASSIFICATION", start)
+    block = text[start:end if end > 0 else len(text)]
+    web_map = {
+        code: (category, severity, action)
+        for code, category, severity, action in re.findall(
+            r"^\s{2}([a-z][a-z0-9_]+):\s*entry\(\s*'([a-z_]+)',\s*'([a-z]+)',\s*'([a-z]+)'",
+            block,
+            re.MULTILINE,
+        )
+    }
+    backend_map = {
+        code: (entry.category, entry.severity, entry.default_action)
+        for code, entry in ERROR_CODE_TAXONOMY.items()
+    }
+    assert set(web_map) == set(backend_map), (
+        f"only_backend={sorted(set(backend_map)-set(web_map))} "
+        f"only_web={sorted(set(web_map)-set(backend_map))}"
+    )
+    mismatches = [
+        (code, backend_map[code], web_map[code])
+        for code in sorted(backend_map)
+        if backend_map[code] != web_map[code]
+    ]
+    assert mismatches == [], f"classification triple mismatches: {mismatches}"

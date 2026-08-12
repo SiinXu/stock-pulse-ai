@@ -37,3 +37,11 @@ English: [api-error-taxonomy_EN.md](api-error-taxonomy_EN.md)
 5. 运行 `python scripts/check_error_taxonomy.py` 与相关测试  
 
 详见英文版完整类别表与验收命令。
+
+## CI 守卫
+
+`scripts/check_error_taxonomy.py` 在 `./scripts/ci_gate.sh deterministic` 中执行，断言：
+
+1. Web `STABLE_ERROR_TEXT` 的每个码都在后端分类学中登记；
+2. 后端与 Web 的 `ERROR_CODE_TAXONOMY` 码集合及
+   `(category, severity, default_action)` 三元组一致。

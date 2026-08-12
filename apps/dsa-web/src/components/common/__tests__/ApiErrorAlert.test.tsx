@@ -170,4 +170,32 @@ describe('ApiErrorAlert', () => {
 
     expect(screen.queryByRole('button', { name: /重试|Retry/i })).not.toBeInTheDocument();
   });
+
+  it('maps taxonomy severity to toast tone', () => {
+    const { unmount } = render(
+      <ApiErrorAlert
+        error={createParsedApiError({
+          title: 'Too many attempts',
+          message: 'Wait a moment.',
+          code: 'rate_limited',
+          category: 'http_error',
+        })}
+      />,
+    );
+    expect(document.querySelector('[data-toast-tone="warning"]')).not.toBeNull();
+    unmount();
+
+    render(
+      <ApiErrorAlert
+        error={createParsedApiError({
+          title: 'Internal',
+          message: 'Failed',
+          code: 'internal_error',
+          category: 'http_error',
+        })}
+      />,
+    );
+    expect(document.querySelector('[data-toast-tone="danger"]')).not.toBeNull();
+  });
+
 });
