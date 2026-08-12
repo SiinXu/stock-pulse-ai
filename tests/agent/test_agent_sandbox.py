@@ -33,6 +33,7 @@ from src.agent.sandbox.effects import (
     EFFECT_DECISION_MEMORY,
     EFFECT_DECISION_SIGNAL,
     EFFECT_NOTIFICATION,
+    EFFECT_PRODUCTION_PORTFOLIO,
 )
 from src.agent.sandbox.policy import SANDBOX_MODE
 from src.services.decision_signal_service import (
@@ -56,8 +57,10 @@ def test_isolation_policy_fail_closed():
     assert "persist_decision_signal" in policy["enforced_in_batch1"]
     assert "persist_decision_memory" in policy["enforced_in_batch1"]
     assert "persist_analysis_history" in policy["enforced_in_batch1"]
-    assert "place_real_orders" in policy["declared_not_yet_enforced"]
-    assert "persist_decision_memory" not in policy["declared_not_yet_enforced"]
+    assert "write_production_portfolio" in policy["enforced_in_batch1"]
+    assert policy["declared_not_yet_enforced"] == ()
+    assert "place_real_orders" in policy["not_applicable_no_write_surface"]
+    assert "persist_agent_memory" in policy["not_applicable_no_write_surface"]
 
 
 def test_fake_clock_is_deterministic_and_advances():
@@ -72,6 +75,12 @@ def test_fake_clock_is_deterministic_and_advances():
 def test_context_requires_snapshot_when_mode_snapshot():
     with pytest.raises(ValueError, match="snapshot"):
         SandboxContext.create(data_mode="snapshot", snapshot={})
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_context_rejects_non_finite_public_values(value):
+    with pytest.raises(ValueError, match="finite JSON-compatible"):
+        SandboxContext.create(config_overlay={"risk_limit": value})
 
 
 def test_snapshot_data_access_is_read_only():
@@ -185,6 +194,67 @@ def test_compare_two_agent_variants():
         assert item.promotion_receipt is not None
         assert item.promotion_receipt.auto_promote is False
         assert item.promotion_receipt.review_required is True
+
+
+def test_runner_failure_is_sanitized_and_trace_is_not_completed():
+    secret = "sk-secret-shaped-value-1234567890"
+
+    def variant(request, context, data):
+        raise RuntimeError(f"api_key={secret}")
+
+    result = SandboxRunner(variant_callable=variant).run(
+        SandboxRunRequest(prompt="probe"),
+        context=SandboxContext.create(fixed_now=FIXED_NOW),
+    )
+
+    payload = result.to_dict()
+    assert result.success is False
+    assert result.error == "sandbox_variant_failed"
+    assert secret not in str(payload)
+    assert payload["trace"]["completed"] is False
+    assert result.trace.trajectory_compatible_runs()[0]["completed"] is False
+
+
+def test_runner_rejects_non_finite_variant_output():
+    result = SandboxRunner(
+        variant_callable=lambda request, context, data: {
+            "success": True,
+            "content": "bad metric",
+            "events": [{"duration_ms": float("nan")}],
+        }
+    ).run(
+        SandboxRunRequest(prompt="probe"),
+        context=SandboxContext.create(fixed_now=FIXED_NOW),
+    )
+
+    assert result.success is False
+    assert result.error == "sandbox_variant_failed"
+    assert result.trace.completed is False
+
+
+def test_runner_redacts_secrets_from_all_public_variant_fields():
+    secret = "sk-public-output-secret-1234567890"
+
+    def variant(request, context, data):
+        return {
+            "content": f"api_key={secret}",
+            "events": [{"attrs": {"authorization": f"Bearer {secret}"}}],
+            "simulated_actions": [{"detail": f"token={secret}"}],
+            "raw": {"api_key": secret},
+        }
+
+    result = SandboxRunner(variant_callable=variant).run(
+        SandboxRunRequest(prompt="probe"),
+        context=SandboxContext.create(
+            fixed_now=FIXED_NOW,
+            source_data_window={"from": "2026-01-01", "api_key": secret},
+        ),
+    )
+
+    payload = result.to_dict()
+    assert result.success is True
+    assert secret not in str(payload)
+    assert "[REDACTED]" in str(payload)
 
 
 def test_promotion_receipt_is_review_gated_never_auto():
@@ -328,6 +398,25 @@ def test_counterexample_decision_memory_flag_write_blocked_under_sandbox():
     mock_db.get_session.assert_not_called()
 
 
+def test_counterexample_production_portfolio_write_blocked_under_sandbox():
+    """Portfolio repository mutations must stop before opening a DB session."""
+    from src.repositories.portfolio_repo import PortfolioRepository
+
+    mock_db = MagicMock()
+    repo = PortfolioRepository(db_manager=mock_db)
+    ctx = SandboxContext.create(fixed_now=FIXED_NOW)
+    with active_sandbox_context(ctx):
+        with pytest.raises(SandboxExternalEffectBlocked) as raised:
+            repo.create_account(
+                name="must-not-persist",
+                broker=None,
+                market="us",
+                base_currency="USD",
+            )
+    assert raised.value.effect == EFFECT_PRODUCTION_PORTFOLIO
+    mock_db.get_session.assert_not_called()
+
+
 def test_production_path_unblocked_when_sandbox_inactive():
     """Fence must not fire outside sandbox (no false positives)."""
     service = DecisionSignalService(repo=MagicMock())
@@ -361,3 +450,26 @@ def test_build_promotion_receipt_rejects_unknown_guard():
     ctx = SandboxContext.create(fixed_now=FIXED_NOW)
     with pytest.raises(ValueError, match="first_live_run_guard"):
         build_promotion_receipt(context=ctx, first_live_run_guard="auto_ship")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (
+            "risk_boundary",
+            {
+                "force_paper_only": False,
+                "allow_real_orders": True,
+                "allow_real_notifications": True,
+            },
+        ),
+        (
+            "production_authority_scope",
+            {"may_touch": ["real_order"], "may_not_touch": [], "declared": True},
+        ),
+    ],
+)
+def test_build_promotion_receipt_rejects_authority_override(field, value):
+    ctx = SandboxContext.create(fixed_now=FIXED_NOW)
+    with pytest.raises(ValueError, match="authority|remain"):
+        build_promotion_receipt(context=ctx, **{field: value})

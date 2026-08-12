@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """External-effect fence for sandbox runs.
 
-Any production side effect (decision signals, notifications, real orders)
-attempted while a sandbox is active is recorded as blocked and refused.
+Known repository-owned production effects attempted while a sandbox is active
+are recorded as blocked and refused at their authoritative entry points.
 """
 
 from __future__ import annotations
@@ -118,6 +118,7 @@ class ExternalEffectFence:
 # Canonical effect names used by production write fences.
 EFFECT_DECISION_SIGNAL = "decision_signal.write"
 EFFECT_DECISION_MEMORY = "decision_memory.write"
+EFFECT_AGENT_MEMORY = "agent_memory.write"
 EFFECT_ANALYSIS_HISTORY = "analysis_history.write"
 EFFECT_NOTIFICATION = "notification.send"
 EFFECT_REAL_ORDER = "order.place"

@@ -11,9 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from src.agent.sandbox.context import SandboxContext
+from src.agent.sandbox.context import SandboxContext, validate_sandbox_json
 from src.agent.sandbox.policy import SANDBOX_MODE, SIMULATION_LABEL
 from src.agent.sandbox.trace import SandboxTrace
+from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
 
 PROMOTION_RECEIPT_SCHEMA_VERSION = "sandbox-promotion-receipt-v1"
 
@@ -21,6 +22,23 @@ VALID_ASSUMPTION_CLASSES = frozenset({"observed", "inferred", "not_checked"})
 VALID_FIRST_LIVE_GUARDS = frozenset(
     {"notification_only", "small_scope", "human_approval_required"}
 )
+
+_FAIL_CLOSED_RISK_BOUNDARY = {
+    "force_paper_only": True,
+    "allow_real_orders": False,
+    "allow_real_notifications": False,
+}
+_NO_PRODUCTION_AUTHORITY_SCOPE = {
+    "may_touch": [],
+    "may_not_touch": [
+        "decision_signal",
+        "decision_memory",
+        "real_notification",
+        "real_order",
+        "production_portfolio",
+    ],
+    "declared": False,
+}
 
 
 @dataclass(frozen=True)
@@ -96,6 +114,15 @@ def build_promotion_receipt(
         raise ValueError(
             f"first_live_run_guard must be one of {sorted(VALID_FIRST_LIVE_GUARDS)}"
         )
+    if risk_boundary is not None and dict(risk_boundary) != _FAIL_CLOSED_RISK_BOUNDARY:
+        raise ValueError("risk_boundary cannot grant or alter production authority")
+    if (
+        production_authority_scope is not None
+        and dict(production_authority_scope) != _NO_PRODUCTION_AUTHORITY_SCOPE
+    ):
+        raise ValueError(
+            "production_authority_scope must remain explicitly empty and undeclared"
+        )
 
     normalized_assumptions = _normalize_assumptions(assumptions)
     actions = list(simulated_actions or ())
@@ -108,49 +135,35 @@ def build_promotion_receipt(
             blocked = list(trace.blocked_external_effects)
         if not rejected:
             rejected = list(trace.rejected_actions)
+    actions = _redacted_mapping_rows(actions, "simulated_actions")
+    blocked = _redacted_mapping_rows(blocked, "blocked_external_effects")
+    rejected = _redacted_mapping_rows(rejected, "rejected_actions")
+    validate_sandbox_json(metadata or {}, field_name="promotion.metadata")
+    safe_metadata = redact_sensitive_data(dict(metadata or {}))
+    if not isinstance(safe_metadata, Mapping):
+        raise ValueError("promotion.metadata could not be safely serialized")
+    public_source_window = context.public_metadata()["source_data_window"]
 
     return PromotionReceipt(
         schema_version=PROMOTION_RECEIPT_SCHEMA_VERSION,
         sandbox_run_id=context.sandbox_run_id,
-        source_data_window=(
-            dict(context.source_data_window)
-            if context.source_data_window is not None
-            else None
-        ),
+        source_data_window=public_source_window,
         config_digest=context.config_digest,
         agent_variant_id=context.agent_variant_id,
         simulated_actions=tuple(dict(item) for item in actions),
         blocked_external_effects=tuple(dict(item) for item in blocked),
         assumptions=tuple(normalized_assumptions),
         rejected_actions=tuple(dict(item) for item in rejected),
-        risk_boundary=dict(
-            risk_boundary
-            or {
-                "force_paper_only": True,
-                "allow_real_orders": False,
-                "allow_real_notifications": False,
-            }
-        ),
-        production_authority_scope=dict(
-            production_authority_scope
-            or {
-                "may_touch": [],
-                "may_not_touch": [
-                    "decision_signal",
-                    "decision_memory",
-                    "real_notification",
-                    "real_order",
-                    "production_portfolio",
-                ],
-                "declared": False,
-            }
-        ),
+        risk_boundary=dict(_FAIL_CLOSED_RISK_BOUNDARY),
+        production_authority_scope=dict(_NO_PRODUCTION_AUTHORITY_SCOPE),
         first_live_run_guard=guard,
-        rollback_condition=rollback_condition
-        or (
-            "Reopen sandbox review if live readback diverges from sandbox "
-            "trace outcomes, blocked-effect set, or assumption classifications."
-        ),
+        rollback_condition=redact_sensitive_text(
+            rollback_condition
+            or (
+                "Reopen sandbox review if live readback diverges from sandbox "
+                "trace outcomes, blocked-effect set, or assumption classifications."
+            )
+        )[:1000],
         review_required=True,
         auto_promote=False,
         metadata={
@@ -158,7 +171,7 @@ def build_promotion_receipt(
                 trace.schema_version if trace is not None else None
             ),
             "data_mode": context.data_mode,
-            **dict(metadata or {}),
+            **dict(safe_metadata),
         },
     )
 
@@ -188,9 +201,28 @@ def _normalize_assumptions(
             classification = "not_checked"
         out.append(
             {
-                "name": str(item.get("name") or "assumption"),
+                "name": redact_sensitive_text(item.get("name") or "assumption")[:160],
                 "classification": classification,
-                "detail": str(item.get("detail") or ""),
+                "detail": redact_sensitive_text(item.get("detail") or "")[:1000],
             }
         )
     return out
+
+
+def _redacted_mapping_rows(
+    values: Sequence[Mapping[str, Any]],
+    field_name: str,
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for index, item in enumerate(values):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"{field_name}[{index}] must be a mapping")
+        validate_sandbox_json(item, field_name=f"{field_name}[{index}]")
+        safe_item = redact_sensitive_data(dict(item))
+        if not isinstance(safe_item, Mapping):
+            raise ValueError(
+                f"{field_name}[{index}] could not be safely serialized"
+            )
+        rows.append(dict(safe_item))
+    validate_sandbox_json(rows, field_name=field_name)
+    return rows

@@ -3,15 +3,16 @@
 
 Division of labor (Issues #247 / #202 / #442 vs backtest V30):
 
-- **Sandbox** owns environment isolation and safety: isolated config, fake
-  clock, read-only or snapshot data, SIMULATION labels, and hard fences that
-  block production DecisionSignal / decision-memory / notification / order
-  writes.
+- **Sandbox** owns simulation context and repository-level safety: isolated
+  config, fake clock, read-only or snapshot data, SIMULATION labels, and hard
+  fences that block known production DecisionSignal / decision-memory /
+  notification / portfolio writes.
 - **Backtest** owns historical validation methodology (forward windows,
   engine versioning, performance metrics over analysis history).
 
-Passing a sandbox run never grants production authority. Promotion produces a
-reviewable receipt only.
+This in-process runner accepts trusted callables and is not an OS or ToolSurface
+security boundary. Passing a run never grants production authority; promotion
+produces a reviewable receipt only.
 """
 
 from __future__ import annotations

@@ -14,8 +14,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 
-from src.agent.sandbox.context import SandboxContext
+from src.agent.sandbox.context import SandboxContext, validate_sandbox_json
 from src.agent.sandbox.policy import SANDBOX_MODE, SIMULATION_LABEL
+from src.utils.sanitize import redact_sensitive_data
 
 SANDBOX_TRACE_SCHEMA_VERSION = "sandbox-trace-v1"
 
@@ -66,6 +67,7 @@ class SandboxTrace:
     data_mode: str
     label: str
     mode: str
+    completed: bool
     events: tuple = ()
     tool_calls: tuple = ()
     simulated_actions: tuple = ()
@@ -84,6 +86,7 @@ class SandboxTrace:
             "label": self.label,
             "mode": self.mode,
             "simulation": True,
+            "completed": self.completed,
             "events": [event.to_dict() for event in self.events],
             "tool_calls": [dict(item) for item in self.tool_calls],
             "simulated_actions": [dict(item) for item in self.simulated_actions],
@@ -108,7 +111,7 @@ class SandboxTrace:
                 "run_id": self.sandbox_run_id,
                 "agent_id": self.agent_variant_id,
                 "started_at": self.clock_now,
-                "completed": True,
+                "completed": self.completed,
                 "source_truncated": False,
                 "tool_calls": [
                     {
@@ -152,39 +155,74 @@ def build_sandbox_trace(
     blocked_external_effects: Optional[Sequence[Mapping[str, Any]]] = None,
     rejected_actions: Optional[Sequence[Mapping[str, Any]]] = None,
     metadata: Optional[Mapping[str, Any]] = None,
+    completed: bool = True,
 ) -> SandboxTrace:
     """Assemble a labeled sandbox trace from run artifacts."""
     normalized_events: List[SandboxTraceEvent] = []
     for index, raw in enumerate(events or ()):
         if isinstance(raw, SandboxTraceEvent):
-            normalized_events.append(raw)
-            continue
-        if not isinstance(raw, Mapping):
-            continue
+            raw = {
+                "event_type": raw.event_type,
+                "name": raw.name,
+                "sequence": raw.sequence,
+                "timestamp": raw.timestamp,
+                "status": raw.status,
+                "duration_ms": raw.duration_ms,
+                "step": raw.step,
+                "attrs": dict(raw.attrs),
+            }
+        elif not isinstance(raw, Mapping):
+            raise ValueError(f"events[{index}] must be a mapping")
+        validate_sandbox_json(raw, field_name=f"events[{index}]")
+        safe_raw = redact_sensitive_data(dict(raw))
+        if not isinstance(safe_raw, Mapping):
+            raise ValueError(f"events[{index}] could not be safely serialized")
         normalized_events.append(
             SandboxTraceEvent(
-                event_type=str(raw.get("event_type") or "agent.event"),
-                name=str(raw.get("name") or raw.get("event_type") or "event"),
-                sequence=int(raw.get("sequence", index)),
+                event_type=str(safe_raw.get("event_type") or "agent.event"),
+                name=str(
+                    safe_raw.get("name")
+                    or safe_raw.get("event_type")
+                    or "event"
+                ),
+                sequence=int(safe_raw.get("sequence", index)),
                 timestamp=str(
-                    raw.get("timestamp") or context.clock.isoformat()
+                    safe_raw.get("timestamp") or context.clock.isoformat()
                 ),
                 status=(
-                    str(raw["status"]) if raw.get("status") is not None else None
-                ),
-                duration_ms=(
-                    int(raw["duration_ms"])
-                    if raw.get("duration_ms") is not None
+                    str(safe_raw["status"])
+                    if safe_raw.get("status") is not None
                     else None
                 ),
-                step=int(raw["step"]) if raw.get("step") is not None else None,
-                attrs=dict(raw.get("attrs") or {}),
+                duration_ms=(
+                    int(safe_raw["duration_ms"])
+                    if safe_raw.get("duration_ms") is not None
+                    else None
+                ),
+                step=(
+                    int(safe_raw["step"])
+                    if safe_raw.get("step") is not None
+                    else None
+                ),
+                attrs=dict(safe_raw.get("attrs") or {}),
             )
         )
 
+    tool_call_rows = _redacted_mapping_rows(tool_calls, "tool_calls")
+    simulated_action_rows = _redacted_mapping_rows(
+        simulated_actions, "simulated_actions"
+    )
+    blocked_rows = _redacted_mapping_rows(
+        blocked_external_effects, "blocked_external_effects"
+    )
+    rejected_rows = _redacted_mapping_rows(rejected_actions, "rejected_actions")
+    validate_sandbox_json(metadata or {}, field_name="metadata")
+    safe_metadata = redact_sensitive_data(dict(metadata or {}))
+    if not isinstance(safe_metadata, Mapping):
+        raise ValueError("metadata could not be safely serialized")
     meta = {
         **context.public_metadata(),
-        **dict(metadata or {}),
+        **dict(safe_metadata),
         "simulation": True,
         "label": SIMULATION_LABEL,
         "mode": SANDBOX_MODE,
@@ -198,12 +236,30 @@ def build_sandbox_trace(
         data_mode=context.data_mode,
         label=SIMULATION_LABEL,
         mode=SANDBOX_MODE,
+        completed=bool(completed),
         events=tuple(normalized_events),
-        tool_calls=tuple(dict(item) for item in (tool_calls or ())),
-        simulated_actions=tuple(dict(item) for item in (simulated_actions or ())),
-        blocked_external_effects=tuple(
-            dict(item) for item in (blocked_external_effects or ())
-        ),
-        rejected_actions=tuple(dict(item) for item in (rejected_actions or ())),
+        tool_calls=tuple(tool_call_rows),
+        simulated_actions=tuple(simulated_action_rows),
+        blocked_external_effects=tuple(blocked_rows),
+        rejected_actions=tuple(rejected_rows),
         metadata=meta,
     )
+
+
+def _redacted_mapping_rows(
+    values: Optional[Sequence[Mapping[str, Any]]],
+    field_name: str,
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for index, item in enumerate(values or ()):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"{field_name}[{index}] must be a mapping")
+        validate_sandbox_json(item, field_name=f"{field_name}[{index}]")
+        safe_item = redact_sensitive_data(dict(item))
+        if not isinstance(safe_item, Mapping):
+            raise ValueError(
+                f"{field_name}[{index}] could not be safely serialized"
+            )
+        rows.append(dict(safe_item))
+    validate_sandbox_json(rows, field_name=field_name)
+    return rows

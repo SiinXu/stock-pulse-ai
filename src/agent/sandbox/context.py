@@ -23,8 +23,11 @@ from src.agent.sandbox.policy import (
     get_sandbox_isolation_policy,
     simulation_markers,
 )
+from src.utils.sanitize import redact_sensitive_data
 
 SandboxDataMode = Literal["readonly_live", "snapshot"]
+
+_MAX_SANDBOX_JSON_CHARS = 262_144
 
 _ACTIVE_SANDBOX: ContextVar[Optional["SandboxContext"]] = ContextVar(
     "agent_sandbox_active_context",
@@ -43,8 +46,25 @@ def _deep_freeze(value: Any) -> Any:
 
 
 def _stable_digest(payload: Mapping[str, Any]) -> str:
-    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str)
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, allow_nan=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+
+def validate_sandbox_json(
+    value: Any,
+    *,
+    field_name: str,
+    max_chars: int = _MAX_SANDBOX_JSON_CHARS,
+) -> None:
+    """Reject non-JSON, non-finite, or unbounded sandbox public data."""
+    try:
+        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(
+            f"{field_name} must contain finite JSON-compatible values"
+        ) from exc
+    if len(encoded) > max_chars:
+        raise ValueError(f"{field_name} exceeds the {max_chars}-character budget")
 
 
 @dataclass(frozen=True)
@@ -71,6 +91,13 @@ class SandboxContext:
     )
 
     def __post_init__(self) -> None:
+        validate_sandbox_json(self.snapshot, field_name="snapshot")
+        validate_sandbox_json(self.config_overlay, field_name="config_overlay")
+        if self.source_data_window is not None:
+            validate_sandbox_json(
+                self.source_data_window,
+                field_name="source_data_window",
+            )
         object.__setattr__(self, "snapshot", _deep_freeze(dict(self.snapshot or {})))
         object.__setattr__(
             self, "config_overlay", _deep_freeze(dict(self.config_overlay or {}))
@@ -160,7 +187,7 @@ class SandboxContext:
             "data_mode": self.data_mode,
             "clock_now": self.clock.isoformat(),
             "source_data_window": (
-                dict(self.source_data_window)
+                dict(redact_sensitive_data(dict(self.source_data_window)))
                 if self.source_data_window is not None
                 else None
             ),

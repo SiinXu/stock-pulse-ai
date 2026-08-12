@@ -1,27 +1,39 @@
 # -*- coding: utf-8 -*-
 """Sandbox runner for agent / strategy variants.
 
-Runs an agent variant under an active SandboxContext so that:
+Runs a trusted agent variant under an active SandboxContext so that:
 - config overlay + fake clock + data access are isolated
 - all outputs are labeled SIMULATION
-- production decision / notification writes are fenced
+- known production decision / notification / portfolio writes are fenced
 - traces stay production-isomorphic for comparison
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from src.agent.sandbox.context import (
     SandboxContext,
     active_sandbox_context,
+    validate_sandbox_json,
 )
 from src.agent.sandbox.data_access import SandboxDataAccess
 from src.agent.sandbox.effects import get_blocked_external_effects
 from src.agent.sandbox.policy import SIMULATION_LABEL
 from src.agent.sandbox.promotion import PromotionReceipt, build_promotion_receipt
 from src.agent.sandbox.trace import SandboxTrace, build_sandbox_trace
+from src.utils.sanitize import (
+    log_safe_exception,
+    redact_sensitive_data,
+    redact_sensitive_text,
+    safe_exception_type_name,
+)
+
+logger = logging.getLogger(__name__)
+
+_MAX_SANDBOX_CONTENT_CHARS = 16_000
 
 
 VariantCallable = Callable[
@@ -87,7 +99,7 @@ class SandboxRunResult:
 
 
 class SandboxRunner:
-    """Execute one or more agent variants inside a safe sandbox."""
+    """Execute trusted variants with repository-owned production writes fenced."""
 
     def __init__(
         self,
@@ -132,66 +144,107 @@ class SandboxRunner:
         with active_sandbox_context(ctx) as active:
             data = SandboxDataAccess(context=active, live_reader=self._live_reader)
             try:
-                raw = dict(self._variant_callable(request, active, data) or {})
-                success = bool(raw.get("success", True))
+                variant_output = self._variant_callable(request, active, data) or {}
+                if not isinstance(variant_output, Mapping):
+                    raise ValueError("sandbox variant output must be a mapping")
+                validate_sandbox_json(variant_output, field_name="variant_output")
+                raw_output = dict(variant_output)
+                success = bool(raw_output.get("success", True))
                 content = _ensure_simulation_label(
-                    str(raw.get("content") or ""),
+                    redact_sensitive_text(raw_output.get("content") or "")[
+                        :_MAX_SANDBOX_CONTENT_CHARS
+                    ],
                     banner=active.banner(),
                 )
-                events = list(raw.get("events") or ())
-                tool_calls = list(raw.get("tool_calls") or ())
-                simulated_actions = list(raw.get("simulated_actions") or ())
-                rejected_actions = list(raw.get("rejected_actions") or ())
+                events = _public_mapping_list(raw_output.get("events"), "events")
+                tool_calls = _public_mapping_list(
+                    raw_output.get("tool_calls"), "tool_calls"
+                )
+                simulated_actions = _public_mapping_list(
+                    raw_output.get("simulated_actions"), "simulated_actions"
+                )
+                rejected_actions = _public_mapping_list(
+                    raw_output.get("rejected_actions"), "rejected_actions"
+                )
                 error = (
-                    str(raw["error"]) if raw.get("error") is not None else None
+                    redact_sensitive_text(raw_output["error"])[:512]
+                    if raw_output.get("error") is not None
+                    else None
                 )
                 if not success and error is None:
                     error = "sandbox_variant_failed"
-            except Exception as exc:  # noqa: BLE001 — surface as labeled failure
+                raw = _public_mapping(raw_output.get("raw"), "raw")
+                blocked = [
+                    item.to_dict() for item in get_blocked_external_effects()
+                ]
+                if not simulated_actions:
+                    simulated_actions = [
+                        {
+                            "action": "sandbox_variant_run",
+                            "agent_variant_id": active.agent_variant_id,
+                            "simulation": True,
+                        }
+                    ]
+
+                trace = build_sandbox_trace(
+                    active,
+                    events=events,
+                    tool_calls=tool_calls,
+                    simulated_actions=simulated_actions,
+                    blocked_external_effects=blocked,
+                    rejected_actions=rejected_actions,
+                    metadata={
+                        "prompt_present": bool(request.prompt),
+                        "stock_code": request.stock_code,
+                        "market": request.market,
+                        **_public_mapping(request.metadata, "request.metadata"),
+                    },
+                    completed=success,
+                )
+                receipt = None
+                if emit_promotion_receipt:
+                    receipt = build_promotion_receipt(
+                        context=active,
+                        trace=trace,
+                        simulated_actions=simulated_actions,
+                        blocked_external_effects=blocked,
+                        rejected_actions=rejected_actions,
+                    )
+            except Exception as exc:  # broad-exception: fallback_recorded - failure is logged and labeled.
+                log_safe_exception(
+                    logger,
+                    "Sandbox variant run failed",
+                    exc,
+                    error_code="sandbox_variant_failed",
+                    context={
+                        "sandbox_run_id": active.sandbox_run_id,
+                        "agent_variant_id": active.agent_variant_id,
+                    },
+                )
                 success = False
                 content = _ensure_simulation_label(
-                    f"Sandbox variant error: {exc}",
+                    "Sandbox variant failed. No production authority was granted.",
                     banner=active.banner(),
                 )
                 events = []
                 tool_calls = []
                 simulated_actions = []
                 rejected_actions = []
-                error = str(exc)
-                raw = {"exception_type": type(exc).__name__}
-
-            blocked = [item.to_dict() for item in get_blocked_external_effects()]
-            if not simulated_actions:
-                simulated_actions = [
-                    {
-                        "action": "sandbox_variant_run",
-                        "agent_variant_id": active.agent_variant_id,
-                        "simulation": True,
-                    }
+                blocked = [
+                    item.to_dict() for item in get_blocked_external_effects()
                 ]
-
-            trace = build_sandbox_trace(
-                active,
-                events=events,
-                tool_calls=tool_calls,
-                simulated_actions=simulated_actions,
-                blocked_external_effects=blocked,
-                rejected_actions=rejected_actions,
-                metadata={
-                    "prompt_present": bool(request.prompt),
-                    "stock_code": request.stock_code,
-                    "market": request.market,
-                    **dict(request.metadata or {}),
-                },
-            )
-            receipt = None
-            if emit_promotion_receipt:
-                receipt = build_promotion_receipt(
-                    context=active,
-                    trace=trace,
-                    simulated_actions=simulated_actions,
+                error = "sandbox_variant_failed"
+                raw = {"exception_type": safe_exception_type_name(exc)}
+                trace = build_sandbox_trace(
+                    active,
                     blocked_external_effects=blocked,
-                    rejected_actions=rejected_actions,
+                    metadata={"prompt_present": bool(request.prompt)},
+                    completed=False,
+                )
+                receipt = (
+                    build_promotion_receipt(context=active, trace=trace)
+                    if emit_promotion_receipt
+                    else None
                 )
             return SandboxRunResult(
                 success=success,
@@ -334,3 +387,27 @@ def _ensure_simulation_label(content: str, *, banner: str) -> str:
     if not text.strip():
         return banner
     return f"{banner}\n{text}"
+
+
+def _public_mapping(value: Any, field_name: str) -> Dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field_name} must be a mapping")
+    validate_sandbox_json(value, field_name=field_name)
+    redacted = redact_sensitive_data(dict(value))
+    if not isinstance(redacted, Mapping):
+        raise ValueError(f"{field_name} could not be safely serialized")
+    return dict(redacted)
+
+
+def _public_mapping_list(value: Any, field_name: str) -> List[Dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field_name} must be a list of mappings")
+    validate_sandbox_json(value, field_name=field_name)
+    return [
+        _public_mapping(item, f"{field_name}[{index}]")
+        for index, item in enumerate(value)
+    ]
