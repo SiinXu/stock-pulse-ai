@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 234047,
-      "measuredGzipBytes": 233847,
-      "note": "Remeasured after Data Sources Hub runtime projection i18n/OpenAPI (Refs #867); measured 233847 B + 200 B headroom."
+      "maxGzipBytes": 234690,
+      "measuredGzipBytes": 234490,
+      "note": "Remeasured after Data Sources Hub runtime projection merge with main (Refs #867); measured 234490 B + 200 B headroom."
     },
     {
       "id": "js-entry",
