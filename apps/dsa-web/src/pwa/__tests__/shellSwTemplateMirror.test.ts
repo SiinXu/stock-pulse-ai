@@ -4,8 +4,11 @@
  * Guard against policy drift: the generated SW template in vite-plugin-shell-pwa.ts
  * must keep the same never-cache / shell-static path rules as shellCachePolicy.ts.
  */
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import { readFileSync } from 'node:fs';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import path from 'node:path';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
@@ -27,7 +30,7 @@ describe('shell SW template mirrors shellCachePolicy', () => {
       "path === '/api'",
       "path.startsWith('/api/')",
       "path === '/health'",
-      "stocks.index.json",
+      'stocks.index.json',
       "path === '/docs'",
       "path === '/redoc'",
       "path === '/openapi.json'",
