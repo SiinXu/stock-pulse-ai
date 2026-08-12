@@ -324,34 +324,29 @@ class _AnalysisResultStageMixin:
         """Attach info-quality grade and forced conclusion; optionally block weak Pass."""
         if result is None:
             return []
-        try:
-            from src.services.info_quality_grading import apply_info_quality_constraints
+        from src.services.info_quality_grading import (
+            apply_info_quality_constraints,
+            read_info_quality_feature_flag,
+        )
 
-            config = getattr(self, "config", None)
-            grading_enabled = bool(
-                getattr(config, "info_quality_grading_enabled", True)
-            )
-            forced_enabled = bool(
-                getattr(config, "forced_conclusion_enabled", True)
-            )
-            return apply_info_quality_constraints(
-                result,
-                analysis_context_pack_overview=analysis_context_pack_overview,
-                grading_enabled=grading_enabled,
-                forced_conclusion_enabled=forced_enabled,
-                enforce_action_downgrade=enforce_action_downgrade and forced_enabled,
-                report_language=getattr(result, "report_language", None)
-                or getattr(config, "report_language", "zh"),
-            )
-        except Exception as exc:  # broad-exception: fallback_recorded
-            log_safe_exception(
-                logger,
-                "Info quality constraints skipped",
-                exc,
-                error_code="pipeline_info_quality_constraints_failed",
-                level=logging.WARNING,
-            )
-            return []
+        config = getattr(self, "config", None)
+        grading_enabled = read_info_quality_feature_flag(
+            config,
+            "info_quality_grading_enabled",
+        )
+        forced_enabled = read_info_quality_feature_flag(
+            config,
+            "forced_conclusion_enabled",
+        )
+        return apply_info_quality_constraints(
+            result,
+            analysis_context_pack_overview=analysis_context_pack_overview,
+            grading_enabled=grading_enabled,
+            forced_conclusion_enabled=forced_enabled,
+            enforce_action_downgrade=enforce_action_downgrade and forced_enabled,
+            report_language=getattr(result, "report_language", None)
+            or getattr(config, "report_language", "zh"),
+        )
 
     @staticmethod
     def _agent_dashboard_value(

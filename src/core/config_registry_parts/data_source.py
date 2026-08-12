@@ -1140,8 +1140,8 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Derive A/B/C information quality grades from the existing data "
             "validation evidence and AnalysisContextPack block statuses "
-            "(source reliability, timeliness, consistency). Grade C blocks "
-            "evidence-free Pass conclusions. Default true."
+            "(source reliability, timeliness, consistency). Disabling this "
+            "removes grade metadata and grade-driven prompt rules. Default true."
         ),
         "category": "data_source",
         "data_type": "boolean",
@@ -1170,7 +1170,8 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Require reports and DecisionSignal metadata to include an explicit "
             "Pass / Fail / Watch forced conclusion constrained by information "
-            "quality. Default true."
+            "quality, including action and Risk Manager downgrades. Disabling "
+            "this keeps grades visible without changing the action. Default true."
         ),
         "category": "data_source",
         "data_type": "boolean",

@@ -508,6 +508,9 @@ class _AgentAnalysisStageMixin:
                     attach_risk_gate_result,
                     build_agent_runtime_facts,
                 )
+                from src.services.info_quality_grading import (
+                    read_info_quality_feature_flag,
+                )
 
                 if not isinstance(result.dashboard, dict):
                     result.dashboard = {}
@@ -518,6 +521,10 @@ class _AgentAnalysisStageMixin:
                     current_signal=pipeline_start_signal,
                     dashboard=result.dashboard,
                     runtime_facts=runtime_facts,
+                    info_quality_risk_enabled=read_info_quality_feature_flag(
+                        self.config,
+                        "forced_conclusion_enabled",
+                    ),
                 )
                 final_gate = apply_risk_manager_gate_from_config(
                     final_gate_ctx,

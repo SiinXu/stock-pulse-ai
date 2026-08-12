@@ -430,3 +430,37 @@ def test_extract_returns_none_for_malformed_persisted_overview() -> None:
             }
         }
     ) is None
+
+
+def test_renderer_fail_closes_overlong_evidence_and_rejects_grade_only_metadata() -> None:
+    pack = _pack()
+    pack.data_quality.metadata = {
+        "info_quality": {"grade": "A"},
+        "validation_evidence": [
+            {
+                "schema_version": "data_quality_evidence.v1",
+                "data_type": "daily_bars",
+                "severity": "pass",
+                "issues": [],
+            }
+            for _ in range(25)
+        ],
+    }
+
+    overview = render_analysis_context_pack_overview(pack, report_language="en")
+
+    assert overview is not None
+    quality = overview["data_quality"]
+    assert "info_quality" not in quality
+    assert len(quality["validation_evidence"]) == 24
+    assert quality["validation_evidence"][0] == {
+        "schema_version": "data_quality_evidence.v1",
+        "data_type": "invalid",
+        "severity": "reject",
+        "symbol": None,
+        "provider": None,
+        "market": "unknown",
+        "instrument_type": "equity",
+        "rejected": True,
+        "reason_codes": ["invalid_validation_evidence"],
+    }

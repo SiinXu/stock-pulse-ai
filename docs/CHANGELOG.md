@@ -8,8 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Fixed] Information quality grading accepts overview list-shaped blocks and prefers precomputed grades so clean evidence is not forced to grade C / Watch (Refs #123).
-- [Added] Information quality A/B/C grading from validation-backed context evidence with forced Pass/Fail/Watch conclusions, grade-C Pass blocking, and report/DecisionSignal/trace surfaces (Refs #123).
+- [Added] Fail-closed information quality A/B/C grading from validation-backed context evidence, with independently configurable Pass/Fail/Watch constraints across report, DecisionSignal, prompt, and risk surfaces (Refs #123).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
 - [Fixed] Restore the Chat context-compression switch semantics and shared 44px touch target after the compact workspace migration.
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).

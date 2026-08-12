@@ -341,6 +341,17 @@ class TestReportRenderer(unittest.TestCase):
         self.assertNotIn("technical: fallback", out)
         self.assertNotIn("raw context pack", out)
 
+    def test_render_brief_ignores_malformed_quality_dashboard_fields(self) -> None:
+        r = _make_result()
+        r.dashboard["info_quality"] = "A"
+        r.dashboard["forced_conclusion"] = ["Pass"]
+
+        out = render("brief", [r])
+
+        self.assertIsNotNone(out)
+        self.assertNotIn("质量等级", out)
+        self.assertNotIn("强制结论", out)
+
     def test_render_templates_skip_phase_pack_excerpt_when_summary_missing(self) -> None:
         r = _make_result()
 

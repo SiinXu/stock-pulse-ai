@@ -545,6 +545,29 @@ def test_build_batch_returns_one_pack_per_artifact() -> None:
     assert [pack.subject.code for pack in packs] == ["600519", "000001"]
 
 
+def test_info_quality_builder_feature_flag_controls_grade_metadata() -> None:
+    enabled = AnalysisContextBuilder.build(_artifacts())
+    disabled = AnalysisContextBuilder.build(
+        _artifacts(info_quality_grading_enabled=False)
+    )
+
+    assert enabled.data_quality.metadata["info_quality"]["schema_version"] == "info-quality-v1"
+    assert "info_quality" not in disabled.data_quality.metadata
+    assert "info_quality_grade" not in disabled.data_quality.metadata
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"info_quality_grading_enabled": "false"},
+        {"forced_conclusion_enabled": 1},
+    ],
+)
+def test_info_quality_builder_feature_flags_reject_truthy_coercions(overrides) -> None:
+    with pytest.raises(TypeError):
+        AnalysisContextBuilder.build(_artifacts(**overrides))
+
+
 def test_builder_output_safe_dict_redacts_sensitive_mapping_keys() -> None:
     pack = AnalysisContextBuilder.build(
         _artifacts(
