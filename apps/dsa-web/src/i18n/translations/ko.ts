@@ -955,6 +955,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "다른 탭에서 레이아웃이 갱신되어 최신 설정을 다시 불러왔습니다.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "해당 작업은 대시보드를 사용할 수 없게 만들어 취소되었습니다.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "이 위젯은 숨겨져 있습니다",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "터치 기기에서는 위로/아래로 이동 버튼으로 순서를 바꾸세요",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "포트폴리오 건전성",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthDescription": "저장된 일일 포트폴리오 건전성 스냅샷 읽기 전용 보기.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthUnavailable": "포트폴리오 건전성을 사용할 수 없음",

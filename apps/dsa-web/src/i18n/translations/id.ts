@@ -955,6 +955,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "Tata letak diperbarui di tab lain; preferensi terbaru dimuat ulang.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Perubahan itu akan membuat dasbor tidak dapat digunakan dan dibatalkan.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Widget ini disembunyikan",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "Di perangkat sentuh, gunakan tombol naik dan turun untuk mengurutkan ulang",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Kesehatan portofolio",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthDescription": "Tampilan hanya-baca snapshot kesehatan portofolio harian yang disimpan.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthUnavailable": "Kesehatan portofolio tidak tersedia",

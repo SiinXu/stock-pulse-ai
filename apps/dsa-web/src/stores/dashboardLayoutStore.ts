@@ -114,12 +114,37 @@ function commitWithRevision(
       ...mutated,
       revision: authoritative.revision + 1,
     });
+
+    // Shrink the multi-tab race window: re-read durable storage immediately before
+    // writing so a concurrent winner is not overwritten by a stale mutator.
+    const recheck = readDashboardLayoutFromStorage();
+    if (recheck.revision !== expectedRevision) {
+      const recovered = normalizeDashboardLayout(recheck);
+      set({ layout: recovered, lastError: 'revision_conflict' });
+      return { ok: false, reason: 'revision_conflict', layout: recovered };
+    }
+
     const persisted = writeDashboardLayoutToStorage(next);
     if (!persisted && getLocalStorage()) {
-      // Storage exists but write failed: keep memory updated, surface storage_failed.
-      set({ layout: next, lastError: 'storage_failed' });
-      return { ok: false, reason: 'storage_failed', layout: next };
+      // Storage exists but write failed: do not claim success; keep prior durable state.
+      const recovered = readDashboardLayoutFromStorage();
+      set({ layout: recovered, lastError: 'storage_failed' });
+      return { ok: false, reason: 'storage_failed', layout: recovered };
     }
+
+    // Confirm durable content after write; treat unexpected drift as conflict.
+    const confirmed = readDashboardLayoutFromStorage();
+    if (
+      getLocalStorage()
+      && (
+        confirmed.revision !== next.revision
+        || JSON.stringify(confirmed.widgets) !== JSON.stringify(next.widgets)
+      )
+    ) {
+      set({ layout: confirmed, lastError: 'revision_conflict' });
+      return { ok: false, reason: 'revision_conflict', layout: confirmed };
+    }
+
     set({ layout: next, lastError: null });
     return { ok: true, layout: next };
   } finally {

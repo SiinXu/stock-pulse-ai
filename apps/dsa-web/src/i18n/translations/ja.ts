@@ -955,6 +955,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "別タブで配置が更新されたため、最新の設定を再読み込みしました。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "その操作ではダッシュボードが使えなくなるため取り消しました。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "このウィジェットは非表示です",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "タッチ端末では上下移動ボタンで並べ替えてください",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "ポートフォリオ健全性",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthDescription": "保存済み日次ポートフォリオ健全性スナップショットの読み取り専用表示。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthUnavailable": "ポートフォリオ健全性を利用できません",

@@ -955,6 +955,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "Layout wurde in einem anderen Tab aktualisiert; neueste Einstellung geladen.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Diese Änderung würde das Dashboard unbenutzbar machen und wurde abgebrochen.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Dieses Widget ist ausgeblendet",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "Auf Touch-Geräten Reihenfolge mit den Schaltflächen Nach oben/unten ändern",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Portfolio-Gesundheit",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthDescription": "Schreibgeschützte Ansicht des gespeicherten täglichen Portfolio-Gesundheits-Snapshots.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthUnavailable": "Portfolio-Gesundheit nicht verfügbar",

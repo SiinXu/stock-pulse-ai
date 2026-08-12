@@ -52,11 +52,23 @@ describe('HomeDashboardLayout', () => {
     fireEvent.click(screen.getByTestId('home-dashboard-layout-customize'));
     expect(screen.getByTestId('home-dashboard-move-up-watchlist')).toBeInTheDocument();
     expect(screen.getByTestId('home-dashboard-move-down-watchlist')).toBeInTheDocument();
+    expect(screen.getByTestId('home-dashboard-layout-mobile-hint')).toBeInTheDocument();
+    expect(screen.getByTestId('home-dashboard-drag-watchlist').className).toMatch(/sm:inline-flex/);
 
     fireEvent.click(screen.getByTestId('home-dashboard-toggle-portfolio_health'));
     fireEvent.click(screen.getByTestId('home-dashboard-toggle-alerts'));
     fireEvent.click(screen.getByTestId('home-dashboard-toggle-recent_reports'));
     const lastToggle = screen.getByTestId('home-dashboard-toggle-watchlist');
     expect(lastToggle).toBeDisabled();
+  });
+
+  it('restores defaults from customize mode', () => {
+    renderLayout();
+    fireEvent.click(screen.getByTestId('home-dashboard-layout-customize'));
+    fireEvent.click(screen.getByTestId('home-dashboard-toggle-alerts'));
+    fireEvent.click(screen.getByTestId('home-dashboard-layout-reset'));
+    fireEvent.click(screen.getByTestId('home-dashboard-layout-customize'));
+    expect(screen.getByTestId('home-dashboard-widget-alerts')).toHaveAttribute('data-visible', 'true');
+    expect(screen.getByTestId('home-dashboard-layout-announcement')).toHaveTextContent(/default/i);
   });
 });

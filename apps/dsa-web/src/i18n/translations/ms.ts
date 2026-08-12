@@ -955,6 +955,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "Susun atur dikemas kini dalam tab lain; keutamaan terkini dimuatkan semula.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Perubahan itu akan menjadikan papan pemuka tidak boleh digunakan dan dibatalkan.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Widget ini disembunyikan",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "Pada peranti sentuh, gunakan butang naik dan turun untuk menyusun semula",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Kesihatan portfolio",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthDescription": "Paparan baca sahaja petikan harian kesihatan portfolio yang disimpan.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthUnavailable": "Kesihatan portfolio tidak tersedia",

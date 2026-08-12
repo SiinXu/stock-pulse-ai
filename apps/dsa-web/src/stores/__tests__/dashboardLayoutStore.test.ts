@@ -64,13 +64,49 @@ describe('dashboardLayoutStore', () => {
     void revision;
   });
 
-  it('resets to the default ordered preset', () => {
+  it('resets to the default ordered preset and persists it in localStorage', () => {
     useDashboardLayoutStore.getState().hydrate();
     const first = useDashboardLayoutStore.getState().setVisible('alerts', false, 0);
     expect(first.ok).toBe(true);
-    const reset = useDashboardLayoutStore.getState().reset(useDashboardLayoutStore.getState().layout.revision);
+    const beforeReset = useDashboardLayoutStore.getState().layout.revision;
+    const reset = useDashboardLayoutStore.getState().reset(beforeReset);
     expect(reset.ok).toBe(true);
     expect(useDashboardLayoutStore.getState().layout.widgets.every((w) => w.visible)).toBe(true);
     expect(useDashboardLayoutStore.getState().layout.widgets.map((w) => w.id)).toEqual([...DASHBOARD_WIDGET_IDS]);
+
+    const durable = readDashboardLayoutFromStorage();
+    expect(durable.revision).toBe(beforeReset + 1);
+    expect(durable.widgets.every((w) => w.visible)).toBe(true);
+    expect(durable.widgets.map((w) => w.id)).toEqual([...DASHBOARD_WIDGET_IDS]);
+    expect(window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)).toContain('"schemaVersion":1');
+  });
+
+  it('keeps concurrent writers with the same revision lease from overwriting each other', () => {
+    useDashboardLayoutStore.getState().hydrate();
+    const lease = useDashboardLayoutStore.getState().layout.revision;
+
+    // Simulate an external tab winning the lease first (real localStorage write).
+    writeDashboardLayoutToStorage(normalizeDashboardLayout({
+      revision: lease + 1,
+      widgets: [
+        { id: 'alerts', visible: true },
+        { id: 'watchlist', visible: true },
+        { id: 'portfolio_health', visible: true },
+        { id: 'recent_reports', visible: true },
+      ],
+    }));
+
+    const stale = useDashboardLayoutStore.getState().reorder(
+      [...DASHBOARD_WIDGET_IDS].reverse() as typeof DASHBOARD_WIDGET_IDS[number][],
+      lease,
+    );
+    expect(stale.ok).toBe(false);
+    if (!stale.ok) expect(stale.reason).toBe('revision_conflict');
+
+    const durable = readDashboardLayoutFromStorage();
+    expect(durable.revision).toBe(lease + 1);
+    expect(durable.widgets.map((w) => w.id)[0]).toBe('alerts');
+    // Stale reverse order must not have landed.
+    expect(durable.widgets.map((w) => w.id)).not.toEqual([...DASHBOARD_WIDGET_IDS].reverse());
   });
 });

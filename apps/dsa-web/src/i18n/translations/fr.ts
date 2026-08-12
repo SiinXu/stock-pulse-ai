@@ -955,6 +955,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "La disposition a été mise à jour dans un autre onglet ; préférence la plus récente rechargée.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Cette modification rendrait le tableau de bord inutilisable et a été annulée.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Ce widget est masqué",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "Sur les appareils tactiles, utilisez les boutons monter/descendre pour réordonner",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Santé du portefeuille",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthDescription": "Vue en lecture seule de l’instantané quotidien de santé du portefeuille stocké.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthUnavailable": "Santé du portefeuille indisponible",

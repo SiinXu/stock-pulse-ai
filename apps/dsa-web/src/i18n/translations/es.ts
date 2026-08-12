@@ -955,6 +955,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "El diseño se actualizó en otra pestaña; se recargó la preferencia más reciente.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Ese cambio dejaría el panel inutilizable y se canceló.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Este widget está oculto",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "En dispositivos táctiles, usa los botones de subir y bajar para reordenar",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Salud de la cartera",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthDescription": "Vista de solo lectura de la instantánea diaria de salud de cartera almacenada.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealthUnavailable": "Salud de cartera no disponible",

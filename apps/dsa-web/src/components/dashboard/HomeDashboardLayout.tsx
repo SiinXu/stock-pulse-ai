@@ -335,6 +335,15 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
           })}
         </div>
       )}
+
+      {customizing ? (
+        <p
+          className="text-xs text-muted-text sm:hidden"
+          data-testid="home-dashboard-layout-mobile-hint"
+        >
+          {t('home.dashboardLayout.mobileMoveHint')}
+        </p>
+      ) : null}
     </section>
   );
 };
