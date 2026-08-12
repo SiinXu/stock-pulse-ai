@@ -428,6 +428,22 @@ class PlanningEngine:
                     "Produce a revised plan that avoids repeating hard-failed tools when alternatives exist."
                 )
 
+        if isinstance(context, dict):
+            reason_kinds = context.get("replan_reason_kinds")
+            if isinstance(reason_kinds, (list, tuple)) and reason_kinds:
+                codes = [
+                    str(code).strip()
+                    for code in reason_kinds
+                    if str(code).strip()
+                ][:8]
+                if codes:
+                    observation_hint = (
+                        (observation_hint or "")
+                        + "\nStandardized replan reason kinds (shared lesson taxonomy): "
+                        + ", ".join(codes)
+                        + ".\nAddress these kinds without inventing tools or claims."
+                    )
+
         user = (
             f"Task:\n{task}{stock_hint}{observation_hint}\n\n"
             f"Available tools:\n{', '.join(available_tools) or '(none)'}\n\n"

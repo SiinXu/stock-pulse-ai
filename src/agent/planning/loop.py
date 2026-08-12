@@ -300,6 +300,11 @@ def execute_plan_loop(
                     phase_status="failed",
                 )
 
+            replan_reason_kinds = _step_critique_replan_reasons(
+                observations=observations,
+                context=context,
+                failed_step=step,
+            )
             replan_outcome = _replan(
                 task=task or current_plan.goal,
                 available_tools=tools,
@@ -342,6 +347,7 @@ def execute_plan_loop(
                     "role": "replan",
                     "after_failed_step": step.id,
                     "replan_index": observation_replans,
+                    "replan_reason_kinds": list(replan_reason_kinds),
                 }
             )
             emit_decision(
@@ -351,6 +357,7 @@ def execute_plan_loop(
                     "new_plan_id": new_plan.plan_id,
                     "observation_replans": observation_replans,
                     "failed_step_id": step.id,
+                    "replan_reason_kinds": list(replan_reason_kinds),
                 },
             )
             # Replace the active plan and restart from the first step of the
@@ -590,6 +597,74 @@ def _execute_step(
     )
 
 
+
+def _step_critique_replan_reasons(
+    *,
+    observations: Sequence[StepObservation],
+    context: Optional[Dict[str, Any]],
+    failed_step: PlanStep,
+) -> List[str]:
+    """Map the failed step into shared ReflectionLesson.kind replan codes.
+
+    Always deterministic and taxonomy-aligned. When step critique is enabled via
+    context config, also records a typed immediate-layer result onto
+    ``context["step_critique_result"]`` for episode storage. Never mutates Soul
+    or ToolSurface.
+    """
+    from src.agent.evolution.step_critique import (
+        STEP_CRITIQUE_META_KEY,
+        critique_step_observations,
+        deterministic_step_lessons,
+        map_replan_reason_kind,
+    )
+
+    _, reason_codes = deterministic_step_lessons(observations)
+    if not reason_codes:
+        reason_codes = [
+            map_replan_reason_kind(
+                failure_reason="step_failed",
+                error_code="tool_failed",
+                summary=failed_step.goal,
+            )
+        ]
+
+    if isinstance(context, dict):
+        context["replan_reason_kinds"] = list(reason_codes)
+        config = context.get("config")
+        if getattr(config, "agent_step_critique_enabled", False) is True:
+
+            class _Ctx:
+                meta: Dict[str, Any]
+
+            critique_ctx = _Ctx()
+            critique_ctx.meta = {
+                "run_id": context.get("run_id") or context.get("analysis_history_id"),
+                "episode_id": context.get("episode_id"),
+            }
+            try:
+                critique_step_observations(
+                    observations,
+                    config=config,
+                    ctx=critique_ctx,
+                    force=True,
+                )
+                step_payload = critique_ctx.meta.get(STEP_CRITIQUE_META_KEY)
+                if isinstance(step_payload, dict):
+                    context[STEP_CRITIQUE_META_KEY] = step_payload
+                    if step_payload.get("replan_reasons"):
+                        context["replan_reason_kinds"] = list(step_payload["replan_reasons"])
+                        reason_codes = list(step_payload["replan_reasons"])
+            except Exception as exc:  # broad-exception: fallback_recorded - step critique is advisory
+                log_safe_exception(
+                    logger,
+                    "Immediate step critique failed during replan",
+                    exc,
+                    error_code="agent_step_critique_replan_failed",
+                    level=logging.INFO,
+                )
+    return list(reason_codes)
+
+
 def _replan(
     *,
     task: str,
@@ -623,6 +698,8 @@ def _replan(
     replan_context["prior_observations_summary"] = compact_observation_summary(
         observations
     )
+    if isinstance(context, dict) and context.get("replan_reason_kinds"):
+        replan_context["replan_reason_kinds"] = list(context["replan_reason_kinds"])
     non_retriable = {
         call.tool_name
         for obs in observations
