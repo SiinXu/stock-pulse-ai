@@ -485,8 +485,9 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           disabled || dependencyLocked || Boolean(readOnlyDiagnostic),
           (nextValue) => {
             onChange(item.key, nextValue);
+            // Live CSS preview only — do not persist until system config save succeeds.
             if (item.key === 'MARKET_REVIEW_COLOR_SCHEME') {
-              themeAppearance?.syncPriceDirectionFromChangeColorPref(nextValue);
+              themeAppearance?.syncPriceDirectionFromChangeColorPref(nextValue, { persist: false });
             }
           },
           isPasswordEditable,

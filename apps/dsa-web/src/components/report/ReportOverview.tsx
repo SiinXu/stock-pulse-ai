@@ -8,6 +8,13 @@ import type {
 import { Badge, Button, Card, ScoreGauge } from '../common';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
+import {
+  changeColorCssVar,
+  changeSemantics,
+  resolveMarketIdFromStockCode,
+} from '../../utils/marketFormat';
+import { changeColorPrefFromPriceDirection } from '../../design/theme';
+import { readDocumentPriceDirection } from '../theme/themeRuntime';
 import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/marketPhase';
 import { normalizeBoardType } from '../../utils/reportDomain';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
@@ -180,16 +187,12 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
     if (changePct === undefined || changePct === null) {
       return undefined;
     }
-
-    if (changePct > 0) {
-      return { color: 'var(--price-up)' };
-    }
-
-    if (changePct < 0) {
-      return { color: 'var(--price-down)' };
-    }
-
-    return undefined;
+    // Market-aware paint via marketFormat; document price-direction supplies the
+    // active red_up/green_up preference so report boards stay aligned with Settings.
+    const market = resolveMarketIdFromStockCode(meta.stockCode) ?? 'cn';
+    const userPref = changeColorPrefFromPriceDirection(readDocumentPriceDirection());
+    const paint = changeColorCssVar(changeSemantics(changePct, market, userPref).color);
+    return paint ? { color: paint } : undefined;
   };
 
   const formatChangePct = (changePct: number | undefined): string => {

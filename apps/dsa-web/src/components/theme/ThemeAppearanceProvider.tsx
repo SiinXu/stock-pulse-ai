@@ -20,12 +20,23 @@ import {
   readDocumentThemePack,
 } from './themeRuntime';
 
+export type SyncPriceDirectionOptions = {
+  /**
+   * When true (default), write localStorage. Draft Settings edits should pass
+   * false so uncommitted values do not outlive a cancelled settings session.
+   */
+  persist?: boolean;
+};
+
 type ThemeAppearanceContextValue = {
   pack: ThemePackId;
   priceDirection: PriceDirectionId;
   setPack: (pack: ThemePackId) => void;
   setPriceDirection: (direction: PriceDirectionId) => void;
-  syncPriceDirectionFromChangeColorPref: (pref: string | null | undefined) => void;
+  syncPriceDirectionFromChangeColorPref: (
+    pref: string | null | undefined,
+    options?: SyncPriceDirectionOptions,
+  ) => void;
 };
 
 const ThemeAppearanceContext = createContext<ThemeAppearanceContextValue | null>(null);
@@ -58,9 +69,13 @@ export const ThemeAppearanceProvider: React.FC<{ children: React.ReactNode }> = 
   }, []);
 
   const syncPriceDirectionFromChangeColorPref = useCallback(
-    (pref: string | null | undefined) => {
+    (pref: string | null | undefined, options?: SyncPriceDirectionOptions) => {
       if (pref === null || pref === undefined || String(pref).trim() === '') return;
-      setPriceDirectionState(applyPriceDirection(priceDirectionFromChangeColorPref(pref)));
+      const applied = applyPriceDirection(
+        priceDirectionFromChangeColorPref(pref),
+        { persist: options?.persist !== false },
+      );
+      setPriceDirectionState(applied);
     },
     [],
   );

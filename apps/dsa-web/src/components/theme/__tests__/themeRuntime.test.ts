@@ -50,4 +50,10 @@ describe('themeRuntime', () => {
     const applied = bootstrapThemeAppearance();
     expect(applied).toEqual({ pack: 'slate', priceDirection: 'us' });
   });
+
+  it('does not write localStorage when persist is false', () => {
+    applyPriceDirection('us', { persist: false });
+    expect(document.documentElement.getAttribute('data-price-direction')).toBe('us');
+    expect(localStorage.getItem(THEME_STORAGE_KEYS.priceDirection)).toBeNull();
+  });
 });

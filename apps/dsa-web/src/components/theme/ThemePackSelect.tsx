@@ -8,7 +8,7 @@ import type { ThemePackId } from '../../design/theme';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { Select } from '../common/Select';
-import { useThemeAppearance } from './ThemeAppearanceProvider';
+import { useThemeAppearanceOptional } from './ThemeAppearanceProvider';
 
 type ThemePackSelectProps = {
   wrapperClassName?: string;
@@ -16,15 +16,28 @@ type ThemePackSelectProps = {
   iconClassName?: string;
 };
 
-/** Pack labels are proper nouns (Classic / Slate) — no new i18n keys. */
+/**
+ * Compact theme-pack picker. Pack display names are proper nouns from the
+ * registry (Classic / Slate) — no new i18n baseline keys.
+ * Soft-noops when ThemeAppearanceProvider is absent (playground / partial mounts).
+ */
 export const ThemePackSelect: React.FC<ThemePackSelectProps> = ({
   wrapperClassName,
   triggerClassName,
   iconClassName,
 }) => {
-  const { pack, setPack } = useThemeAppearance();
+  const appearance = useThemeAppearanceOptional();
   const { t } = useUiLanguage();
   const packs = listThemePacks();
+
+  if (!appearance) {
+    return null;
+  }
+
+  const { pack, setPack } = appearance;
+  const activeLabel = packs.find((entry) => entry.id === pack)?.displayName ?? pack;
+  // Distinguish from ThemeToggle (theme.toggle / theme.theme) without new i18n keys.
+  const ariaLabel = `${t('theme.theme')} · ${activeLabel}`;
 
   return (
     <div
@@ -43,7 +56,7 @@ export const ThemePackSelect: React.FC<ThemePackSelectProps> = ({
           value: entry.id,
           label: entry.displayName,
         }))}
-        ariaLabel={t('theme.theme')}
+        ariaLabel={ariaLabel}
         className="min-w-0 flex-1 [&>div]:w-full"
         triggerClassName="h-11 min-h-11 border-0 bg-transparent px-0 text-sm font-normal hover:bg-transparent sm:h-11 sm:min-h-11"
         menuAlign="start"

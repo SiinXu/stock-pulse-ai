@@ -13,6 +13,7 @@ import type {
 import { serializeStockListValue } from '../utils/stockList';
 import { getDefaultSubCategory, getSubCategories } from '../components/settings/settingsSubCategories';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { useThemeAppearanceOptional } from '../components/theme/ThemeAppearanceProvider';
 import { SETTINGS_PAGE_TEXT } from '../locales/settingsPage';
 
 type ToastState = {
@@ -76,6 +77,7 @@ function normalizeFieldValue(value: string, schema: SystemConfigItem['schema'] |
 
 export function useSystemConfig(initialTab?: { category: string; subCategory: string | null }) {
   const { language, t } = useUiLanguage();
+  const themeAppearance = useThemeAppearanceOptional();
   // Server state
   const [configVersion, setConfigVersion] = useState<string>('');
   const [maskToken, setMaskToken] = useState<string>('******');
@@ -581,6 +583,12 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         committedValues,
       );
       setConflictState(null);
+      if (committedValues.MARKET_REVIEW_COLOR_SCHEME !== undefined) {
+        themeAppearance?.syncPriceDirectionFromChangeColorPref(
+          committedValues.MARKET_REVIEW_COLOR_SCHEME,
+          { persist: true },
+        );
+      }
 
       if (!silent) {
         setToast({
@@ -620,6 +628,12 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
               committedValues,
             );
             setConflictState(null);
+            if (committedValues.MARKET_REVIEW_COLOR_SCHEME !== undefined) {
+              themeAppearance?.syncPriceDirectionFromChangeColorPref(
+                committedValues.MARKET_REVIEW_COLOR_SCHEME,
+                { persist: true },
+              );
+            }
             if (!silent) {
               setToast({
                 type: 'success',
