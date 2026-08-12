@@ -112,7 +112,7 @@
       "match": "assets/vendor-icons-*.js",
       "maxGzipBytes": 10599,
       "measuredGzipBytes": 10399,
-      "note": "GitHub Actions Linux measurement after Home dashboard layout icons (PR #1158 / Refs #189); measured 10399 B + 200 B headroom."
+      "note": "GitHub Actions Linux measurement after Home dashboard layout lucide icons (GripVertical/Eye/RotateCcw etc., PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "vendor-misc",
