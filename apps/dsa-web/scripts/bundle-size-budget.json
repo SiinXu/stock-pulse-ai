@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after data-validation Settings help and fieldTitleMaps inventory keys (Refs #185 / PR #1161); failed locales use measured gzip + 600 B headroom.",
+  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after AGENT_MODE_BUDGET_* inventory on current main (Refs #1121 / #125).",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 236063,
-      "measuredGzipBytes": 235863,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help inventory (PR #1161 / Refs #185); measured gzip + 200 B headroom."
+      "maxGzipBytes": 238501,
+      "measuredGzipBytes": 238101,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 153720,
-      "measuredGzipBytes": 153120,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 155316,
+      "measuredGzipBytes": 154616,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 147131,
-      "measuredGzipBytes": 146531,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 148660,
+      "measuredGzipBytes": 147960,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 147091,
-      "measuredGzipBytes": 146491,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 148539,
+      "measuredGzipBytes": 147839,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 147384,
-      "measuredGzipBytes": 146784,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 148106,
+      "measuredGzipBytes": 147506,
+      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 143171,
-      "measuredGzipBytes": 142571,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 144564,
+      "measuredGzipBytes": 143864,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 139684,
-      "measuredGzipBytes": 139084,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 141061,
+      "measuredGzipBytes": 140361,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 133151,
-      "measuredGzipBytes": 132551,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 134565,
+      "measuredGzipBytes": 133865,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 133234,
-      "measuredGzipBytes": 132634,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 134702,
+      "measuredGzipBytes": 134002,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "vendor-charts",

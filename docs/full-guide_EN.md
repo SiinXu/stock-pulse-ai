@@ -1765,6 +1765,10 @@ The global Critic retry budget is fixed at one per run, and the same target cann
 `StrategyEngine` remains the sole owner of Skill evidence partitioning and `strategy_synthesis` at the existing Decision boundary. The Critic is read-only, has no ToolSurface, and cannot author the final investment decision. Its verdict, reasons, missing evidence, requested/executed targets, budget consumption, and retry status are recorded in internal `AgentContext.meta`, `StageResult.meta`, and `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events. This does not expand persisted runtime facts or public Chat metadata.
 
 Cost boundary: an eligible enabled Multi run adds at most one Critic LLM call. Only a `retry` verdict adds at most one whitelist-stage LLM/tool rerun. Both remain bounded by the existing `AGENT_ORCHESTRATOR_TIMEOUT_S` remaining budget, and their timeouts exclude the minimum reserved for Decision. Disable or remove `AGENT_CRITIC_ENABLED` to roll back; no data migration or cleanup is required.
+### Hard per-mode budgets (#1121 / #125)
+
+Each run mode (`quick` / `standard` / `full` / `specialist` / chat) has hard caps for LLM turns, tool calls, and estimated USD cost (optional token ceiling via `AGENT_MODE_BUDGET_MAX_TOKENS`). Consumption is tracked on a shared `mode_budget` account and exposed in diagnostics (`ctx.meta["mode_budget"]` / `result.budget_snapshot`). On breach the run terminates with `success=false` and an explicit reason (`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`). Existing residual wall-clock skips remain `budget_skip` / `timeout` and record into the same snapshot — there is a single budget concept, not a parallel system. Configure via `AGENT_MODE_BUDGET_*` (see `.env.example`).
+
 
 ## Agent Runtime Guards
 

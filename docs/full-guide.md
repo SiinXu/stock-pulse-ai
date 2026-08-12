@@ -1902,6 +1902,10 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 `StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
 
 成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
+### 按模式硬预算（#1121 / #125）
+
+每种运行模式（`quick` / `standard` / `full` / `specialist` / chat）对 LLM 轮次、工具调用与估算 USD 成本设有硬上限（可选 token 上限见 `AGENT_MODE_BUDGET_MAX_TOKENS`）。消耗记录在共享的 `mode_budget` 账户中，并可在诊断中查看（`ctx.meta["mode_budget"]` / `result.budget_snapshot`）。超限时以 `success=false` 明确终止并给出原因码（`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`）。既有的剩余墙钟预算跳过仍使用 `budget_skip` / `timeout`，并写入同一快照——预算概念统一，不另造并行体系。配置项为 `AGENT_MODE_BUDGET_*`（见 `.env.example`）。
+
 
 ## Agent 运行时护栏
 
