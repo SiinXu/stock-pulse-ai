@@ -442,6 +442,61 @@ class BacktestEngineTestCase(unittest.TestCase):
             "flat",
         )
 
+    def test_evaluate_single_rejects_nan_and_inf_prices(self):
+        cfg = EvaluationConfig(eval_window_days=3, neutral_band_pct=2.0)
+        bars = self._bars(date(2024, 1, 1), [102, 104, 105])
+        nan_start = BacktestEngine.evaluate_single(
+            operation_advice="买入",
+            analysis_date=date(2024, 1, 1),
+            start_price=float("nan"),
+            forward_bars=bars,
+            stop_loss=None,
+            take_profit=None,
+            config=cfg,
+        )
+        self.assertEqual(nan_start["eval_status"], "error")
+
+        inf_end_bars = self._bars(date(2024, 1, 1), [102, 104, float("inf")])
+        inf_end = BacktestEngine.evaluate_single(
+            operation_advice="买入",
+            analysis_date=date(2024, 1, 1),
+            start_price=100,
+            forward_bars=inf_end_bars,
+            stop_loss=None,
+            take_profit=None,
+            config=cfg,
+        )
+        self.assertEqual(inf_end["eval_status"], "error")
+
+    def test_evaluate_single_applies_explicit_round_trip_cost_model(self):
+        # 5% gross long return with 50 bps commission + 50 bps slippage per side
+        # => round-trip cost = 2 * (50+50)/100 = 2.0%
+        cfg = EvaluationConfig(
+            eval_window_days=3,
+            neutral_band_pct=2.0,
+            commission_bps=50.0,
+            slippage_bps=50.0,
+        )
+        bars = self._bars(date(2024, 1, 1), [102, 104, 105], highs=[103, 105, 106], lows=[101, 103, 104])
+        res = BacktestEngine.evaluate_single(
+            operation_advice="买入",
+            analysis_date=date(2024, 1, 1),
+            start_price=100,
+            forward_bars=bars,
+            stop_loss=None,
+            take_profit=None,
+            config=cfg,
+        )
+        self.assertEqual(res["eval_status"], "completed")
+        self.assertAlmostEqual(res["stock_return_pct"], 5.0)
+        self.assertAlmostEqual(res["simulated_return_pct_gross"], 5.0)
+        self.assertAlmostEqual(res["round_trip_cost_pct"], 2.0)
+        self.assertAlmostEqual(res["simulated_return_pct"], 3.0)
+
+    def test_average_skips_non_finite_values(self):
+        avg = BacktestEngine._average([1.0, float("nan"), 3.0, float("inf"), None])
+        self.assertAlmostEqual(avg, 2.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -84,6 +84,8 @@ export const BACKTEST_TEXT = createUiLanguageRecord("locales.backtest.BACKTEST_T
     neutralBand: '中性带',
     forceOn: '强制',
     forceOff: '常规',
+    methodologyDisclaimer:
+      '历史模拟研究用途，不是收益承诺，也不是真实成交。已声明前视偏差防护、幸存者偏差（仅本机已分析标的）与显式费用/滑点模型；百分比收益跨币种可比，绝对价格不会跨币种直接加总。',
     yes: '是',
     no: '否',
     unknown: '未知',
@@ -164,6 +166,8 @@ export const BACKTEST_TEXT = createUiLanguageRecord("locales.backtest.BACKTEST_T
     neutralBand: 'Neutral band',
     forceOn: 'Force',
     forceOff: 'Normal',
+    methodologyDisclaimer:
+      'Historical simulation for research only — not a return promise and not live fills. Look-ahead protection, survivorship limits (analyzed universe only), and explicit commission/slippage are disclosed. Percent returns are currency-agnostic; absolute prices are never summed across currencies.',
     yes: 'Yes',
     no: 'No',
     unknown: 'Unknown',

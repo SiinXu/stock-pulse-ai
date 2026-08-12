@@ -58,6 +58,8 @@ def _serialize_overall_backtest_summary(summary: dict, eval_window_days: int) ->
         "take_profit_trigger_rate": summary.get("take_profit_trigger_rate"),
         "advice_breakdown": summary.get("advice_breakdown"),
         "computed_at": summary.get("computed_at"),
+        "methodology": summary.get("methodology"),
+        "is_return_promise": False,
     }
 
 
@@ -105,6 +107,10 @@ def _handle_get_skill_backtest_summary(skill_id: str = "", eval_window_days: int
             "eval_window_days": summary.get("eval_window_days", eval_window_days),
             "total_evaluations": summary.get("total_evaluations", 0),
             "completed_count": summary.get("completed_count", 0),
+            "insufficient_count": summary.get("insufficient_count", 0),
+            "win_count": summary.get("win_count", 0),
+            "loss_count": summary.get("loss_count", 0),
+            "neutral_count": summary.get("neutral_count", 0),
             "win_rate": summary.get("win_rate"),
             "direction_accuracy": summary.get("direction_accuracy"),
             "avg_return": summary.get("avg_return"),
@@ -113,6 +119,9 @@ def _handle_get_skill_backtest_summary(skill_id: str = "", eval_window_days: int
             "avg_stock_return_pct": summary.get("avg_stock_return_pct"),
             "avg_simulated_return_pct": summary.get("avg_simulated_return_pct"),
             "computed_at": summary.get("computed_at"),
+            "methodology": summary.get("methodology"),
+            "diagnostics": summary.get("diagnostics"),
+            "is_return_promise": False,
         }
     except Exception as exc:
         log_safe_exception(

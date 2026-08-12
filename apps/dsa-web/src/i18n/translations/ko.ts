@@ -6085,4 +6085,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "계층형 메모리 기록 한도",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "계층형 메모리 보존 일수",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "계층형 메모리 벡터 검색",
+  "locales.backtest.BACKTEST_TEXT.methodologyDisclaimer": "Historical simulation for research only — not a return promise and not live fills. Look-ahead protection, survivorship limits (analyzed universe only), and explicit commission/slippage are disclosed. Percent returns are currency-agnostic; absolute prices are never summed across currencies.",
+  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_COMMISSION_BPS": "Backtest Commission Bps",
+  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_SLIPPAGE_BPS": "Backtest Slippage Bps",
 } as const;

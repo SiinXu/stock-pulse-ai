@@ -1639,10 +1639,21 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 | `BACKTEST_MIN_AGE_DAYS` | `14` | 仅回测 N 天前的记录，避免数据不完整 |
 | `BACKTEST_ENGINE_VERSION` | `v1` | 引擎版本号，升级逻辑时用于区分结果 |
 | `BACKTEST_NEUTRAL_BAND_PCT` | `2.0` | 中性区间阈值（%），±2% 内视为震荡 |
+| `BACKTEST_COMMISSION_BPS` | `0` | 显式佣金（基点/单边），用于多头模拟收益 |
+| `BACKTEST_SLIPPAGE_BPS` | `0` | 显式滑点（基点/单边）；往返成本% = `2 × (佣金+滑点) / 100` |
 
 ### 自动运行
 
 回测在每日分析流程完成后自动触发（非阻塞，失败不影响通知推送）。也可通过 API 手动触发。
+
+### 方法学说明（研究诚实）
+
+- 指标仅为**历史模拟**，不是收益承诺，也不是真实成交。
+- 前视偏差防护：仅使用解析后起始交易日后的前向行情。
+- 幸存者偏差：股票宇宙限于本机已有分析历史的标的。
+- 样本内外：表现 API 支持 `sample_split=full|in_sample|out_of_sample` 与 `split_date`。
+- 跨币种：百分比收益币种无关；绝对价格不会在未做汇率归一时跨币种加总。
+- YAML 技能/策略：`GET /api/v1/backtest/skills/{skill_id}/performance`（及 Agent 工具 `get_skill_backtest_summary`）将 skill-opinion 后验映射为与人工策略同构的公开百分比字段。
 
 ### 评估指标
 
@@ -1650,10 +1661,11 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 |------|------|
 | `direction_accuracy_pct` | 方向预测准确率（预期方向与实际一致） |
 | `win_rate_pct` | 胜率（胜 / (胜+负)，不含中性） |
-| `avg_stock_return_pct` | 平均股票收益率 |
-| `avg_simulated_return_pct` | 平均模拟执行收益率（含止盈止损退出） |
+| `avg_stock_return_pct` | 平均股票收益率（毛收益） |
+| `avg_simulated_return_pct` | 平均模拟执行收益率（扣减显式佣金/滑点后） |
 | `stop_loss_trigger_rate` | 止损触发率（仅统计配置了止损的记录） |
 | `take_profit_trigger_rate` | 止盈触发率（仅统计配置了止盈的记录） |
+| `methodology` | 结构化方法学限制块（`is_return_promise=false`） |
 
 ---
 

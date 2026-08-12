@@ -33,8 +33,28 @@ const backtestAppliedConfigSchema = z.object({
   limit: z.number(),
   engineVersion: z.string(),
   neutralBandPct: z.number(),
+  commissionBps: z.number().optional(),
+  slippageBps: z.number().optional(),
+  roundTripCostPct: z.number().optional(),
   analysisDateFrom: z.string().nullable().optional(),
   analysisDateTo: z.string().nullable().optional(),
+}).passthrough();
+
+const backtestMethodologySchema = z.object({
+  engineVersion: z.string(),
+  isReturnPromise: z.boolean(),
+  disclaimer: z.string(),
+  version: z.string().optional(),
+  metricSource: z.string().optional(),
+  evalWindowDays: z.number().nullable().optional(),
+  disclaimerCodes: z.array(z.string()).optional(),
+  lookAheadPolicy: z.string().optional(),
+  survivorshipPolicy: z.string().optional(),
+  costModel: z.record(z.string(), z.unknown()).optional(),
+  sampleSplit: z.record(z.string(), z.unknown()).optional(),
+  returnUnits: z.string().optional(),
+  currencyPolicy: z.string().optional(),
+  limitations: z.array(z.string()).optional(),
 }).passthrough();
 
 const backtestRunResponseSchema = z.object({
@@ -45,6 +65,7 @@ const backtestRunResponseSchema = z.object({
   errors: z.number(),
   appliedEvalWindowDays: z.number().nullable(),
   appliedConfig: backtestAppliedConfigSchema.nullable().optional(),
+  methodology: backtestMethodologySchema.nullable().optional(),
   message: z.string().nullable().optional(),
   diagnostics: z.record(z.string(), z.unknown()).optional(),
 }).passthrough();
@@ -121,6 +142,8 @@ const performanceMetricsSchema = z.object({
   avgDaysToFirstHit: z.number().nullable().optional(),
   adviceBreakdown: z.record(z.string(), z.unknown()).optional(),
   diagnostics: z.record(z.string(), z.unknown()).optional(),
+  methodology: backtestMethodologySchema.nullable().optional(),
+  skillId: z.string().nullable().optional(),
 }).passthrough();
 
 function parseCamelCasePayload<T>(

@@ -13,6 +13,8 @@ import math
 import re
 from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence
 
+from src.core.backtest_methodology import CostModelConfig, apply_round_trip_cost
+
 
 OVERALL_SENTINEL_CODE = "__overall__"
 
@@ -47,6 +49,15 @@ class EvaluationConfig:
     eval_window_days: int
     neutral_band_pct: float = 2.0
     engine_version: str = "v1"
+    # Explicit friction model (bps per side). Defaults preserve legacy zero-cost behavior.
+    commission_bps: float = 0.0
+    slippage_bps: float = 0.0
+
+    def cost_model(self) -> CostModelConfig:
+        return CostModelConfig(
+            commission_bps=float(self.commission_bps or 0.0),
+            slippage_bps=float(self.slippage_bps or 0.0),
+        )
 
 
 class BacktestEngine:
@@ -174,7 +185,8 @@ class BacktestEngine:
           first_hit="ambiguous" and assume stop-loss first for simulated exit.
         """
 
-        if start_price is None or start_price <= 0:
+        start_price_value = cls._finite_optional_float(start_price)
+        if start_price_value is None or start_price_value <= 0:
             return {
                 "analysis_date": analysis_date,
                 "operation_advice": operation_advice,
@@ -198,9 +210,17 @@ class BacktestEngine:
             }
 
         window_bars = list(forward_bars[:eval_days])
-        end_close = window_bars[-1].close
-        highs = [b.high for b in window_bars if b.high is not None]
-        lows = [b.low for b in window_bars if b.low is not None]
+        raw_end_close = window_bars[-1].close
+        end_close = cls._finite_optional_float(raw_end_close)
+        highs: List[float] = []
+        lows: List[float] = []
+        for bar in window_bars:
+            high = cls._finite_optional_float(bar.high)
+            low = cls._finite_optional_float(bar.low)
+            if high is not None:
+                highs.append(high)
+            if low is not None:
+                lows.append(low)
         max_high = max(highs) if highs else None
         min_low = min(lows) if lows else None
 
@@ -208,10 +228,27 @@ class BacktestEngine:
         if end_close is None:
             stock_return_pct = None
         else:
-            stock_return_pct = (end_close - start_price) / start_price * 100
+            stock_return_pct = cls._finite_optional_float(
+                (end_close - start_price_value) / start_price_value * 100
+            )
+
+        # Non-finite OHLC / returns are rejected rather than labeled as outcomes.
+        if stock_return_pct is None and raw_end_close is not None:
+            return {
+                "analysis_date": analysis_date,
+                "operation_advice": operation_advice,
+                "position_recommendation": cls.infer_position_recommendation(operation_advice),
+                "direction_expected": cls.infer_direction_expected(operation_advice),
+                "eval_status": "error",
+                "eval_window_days": eval_days,
+                "engine_version": config.engine_version,
+            }
 
         direction_expected = cls.infer_direction_expected(operation_advice)
         position = cls.infer_position_recommendation(operation_advice)
+        cost_model = config.cost_model()
+        stop_loss_value = cls._finite_optional_float(stop_loss)
+        take_profit_value = cls._finite_optional_float(take_profit)
 
         outcome, direction_correct = cls._classify_outcome(
             stock_return_pct=stock_return_pct,
@@ -229,20 +266,29 @@ class BacktestEngine:
             simulated_exit_reason,
         ) = cls._evaluate_targets(
             position=position,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
+            stop_loss=stop_loss_value,
+            take_profit=take_profit_value,
             window_bars=window_bars,
             end_close=end_close,
         )
 
-        simulated_entry_price = start_price if position == "long" else None
-        simulated_return_pct: Optional[float]
+        simulated_entry_price = start_price_value if position == "long" else None
+        simulated_exit_price = cls._finite_optional_float(simulated_exit_price)
+        gross_simulated_return_pct: Optional[float]
         if position != "long":
-            simulated_return_pct = 0.0
+            gross_simulated_return_pct = 0.0
         elif simulated_exit_price is None:
-            simulated_return_pct = None
+            gross_simulated_return_pct = None
         else:
-            simulated_return_pct = (simulated_exit_price - start_price) / start_price * 100
+            gross_simulated_return_pct = cls._finite_optional_float(
+                (simulated_exit_price - start_price_value) / start_price_value * 100
+            )
+
+        simulated_return_pct = apply_round_trip_cost(
+            gross_return_pct=gross_simulated_return_pct,
+            cost_model=cost_model,
+            position=position,
+        )
 
         return {
             "analysis_date": analysis_date,
@@ -251,7 +297,7 @@ class BacktestEngine:
             "eval_status": "completed",
             "operation_advice": operation_advice,
             "position_recommendation": position,
-            "start_price": start_price,
+            "start_price": start_price_value,
             "end_close": end_close,
             "max_high": max_high,
             "min_low": min_low,
@@ -259,8 +305,8 @@ class BacktestEngine:
             "direction_expected": direction_expected,
             "direction_correct": direction_correct,
             "outcome": outcome,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
+            "stop_loss": stop_loss_value,
+            "take_profit": take_profit_value,
             "hit_stop_loss": hit_stop_loss,
             "hit_take_profit": hit_take_profit,
             "first_hit": first_hit,
@@ -269,7 +315,10 @@ class BacktestEngine:
             "simulated_entry_price": simulated_entry_price,
             "simulated_exit_price": simulated_exit_price,
             "simulated_exit_reason": simulated_exit_reason,
+            "simulated_return_pct_gross": gross_simulated_return_pct,
             "simulated_return_pct": simulated_return_pct,
+            "cost_model": cost_model.to_dict(),
+            "round_trip_cost_pct": cost_model.round_trip_cost_pct,
         }
 
     @classmethod
@@ -734,8 +783,8 @@ class BacktestEngine:
         exit_reason = "window_end"
 
         for idx, bar in enumerate(window_bars, start=1):
-            low = bar.low
-            high = bar.high
+            low = cls._finite_optional_float(bar.low)
+            high = cls._finite_optional_float(bar.high)
             stop_hit = stop_loss is not None and low is not None and low <= stop_loss
             tp_hit = take_profit is not None and high is not None and high >= take_profit
 
@@ -779,10 +828,22 @@ class BacktestEngine:
 
     @staticmethod
     def _average(values: Iterable[Optional[float]]) -> Optional[float]:
-        items = [float(v) for v in values if v is not None]
+        items: List[float] = []
+        for value in values:
+            if value is None:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(number):
+                items.append(number)
         if not items:
             return None
-        return round(sum(items) / len(items), 4)
+        average = sum(items) / len(items)
+        if not math.isfinite(average):
+            return None
+        return round(average, 4)
 
     @staticmethod
     def _compute_advice_breakdown(results: List[BacktestResultLike]) -> Dict[str, Any]:
