@@ -8,7 +8,6 @@ import {
   CalendarClock,
   ChevronDown,
   ClipboardCheck,
-  History,
   PlayCircle,
   RefreshCw,
   ShieldAlert,
@@ -41,6 +40,12 @@ import {
   getScheduledTaskTypeLabel,
   resolveSetupCheckLabel,
 } from '../components/home';
+import {
+  HomeAlertsWidget,
+  HomeDashboardLayout,
+  HomePortfolioHealthWidget,
+  HomeRecentReportsWidget,
+} from '../components/dashboard';
 import { HomeOnboardingSection } from '../components/onboarding/HomeOnboardingSection';
 import { HomeWatchlistGroupsSection } from '../components/watchlist/HomeWatchlistGroupsSection';
 import { useRouteFocusTarget } from '../components/routing';
@@ -464,9 +469,34 @@ const HomePage: React.FC = () => {
         />
       ) : null}
 
-      {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
-          avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
-      <HomeWatchlistGroupsSection scoreRefreshKey={watchlistScoreRefreshKey} />
+      {/* Customizable dashboard board: independent of readiness / Today's Focus. */}
+      <HomeDashboardLayout
+        widgets={{
+          watchlist: (
+            <HomeWatchlistGroupsSection scoreRefreshKey={watchlistScoreRefreshKey} />
+          ),
+          portfolio_health: (
+            <HomePortfolioHealthWidget refreshKey={scoreRefreshGeneration} />
+          ),
+          alerts: (
+            <HomeAlertsWidget
+              isLoading={isLoading}
+              available={availability.alerts}
+              triggeredAlertTotal={data.triggeredAlertTotal}
+              onRetry={handleRefresh}
+            />
+          ),
+          recent_reports: (
+            <HomeRecentReportsWidget
+              isLoading={isLoading}
+              available={availability.recentAnalyses}
+              items={data.recentAnalyses}
+              language={language}
+              onRetry={handleRefresh}
+            />
+          ),
+        }}
+      />
 
       {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
           avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
@@ -652,58 +682,6 @@ const HomePage: React.FC = () => {
                     onClick={() => navigate(APP_ROUTE_PATHS.researchMarket)}
                   >
                     {t('home.marketReview')}
-                  </Button>
-                )}
-              />
-            )}
-          </Section>
-
-          <Section
-            title={t('home.recentAnalyses')}
-            level="interactive"
-            padding="md"
-            actions={<History className="h-5 w-5 text-primary" aria-hidden="true" />}
-          >
-            {isLoading ? (
-              <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
-            ) : data.recentAnalyses.length > 0 ? (
-              <div className="divide-y divide-border/70">
-                {data.recentAnalyses.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left"
-                    onClick={() => navigate(buildAnalysisWorkbenchHref({ recordId: item.id }))}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-foreground">
-                        {item.stockName || item.stockCode}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-secondary-text">
-                        {item.stockCode} · {formatDateTime(item.createdAt, language)}
-                      </span>
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
-            ) : !availability.recentAnalyses ? (
-              <StatePanel
-                state="partial"
-                title={t('home.partialDataTitle')}
-                description={t('home.partialDataMessage')}
-                action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
-                size="compact"
-                titleAs="p"
-              />
-            ) : (
-              <EmptyState
-                compact
-                title={t('home.noRecentAnalysesTitle')}
-                description={t('home.noRecentAnalysesDescription')}
-                action={(
-                  <Button variant="secondary" size="default" onClick={() => navigate(analysisHref)}>
-                    {t('home.startAnalysisTitle')}
                   </Button>
                 )}
               />

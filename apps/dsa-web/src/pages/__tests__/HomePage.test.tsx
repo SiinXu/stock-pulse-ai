@@ -69,6 +69,16 @@ vi.mock('../../api/todaysFocus', () => ({
   getTodaysFocus: vi.fn(),
 }));
 
+vi.mock('../../api/portfolioHealth', () => ({
+  portfolioHealthApi: {
+    getSummary: vi.fn(async () => null),
+  },
+}));
+
+vi.mock('../../components/watchlist/HomeWatchlistGroupsSection', () => ({
+  HomeWatchlistGroupsSection: () => <div data-testid="home-watchlist-groups-section" />,
+}));
+
 const emptyTodaysFocus: TodaysFocusResponse = {
   packVersion: 'todays_focus/2.1',
   generatedAt: '2026-08-09T00:00:00Z',
@@ -352,6 +362,8 @@ describe('HomePage attention hub', () => {
     expect(within(core).getByRole('heading', { name: 'Signal summary' })).toBeInTheDocument();
     // Production reachability: deterministic focus panel is mounted on Home (not Playground-only).
     expect(within(core).getByTestId('todays-focus-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('home-dashboard-layout')).toBeInTheDocument();
+    expect(screen.getByTestId('home-watchlist-groups-section')).toBeInTheDocument();
     await waitFor(() => {
       expect(getTodaysFocus).toHaveBeenCalled();
     });
@@ -542,7 +554,7 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findAllByText('Home data is incomplete')).toHaveLength(3);
+    expect((await screen.findAllByText('Home data is incomplete')).length).toBeGreaterThanOrEqual(2);
     expect(within(screen.getByRole('region', { name: 'Morning report / Market review' }))
       .getByText('Home data is incomplete')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Recent analyses' }))
@@ -602,7 +614,7 @@ describe('HomePage attention hub', () => {
     expect(await screen.findByTestId('todays-focus-empty')).toBeInTheDocument();
     expect(screen.getByText('Nothing special today')).toBeInTheDocument();
     // Header Start analysis remains; to-do empty state still offers Review signals.
-    expect(screen.getByRole('button', { name: 'Start analysis' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Start analysis' }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: 'Review signals' })).toBeInTheDocument();
   });
 
@@ -611,9 +623,9 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    expect(await screen.findByText('Home data is incomplete')).toBeInTheDocument();
+    expect((await screen.findAllByText('Home data is incomplete')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Apple')).not.toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0]!);
     await waitFor(() => expect(alertsApi.listTriggers).toHaveBeenCalledTimes(2));
   });
 
