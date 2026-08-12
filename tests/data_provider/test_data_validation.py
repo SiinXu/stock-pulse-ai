@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
@@ -15,28 +17,43 @@ import pytest
 
 from data_provider.data_validation import (
     ATTR_KEY,
+    CODE_CROSS_SOURCE_DIVERGENCE,
     CODE_DATE_DUPLICATE,
     CODE_DATE_OUT_OF_ORDER,
     CODE_EMPTY_PAYLOAD,
     CODE_FUND_PB_EXTREME,
     CODE_FUND_PB_INVALID_TYPE,
+    CODE_FUND_PB_SUSPECT,
     CODE_FUND_PE_EXTREME,
     CODE_FUND_PE_INVALID_TYPE,
     CODE_FUND_PE_NEGATIVE,
     CODE_FUND_PE_NON_FINITE,
+    CODE_FUND_PE_SUSPECT,
+    CODE_INDICATOR_INPUT_INSUFFICIENT,
     DataValidationRejected,
     ValidationSeverity,
+    compare_cross_source_fields,
+    compare_cross_source_quotes,
     infer_instrument_type,
     is_strict_mode,
     is_validation_enabled,
+    prepare_indicator_inputs,
+    project_technical_indicators,
     validate_and_annotate,
     validate_daily_frame,
     validate_fundamental_context,
     validate_fundamental_metrics,
+    validate_indicator_inputs,
     validate_ohlcv_bar,
     validate_realtime_quote,
     validate_technical_indicators,
 )
+
+FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "data_validation"
+
+
+def _load_fixture(name: str) -> dict:
+    return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
 
 
 @pytest.fixture(autouse=True)
@@ -828,3 +845,285 @@ def test_validation_rejected_fundamental_context_is_typed_not_pipeline_failure()
         "dv_fund_pe_invalid_type"
     ]
     assert context["data_quality_evidence"] == [evidence]
+
+
+# ---------------------------------------------------------------------------
+# Issue #185 remaining scope: indicator I/O, fund suspect, cross-source, fixtures
+# ---------------------------------------------------------------------------
+
+
+def test_indicator_inputs_reject_non_finite_rows_and_drop_them():
+    frame = _normal_frame(
+        [
+            _normal_bar(date="2024-01-02", close=10.2, pre_close=10.0, pct_chg=2.0),
+            _normal_bar(
+                date="2024-01-03",
+                close=float("nan"),
+                high=10.8,
+                low=10.0,
+                open=10.2,
+                volume=1_100_000,
+                amount=11_550_000.0,
+                pct_chg=2.9,
+                pre_close=10.2,
+            ),
+            _normal_bar(
+                date="2024-01-04",
+                close=10.7,
+                high=10.9,
+                low=10.5,
+                open=10.5,
+                volume=1_200_000,
+                amount=12_840_000.0,
+                pct_chg=1.9,
+                pre_close=10.5,
+            ),
+        ]
+    )
+    cleaned, result = prepare_indicator_inputs(
+        frame, market="cn", stock_code="600519", provider="unit_test"
+    )
+    assert result.has_reject
+    assert any("non_finite" in issue.code for issue in result.issues)
+    assert len(cleaned) == 2
+    assert float(cleaned.iloc[0]["close"]) == 10.2
+    assert float(cleaned.iloc[1]["close"]) == 10.7
+    assert all(math.isfinite(float(v)) for v in cleaned["close"].tolist())
+
+
+def test_indicator_inputs_all_dirty_degrades_without_clean_rows():
+    frame = _normal_frame(
+        [
+            _normal_bar(close=float("inf")),
+            _normal_bar(date="2024-01-03", close=float("nan"), volume=float("nan")),
+        ]
+    )
+    cleaned, result = prepare_indicator_inputs(frame, stock_code="600519")
+    assert result.has_reject
+    assert any(i.code == CODE_INDICATOR_INPUT_INSUFFICIENT for i in result.issues)
+    assert cleaned is not None
+    assert len(cleaned) == 0
+
+
+def test_project_technical_indicators_never_returns_non_finite():
+    projected = project_technical_indicators(
+        {
+            "ma5": float("nan"),
+            "ma10": 10.5,
+            "ma20": float("inf"),
+            "bias_ma5": 1.2,
+            "trend_strength": 55,
+            "signal_score": 70,
+            "macd_dif": float("nan"),
+            "rsi_by_period": {"6": float("inf"), "12": 45.0},
+        },
+        market="cn",
+        stock_code="600519",
+    )
+    assert "ma5" not in projected or projected.get("ma5") is None
+    assert projected.get("ma10") == 10.5
+    assert "ma20" not in projected or projected.get("ma20") is None
+    assert projected.get("rsi_by_period", {}).get("12") == 45.0
+    assert projected.get("rsi_by_period", {}).get("6") is None
+    json.dumps(projected, allow_nan=False)
+
+
+def test_fundamental_suspect_pe_pb_are_warn_and_kept():
+    result = validate_fundamental_metrics({"pe_ratio": 250.0, "pb_ratio": 60.0})
+    codes = {issue.code for issue in result.issues}
+    assert CODE_FUND_PE_SUSPECT in codes
+    assert CODE_FUND_PB_SUSPECT in codes
+    assert result.status == ValidationSeverity.WARN
+    assert not result.has_reject
+    for issue in result.issues:
+        if issue.code in {CODE_FUND_PE_SUSPECT, CODE_FUND_PB_SUSPECT}:
+            assert issue.detail and issue.detail.get("kept") is True
+
+
+def test_fundamental_normal_pe_pb_not_suspect():
+    result = validate_fundamental_metrics({"pe_ratio": 18.5, "pb_ratio": 3.2})
+    assert result.ok
+    assert result.issues == []
+
+
+def test_fundamental_extreme_still_rejects_above_suspect():
+    result = validate_fundamental_metrics({"pe_ratio": 100_000.0, "pb_ratio": 20_000.0})
+    codes = {issue.code for issue in result.issues}
+    assert CODE_FUND_PE_EXTREME in codes
+    assert CODE_FUND_PB_EXTREME in codes
+    assert CODE_FUND_PE_SUSPECT not in codes
+    assert result.has_reject
+
+
+def test_cross_source_divergence_warns_with_attribution_and_keeps_values():
+    result = compare_cross_source_fields(
+        {
+            "efinance": {"price": 10.0, "pe_ratio": 15.0},
+            "akshare_em": {"price": 11.0, "pe_ratio": 15.1},
+        },
+        relative_threshold=0.05,
+        stock_code="600519",
+        market="cn",
+    )
+    assert result.status == ValidationSeverity.WARN
+    assert any(i.code == CODE_CROSS_SOURCE_DIVERGENCE for i in result.issues)
+    price_issue = next(i for i in result.issues if i.field == "price")
+    assert price_issue.detail["kept"] is True
+    providers = {item["provider"] for item in price_issue.detail["values"]}
+    assert providers == {"efinance", "akshare_em"}
+    assert not any(i.field == "pe_ratio" for i in result.issues)
+
+
+def test_cross_source_single_provider_is_noop():
+    result = compare_cross_source_fields(
+        {"efinance": {"price": 10.0}},
+        stock_code="600519",
+    )
+    assert result.ok
+    assert result.context.get("compared") is False
+
+
+def test_cross_source_quotes_compare_attributes():
+    primary = SimpleNamespace(
+        price=100.0,
+        pe_ratio=20.0,
+        volume=1_000_000,
+        to_dict=lambda: {"price": 100.0, "pe_ratio": 20.0, "volume": 1_000_000},
+    )
+    secondary = SimpleNamespace(
+        price=112.0,
+        pe_ratio=20.2,
+        volume=1_050_000,
+        to_dict=lambda: {"price": 112.0, "pe_ratio": 20.2, "volume": 1_050_000},
+    )
+    result = compare_cross_source_quotes(
+        primary,
+        secondary,
+        primary_provider="primary",
+        secondary_provider="secondary",
+        stock_code="AAPL",
+        market="us",
+        log=False,
+    )
+    assert any(
+        i.code == CODE_CROSS_SOURCE_DIVERGENCE and i.field == "price"
+        for i in result.issues
+    )
+
+
+def test_config_suspect_and_cross_source_thresholds(monkeypatch):
+    from src.config import Config
+
+    monkeypatch.setenv("DATA_VALIDATION_FUND_PE_SUSPECT_ABS", "150")
+    monkeypatch.setenv("DATA_VALIDATION_FUND_PB_SUSPECT_ABS", "40")
+    monkeypatch.setenv("DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD", "0.1")
+    Config.reset_instance()
+    config = Config.get_instance()
+    assert config.data_validation_fund_pe_suspect_abs == 150.0
+    assert config.data_validation_fund_pb_suspect_abs == 40.0
+    assert config.data_validation_cross_source_rel_threshold == 0.1
+    result = validate_fundamental_metrics({"pe_ratio": 160.0, "pb_ratio": 45.0})
+    codes = {issue.code for issue in result.issues}
+    assert CODE_FUND_PE_SUSPECT in codes
+    assert CODE_FUND_PB_SUSPECT in codes
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    [
+        "cn_etf_510300_daily.json",
+        "us_etf_spy_daily.json",
+        "suspended_etf_zero_turnover.json",
+    ],
+)
+def test_etf_daily_fixtures_have_zero_false_positives(fixture_name):
+    payload = _load_fixture(fixture_name)
+    meta = payload["meta"]
+    rows = payload.get("rows")
+    if rows is None:
+        rows = [payload["bar"]]
+    frame = pd.DataFrame(rows)
+    daily = validate_daily_frame(
+        frame,
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+        stock_code=meta["symbol"],
+    )
+    assert daily.ok, daily.to_dict()
+    fund = validate_fundamental_metrics(
+        payload.get("valuation") or {},
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+    )
+    assert fund.ok, fund.to_dict()
+    cleaned, inputs = prepare_indicator_inputs(
+        frame,
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+        stock_code=meta["symbol"],
+    )
+    assert len(cleaned) == len(frame)
+    assert all(math.isfinite(float(v)) for v in cleaned["close"].tolist())
+
+
+def test_hk_etf_quote_fixture_zero_false_positive():
+    payload = _load_fixture("hk_etf_02800_quote.json")
+    meta = payload["meta"]
+    quote = payload["quote"]
+    result = validate_realtime_quote(
+        quote,
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+        stock_code=meta["symbol"],
+    )
+    assert result.ok, result.to_dict()
+
+
+def test_index_fixture_zero_false_positive():
+    payload = _load_fixture("cn_index_000300_bar.json")
+    meta = payload["meta"]
+    result = validate_ohlcv_bar(
+        payload["bar"],
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+    )
+    assert result.ok, result.to_dict()
+    fund = validate_fundamental_metrics(
+        payload["valuation"],
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+    )
+    assert fund.ok, fund.to_dict()
+
+
+def test_high_pe_growth_fixture_is_suspect_not_discarded():
+    payload = _load_fixture("us_equity_high_pe_growth.json")
+    meta = payload["meta"]
+    bar = validate_ohlcv_bar(
+        payload["bar"],
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+    )
+    assert bar.ok, bar.to_dict()
+    fund = validate_fundamental_metrics(
+        payload["valuation"],
+        market=meta["market"],
+        asset_type=meta["instrument_type"],
+    )
+    assert fund.status == ValidationSeverity.WARN
+    assert any(i.code == CODE_FUND_PE_SUSPECT for i in fund.issues)
+    assert not fund.has_reject
+    assert payload["valuation"]["pe_ratio"] == 285.4
+
+
+def test_validate_indicator_inputs_via_annotate_data_type():
+    frame = _normal_frame([_normal_bar(close=float("nan"))])
+    result = validate_and_annotate(
+        frame,
+        data_type="indicator_inputs",
+        stock_code="600519",
+        market="cn",
+        strict=False,
+    )
+    assert result.has_reject
+    assert any("non_finite" in i.code for i in result.issues)

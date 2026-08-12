@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "symbol": "HK02800",
+    "market": "hk",
+    "instrument_type": "etf",
+    "note": "Tracker Fund of Hong Kong style quote."
+  },
+  "quote": {
+    "price": 18.42,
+    "open_price": 18.36,
+    "high": 18.5,
+    "low": 18.3,
+    "pre_close": 18.34,
+    "volume": 95420500,
+    "amount": 1754330120.0,
+    "change_pct": 0.436,
+    "pe_ratio": null,
+    "pb_ratio": null
+  }
+}
