@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CalendarDays, RefreshCw } from 'lucide-react';
 import { alertsApi } from '../../api/alerts';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import type { AlertTriggerItem } from '../../types/alerts';
@@ -10,7 +11,9 @@ import type { EventAlertDisplayItem, EventAlertImpactGrade } from '../../types/e
 import { projectCorporateEventAlerts } from '../../utils/eventAlertContext';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { EVENT_ALERT_PAGE_TEXT } from '../../locales/eventAlerts';
+import { EVENT_CALENDAR_TEXT } from '../../locales/eventCalendar';
 import { formatUiText } from '../../i18n/uiText';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { ApiErrorAlert, AppPage, Button, PageHeader, Select, Toolbar } from '../common';
 import EventAlertDetail from './EventAlertDetail';
 import EventAlertList from './EventAlertList';
@@ -26,8 +29,10 @@ export type EventAlertsPanelProps = {
 const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
   items: controlledItems, isLoading: controlledLoading, error: controlledError = null, embedded = false, onRefresh,
 }) => {
+  const navigate = useNavigate();
   const { language } = useUiLanguage();
   const text = EVENT_ALERT_PAGE_TEXT[language];
+  const calendarText = EVENT_CALENDAR_TEXT[language];
   const isControlled = controlledItems !== undefined;
   const [remoteTriggers, setRemoteTriggers] = useState<AlertTriggerItem[]>([]);
   const [remoteTotal, setRemoteTotal] = useState(0);
@@ -87,9 +92,21 @@ const EventAlertsPanel: React.FC<EventAlertsPanelProps> = ({
     <Root className="max-w-none space-y-5" data-testid="event-alerts-panel">
       {!embedded ? (
         <PageHeader title={text.title} description={text.description} actions={(
-          <Button type="button" variant="secondary" size="default" onClick={() => { if (onRefresh) onRefresh(); else void loadRemote({ append: false }); }} isLoading={isLoading} loadingText={text.loading}>
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />{text.refresh}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="default"
+              data-testid="event-alerts-open-calendar"
+              onClick={() => navigate(APP_ROUTE_PATHS.eventCalendar)}
+            >
+              <CalendarDays className="h-4 w-4" aria-hidden="true" />
+              {calendarText.title}
+            </Button>
+            <Button type="button" variant="secondary" size="default" onClick={() => { if (onRefresh) onRefresh(); else void loadRemote({ append: false }); }} isLoading={isLoading} loadingText={text.loading}>
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />{text.refresh}
+            </Button>
+          </div>
         )} />
       ) : null}
       <Toolbar aria-label={text.title} left={(
