@@ -83,8 +83,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         summary = resolver.tick(limit=args.limit)
-    except Exception:
-        logger.exception("PredictionResolver.tick failed")
+    except Exception as exc:  # broad-exception: fallback_recorded - CLI returns exit 2 on tick failure
+        logger.exception("PredictionResolver.tick failed: %s", exc)
         return 2
 
     if args.json:
