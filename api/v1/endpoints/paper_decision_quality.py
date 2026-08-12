@@ -12,7 +12,10 @@ from fastapi import APIRouter, Query
 from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.paper_decision_quality import PaperDecisionQualityResponse
-from src.services.paper_decision_quality_service import PaperDecisionQualityService
+from src.services.paper_decision_quality_service import (
+    PaperAccountNotFoundError,
+    PaperDecisionQualityService,
+)
 from src.services.paper_portfolio_service import PaperAccountRequiredError
 from src.utils.sanitize import log_safe_exception
 
@@ -26,6 +29,7 @@ router = APIRouter()
     response_model=PaperDecisionQualityResponse,
     responses={
         400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
     summary="Score paper-trading decisions on process quality (not PnL)",
@@ -52,6 +56,8 @@ def get_paper_decision_quality(
             limit=limit,
         )
         return PaperDecisionQualityResponse(**data)
+    except PaperAccountNotFoundError as exc:
+        raise api_error(404, "account_not_found", str(exc)) from exc
     except PaperAccountRequiredError as exc:
         raise api_error(400, "paper_account_required", str(exc)) from exc
     except ValueError as exc:

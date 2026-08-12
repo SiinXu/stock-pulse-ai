@@ -25,12 +25,13 @@ Both may appear under a personal performance view. This API never redefines outc
 
 ## Formula
 
-- `formula_version`: `paper-decision-quality-v1`
+- `formula_version`: `paper-decision-quality-v2`
 - Default weights: analysis 0.40, risk-gate 0.35, position 0.25
 - Unavailable dimensions are dropped and remaining weights re-normalized
 - Score range: 0–100
 - Every dimension emits machine `code` + human-readable `message` reasons
-- Evidence block records linked signal id/action, size inputs, and any ignored return field names present on the input
+- Evidence block records linked signal id/action, size inputs, equity basis, signal candidate count / ambiguity, and any ignored return field names present on the input
+- **Position size uses equity as of the trade date** (portfolio snapshot replay through that date), not the account’s latest equity. Evidence fields: `equity_basis=trade_date_snapshot`, `equity_as_of`
 
 ## API
 
@@ -45,7 +46,7 @@ Query:
 
 Requires a **paper** account (`account_type=paper` via the #370 sidecar). Real accounts return `400 paper_account_required`.
 
-Signal linkage: DecisionSignals for the same stock code with `created_at` within 7 calendar days before the trade date (inclusive). Prefer action-aligned, analysis-sourced, higher `plan_quality`, then newest.
+Signal linkage: DecisionSignals for the same stock code with `created_at` within 7 calendar days before the trade date (inclusive). Prefer action-aligned, analysis-sourced, higher `plan_quality`, then newest. When more than one candidate remains, the top-ranked signal is used and evidence sets `signal_linkage_ambiguous=true` with `signal_candidate_count`.
 
 ## Service entry points
 

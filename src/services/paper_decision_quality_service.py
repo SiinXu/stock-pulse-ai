@@ -37,7 +37,13 @@ from src.services.paper_portfolio_service import PaperAccountRequiredError
 from src.services.portfolio_service import PortfolioService
 from src.storage import DecisionSignalRecord
 
-FORMULA_VERSION = "paper-decision-quality-v1"
+
+class PaperAccountNotFoundError(ValueError):
+    """Raised when the target portfolio account is missing or inactive."""
+
+    error_code = "account_not_found"
+
+FORMULA_VERSION = "paper-decision-quality-v2"
 SCORE_KIND = "process"
 
 DIMENSION_WEIGHTS: Dict[str, float] = {
@@ -181,12 +187,10 @@ class PaperDecisionQualityService:
     ) -> Dict[str, Any]:
         """Score paper trades for an account with linked DecisionSignals."""
 
-        self.portfolio._require_active_account(int(account_id))
-        kind_row = self.portfolio.kind_repo.get(account_id=int(account_id))
-        if kind_row is None or str(getattr(kind_row, "account_type", "")) != "paper":
-            raise PaperAccountRequiredError(
-                f"Account {account_id} is not a paper trading account"
-            )
+        if date_from is not None and date_to is not None and date_from > date_to:
+            raise ValueError("date_from must be <= date_to")
+
+        self._require_active_paper_account(int(account_id))
 
         safe_limit = max(1, min(int(limit), 200))
         trade_page = self.portfolio.list_trade_events(
@@ -199,22 +203,20 @@ class PaperDecisionQualityService:
         trades = list(trade_page.get("items") or [])
 
         as_of = date_to or date.today()
-        snapshot = self.portfolio.get_portfolio_snapshot(
-            account_id=int(account_id),
-            as_of=as_of,
-            include_realtime=False,
-        )
-        equity = _equity_for_account(snapshot, account_id=int(account_id))
         concentration_alert_pct = float(
             getattr(self.config, "portfolio_risk_concentration_alert_pct", 35.0)
         )
+        # Equity is resolved per trade date so historical size discipline is
+        # path-reproducible (not skewed by later deposits/trades).
+        equity_by_date: Dict[date, float] = {}
 
         items: List[Dict[str, Any]] = []
         for trade in trades:
             items.append(
                 self._score_trade_row(
+                    account_id=int(account_id),
                     trade=trade,
-                    equity=equity,
+                    equity_by_date=equity_by_date,
                     concentration_alert_pct=concentration_alert_pct,
                 )
             )
@@ -239,11 +241,36 @@ class PaperDecisionQualityService:
             },
         }
 
+    def _require_active_paper_account(self, account_id: int) -> None:
+        """Validate active paper account via public portfolio/repo surfaces only."""
+
+        account = self.portfolio.repo.get_account(
+            int(account_id), include_inactive=False
+        )
+        if account is None:
+            raise PaperAccountNotFoundError(
+                f"Active account not found: {account_id}"
+            )
+        kind_row = self.portfolio.kind_repo.get(account_id=int(account_id))
+        if kind_row is None or str(getattr(kind_row, "account_type", "")) != "paper":
+            raise PaperAccountRequiredError(
+                f"Account {account_id} is not a paper trading account"
+            )
+
+    def _equity_as_of(self, *, account_id: int, as_of: date) -> float:
+        snapshot = self.portfolio.get_portfolio_snapshot(
+            account_id=int(account_id),
+            as_of=as_of,
+            include_realtime=False,
+        )
+        return _equity_for_account(snapshot, account_id=int(account_id))
+
     def _score_trade_row(
         self,
         *,
+        account_id: int,
         trade: Mapping[str, Any],
-        equity: float,
+        equity_by_date: Dict[date, float],
         concentration_alert_pct: float,
     ) -> Dict[str, Any]:
         symbol = str(trade.get("symbol") or "")
@@ -252,14 +279,27 @@ class PaperDecisionQualityService:
         quantity = _optional_finite(trade.get("quantity")) or 0.0
         price = _optional_finite(trade.get("price")) or 0.0
         notional = abs(quantity * price)
-        notional_pct = (notional / equity * 100.0) if equity > 0 else None
 
-        linked_record = self._find_supporting_signal(
+        notional_pct: Optional[float] = None
+        equity_as_of: Optional[float] = None
+        equity_basis = "unavailable"
+        if trade_date is not None:
+            if trade_date not in equity_by_date:
+                equity_by_date[trade_date] = self._equity_as_of(
+                    account_id=account_id, as_of=trade_date
+                )
+            equity_as_of = equity_by_date[trade_date]
+            if equity_as_of is not None and equity_as_of > 0:
+                notional_pct = notional / equity_as_of * 100.0
+                equity_basis = "trade_date_snapshot"
+
+        linkage = self._find_supporting_signal(
             symbol=symbol,
             market=_optional_str(trade.get("market")),
             trade_date=trade_date,
             side=side,
         )
+        linked_record = linkage.get("signal")
         linked = _signal_record_to_context(linked_record) if linked_record else None
 
         context = {
@@ -272,6 +312,18 @@ class PaperDecisionQualityService:
             "concentration_alert_pct": concentration_alert_pct,
         }
         scored = self.score_decision(context)
+        evidence = dict(scored["evidence"])
+        evidence.update(
+            {
+                "equity_as_of": equity_as_of,
+                "equity_basis": equity_basis,
+                "signal_candidate_count": int(linkage.get("candidate_count") or 0),
+                "signal_linkage_ambiguous": bool(
+                    linkage.get("linkage_ambiguous")
+                ),
+                "signal_pool": linkage.get("pool") or "none",
+            }
+        )
         return {
             "trade_id": trade.get("id"),
             "symbol": symbol,
@@ -285,7 +337,7 @@ class PaperDecisionQualityService:
             "dimensions": scored["dimensions"],
             "effective_weights": scored["effective_weights"],
             "reasons": scored["reasons"],
-            "evidence": scored["evidence"],
+            "evidence": evidence,
             "score_kind": SCORE_KIND,
             "formula_version": FORMULA_VERSION,
         }
@@ -297,12 +349,16 @@ class PaperDecisionQualityService:
         market: Optional[str],
         trade_date: Optional[date],
         side: str,
-    ) -> Optional[DecisionSignalRecord]:
+    ) -> Dict[str, Any]:
+        empty = {
+            "signal": None,
+            "candidate_count": 0,
+            "linkage_ambiguous": False,
+            "pool": "none",
+        }
         if not symbol or trade_date is None:
-            return None
-        codes = DecisionSignalService._stock_filter_codes(symbol, market=market)
-        if not codes:
-            codes = [canonical_stock_code(symbol) or symbol]
+            return empty
+        codes = _signal_lookup_codes(symbol, market=market)
         created_to = datetime.combine(trade_date, time(23, 59, 59))
         created_from = datetime.combine(
             trade_date - timedelta(days=SIGNAL_LOOKBACK_DAYS),
@@ -317,7 +373,7 @@ class PaperDecisionQualityService:
             page_size=20,
         )
         if not rows:
-            return None
+            return empty
         preferred_actions = (
             BUY_ALIGNED_ACTIONS if side == "buy" else SELL_ALIGNED_ACTIONS
         )
@@ -326,6 +382,7 @@ class PaperDecisionQualityService:
             for row in rows
             if str(getattr(row, "action", "") or "") in preferred_actions
         ]
+        pool_name = "action_aligned" if aligned else "any_in_lookback"
         pool = aligned or list(rows)
         plan_rank = {"complete": 0, "partial": 1, "minimal": 2, "unknown": 3}
 
@@ -333,7 +390,6 @@ class PaperDecisionQualityService:
             source_rank = 0 if str(getattr(row, "source_type", "")) == "analysis" else 1
             quality = plan_rank.get(str(getattr(row, "plan_quality", "unknown")), 3)
             created = getattr(row, "created_at", None) or datetime.min
-            # reverse=True: prefer lower source_rank/quality via negation.
             return (
                 -source_rank,
                 -quality,
@@ -342,7 +398,26 @@ class PaperDecisionQualityService:
             )
 
         pool.sort(key=sort_key, reverse=True)
-        return pool[0]
+        return {
+            "signal": pool[0],
+            "candidate_count": len(pool),
+            "linkage_ambiguous": len(pool) > 1,
+            "pool": pool_name,
+        }
+
+
+def _signal_lookup_codes(symbol: str, *, market: Optional[str]) -> List[str]:
+    """Build stock-code lookup keys via public DecisionSignal normalizers only."""
+
+    primary = DecisionSignalService.normalize_stock_code_for_signal(
+        symbol, market=market
+    )
+    codes = [primary]
+    if market is None:
+        canonical = canonical_stock_code(symbol)
+        if canonical and canonical not in codes:
+            codes.append(canonical)
+    return [code for code in codes if code]
 
 
 def score_paper_decision_context(context: Mapping[str, Any]) -> Dict[str, Any]:
