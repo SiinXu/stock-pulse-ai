@@ -1840,6 +1840,26 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects total analysis time and API call frequency.'],
     notes: ['Too many workers can cause API rate-limit errors.'],
   },
+  'settings.system.ANALYSIS_PARALLEL_FETCH': {
+    title: 'Parallel Market-Input Fetch',
+    summary:
+      'Runs dependency-free market-input pulls (realtime, chip, money-flow, fundamental) concurrently inside one stock analysis.',
+    usage:
+      'ANALYSIS_PARALLEL_FETCH_ENABLED toggles parallel vs serial declaration-order execution. MAX_CONCURRENT is the global slot cap. PER_PROVIDER_LIMIT caps branches that share a logical provider key. BUDGET_SECONDS is an optional wall-clock budget (0 disables); unstarted branches become typed budget_skipped gaps.',
+    valueNotes: [
+      'Still uses DataFetcherManager (fallback, cache, circuit, validation); parallel mode is not a side-channel HTTP path.',
+      'Default concurrent=3 and per-provider=1 reduce stampede risk while overlapping independent capabilities.',
+      'Disable the switch to force serial fetch order when diagnosing provider issues.',
+    ],
+    impact: [
+      'Affects single-stock analysis latency and peak concurrent provider calls within one run.',
+      'Does not change multi-stock MAX_WORKERS concurrency across the queue.',
+    ],
+    notes: [
+      'Merge order into stage IO / AgentContext follows declared task keys, never completion order.',
+      'Compatible with prediction ActualsFetcher coalesce: overlapping symbol pulls still go through the provider manager path.',
+    ],
+  },
   'settings.system.ANALYSIS_DELAY': {
     title: 'Analysis Delay',
     summary: 'Delay in seconds between stock analyses for rate limiting.',
