@@ -1962,10 +1962,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     summary:
       'Emit a dedicated alert when multi-agent structured disagreement exceeds the threshold.',
     usage:
-      'Default on. Requires a structured disagreement_handling record from multi-agent disagreement handling. Routes through NOTIFICATION_ALERT_CHANNELS. Does not recompute disagreement scores.',
+      'Default on. Requires a structured disagreement_handling record from multi-agent disagreement handling. Routes through NOTIFICATION_ALERT_CHANNELS. Does not recompute disagreement scores. Honors --no-notify / send_notification=false the same way as report push.',
     valueNotes: [
       'Off: never emit high-disagreement alerts.',
-      'On: emit when disagreement_score >= HIGH_DISAGREEMENT_THRESHOLD or high_disagreement=true.',
+      'On: emit when disagreement_score >= HIGH_DISAGREEMENT_THRESHOLD (score-primary).',
     ],
     impact: [
       'Adds an alert-route notification with disagreement points and a history entry link.',
@@ -1979,7 +1979,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'High Disagreement Alert Threshold',
     summary: 'Score threshold (0-1) for high-disagreement alerts.',
     usage:
-      'Default 0.6. Compared against disagreement_handling.disagreement_score. Records with high_disagreement=true also alert.',
+      'Default 0.6. When disagreement_score is present, only score >= threshold alerts (high_disagreement alone does not bypass). When score is absent, falls back to high_disagreement=true.',
     impact: ['Controls how sensitive high-disagreement alert emission is.'],
   },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {

@@ -1529,6 +1529,8 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "disagreement_handling record above the score threshold emit a dedicated "
             "alert through the existing notification alert route "
             "(NOTIFICATION_ALERT_CHANNELS). Does not recompute disagreement. "
+            "Respects the same outbound delivery intent as report notifications "
+            "(disabled for --no-notify / send_notification=false). "
             "Channel failures never interrupt analysis."
         ),
         "category": "notification",
@@ -1558,9 +1560,9 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "title": "High Disagreement Alert Threshold",
         "description": (
             "Disagreement score threshold (0-1) for emitting high-disagreement alerts. "
-            "Compared against the structured disagreement_handling.disagreement_score "
-            "from multi-agent handling; also fires when that record sets "
-            "high_disagreement=true. Default 0.6."
+            "When disagreement_handling.disagreement_score is present, only score >= "
+            "threshold alerts (high_disagreement alone does not bypass the threshold). "
+            "When score is absent, falls back to high_disagreement=true. Default 0.6."
         ),
         "category": "notification",
         "data_type": "number",

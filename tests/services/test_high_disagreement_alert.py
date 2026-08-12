@@ -101,9 +101,24 @@ class ThresholdPolicyTests(unittest.TestCase):
         self.assertTrue(should_emit_high_disagreement_alert(record, threshold=0.6))
         self.assertFalse(should_emit_high_disagreement_alert(record, threshold=0.61))
 
-    def test_high_disagreement_flag_triggers_even_below_threshold(self) -> None:
+    def test_score_below_threshold_not_bypassed_by_high_flag(self) -> None:
+        """Raising the threshold must suppress low-score records even if flagged high."""
         record = _sample_record(score=0.4, high_disagreement=True)
+        self.assertFalse(should_emit_high_disagreement_alert(record, threshold=0.6))
+
+    def test_high_flag_used_only_when_score_absent(self) -> None:
+        record = {
+            "enabled": True,
+            "high_disagreement": True,
+            "points": [],
+        }
         self.assertTrue(should_emit_high_disagreement_alert(record, threshold=0.6))
+        record_low = {
+            "enabled": True,
+            "high_disagreement": False,
+            "points": [],
+        }
+        self.assertFalse(should_emit_high_disagreement_alert(record_low, threshold=0.6))
 
     def test_missing_record_does_not_trigger(self) -> None:
         self.assertFalse(should_emit_high_disagreement_alert(None, threshold=0.6))
@@ -124,12 +139,35 @@ class AlertContentTests(unittest.TestCase):
         self.assertIn("momentum", text)
         self.assertIn("/research/analysis?segment=history&recordId=42", text)
 
+    def test_zh_labels_when_report_language_zh(self) -> None:
+        text = build_high_disagreement_alert_text(
+            stock_code="600519",
+            stock_name="贵州茅台",
+            record=_sample_record(),
+            history_id=1,
+            report_language="zh",
+        )
+        self.assertIn("高分歧告警", text)
+        self.assertIn("分歧要点", text)
+
     def test_history_href_rejects_invalid_ids(self) -> None:
         self.assertIsNone(build_history_entry_href(None))
         self.assertIsNone(build_history_entry_href(0))
         self.assertIsNone(build_history_entry_href(-1))
         self.assertEqual(
             build_history_entry_href(7),
+            "/research/analysis?segment=history&recordId=7",
+        )
+
+    def test_history_href_absolute_when_webui_host_usable(self) -> None:
+        config = SimpleNamespace(webui_host="127.0.0.1", webui_port=8000)
+        self.assertEqual(
+            build_history_entry_href(7, config=config),
+            "http://127.0.0.1:8000/research/analysis?segment=history&recordId=7",
+        )
+        bind_all = SimpleNamespace(webui_host="0.0.0.0", webui_port=8000)
+        self.assertEqual(
+            build_history_entry_href(7, config=bind_all),
             "/research/analysis?segment=history&recordId=7",
         )
 
@@ -236,6 +274,40 @@ class EmitAlertTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         notifier.send_with_results.assert_not_called()
+
+    def test_score_below_threshold_with_high_flag_skips(self) -> None:
+        """Counterexample from PR review: threshold must remain effective."""
+        notifier = MagicMock()
+        config = SimpleNamespace(
+            high_disagreement_alerts_enabled=True,
+            high_disagreement_threshold=0.6,
+        )
+        ok = maybe_send_high_disagreement_alert(
+            self._result(_sample_record(score=0.4, high_disagreement=True)),
+            history_id=1,
+            config=config,
+            notifier=notifier,
+        )
+        self.assertFalse(ok)
+        notifier.send_with_results.assert_not_called()
+
+    def test_skips_when_outbound_notifications_disabled(self) -> None:
+        """Counterexample: --no-notify / send_notification=false must not push."""
+        notifier = MagicMock()
+        config = SimpleNamespace(
+            high_disagreement_alerts_enabled=True,
+            high_disagreement_threshold=0.6,
+        )
+        ok = maybe_send_high_disagreement_alert(
+            self._result(_sample_record(score=0.9)),
+            history_id=1,
+            config=config,
+            notifier=notifier,
+            outbound_notifications_enabled=False,
+        )
+        self.assertFalse(ok)
+        notifier.send_with_results.assert_not_called()
+        notifier.send.assert_not_called()
 
 
 if __name__ == "__main__":

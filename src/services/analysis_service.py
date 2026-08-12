@@ -174,12 +174,14 @@ class AnalysisService:
             # Determine report type (API: simple/detailed/full/brief -> ReportType)
             rt = ReportType.from_str(report_type)
             
-            # Execute analysis
+            # Execute analysis. Outbound intent governs report push and
+            # high-disagreement alerts alike (#134 / no-notify contract).
             result = pipeline.process_single_stock(
                 code=stock_code,
                 skip_analysis=False,
                 single_stock_notify=send_notification,
                 report_type=rt,
+                send_notification=send_notification,
             )
             
             if result is None:

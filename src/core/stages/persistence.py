@@ -223,6 +223,13 @@ class _PersistenceStageMixin:
                             history_id=int(saved_history_id),
                             config=getattr(self, "config", None),
                             notifier=getattr(self, "notifier", None),
+                            outbound_notifications_enabled=bool(
+                                getattr(
+                                    self,
+                                    "outbound_notifications_enabled",
+                                    True,
+                                )
+                            ),
                         )
                     except Exception as alert_exc:  # broad-exception: fallback_recorded - High-disagreement alerts must never fail history persistence.
                         log_safe_exception(

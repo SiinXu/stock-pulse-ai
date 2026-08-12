@@ -275,6 +275,7 @@ class _OrchestrationStageMixin:
         report_type: ReportType = ReportType.SIMPLE,
         analysis_query_id: Optional[str] = None,
         current_time: Optional[datetime] = None,
+        send_notification: Optional[bool] = None,
     ) -> Optional[AnalysisResult]:
         """
         处理单只股票的完整流程
@@ -294,11 +295,19 @@ class _OrchestrationStageMixin:
             single_stock_notify: 是否启用单股推送模式（每分析完一只立即推送）
             report_type: 报告类型枚举（从配置读取，Issue #119）
             current_time: 本轮运行冻结的参考时间，用于统一断点续传目标交易日判断
+            send_notification: Optional explicit outbound delivery intent for this
+                call (API/CLI no-notify). When set, updates
+                ``outbound_notifications_enabled`` used by report push and
+                high-disagreement alerts. When omitted, keeps the pipeline flag
+                already set by ``run()`` or the caller.
 
         Returns:
             AnalysisResult 或 None
         """
         from src.plugins.event_hooks import dispatch_analysis_event
+
+        if send_notification is not None:
+            self.outbound_notifications_enabled = bool(send_notification)
 
         logger.info("========== Processing %s ==========", code)
 
@@ -619,6 +628,12 @@ class _OrchestrationStageMixin:
             "Concurrency=%s mode=%s",
             self.max_workers,
             "data-only" if dry_run else "full-analysis",
+        )
+
+        # Align report push and high-disagreement alerts (#134) with the same
+        # delivery intent (CLI --no-notify / API send_notification=false / dry-run).
+        self.outbound_notifications_enabled = bool(send_notification) and not bool(
+            dry_run
         )
 
         # Freeze the unified reference time for this round of running to avoid using the same stocks across market closing boundaries with different target trading days.

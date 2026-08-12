@@ -81,7 +81,13 @@ def should_emit_high_disagreement_alert(
     *,
     threshold: float = DEFAULT_HIGH_DISAGREEMENT_THRESHOLD,
 ) -> bool:
-    """True when an existing record meets the alert threshold policy."""
+    """True when an existing record meets the alert threshold policy.
+
+    Policy (score-primary so ``HIGH_DISAGREEMENT_THRESHOLD`` is effective):
+    - When ``disagreement_score`` is present: alert only if ``score >= threshold``.
+    - When score is absent: fall back to the record's ``high_disagreement`` flag
+      so #1205 classifications without a numeric score are still consumable.
+    """
     if not isinstance(record, Mapping) or not record:
         return False
     if record.get("enabled") is False:
@@ -89,20 +95,24 @@ def should_emit_high_disagreement_alert(
 
     threshold_value = _clamp_unit(threshold, DEFAULT_HIGH_DISAGREEMENT_THRESHOLD)
     score = _safe_float(record.get("disagreement_score"))
-    if score is not None and score >= threshold_value:
-        return True
-    # Consume #1205's high-disagreement classification when score is absent or
-    # when escalation already marked the product as high disagreement.
-    if bool(record.get("high_disagreement")):
-        return True
-    return False
+    if score is not None:
+        return score >= threshold_value
+    return bool(record.get("high_disagreement"))
 
 
-def build_history_entry_href(history_id: Optional[int]) -> Optional[str]:
-    """Build the in-app history entry path used by notification inbox deep links."""
+def build_history_entry_href(
+    history_id: Optional[int],
+    *,
+    config: Any = None,
+) -> Optional[str]:
+    """Build history entry path, preferring absolute URL when WebUI host is usable."""
     if not isinstance(history_id, int) or isinstance(history_id, bool) or history_id <= 0:
         return None
-    return _HISTORY_ENTRY_HREF_TEMPLATE.format(record_id=history_id)
+    path = _HISTORY_ENTRY_HREF_TEMPLATE.format(record_id=history_id)
+    base = _public_web_base(config)
+    if base:
+        return f"{base}{path}"
+    return path
 
 
 def build_high_disagreement_alert_text(
@@ -112,13 +122,14 @@ def build_high_disagreement_alert_text(
     record: Mapping[str, Any],
     history_id: Optional[int] = None,
     report_language: str = "zh",
+    config: Any = None,
 ) -> str:
     """Build outbound alert Markdown from an existing disagreement record.
 
     Formats locally (same shape as ``NotificationBuilder.build_simple_alert``)
     to avoid importing the full notification facade for pure text construction.
     """
-    del report_language  # reserved for future localized labels
+    labels = _alert_labels(report_language)
     code = (stock_code or "").strip() or "unknown"
     name = (stock_name or "").strip() or code
     score = _safe_float(record.get("disagreement_score"))
@@ -128,16 +139,16 @@ def build_high_disagreement_alert_text(
     resolution = str(record.get("resolution_status") or "").strip() or "unknown"
 
     lines: List[str] = [
-        f"Stock: {name} ({code})",
-        f"Disagreement score: {score_text}",
-        f"Verdict mode: {verdict}",
-        f"Escalation: {escalation}",
-        f"Resolution: {resolution}",
+        f"{labels['stock']}: {name} ({code})",
+        f"{labels['score']}: {score_text}",
+        f"{labels['verdict']}: {verdict}",
+        f"{labels['escalation']}: {escalation}",
+        f"{labels['resolution']}: {resolution}",
     ]
 
     points = _public_points(record.get("points"))
     if points:
-        lines.append("Disagreement points:")
+        lines.append(f"{labels['points']}:")
         for point in points:
             source = point.get("source") or "unknown"
             kind = point.get("kind") or "unknown"
@@ -147,18 +158,18 @@ def build_high_disagreement_alert_text(
                 ", ".join(participants) if participants else "n/a"
             )
             lines.append(
-                f"- [{source}] {severity}/{kind} · participants: {participant_text}"
+                f"- [{source}] {severity}/{kind} · {labels['participants']}: {participant_text}"
             )
     else:
-        lines.append("Disagreement points: (none recorded)")
+        lines.append(f"{labels['points']}: {labels['points_none']}")
 
-    entry_href = build_history_entry_href(history_id)
+    entry_href = build_history_entry_href(history_id, config=config)
     if entry_href:
-        lines.append(f"Entry: {entry_href}")
+        lines.append(f"{labels['entry']}: {entry_href}")
     else:
-        lines.append("Entry: history record unavailable")
+        lines.append(f"{labels['entry']}: {labels['entry_unavailable']}")
 
-    title = f"High Disagreement Alert | {name} ({code})"
+    title = f"{labels['title']} | {name} ({code})"
     # Match NotificationBuilder.build_simple_alert(warning) without importing it.
     return f"⚠️ **{title}**\n\n" + "\n".join(lines)
 
@@ -169,13 +180,21 @@ def maybe_send_high_disagreement_alert(
     history_id: Optional[int] = None,
     config: Any = None,
     notifier: Any = None,
+    outbound_notifications_enabled: bool = True,
 ) -> bool:
     """Emit a high-disagreement alert when an existing record exceeds threshold.
 
     Always fail-open: any extraction, formatting, or channel failure is logged
     and returns ``False`` without raising into the analysis pipeline.
+
+    Respects the same outbound delivery intent as report notifications: when
+    ``outbound_notifications_enabled`` is false (``--no-notify`` /
+    ``send_notification=false`` / dry-run delivery skip), no alert is sent.
     """
     try:
+        if not bool(outbound_notifications_enabled):
+            return False
+
         if config is None:
             from src.config import get_config
 
@@ -208,6 +227,7 @@ def maybe_send_high_disagreement_alert(
             record=record,
             history_id=history_id,
             report_language=str(report_language or "zh"),
+            config=config,
         )
 
         if notifier is None:
@@ -329,6 +349,55 @@ def _clamp_unit(value: Any, default: float) -> float:
     if number is None:
         return float(default)
     return max(0.0, min(1.0, number))
+
+
+def _public_web_base(config: Any) -> Optional[str]:
+    """Return an absolute origin when WEBUI_HOST is a usable non-bind-all host."""
+    if config is None:
+        return None
+    host = str(getattr(config, "webui_host", "") or "").strip()
+    if not host or host in {"0.0.0.0", "::", "[::]"}:
+        return None
+    port_raw = getattr(config, "webui_port", None)
+    try:
+        port = int(port_raw) if port_raw is not None else 8000
+    except (TypeError, ValueError):
+        port = 8000
+    if port <= 0:
+        return None
+    # Local WebUI is HTTP-only; do not invent TLS settings.
+    return f"http://{host}:{port}"
+
+
+def _alert_labels(report_language: str) -> Dict[str, str]:
+    language = str(report_language or "zh").strip().lower()
+    if language.startswith("zh"):
+        return {
+            "title": "高分歧告警",
+            "stock": "标的",
+            "score": "分歧分数",
+            "verdict": "裁决模式",
+            "escalation": "升级",
+            "resolution": "解决状态",
+            "points": "分歧要点",
+            "points_none": "（无记录）",
+            "participants": "参与方",
+            "entry": "入口",
+            "entry_unavailable": "历史记录不可用",
+        }
+    return {
+        "title": "High Disagreement Alert",
+        "stock": "Stock",
+        "score": "Disagreement score",
+        "verdict": "Verdict mode",
+        "escalation": "Escalation",
+        "resolution": "Resolution",
+        "points": "Disagreement points",
+        "points_none": "(none recorded)",
+        "participants": "participants",
+        "entry": "Entry",
+        "entry_unavailable": "history record unavailable",
+    }
 
 
 __all__ = [

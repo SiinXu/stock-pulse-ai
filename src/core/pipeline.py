@@ -310,6 +310,9 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         self._pipeline_stage_runner = PipelineStageRunner()
         self._concept_rankings_cache_lock = threading.Lock()
         self._concept_rankings_cache: Dict[str, Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]] = {}
+        # Shared outbound delivery intent for report push and high-disagreement
+        # alerts (#134). Callers set False for --no-notify / send_notification=false.
+        self.outbound_notifications_enabled: bool = True
         
         # Initialize the search service (optional, failure should not block the main analysis process)
         try:

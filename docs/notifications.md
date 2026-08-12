@@ -224,7 +224,7 @@ P3 新增三类通知路由配置：
 | `alert` | `NOTIFICATION_ALERT_CHANNELS` | EventMonitor / Alert worker 触发通知；多智能体高分歧告警（#134，`src/services/high_disagreement_alert.py`，仅消费结构化 `disagreement_handling` 记录） |
 | `system_error` | `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | GitHub Actions Daily Analysis 失败短通知（#850，`scripts/actions_daily_run_summary.py`）；其它路径仍可不使用 |
 
-高分歧告警（#134）在分析历史落库后按 `HIGH_DISAGREEMENT_ALERTS_ENABLED` / `HIGH_DISAGREEMENT_THRESHOLD` 判定；阈值比较的是既有 `disagreement_handling.disagreement_score`（或记录上的 `high_disagreement=true`），**不**重新计算分歧。告警正文包含分歧要点与历史入口链接（`/research/analysis?segment=history&recordId=...`）。发送失败或单渠道失败不会中断分析。渠道配置仍归通知渠道 Settings（#931）；应用内收件箱投影仍归 #953。
+高分歧告警（#134）在分析历史落库后按 `HIGH_DISAGREEMENT_ALERTS_ENABLED` / `HIGH_DISAGREEMENT_THRESHOLD` 判定；**仅消费**既有 `disagreement_handling` 记录，**不**重新计算分歧。存在 `disagreement_score` 时仅当 `score >=` 阈值才告警（`high_disagreement` 不能旁路阈值）；分数缺失时回退到 `high_disagreement=true`。告警与报告推送共用出站意图：`--no-notify` / `send_notification=false` / dry-run 时不发送。告警正文包含分歧要点与历史入口（相对路径 `/research/analysis?segment=history&recordId=...`；当 `WEBUI_HOST` 为可用主机时附绝对 URL）。发送失败或单渠道失败不会中断分析。渠道配置仍归通知渠道 Settings（#931）；应用内收件箱投影仍归 #953。
 
 配置值为逗号分隔渠道 ID。内置 ID 为 `wechat,feishu,dingtalk,telegram,email,pushover,ntfy,gotify,pushplus,serverchan3,custom,discord,slack,astrbot`；运行时还接受当前 enabled 插件注册的 canonical ID。
 
