@@ -21,6 +21,13 @@ from src.analyzer import (
     stabilize_decision_with_structure,
 )
 from src.config import FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
+from src.core.contracts import (
+    AnalyzeStageInput,
+    AnalyzeStageOutput,
+    FetchMarketInputsOutput,
+    FetchStageInput,
+    build_run_context,
+)
 from src.core.pipeline_stage_results import (
     PipelineStageName,
     PipelineStageResult,
