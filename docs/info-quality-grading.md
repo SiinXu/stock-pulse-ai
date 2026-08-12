@@ -11,6 +11,8 @@ Information quality grading **consumes** existing AnalysisContextPack `data_qual
 
 It does **not** re-validate OHLCV, fundamentals, or indicators, and it does not invent a second scoring pipeline.
 
+Public overview `blocks` are list-shaped (`[{key, status}, ...]`). Grading normalizes that list (or the pack mapping) before scoring and prefers a precomputed `info_quality` payload when block status inputs are absent, so it never invents core-block `"missing"` from an empty block list.
+
 | Configuration | Default | Contract |
 | --- | --- | --- |
 | `INFO_QUALITY_GRADING_ENABLED` | `true` | Derive A/B/C grades and attach them to reports / DecisionSignal / prompt constraints. |

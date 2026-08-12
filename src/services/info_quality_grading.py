@@ -58,9 +58,13 @@ _CONSISTENCY_CODES = frozenset(
 def grade_info_quality(
     data_quality: Optional[Mapping[str, Any]],
     *,
-    blocks: Optional[Mapping[str, Any]] = None,
+    blocks: Any = None,
 ) -> Dict[str, Any]:
-    """Build an A/B/C grade from validation-backed data_quality artifacts."""
+    """Build an A/B/C grade from validation-backed data_quality artifacts.
+
+    ``blocks`` accepts either the pack-shaped mapping ``{key: {status: ...}}``
+    or the public overview list ``[{key, status}, ...]``.
+    """
 
     quality = dict(data_quality) if isinstance(data_quality, Mapping) else {}
     metadata = quality.get("metadata") if isinstance(quality.get("metadata"), Mapping) else {}
@@ -231,7 +235,8 @@ def apply_info_quality_constraints(
     data_quality = overview.get("data_quality")
     if not isinstance(data_quality, Mapping):
         data_quality = {}
-    blocks = overview.get("blocks") if isinstance(overview.get("blocks"), Mapping) else None
+    # Overview emits list-shaped blocks; pack emit mapping-shaped blocks.
+    blocks = overview.get("blocks")
 
     dashboard = getattr(result, "dashboard", None)
     if not isinstance(dashboard, dict):
@@ -240,7 +245,7 @@ def apply_info_quality_constraints(
 
     adjustments: List[str] = []
     if grading_enabled:
-        info_quality = grade_info_quality(data_quality, blocks=blocks)
+        info_quality = resolve_info_quality(data_quality, blocks=blocks)
         dashboard["info_quality"] = info_quality
         adjustments.append(f"info_quality_grade_{info_quality['grade'].lower()}")
     else:
@@ -314,6 +319,34 @@ def apply_info_quality_constraints(
     return adjustments
 
 
+def resolve_info_quality(
+    data_quality: Optional[Mapping[str, Any]],
+    *,
+    blocks: Any = None,
+) -> Dict[str, Any]:
+    """Resolve grade using complete inputs; prefer precomputed when re-grade lacks status."""
+
+    quality = data_quality if isinstance(data_quality, Mapping) else {}
+    precomputed = _precomputed_info_quality(quality)
+    normalized_blocks = _normalize_blocks_input(blocks)
+    limitations = _list_strings(quality.get("limitations"))
+    has_status_signal = bool(normalized_blocks) or any(
+        ":" in item for item in limitations
+    )
+    if precomputed is not None and not has_status_signal:
+        return precomputed
+    graded = grade_info_quality(
+        quality,
+        blocks=normalized_blocks if normalized_blocks else None,
+    )
+    if precomputed is not None and not _has_core_status_signal(
+        _block_statuses(normalized_blocks, limitations)
+    ):
+        # Re-grade had no core statuses; keep builder/overview grade.
+        return precomputed
+    return graded
+
+
 def info_quality_grade_from_any(value: Any) -> Optional[InfoQualityGrade]:
     """Extract A/B/C from grade payloads or legacy quality levels."""
 
@@ -354,18 +387,43 @@ def _validation_evidence(
     return evidence
 
 
+def _normalize_blocks_input(blocks: Any) -> Dict[str, Dict[str, Any]]:
+    """Normalize pack mapping or overview list into ``{key: block_dict}``."""
+
+    if isinstance(blocks, Mapping):
+        out: Dict[str, Dict[str, Any]] = {}
+        for key, value in blocks.items():
+            text_key = str(key or "").strip()
+            if not text_key:
+                continue
+            if isinstance(value, Mapping):
+                out[text_key] = dict(value)
+            elif value is not None and str(value).strip():
+                out[text_key] = {"status": str(value).strip()}
+        return out
+    if isinstance(blocks, Sequence) and not isinstance(blocks, (str, bytes)):
+        out = {}
+        for item in blocks:
+            if not isinstance(item, Mapping):
+                continue
+            key = str(item.get("key") or "").strip()
+            if not key:
+                continue
+            out[key] = dict(item)
+        return out
+    return {}
+
+
 def _block_statuses(
-    blocks: Optional[Mapping[str, Any]],
+    blocks: Any,
     limitations: Sequence[str],
 ) -> Dict[str, str]:
     statuses: Dict[str, str] = {}
-    if isinstance(blocks, Mapping):
-        for key, block in blocks.items():
-            if not isinstance(block, Mapping):
-                continue
-            status = str(block.get("status") or "").strip().lower()
-            if status:
-                statuses[str(key)] = status
+    normalized = _normalize_blocks_input(blocks)
+    for key, block in normalized.items():
+        status = str(block.get("status") or "").strip().lower()
+        if status:
+            statuses[key] = status
     for item in limitations:
         key, separator, status = str(item).partition(":")
         if not separator:
@@ -377,6 +435,66 @@ def _block_statuses(
     return statuses
 
 
+def _has_core_status_signal(block_statuses: Mapping[str, str]) -> bool:
+    return any(key in block_statuses for key in _CORE_BLOCKS)
+
+
+def _precomputed_info_quality(quality: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+    candidates: List[Any] = [
+        quality.get("info_quality"),
+        quality.get("metadata") if isinstance(quality.get("metadata"), Mapping) else None,
+    ]
+    metadata = quality.get("metadata")
+    if isinstance(metadata, Mapping):
+        candidates.append(metadata.get("info_quality"))
+        if metadata.get("info_quality_grade") is not None:
+            candidates.append({"grade": metadata.get("info_quality_grade")})
+    if quality.get("info_quality_grade") is not None:
+        candidates.append({"grade": quality.get("info_quality_grade"), **(
+            dict(quality["info_quality"]) if isinstance(quality.get("info_quality"), Mapping) else {}
+        )})
+    for candidate in candidates:
+        if not isinstance(candidate, Mapping):
+            continue
+        grade = _safe_grade(candidate.get("grade") or candidate.get("info_quality_grade"))
+        if grade is None:
+            continue
+        dimensions_raw = candidate.get("dimensions")
+        dimensions: Dict[str, str] = {}
+        if isinstance(dimensions_raw, Mapping):
+            for key in ("source_reliability", "timeliness", "consistency"):
+                dim = _safe_grade(dimensions_raw.get(key))
+                if dim:
+                    dimensions[key] = dim
+        if not dimensions:
+            dimensions = {
+                "source_reliability": grade,
+                "timeliness": grade,
+                "consistency": grade,
+            }
+        return {
+            "schema_version": str(
+                candidate.get("schema_version") or INFO_QUALITY_SCHEMA_VERSION
+            ),
+            "grade": grade,
+            "dimensions": dimensions,
+            "level": candidate.get("level") if candidate.get("level") is not None else quality.get("level"),
+            "overall_score": candidate.get("overall_score")
+            if candidate.get("overall_score") is not None
+            else quality.get("overall_score"),
+            "evidence_backed": candidate.get("evidence_backed") is True
+            if "evidence_backed" in candidate
+            else True,
+            "reasons": _list_strings(candidate.get("reasons") or ["precomputed_info_quality"], limit=12),
+            "source": str(
+                candidate.get("source")
+                or "data_quality_evidence.v1+analysis_context_pack"
+            ),
+            "validation_issue_count": candidate.get("validation_issue_count"),
+        }
+    return None
+
+
 def _grade_source_reliability(
     *,
     quality: Mapping[str, Any],
@@ -385,11 +503,17 @@ def _grade_source_reliability(
 ) -> DimensionGrade:
     if any(item.get("severity") == "reject" or item.get("rejected") is True for item in evidence):
         return "C"
-    core_statuses = [block_statuses.get(key, "missing") for key in _CORE_BLOCKS]
-    if any(status in {"fetch_failed", "missing"} for status in core_statuses):
-        return "C"
-    if any(status in {"fallback", "estimated"} for status in core_statuses):
-        return "B"
+    # Only score cores that are explicitly present; never invent "missing".
+    known = [
+        block_statuses[key]
+        for key in _CORE_BLOCKS
+        if key in block_statuses and block_statuses[key]
+    ]
+    if known:
+        if any(status in {"fetch_failed", "missing"} for status in known):
+            return "C"
+        if any(status in {"fallback", "estimated"} for status in known):
+            return "B"
     level = str(quality.get("level") or "").strip().lower()
     if level in {"poor", "limited"}:
         return "C"
@@ -403,11 +527,16 @@ def _grade_timeliness(
     evidence: Sequence[Mapping[str, Any]],
     block_statuses: Mapping[str, str],
 ) -> DimensionGrade:
-    core_statuses = [block_statuses.get(key, "available") for key in _CORE_BLOCKS]
-    if any(status == "stale" for status in core_statuses):
-        return "C"
-    if any(status in _TIMELINESS_WEAK for status in core_statuses):
-        return "B"
+    known = [
+        block_statuses[key]
+        for key in _CORE_BLOCKS
+        if key in block_statuses and block_statuses[key]
+    ]
+    if known:
+        if any(status == "stale" for status in known):
+            return "C"
+        if any(status in _TIMELINESS_WEAK for status in known):
+            return "B"
     for item in evidence:
         provenance = item.get("provenance")
         if isinstance(provenance, Mapping):

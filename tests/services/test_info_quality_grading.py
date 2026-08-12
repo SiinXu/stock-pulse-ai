@@ -203,3 +203,112 @@ def test_disabled_flags_skip_surfaces() -> None:
     assert "info_quality" not in result.dashboard
     assert "forced_conclusion" not in result.dashboard
     assert result.action == "buy"
+
+
+def test_overview_list_blocks_preserves_grade_a_and_pass() -> None:
+    """Regression: public overview emits list-shaped blocks, not a mapping."""
+
+    overview = {
+        "data_quality": {
+            "overall_score": 92,
+            "level": "good",
+            "limitations": [],
+            "validation_evidence": [
+                {
+                    "schema_version": "data_quality_evidence.v1",
+                    "severity": "pass",
+                    "issues": [],
+                }
+            ],
+            "info_quality": {
+                "schema_version": "info-quality-v1",
+                "grade": "A",
+                "dimensions": {
+                    "source_reliability": "A",
+                    "timeliness": "A",
+                    "consistency": "A",
+                },
+                "evidence_backed": True,
+            },
+            "info_quality_grade": "A",
+        },
+        "blocks": [
+            {"key": "quote", "status": "available"},
+            {"key": "daily_bars", "status": "available"},
+            {"key": "technical", "status": "available"},
+        ],
+    }
+    result = SimpleNamespace(
+        success=True,
+        action="buy",
+        action_label="Buy",
+        operation_advice="买入",
+        decision_type="buy",
+        confidence_level="高",
+        sentiment_score=80,
+        analysis_summary="Buy with clean evidence",
+        risk_warning="",
+        report_language="zh",
+        dashboard={},
+        analysis_context_pack_overview=overview,
+    )
+    adjustments = apply_info_quality_constraints(
+        result,
+        analysis_context_pack_overview=overview,
+        grading_enabled=True,
+        forced_conclusion_enabled=True,
+        enforce_action_downgrade=True,
+        report_language="zh",
+    )
+    assert result.dashboard["info_quality"]["grade"] == "A"
+    assert result.action == "buy"
+    assert result.dashboard["forced_conclusion"]["stance"] == "Pass"
+    assert "forced_conclusion_pass_blocked" not in adjustments
+
+
+def test_precomputed_grade_used_when_blocks_absent() -> None:
+    overview = {
+        "data_quality": {
+            "overall_score": 90,
+            "level": "good",
+            "limitations": [],
+            "info_quality_grade": "A",
+            "info_quality": {
+                "schema_version": "info-quality-v1",
+                "grade": "A",
+                "dimensions": {
+                    "source_reliability": "A",
+                    "timeliness": "A",
+                    "consistency": "A",
+                },
+                "evidence_backed": True,
+            },
+        },
+        # no blocks key
+    }
+    result = SimpleNamespace(
+        success=True,
+        action="buy",
+        action_label="Buy",
+        operation_advice="Buy",
+        decision_type="buy",
+        confidence_level="High",
+        sentiment_score=80,
+        analysis_summary="buy",
+        risk_warning="",
+        report_language="en",
+        dashboard={},
+        analysis_context_pack_overview=overview,
+    )
+    apply_info_quality_constraints(
+        result,
+        analysis_context_pack_overview=overview,
+        grading_enabled=True,
+        forced_conclusion_enabled=True,
+        enforce_action_downgrade=True,
+        report_language="en",
+    )
+    assert result.dashboard["info_quality"]["grade"] == "A"
+    assert result.action == "buy"
+    assert result.dashboard["forced_conclusion"]["stance"] == "Pass"
+

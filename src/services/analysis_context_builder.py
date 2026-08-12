@@ -709,8 +709,20 @@ def _build_data_quality(
             "info_quality_grade": info_quality.get("grade"),
             "info_quality": info_quality,
         }
-    except Exception:  # broad-exception: optional_metadata - Grading is additive.
-        pass
+    except Exception as exc:  # broad-exception: optional_metadata - Grading is additive.
+        try:
+            from src.utils.sanitize import log_safe_exception
+            import logging
+
+            log_safe_exception(
+                logging.getLogger(__name__),
+                "Info quality grading skipped during context pack build",
+                exc,
+                error_code="analysis_context_info_quality_grade_failed",
+                level=logging.DEBUG,
+            )
+        except Exception:
+            pass
     return quality
 
 

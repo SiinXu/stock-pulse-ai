@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Information quality grading accepts overview list-shaped blocks and prefers precomputed grades so clean evidence is not forced to grade C / Watch (Refs #123).
 - [Added] Information quality A/B/C grading from validation-backed context evidence with forced Pass/Fail/Watch conclusions, grade-C Pass blocking, and report/DecisionSignal/trace surfaces (Refs #123).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
