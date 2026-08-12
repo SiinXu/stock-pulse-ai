@@ -173,7 +173,7 @@ const FIXTURE_RECENT_REPORTS: HistoryItem[] = [
 const HomeDashboardLayoutStory = () => (
   <HomeDashboardLayout
     widgets={{
-      watchlist: <div className="rounded-lg border border-border p-3 text-sm">Watchlist fixture</div>,
+      watchlist: <div className="rounded-lg border border-border p-3 text-sm" data-testid="playground-watchlist-fixture" />,
       portfolio_health: <HomePortfolioHealthWidget />,
       alerts: (
         <HomeAlertsWidget
