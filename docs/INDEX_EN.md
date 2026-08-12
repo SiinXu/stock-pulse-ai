@@ -76,6 +76,7 @@ This is the entry point for project documentation. The README covers the project
 | [Alert Center — Issue #241 EN companion](alerts_EN.md) | English companion for context-aware corporate event alerts (backend V0) |
 | [Scheduled Tasks](scheduled-tasks.md) | Versioned daily analysis/research tasks, a read-only today view, trading-day policy, durable run records, bounded retry, and local/Docker/API ownership |
 | [Daily Brief (historical accuracy)](daily-brief_EN.md) | Config-gated morning brief: yesterday's analyses, watchlist context, and honesty-first accuracy from existing outcome stores ([Chinese](daily-brief.md)) |
+| [Research Timeline](research-timeline.md) | Per-symbol research activity timeline (runs, chat, signals; hypothesis optional) |
 | [DecisionSignal Topic](decision-signals.md) <sub><sub>![P7 Badge](https://img.shields.io/badge/P7-orange?style=flat)</sub></sub> (Chinese-only) | AI signal fields, API, Web display, alert/notification/portfolio-risk linkage, outcome evaluation, redaction, migration, and rollback |
 | [Personal Investment Framework](personal-investment-framework_EN.md) | Minimal Settings editor, versioned API, single-stock read-only injection, and report framework_alignment slot |
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |

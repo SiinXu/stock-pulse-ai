@@ -69,6 +69,7 @@
 | [Alert Center English companion](alerts_EN.md) | Issue #241 后端 V0 英文摘要（企业事件告警与 impact context） |
 | [定时任务 API 与执行契约（英文）](scheduled-tasks.md) | 版本化每日分析/研究任务、今日只读视图、交易日策略、运行记录、重试与 local/Docker/API 调度所有权边界 |
 | [每日简报（历史准确率复盘）](daily-brief.md) | 配置门控的晨间简报：昨日分析、关注列表与基于既有 outcome 存储的诚实准确率复盘（[英文](daily-brief_EN.md)） |
+| [研究时间线](research-timeline_CN.md) / [EN](research-timeline.md) | 按标的聚合分析运行、对话、信号（假设可选） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
