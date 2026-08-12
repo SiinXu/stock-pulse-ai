@@ -21,6 +21,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
 )
 from src.config_parts.domain_facade import (
     install_flat_domain_facade,
@@ -125,6 +126,10 @@ class Config:
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
 
+    # === Read-only research API for stratified conclusions (Issue #1143) ===
+    research_api_enabled: bool = False
+    research_api_rate_limit_per_minute: int = 60
+
     # === Reasoning-trace export (Issue #135) — default off ===
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
@@ -134,7 +139,7 @@ class Config:
     security_audit_retention_days: int = 90
     security_audit_max_events: int = 10_000
 
-    # === Daily brief with historical accuracy review (Issue #466) ===
+    # === Daily brief: personal morning + accuracy review (#149 / #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
     daily_brief_timezone: str = "Asia/Shanghai"
@@ -142,6 +147,15 @@ class Config:
     daily_brief_notify: bool = True
     daily_brief_persist_history: bool = True
     daily_brief_save_report_file: bool = True
+    daily_brief_quiet_when_empty: bool = False
+
+    # === Event-driven research briefs (Issue #1131; default off) ===
+    event_research_brief_enabled: bool = False
+    event_research_brief_notify: bool = True
+    event_research_brief_persist_history: bool = True
+    event_research_brief_save_report_file: bool = True
+    event_research_brief_lookback_hours: int = 48
+    event_research_brief_categories: str = "earnings"
 
     # === Paper trading portfolio (Issue #370) ===
     paper_portfolio_initial_cash: float = 1_000_000.0
@@ -165,6 +179,9 @@ class Config:
     llm_prompt_cache_telemetry_enabled: bool = True
     llm_prompt_cache_hints_enabled: bool = False
     llm_prompt_cache_diagnostics_level: str = "off"
+
+    # Fine-grained cost attribution + routing quality on llm_usage (Refs #166/#248).
+    llm_usage_attribution_enabled: bool = True
 
     # --- Multi-channel LLM config (new) ---
     # LITELLM_CONFIG: path to a standard litellm_config.yaml file (most powerful)
@@ -273,6 +290,29 @@ class Config:
     agent_arch: str = "single"     # Agent architecture: 'single' (legacy) or 'multi' (orchestrator)
     agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/specialist
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
+    # Hard per-mode budgets (LLM turns / tool calls / cost / tokens). Built-in
+    # mode defaults live in src.agent.runtime.mode_budget; 0 on overrides means
+    # "keep mode default". Residual wall-clock skips remain budget_skip.
+    agent_mode_budget_enabled: bool = True
+    agent_mode_budget_max_llm_turns: int = 0
+    agent_mode_budget_max_tool_calls: int = 0
+    agent_mode_budget_max_cost_usd: float = 0.0
+    agent_mode_budget_max_tokens: int = 0
+    agent_mode_budget_quick_max_llm_turns: int = 0
+    agent_mode_budget_quick_max_tool_calls: int = 0
+    agent_mode_budget_quick_max_cost_usd: float = 0.0
+    agent_mode_budget_standard_max_llm_turns: int = 0
+    agent_mode_budget_standard_max_tool_calls: int = 0
+    agent_mode_budget_standard_max_cost_usd: float = 0.0
+    agent_mode_budget_full_max_llm_turns: int = 0
+    agent_mode_budget_full_max_tool_calls: int = 0
+    agent_mode_budget_full_max_cost_usd: float = 0.0
+    agent_mode_budget_specialist_max_llm_turns: int = 0
+    agent_mode_budget_specialist_max_tool_calls: int = 0
+    agent_mode_budget_specialist_max_cost_usd: float = 0.0
+    agent_mode_budget_chat_max_llm_turns: int = 0
+    agent_mode_budget_chat_max_tool_calls: int = 0
+    agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_critic_max_iters: int = 1  # Max controlled revision rounds after Critic findings (hard-capped at 2)
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
@@ -316,6 +356,9 @@ class Config:
     agent_context_protected_turns: int = 4
     agent_observability_enabled: bool = True  # Lightweight agent run events (default on)
     agent_observability_deep_payload: bool = False  # Capture sanitized tool/model payloads (default off)
+    # Performance baseline collection / optional cProfile (Issue #227). Default off.
+    perf_collection_enabled: bool = False
+    perf_profile_enabled: bool = False
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
@@ -374,6 +417,17 @@ class Config:
 
     # System Configuration
     max_workers: int = 3  # Low concurrency anti-ban
+    # Per-check timeout for structured readiness/self-check (on-demand only; never auto-run at startup).
+    readiness_check_timeout_seconds: float = READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT
+    # Parallel dependency-free market-input pulls inside one stock analysis
+    # (realtime / chip / money-flow / fundamental). Does not bypass provider
+    # governance or cache; set enabled=false to force serial declaration order.
+    analysis_parallel_fetch_enabled: bool = True
+    analysis_parallel_fetch_max_concurrent: int = 3
+    analysis_parallel_fetch_per_provider_limit: int = 1
+    # 0 disables the coordinator-level wall-clock budget (individual stage
+    # timeouts such as FUNDAMENTAL_STAGE_TIMEOUT_SECONDS still apply).
+    analysis_parallel_fetch_budget_seconds: float = 0.0
     debug: bool = False
     http_proxy: Optional[str] = None  # HTTP Proxy (e.g., http://127.0.0.1:10809)
     https_proxy: Optional[str] = None # HTTPS Proxy
