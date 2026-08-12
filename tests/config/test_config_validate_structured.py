@@ -261,8 +261,7 @@ class TestValidateStructuredLLM:
 
         error = next(i for i in issues if i.field == "AGENT_GENERATION_BACKEND")
         assert error.severity == "error"
-        assert "auto、litellm" in error.message
-        assert "不支持 Agent 工具调用" in error.message
+        assert "auto、claude_code_cli、codex_cli、litellm、opencode_cli" in error.message
         assert "hermes" in error.message
 
     @pytest.mark.parametrize("generation_backend", LOCAL_CLI_BACKENDS)

@@ -16,6 +16,7 @@ from src.agent.protocols import AgentContext
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
+    build_agent_tool_history_context,
     sanitize_agent_diagnostic,
 )
 from src.agent.runner import run_agent_loop
@@ -241,7 +242,22 @@ class _ChatMethods:
 
         terminal_state = classify_result_terminal_state(orch_result)
         if terminal_state is ExecutionState.SUCCEEDED:
-            conversation_manager.add_message(session_id, "assistant", orch_result.content)
+            history_context = build_agent_tool_history_context(
+                orch_result.tool_calls_log
+            )
+            if history_context:
+                conversation_manager.add_message(
+                    session_id,
+                    "assistant",
+                    orch_result.content,
+                    context=history_context,
+                )
+            else:
+                conversation_manager.add_message(
+                    session_id,
+                    "assistant",
+                    orch_result.content,
+                )
         elif terminal_state is ExecutionState.CANCELLED:
             logger.info(
                 "Agent orchestrator chat cancelled: session_id=%s", session_id

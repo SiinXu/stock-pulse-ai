@@ -42,6 +42,26 @@ class _RunMethods:
         Returns:
             AgentResult with parsed dashboard or error.
         """
+        # Opt-in plan→act→observe product path (#199). Default-off via Config.
+        from src.agent.planning.product import try_run_with_planning
+
+        planned = try_run_with_planning(
+            self,
+            task=task,
+            context=context,
+            cancelled_check=cancelled_check,
+        )
+        if planned is not None:
+            if planned.runtime_facts is None:
+                # Keep soul runtime facts even when planning short-circuits.
+                scope_resolution = resolve_stock_scope(task, context)
+                system_prompt, _, _ = self.build_run_messages(
+                    task,
+                    scope_resolution.effective_context,
+                )
+                planned.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
+            return planned
+
         scope_resolution = resolve_stock_scope(task, context)
         system_prompt, user_message, tool_decls = self.build_run_messages(
             task,

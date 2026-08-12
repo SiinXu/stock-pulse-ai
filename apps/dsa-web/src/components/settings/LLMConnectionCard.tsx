@@ -101,7 +101,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           </Tooltip>
         );
       case 'disabled':
-        return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.disabled}</Badge>;
+        return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.untested}</Badge>;
       case 'untested':
       default:
         return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.untested}</Badge>;
@@ -133,6 +133,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                 </span>
               </Tooltip>
             ) : null}
+            <Badge variant={channel.enabled ? 'success' : 'default'}>
+              {channel.enabled ? text.enabled : text.disabled}
+            </Badge>
             {availabilityBadge}
             {testState?.status === 'success' ? (
               <Badge variant="success">{text.testPassed}</Badge>

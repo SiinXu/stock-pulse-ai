@@ -42,7 +42,11 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
   const tx = (entry: Record<UiLang, string>) => entry[language];
   const text = SETTINGS_MISC_TEXT[language];
-  const showCliCapabilityNote = isGenerationOnlyBackend((getValue('GENERATION_BACKEND') || 'litellm').trim());
+  const reportBackend = (getValue('GENERATION_BACKEND') || 'litellm').trim();
+  const configuredAgentBackend = (getValue('AGENT_GENERATION_BACKEND') || 'auto').trim();
+  const agentBackend = configuredAgentBackend === 'auto' ? reportBackend : configuredAgentBackend;
+  const showCliCapabilityNote = isGenerationOnlyBackend(reportBackend)
+    || isGenerationOnlyBackend(agentBackend);
   const columns: readonly DataTableColumn<AiTaskRow>[] = [
     {
       id: 'task',

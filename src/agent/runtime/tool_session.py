@@ -211,6 +211,11 @@ class BoundToolSession:
         return self._granted_permissions
 
     @property
+    def deadline_monotonic(self) -> Optional[float]:
+        """Return the immutable execution deadline shared with runner fences."""
+        return self._deadline_monotonic
+
+    @property
     def closed(self) -> bool:
         with self._lock:
             return self._closed

@@ -537,14 +537,14 @@ def test_skill_partial_availability_reports_disabled_and_active_truthfully() -> 
     assert snapshot.sources[0].state == "ok"
     assert snapshot.sources[0].generation == "7"
     assert records["skill:momentum"].registered is True
-    assert records["skill:momentum"].healthy is True
+    assert records["skill:momentum"].healthy is None
     assert records["skill:momentum"].executable is None
     assert records["skill:momentum"].dependencies == ("get_realtime_quote",)
     disabled = records["skill:custom_disabled"]
     assert disabled.registered is True
     assert disabled.executable is False
-    assert disabled.healthy is False
-    assert disabled.degraded is True
+    assert disabled.healthy is None
+    assert disabled.degraded is None
     assert disabled.reason_code == "skill_disabled"
 
 
@@ -562,7 +562,7 @@ def test_pipeline_stages_come_from_live_owner_not_a_copied_static_list() -> None
     assert snapshot.partial is False
     assert snapshot.sources[0].generation == "resolve,fetch"
     assert records["pipeline.stage:resolve"].registered is True
-    assert records["pipeline.stage:resolve"].healthy is True
+    assert records["pipeline.stage:resolve"].healthy is None
     assert records["pipeline.stage:fetch"].registered is True
 
 
@@ -620,3 +620,181 @@ def test_failed_plugin_lifecycle_exposes_health_not_silent_success() -> None:
     assert record.degraded is True
     assert record.executable is False
     assert record.reason_code == "plugin_failed"
+
+
+def test_tool_source_does_not_construct_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tool inventory observes only an already-built registry."""
+
+    import src.agent.runtime_assembly as runtime_assembly
+
+    monkeypatch.setattr(runtime_assembly, "_TOOL_REGISTRY", None)
+
+    def _forbid_build() -> Any:
+        raise AssertionError("must not construct ToolRegistry during inventory")
+
+    monkeypatch.setattr(runtime_assembly, "get_tool_registry", _forbid_build)
+    snapshot = _collect(domains=("tool",))
+
+    assert snapshot.partial is True
+    assert snapshot.items == ()
+    assert snapshot.sources[0].state == "not_initialized"
+    assert snapshot.sources[0].error_code == "tool_registry_not_initialized"
+
+
+def test_skill_generation_advances_when_equal_count_catalog_swaps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Equal-length skill catalogs with different identities must not share generation."""
+
+    from src.capability_registry import service as capability_service
+
+    class _Snap:
+        def __init__(self, generation: int, names: tuple[str, ...]) -> None:
+            self.generation = generation
+            self.registrations = tuple(
+                SimpleNamespace(
+                    plugin_id=f"plugin.{name}",
+                    definition=SimpleNamespace(
+                        name=name,
+                        display_name=name,
+                        default_active=True,
+                        user_invocable=True,
+                        required_tools=(),
+                    ),
+                )
+                for name in names
+            )
+
+    class _Services:
+        def __init__(self, names: tuple[str, ...]) -> None:
+            self._names = names
+            self.config = SimpleNamespace(agent_skill_dir=None)
+
+        def analysis_strategy_snapshot(self) -> Any:
+            return _Snap(3, self._names)
+
+    first = {"services": _Services(("alpha",))}
+    monkeypatch.setattr(
+        "src.application_services.get_installed_application_services",
+        lambda: first["services"],
+    )
+    first_snapshot = collect_capability_records(
+        clock=lambda: NOW, domains=("skill",),
+    )
+    first["services"] = _Services(("beta",))
+    second_snapshot = collect_capability_records(
+        clock=lambda: NOW, domains=("skill",),
+    )
+
+    assert first_snapshot.sources[0].state == "ok"
+    assert second_snapshot.sources[0].state == "ok"
+    assert first_snapshot.sources[0].generation != second_snapshot.sources[0].generation
+    assert "skill:alpha" in _by_id(first_snapshot)
+    assert "skill:beta" in _by_id(second_snapshot)
+
+
+def test_skill_generation_tracks_same_name_declarative_record_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Record-visible declarative changes must advance the source generation."""
+
+    class _Services:
+        config = SimpleNamespace(agent_skill_dir=None)
+
+        @staticmethod
+        def analysis_strategy_snapshot() -> Any:
+            return SimpleNamespace(generation=3, registrations=())
+
+    skill_state = {"value": SimpleNamespace()}
+    base_fields = {
+        "name": "alpha",
+        "source": "builtin",
+        "display_name": "Alpha",
+        "enabled": True,
+        "required_tools": ("quote",),
+    }
+
+    class _SkillManager:
+        @staticmethod
+        def list_skills() -> list[Any]:
+            return [skill_state["value"]]
+
+        @staticmethod
+        def load_custom_skills(_custom_dir: str) -> None:
+            raise AssertionError("custom skill loading is not expected")
+
+    monkeypatch.setattr(
+        "src.application_services.get_installed_application_services",
+        lambda: _Services(),
+    )
+    monkeypatch.setattr("src.agent.skills.base.SkillManager", _SkillManager)
+
+    def _snapshot(**overrides: Any) -> Any:
+        skill_state["value"] = SimpleNamespace(**(base_fields | overrides))
+        return collect_capability_records(
+            clock=lambda: NOW,
+            domains=("skill",),
+        )
+
+    enabled_snapshot = _snapshot()
+    disabled_snapshot = _snapshot(enabled=False)
+    source_snapshot = _snapshot(enabled=False, source="custom")
+    display_snapshot = _snapshot(
+        enabled=False,
+        source="custom",
+        display_name="Custom Alpha",
+    )
+    dependency_snapshot = _snapshot(
+        enabled=False,
+        source="custom",
+        display_name="Custom Alpha",
+        required_tools=("quote", "news"),
+    )
+    renamed_snapshot = _snapshot(
+        name="beta",
+        enabled=False,
+        source="custom",
+        display_name="Custom Alpha",
+        required_tools=("quote", "news"),
+    )
+
+    generations = {
+        enabled_snapshot.sources[0].generation,
+        disabled_snapshot.sources[0].generation,
+        source_snapshot.sources[0].generation,
+        display_snapshot.sources[0].generation,
+        dependency_snapshot.sources[0].generation,
+        renamed_snapshot.sources[0].generation,
+    }
+    assert len(generations) == 6
+    assert _by_id(disabled_snapshot)["skill:alpha"].executable is False
+    assert _by_id(disabled_snapshot)["skill:alpha"].reason_code == "skill_disabled"
+    assert _by_id(source_snapshot)["skill:alpha"].provider == "custom"
+    assert _by_id(display_snapshot)["skill:alpha"].display_name == "Custom Alpha"
+    assert _by_id(dependency_snapshot)["skill:alpha"].dependencies == (
+        "quote",
+        "news",
+    )
+    assert "skill:beta" in _by_id(renamed_snapshot)
+
+
+def test_live_pipeline_binding_requires_stage_runner_and_method_refs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stages stay unbound when the live pipeline lacks a stage-runner entry."""
+
+    import src.core.pipeline as pipeline_module
+
+    monkeypatch.setattr(
+        pipeline_module.StockAnalysisPipeline,
+        "_run_pipeline_stage",
+        None,
+        raising=False,
+    )
+    snapshot = _collect(domains=("pipeline",))
+    assert snapshot.sources[0].state == "ok"
+    assert snapshot.items
+    assert all(item.registered is False for item in snapshot.items)
+    assert all(item.reason_code == "stage_not_bound" for item in snapshot.items)

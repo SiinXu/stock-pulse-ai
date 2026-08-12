@@ -383,7 +383,7 @@ describe('LLMChannelEditor', () => {
     localStorage.setItem('dsa.uiLanguage', 'zh');
   });
 
-  it('updates cards and an open Connection modal immediately when UI language changes', () => {
+  it('updates cards and an open Connection modal immediately when UI language changes', async () => {
     localStorage.setItem('dsa.uiLanguage', 'en');
     renderWithRouter(
       <UiLanguageProvider>
@@ -394,7 +394,7 @@ describe('LLMChannelEditor', () => {
     const languageSwitch = screen.getByRole('button', { name: 'switch-language' });
     expect(connectionCard()).toHaveTextContent('OpenAI Official');
     fireEvent.click(within(connectionCard()).getByRole('button', { name: 'Edit' }));
-    const dialog = screen.getByTestId('model-source-setup-page');
+    const dialog = await screen.findByTestId('model-source-setup-page');
     expect(within(dialog).getByRole('button', { name: 'Choose model provider' })).toHaveTextContent('OpenAI Official');
 
     fireEvent.click(languageSwitch);

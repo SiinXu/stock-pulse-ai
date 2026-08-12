@@ -18,6 +18,13 @@ const SECTION_KIND_PATTERNS = {
 
 export type MarketReviewSectionKind = keyof typeof SECTION_KIND_PATTERNS | 'default';
 
+/** Return the canonical Market Light traffic-light color for a persisted score. */
+export const getMarketLightColor = (score: number): string => {
+  if (Number.isFinite(score) && score >= 60) return '#22c55e';
+  if (Number.isFinite(score) && score < 40) return '#ef4444';
+  return '#eab308';
+};
+
 export const normalizeMarketReviewHeading = (value: string): string =>
   value.trim().replace(/\s+/g, ' ').toLowerCase();
 

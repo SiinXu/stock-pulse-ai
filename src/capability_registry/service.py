@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Optional
@@ -89,6 +91,10 @@ def collect_capability_records(
             generation, definitions, declarations = _stable_tool_snapshot(registry)
             records.extend(_tool_records(definitions, declarations, generation, now))
             sources.append(SourceStatus("tool", "ok", generation, now))
+        except OwnerNotInitialized as exc:
+            sources.append(SourceStatus(
+                "tool", "not_initialized", "unknown", now, exc.error_code,
+            ))
         except RuntimeError:
             sources.append(SourceStatus(
                 "tool", "generation_drift", "unknown", now,
@@ -225,8 +231,14 @@ def _resolve_data_runtime() -> Any:
 
 
 def _resolve_tool_registry() -> Any:
-    from src.agent.runtime_assembly import get_tool_registry
-    return get_tool_registry()
+    """Observe only an already-built ToolRegistry; never construct one here."""
+
+    from src.agent.runtime_assembly import get_installed_tool_registry
+
+    registry = get_installed_tool_registry()
+    if registry is None:
+        raise OwnerNotInitialized("tool_registry_not_initialized")
+    return registry
 
 
 def _resolve_plugin_manager() -> Any:
@@ -385,7 +397,37 @@ def _extension_records(
     return records
 
 
-def _resolve_skill_catalog() -> tuple[int, tuple[Any, ...], tuple[Any, ...]]:
+def _declarative_skill_projections(
+    skills: tuple[Any, ...],
+    *,
+    reserved_names: Iterable[str] = (),
+) -> tuple[tuple[str, str, bool, str, tuple[str, ...]], ...]:
+    """Normalize exactly the declarative fields published in skill records."""
+
+    seen = set(reserved_names)
+    projected: list[tuple[str, str, bool, str, tuple[str, ...]]] = []
+    for skill in skills:
+        name = str(getattr(skill, "name", "") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        projected.append(
+            (
+                name,
+                str(getattr(skill, "source", "custom") or "custom"),
+                bool(getattr(skill, "enabled", True)),
+                _bounded_display_name(
+                    str(getattr(skill, "display_name", name) or name)
+                ),
+                _bounded_dependencies(
+                    getattr(skill, "required_tools", None) or ()
+                ),
+            )
+        )
+    return tuple(projected)
+
+
+def _resolve_skill_catalog() -> tuple[str, tuple[Any, ...], tuple[Any, ...]]:
     """Read plugin analysis strategies and declarative skills from live owners."""
 
     from src.application_services import get_installed_application_services
@@ -432,14 +474,60 @@ def _resolve_skill_catalog() -> tuple[int, tuple[Any, ...], tuple[Any, ...]]:
         )
         raise OwnerReadError("skill_catalog_unavailable") from exc
     plugin_skills = tuple(snapshot.registrations)
-    generation = (int(snapshot.generation) << 16) ^ len(declarative)
+    # Plugin field changes advance the owner's generation. Declarative skills
+    # do not expose an owner generation, so hash every normalized field that
+    # _skill_records publishes for them.
+    plugin_ids = ",".join(
+        sorted(
+            f"{getattr(item, 'plugin_id', '')}:{getattr(getattr(item, 'definition', None), 'name', '')}"
+            for item in plugin_skills
+        )
+    )
+    plugin_names = {
+        str(getattr(getattr(item, "definition", None), "name", ""))
+        for item in plugin_skills
+    }
+    declarative_projection = sorted(
+        _declarative_skill_projections(
+            declarative,
+            reserved_names=plugin_names,
+        ),
+        key=lambda item: item[0],
+    )
+    declarative_payload = json.dumps(
+        declarative_projection,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    declarative_digest = hashlib.sha256(
+        declarative_payload.encode("utf-8")
+    ).hexdigest()
+    generation = (
+        f"{int(snapshot.generation)}|{plugin_ids}|"
+        f"declarative={declarative_digest}"
+    )
+    if len(generation) > 256:
+        generation = (
+            f"{int(snapshot.generation)}|"
+            f"{hashlib.sha256(generation.encode('utf-8')).hexdigest()}"
+        )
     return generation, plugin_skills, declarative
 
 
 def _resolve_pipeline_stages() -> tuple[str, tuple[str, ...], frozenset[str]]:
-    """Read pipeline stages from the shared owner contract (not a copied list)."""
+    """Read pipeline stages from the shared owner and live pipeline binding.
+
+    Stage names come from the diagnostics owner. A stage is bound only when:
+    - it exists in ``PipelineStageName``;
+    - stage-mixin methods are bound onto ``StockAnalysisPipeline``;
+    - the live pipeline type exposes a stage runner entrypoint; and
+    - bound pipeline methods actually reference that stage name.
+    """
 
     try:
+        import inspect
+
+        from src.core import pipeline as pipeline_module
         from src.core.pipeline import StockAnalysisPipeline
         from src.core.pipeline_stage_results import PipelineStageName
         from src.services.run_diagnostics import PIPELINE_STAGE_NAMES
@@ -456,9 +544,60 @@ def _resolve_pipeline_stages() -> tuple[str, tuple[str, ...], frozenset[str]]:
     stage_names = tuple(str(name) for name in PIPELINE_STAGE_NAMES)
     if not stage_names:
         raise OwnerReadError("pipeline_source_unavailable")
-    enum_names = {member.value for member in PipelineStageName}
-    bound = frozenset(name for name in stage_names if name in enum_names)
-    return ",".join(stage_names), stage_names, bound
+
+    enum_by_value = {member.value: member for member in PipelineStageName}
+    mixin_method_names: list[str] = []
+    for attr in (
+        "_ANALYSIS_STAGE_METHOD_NAMES",
+        "_DELIVERY_STAGE_METHOD_NAMES",
+        "_PERSISTENCE_STAGE_METHOD_NAMES",
+        "_ORCHESTRATION_STAGE_METHOD_NAMES",
+    ):
+        values = getattr(pipeline_module, attr, ())
+        mixin_method_names.extend(str(name) for name in values)
+    if not mixin_method_names:
+        raise OwnerReadError("pipeline_source_unavailable")
+
+    method_digest = hashlib.sha256(
+        ",".join(sorted(set(mixin_method_names))).encode("utf-8")
+    ).hexdigest()[:16]
+
+    # Live type must expose the stage-runner entry used by orchestration.
+    if not callable(getattr(StockAnalysisPipeline, "_run_pipeline_stage", None)):
+        generation = f"{','.join(stage_names)}|bound=|methods={method_digest}"
+        return generation, stage_names, frozenset()
+
+    sources: list[str] = []
+    for method_name in mixin_method_names:
+        method = getattr(StockAnalysisPipeline, method_name, None)
+        if method is None:
+            continue
+        try:
+            sources.append(inspect.getsource(method))
+        except (OSError, TypeError):
+            # Bound descriptors without source still count as present methods.
+            sources.append(method_name)
+    combined = "\n".join(sources)
+    bound_names: set[str] = set()
+    for name in stage_names:
+        member = enum_by_value.get(name)
+        if member is None:
+            continue
+        if (
+            f'"{name}"' in combined
+            or f"'{name}'" in combined
+            or f"PipelineStageName.{member.name}" in combined
+        ):
+            bound_names.add(name)
+
+    generation = (
+        f"{','.join(stage_names)}"
+        f"|bound={','.join(sorted(bound_names))}"
+        f"|methods={method_digest}"
+    )
+    if len(generation) > 256:
+        generation = hashlib.sha256(generation.encode("utf-8")).hexdigest()
+    return generation, stage_names, frozenset(bound_names)
 
 
 def _bounded_dependencies(values: Any) -> tuple[str, ...]:
@@ -494,8 +633,10 @@ def _skill_records(
             registered=True,
             configured=True,
             executable=None if enabled else False,
-            healthy=True,
-            degraded=False,
+            # Registration is not operational health; leave unknown until an
+            # owner publishes a real health signal.
+            healthy=None,
+            degraded=None,
             reason_code=None if enabled else "skill_not_default_active",
             display_name=_bounded_display_name(
                 str(getattr(definition, "display_name", name) or name)
@@ -504,28 +645,24 @@ def _skill_records(
                 getattr(definition, "required_tools", ())
             ),
         ))
-    for skill in declarative_skills:
-        name = str(getattr(skill, "name", "") or "").strip()
-        if not name or name in seen:
-            continue
-        seen.add(name)
-        enabled = bool(getattr(skill, "enabled", True))
+    for name, source, enabled, display_name, dependencies in (
+        _declarative_skill_projections(
+            declarative_skills,
+            reserved_names=seen,
+        )
+    ):
         records.append(CapabilityRecord(
             f"skill:{name}", "skill", "analysis_skill",
-            "agent.skill_manager", str(getattr(skill, "source", "custom") or "custom"),
+            "agent.skill_manager", source,
             "1", generation, now,
             registered=True,
             configured=True,
             executable=None if enabled else False,
-            healthy=True if enabled else False,
-            degraded=not enabled,
+            healthy=None,
+            degraded=None,
             reason_code=None if enabled else "skill_disabled",
-            display_name=_bounded_display_name(
-                str(getattr(skill, "display_name", name) or name)
-            ),
-            dependencies=_bounded_dependencies(
-                getattr(skill, "required_tools", None) or ()
-            ),
+            display_name=display_name,
+            dependencies=dependencies,
         ))
     return records
 
@@ -545,10 +682,10 @@ def _pipeline_records(
             registered=registered,
             configured=True if registered else None,
             executable=None if registered else False,
-            healthy=True if registered else False,
-            degraded=not registered,
+            # Binding proves registration, not live run health.
+            healthy=None if registered else False,
+            degraded=None if registered else True,
             reason_code=None if registered else "stage_not_bound",
             display_name=name,
         ))
     return records
-

@@ -308,7 +308,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
         )
         self.assertEqual(
             set(persist_history.call_args.kwargs["market_light_snapshots"]),
-            {"cn", "hk", "us"},
+            {"cn", "hk", "us", "jp", "kr"},
         )
         sent_content = notifier.send.call_args.args[0]
         self.assertTrue(sent_content.startswith("🎯 Market Review\n\n"))
@@ -442,17 +442,37 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
         self.assertEqual(snapshots["cn"]["score"], 60)
         self.assertEqual(snapshots["us"]["score"], 55)
 
-    def test_run_market_review_jp_kr_skips_market_light_snapshot_schema(self) -> None:
+    def test_run_market_review_jp_kr_persists_market_light_scores(self) -> None:
         notifier = self._make_notifier()
 
-        from src.market_analyzer import MarketOverview
+        from src.market_analyzer import MarketIndex, MarketOverview
 
         with patch.object(
             market_review_module.MarketAnalyzer,
             "get_market_overview",
             side_effect=[
-                MarketOverview(date="2026-03-06"),
-                MarketOverview(date="2026-03-06"),
+                MarketOverview(
+                    date="2026-03-06",
+                    indices=[
+                        MarketIndex(
+                            code="N225",
+                            name="Nikkei 225",
+                            current=39000,
+                            change_pct=1.0,
+                        )
+                    ],
+                ),
+                MarketOverview(
+                    date="2026-03-06",
+                    indices=[
+                        MarketIndex(
+                            code="KS11",
+                            name="KOSPI",
+                            current=2600,
+                            change_pct=-1.0,
+                        )
+                    ],
+                ),
             ],
         ), patch.object(
             market_review_module.MarketAnalyzer,
@@ -471,10 +491,13 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
 
         self.assertIn("# 日股大盘复盘\n\nJP body", result)
         self.assertIn("# 韩股大盘复盘\n\nKR body", result)
-        self.assertEqual(persist_history.call_args.kwargs["market_light_snapshots"], {})
+        snapshots = persist_history.call_args.kwargs["market_light_snapshots"]
+        self.assertEqual(set(snapshots), {"jp", "kr"})
+        self.assertEqual(snapshots["jp"]["score"], 54)
+        self.assertEqual(snapshots["kr"]["score"], 46)
         payload = persist_history.call_args.kwargs["market_review_payload"]
-        self.assertNotIn("market_light", payload["markets"]["jp"])
-        self.assertNotIn("market_light", payload["markets"]["kr"])
+        self.assertEqual(payload["markets"]["jp"]["market_light"]["score"], 54)
+        self.assertEqual(payload["markets"]["kr"]["market_light"]["score"], 46)
 
     def test_run_market_review_normalizes_single_region_snapshot_key(self) -> None:
         notifier = self._make_notifier()
@@ -788,6 +811,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     self.assertEqual(row.code, market_review_module.MARKET_REVIEW_HISTORY_CODE)
                     self.assertEqual(row.name, "大盘复盘")
                     self.assertEqual(row.report_type, market_review_module.MARKET_REVIEW_REPORT_TYPE)
+                    self.assertEqual(row.sentiment_score, 30)
                     self.assertEqual(row.news_content, "## 今日大盘\n\n复盘正文")
                     self.assertIn("# 🎯 大盘复盘", row.raw_result)
                     self.assertIn('"market_light_snapshots"', row.context_snapshot)
@@ -802,6 +826,32 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     os.environ.pop("DATABASE_PATH", None)
                 else:
                     os.environ["DATABASE_PATH"] = old_db_path
+
+    def test_resolve_market_review_sentiment_score_aggregates_valid_regions(self) -> None:
+        score = market_review_module.resolve_market_light_sentiment_score(
+            {
+                "us": {"score": 40},
+                "cn": {"score": 61},
+                "hk": {"score": True},
+                "jp": {"score": "not-a-score"},
+            }
+        )
+
+        self.assertEqual(score, 51)
+
+    def test_resolve_market_review_sentiment_score_clamps_and_falls_back(self) -> None:
+        self.assertEqual(
+            market_review_module.resolve_market_light_sentiment_score(
+                {"cn": {"score": -10}, "us": {"score": 120}}
+            ),
+            50,
+        )
+        self.assertEqual(
+            market_review_module.resolve_market_light_sentiment_score(
+                {"cn": {"score": None}, "us": {"score": float("nan")}}
+            ),
+            50,
+        )
 
     def test_run_market_review_persists_notification_diagnostics_after_history_save(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

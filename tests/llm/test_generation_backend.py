@@ -12,6 +12,7 @@ ensure_litellm_stub()
 
 from src.llm.backend_registry import (  # noqa: E402
     AGENT_CAPABLE_BACKEND_IDS,
+    AGENT_BRIDGED_BACKEND_IDS,
     GENERATION_ONLY_BACKEND_IDS,
     LITELLM_BACKEND_ID,
     LOCAL_CLI_GENERATION_BACKEND_IDS,
@@ -236,11 +237,11 @@ def test_explicit_litellm_resolves_for_analysis_and_agent() -> None:
 
 
 @pytest.mark.parametrize("generation_backend", sorted(LOCAL_CLI_GENERATION_BACKEND_IDS))
-def test_agent_auto_does_not_inherit_local_generation_backend(generation_backend: str) -> None:
+def test_agent_auto_inherits_local_generation_backend(generation_backend: str) -> None:
     config = _config(generation_backend=generation_backend, agent_generation_backend="auto")
 
     assert resolve_generation_backend_id(config) == generation_backend
-    assert resolve_agent_generation_backend_id(config) == "litellm"
+    assert resolve_agent_generation_backend_id(config) == generation_backend
 
 
 def test_unknown_generation_backend_raises_structured_config_error() -> None:
@@ -319,35 +320,47 @@ def test_unknown_agent_backend_raises_structured_config_error() -> None:
     ]
 
 
-def test_generation_only_backends_are_not_agent_capable() -> None:
-    assert GENERATION_ONLY_BACKEND_IDS.isdisjoint(AGENT_CAPABLE_BACKEND_IDS)
+def test_local_cli_backends_are_agent_capable_through_the_bridge() -> None:
+    assert AGENT_BRIDGED_BACKEND_IDS == LOCAL_CLI_GENERATION_BACKEND_IDS
+    assert AGENT_BRIDGED_BACKEND_IDS.issubset(AGENT_CAPABLE_BACKEND_IDS)
+    assert GENERATION_ONLY_BACKEND_IDS == frozenset()
 
 
-def test_explicit_local_agent_backends_resolve_to_unsupported_ids() -> None:
-    for backend_id in sorted(GENERATION_ONLY_BACKEND_IDS):
+def test_explicit_local_agent_backends_resolve_to_bridge_ids() -> None:
+    for backend_id in sorted(LOCAL_CLI_GENERATION_BACKEND_IDS):
         assert resolve_agent_generation_backend_id(
             _config(agent_generation_backend=backend_id)
         ) == backend_id
 
 
-@pytest.mark.parametrize("agent_backend", sorted(GENERATION_ONLY_BACKEND_IDS))
-def test_llm_tool_adapter_local_agent_backend_is_not_silent_litellm_fallback(
+@pytest.mark.parametrize("agent_backend", sorted(LOCAL_CLI_GENERATION_BACKEND_IDS))
+def test_llm_tool_adapter_local_agent_backend_uses_structured_bridge(
     agent_backend: str,
 ) -> None:
     from src.agent.llm_adapter import LLMToolAdapter
 
-    with patch("src.agent.llm_adapter.litellm.register_model", create=True):
+    backend = MagicMock()
+    backend.get_config_error.return_value = None
+    backend.generate.return_value = GenerationResult(
+        text='{"type":"final","content":"local answer"}',
+        model=agent_backend,
+        provider=agent_backend,
+        backend=agent_backend,
+        usage={"usage_available": False},
+    )
+    with patch("src.agent.llm_adapter.litellm.register_model", create=True), \
+         patch("src.agent.llm_adapter._create_generation_backend", return_value=backend):
         adapter = LLMToolAdapter(_config(agent_generation_backend=agent_backend))
 
-    assert adapter.is_available is False
+    assert adapter.is_available is True
     response = adapter.call_completion([])
-    assert response.provider == "error"
-    assert "unsupported_tool_calling" in (response.content or "")
-    assert agent_backend in (response.content or "")
+    assert response.provider == agent_backend
+    assert response.content == "local answer"
+    backend.generate.assert_called_once()
 
 
 @pytest.mark.parametrize("generation_backend", sorted(LOCAL_CLI_GENERATION_BACKEND_IDS))
-def test_agent_auto_with_local_generation_backend_returns_unsupported_when_litellm_missing(
+def test_agent_auto_with_local_generation_backend_uses_structured_bridge(
     generation_backend: str,
 ) -> None:
     from src.agent.llm_adapter import LLMToolAdapter
@@ -361,11 +374,20 @@ def test_agent_auto_with_local_generation_backend_returns_unsupported_when_litel
         llm_model_list=[],
     )
 
-    with patch("src.agent.llm_adapter.litellm.register_model", create=True):
+    backend = MagicMock()
+    backend.get_config_error.return_value = None
+    backend.generate.return_value = GenerationResult(
+        text='{"type":"final","content":"local answer"}',
+        model=generation_backend,
+        provider=generation_backend,
+        backend=generation_backend,
+        usage={},
+    )
+    with patch("src.agent.llm_adapter.litellm.register_model", create=True), \
+         patch("src.agent.llm_adapter._create_generation_backend", return_value=backend):
         adapter = LLMToolAdapter(config)
 
-    assert adapter.is_available is False
-    response = adapter.call_completion([], tools=[{"type": "function"}])
-    assert response.provider == "error"
-    assert "unsupported_tool_calling" in (response.content or "")
-    assert generation_backend in (response.content or "")
+    assert adapter.is_available is True
+    response = adapter.call_completion([])
+    assert response.provider == generation_backend
+    assert response.content == "local answer"

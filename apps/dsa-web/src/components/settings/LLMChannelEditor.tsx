@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -40,7 +40,6 @@ import {
 import { isModelRef } from '../../utils/modelRef';
 import { getUiListSeparator } from '../../utils/uiLocale';
 import ConnectionCard from './LLMConnectionCard';
-import ConnectionModal from './LLMConnectionModal';
 import {
   applyChannelDraftItems,
   buildChannelDraftItems,
@@ -56,14 +55,14 @@ import {
   getChannelDisplayNameIssues,
   getChannelNameIssues,
   getChannelSaveIssues,
-  hasRuntimeOnlyMaskedHermesSecret,
+  hasRuntimeOnlyMaskedConnectionSecret,
   modelIdentityForConnection,
   normalizeTaskReferenceRoute,
   parseChannelsFromItems,
   parseRuntimeConfigFromItems,
   resolveChannelRouteModels,
   runChannelConnectionTest,
-  shouldUseSavedHermesSecret,
+  shouldUseSavedConnectionSecret,
   type ChannelConfig,
   type ChannelTestState,
   type LLMChannelEditorProps,
@@ -79,6 +78,8 @@ import {
   resolveModelSourceSetupRestore,
   type ModelSourceType,
 } from './modelSourcesRoute';
+
+const ConnectionModal = lazy(() => import('./LLMConnectionModal'));
 
 export type {
   ModelReferenceReplacement,
@@ -123,7 +124,11 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const initialNames = useMemo(() => initialChannels.map((channel) => channel.name), [initialChannels]);
   const initialRuntimeConfig = useMemo(() => parseRuntimeConfigFromItems(items), [items]);
   const savedItemMap = useMemo(() => new Map(items.map((item) => [item.key.toUpperCase(), item.value])), [items]);
-  const hermesSecretPersisted = initialItemSourceByKey.get('LLM_HERMES_API_KEY') === true;
+  const connectionHasPersistedSecret = useCallback((channel: ChannelConfig): boolean => {
+    const prefix = `LLM_${channel.name.trim().toUpperCase()}`;
+    const suffix = channel.credentialField === 'api_keys' ? 'API_KEYS' : 'API_KEY';
+    return initialItemSourceByKey.get(`${prefix}_${suffix}`) === true;
+  }, [initialItemSourceByKey]);
 
   const channelsFingerprint = useMemo(() => JSON.stringify(initialChannels), [initialChannels]);
   const persistedDraftFingerprint = useMemo(
@@ -243,16 +248,16 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     setSearchParams(clearModelSourceSetupParams(searchParams), { replace: true });
   };
 
-  const navigateToLocalModels = () => {
+  const navigateToLocalModels = useCallback(() => {
     setSearchParams(new URLSearchParams(
       buildSettingsHref({
         section: SETTINGS_SECTION_IDS.aiModels,
         view: SETTINGS_VIEW_IDS.aiModels.localModels,
       }).split('?')[1] ?? '',
     ), { replace: false });
-  };
+  }, [setSearchParams]);
 
-  const navigateToCliBackend = () => {
+  const navigateToCliBackend = useCallback(() => {
     if (onViewDiagnostics) {
       onViewDiagnostics();
       return;
@@ -263,7 +268,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         view: 'raw_config',
       }).split('?')[1] ?? '',
     ), { replace: false });
-  };
+  }, [onViewDiagnostics, setSearchParams]);
 
   const navigateToTaskRouting = () => {
     if (onManageModels) {
@@ -487,7 +492,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       }
     });
     // navigate actions leave the hub; setup params are replaced by the target view URL.
-  }, [channels, modal, mutationBusy, searchParams, typePickerOpen]);
+  }, [
+    channels,
+    modal,
+    mutationBusy,
+    navigateToCliBackend,
+    navigateToLocalModels,
+    searchParams,
+    typePickerOpen,
+  ]);
 
   // Keep setup query params aligned while the wizard session is open.
   useEffect(() => {
@@ -649,6 +662,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     ) {
       return;
     }
+    const hasPersistedSecret = connectionHasPersistedSecret(channel);
     const markUnavailableAfterFailedTest = (target: ChannelConfig, errorText: string) => {
       setTestStates((previous) => ({
         ...previous,
@@ -669,7 +683,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       ));
     };
 
-    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hermesSecretPersisted)) {
+    if (hasRuntimeOnlyMaskedConnectionSecret(channel, maskToken, hasPersistedSecret)) {
       markUnavailableAfterFailedTest(channel, MODEL_ACCESS_TEXT[language].runtimeSecret);
       return;
     }
@@ -682,7 +696,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     }));
     const result = await runChannelConnectionTest(
       channel,
-      shouldUseSavedHermesSecret(channel, maskToken, hermesSecretPersisted),
+      shouldUseSavedConnectionSecret(channel, maskToken, hasPersistedSecret),
       language,
     );
     if (testNonceRef.current[channel.id] !== requestId) {
@@ -884,7 +898,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           editorText.hubCloudGroup,
         ].join(' ').toLowerCase().includes(normalizedFilter);
       });
-  }, [channels, connectionFilter, editorText.hubCloudGroup, language, normalizedFilter, providers]);
+  }, [channels, editorText.hubCloudGroup, language, normalizedFilter, providers]);
 
   const primaryModel = initialRuntimeConfig.primaryModel.trim();
   const agentModel = initialRuntimeConfig.agentPrimaryModel.trim();
@@ -1008,29 +1022,33 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           ) : null}
 
           {modal ? (
-            <ConnectionModal
-              presentation="page"
-              mode={modal.mode}
-              initialChannel={modal.mode === 'edit' ? channels[modal.index] ?? null : null}
-              focusModels={modal.mode === 'edit' ? modal.focusModels : false}
-              focusField={modal.mode === 'edit' ? modal.focusField : undefined}
-              channels={channels}
-              availableModelRoutes={availableModelRoutes}
-              availableModels={availableModels}
-              providers={providers}
-              connectionFields={connectionFields}
-              emptyApiKeyHosts={emptyApiKeyHosts}
-              maskToken={maskToken}
-              hermesSecretPersisted={hermesSecretPersisted}
-              catalogUnavailable={catalogUnavailable}
-              disabled={busy}
-              taskModelRefs={resolvedTaskModelRefs}
-              onReloadCatalog={onReloadCatalog}
-              onManageModels={navigateToTaskRouting}
-              canReplaceModelReferences={Boolean(onReplaceModelReferences)}
-              onSubmit={handleModalSubmit}
-              onClose={closeSetup}
-            />
+            <Suspense fallback={null}>
+              <ConnectionModal
+                presentation="page"
+                mode={modal.mode}
+                initialChannel={modal.mode === 'edit' ? channels[modal.index] ?? null : null}
+                focusModels={modal.mode === 'edit' ? modal.focusModels : false}
+                focusField={modal.mode === 'edit' ? modal.focusField : undefined}
+                channels={channels}
+                availableModelRoutes={availableModelRoutes}
+                availableModels={availableModels}
+                providers={providers}
+                connectionFields={connectionFields}
+                emptyApiKeyHosts={emptyApiKeyHosts}
+                maskToken={maskToken}
+                connectionSecretPersisted={modal.mode === 'edit' && channels[modal.index]
+                  ? connectionHasPersistedSecret(channels[modal.index])
+                  : false}
+                catalogUnavailable={catalogUnavailable}
+                disabled={busy}
+                taskModelRefs={resolvedTaskModelRefs}
+                onReloadCatalog={onReloadCatalog}
+                onManageModels={navigateToTaskRouting}
+                canReplaceModelReferences={Boolean(onReplaceModelReferences)}
+                onSubmit={handleModalSubmit}
+                onClose={closeSetup}
+              />
+            </Suspense>
           ) : null}
         </div>
       ) : null}

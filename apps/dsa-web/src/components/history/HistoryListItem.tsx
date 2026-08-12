@@ -6,6 +6,7 @@ import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../../utils/marketPhase';
+import { getMarketLightColor } from '../../utils/marketReview';
 import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -27,7 +28,11 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
   onClick,
 }) => {
   const { language, t } = useUiLanguage();
-  const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
+  const isMarketReview = item.reportType === 'market_review'
+    || item.stockCode.trim().toUpperCase() === 'MARKET';
+  const sentimentColor = item.sentimentScore !== undefined
+    ? (isMarketReview ? getMarketLightColor(item.sentimentScore) : getSentimentColor(item.sentimentScore))
+    : null;
   const stockName = item.stockName || item.stockCode;
   const actionLabels = buildDecisionActionLabelMap(t);
   const operationLabel = getDecisionActionLabel(

@@ -1,6 +1,7 @@
 """Runtime helper methods for :class:`src.config.Config`."""
 
 import os
+import shutil as _shutil
 from pathlib import Path
 
 from dotenv import dotenv_values
@@ -8,8 +9,11 @@ from dotenv import dotenv_values
 from src.config_parts.parsers import get_effective_agent_primary_model
 from src.llm.backend_registry import (
     AUTO_AGENT_BACKEND_ID,
-    GENERATION_ONLY_BACKEND_IDS,
+    LOCAL_CLI_GENERATION_BACKEND_IDS,
+    resolve_agent_generation_backend_id as _resolve_agent_generation_backend_id,
 )
+from src.llm.generation_backend import GenerationError as _GenerationError
+from src.llm.local_cli_backend import resolve_local_cli_preset as _resolve_local_cli_preset
 from src.llm.hermes import route_deployment_origins
 from src.utils.stock_list import split_stock_list
 
@@ -62,15 +66,20 @@ class _ConfigRuntimeMethods:
         ``AGENT_MODE=true`` expresses user intent, but Phase 3 Hermes safety
         still requires a non-Hermes Agent route. Hermes-only deployments cannot
         satisfy Agent tool roundtrip support; mixed routes are usable only via
-        their non-Hermes deployments. ``AGENT_MODE=false`` remains an explicit
-        kill-switch. Explicit local CLI Agent backends are unavailable because
-        they are text generation backends, not Agent tool-calling runtimes.
+        their non-Hermes deployments. Local CLI backends use the application
+        tool bridge and require the selected executable on ``PATH``.
+        ``AGENT_MODE=false`` remains an explicit kill-switch.
         """
-        if (self.agent_generation_backend or AUTO_AGENT_BACKEND_ID).strip().lower() in GENERATION_ONLY_BACKEND_IDS:
-            return False
         # Phase 3 no longer lets AGENT_MODE=true bypass tool-route safety.
         if self._agent_mode_explicit and not self.agent_mode:
             return False
+        try:
+            agent_backend = _resolve_agent_generation_backend_id(self)
+        except _GenerationError:
+            return False
+        if agent_backend in LOCAL_CLI_GENERATION_BACKEND_IDS:
+            preset = _resolve_local_cli_preset(agent_backend)
+            return _shutil.which(preset.executable) is not None
         # Auto-detect inherits the global model when AGENT_LITELLM_MODEL is empty.
         primary_model = get_effective_agent_primary_model(self)
         if not primary_model:

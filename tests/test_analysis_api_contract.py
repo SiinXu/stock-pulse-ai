@@ -274,6 +274,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 )
 
         self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(ctx.exception.detail["error"], "invalid_stock_or_name")
         self.assertEqual(ctx.exception.detail["message"], "请输入有效的股票代码或股票名称")
         resolve_mock.assert_not_called()
 
@@ -297,6 +298,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 )
 
         self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(ctx.exception.detail["error"], "invalid_stock_or_name")
         self.assertEqual(ctx.exception.detail["message"], "请输入有效的股票代码或股票名称")
         queue_mock.assert_not_called()
 
@@ -598,7 +600,11 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                         )
 
                 self.assertEqual(exc.exception.status_code, 400)
-                self.assertEqual(exc.exception.detail["error"], "validation_error")
+                self.assertEqual(exc.exception.detail["error"], "invalid_stock_or_name")
+                self.assertEqual(
+                    exc.exception.detail["message"],
+                    "请输入有效的股票代码或股票名称",
+                )
                 resolve_mock.assert_not_called()
                 queue.submit_tasks_batch.assert_not_called()
 

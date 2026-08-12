@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
@@ -22,7 +22,6 @@ import {
   GenerationBackendStatusPanel,
   IntelligentImport,
   LocalModelsWithKronos,
-  LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationTestPanel,
   NOTIFICATION_FIELD_GROUP_ORDER,
@@ -115,6 +114,11 @@ import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS } from '../locales/s
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 import TokenUsagePage from '../components/usage/TokenUsagePage';
+
+const LLMChannelEditor = lazy(async () => {
+  const module = await import('../components/settings/LLMChannelEditor');
+  return { default: module.LLMChannelEditor };
+});
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
 const CHANNEL_ROUTING_FIELD_KEYS = new Set([
@@ -167,6 +171,7 @@ const SettingsPage: React.FC = () => {
   const [setupSmokeError, setSetupSmokeError] = useState<ParsedApiError | null>(null);
   const [setupSmokeSuccess, setSetupSmokeSuccess] = useState('');
   const [llmChannelDraftItems, setLlmChannelDraftItems] = useState<SystemConfigUpdateItem[]>([]);
+  const [dismissedErrorSummaryFingerprint, setDismissedErrorSummaryFingerprint] = useState('');
   const [groupSaveStates, setGroupSaveStates] = useState<Record<string, SettingsGroupSaveState>>({});
   const groupSaveStatesRef = useRef<Record<string, SettingsGroupSaveState>>({});
   const pendingGroupsRef = useRef<Map<string, SystemConfigUpdateItem[]>>(new Map());
@@ -777,6 +782,13 @@ const SettingsPage: React.FC = () => {
     }
     return entries;
   }, [issueByKey, categoryByKey, configItemByKey, uiLanguage]);
+  const errorSummaryFingerprint = useMemo(
+    () => JSON.stringify(errorSummaryEntries.map((entry) => [entry.key, entry.message])),
+    [errorSummaryEntries],
+  );
+  const hasValidationSummary = errorSummaryEntries.length > 0;
+  const showErrorSummary = hasValidationSummary
+    && dismissedErrorSummaryFingerprint !== errorSummaryFingerprint;
   const jumpToErrorField = useCallback((entry: ErrorSummaryEntry) => {
     selectSectionView(entry.section as SettingsSectionId, entry.view);
     if (parseModelAccessFieldKey(entry.key)) {
@@ -825,11 +837,12 @@ const SettingsPage: React.FC = () => {
       .filter((item): item is NonNullable<typeof item> => Boolean(item)),
     [configItemByKey],
   );
-  // Task Routing is the single canonical editor for per-task models and the
-  // generation temperature. Fallback order is edited under Reliability only, so
-  // here it is a read-only summary with a jump link (no duplicate editor).
+  // Task Routing is the single canonical editor for the report-generation
+  // backend, per-task models, and generation temperature. Fallback order is
+  // edited under Reliability only, so here it is a read-only summary with a
+  // jump link (no duplicate editor).
   const taskRoutingItems = useMemo(
-    () => pickAiModelItems(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LLM_TEMPERATURE'])
+    () => pickAiModelItems(['GENERATION_BACKEND', 'LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LLM_TEMPERATURE'])
       .filter((item) => item.schema?.uiPlacement === 'task_routing'),
     [pickAiModelItems],
   );
@@ -1474,17 +1487,6 @@ const SettingsPage: React.FC = () => {
           actions={settingsSaveActions}
         />
 
-        {saveError ? (
-          <ApiErrorAlert
-            className="mt-3"
-            error={saveError}
-            actionLabel={retryAction === 'save' && lastSaveGroupRef.current ? settingsText.autosaveRetry : undefined}
-            onAction={retryAction === 'save' && lastSaveGroupRef.current
-              ? () => retryAutosaveGroup(lastSaveGroupRef.current!)
-              : undefined}
-          />
-        ) : null}
-
         {conflictState ? (
           <SettingsConflictPanel
             fields={conflictState.fields}
@@ -1493,15 +1495,6 @@ const SettingsPage: React.FC = () => {
           />
         ) : null}
       </div>
-
-      {loadError && activeSection !== SETTINGS_SECTION_IDS.usage ? (
-        <ApiErrorAlert
-          error={loadError}
-          actionLabel={retryAction === 'load' ? t('common.retry') : t('settings.reload')}
-          onAction={() => void retry()}
-          className="mb-4"
-        />
-      ) : null}
 
       {isLoading && activeSection !== SETTINGS_SECTION_IDS.usage ? (
         <SettingsLoading />
@@ -1537,11 +1530,6 @@ const SettingsPage: React.FC = () => {
                   onSelectView={(view) => selectSectionView(activeSection, view)}
                   language={uiLanguage}
                   tabsLabel={t('settings.categoryNavTitle')}
-                />
-                <SettingsErrorSummary
-                  entries={errorSummaryEntries}
-                  onJump={jumpToErrorField}
-                  language={uiLanguage}
                 />
                 {hasDirtyRestartRequired ? (
               <SettingsAlert
@@ -1774,31 +1762,33 @@ const SettingsPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                <LLMChannelEditor
-                  key={`llm-connections-${configVersion}`}
-                  items={rawActiveItems}
-                  providers={providerCatalog}
-                  connectionFields={providerConnectionFields}
-                  catalogLoading={isProviderCatalogLoading}
-                  emptyApiKeyHosts={providerEmptyApiKeyHosts}
-                  availableModels={availableModels}
-                  availableModelRoutes={availableModels.map((model) => model.route)}
-                  maskToken={maskToken}
-                  persistedDraftItems={llmChannelDraftItems}
-                  onDraftItemsChange={handleLlmChannelDraftItemsChange}
-                  onValidityChange={handleLlmChannelValidityChange}
-                  resetSignal={llmChannelResetSignal}
-                  addSignal={llmChannelAddSignal}
-                  focusFieldRequest={llmFocusFieldRequest}
-                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || (providerConnectionSchemaUnavailable && !providerConnectionSchemaAllowsInspection) || hasUnsafeModelAccessSchema}
-                  catalogUnavailable={Boolean(providerCatalogError)}
-                  onReloadCatalog={() => reloadProviderCatalog()}
-                  overriddenByMode={channelsOverriddenByMode}
-                  onViewDiagnostics={() => selectSectionView('advanced', 'raw_config')}
-                  taskModelRefs={taskModelRefs}
-                  onManageModels={() => selectSectionView('ai_models', 'task_routing')}
-                  onReplaceModelReferences={replaceModelReferences}
-                />
+                <Suspense fallback={<SettingsLoading />}>
+                  <LLMChannelEditor
+                    key={`llm-connections-${configVersion}`}
+                    items={rawActiveItems}
+                    providers={providerCatalog}
+                    connectionFields={providerConnectionFields}
+                    catalogLoading={isProviderCatalogLoading}
+                    emptyApiKeyHosts={providerEmptyApiKeyHosts}
+                    availableModels={availableModels}
+                    availableModelRoutes={availableModels.map((model) => model.route)}
+                    maskToken={maskToken}
+                    persistedDraftItems={llmChannelDraftItems}
+                    onDraftItemsChange={handleLlmChannelDraftItemsChange}
+                    onValidityChange={handleLlmChannelValidityChange}
+                    resetSignal={llmChannelResetSignal}
+                    addSignal={llmChannelAddSignal}
+                    focusFieldRequest={llmFocusFieldRequest}
+                    disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || (providerConnectionSchemaUnavailable && !providerConnectionSchemaAllowsInspection) || hasUnsafeModelAccessSchema}
+                    catalogUnavailable={Boolean(providerCatalogError)}
+                    onReloadCatalog={() => reloadProviderCatalog()}
+                    overriddenByMode={channelsOverriddenByMode}
+                    onViewDiagnostics={() => selectSectionView('advanced', 'raw_config')}
+                    taskModelRefs={taskModelRefs}
+                    onManageModels={() => selectSectionView('ai_models', 'task_routing')}
+                    onReplaceModelReferences={replaceModelReferences}
+                  />
+                </Suspense>
               </section>
             ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
@@ -1866,10 +1856,17 @@ const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      {toast ? (
+      {(
+        showErrorSummary
+        || (!hasValidationSummary && (
+          saveError
+          || (loadError && activeSection !== SETTINGS_SECTION_IDS.usage)
+          || toast
+        ))
+      ) ? (
         <ToastViewport>
           <div
-            className="pointer-events-auto"
+            className="pointer-events-auto max-h-[calc(100dvh-2rem)] overflow-y-auto"
             onMouseEnter={() => setIsToastPaused(true)}
             onMouseLeave={() => setIsToastPaused(false)}
             onFocusCapture={() => setIsToastPaused(true)}
@@ -1879,15 +1876,37 @@ const SettingsPage: React.FC = () => {
               }
             }}
           >
-            {toast.type === 'success'
-              ? (
-                  <SettingsAlert
-                    title={t('settings.actionSuccess')}
-                    message={toast.message}
-                    variant="success"
-                  />
-                )
-              : <ApiErrorAlert error={toast.error} />}
+            {showErrorSummary ? (
+              <SettingsErrorSummary
+                entries={errorSummaryEntries}
+                onJump={jumpToErrorField}
+                language={uiLanguage}
+                dismissLabel={t('common.close')}
+                onDismiss={() => setDismissedErrorSummaryFingerprint(errorSummaryFingerprint)}
+              />
+            ) : !hasValidationSummary && saveError ? (
+              <ApiErrorAlert
+                error={saveError}
+                actionLabel={retryAction === 'save' && lastSaveGroupRef.current ? settingsText.autosaveRetry : undefined}
+                onAction={retryAction === 'save' && lastSaveGroupRef.current
+                  ? () => retryAutosaveGroup(lastSaveGroupRef.current!)
+                  : undefined}
+              />
+            ) : loadError && activeSection !== SETTINGS_SECTION_IDS.usage ? (
+              <ApiErrorAlert
+                error={loadError}
+                actionLabel={retryAction === 'load' ? t('common.retry') : t('settings.reload')}
+                onAction={() => void retry()}
+              />
+            ) : toast?.type === 'success' ? (
+              <SettingsAlert
+                title={t('settings.actionSuccess')}
+                message={toast.message}
+                variant="success"
+              />
+            ) : toast ? (
+              <ApiErrorAlert error={toast.error} />
+            ) : null}
           </div>
         </ToastViewport>
       ) : null}

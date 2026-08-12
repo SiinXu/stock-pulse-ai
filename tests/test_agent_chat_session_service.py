@@ -123,3 +123,50 @@ def test_session_detail_preserves_missing_persisted_state() -> None:
     assert [message["content"] for message in detail.messages] == ["legacy question"]
     assert detail.selected_skill_ids is None
     assert db.get_conversation_session_selected_skill_ids(session_id) is None
+
+
+def test_research_turn_is_persisted_in_chat_session_history() -> None:
+    db = DatabaseManager(db_url="sqlite:///:memory:")
+    service = AgentChatSessionService(db)
+
+    service.record_research_start(
+        session_id="research-session",
+        question="What is the moat?",
+        stock_code="AAPL",
+        turn_id="research-turn-1",
+    )
+    service.record_research_success(
+        session_id="research-session",
+        content="The research report.",
+    )
+
+    sessions = service.list_sessions(limit=10, user_id=None)
+    detail = service.get_session_detail("research-session", limit=100)
+
+    assert sessions[0]["session_id"] == "research-session"
+    assert sessions[0]["title"] == "What is the moat?"
+    assert sessions[0]["message_count"] == 2
+    assert [(message["role"], message["content"]) for message in detail.messages] == [
+        ("user", "What is the moat?"),
+        ("assistant", "The research report."),
+    ]
+    assert detail.messages[0]["turn_id"] == "research-turn-1"
+
+
+def test_research_failure_is_exposed_as_a_stable_history_error() -> None:
+    db = DatabaseManager(db_url="sqlite:///:memory:")
+    service = AgentChatSessionService(db)
+
+    service.record_research_start(
+        session_id="failed-research-session",
+        question="Research this failure",
+        stock_code=None,
+        turn_id="research-turn-failed",
+    )
+    service.record_research_failure(session_id="failed-research-session")
+
+    detail = service.get_session_detail("failed-research-session", limit=100)
+
+    assert detail.messages[1]["content"] == "Agent research failed"
+    assert detail.messages[1]["error"] == "agent_research_failed"
+    assert detail.messages[1]["params"] == {}

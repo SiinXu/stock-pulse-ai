@@ -29,7 +29,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     StageStatus StockScope StrategyEngine StrategyResultStatus
     TYPE_CHECKING ThreadPoolExecutor ToolRegistry VALID_MODES
     annotations build_agent_chat_market_context
-    build_agent_chat_tool_registry build_agent_disagreement_summary
+    build_agent_chat_tool_registry build_agent_tool_history_context
+    build_agent_disagreement_summary
     build_agent_runtime_facts build_risk_override_application
     build_risk_override_plan build_visible_chat_history
     classify_result_terminal_state contextvars copy dataclass
@@ -113,8 +114,8 @@ EXPECTED_DASHBOARD_METHODS = (
 )
 
 EXPECTED_AST_HASHES = {
-    "_ExecutionMethods": "353d048051f1e3c3459a836a41481d45d35c0b3c064c06f459670209414c28e6",
-    "_ChatMethods": "1962c3e91dcd15b7c77d5159cf147c5af3e6dc3c9a972d6bbd5519e33c7119fa",
+    "_ExecutionMethods": "874bde2ce8e46d268096bafa929a23c6532462fcde6e887f052f72f7ff2d6cde",
+    "_ChatMethods": "1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d",
     "_PipelineMethods": "4611d9230b5c31e916ef72fc5125fafd580a4f5ee002e3ddee8b615352c7914e",
     "_DashboardMethods": "3aac353fb950aa588b71dc59eca0db793b131150949df7b8d08bf9731f5b611f",
 }
