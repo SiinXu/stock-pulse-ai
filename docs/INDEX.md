@@ -48,6 +48,7 @@
 | --- | --- |
 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | 模型服务商与连接、三层配置、Web 设置页和常见模型配置 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | 市场感知的 provider 顺序、健康评分、自适应排序、熔断、stale 降级与推荐配置 |
+| [分析内无依赖并行取数](parallel-data-fetch.md) | 单股分析内 realtime/chip/money-flow/fundamental 并行拉取、并发护栏与串行回退（Issue #1126） |
 | [LLM 服务商配置指南](llm-providers.md) | Provider 预设、Actions 映射、错误分类和诊断建议 |
 | [LiteLLM YAML 示例](examples/litellm_config.example.yaml) | LiteLLM 多渠道配置示例 |
 | [通知能力基线](notifications.md) | 企业微信、飞书、Telegram、Discord、Slack、邮件等通知渠道配置 |
@@ -107,6 +108,7 @@
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
+| [性能基线与剖析](performance-baseline.md) | 关键路径离线基线（数据/分析/报告）、可关闭 span 采集与 cProfile 入口（#227） |
 | [插件开发指南](plugin-development-guide_zh.md) | 六个扩展点的统一入口：是什么/为什么、信任模型、10 分钟 quickstart、官方示例与专题链接（[English](plugin-development-guide.md)） |
 | [离线金融 Agent 评测基准](agent-eval-benchmark.md) | Agent 运行度量（任务正确性、工具纪律、不确定性诚实）、基线与刷新流程（#252 V0；[EN](agent-eval-benchmark_EN.md)） |
 | [Data Provider 插件作者指南（英文）](data-provider-plugin-authoring.md) | 可加载示例、manifest、`PLUGINS_DIR`、生命周期诊断、版本兼容、信任模型与路由边界 |
