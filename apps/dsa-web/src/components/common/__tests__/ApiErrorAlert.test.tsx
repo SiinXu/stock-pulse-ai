@@ -134,4 +134,40 @@ describe('ApiErrorAlert', () => {
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: /Open Settings|打开设置/ })).not.toBeInTheDocument();
   });
+
+  it('opens docs remediation in a new tab for docs-default taxonomy codes', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(
+      <ApiErrorAlert
+        error={createParsedApiError({
+          title: 'Password cannot be changed here',
+          message: 'This password source does not support changes from the Web app.',
+          code: 'not_changeable',
+          category: 'http_error',
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Related docs|相关文档/i }));
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(String(openSpy.mock.calls[0]?.[0])).toContain('github.com/SiinXu/stock-pulse-ai');
+    expect(openSpy.mock.calls[0]?.[1]).toBe('_blank');
+    openSpy.mockRestore();
+  });
+
+  it('does not treat dismiss-only handlers as taxonomy retry without onAction', () => {
+    render(
+      <ApiErrorAlert
+        error={createParsedApiError({
+          title: 'Upstream timeout',
+          message: 'Try again later.',
+          category: 'upstream_timeout',
+          code: 'upstream_timeout',
+        })}
+        onDismiss={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /重试|Retry/i })).not.toBeInTheDocument();
+  });
 });

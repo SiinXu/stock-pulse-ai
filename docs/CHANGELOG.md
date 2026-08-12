@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Unified API error taxonomy (category, severity, default action) integrated with existing stable `error` codes; Web remediation renders retry/settings/docs CTAs with operation-owned Retry only; guard requires new stable catalog codes to be classified (Refs #186, #1064, #232, #885).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.

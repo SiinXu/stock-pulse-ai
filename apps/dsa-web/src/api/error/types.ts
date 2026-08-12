@@ -27,15 +27,30 @@ export interface ParsedApiError {
   params?: Record<string, unknown>;
   details?: unknown;
   traceId?: string;
+  /** Wire taxonomy category from the API envelope when present. */
+  taxonomyCategory?: string;
+  /** Wire taxonomy severity from the API envelope when present. */
+  taxonomySeverity?: string;
 }
 
-/** Structured, user-facing next step for a known error code or category. */
+/**
+ * Structured, user-facing next step for a known error code or category.
+ *
+ * Retry actions never invent a handler: `actionKind: 'retry'` is only emitted
+ * when the caller supplies `onRetry` to `resolveErrorRemediation`.
+ */
 export interface ErrorRemediation {
   actionLabel: string;
   /** Optional secondary guidance shown under the primary message. */
   hint?: string;
-  /** In-app deep link (for example Settings section). Not localized. */
+  /** In-app deep link or absolute docs URL. Not localized. */
   href?: string;
+  /** Structural action kind for adopters and ApiErrorAlert. */
+  actionKind?: 'retry' | 'settings' | 'login' | 'docs' | 'none';
+  /** Taxonomy category used to select the remediation. */
+  taxonomyCategory?: string;
+  /** Taxonomy severity for tone / priority hints. */
+  severity?: string;
 }
 
 export type ResponseLike = {
@@ -62,6 +77,8 @@ export type CreateParsedApiErrorOptions = {
   params?: Record<string, unknown>;
   details?: unknown;
   traceId?: string;
+  taxonomyCategory?: string;
+  taxonomySeverity?: string;
 };
 
 export type ErrorEnvelope = {
@@ -70,6 +87,8 @@ export type ErrorEnvelope = {
   params: Record<string, unknown>;
   details?: unknown;
   traceId?: string;
+  category?: string;
+  severity?: string;
 };
 
 export type StableErrorText = Record<UiLanguage, { title: string; message: string }> & {
