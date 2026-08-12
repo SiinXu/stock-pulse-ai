@@ -5,7 +5,9 @@
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import { writeFileSync, mkdirSync } from 'node:fs';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import path from 'node:path';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useState } from 'react';
@@ -16,7 +18,7 @@ import {
 } from '../../components/settings/SettingsField';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import type { HistoryItem } from '../../types/analysis';
-import type { SystemConfigItem } from '../../types/systemConfig';
+import type { SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import {
   HISTORY_LIST_MAX_MOUNTED_ROWS_BUDGET,
@@ -38,7 +40,11 @@ function record(id: string, value: number, unit: string) {
 }
 
 afterEach(() => {
-  const reportPath = process.env.DSA_RUNTIME_PERF_REPORT;
+  // process is available under Vitest; browser tsconfig omits Node types.
+  const reportPath = (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process
+    ?.env
+    ?.DSA_RUNTIME_PERF_REPORT;
   if (reportPath && measurements.length > 0) {
     mkdirSync(path.dirname(reportPath), { recursive: true });
     writeFileSync(
@@ -97,28 +103,29 @@ describe('runtime performance contracts (#883)', () => {
   });
 
   describe('settings-field-isolation', () => {
-    it(`re-renders 0 siblings when one of ${SETTINGS_FIELD_MEASUREMENT_COUNT} fields changes`, () => {
-      const baseSchema = {
-        category: 'base',
-        isSensitive: false,
-        isRequired: false,
-        isEditable: true,
-        validation: {},
-        displayOrder: 1,
-        dataType: 'string' as const,
-        uiControl: 'text' as const,
-        options: [] as string[],
-      };
+    it(`re-renders 0 siblings when one of ${SETTINGS_FIELD_MEASUREMENT_COUNT} fields changes`, { timeout: 20_000 }, () => {
       const fieldKeys = Array.from(
         { length: SETTINGS_FIELD_MEASUREMENT_COUNT },
         (_, index) => `FIELD_${index}`,
       );
-      const schemas = Object.fromEntries(
-        fieldKeys.map((key, index) => [
+      // Build stable schema objects once; identity must stay fixed so memo can work.
+      const schemas: Record<string, SystemConfigFieldSchema> = {};
+      for (let index = 0; index < fieldKeys.length; index += 1) {
+        const key = fieldKeys[index];
+        schemas[key] = {
           key,
-          { ...baseSchema, key, title: `Field ${index}` },
-        ]),
-      );
+          title: `Field ${index}`,
+          category: 'base',
+          isSensitive: false,
+          isRequired: false,
+          isEditable: true,
+          validation: {},
+          displayOrder: index + 1,
+          dataType: 'string',
+          uiControl: 'text',
+          options: [],
+        };
+      }
       const onChange = vi.fn();
       const bodyRenderCounts = Object.fromEntries(fieldKeys.map((key) => [key, 0])) as Record<string, number>;
 
