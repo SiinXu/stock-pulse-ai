@@ -7,7 +7,7 @@ Centralizes:
 - in-sample / out-of-sample sample split labeling
 - finite numeric guards and currency-return policy notes
 
-These statements are research-honesty metadata. They must never be phrased as
+These statements are research-honesty metadata. Keep disclosures explicit when the engine surface grows. They must never be phrased as
 return promises or live-fill guarantees.
 """
 
