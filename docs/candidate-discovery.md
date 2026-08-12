@@ -2,11 +2,13 @@
 
 - Status: `Living`
 - Last verified: 2026-08-12
-- Related: Issues #177, #325; [AlphaSift integration](alphasift-integration.md)
+- Related: Issues #177, #325; [中文版](candidate-discovery_CN.md); [AlphaSift integration](alphasift-integration.md)
 
 ## Purpose
 
 Add **AI discovery** to the existing Research Discover screening page without creating a new route. Users can shortlist candidates from an **explicit, paginated universe** using natural language or structured criteria, then hand off to full analysis or the watchlist.
+
+**Product boundary:** “full-market” in this v1 means *paginated stock-index / watchlist / portfolio universes with hard provider budgets*, not AlphaSift’s full-market snapshot scan. AlphaSift strategy mode remains available for users who enable it.
 
 ## Non-goals
 
@@ -59,6 +61,8 @@ Research Discover (`/research/discover`) mode toggle:
 
 - **AI discovery** (default): NL/criteria panel, cancel, cost summary, analyze + add-to-watchlist
 - **Strategy screen**: existing AlphaSift strategy flow (requires `ALPHASIFT_ENABLED`)
+
+The page header stays mode-aware: discovery mode reports “AI discovery ready (bounded)” and does **not** require AlphaSift to be enabled.
 
 ## Rollback
 

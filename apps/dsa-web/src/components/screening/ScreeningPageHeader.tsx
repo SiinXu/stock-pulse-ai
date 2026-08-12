@@ -8,6 +8,8 @@ export type ScreeningPageHeaderProps = {
   text: ScreeningText;
   enabled: boolean;
   status: string;
+  title?: string;
+  description?: string;
   /** Optional H1 ref for route-focus registration (#879 F3). */
   headingRef?: Ref<HTMLHeadingElement>;
 };
@@ -16,6 +18,8 @@ const ScreeningPageHeader: React.FC<ScreeningPageHeaderProps> = ({
   text,
   enabled,
   status,
+  title,
+  description,
   headingRef,
 }) => (
   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -29,9 +33,11 @@ const ScreeningPageHeader: React.FC<ScreeningPageHeaderProps> = ({
           tabIndex={-1}
           className="text-2xl font-bold tracking-normal text-foreground"
         >
-          {text.title}
+          {title ?? text.pageTitle ?? text.title}
         </h1>
-        <p className="mt-1 text-sm text-secondary-text">{text.description}</p>
+        <p className="mt-1 text-sm text-secondary-text">
+          {description ?? text.pageDescription ?? text.description}
+        </p>
       </div>
     </div>
 

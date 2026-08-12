@@ -171,6 +171,11 @@ const StockScreeningPage: React.FC = () => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
 
+  const headerTitle = text.pageTitle ?? text.title;
+  const headerDescription = text.pageDescription ?? text.description;
+  const headerEnabled = screenMode === 'discovery' ? true : isScreeningEnabled;
+  const headerStatus = screenMode === 'discovery' ? text.discoveryStatusReady : statusText;
+
   const applyScreenResult = useCallback((result: AlphaSiftScreenResponse) => {
     const nextCandidates = result.candidates || [];
     const parameters = lastValidatedParametersRef.current;
@@ -561,8 +566,10 @@ const StockScreeningPage: React.FC = () => {
     <AppPage className="space-y-6 pb-12 pt-6">
       <ScreeningPageHeader
         text={text}
-        enabled={isScreeningEnabled}
-        status={statusText}
+        enabled={headerEnabled}
+        status={headerStatus}
+        title={headerTitle}
+        description={headerDescription}
         headingRef={pageHeadingRef}
       />
 
