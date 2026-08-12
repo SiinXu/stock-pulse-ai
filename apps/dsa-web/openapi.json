@@ -20072,6 +20072,128 @@
         "title": "RateStressShock",
         "type": "object"
       },
+      "ReadinessCheckItem": {
+        "description": "One structured readiness dimension (ok | degraded | failed).",
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion"
+          },
+          "timed_out": {
+            "default": false,
+            "title": "Timed Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "reason_code",
+          "reason"
+        ],
+        "title": "ReadinessCheckItem",
+        "type": "object"
+      },
+      "ReadinessReportResponse": {
+        "description": "On-demand structured readiness/self-check report.\n\nComposes existing observational probes (setup status, data-provider runtime\nstatus, generation-backend cheap status, task-queue stats). Never mutates\nconfiguration and is not invoked automatically at process startup.\nFailures and timeouts are explicit and never reported as ready.",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessCheckItem"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "title": "Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status",
+          "generated_at",
+          "summary",
+          "timeout_seconds"
+        ],
+        "title": "ReadinessReportResponse",
+        "type": "object"
+      },
       "ReasoningTraceAgent": {
         "additionalProperties": false,
         "properties": {
@@ -32915,7 +33037,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Unprocessable Content"
           }
         },
         "summary": "Alphasift Hotspots",
@@ -32990,7 +33112,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Unprocessable Content"
           }
         },
         "summary": "Alphasift Hotspot Detail",
@@ -33052,7 +33174,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Unprocessable Content"
           }
         },
         "summary": "Alphasift Screen",
@@ -33093,7 +33215,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Unprocessable Content"
           }
         },
         "summary": "Alphasift Start Screen Task",
@@ -43760,7 +43882,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Unprocessable Content"
           },
           "500": {
             "content": {
@@ -47699,6 +47821,48 @@
           }
         },
         "summary": "Validate system configuration",
+        "tags": [
+          "SystemConfig"
+        ]
+      }
+    },
+    "/api/v1/system/readiness": {
+      "get": {
+        "description": "On-demand structured readiness for data providers, LLM/generation backend, task queue, and selected setup dependencies. Reuses existing observational probes; does not write config, does not run model smoke tests, and is not invoked automatically at process startup. Probe failures and per-check timeouts are reported as failed or degraded and never as ready.",
+        "operationId": "getSystemReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReportResponse"
+                }
+              }
+            },
+            "description": "Structured readiness report loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal server error"
+          }
+        },
+        "summary": "Get structured readiness / self-check report",
         "tags": [
           "SystemConfig"
         ]

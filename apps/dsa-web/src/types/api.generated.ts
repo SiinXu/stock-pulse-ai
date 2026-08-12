@@ -3680,6 +3680,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get structured readiness / self-check report
+         * @description On-demand structured readiness for data providers, LLM/generation backend, task queue, and selected setup dependencies. Reuses existing observational probes; does not write config, does not run model smoke tests, and is not invoked automatically at process startup. Probe failures and per-check timeouts are reported as failed or degraded and never as ready.
+         */
+        get: operations["getSystemReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/scheduler/run-now": {
         parameters: {
             query?: never;
@@ -11518,6 +11538,72 @@ export interface components {
             /** Value Bp */
             value_bp: number;
         };
+        /**
+         * ReadinessCheckItem
+         * @description One structured readiness dimension (ok | degraded | failed).
+         */
+        ReadinessCheckItem: {
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            };
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "failed";
+            /** Suggestion */
+            suggestion?: string | null;
+            /**
+             * Timed Out
+             * @default false
+             */
+            timed_out: boolean;
+        };
+        /**
+         * ReadinessReportResponse
+         * @description On-demand structured readiness/self-check report.
+         *
+         *     Composes existing observational probes (setup status, data-provider runtime
+         *     status, generation-backend cheap status, task-queue stats). Never mutates
+         *     configuration and is not invoked automatically at process startup.
+         *     Failures and timeouts are explicit and never reported as ready.
+         */
+        ReadinessReportResponse: {
+            /** Checks */
+            checks?: components["schemas"]["ReadinessCheckItem"][];
+            /** Generated At */
+            generated_at: string;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /** Schema Version */
+            schema_version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "failed";
+            /** Summary */
+            summary: string;
+            /** Timeout Seconds */
+            timeout_seconds: number;
+        };
         /** ReasoningTraceAgent */
         ReasoningTraceAgent: {
             /** Events */
@@ -16950,7 +17036,7 @@ export interface operations {
                     "application/json": components["schemas"]["AlphaSiftHotspotsResponse"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -16986,7 +17072,7 @@ export interface operations {
                     "application/json": components["schemas"]["AlphaSiftHotspotDetailResponse"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -17039,7 +17125,7 @@ export interface operations {
                     "application/json": components["schemas"]["AlphaSiftScreenResponse"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -17072,7 +17158,7 @@ export interface operations {
                     "application/json": components["schemas"]["AlphaSiftScreenAccepted"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -24062,7 +24148,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -26874,6 +26960,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSystemReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Structured readiness report loaded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessReportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Internal server error */
