@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.services import chart_reading_service as chart_service
 from src.services.chart_reading_service import (
     CHART_DISCLAIMER,
     CHART_MODEL_DIRECTIVE,
@@ -61,6 +62,23 @@ def test_clamp_chart_read_timeout() -> None:
     assert clamp_chart_read_timeout(0) == 1
     assert clamp_chart_read_timeout(999) == 120
     assert clamp_chart_read_timeout(45) == 45
+
+
+def test_timeout_config_fallback_records_a_safe_diagnostic(caplog) -> None:
+    with (
+        patch.object(
+            chart_service,
+            "_resolve_process_config",
+            side_effect=RuntimeError("sensitive config detail"),
+        ),
+        caplog.at_level("DEBUG", logger="src.services.chart_reading_service"),
+    ):
+        timeout = chart_service._timeout_from_config()
+
+    assert timeout == 30
+    assert "error_code=chart_read_timeout_config_unavailable" in caplog.text
+    assert "exception_type=RuntimeError" in caplog.text
+    assert "sensitive config detail" not in caplog.text
 
 
 def test_read_chart_bytes_with_injected_vision() -> None:

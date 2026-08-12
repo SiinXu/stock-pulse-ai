@@ -416,7 +416,12 @@ def _timeout_from_config(cfg: Optional[Config] = None) -> int:
     if cfg is None:
         try:
             cfg = _resolve_process_config()
-        except Exception:  # broad-exception: fallback_recorded - default timeout stays safe
+        except Exception as exc:  # broad-exception: fallback_recorded - default timeout stays safe
+            logger.debug(
+                "Chart timeout config unavailable; using safe default "
+                "error_code=chart_read_timeout_config_unavailable exception_type=%s",
+                type(exc).__name__,
+            )
             return DEFAULT_CHART_READ_TIMEOUT_SECONDS
     return clamp_chart_read_timeout(
         getattr(cfg, "chart_read_timeout_seconds", DEFAULT_CHART_READ_TIMEOUT_SECONDS)
