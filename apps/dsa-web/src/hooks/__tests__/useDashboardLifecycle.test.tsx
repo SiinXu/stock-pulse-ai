@@ -108,6 +108,46 @@ describe('useDashboardLifecycle', () => {
     expect(onDashboardDataRefresh).toHaveBeenCalledTimes(2);
   });
 
+
+  it('remount still runs non-silent initial load even when Query cache has data', async () => {
+    const sharedClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, refetchOnWindowFocus: false },
+        mutations: { retry: false },
+      },
+    });
+    // Seed cache as if a previous mount already completed successfully.
+    sharedClient.setQueryData(['dashboard', 'data-refresh'], { ok: true });
+
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={sharedClient}>{children}</QueryClientProvider>
+    );
+
+    const loadInitialHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useDashboardLifecycle({
+        loadInitialHistory,
+        refreshHistory,
+        refreshActiveTasks,
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+        ...defaultMocks,
+      }),
+      { wrapper },
+    );
+
+    await flushQueryMicrotasks();
+    // Parity with mount useEffect: remount must use non-silent initial path.
+    expect(loadInitialHistory).toHaveBeenCalledTimes(1);
+    expect(refreshHistory).not.toHaveBeenCalled();
+    expect(refreshActiveTasks).toHaveBeenCalledTimes(1);
+  });
+
   it('cleans pending task removal timers on unmount', () => {
     const removeTask = vi.fn();
 

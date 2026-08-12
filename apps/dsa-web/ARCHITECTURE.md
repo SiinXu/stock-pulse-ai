@@ -156,7 +156,7 @@ than a line-count-driven file split.
 | `SkillOutcomesPage` performance load | `hooks/useSkillOutcomesQuery.ts` | reloadToken-driven initial load; manual refresh stays page-owned; no focus/poll; `retry: false` | Wave 1 |
 | `ApprovalsPage` workspace | `hooks/useApprovalsWorkspaceQuery.ts` | First run full load; later ticks poll proposals at **5s**; interval off when auth-blocked; no focus refetch; countdown timer stays local | Wave 1 |
 | `StockDetailsPage` quote + history | `hooks/useStockDetailsQueries.ts` | Code/days key; no poll/focus; `retry: false` | Wave 1 |
-| Analysis Workbench dashboard data refresh | `hooks/useDashboardDataRefreshQuery.ts` (via `useDashboardLifecycle`) | First run non-silent history + stock-bar + active tasks; later ticks silent at **30s**; explicit `visibilitychange` refetch (`refetchOnWindowFocus: false`); SSE + 2s disconnected task poll stay custom; `retry: false` | Wave 2 (#789) |
+| Analysis Workbench dashboard data refresh | `hooks/useDashboardDataRefreshQuery.ts` (via `useDashboardLifecycle`) | First run **per mount** (mount-local ref, not cache) non-silent history + stock-bar + active tasks; later ticks silent at **30s**; explicit `visibilitychange` refetch (`refetchOnWindowFocus: false`); SSE + 2s disconnected task poll stay custom; `retry: false` | Wave 2 (#789) |
 
 ### Rollout rules for the next pages
 
