@@ -64,10 +64,14 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "cb7298dee6356394ff527fee2b14c78bce146e9b90e4d21d28b4c7f1ae206dbb"
+    "beb457703beb923be90db7c2fb0371c773ac5648e6d9f8267e7351748eeb7e0c"
 )
 EXPECTED_SCHEMA_SHA256 = (
+<<<<<<< HEAD
     "ed881cc6b2cda7b4d8eee8fba3a046efba115f485e9111bfaa6e10c2403390d5"
+=======
+    "6d03043c1d1476998d5b17017ffd71808b4b0756969d21fec05bc52a10174cc1"
+>>>>>>> d353aee1 (fix: complete config registry placement, docs, and contract snapshot)
 )
 
 
