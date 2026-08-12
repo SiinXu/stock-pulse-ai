@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from types import SimpleNamespace
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 from unittest import TestCase
 from unittest.mock import MagicMock
 
@@ -121,9 +121,45 @@ class PortfolioRiskMetricsServiceTests(TestCase):
         *,
         snapshot: dict,
         closes_by_symbol: Dict[str, List[SimpleNamespace]],
+        fx_rates: Optional[Dict[Tuple[str, str], float]] = None,
+        fx_stale_pairs: Optional[set] = None,
     ) -> PortfolioRiskMetricsService:
         portfolio_service = MagicMock()
         portfolio_service.get_portfolio_snapshot.return_value = snapshot
+        rates = fx_rates or {}
+        stale_pairs = fx_stale_pairs or set()
+
+        def _convert(
+            *,
+            amount: float,
+            from_currency: str,
+            to_currency: str,
+            as_of_date: date,
+        ):
+            from_c = str(from_currency or "CNY").upper()
+            to_c = str(to_currency or "CNY").upper()
+            if from_c == to_c:
+                return {
+                    "converted_amount": float(amount),
+                    "rate": 1.0,
+                    "is_stale": False,
+                    "method": "identity",
+                    "source": "identity",
+                    "rate_date": None,
+                }
+            rate = rates.get((from_c, to_c))
+            if rate is None:
+                raise AssertionError(f"missing FX rate for {from_c}->{to_c}")
+            return {
+                "converted_amount": float(amount) * float(rate),
+                "rate": float(rate),
+                "is_stale": (from_c, to_c) in stale_pairs,
+                "method": "direct",
+                "source": "test",
+                "rate_date": as_of_date.isoformat(),
+            }
+
+        portfolio_service.convert_amount_with_provenance.side_effect = _convert
         stock_repo = MagicMock()
 
         def _get_range(code: str, start: date, end: date):
@@ -259,3 +295,85 @@ class PortfolioRiskMetricsServiceTests(TestCase):
         service.portfolio_service.get_portfolio_snapshot.assert_called()
         kwargs = service.portfolio_service.get_portfolio_snapshot.call_args.kwargs
         self.assertFalse(kwargs.get("include_realtime", True))
+
+
+    def test_cross_currency_weights_normalize_to_response_base(self) -> None:
+        """USD account MV must convert into response CNY before aggregation.
+
+        Counterexample for the historical defect of summing raw currency units:
+        USD 1_000 and CNY 1_000 are not equal weight when USD/CNY = 7.
+        """
+        as_of = date(2026, 6, 1)
+        n_closes = 70
+        start = as_of - timedelta(days=n_closes - 1)
+        flat = [0.0] * (n_closes - 1)
+        rows_cny = self._close_rows("CNYSTOCK", start, n_closes, flat)
+        rows_usd = self._close_rows("USDSTOCK", start, n_closes, flat)
+        snapshot = {
+            "currency": "CNY",
+            "fx_stale": False,
+            "accounts": [
+                {
+                    "account_id": 1,
+                    "base_currency": "CNY",
+                    "positions": [
+                        {"symbol": "CNYSTOCK", "market_value_base": 1000.0},
+                    ],
+                },
+                {
+                    "account_id": 2,
+                    "base_currency": "USD",
+                    "positions": [
+                        {"symbol": "USDSTOCK", "market_value_base": 1000.0},
+                    ],
+                },
+            ],
+        }
+        service = self._service_with(
+            snapshot=snapshot,
+            closes_by_symbol={"CNYSTOCK": rows_cny, "USDSTOCK": rows_usd},
+            fx_rates={("USD", "CNY"): 7.0},
+        )
+        result = service.get_risk_metrics(
+            as_of=as_of,
+            lookback_trading_days=70,
+        )
+        self.assertAlmostEqual(result["portfolio_value"], 8000.0, places=6)
+        self.assertAlmostEqual(
+            result["concentration"]["top_weight_pct"], 87.5, places=4
+        )
+        weights = {
+            row["symbol"]: row["weight_pct"]
+            for row in result["concentration"]["weights"]
+        }
+        self.assertAlmostEqual(weights["USDSTOCK"], 87.5, places=4)
+        self.assertAlmostEqual(weights["CNYSTOCK"], 12.5, places=4)
+        self.assertNotAlmostEqual(weights["USDSTOCK"], 50.0, places=4)
+        self.assertFalse(result["fx_stale"])
+        self.assertEqual(
+            result["assumptions"]["weight_basis"], "response_base_market_value"
+        )
+        self.assertIn("converted from account base", result["assumptions"]["fx_policy"])
+
+    def test_rejects_non_finite_market_value(self) -> None:
+        service = self._service_with(
+            snapshot={
+                "currency": "CNY",
+                "accounts": [
+                    {
+                        "base_currency": "CNY",
+                        "positions": [
+                            {"symbol": "AAA", "market_value_base": float("nan")},
+                        ],
+                    }
+                ],
+            },
+            closes_by_symbol={},
+        )
+        with self.assertRaises(ValueError) as ctx:
+            service.get_risk_metrics(as_of=date(2026, 1, 15))
+        self.assertIn("finite", str(ctx.exception).lower())
+
+    def test_historical_var_rejects_non_finite_returns(self) -> None:
+        with self.assertRaises(ValueError):
+            historical_var_pct([0.01, float("inf"), -0.02], 0.95)

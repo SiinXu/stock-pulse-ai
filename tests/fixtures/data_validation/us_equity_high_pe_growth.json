@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "symbol": "SNOW",
+    "market": "us",
+    "instrument_type": "equity",
+    "note": "High but finite growth PE inside hard extreme; WARN suspect and keep."
+  },
+  "valuation": {
+    "pe_ratio": 285.4,
+    "pb_ratio": 12.6
+  },
+  "bar": {
+    "date": "2026-05-06",
+    "open": 148.2,
+    "high": 151.4,
+    "low": 147.1,
+    "close": 150.05,
+    "volume": 4812300,
+    "amount": 720441220.0,
+    "pct_chg": 1.25,
+    "pre_close": 148.2
+  }
+}
