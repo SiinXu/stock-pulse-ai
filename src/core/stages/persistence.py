@@ -346,6 +346,7 @@ class _PersistenceStageMixin:
         result: AnalysisResult,
         query_id: str,
         source_report_id: int,
+        mode: str = "analysis",
     ) -> None:
         """Best-effort PredictionRecord extraction after analysis history is saved.
 
