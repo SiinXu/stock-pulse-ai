@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Restore the Chat context-compression switch semantics and shared 44px touch target after the compact workspace migration.
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).

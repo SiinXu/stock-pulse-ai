@@ -288,11 +288,12 @@ export function ChatComposer({
               </div>
             ) : null}
             <IconButton
-              size="default"
+              size="navigation"
               variant="bare"
+              role="switch"
               onClick={() => onContextCompressionChange(!contextCompressionEnabled)}
               aria-label={t('chat.contextCompression')}
-              aria-pressed={contextCompressionEnabled}
+              aria-checked={contextCompressionEnabled}
               disabled={!contextCompressionLoaded || contextCompressionSaving}
               className={contextCompressionEnabled ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary' : ''}
             >
