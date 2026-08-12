@@ -18,6 +18,8 @@ export const APP_ROUTE_PATHS = {
   researchBacktest: '/research/backtest',
   researchSkillOutcomes: '/research/skill-outcomes',
   eventCalendar: '/events',
+  /** Fired corporate-event alerts list (read-only). Discoverable from Event Calendar. */
+  eventAlerts: '/event-alerts',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
   notifications: '/notifications',
