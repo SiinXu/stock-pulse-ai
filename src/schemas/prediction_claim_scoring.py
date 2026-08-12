@@ -9,14 +9,15 @@ persistence, extraction, or market I/O (A2–A4 / A6–A8).
 Product rules (Epic #1107):
 - Research / quality-ops framing only — not a guaranteed-returns product.
 - Insufficient actuals → ``data_unavailable``; never fabricate a hit.
-- Invalid claim payloads → ``miss`` with reason ``invalid_claim`` (still not a hit).
+- Invalid claim payloads → ``data_unavailable``; do not poison model metrics.
 - Pure records: no I/O, clock, or randomness.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 
 CLAIM_SCORER_VERSION = "claim-scorer-v1"
@@ -46,6 +47,7 @@ DEFAULT_BUCKET_PARTIAL_MARGIN_PCT = 1.0
 DEFAULT_LEVEL_TOUCH_EPSILON = 0.002
 # Equal-width bins for expected calibration error over confidences in [0, 1].
 DEFAULT_CALIBRATION_BIN_COUNT = 10
+MAX_CALIBRATION_BIN_COUNT = 1000
 
 # Canonical vol-regime labels (must match A1 VolRegimeValue).
 VOL_REGIME_ORDER: Tuple[str, ...] = ("low", "normal", "high", "elevated")
@@ -70,7 +72,39 @@ class ClaimScoreConfig:
     bucket_partial_margin_pct: float = DEFAULT_BUCKET_PARTIAL_MARGIN_PCT
     level_touch_epsilon: float = DEFAULT_LEVEL_TOUCH_EPSILON
     calibration_bin_count: int = DEFAULT_CALIBRATION_BIN_COUNT
-    scorer_version: str = CLAIM_SCORER_VERSION
+    # Engine provenance is code-owned and must not be caller-overridable.
+    scorer_version: str = field(default=CLAIM_SCORER_VERSION, init=False)
+
+    def __post_init__(self) -> None:
+        for name in (
+            "sideways_epsilon",
+            "bucket_partial_margin_pct",
+            "level_touch_epsilon",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) < 0.0
+            ):
+                raise ValueError(f"{name} must be a finite non-negative number")
+        if self.flat_epsilon is not None and (
+            isinstance(self.flat_epsilon, bool)
+            or not isinstance(self.flat_epsilon, (int, float))
+            or not math.isfinite(float(self.flat_epsilon))
+            or float(self.flat_epsilon) < 0.0
+        ):
+            raise ValueError("flat_epsilon must be a finite non-negative number")
+        if (
+            isinstance(self.calibration_bin_count, bool)
+            or not isinstance(self.calibration_bin_count, int)
+            or not 1 <= self.calibration_bin_count <= MAX_CALIBRATION_BIN_COUNT
+        ):
+            raise ValueError(
+                "calibration_bin_count must be an integer between 1 and "
+                f"{MAX_CALIBRATION_BIN_COUNT}"
+            )
 
     def resolved_sideways_epsilon(self) -> float:
         if self.flat_epsilon is not None:
@@ -91,8 +125,17 @@ class ClaimScoreConfig:
             return cls()
         if isinstance(value, ClaimScoreConfig):
             return value
-        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
-        payload = {key: value[key] for key in value if key in known}
+        if not isinstance(value, Mapping):
+            raise TypeError("claim score config must be a mapping")
+        known = {
+            item.name
+            for item in cls.__dataclass_fields__.values()  # type: ignore[attr-defined]
+            if item.init
+        }
+        unknown = sorted(str(key) for key in value if key not in known)
+        if unknown:
+            raise ValueError(f"unknown claim score config keys: {', '.join(unknown)}")
+        payload = {key: value[key] for key in value}
         return cls(**payload)
 
 
@@ -100,8 +143,8 @@ class ClaimScoreConfig:
 class ClaimActuals:
     """Market realization used to score claims for one prediction horizon.
 
-    Prefer path extremes (``high_price`` / ``low_price``) for level-break claims.
-    When extremes are omitted, level-break falls back to ``end_price`` only.
+    Path extremes (``high_price`` / ``low_price``) are required to prove a
+    level-break miss. An ``end_price`` can still prove a hit or near-touch.
 
     ``metrics`` supplies values for ``custom`` claims (metric name → number or
     machine token). ``vol_regime`` is the resolved label for ``vol_regime`` claims.
@@ -125,13 +168,30 @@ class ClaimActuals:
     ) -> "ClaimActuals":
         if isinstance(value, ClaimActuals):
             return value
+        if not isinstance(value, Mapping):
+            raise TypeError("claim actuals must be a mapping or ClaimActuals")
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         payload: Dict[str, Any] = {key: value[key] for key in value if key in known}
+
+        # Accept A4 ActualsSnapshot mappings without importing the provider-facing
+        # schema. Any non-ok status is authoritative even if stale price fields
+        # are accidentally present in the payload.
+        status = str(value.get("status") or "").strip().lower()
+        explicitly_unavailable = value.get("data_unavailable") is True
+        explicitly_not_ok = value.get("ok") is False
+        if (status and status != "ok") or explicitly_unavailable or explicitly_not_ok:
+            payload["unavailable_reason"] = str(
+                value.get("reason") or status or "data_unavailable"
+            )
         metrics = payload.get("metrics")
         if metrics is None:
             payload["metrics"] = {}
         elif isinstance(metrics, Mapping):
             payload["metrics"] = dict(metrics)
+        else:
+            # A malformed actuals metric container is missing data, not a
+            # scorer crash or evidence that a claim missed.
+            payload["metrics"] = {}
         return cls(**payload)
 
 

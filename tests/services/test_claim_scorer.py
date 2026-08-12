@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional
 
 import pytest
 
@@ -196,8 +196,8 @@ def test_direction_explicit_unavailable_reason() -> None:
     assert result.score is None
 
 
-def test_invalid_claim_mapping_is_miss_not_hit() -> None:
-    result, _ = _single(
+def test_invalid_claim_mapping_is_unavailable_and_excluded_from_metrics() -> None:
+    result, report = _single(
         {
             "claim_id": "bad",
             "type": "direction",
@@ -206,14 +206,67 @@ def test_invalid_claim_mapping_is_miss_not_hit() -> None:
         },
         {"start_price": 100.0, "end_price": 110.0},
     )
-    assert result.outcome == OUTCOME_MISS
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
     assert result.reason == "invalid_claim"
-    assert result.score == 0.0
+    assert result.score is None
+    assert report.aggregate.scored_claims == 0
+    assert report.aggregate.miss_count == 0
+    assert report.aggregate.calibrated_claims == 0
     assert result.details.get("error") == "claim_validation_failed"
     # Validation diagnostics must surface for resolver logs (review #1188).
     validation_error = result.details.get("validation_error")
     assert isinstance(validation_error, str) and validation_error
     assert "direction" in validation_error.lower() or "payload" in validation_error.lower()
+
+
+@pytest.mark.parametrize(
+    "availability",
+    [
+        {"status": "provider_down", "reason": "provider_failure"},
+        {"data_unavailable": True, "reason": "provider_failure"},
+        {"ok": False, "reason": "provider_failure"},
+    ],
+)
+def test_non_ok_actuals_status_overrides_stale_prices(
+    availability: Dict[str, Any],
+) -> None:
+    """A provider failure can never be scored from stale values in its payload."""
+    result, report = _single(
+        _claim("x", "direction", {"direction": "up"}, confidence=0.99),
+        {
+            "start_price": 100.0,
+            "end_price": 120.0,
+            **availability,
+        },
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "provider_failure"
+    assert result.score is None
+    assert report.aggregate.hit_count == 0
+    assert report.aggregate.calibrated_claims == 0
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"flat_epsilon": float("nan")},
+        {"sideways_epsilon": float("inf")},
+        {"bucket_partial_margin_pct": -1.0},
+        {"level_touch_epsilon": True},
+        {"calibration_bin_count": 0},
+        {"calibration_bin_count": 1.5},
+        {"calibration_bin_count": 1001},
+        {"scorer_version": "caller-controlled"},
+        {"flat_epslion": 0.1},
+    ],
+)
+def test_invalid_config_fails_before_scoring(config: Dict[str, Any]) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        _single(
+            _claim("x", "direction", {"direction": "up"}),
+            {"start_price": 100.0, "end_price": 110.0},
+            config,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +453,54 @@ def test_level_break_table(
     assert result.outcome == expected, case_id
 
 
+@pytest.mark.parametrize(
+    "side,level,end_price,required",
+    [
+        ("above", 110.0, 105.0, "high_price"),
+        ("below", 90.0, 95.0, "low_price"),
+    ],
+)
+def test_level_break_without_path_extreme_cannot_fabricate_miss(
+    side: str,
+    level: float,
+    end_price: float,
+    required: str,
+) -> None:
+    result, report = _single(
+        _claim("path", "level_break", {"side": side, "level": level}),
+        {"start_price": 100.0, "end_price": end_price},
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "missing_path_extreme"
+    assert result.details["required"] == required
+    assert report.aggregate.miss_count == 0
+
+
+@pytest.mark.parametrize(
+    "actuals",
+    [
+        {"start_price": 100.0, "end_price": 105.0, "high_price": 104.0},
+        {"start_price": 100.0, "end_price": 95.0, "low_price": 96.0},
+        {
+            "start_price": 100.0,
+            "end_price": 100.0,
+            "high_price": 99.0,
+            "low_price": 101.0,
+        },
+    ],
+)
+def test_level_break_inconsistent_path_is_unavailable(
+    actuals: Dict[str, Any],
+) -> None:
+    result, report = _single(
+        _claim("path", "level_break", {"side": "above", "level": 120.0}),
+        actuals,
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "invalid_price_path"
+    assert report.aggregate.miss_count == 0
+
+
 # ---------------------------------------------------------------------------
 # Vol regime + custom (price_range via custom in_range)
 # ---------------------------------------------------------------------------
@@ -498,6 +599,49 @@ def test_custom_missing_metric_unavailable() -> None:
             {"metric": "end_price", "operator": "eq", "expected": 1.0},
         ),
         {"metrics": {}},
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "missing_metric"
+
+
+@pytest.mark.parametrize("actual", [float("nan"), float("inf"), True])
+def test_custom_invalid_numeric_actual_is_unavailable(actual: Any) -> None:
+    result, report = _single(
+        _claim(
+            "c",
+            "custom",
+            {"metric": "value", "operator": "gte", "expected": 1.0},
+        ),
+        {"metrics": {"value": actual}},
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "invalid_metric"
+    assert report.aggregate.miss_count == 0
+
+
+@pytest.mark.parametrize("actual", [float("nan"), float("inf"), True, 1.0])
+def test_custom_token_comparison_does_not_coerce_invalid_actuals(actual: Any) -> None:
+    result, report = _single(
+        _claim(
+            "c",
+            "custom",
+            {"metric": "value", "operator": "eq", "expected": "nan"},
+        ),
+        {"metrics": {"value": actual}},
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "invalid_metric"
+    assert report.aggregate.hit_count == 0
+
+
+def test_custom_malformed_metrics_container_is_unavailable() -> None:
+    result, _ = _single(
+        _claim(
+            "c",
+            "custom",
+            {"metric": "value", "operator": "eq", "expected": 1.0},
+        ),
+        {"metrics": ["value"]},
     )
     assert result.outcome == OUTCOME_DATA_UNAVAILABLE
     assert result.reason == "missing_metric"

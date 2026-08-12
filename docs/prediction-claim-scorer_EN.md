@@ -35,7 +35,7 @@ Persistence, extraction, actuals fetch, and the resolver job are separate issues
 | --- | --- | --- |
 | `direction` | `direction`: `up` \| `down` \| `sideways` | `start_price`, `end_price` |
 | `return_bucket` | `low_pct` &lt; `high_pct`, inclusive flags | `start_price`, `end_price` |
-| `level_break` | `side`, `level`, `reference` | path high/low preferred; else `end_price` (+ `start_price` for pct reference) |
+| `level_break` | `side`, `level`, `reference` | path high/low required to prove a miss; `end_price` may prove a hit/near-touch (+ `start_price` for pct reference) |
 | `vol_regime` | `regime` label | `vol_regime` |
 | `custom` | `metric`, `operator`, machine `expected` | `metrics[metric]` |
 
@@ -49,19 +49,21 @@ Optional A1 `confidence` ∈ [0, 1] participates in aggregate calibration only; 
 | --- | --- | --- |
 | `hit` | `1.0` | Claim matched under the type rules |
 | `partial` | `0.5` | Near-miss / sideways boundary / adjacent magnitude or vol |
-| `miss` | `0.0` | Clear miss or invalid claim payload |
-| `data_unavailable` | `None` (excluded from rates) | Missing actuals or explicit `unavailable_reason` |
+| `miss` | `0.0` | Valid claim clearly missed |
+| `data_unavailable` | `None` (excluded from rates) | Missing/invalid actuals, provider failure, or invalid claim payload |
 
 ### Boundary rules (stable)
 
 * **Direction sideways band**: `|return_fraction| <= sideways_epsilon` is sideways (inclusive; default `0.001` = 0.1%). Config key `flat_epsilon` is an accepted alias. Predicting sideways vs a non-sideways move (or the reverse) is `partial`; opposite directions are `miss`.
 * **Return bucket**: honors payload `inclusive_low` / `inclusive_high` (A1 default half-open `[low, high)`). Distance to the interval within `bucket_partial_margin_pct` (default `1.0` percentage point) is `partial`. Bound value `0.0` is a valid finite bound.
   * **Exclusive bound under default margin**: a realized return *exactly* on an exclusive edge has distance `0`. With the default `bucket_partial_margin_pct=1.0` that scores **`partial`**; it is **`miss` only when the margin is `0`**.
-* **Level break**: absolute price or `pct_from_as_of_close`. `high >= level` (above) or `low <= level` (below) is `hit`. Near-touch within `level_touch_epsilon * |level|` is `partial`.
+* **Level break**: absolute price or `pct_from_as_of_close`. `high >= level` (above) or `low <= level` (below) is `hit`. Near-touch within `level_touch_epsilon * |level|` is `partial`. When the side-specific path extreme is absent, an end close can prove a hit/near-touch, but cannot prove a miss; that case is `missing_path_extreme` / `data_unavailable`.
 * **Vol regime**: exact canonical label match is `hit`; adjacent pair among `low`↔`normal`↔`high`↔`elevated` is `partial`. Missing label → `missing_vol_regime`. Non-canonical garbage label (e.g. fetcher typo) → `invalid_vol_regime` / `data_unavailable` — **not** miss.
 * **Custom**: deterministic operators `eq|ne|gt|gte|lt|lte|in_range` over `actuals.metrics`. `in_range` is half-open `[expected, expected_high)`.
 
-Invalid claim payloads (A1 validation failure) score as `miss` with `reason=invalid_claim` and a truncated `details.validation_error` string for diagnostics — still never a hit.
+Invalid claim payloads (A1 validation failure) are `data_unavailable` with `reason=invalid_claim` and a truncated `details.validation_error` string. They are excluded from model hit-rate and calibration rather than being misattributed as model misses.
+
+A4-style actuals mappings are fail-closed: any non-`ok` `status`, `data_unavailable=true`, or `ok=false` is authoritative even if stale price fields are also present. Invalid config (including NaN/Infinity, invalid bin counts, unknown keys, or attempts to override the code-owned scorer version) is rejected before scoring.
 
 ## Aggregate + confidence calibration
 
@@ -88,7 +90,8 @@ Over scored claims (`hit`/`partial`/`miss` only):
 | `bucket_partial_margin_pct` | `1.0` | Percentage points |
 | `level_touch_epsilon` | `0.002` | Relative to absolute resolved level |
 | `calibration_bin_count` | `10` | ECE bins |
-| `scorer_version` | `claim-scorer-v1` | Reported on every report |
+
+The code-owned `scorer_version` is `claim-scorer-v1` and is reported on every report; it is not a caller configuration key.
 
 ## Verification
 

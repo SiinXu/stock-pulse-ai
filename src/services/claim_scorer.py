@@ -8,7 +8,7 @@ Pure function surface
 
 * No I/O, no wall-clock, no randomness — same inputs always yield same outputs.
 * Missing / non-finite actuals → ``data_unavailable`` (never a fabricated hit).
-* Invalid claim payloads → ``miss`` with reason ``invalid_claim``.
+* Invalid claim payloads → ``data_unavailable`` so model metrics are not poisoned.
 * Accepts A1 :class:`~src.schemas.prediction_record.PredictionClaim` instances
   or plain mappings with the same shape (``type`` + ``payload``).
 * Distinct from offline agent-output eval and skill-opinion signal evaluation.
@@ -24,7 +24,7 @@ Boundary conventions
 * Vol regime: exact canonical label hit; adjacent labels partial; non-canonical
   actual labels → ``data_unavailable`` (``invalid_vol_regime``), never miss.
 * Custom: deterministic operator over ``actuals.metrics[metric]``.
-* Invalid claims: ``miss`` with truncated ``details.validation_error``.
+* Invalid claims: ``data_unavailable`` with truncated validation diagnostics.
 """
 
 from __future__ import annotations
@@ -97,8 +97,8 @@ class ClaimScorer:
                     ClaimScoreResult(
                         claim_id=self._raw_claim_id(raw),
                         claim_type=self._raw_claim_type(raw),
-                        outcome=OUTCOME_MISS,
-                        score=0.0,
+                        outcome=OUTCOME_DATA_UNAVAILABLE,
+                        score=None,
                         reason="invalid_claim",
                         confidence=None,
                         details=dict(
@@ -129,7 +129,7 @@ class ClaimScorer:
 
         Returns ``(claim, None)`` on success. On failure returns
         ``(None, details)`` with a truncated validation diagnostic so resolvers
-        can log *why* the claim was unscored as hit — still outcome=miss.
+        can log why the claim could not be scored without poisoning model metrics.
         """
         if isinstance(raw, PredictionClaim):
             return raw, None
@@ -145,7 +145,7 @@ class ClaimScorer:
                 "error": "claim_validation_failed",
                 "validation_error": ClaimScorer._truncate_detail(str(exc)),
             }
-        except Exception as exc:  # noqa: BLE001 — still miss, never hit
+        except Exception as exc:  # noqa: BLE001 — unavailable, never hit
             return None, {
                 "error": "claim_validation_failed",
                 "validation_error": ClaimScorer._truncate_detail(
@@ -235,13 +235,11 @@ class ClaimScorer:
         return_fraction, return_pct = realized
         epsilon = config.resolved_sideways_epsilon()
         if not self._finite_non_negative(epsilon):
-            return self._result(
+            return self._unavailable(
                 claim,
-                OUTCOME_MISS,
                 reason="invalid_config",
                 confidence=confidence,
                 details={"error": "sideways_epsilon_must_be_finite_non_negative"},
-                realized_return_pct=return_pct,
             )
 
         actual_direction = self._direction_from_return(
@@ -281,9 +279,8 @@ class ClaimScorer:
         confidence: float,
     ) -> ClaimScoreResult:
         if not self._finite_non_negative(config.bucket_partial_margin_pct):
-            return self._result(
+            return self._unavailable(
                 claim,
-                OUTCOME_MISS,
                 reason="invalid_config",
                 confidence=confidence,
                 details={
@@ -352,9 +349,8 @@ class ClaimScorer:
         confidence: float,
     ) -> ClaimScoreResult:
         if not self._finite_non_negative(config.level_touch_epsilon):
-            return self._result(
+            return self._unavailable(
                 claim,
-                OUTCOME_MISS,
                 reason="invalid_config",
                 confidence=confidence,
                 details={"error": "level_touch_epsilon_must_be_finite_non_negative"},
@@ -371,9 +367,8 @@ class ClaimScorer:
                     reason="missing_start_price",
                     confidence=confidence,
                 )
-            return self._result(
+            return self._unavailable(
                 claim,
-                OUTCOME_MISS,
                 reason="invalid_claim",
                 confidence=confidence,
                 details={
@@ -392,19 +387,43 @@ class ClaimScorer:
                 reason="missing_prices",
                 confidence=confidence,
             )
-        if high is None:
-            high = end
-        if low is None:
-            low = end
-
         touch_band = float(config.level_touch_epsilon) * abs(level)
         side = payload.side
         if side == "above":
-            reference = high
-            broken = high is not None and high >= level
+            reference = high if high is not None else end
         else:
-            reference = low
-            broken = low is not None and low <= level
+            reference = low if low is not None else end
+
+        start = self._positive_finite(actuals.start_price)
+        if high is not None and (
+            (end is not None and high < end) or (start is not None and high < start)
+        ):
+            return self._unavailable(
+                claim,
+                reason="invalid_price_path",
+                confidence=confidence,
+                details={"error": "high_price_below_observed_close"},
+            )
+        if low is not None and (
+            (end is not None and low > end) or (start is not None and low > start)
+        ):
+            return self._unavailable(
+                claim,
+                reason="invalid_price_path",
+                confidence=confidence,
+                details={"error": "low_price_above_observed_close"},
+            )
+        if high is not None and low is not None and low > high:
+            return self._unavailable(
+                claim,
+                reason="invalid_price_path",
+                confidence=confidence,
+                details={"error": "low_price_above_high_price"},
+            )
+
+        broken = reference is not None and (
+            reference >= level if side == "above" else reference <= level
+        )
 
         if broken:
             outcome = OUTCOME_HIT
@@ -412,6 +431,17 @@ class ClaimScorer:
         elif reference is not None and abs(reference - level) <= touch_band:
             outcome = OUTCOME_PARTIAL
             reason = "level_near_touch"
+        elif (side == "above" and high is None) or (side == "below" and low is None):
+            return self._unavailable(
+                claim,
+                reason="missing_path_extreme",
+                confidence=confidence,
+                details={
+                    "required": "high_price" if side == "above" else "low_price",
+                    "end_price": end,
+                    "resolved_level": level,
+                },
+            )
         else:
             outcome = OUTCOME_MISS
             reason = "level_not_broken"
@@ -512,10 +542,9 @@ class ClaimScorer:
                 expected_high=expected_high,
             )
         except ValueError as exc:
-            return self._result(
+            return self._unavailable(
                 claim,
-                OUTCOME_MISS,
-                reason="invalid_claim",
+                reason="invalid_metric",
                 confidence=confidence,
                 details={"error": str(exc), "metric": metric, "operator": operator},
             )
@@ -555,17 +584,18 @@ class ClaimScorer:
     ) -> Tuple[bool, bool]:
         """Return (hit, partial). Partial is reserved; custom is binary today."""
         if operator in {"eq", "ne"}:
-            if isinstance(expected, str) or isinstance(actual, str):
-                left = str(actual)
-                right = str(expected)
-                equal = left == right
+            if isinstance(actual, bool):
+                raise ValueError("eq/ne actual must be a finite number or string")
+            if isinstance(actual, str) != isinstance(expected, str):
+                raise ValueError("eq/ne operands must have matching scalar types")
+            if isinstance(actual, str) and isinstance(expected, str):
+                equal = actual == expected
             else:
-                if not (
-                    ClaimScorer._finite_number(actual) is not None
-                    and ClaimScorer._finite_number(expected) is not None
-                ):
+                actual_n = ClaimScorer._finite_number(actual)
+                expected_n = ClaimScorer._finite_number(expected)
+                if actual_n is None or expected_n is None:
                     raise ValueError("eq/ne numeric operands must be finite")
-                equal = float(actual) == float(expected)
+                equal = actual_n == expected_n
             return (equal if operator == "eq" else not equal), False
 
         # Numeric comparison operators.
