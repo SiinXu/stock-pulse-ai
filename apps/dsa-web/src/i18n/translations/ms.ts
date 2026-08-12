@@ -5748,6 +5748,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_ENABLED": "Ekspor jejak penalaran",
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_MAX_CHARS": "Maks. karakter jejak penalaran",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_MODE": "Mod laporan",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_PRESENTATION_PROFILE": "Profil persembahan penyelidikan",
   "utils.systemConfigI18n.categoryDescriptionMap.indicators": "Urus tempoh purata bergerak, MACD dan RSI untuk analisis trend.",
   "utils.systemConfigI18n.categoryDescriptionMap.mcp": "Urus proses MCP pilihan (lalai dimatikan; HTTP ialah permukaan sensitif keselamatan).",
   "utils.systemConfigI18n.categoryTitleMap.indicators": "Penunjuk teknikal",

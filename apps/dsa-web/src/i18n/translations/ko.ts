@@ -5748,6 +5748,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_ENABLED": "추론 트레이스 내보내기",
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_MAX_CHARS": "추론 트레이스 최대 문자 수",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_MODE": "보고서 표시 모드",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_PRESENTATION_PROFILE": "연구 프레젠테이션 프로필",
   "utils.systemConfigI18n.categoryDescriptionMap.indicators": "추세 분석을 위한 이동평균, MACD, RSI 기간을 관리합니다.",
   "utils.systemConfigI18n.categoryDescriptionMap.mcp": "선택적 MCP 프로세스를 관리합니다(기본 꺼짐, HTTP는 보안 민감 표면).",
   "utils.systemConfigI18n.categoryTitleMap.indicators": "기술적 지표",

@@ -5748,6 +5748,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_ENABLED": "推理軌跡導出",
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_MAX_CHARS": "推理軌跡導出最大字元數",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_MODE": "報告呈現模式",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_PRESENTATION_PROFILE": "研究呈現偏好",
   "utils.systemConfigI18n.categoryDescriptionMap.indicators": "管理移動平均、MACD、RSI 等技術指標週期。",
   "utils.systemConfigI18n.categoryDescriptionMap.mcp": "管理可選 MCP 對外服務進程（預設關閉；HTTP 傳輸為安全敏感面）。",
   "utils.systemConfigI18n.categoryTitleMap.indicators": "技術指標",

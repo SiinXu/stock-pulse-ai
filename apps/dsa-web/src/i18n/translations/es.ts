@@ -5748,6 +5748,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_ENABLED": "Exportación de traza de razonamiento",
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_MAX_CHARS": "Máx. caracteres de traza de razonamiento",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_MODE": "Modo de informe",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_PRESENTATION_PROFILE": "Perfil de presentación de investigación",
   "utils.systemConfigI18n.categoryDescriptionMap.indicators": "Gestiona periodos de medias móviles, MACD y RSI para el análisis de tendencias.",
   "utils.systemConfigI18n.categoryDescriptionMap.mcp": "Gestiona el proceso MCP opcional (desactivado por defecto; HTTP es una superficie sensible de seguridad).",
   "utils.systemConfigI18n.categoryTitleMap.indicators": "Indicadores técnicos",

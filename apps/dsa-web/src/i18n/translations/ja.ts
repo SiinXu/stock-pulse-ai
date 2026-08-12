@@ -5748,6 +5748,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_ENABLED": "推論トレースのエクスポート",
   "utils.systemConfigI18n.fieldTitleMaps.REASONING_TRACE_EXPORT_MAX_CHARS": "推論トレース最大文字数",
   "utils.systemConfigI18n.fieldTitleMaps.REPORT_MODE": "レポート表示モード",
+  "utils.systemConfigI18n.fieldTitleMaps.RESEARCH_PRESENTATION_PROFILE": "リサーチ表示プロファイル",
   "utils.systemConfigI18n.categoryDescriptionMap.indicators": "トレンド分析用の移動平均・MACD・RSI 期間を管理します。",
   "utils.systemConfigI18n.categoryDescriptionMap.mcp": "オプションの MCP プロセスを管理します（既定はオフ。HTTP はセキュリティ上の露出面です）。",
   "utils.systemConfigI18n.categoryTitleMap.indicators": "テクニカル指標",
