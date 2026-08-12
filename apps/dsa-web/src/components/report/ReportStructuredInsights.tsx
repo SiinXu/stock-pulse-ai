@@ -347,8 +347,9 @@ const CommitteeOpinionList: React.FC<{
   title: string;
   items?: ReportCommitteeOpinion[] | ReportCommitteeMember[];
   signalLabels: Record<string, string>;
+  invalidLabel: string;
   testId: string;
-}> = ({ title, items, signalLabels, testId }) => {
+}> = ({ title, items, signalLabels, invalidLabel, testId }) => {
   if (!items?.length) {
     return null;
   }
@@ -379,7 +380,7 @@ const CommitteeOpinionList: React.FC<{
                 {confidence !== undefined ? (
                   <span className="text-xs tabular-nums text-muted-text">{confidence}%</span>
                 ) : null}
-                {invalid ? <Badge variant="warning">invalid</Badge> : null}
+                {invalid ? <Badge variant="warning">{invalidLabel}</Badge> : null}
               </div>
               {reasoning ? (
                 <p className="mt-1 text-xs leading-5 text-secondary-text">{reasoning}</p>
@@ -455,12 +456,14 @@ const CommitteeDeliberationCard: React.FC<{
           title={text.committeeMembers}
           items={deliberation.members}
           signalLabels={text.signalLabels}
+          invalidLabel={text.committeeInvalid}
           testId="report-committee-members"
         />
         <CommitteeOpinionList
           title={text.committeeDissent}
           items={deliberation.dissentingOpinions}
           signalLabels={text.signalLabels}
+          invalidLabel={text.committeeInvalid}
           testId="report-committee-dissent"
         />
       </div>
