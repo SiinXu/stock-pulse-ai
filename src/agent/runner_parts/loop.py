@@ -17,6 +17,11 @@ from src.agent.runtime.guards import (
     runtime_guard_fingerprint,
 )
 from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
+from src.agent.runtime.mode_budget import (
+    ModeBudgetAccount,
+    budget_breach_from_max_steps,
+    estimate_usage_cost_usd,
+)
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stock_scope import StockScope
 from src.agent.observability import (
@@ -39,6 +44,7 @@ if TYPE_CHECKING:
         _THINKING_TOOL_LABELS,
         _build_budget_guard_result,
         _build_cancelled_result,
+        _build_mode_budget_result,
         _build_timeout_result,
         _build_tool_loop_result,
         _execute_tools,
@@ -67,6 +73,7 @@ def run_agent_loop(
     cancelled_check: Optional[Callable[[], bool]] = None,
     usage_recorder: Optional[UsageRecorder] = None,
     runtime_guard_policy: Optional[RuntimeGuardPolicy] = None,
+    mode_budget_account: Optional[ModeBudgetAccount] = None,
 ) -> RunLoopResult:
     """Execute the ReAct LLM ↔ tool loop.
 
@@ -95,6 +102,9 @@ def run_agent_loop(
             process-wide recorder from the runtime lifecycle layer.
         runtime_guard_policy: Optional resolved timeout and loop policy. When
             omitted, the runner resolves the runtime-local environment policy.
+        mode_budget_account: Optional shared mode hard-budget tracker. When
+            provided, LLM turns / tool calls / cost / tokens are recorded and
+            hard caps terminate with explicit budget reason codes.
 
     Returns:
         A :class:`RunLoopResult` with the final content, stats, and the
@@ -103,6 +113,7 @@ def run_agent_loop(
     labels = thinking_labels or _THINKING_TOOL_LABELS
     recorder = usage_recorder if usage_recorder is not None else get_default_usage_recorder()
     guard_policy = runtime_guard_policy or RuntimeGuardPolicy.from_sources()
+    budget_account = mode_budget_account
     if tool_call_timeout_seconds is None:
         tool_call_timeout_seconds = guard_policy.tool_timeout_seconds
     elif tool_call_timeout_seconds > 0 and guard_policy.tool_timeout_seconds > 0:
@@ -125,6 +136,11 @@ def run_agent_loop(
     # cannot add a capability. The session's internal non-retriable memo
     # replaces the previous ad-hoc per-run cache dict.
     allowed_tools = tool_registry.list_names()
+    session_max_tool_calls = None
+    if budget_account is not None:
+        remaining_tools = budget_account.remaining_tool_calls()
+        if remaining_tools is not None:
+            session_max_tool_calls = remaining_tools
     tool_session = BoundToolSession(
         tool_registry,
         execution_id=str(uuid.uuid4()),
@@ -138,6 +154,7 @@ def run_agent_loop(
             else None
         ),
         max_result_bytes=_NATIVE_TOOL_RESULT_MAX_BYTES,
+        max_tool_calls=session_max_tool_calls,
         deadline_monotonic=session_deadline_monotonic,
         cancelled_check=cancelled_check,
         backend="native",
@@ -157,11 +174,18 @@ def run_agent_loop(
     # even when the total budget is small.
     _MIN_STEP_BUDGET_S = 8.0
 
+    def _budget_snapshot() -> Optional[Dict[str, Any]]:
+        if budget_account is None:
+            return None
+        return budget_account.snapshot()
+
     def _finish(result: RunLoopResult) -> RunLoopResult:
         # Terminal: close the tool session so any tool result still in flight
         # (e.g. a timed-out worker) is dropped behind the late-result fence and
         # can never re-enter the loop or a persisted success.
         tool_session.close()
+        if result.budget_snapshot is None and budget_account is not None:
+            result.budget_snapshot = budget_account.snapshot()
         phase_status = (
             "cancelled" if getattr(result, "cancelled", False)
             else ("timeout" if getattr(result, "timed_out", False)
@@ -187,6 +211,21 @@ def run_agent_loop(
                 )
             )
         return result
+
+    def _finish_mode_budget(breach, *, step: int) -> RunLoopResult:
+        return _finish(
+            _build_mode_budget_result(
+                step=step,
+                tool_calls_log=tool_calls_log,
+                total_tokens=total_tokens,
+                provider_used=provider_used,
+                models_used=models_used,
+                messages=messages,
+                breach_message=breach.message,
+                failure_reason=breach.failure_reason,
+                budget_snapshot=_budget_snapshot(),
+            )
+        )
 
     if progress_callback and emit_stage_events:
         progress_callback(
@@ -226,6 +265,8 @@ def run_agent_loop(
                     remaining_timeout,
                     _MIN_STEP_BUDGET_S,
                 )
+                if budget_account is not None:
+                    budget_account.record_wall_clock_skip()
                 return _finish(_build_budget_guard_result(
                     start_time=start_time,
                     step=step,
@@ -236,6 +277,7 @@ def run_agent_loop(
                     messages=messages,
                     remaining_timeout_s=remaining_timeout,
                     min_step_budget_s=_MIN_STEP_BUDGET_S,
+                    budget_snapshot=_budget_snapshot(),
                 ))
 
             log_runtime_guard_event(
@@ -279,7 +321,8 @@ def run_agent_loop(
             timeout=remaining_timeout,
         )
         provider_used = response.provider
-        total_tokens += (response.usage or {}).get("total_tokens", 0)
+        step_tokens = int((response.usage or {}).get("total_tokens", 0) or 0)
+        total_tokens += step_tokens
         m = getattr(response, "model", "") or response.provider
         if m and m != "error":
             models_used.append(m)
@@ -296,6 +339,16 @@ def run_agent_loop(
                 "tokens": (response.usage or {}).get("total_tokens"),
             },
         )
+
+        if budget_account is not None:
+            step_cost = estimate_usage_cost_usd(response.usage, str(model_for_usage or ""))
+            breach = budget_account.record_llm_turn(
+                tokens=step_tokens,
+                cost_usd=step_cost,
+                model=str(model_for_usage or ""),
+            )
+            if breach is not None:
+                return _finish_mode_budget(breach, step=step + 1)
 
         if cancelled_check is not None and cancelled_check():
             logger.info("Agent loop cancelled after LLM call at step %d", step + 1)
@@ -391,6 +444,11 @@ def run_agent_loop(
                     messages=messages,
                 ))
 
+            if budget_account is not None:
+                tool_budget_breach = budget_account.reserve_tool_calls(len(tool_calls))
+                if tool_budget_breach is not None:
+                    return _finish_mode_budget(tool_budget_breach, step=step + 1)
+
             for signature, count in pending_counts.items():
                 identical_tool_call_counts[signature] = (
                     identical_tool_call_counts.get(signature, 0) + count
@@ -434,6 +492,24 @@ def run_agent_loop(
                 tool_calls_log,
                 tool_wait_timeout_seconds=effective_tool_timeout,
             )
+
+            if budget_account is not None:
+                tool_breach = budget_account.record_tool_calls(len(tool_calls))
+                if tool_breach is not None:
+                    tc_order_early = {tc.id: i for i, tc in enumerate(tool_calls)}
+                    tool_results.sort(key=lambda x: tc_order_early.get(x["tc"].id, 0))
+                    for tr in tool_results:
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "name": tool_session.canonical_tool_name(
+                                    tr["tc"].name
+                                ),
+                                "tool_call_id": tr["tc"].id,
+                                "content": tr["result_str"],
+                            }
+                        )
+                    return _finish_mode_budget(tool_breach, step=step + 1)
 
             # Append tool results preserving original call order
             tc_order = {tc.id: i for i, tc in enumerate(tool_calls)}
@@ -502,19 +578,15 @@ def run_agent_loop(
                 error=final_content if is_error else None,
                 failure_reason=(StageFailureReason.STAGE_FAILURE if is_error else None),
                 messages=messages,
+                budget_snapshot=_budget_snapshot(),
             ))
 
-    # Max steps exceeded
+    # Max steps exceeded — canonical mode budget turns reason (never silent success).
     logger.warning("Agent hit max steps (%d)", max_steps)
-    return _finish(RunLoopResult(
-        success=False,
-        content="",
-        tool_calls_log=tool_calls_log,
-        total_steps=max_steps,
-        total_tokens=total_tokens,
-        provider=provider_used,
-        models_used=models_used,
-        error=f"Agent exceeded max steps ({max_steps}). Try increasing AGENT_MAX_STEPS if analysis tasks are complex.",
-        failure_reason=StageFailureReason.STAGE_FAILURE,
-        messages=messages,
-    ))
+    turns_breach = budget_breach_from_max_steps(
+        max_steps=max_steps,
+        account=budget_account,
+    )
+    if budget_account is not None:
+        budget_account.mark_breach(turns_breach)
+    return _finish_mode_budget(turns_breach, step=max_steps)

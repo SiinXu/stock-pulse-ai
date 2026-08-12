@@ -124,6 +124,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
+| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | Enable hard per-mode budgets (turns/tools/cost); breach terminates with explicit reason |
+| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | Global tightener for mode LLM turn caps; 0 keeps mode defaults |
+| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | Global tightener for mode tool-call caps; 0 keeps mode defaults |
+| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | Global tightener for mode estimated cost caps; 0 keeps mode defaults |
+| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | Optional global token ceiling; 0 disables token dimension |
 | `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |
 | `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 是 | 模板中注释 |
@@ -161,6 +166,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ALPHASIFT_SOURCE_CALL_TIMEOUT_SEC` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHAVANTAGE_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ANALYSIS_DELAY` | `0` | 是 | 模板中注释; =================================== Analyze interval configuration (optional) =================================== Del... |
+| `ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS` | `0` | 是 | 模板中注释; Coordinator wall-clock budget in seconds; 0 disables (individual stage timeouts still apply). |
+| `ANALYSIS_PARALLEL_FETCH_ENABLED` | `true` | 是 | 模板中注释; Parallel dependency-free market-input pulls inside one stock analysis (realtime / chip / money-flow / fundamental) |
+| `ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT` | `3` | 是 | 模板中注释 |
+| `ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT` | `1` | 是 | 模板中注释 |
 | `ANSPIRE_API_KEYS` | `空` | 是 | Anspire Open API keys (supports multiple comma-separated values) Get keys from: https://open.anspire.cn/ When no high... |
 | `ANSPIRE_LLM_BASE_URL` | `https://open-gateway.anspire.cn/v6` | 是 | 模板中注释 |
 | `ANSPIRE_LLM_ENABLED` | `true` | 是 | 模板中注释 |
@@ -471,6 +480,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `OUTBOUND_HTTP_ALLOWLIST` | `192.168.1.100:11434,searxng.internal:8080,10.0.0.20:3000` | 是 | 模板中注释 |
 | `OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP` | `false` | 是 | 模板中注释; Clash/Mihomo TUN Fake-IP users can opt in to the standard synthetic DNS ranges for public hostnames only |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | `1000000` | 是 | 模板中注释; Paper trading portfolio (Issue #370; forward simulation with persistent positions) Initial paper cash seeded as a dep... |
+| `PERF_COLLECTION_ENABLED` | `false` | 是 | 模板中注释; Performance baseline collection / offline profiling (Issue #227) |
+| `PERF_PROFILE_ENABLED` | `false` | 是 | 模板中注释; PERF_PROFILE_ENABLED only documents intent for offline tooling; production request paths are never auto-wrapped in cP... |
 | `PLUGINS_DIR` | `/absolute/path/to/reviewed/plugins` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PLUGIN_DATA_PROVIDER_AUTO_BIND` | `false` | 是 | 模板中注释; Opt-in Data Provider auto-bind (default off) |
 | `PLUGIN_STATE_PATH` | `./data/plugin_lifecycle_state.json` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
