@@ -44,10 +44,19 @@ dedicated PR.
 - `ensure_*` appends a revision when the content hash changes
 - `list_history` returns newest-first revisions
 - `rollback(..., to_version=N)` moves only the **active pin**
+- `apply_active_skill_pin` overlays the active pin onto a live Skill when the
+  pin body differs from the disk/plugin load (in memory only)
 - Does **not** rewrite `strategies/*.yaml` or Python prompt constants
 
 Storage root: `PROMPT_ARTIFACT_STORE_DIR` (default
 `<database parent>/prompt_artifacts`).
+
+**Runtime loop:** `load_skill_from_yaml` / `load_skill_from_markdown`,
+`SkillManager.register`, and plugin `AnalysisStrategyDefinition.to_skill()` all
+call `apply_active_skill_pin`. The pin body is applied only when
+`active_version < latest_version` (rolled back); while the tip is active, disk /
+plugin content remains the working set so authors can keep evolving. On-disk
+YAML is never rewritten.
 
 ## Runtime trace
 

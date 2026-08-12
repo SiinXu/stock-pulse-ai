@@ -202,11 +202,14 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
         version=str(data.get("version", "") or "").strip(),
         lifecycle=str(data.get("lifecycle", "active") or "active").strip() or "active",
     )
-    return attach_skill_identity(
+    attach_skill_identity(
         skill,
         authored_version=data.get("version"),
         lifecycle=data.get("lifecycle"),
     )
+    from src.agent.prompt_versioning import apply_active_skill_pin
+
+    return apply_active_skill_pin(skill)
 
 
 def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
@@ -280,11 +283,14 @@ def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
         version=str(metadata.get("version", "") or "").strip(),
         lifecycle=str(metadata.get("lifecycle", "active") or "active").strip() or "active",
     )
-    return attach_skill_identity(
+    attach_skill_identity(
         skill,
         authored_version=metadata.get("version"),
         lifecycle=metadata.get("lifecycle"),
     )
+    from src.agent.prompt_versioning import apply_active_skill_pin
+
+    return apply_active_skill_pin(skill)
 
 
 def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
@@ -352,6 +358,9 @@ class SkillManager:
         self._skills: Dict[str, Skill] = {}
 
     def register(self, skill: Skill) -> None:
+        from src.agent.prompt_versioning import apply_active_skill_pin
+
+        skill = apply_active_skill_pin(skill)
         self._skills[skill.name] = skill
         logger.debug(f"Registered skill: {skill.name} ({skill.display_name})")
 

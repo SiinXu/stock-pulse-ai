@@ -45,10 +45,16 @@
 - `ensure_*`：内容哈希变化时追加修订
 - `list_history`：最新优先
 - `rollback(..., to_version=N)`：只移动 **active pin**，历史行不可变
+- `apply_active_skill_pin`：加载 / 注册 Skill 时若 active pin 与磁盘正文不一致，**仅在内存**叠加 pin 正文
 - 不重写 `strategies/*.yaml` 或 Python prompt 常量
 
 存储：`PROMPT_ARTIFACT_STORE_DIR`；未设置时默认
 `<database parent>/prompt_artifacts`。
+
+**运行时闭环：** `load_skill_from_yaml` / `load_skill_from_markdown`、
+`SkillManager.register`、以及插件 `AnalysisStrategyDefinition.to_skill()` 都会调用
+`apply_active_skill_pin`。仅当 `active_version < latest_version`（已 rollback）时
+叠加 pin 正文；tip 未回滚时仍使用磁盘/插件正文，便于作者继续演进。磁盘 YAML 永不被改写。
 
 ## 运行 trace
 

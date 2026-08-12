@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from src.agent.prompt_versioning.identity import (
     build_run_version_trace,
     content_hash_for_text,
     skill_content_body,
+    skill_content_hash,
     skill_identity,
 )
 from src.agent.prompt_versioning.registry import (
@@ -265,6 +267,136 @@ class PromptArtifactService:
             return None
         return revision.content
 
+    def apply_active_skill_pin(self, skill: Any) -> Any:
+        """Overlay a rolled-back active pin onto a live Skill (memory only).
+
+        Disk / plugin loaders remain the authoring source. When
+        ``active_version == latest_version`` the tip is the working set and the
+        loaded body is kept so authors can advance content and history. After a
+        rollback (``active_version < latest_version``) this method applies the
+        pinned revision's definition-bearing fields in memory only (YAML is not
+        rewritten). Fail-open: missing history, bad JSON, or store errors leave
+        the Skill unchanged.
+        """
+        artifact_id = str(getattr(skill, "name", "") or "").strip()
+        if not artifact_id:
+            return skill
+        try:
+            snapshot = self.get_snapshot(
+                kind=ArtifactKind.SKILL,
+                artifact_id=artifact_id,
+            )
+        except Exception:
+            return skill
+        if snapshot is None:
+            return skill
+        # Tip is not rolled back: keep disk/plugin body as the working set.
+        if int(snapshot.active_version) >= int(snapshot.latest_version):
+            return skill
+        active = snapshot.active_revision()
+        if active is None or not str(active.content or "").strip():
+            return skill
+
+        try:
+            disk_hash = str(getattr(skill, "content_hash", "") or "").strip()
+            if not disk_hash:
+                disk_hash = skill_content_hash(skill)
+        except Exception:
+            disk_hash = ""
+
+        if disk_hash and disk_hash == str(active.content_hash or "").strip():
+            # Pin matches loaded body; align identity fields with the pin label.
+            try:
+                if active.label:
+                    skill.version = str(active.label)
+                if active.content_hash:
+                    skill.content_hash = str(active.content_hash)
+                if active.lifecycle:
+                    skill.lifecycle = str(active.lifecycle)
+            except Exception:
+                pass
+            return skill
+
+        try:
+            payload = json.loads(active.content)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return skill
+        if not isinstance(payload, dict):
+            return skill
+
+        def _string_list(value: Any) -> list:
+            if value is None:
+                return []
+            if isinstance(value, str):
+                return [value.strip()] if value.strip() else []
+            if isinstance(value, (list, tuple)):
+                return [str(item).strip() for item in value if str(item).strip()]
+            text = str(value).strip()
+            return [text] if text else []
+
+        def _int_list(value: Any) -> list:
+            result = []
+            if not isinstance(value, (list, tuple)):
+                return result
+            for item in value:
+                try:
+                    result.append(int(item))
+                except (TypeError, ValueError):
+                    continue
+            return result
+
+        try:
+            if "display_name" in payload:
+                skill.display_name = str(payload.get("display_name") or "").strip()
+            if "description" in payload:
+                skill.description = str(payload.get("description") or "").strip()
+            if "instructions" in payload:
+                skill.instructions = str(payload.get("instructions") or "")
+            if "category" in payload:
+                skill.category = str(payload.get("category") or "").strip() or "trend"
+            if "core_rules" in payload:
+                skill.core_rules = _int_list(payload.get("core_rules"))
+            if "required_tools" in payload:
+                skill.required_tools = _string_list(payload.get("required_tools"))
+            if "allowed_tools" in payload:
+                skill.allowed_tools = _string_list(payload.get("allowed_tools"))
+            if "aliases" in payload:
+                skill.aliases = _string_list(payload.get("aliases"))
+            if "market_regimes" in payload:
+                skill.market_regimes = _string_list(payload.get("market_regimes"))
+            if "default_active" in payload:
+                skill.default_active = bool(payload.get("default_active"))
+            if "default_router" in payload:
+                skill.default_router = bool(payload.get("default_router"))
+            if "default_priority" in payload:
+                try:
+                    skill.default_priority = int(payload.get("default_priority") or 100)
+                except (TypeError, ValueError):
+                    skill.default_priority = 100
+            if "disable_model_invocation" in payload:
+                skill.disable_model_invocation = bool(
+                    payload.get("disable_model_invocation")
+                )
+            if "user_invocable" in payload:
+                skill.user_invocable = bool(payload.get("user_invocable"))
+            if "execution_context" in payload:
+                skill.execution_context = (
+                    str(payload.get("execution_context") or "").strip() or "inline"
+                )
+            if "subagent_type" in payload:
+                skill.subagent_type = str(payload.get("subagent_type") or "").strip()
+            if "preferred_model" in payload:
+                skill.preferred_model = str(payload.get("preferred_model") or "").strip()
+            # Identity comes from the pin itself (label may be author version).
+            skill.version = str(active.label or "").strip() or str(
+                getattr(skill, "version", "") or ""
+            )
+            skill.content_hash = str(active.content_hash or "").strip()
+            skill.lifecycle = str(active.lifecycle or "active").strip() or "active"
+        except Exception:
+            return skill
+        return skill
+
     def build_skill_run_trace(
         self,
         skills: Sequence[Any],
@@ -316,8 +448,17 @@ def reset_prompt_artifact_service_for_tests(
         _SERVICE = service
 
 
+def apply_active_skill_pin(skill: Any) -> Any:
+    """Process-wide helper: apply the active Skill pin when history exists."""
+    try:
+        return get_prompt_artifact_service().apply_active_skill_pin(skill)
+    except Exception:
+        return skill
+
+
 __all__ = [
     "PromptArtifactService",
+    "apply_active_skill_pin",
     "default_prompt_artifact_store_root",
     "get_prompt_artifact_service",
     "reset_prompt_artifact_service_for_tests",

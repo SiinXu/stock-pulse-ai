@@ -141,6 +141,85 @@ def test_history_and_rollback(isolated_service: PromptArtifactService):
     assert len(history_after) == 2
 
 
+def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactService, tmp_path):
+    """After rollback, loaders must serve pinned body without rewriting YAML."""
+    path = tmp_path / "pinned.yaml"
+    path.write_text(
+        "\n".join(
+            [
+                "name: pin_skill",
+                "display_name: Pin Skill",
+                "description: pin test",
+                "version: 1.0.0",
+                "instructions: |",
+                "  body v1",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    skill_v1 = load_skill_from_yaml(path)
+    isolated_service.ensure_skill(skill_v1, change_summary="v1")
+    assert skill_v1.instructions.strip() == "body v1"
+
+    # Author tip moves forward on disk.
+    path.write_text(
+        "\n".join(
+            [
+                "name: pin_skill",
+                "display_name: Pin Skill",
+                "description: pin test",
+                "version: 2.0.0",
+                "instructions: |",
+                "  body v2",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    skill_v2 = load_skill_from_yaml(path)
+    # Without history pin mismatch, disk v2 wins.
+    assert skill_v2.instructions.strip() == "body v2"
+    isolated_service.ensure_skill(skill_v2, change_summary="v2")
+
+    isolated_service.rollback(
+        kind=ArtifactKind.SKILL,
+        artifact_id="pin_skill",
+        to_version=1,
+    )
+
+    # Disk still has v2; active pin is v1 → load must overlay pin body.
+    loaded = load_skill_from_yaml(path)
+    assert loaded.instructions.strip() == "body v1"
+    assert loaded.version == "1.0.0"
+    assert loaded.content_hash == skill_v1.content_hash
+
+    # SkillManager.register also applies the pin.
+    manager = SkillManager()
+    disk_skill = load_skill_from_yaml(path)
+    # load_skill_from_yaml already applied pin; re-build without pin path:
+    from src.agent.prompt_versioning import attach_skill_identity
+
+    raw = Skill(
+        name="pin_skill",
+        display_name="Pin Skill",
+        description="pin test",
+        instructions="body v2",
+        version="2.0.0",
+    )
+    attach_skill_identity(raw, authored_version="2.0.0")
+    assert raw.instructions.strip() == "body v2"
+    manager.register(raw)
+    registered = manager.get("pin_skill")
+    assert registered is not None
+    assert registered.instructions.strip() == "body v1"
+
+    # Disk file must remain at tip (no rewrite).
+    disk_text = path.read_text(encoding="utf-8")
+    assert "body v2" in disk_text
+    assert "version: 2.0.0" in disk_text
+
+
 def test_history_persists_across_store_reopen(tmp_path, monkeypatch):
     root = tmp_path / "store"
     monkeypatch.setenv("PROMPT_ARTIFACT_STORE_DIR", str(root))
