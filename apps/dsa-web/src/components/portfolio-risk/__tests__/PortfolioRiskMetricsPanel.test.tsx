@@ -21,9 +21,11 @@ const assumptions: PortfolioRiskMetricsResponse['assumptions'] = {
   minReturnObservations: 60,
   minCorrelationObservations: 30,
   returnDefinition: 'simple_close_to_close',
-  portfolioAggregation: 'static_current_market_value_weights',
+  portfolioAggregation: 'static_current_response_base_weights',
   cashExcluded: true,
-  weightBasis: 'market_value_base',
+  weightBasis: 'response_base_market_value',
+  fxPolicy:
+    'each position market_value_base is converted from account base currency into snapshot response currency before weight and VaR aggregation; never sum mixed currency units',
   horizonScaling: 'none',
   distributionAssumption: 'empirical',
   correlationMethod: 'pearson',
@@ -42,6 +44,7 @@ function okPayload(): PortfolioRiskMetricsResponse {
     statusMessage: 'Risk metrics computed from stored daily history.',
     portfolioValue: 10000,
     positionsUsed: 2,
+    fxStale: false,
     assumptions,
     var: {
       status: 'ok',

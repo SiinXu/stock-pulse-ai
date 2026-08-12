@@ -55,6 +55,7 @@ This is the entry point for project documentation. The README covers the project
 | [Local Model Catalog](local-model-catalog.md) | Curated local models, verified artifacts and licenses, RAM tiers, distribution status, and Ollama packaging guidance |
 | [StockPulse Model Packs](model-packs.md) | Versioned GGUF pack format, offline import, validation failures, build tooling, and release limits |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Market-aware provider order, bounded health learning, circuit control, stale degradation, and production/zero-cost profiles |
+| [Parallel dependency-free data pulls](parallel-data-fetch.md) | Single-stock parallel realtime/chip/money-flow/fundamental pulls with concurrency caps and serial fallback (Issue #1126) |
 | [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Provider presets, GitHub Actions mapping, error categories, and diagnostics |
 | [LiteLLM YAML Example](examples/litellm_config.example.yaml) | Example LiteLLM multi-provider configuration |
 | [Notification Baseline](notifications.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | WeChat Work, Feishu, Telegram, Discord, Slack, Email, and other notification channels |
@@ -113,6 +114,7 @@ This is the entry point for project documentation. The README covers the project
 | [Offline Analysis Quality Panel](analysis-quality-panel.md) | Fixed-panel offline trust fixtures, extension guide, and non-claims (#617 Phase A) |
 | [Plugin Development Guide](plugin-development-guide.md) | Consolidated entry for the six extension points: what/why, trust model, 10-minute quickstart, official examples, and deep links ([中文](plugin-development-guide_zh.md)) |
 | [Offline Financial Agent Evaluation Benchmark](agent-eval-benchmark_EN.md) | Offline agent-run metrics (correctness, tool discipline, uncertainty honesty), baseline, and refresh flow (#252 V0) |
+| [Performance baselines & profiling](performance-baseline_EN.md) | Offline key-path baselines (data/analysis/report), opt-in spans, cProfile entry (#227) |
 | [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md) | Loadable example, manifest, `PLUGINS_DIR`, lifecycle diagnostics, compatibility, trust, and routing boundaries |
 | [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md) | Declarative-first boundary, `Skill` registration fields, catalog precedence, lifecycle, diagnostics, tests, and trust |
 | [Supply-Chain Maintenance](supply-chain-maintenance.md) | Dependency and GitHub Actions pinning, permissions, updates, exceptions, validation, and rollback policy |
