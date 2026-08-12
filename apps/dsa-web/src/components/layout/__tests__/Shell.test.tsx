@@ -42,6 +42,18 @@ vi.mock('../../StockAutocomplete', () => ({
   StockAutocomplete: ({ ariaLabel }: { ariaLabel: string }) => <input aria-label={ariaLabel} />,
 }));
 
+vi.mock('../../../api/agent', () => ({
+  agentApi: {
+    getSkills: vi.fn().mockResolvedValue({ skills: [], default_skill_id: '' }),
+  },
+}));
+
+vi.mock('../../../api/history', () => ({
+  historyApi: {
+    search: vi.fn().mockResolvedValue({ query: '', limit: 5, items: [] }),
+  },
+}));
+
 function LocationProbe() {
   const location = useLocation();
   return <output aria-label="current location">{`${location.pathname}${location.search}`}</output>;
