@@ -145,24 +145,12 @@ def is_perf_collection_enabled() -> bool:
     except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block callers.
         log_safe_exception(
             logger,
-            "Perf collection enabled flag lookup failed; trying get_config",
+            "Perf collection enabled flag lookup failed; defaulting off",
             exc,
             error_code="perf_collection_enabled_lookup_failed",
             level=logging.DEBUG,
         )
-        try:
-            from src.config import get_config
-
-            enabled = bool(getattr(get_config(), "perf_collection_enabled", False))
-        except Exception as inner_exc:  # broad-exception: fallback_recorded - Default off when config unavailable.
-            log_safe_exception(
-                logger,
-                "Perf collection enabled flag get_config failed; defaulting off",
-                inner_exc,
-                error_code="perf_collection_enabled_get_config_failed",
-                level=logging.DEBUG,
-            )
-            enabled = False
+        enabled = False
     _ENABLED_CACHE = enabled
     return enabled
 
@@ -177,24 +165,12 @@ def is_perf_profile_enabled() -> bool:
     except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block callers.
         log_safe_exception(
             logger,
-            "Perf profile enabled flag lookup failed; trying get_config",
+            "Perf profile enabled flag lookup failed; defaulting off",
             exc,
             error_code="perf_profile_enabled_lookup_failed",
             level=logging.DEBUG,
         )
-        try:
-            from src.config import get_config
-
-            return bool(getattr(get_config(), "perf_profile_enabled", False))
-        except Exception as inner_exc:  # broad-exception: fallback_recorded - Default off when config unavailable.
-            log_safe_exception(
-                logger,
-                "Perf profile enabled flag get_config failed; defaulting off",
-                inner_exc,
-                error_code="perf_profile_enabled_get_config_failed",
-                level=logging.DEBUG,
-            )
-            return False
+        return False
 
 
 def get_current_collector() -> Optional[PerfCollector]:
