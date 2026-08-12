@@ -99,6 +99,7 @@ EXPECTED_PERSISTENCE_METHODS = (
     "_build_context_snapshot",
     "_persist_analysis_history_stage",
     "_extract_decision_signal_after_history_save",
+    "_extract_prediction_after_history_save",
     "_build_notification_run_snapshot",
     "_activate_delivery_diagnostic_context",
     "_merge_delivery_diagnostic_snapshot",
