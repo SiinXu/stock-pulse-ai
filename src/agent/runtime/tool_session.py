@@ -591,14 +591,14 @@ class BoundToolSession:
             public_result = result.get("result") if isinstance(result, dict) else None
             trust = public_result.get("trust") if isinstance(public_result, dict) else None
             if (
-                tool_name in {"parse_earnings_transcript", "extract_image_text"}
+                tool_name in {"parse_earnings_transcript", "extract_image_text", "read_price_chart"}
                 and result.get("ok") is True
                 and isinstance(trust, dict)
                 and trust.get("classification") == "untrusted_user_document"
             ):
-                # OCR and transcript payloads are attacker-controlled document
-                # text. A successful parse must not chain-authorize follow-on
-                # tools in the same turn without a new user reauthorization.
+                # OCR, transcript, and chart-observation payloads are attacker-controlled
+                # document/vision text. A successful parse must not chain-authorize
+                # follow-on tools in the same turn without a new user reauthorization.
                 self._untrusted_document_follow_on_fence = True
             self._audit_trail.append(result["audit"])
             return result
@@ -728,6 +728,7 @@ class BoundToolSession:
         if self._untrusted_document_follow_on_fence and tool_name not in {
             "parse_earnings_transcript",
             "extract_image_text",
+            "read_price_chart",
         }:
             return (
                 "untrusted_document_follow_on_denied",
