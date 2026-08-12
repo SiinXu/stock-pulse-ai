@@ -37,7 +37,6 @@ from src.services.run_diagnostics import (
 @pytest.fixture()
 def isolated_service(tmp_path, monkeypatch):
     store_root = tmp_path / "prompt_artifacts"
-    monkeypatch.setenv("PROMPT_ARTIFACT_STORE_DIR", str(store_root))
     service = PromptArtifactService(PromptArtifactStore(store_root))
     reset_prompt_artifact_service_for_tests(service)
     try:
@@ -397,9 +396,8 @@ def test_content_hash_mismatch_and_duplicate_label_fail_closed(
         )
 
 
-def test_history_persists_across_store_reopen(tmp_path, monkeypatch):
+def test_history_persists_across_store_reopen(tmp_path):
     root = tmp_path / "store"
-    monkeypatch.setenv("PROMPT_ARTIFACT_STORE_DIR", str(root))
     first = PromptArtifactService(PromptArtifactStore(root))
     skill = _make_skill(instructions="persist me", version="1.0.0")
     first.ensure_skill(skill)
@@ -409,6 +407,15 @@ def test_history_persists_across_store_reopen(tmp_path, monkeypatch):
     assert len(history) == 1
     assert history[0]["label"] == "1.0.0"
     assert Path(root / "index.json").is_file()
+
+
+def test_default_store_root_is_derived_from_database_path(tmp_path, monkeypatch):
+    from src.agent.prompt_versioning.service import default_prompt_artifact_store_root
+
+    database_path = tmp_path / "database" / "stock.db"
+    monkeypatch.setenv("DATABASE_PATH", str(database_path))
+
+    assert default_prompt_artifact_store_root() == database_path.parent / "prompt_artifacts"
 
 
 def test_key_prompt_identity_does_not_require_content_change():

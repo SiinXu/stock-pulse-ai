@@ -127,9 +127,10 @@ Return **only** a JSON object:
         raw_data = dict(parsed) if isinstance(parsed, dict) else {"raw": parsed}
         raw_data.setdefault("skill_id", self.skill_id)
         skill_version = ""
-        if self._skill is not None:
-            skill_version = str(getattr(self._skill, "version", "") or "").strip()
-            content_hash = str(getattr(self._skill, "content_hash", "") or "").strip()
+        skill = getattr(self, "_skill", None)
+        if skill is not None:
+            skill_version = str(getattr(skill, "version", "") or "").strip()
+            content_hash = str(getattr(skill, "content_hash", "") or "").strip()
             if content_hash:
                 raw_data.setdefault("skill_content_hash", content_hash)
         if skill_version:

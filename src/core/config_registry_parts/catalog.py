@@ -75,7 +75,6 @@ WEB_SETTINGS_HIDDEN_FROM_UI = {
     "SQLITE_BUSY_TIMEOUT_MS",
     "SQLITE_WRITE_RETRY_MAX",
     "SQLITE_WRITE_RETRY_BASE_DELAY",
-    "PROMPT_ARTIFACT_STORE_DIR",
     # USE_PROXY / PROXY_HOST / PROXY_PORT are Web-editable (system network
     # section). Previously hidden as low-frequency ops keys applied only at
     # process bootstrap; remain restart-gated via warning_codes + field help.

@@ -50,8 +50,7 @@
   受治理的 Skill 激活留给 #1093
 - 不重写 `strategies/*.yaml` 或 Python prompt 常量
 
-存储：`PROMPT_ARTIFACT_STORE_DIR`；未设置时默认
-`<database parent>/prompt_artifacts`。
+存储固定派生自既有 `DATABASE_PATH`：`<database parent>/prompt_artifacts`。
 
 **运行时闭环（Skill）：** `resolve_skill_prompt_state` 对实际激活的 Skill 写入历史和
 trace，但不会从历史反向改写 `instructions`、`required_tools`、`allowed_tools`、默认

@@ -48,8 +48,8 @@ dedicated PR.
   to use their source/plugin definition until governed activation in #1093
 - Does **not** rewrite `strategies/*.yaml` or Python prompt constants
 
-Storage root: `PROMPT_ARTIFACT_STORE_DIR` (default
-`<database parent>/prompt_artifacts`).
+Storage root: `<database parent>/prompt_artifacts`, derived from the existing
+`DATABASE_PATH` setting.
 
 **Runtime loop (Skills):** `resolve_skill_prompt_state` records history and trace
 for the actually active Skills. History never rewrites runtime `instructions`,

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import threading
 from datetime import datetime, timezone
@@ -46,10 +45,9 @@ def _utc_now_iso() -> str:
 
 
 def default_prompt_artifact_store_root() -> Path:
-    """Resolve store root from env or beside the application database."""
-    configured = os.getenv("PROMPT_ARTIFACT_STORE_DIR", "").strip()
-    if configured:
-        return Path(configured).expanduser()
+    """Resolve the durable store beside the application database."""
+    import os
+
     database_path = Path(
         os.getenv("DATABASE_PATH", "./data/stock_analysis.db")
     ).expanduser()
