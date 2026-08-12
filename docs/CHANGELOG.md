@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
 - [Tests] CI report-export-stack job installs optional report-export dependencies and host fonts, and fails when HTML/PDF fixture, Chinese glyph-coverage, or bound export tests skip (Refs #163).
 - [Fixed] Split notification/report chunks on true H1 headings and flush max-words buffers after oversize sections (Ported-from upstream 5698068fe; Refs #1219).
+- [Docs] Add bilingual engineering-efficiency playbook for parallel merge trains (batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, worktree safety) and link it from CONTRIBUTING and the docs index (Refs #891).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Changed] Jinja stock reports use Decision Card-first layered reading (card → mode-density evidence strata → detail sections) for brief/standard/research, and `ReportType.BRIEF` notifications force `report_mode=brief` so push length budgets hold (Refs #861, #874).
