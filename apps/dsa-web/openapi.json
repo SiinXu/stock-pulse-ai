@@ -4285,6 +4285,46 @@
         "title": "AuthSettingsRequest",
         "type": "object"
       },
+      "AuthStatusResponse": {
+        "additionalProperties": false,
+        "description": "Wire-stable auth status payload (camelCase aliases, Issue #549).",
+        "properties": {
+          "authEnabled": {
+            "title": "Authenabled",
+            "type": "boolean"
+          },
+          "loggedIn": {
+            "title": "Loggedin",
+            "type": "boolean"
+          },
+          "passwordChangeable": {
+            "title": "Passwordchangeable",
+            "type": "boolean"
+          },
+          "passwordSet": {
+            "title": "Passwordset",
+            "type": "boolean"
+          },
+          "setupState": {
+            "enum": [
+              "enabled",
+              "password_retained",
+              "no_password"
+            ],
+            "title": "Setupstate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authEnabled",
+          "loggedIn",
+          "passwordSet",
+          "passwordChangeable",
+          "setupState"
+        ],
+        "title": "AuthStatusResponse",
+        "type": "object"
+      },
       "BacktestAppliedConfig": {
         "description": "Echo of the effective run configuration used for evaluation honesty.",
         "properties": {
@@ -34241,7 +34281,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             },
             "description": "Successful Response"

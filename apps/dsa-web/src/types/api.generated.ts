@@ -5312,6 +5312,25 @@ export interface components {
             passwordConfirm?: string | null;
         };
         /**
+         * AuthStatusResponse
+         * @description Wire-stable auth status payload (camelCase aliases, Issue #549).
+         */
+        AuthStatusResponse: {
+            /** Authenabled */
+            authEnabled: boolean;
+            /** Loggedin */
+            loggedIn: boolean;
+            /** Passwordchangeable */
+            passwordChangeable: boolean;
+            /** Passwordset */
+            passwordSet: boolean;
+            /**
+             * Setupstate
+             * @enum {string}
+             */
+            setupState: "enabled" | "password_retained" | "no_password";
+        };
+        /**
          * BacktestAppliedConfig
          * @description Echo of the effective run configuration used for evaluation honesty.
          */
@@ -17954,7 +17973,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthStatusResponse"];
                 };
             };
         };

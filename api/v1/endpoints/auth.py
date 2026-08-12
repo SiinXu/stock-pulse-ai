@@ -7,9 +7,11 @@ import hashlib
 import logging
 import os
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from api.deps import (
     get_system_config_service,
@@ -154,7 +156,7 @@ def _record_login_completion(
 class LoginRequest(BaseModel):
     """Login request body. For first-time setup use password + password_confirm."""
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     password: str = Field(default="", description="Admin password")
     password_confirm: str | None = Field(default=None, alias="passwordConfirm", description="Confirm (first-time)")
@@ -163,7 +165,7 @@ class LoginRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     """Change password request body."""
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     current_password: str = Field(default="", alias="currentPassword")
     new_password: str = Field(default="", alias="newPassword")
@@ -173,12 +175,26 @@ class ChangePasswordRequest(BaseModel):
 class AuthSettingsRequest(BaseModel):
     """Update auth enablement and initial password settings."""
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     auth_enabled: bool = Field(alias="authEnabled")
     password: str = Field(default="")
     password_confirm: str | None = Field(default=None, alias="passwordConfirm")
     current_password: str = Field(default="", alias="currentPassword")
+
+
+class AuthStatusResponse(BaseModel):
+    """Wire-stable auth status payload (camelCase aliases, Issue #549)."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    auth_enabled: bool = Field(alias="authEnabled")
+    logged_in: bool = Field(alias="loggedIn")
+    password_set: bool = Field(alias="passwordSet")
+    password_changeable: bool = Field(alias="passwordChangeable")
+    setup_state: Literal["enabled", "password_retained", "no_password"] = Field(
+        alias="setupState"
+    )
 
 
 def _cookie_params(request: Request) -> dict:
@@ -277,8 +293,8 @@ def _set_session_cookie(response: Response, session_value: str, request: Request
     )
 
 
-def _get_auth_status_dict(request: Request | None = None) -> dict:
-    """Helper to build consistent auth status response body."""
+def _build_auth_status(request: Request | None = None) -> AuthStatusResponse:
+    """Build the canonical auth status DTO."""
     auth_enabled = is_auth_enabled()
     logged_in = False
     if auth_enabled and request:
@@ -290,23 +306,29 @@ def _get_auth_status_dict(request: Request | None = None) -> dict:
     # - password_retained: auth disabled but password exists
     # - no_password: auth disabled and no password exists
     if auth_enabled:
-        setup_state = "enabled"
+        setup_state: Literal["enabled", "password_retained", "no_password"] = "enabled"
     elif has_stored_password():
         setup_state = "password_retained"
     else:
         setup_state = "no_password"
 
-    return {
-        "authEnabled": auth_enabled,
-        "loggedIn": logged_in,
-        "passwordSet": _password_set_for_response(auth_enabled),
-        "passwordChangeable": is_password_changeable() if auth_enabled else False,
-        "setupState": setup_state,
-    }
+    return AuthStatusResponse(
+        authEnabled=auth_enabled,
+        loggedIn=logged_in,
+        passwordSet=_password_set_for_response(auth_enabled),
+        passwordChangeable=is_password_changeable() if auth_enabled else False,
+        setupState=setup_state,
+    )
+
+
+def _get_auth_status_dict(request: Request | None = None) -> dict:
+    """Helper to build consistent auth status response body (camelCase wire keys)."""
+    return _build_auth_status(request).model_dump(mode="json", by_alias=True)
 
 
 @router.get(
     "/status",
+    response_model=AuthStatusResponse,
     summary="Get auth status",
     description="Returns whether auth is enabled and if the current request is logged in.",
 )
