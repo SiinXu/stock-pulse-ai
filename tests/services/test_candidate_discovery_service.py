@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
+from unittest.mock import patch
 
 from src.services.candidate_discovery_service import (
     MAX_PROVIDER_CALLS_HARD_CAP,
@@ -173,6 +175,40 @@ class CandidateDiscoveryServiceTests(unittest.TestCase):
         self.assertGreaterEqual(result["candidate_count"], 1)
         self.assertTrue(
             any("metadata_only" in (item.get("reason_codes") or []) for item in result["candidates"])
+        )
+
+    def test_watchlist_parse_failure_is_logged_and_returns_an_empty_universe(self) -> None:
+        service = CandidateDiscoveryService(
+            config_provider=lambda: SimpleNamespace(stock_list="invalid"),
+            index_loader=lambda: [],
+        )
+
+        with (
+            patch("src.utils.stock_list.split_stock_list", side_effect=ValueError("invalid")),
+            self.assertLogs("src.services.candidate_discovery_service", level="DEBUG") as logs,
+        ):
+            result = service.discover(universe="watchlist")
+
+        self.assertEqual(result["empty_reason"], "empty_universe")
+        self.assertEqual(result["universe_contract"]["resolved_count"], 0)
+        self.assertTrue(
+            any("candidate_discovery_watchlist_parse_failed" in entry for entry in logs.output)
+        )
+
+    def test_portfolio_lookup_failure_is_logged_and_returns_an_empty_universe(self) -> None:
+        service = CandidateDiscoveryService(index_loader=lambda: [])
+
+        with (
+            patch("src.repositories.portfolio_repo.PortfolioRepository") as repository,
+            self.assertLogs("src.services.candidate_discovery_service", level="WARNING") as logs,
+        ):
+            repository.return_value.list_cached_positions.side_effect = RuntimeError("offline")
+            result = service.discover(universe="portfolio", account_id=7)
+
+        self.assertEqual(result["empty_reason"], "empty_universe")
+        self.assertEqual(result["universe_contract"]["resolved_count"], 0)
+        self.assertTrue(
+            any("candidate_discovery_portfolio_failed" in entry for entry in logs.output)
         )
 
 

@@ -708,7 +708,7 @@ class CandidateDiscoveryService:
                 from src.utils.stock_list import split_stock_list
 
                 return list(split_stock_list(raw))
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - malformed configured watchlists are safely logged and treated as empty
                 log_safe_exception(
                     logger,
                     "Candidate discovery watchlist parse failed",
@@ -730,7 +730,7 @@ class CandidateDiscoveryService:
             rows = PortfolioRepository().list_cached_positions(
                 account_id=account_id, cost_method="fifo"
             )
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - portfolio lookup failures are safely logged and treated as empty
             log_safe_exception(
                 logger,
                 "Candidate discovery portfolio load failed",
