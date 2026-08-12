@@ -124,11 +124,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
-| `AGENT_MODE_BUDGET_ENABLED` | `true` | yes | Enable hard per-mode budgets (turns/tools/cost); breach terminates with explicit reason |
-| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | yes | Global tightener for mode LLM turn caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | yes | Global tightener for mode tool-call caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | yes | Global tightener for mode estimated cost caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | yes | Optional global token ceiling; 0 disables token dimension |
+| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | Enable hard per-mode budgets (turns/tools/cost); breach terminates with explicit reason |
+| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | Global tightener for mode LLM turn caps; 0 keeps mode defaults |
+| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | Global tightener for mode tool-call caps; 0 keeps mode defaults |
+| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | Global tightener for mode estimated cost caps; 0 keeps mode defaults |
+| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | Optional global token ceiling; 0 disables token dimension |
 | `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |
 | `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 是 | 模板中注释 |
