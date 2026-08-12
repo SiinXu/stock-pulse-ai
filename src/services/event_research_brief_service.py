@@ -506,13 +506,12 @@ def build_event_research_brief_background_tasks(config, *, config_provider, serv
     def task():
         try:
             result = svc.maybe_run(force=False)
+            if result is None or result.skipped_reason:
+                return
         except Exception as exc:  # broad-exception: fallback_recorded - scheduler isolates brief failure
             log_safe_exception(logger, "scheduled run failed", exc,
                                error_code="event_research_brief_scheduled_run_failed", level=logging.WARNING)
             return
-        if result is None or result.skipped_reason:
-            return
-        logger.info("[EventResearchBrief] complete count=%s notify=%s", len(result.briefs), result.notification_status)
 
     return [{"task": task, "interval_seconds": EVENT_RESEARCH_BRIEF_POLL_INTERVAL_SECONDS,
              "run_immediately": True, "name": "event_research_brief"}]
