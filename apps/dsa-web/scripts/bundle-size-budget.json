@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after AGENT_MODE_BUDGET_* inventory on current main (Refs #1121 / #125) and PERF_* i18n (Refs #227).",
+  "baselineNote": "Locale/IntelligenceSourcesPanel budgets include PERF_* field-title i18n headroom (Refs #227 / PR #1211) on top of concurrent main settings help growth; failed artifacts use measured gzip + documented headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 238501,
-      "measuredGzipBytes": 238101,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 239062,
+      "measuredGzipBytes": 238662,
+      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 238662 B + 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -47,9 +47,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 148106,
-      "measuredGzipBytes": 147506,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 148659,
+      "measuredGzipBytes": 148259,
+      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 148259 B + 400 B headroom."
     },
     {
       "id": "locale-es",
