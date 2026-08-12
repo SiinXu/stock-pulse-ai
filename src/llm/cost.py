@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 COST_STATUS_PROVIDER_REPORTED = "provider_reported"
@@ -139,7 +141,14 @@ def _load_optional_pricing_table() -> Dict[str, Dict[str, float]]:
         try:
             raw = json.loads(Path(path).read_text(encoding="utf-8"))
         except Exception as exc:  # broad-exception: optional_metadata - bad pricing file must degrade to unpriced
-            logger.warning("Failed to load LLM_COST_PRICING_PATH=%s: %s", path, exc)
+            log_safe_exception(
+                logger,
+                "LLM cost pricing table load failed",
+                exc,
+                error_code="llm_cost_pricing_table_load_failed",
+                level=logging.WARNING,
+                context={"pricing_path": path},
+            )
             _pricing_cache, _pricing_cache_path = {}, path
             return _pricing_cache
         parsed: Dict[str, Dict[str, float]] = {}

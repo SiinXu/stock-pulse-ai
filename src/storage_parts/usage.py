@@ -4,7 +4,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, case, desc, func, select
+from sqlalchemy import and_, case as _case, desc, func, select
 
 from src.storage import (
     LLMUsage,
@@ -54,11 +54,11 @@ class _UsageMethods:
                     func.coalesce(func.sum(LLMUsage.completion_tokens), 0).label("completion_tokens"),
                     func.coalesce(func.sum(LLMUsage.total_tokens), 0).label("tokens"),
                     func.sum(LLMUsage.estimated_cost_usd).label("cost_usd"),
-                    func.coalesce(func.sum(case((LLMUsage.estimated_cost_usd.is_not(None), 1), else_=0)), 0).label("priced_calls"),
-                    func.coalesce(func.sum(case((LLMUsage.cost_status == "unpriced", 1), else_=0)), 0).label("unpriced_calls"),
-                    func.coalesce(func.sum(case((LLMUsage.route_outcome == "primary_success", 1), else_=0)), 0).label("route_primary"),
-                    func.coalesce(func.sum(case((LLMUsage.route_outcome == "fallback_success", 1), else_=0)), 0).label("route_fallback"),
-                    func.coalesce(func.sum(case((LLMUsage.route_outcome == "failed", 1), else_=0)), 0).label("route_failed"),
+                    func.coalesce(func.sum(_case((LLMUsage.estimated_cost_usd.is_not(None), 1), else_=0)), 0).label("priced_calls"),
+                    func.coalesce(func.sum(_case((LLMUsage.cost_status == "unpriced", 1), else_=0)), 0).label("unpriced_calls"),
+                    func.coalesce(func.sum(_case((LLMUsage.route_outcome == "primary_success", 1), else_=0)), 0).label("route_primary"),
+                    func.coalesce(func.sum(_case((LLMUsage.route_outcome == "fallback_success", 1), else_=0)), 0).label("route_fallback"),
+                    func.coalesce(func.sum(_case((LLMUsage.route_outcome == "failed", 1), else_=0)), 0).label("route_failed"),
                 ).where(base_filter)
             ).one()
             by_type_rows = session.execute(
@@ -90,7 +90,7 @@ class _UsageMethods:
                     func.coalesce(func.sum(LLMUsage.completion_tokens), 0).label("completion_tokens"),
                     func.coalesce(func.sum(LLMUsage.total_tokens), 0).label("tokens"),
                     func.sum(LLMUsage.estimated_cost_usd).label("cost_usd"),
-                    func.coalesce(func.sum(case((LLMUsage.call_success == 1, 1), else_=0)), 0).label("success_calls"),
+                    func.coalesce(func.sum(_case((LLMUsage.call_success == 1, 1), else_=0)), 0).label("success_calls"),
                     func.coalesce(func.avg(LLMUsage.latency_ms), 0).label("avg_latency_ms"),
                 ).where(and_(base_filter, LLMUsage.stage.is_not(None))).group_by(LLMUsage.stage).order_by(desc(func.sum(LLMUsage.total_tokens)))
             ).all()

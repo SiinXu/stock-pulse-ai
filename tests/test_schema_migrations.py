@@ -40,6 +40,7 @@ from src.migrations.registry import (
     INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
     INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
+    LLM_USAGE_COST_ATTRIBUTION_MIGRATION,
     LLM_USAGE_TELEMETRY_MIGRATION,
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
     REGISTRY_METADATA_MIGRATION,
@@ -445,6 +446,7 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         NOTIFICATION_INBOX_READ_STATE_MIGRATION.id,
         CHAT_TURN_IDENTITY_MIGRATION.id,
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
+        LLM_USAGE_COST_ATTRIBUTION_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)

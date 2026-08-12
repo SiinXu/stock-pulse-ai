@@ -40,7 +40,7 @@ from sqlalchemy import (
     select,
     and_,
     or_,
-    case,
+    case as _case,
     delete,
     desc,
     event,

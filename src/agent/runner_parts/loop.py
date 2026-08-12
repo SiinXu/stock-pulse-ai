@@ -7,6 +7,7 @@ import logging
 import time
 import uuid
 from dataclasses import replace
+from inspect import signature as _signature
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent.llm_adapter import LLMToolAdapter
@@ -56,6 +57,31 @@ logger = logging.getLogger("src.agent.runner")
 # Defense-in-depth for every native tool result before it becomes the next
 # model message. Transcript parsing keeps its own valid-JSON result below 96 KiB.
 _NATIVE_TOOL_RESULT_MAX_BYTES = 128 * 1024
+
+
+def _record_usage_with_optional_attribution(
+    recorder: Any,
+    usage: Any,
+    model: str,
+    **telemetry: Any,
+) -> Any:
+    """Preserve legacy injected recorder sinks while enriching current ones."""
+    record = recorder.record
+    try:
+        parameters = _signature(record).parameters
+    except (TypeError, ValueError):
+        return record(usage, model, call_type=telemetry["call_type"])
+
+    accepts_arbitrary_keywords = any(
+        parameter.kind is parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    supported = (
+        telemetry
+        if accepts_arbitrary_keywords
+        else {key: value for key, value in telemetry.items() if key in parameters}
+    )
+    return record(usage, model, **supported)
 
 
 def run_agent_loop(
@@ -335,24 +361,22 @@ def run_agent_loop(
         model_for_usage = m or response.provider
         step_latency_ms = max(0, int((time.perf_counter() - model_started) * 1000))
         call_ok = getattr(response, "provider", None) != "error"
-        usage_payload = dict(response.usage or {})
-        if usage_payload.get("latency_ms") is None:
-            usage_payload["latency_ms"] = step_latency_ms
-        if usage_payload.get("call_success") is None:
-            usage_payload["call_success"] = call_ok
         if model_for_usage:
-            recorder.record(
-                usage_payload,
+            recorded_usage = response.usage
+            response_usage = recorded_usage or {}
+            _record_usage_with_optional_attribution(
+                recorder,
+                recorded_usage,
                 model_for_usage if model_for_usage != "error" else (m or "unknown"),
                 call_type="agent",
                 run_id=run_id,
                 stage="agent_step",
                 agent_mode=agent_mode,
-                latency_ms=usage_payload.get("latency_ms"),
-                call_success=bool(usage_payload.get("call_success")),
-                route_outcome=usage_payload.get("route_outcome"),
-                route_attempt=usage_payload.get("route_attempt"),
-                primary_model=usage_payload.get("primary_model"),
+                latency_ms=response_usage.get("latency_ms", step_latency_ms),
+                call_success=bool(response_usage.get("call_success", call_ok)),
+                route_outcome=response_usage.get("route_outcome"),
+                route_attempt=response_usage.get("route_attempt"),
+                primary_model=response_usage.get("primary_model"),
             )
         emit_model_end(
             str(m or model_label or "model"),
