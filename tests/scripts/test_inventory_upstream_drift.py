@@ -7,9 +7,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.check_upstream_parity import (
+    DEFAULT_WHITELIST,
     STATUS_ATTENTION,
     ParityReport,
     UpstreamCommit,
+    load_whitelist,
 )
 from scripts.inventory_upstream_drift import (
     ACTION_DESIGN_NEEDED,
@@ -27,6 +29,15 @@ from scripts.inventory_upstream_drift import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_inventory_script_does_not_expand_upstream_path_whitelist() -> None:
+    """Local inventory tooling must not weaken upstream path coverage."""
+    whitelist = load_whitelist(DEFAULT_WHITELIST)
+
+    assert "scripts/inventory_upstream_drift.py" not in (
+        whitelist.deliberately_diverged_prefixes
+    )
 
 
 def test_skip_docs_for_changelog_only() -> None:
