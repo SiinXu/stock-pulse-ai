@@ -1200,6 +1200,39 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
 
+    "READINESS_CHECK_TIMEOUT_SECONDS": {
+        "title": "Readiness Check Timeout",
+        "description": (
+            "Per-check timeout in seconds for the structured readiness/self-check module "
+            "(data providers, LLM, task queue, setup dependencies). "
+            "Clamped to 0.1–5.0. On-demand only — never runs automatically at process startup. "
+            "Timed-out or failed probes are reported as failed/degraded and never as ready."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1.0",
+        "options": [],
+        "validation": {"min": 0.1, "max": 5.0},
+        "display_order": 60,
+        "help_key": "settings.system.READINESS_CHECK_TIMEOUT_SECONDS",
+        "examples": [
+            "READINESS_CHECK_TIMEOUT_SECONDS=1.0",
+            "READINESS_CHECK_TIMEOUT_SECONDS=2.0",
+        ],
+        "docs": [
+            {
+                "label": "Structured readiness self-check",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/readiness-self-check_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+
+
     "DAILY_BRIEF_ENABLED": {
         "title": "Daily Brief Enabled",
         "description": (

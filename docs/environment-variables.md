@@ -533,6 +533,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PYTDX_PRIORITY` | `2` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PYTDX_SERVERS` | `192.168.1.100:7709,10.0.0.1:7709` | 是 | 模板中注释; Comma-separated ip:port list; overrides PYTDX_HOST/PYTDX_PORT when set. |
 | `REALTIME_SOURCE_PRIORITY` | `tencent,akshare_sina,efinance,akshare_em` | 是 | 模板中注释 |
+| `READINESS_CHECK_TIMEOUT_SECONDS` | `1.0` | 是 | 模板中注释; 结构化就绪/自检单检查超时（GET /api/v1/system/readiness；仅按需；钳制 0.1–5.0；超时不得报就绪） |
 | `REASONING_TRACE_EXPORT_ENABLED` | `false` | 是 | 模板中注释; Reasoning-trace export (Issue #135): default off |
 | `REASONING_TRACE_EXPORT_MAX_CHARS` | `500000` | 是 | 模板中注释; clamped to 10000..2000000 |
 | `REPORT_EXPORT_PDF_FONT_PATH` | `空` | 是 | 模板中注释; Report export (optional PDF) |

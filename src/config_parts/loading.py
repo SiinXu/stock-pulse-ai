@@ -17,6 +17,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT as _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
     logger,
     normalize_tickflow_kline_adjust,
     parse_prompt_cache_diagnostics_level,
@@ -1279,6 +1280,12 @@ class _ConfigLoadingMethods:
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),
+            readiness_check_timeout_seconds=parse_env_float(
+                os.getenv('READINESS_CHECK_TIMEOUT_SECONDS'),
+                _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
+                field_name='READINESS_CHECK_TIMEOUT_SECONDS',
+                minimum=0.1,
+            ),
             analysis_parallel_fetch_enabled=parse_env_bool(
                 os.getenv('ANALYSIS_PARALLEL_FETCH_ENABLED'),
                 default=True,
