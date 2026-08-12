@@ -6085,7 +6085,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "Had rekod memori berlapis",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "Hari pengekalan memori berlapis",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "Carian vektor memori berlapis",
-  "locales.backtest.BACKTEST_TEXT.methodologyDisclaimer": "Historical simulation for research only — not a return promise and not live fills. Look-ahead protection, survivorship limits (analyzed universe only), and explicit commission/slippage are disclosed. Percent returns are currency-agnostic; absolute prices are never summed across currencies.",
-  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_COMMISSION_BPS": "Backtest Commission Bps",
-  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_SLIPPAGE_BPS": "Backtest Slippage Bps",
+  "locales.backtest.BACKTEST_TEXT.methodologyDisclaimer": "Simulasi sejarah untuk penyelidikan sahaja — bukan janji pulangan dan bukan fill langsung. Perlindungan look-ahead, had survivorship (hanya alam semesta dianalisis) serta komisen/gelinciran eksplisit didedahkan. Pulangan peratusan agnostik mata wang; harga mutlak tidak pernah dijumlah merentas mata wang.",
+  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_COMMISSION_BPS": "Komisen backtest (bp/sisi)",
+  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_SLIPPAGE_BPS": "Gelinciran backtest (bp/sisi)",
 } as const;

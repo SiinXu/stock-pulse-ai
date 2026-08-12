@@ -6085,7 +6085,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "Datensatzlimit des Schichtgedächtnisses",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "Aufbewahrungstage des Schichtgedächtnisses",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "Vektorsuche im Schichtgedächtnis",
-  "locales.backtest.BACKTEST_TEXT.methodologyDisclaimer": "Historical simulation for research only — not a return promise and not live fills. Look-ahead protection, survivorship limits (analyzed universe only), and explicit commission/slippage are disclosed. Percent returns are currency-agnostic; absolute prices are never summed across currencies.",
-  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_COMMISSION_BPS": "Backtest Commission Bps",
-  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_SLIPPAGE_BPS": "Backtest Slippage Bps",
+  "locales.backtest.BACKTEST_TEXT.methodologyDisclaimer": "Nur historische Simulation zur Forschung — kein Renditeversprechen und keine Live-Fills. Look-ahead-Schutz, Survivorship-Grenzen (nur analysiertes Universum) und explizite Gebühren/Slippage sind ausgewiesen. Prozentuale Renditen sind währungsagnostisch; absolute Preise werden nie währungsübergreifend summiert.",
+  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_COMMISSION_BPS": "Backtest-Provision (Bp/Seite)",
+  "utils.systemConfigI18n.fieldTitleMaps.BACKTEST_SLIPPAGE_BPS": "Backtest-Slippage (Bp/Seite)",
 } as const;
