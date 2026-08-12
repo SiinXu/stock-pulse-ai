@@ -149,9 +149,9 @@ def resolve_readiness_check_timeout_seconds(
             env_map.get("READINESS_CHECK_TIMEOUT_SECONDS")
         )
     try:
-        from src.config import get_config
+        from src import config as config_module
 
-        cfg = get_config()
+        cfg = config_module.get_config()
         return parse_readiness_check_timeout_seconds(
             getattr(cfg, "readiness_check_timeout_seconds", DEFAULT_CHECK_TIMEOUT_SECONDS)
         )
@@ -1021,6 +1021,13 @@ def build_readiness_report(
                             )
                         )
                     except Exception as exc:  # broad-exception: fallback_recorded - fail closed item
+                        log_safe_exception(
+                            logger,
+                            "Dependency readiness item projection failed",
+                            exc,
+                            error_code="readiness_dependency_item_invalid",
+                            context={"item_key": str((item or {}).get("key") or "dependency")},
+                        )
                         checks.append(
                             ReadinessCheck(
                                 key=str((item or {}).get("key") or "dependency"),

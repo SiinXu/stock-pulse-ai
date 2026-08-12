@@ -411,8 +411,14 @@ def get_system_readiness(
             generation_status_factory=service.get_generation_backend_status,
         )
         return ReadinessReportResponse.model_validate(report.to_dict())
-    except Exception as exc:
-        _log_config_exception("Readiness report load failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map readiness failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Readiness report load failed",
+            exc,
+            error_code="internal_error",
+            level=logging.ERROR,
+        )
         raise HTTPException(
             status_code=500,
             detail={
