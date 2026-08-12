@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Chore] Rebaseline Web locale gzip budgets after HTML report-export download chrome strings (Refs #163).
 - [Added] Report Markdown panel one-click HTML export uses history export capabilities so office-friendly HTML is user-reachable alongside Markdown and PDF (Refs #163).
+- [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
+- [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
 - [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
 - [Changed] Mount the interactive DCF sensitivity panel on Stock Details and reset its stock-bound estimate and assumptions when the canonical route stock changes (Refs #238, #1008).
 - [Changed] Mount watchlist AI scores and opt-in sorting on production Home watchlist groups, refetch on analysis or refresh lifecycle changes, and fail closed on score errors (Refs #147, #1008).
