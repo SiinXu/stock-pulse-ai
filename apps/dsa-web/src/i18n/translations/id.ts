@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -1365,7 +1367,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.enableAuth": "Mengaktifkan autentikasi",
   "i18n.uiText.UI_TEXT.settings.enabledAlphaSiftSuccess": "Penyaringan AlphaSift diaktifkan.",
   "i18n.uiText.UI_TEXT.settings.enablingAlphaSift": "Mengaktifkan...",
-  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Dalam Docker penyebaran,--env-file dan Compose env_file Menyuntikkan variabel lingkungan hanya saat startup. Area ekspor/impor ini menggunakan backend aktif .env berkas. Untuk mempertahankan WebUI-saved di seluruh kontainer rekontai, titik ENV_FILE ke file volume data yang dapat ditulis seperti /app/data/runtime.env dan hindari menyimpan nilai lama dengan nama yang sama di lingkungan startup.",
+  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Di Docker, --env-file dan Compose env_file hanya berlaku saat startup. Ekspor/impor memakai .env backend aktif. Agar setelan WebUI bertahan, arahkan ENV_FILE ke volume tulis seperti /app/data/runtime.env; hapus nilai bernama sama dari lingkungan startup.",
   "i18n.uiText.UI_TEXT.settings.envExported": "Tersimpan .env cadangan diekspor.",
   "i18n.uiText.UI_TEXT.settings.envExportNote": "Ekspor hanya menyertakan konfigurasi yang saat ini disimpan, bukan draf lokal yang belum disimpan di halaman.",
   "i18n.uiText.UI_TEXT.settings.envImported": ".env cadangan diimpor dan konfigurasi dimuat ulang.",

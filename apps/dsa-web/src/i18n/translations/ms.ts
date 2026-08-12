@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",
@@ -1365,7 +1367,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.enableAuth": "Dayakan pengesahan",
   "i18n.uiText.UI_TEXT.settings.enabledAlphaSiftSuccess": "Saringan AlphaSift didayakan.",
   "i18n.uiText.UI_TEXT.settings.enablingAlphaSift": "Mendayakan...",
-  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Dalam Docker penempatan,--env-file dan Mengarang env_file menyuntik pembolehubah persekitaran hanya semasa permulaan. Kawasan eksport/import ini menggunakan bahagian belakang aktif .env fail. Untuk mengekalkan WebUI-nilai yang disimpan merentas pembinaan semula kontena, titik ENV_FILE kepada fail volum data boleh tulis seperti /app/data/runtime.env dan elakkan mengekalkan nilai lama dengan nama yang sama dalam persekitaran permulaan.",
+  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Di Docker, --env-file dan Compose env_file hanya berkuat kuasa ketika mula. Eksport/import memakai .env backend aktif. Agar tetapan WebUI kekal, arahkan ENV_FILE ke volum boleh tulis seperti /app/data/runtime.env; buang nilai bernama sama daripada persekitaran mula.",
   "i18n.uiText.UI_TEXT.settings.envExported": "Disimpan .env sandaran dieksport.",
   "i18n.uiText.UI_TEXT.settings.envExportNote": "Eksport hanya termasuk konfigurasi yang disimpan pada masa ini, bukan draf tempatan yang tidak disimpan pada halaman.",
   "i18n.uiText.UI_TEXT.settings.envImported": ".env sandaran diimport dan konfigurasi dimuat semula.",
