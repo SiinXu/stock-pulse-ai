@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildFailedRowsCsv,
   buildFxRefreshFeedback,
-  formatBrokerLabel,
   formatMoney,
   formatPositionMoney,
   formatPositionPrice,
   formatSignedPct,
-  getCsvCommitVariant,
-  getCsvParseVariant,
   getPositionPriceLabel,
 } from '../portfolioFormat';
+import {
+  buildFailedRowsCsv,
+  formatBrokerLabel,
+  getCsvCommitVariant,
+  getCsvParseVariant,
+} from '../../components/portfolio/portfolioImportFailedRows';
 import type { PortfolioPositionItem } from '../../types/portfolio';
 
 const pricedPosition: PortfolioPositionItem = {
@@ -68,7 +70,7 @@ describe('portfolioFormat', () => {
         rowNumber: 3,
         reasonCode: 'invalid_price',
         reason: 'Price must be a positive number',
-        source: { 成交日期: '2026-01-03', 证券代码: '000001', 成交均价: '0' },
+        source: { 成交日期: '2026-01-03', 证券代码: '000001', 成交均价: '=1+1' },
       },
     ]);
     expect(csv.startsWith('\uFEFF')).toBe(true);
@@ -76,6 +78,7 @@ describe('portfolioFormat', () => {
     expect(csv).toContain('invalid_side');
     expect(csv).toContain('600519');
     expect(csv).toContain('Asset Transfer');
+    expect(csv).toContain("'=1+1");
   });
 
   it('builds FX refresh feedback from refresh outcomes', () => {

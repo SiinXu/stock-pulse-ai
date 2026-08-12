@@ -447,7 +447,7 @@ class PortfolioImportService:
                     engine="openpyxl",
                     dtype=str,
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: cleanup - Translate pandas/openpyxl workbook failures to a stable import validation error.
                 raise ValueError(
                     "Excel parse failed. Confirm the file is a valid .xlsx workbook "
                     "with a non-empty first sheet."
@@ -470,7 +470,7 @@ class PortfolioImportService:
             except UnicodeDecodeError as exc:
                 last_decode_error = exc
                 continue
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: cleanup - Translate pandas CSV parser failures to a stable import validation error.
                 raise ValueError(
                     "CSV parse failed. Check delimiter consistency and quoting."
                 ) from exc
@@ -616,10 +616,10 @@ class PortfolioImportService:
         snapshot: Dict[str, str] = {}
         try:
             items = list(row.items())  # type: ignore[attr-defined]
-        except Exception:
+        except Exception:  # broad-exception: optional_metadata - Unsupported row objects fall back to index-based source metadata.
             try:
                 items = [(col, row[col]) for col in list(row.index)]  # type: ignore[index]
-            except Exception:
+            except Exception:  # broad-exception: optional_metadata - Unreadable optional source metadata becomes an empty snapshot.
                 return snapshot
         for col, value in items:
             if value is None:

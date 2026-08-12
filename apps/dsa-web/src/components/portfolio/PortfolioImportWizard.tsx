@@ -19,7 +19,7 @@ import {
   formatBrokerLabel,
   getCsvCommitVariant,
   getCsvParseVariant,
-} from '../../utils/portfolioFormat';
+} from './portfolioImportFailedRows';
 import { formatUiText } from '../../i18n/uiText';
 import type { UiLanguage } from '../../i18n/uiText';
 import {
@@ -279,7 +279,8 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
 
   return (
     <div
-      data-testid="portfolio-import-wizard"
+      role="region"
+      aria-label={text.importWizardTitle}
       data-pattern="wizard"
       className="space-y-4"
     >
@@ -512,7 +513,6 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
                       type="button"
                       variant="secondary"
                       size="comfortable"
-                      data-testid="portfolio-import-download-failed-rows"
                       onClick={downloadFailedRows}
                     >
                       {text.importWizardDownloadFailedRows}

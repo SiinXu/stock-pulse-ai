@@ -522,9 +522,13 @@ describe('PortfolioPage FX refresh', () => {
 
   async function openCsvImportWizardAndReachConfirm(file: File) {
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    expect(await screen.findByTestId('portfolio-import-wizard')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: '导入持仓向导' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     expect(screen.getByLabelText('选择 CSV / Excel')).toHaveAttribute('data-control', 'file-input');
+    expect(screen.getByLabelText('选择 CSV / Excel')).toHaveAttribute(
+      'accept',
+      expect.stringContaining('.xlsx'),
+    );
     expect(screen.getByRole('button', { name: '选择 CSV / Excel' })).toHaveAttribute('data-control', 'button');
     fireEvent.change(screen.getByLabelText('选择 CSV / Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
@@ -849,7 +853,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    const wizard = await screen.findByTestId('portfolio-import-wizard');
+    const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
 
     expect(within(wizard).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
     expect(within(wizard).getByRole('combobox', { name: '券商' })).toBeDisabled();
@@ -878,7 +882,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    await screen.findByTestId('portfolio-import-wizard');
+    await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     const source = screen.getByLabelText('或粘贴表格文本');
     fireEvent.change(source, { target: { value: 'symbol,quantity\nAAPL,bad' } });
@@ -901,6 +905,52 @@ describe('PortfolioPage FX refresh', () => {
     expect(await correctedFile.text()).toBe('symbol,quantity\nAAPL,2');
   });
 
+  it('lets a user reach and download structured failed rows for correction', async () => {
+    parseCsvImport.mockResolvedValueOnce({
+      broker: 'huatai',
+      recordCount: 0,
+      skippedCount: 0,
+      errorCount: 1,
+      records: [],
+      errors: [],
+      failedRows: [{
+        rowNumber: 2,
+        reasonCode: 'invalid_side',
+        reason: 'Side must be buy or sell',
+        source: { 证券代码: '600519', 买卖标志: '=1+1' },
+      }],
+    });
+    const createObjectURL = vi.fn(() => 'blob:failed-rows');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    renderPortfolioPage();
+    await waitForInitialLoad();
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    const file = new File(['not-a-real-workbook'], 'trades.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    fireEvent.change(within(wizard).getByLabelText('选择 CSV / Excel'), {
+      target: { files: [file] },
+    });
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    await waitFor(() => expect(parseCsvImport).toHaveBeenCalledWith('huatai', file));
+    await within(wizard).findByText('CSV 解析结果');
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+
+    expect(await within(wizard).findByRole('table', { name: '失败行（可下载修正）' }))
+      .toHaveTextContent('invalid_side');
+    fireEvent.click(within(wizard).getByRole('button', { name: '下载失败行 CSV' }));
+
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(anchorClick).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:failed-rows');
+  });
+
   it('does not automatically retry a failed CSV parse', async () => {
     parseCsvImport.mockRejectedValueOnce(
       createApiError(createParsedApiError({ title: '解析失败', message: 'CSV 格式无效' })),
@@ -909,7 +959,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
-    await screen.findByTestId('portfolio-import-wizard');
+    await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     const file = new File(['bad'], 'bad.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText('选择 CSV / Excel'), { target: { files: [file] } });
