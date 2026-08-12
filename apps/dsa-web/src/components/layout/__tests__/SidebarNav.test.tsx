@@ -134,8 +134,8 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute('href', APP_ROUTE_PATHS.home);
-    expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.agent}?stock=AAPL`);
+    expect(screen.getByRole('link', { name: '今日' })).toHaveAttribute('href', APP_ROUTE_PATHS.home);
+    expect(screen.getByRole('link', { name: '信号中心' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.signals}?stock=AAPL`);
     expect(screen.getByRole('link', { name: '回测' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL`);
   });
 
@@ -203,8 +203,8 @@ describe('SidebarNav', () => {
       APP_ROUTE_PATHS.researchBacktest,
       APP_ROUTE_PATHS.calculators,
       APP_ROUTE_PATHS.researchSkillOutcomes,
+      APP_ROUTE_PATHS.signals,
       APP_ROUTE_PATHS.portfolio,
-      APP_ROUTE_PATHS.agent,
       APP_ROUTE_PATHS.settings,
     ]);
   });
@@ -243,7 +243,7 @@ describe('SidebarNav', () => {
     expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '分析工作台' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '首页' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '今日' })).toBeVisible();
 
     fireEvent.click(researchToggle);
     expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
@@ -311,25 +311,17 @@ describe('SidebarNav', () => {
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
   });
 
-  it('shows the shared completion badge only when chat completion is pending', () => {
+  it('does not surface the Agent completion badge after Agent leaves primary nav', () => {
     completionBadgeState.value = true;
 
-    const { rerender } = render(
+    render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.agent]}>
         <SidebarNav />
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId('chat-completion-badge')).toBeInTheDocument();
-    expect(screen.getByLabelText('问股有新消息')).toBeInTheDocument();
-
-    completionBadgeState.value = false;
-    rerender(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.agent]}>
-        <SidebarNav />
-      </MemoryRouter>,
-    );
-
+    // Agent is demoted to command-palette-only (#873); primary chrome has no Agent link/badge.
+    expect(screen.queryByRole('link', { name: 'Agent' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('chat-completion-badge')).not.toBeInTheDocument();
   });
 
@@ -370,8 +362,8 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    const chatLink = screen.getByRole('link', { name: 'Agent' });
-    expect(chatLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
+    const signalsLink = screen.getByRole('link', { name: '信号中心' });
+    expect(signalsLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
     const preventNativeNavigation = (event: MouseEvent) => event.preventDefault();
     document.addEventListener('click', preventNativeNavigation);
     try {
@@ -381,11 +373,11 @@ describe('SidebarNav', () => {
         { shiftKey: true },
         { altKey: true },
       ]) {
-        fireEvent.click(chatLink, modifier);
+        fireEvent.click(signalsLink, modifier);
       }
       expect(onNavigate).not.toHaveBeenCalled();
 
-      fireEvent.click(chatLink);
+      fireEvent.click(signalsLink);
     } finally {
       document.removeEventListener('click', preventNativeNavigation);
     }
@@ -626,7 +618,7 @@ describe('SidebarNav', () => {
       'data-route-focus-key',
       'shell-nav-desktop:search',
     );
-    expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '今日' })).toHaveAttribute(
       'data-route-focus-key',
       'shell-nav-desktop:home',
     );
@@ -663,15 +655,16 @@ describe('SidebarNav', () => {
     expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.usage}"]`)).toBeNull();
   });
 
-  it('removes the temporary Signal Center item from product navigation', () => {
+  it('promotes Signal Center into primary product navigation without legacy aliases', () => {
     const { container } = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.signals]}>
         <SidebarNav />
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('link', { name: '信号中心' })).not.toBeInTheDocument();
-    expect(container.querySelector(`a[href="${APP_ROUTE_PATHS.signals}"]`)).toBeNull();
+    expect(screen.getByRole('link', { name: '信号中心' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.signals);
+    expect(container.querySelector(`a[href="${APP_ROUTE_PATHS.signals}"]`)).not.toBeNull();
     expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.decisionSignals}"]`)).toBeNull();
     expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.alerts}"]`)).toBeNull();
   });
