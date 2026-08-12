@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Docs] Add bilingual local-first finance AI competitive landscape note with honest peer strengths, StockPulse differentiators, and gap links (Refs #799, #1063).
+- [Docs] Add bilingual local-first finance AI competitive landscape note with honest peer strengths, StockPulse differentiators, gap links, and homepage/INDEX/FAQ entry points (Refs #799, #1063).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).

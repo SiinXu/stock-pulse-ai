@@ -178,7 +178,7 @@ Documentation index: [INDEX_EN.md](INDEX_EN.md).
 2. Prefer linking **issues and docs** over vague adjectives.
 3. When a gap closes, move the row from **Honest Gaps** to **Differentiation** only if the surface is user-reachable (not wire-only).
 4. Keep EN/CN parity for material claim changes.
-5. Root README stays **homepage-level**; deep peer tables live here (AGENTS.md README focus rule). INDEX/FAQ link here instead of expanding the homepage feature matrix.
+5. Root README stays **homepage-level**: one link near Why StockPulse is enough (AGENTS.md focus rule). Deep peer tables live here; do not expand the homepage feature matrix with competitor rows.
 6. Out of scope: marketing website, continuous competitive monitoring bots, inventing features solely to win a comparison cell.
 
 ---
