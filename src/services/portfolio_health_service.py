@@ -710,42 +710,63 @@ class PortfolioHealthService:
         persist: bool = True,
         weights: Optional[Mapping[str, float]] = None,
         concentration_alert_pct: Optional[float] = None,
+        snapshot: Optional[Mapping[str, Any]] = None,
+        risk: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Preview one immutable portfolio input and optionally persist health."""
+        """Preview one immutable portfolio input and optionally persist health.
+
+        When ``snapshot`` is provided, the holdings replay is skipped and the
+        caller-supplied mapping is scored in place (used by multi-symbol basket
+        analysis). ``risk`` may be supplied with ``snapshot`` to avoid a second
+        risk-metrics pass. Persistence remains account-keyed and is disabled by
+        default for injected snapshots when ``account_id`` is None.
+        """
         as_of_date = as_of or date.today()
         method = str(cost_method or "fifo").strip().lower() or "fifo"
         if method not in {"fifo", "avg"}:
             raise ValueError("cost_method must be fifo or avg")
+        if risk is not None and snapshot is None:
+            raise ValueError("risk requires snapshot when injected")
         settings = PortfolioHealthSettings.from_config(
             self.config or Config.get_instance(),
             weight_overrides=weights,
             concentration_alert_override=concentration_alert_pct,
         )
 
-        snapshot = self.portfolio_service.preview_portfolio_snapshot(
-            account_id=account_id,
-            as_of=as_of_date,
-            cost_method=method,
-            include_realtime=False,
-        )
-        risk = self.risk_metrics_service.get_risk_metrics(
-            account_id=account_id,
-            as_of=as_of_date,
-            cost_method=method,
-            snapshot=snapshot,
-        )
+        if snapshot is None:
+            snapshot_payload: Mapping[str, Any] = self.portfolio_service.preview_portfolio_snapshot(
+                account_id=account_id,
+                as_of=as_of_date,
+                cost_method=method,
+                include_realtime=False,
+            )
+        else:
+            snapshot_payload = snapshot
+
+        if risk is None:
+            risk_payload = self.risk_metrics_service.get_risk_metrics(
+                account_id=account_id,
+                as_of=as_of_date,
+                cost_method=method,
+                snapshot=snapshot_payload,
+            )
+        else:
+            risk_payload = risk
 
         result = self._score_from_inputs(
-            snapshot=snapshot,
-            risk=risk,
+            snapshot=snapshot_payload,
+            risk=risk_payload,
             account_id=account_id,
             as_of_date=as_of_date,
             cost_method=method,
             settings=settings,
         )
 
-        result["persisted"] = bool(persist)
-        if persist:
+        # Injected basket snapshots are not daily account health rows unless the
+        # caller explicitly opts into persistence with an account_id.
+        can_persist = bool(persist) and snapshot is None
+        result["persisted"] = can_persist
+        if can_persist:
             self.health_repo.upsert_snapshot(
                 account_id=account_id,
                 snapshot_date=as_of_date,

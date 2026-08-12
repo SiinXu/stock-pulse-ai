@@ -72,6 +72,7 @@
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
+| [多标的组合级分析](portfolio-level-analysis.md) | 对一组标的做组合层面相关性/集中度/共同风险分析，复用健康评分与压力测试数据面，含规模上界与缺数降级；`POST /api/v1/analysis/portfolio` ([English](portfolio-level-analysis_EN.md)) |
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |

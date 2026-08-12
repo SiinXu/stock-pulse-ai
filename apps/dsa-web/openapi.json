@@ -18864,6 +18864,663 @@
         "title": "PortfolioImportTradeItem",
         "type": "object"
       },
+      "PortfolioLevelAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As-of date for price history and synthetic snapshot; default today",
+            "title": "As Of"
+          },
+          "confidence": {
+            "default": 0.95,
+            "exclusiveMaximum": 1.0,
+            "exclusiveMinimum": 0.5,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "currency": {
+            "default": "CNY",
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Currency",
+            "type": "string"
+          },
+          "high_correlation_threshold": {
+            "default": 0.7,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "High Correlation Threshold",
+            "type": "number"
+          },
+          "horizon_days": {
+            "default": 1,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "include_stress": {
+            "default": true,
+            "description": "When true, overlay a deterministic stress scenario on the basket",
+            "title": "Include Stress",
+            "type": "boolean"
+          },
+          "lookback_trading_days": {
+            "default": 252,
+            "maximum": 1000.0,
+            "minimum": 60.0,
+            "title": "Lookback Trading Days",
+            "type": "integer"
+          },
+          "scenario_id": {
+            "default": "market_down_10",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Scenario Id",
+            "type": "string"
+          },
+          "sector_map": {
+            "anyOf": [
+              {
+                "patternProperties": {
+                  "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "propertyNames": {
+                  "maxLength": 16,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional caller-provided sector labels for shared-risk clustering",
+            "title": "Sector Map"
+          },
+          "stock_codes": {
+            "description": "Symbols to analyze as one basket (1..20). Duplicates are rejected.",
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Stock Codes",
+            "type": "array"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "patternProperties": {
+                  "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$": {
+                    "type": "number"
+                  }
+                },
+                "propertyNames": {
+                  "maxLength": 16,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional non-negative weights keyed by stock code. Missing symbols use equal weight among usable names; weights for degraded symbols are ignored when rebasing.",
+            "title": "Weights"
+          }
+        },
+        "required": [
+          "stock_codes"
+        ],
+        "title": "PortfolioLevelAnalysisRequest",
+        "type": "object"
+      },
+      "PortfolioLevelAnalysisResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_mode": {
+            "const": "portfolio_level_basket",
+            "title": "Analysis Mode",
+            "type": "string"
+          },
+          "annotations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Annotations",
+            "type": "array"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "additionalProperties": true,
+            "title": "Assumptions",
+            "type": "object"
+          },
+          "calculated_at": {
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "concentration": {
+            "additionalProperties": true,
+            "title": "Concentration",
+            "type": "object"
+          },
+          "correlation": {
+            "additionalProperties": true,
+            "title": "Correlation",
+            "type": "object"
+          },
+          "correlation_highlights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelCorrelationHighlight"
+            },
+            "maxItems": 32,
+            "title": "Correlation Highlights",
+            "type": "array"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "degraded_symbols": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelDegradedSymbol"
+            },
+            "maxItems": 20,
+            "title": "Degraded Symbols",
+            "type": "array"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "formula_version": {
+            "const": "portfolio_level_analysis_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "health": {
+            "additionalProperties": true,
+            "title": "Health",
+            "type": "object"
+          },
+          "max_symbols": {
+            "minimum": 1.0,
+            "title": "Max Symbols",
+            "type": "integer"
+          },
+          "requested_symbols": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Requested Symbols",
+            "type": "array"
+          },
+          "risk_history": {
+            "additionalProperties": true,
+            "title": "Risk History",
+            "type": "object"
+          },
+          "risk_metrics_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Metrics Status"
+          },
+          "shared_risk_exposures": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelSharedRisk"
+            },
+            "maxItems": 32,
+            "title": "Shared Risk Exposures",
+            "type": "array"
+          },
+          "snapshot_kind": {
+            "const": "synthetic_basket_v1",
+            "title": "Snapshot Kind",
+            "type": "string"
+          },
+          "stance_distribution": {
+            "$ref": "#/components/schemas/PortfolioLevelStanceDistribution"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "stress": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stress"
+          },
+          "symbols_requested_count": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Symbols Requested Count",
+            "type": "integer"
+          },
+          "symbols_used": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Symbols Used",
+            "type": "array"
+          },
+          "symbols_used_count": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Symbols Used Count",
+            "type": "integer"
+          },
+          "var": {
+            "additionalProperties": true,
+            "title": "Var",
+            "type": "object"
+          },
+          "weighting_mode": {
+            "title": "Weighting Mode",
+            "type": "string"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelWeightItem"
+            },
+            "maxItems": 20,
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "formula_version",
+          "analysis_mode",
+          "snapshot_kind",
+          "as_of",
+          "currency",
+          "status",
+          "disclaimer",
+          "requested_symbols",
+          "symbols_requested_count",
+          "symbols_used_count",
+          "max_symbols",
+          "weighting_mode",
+          "stance_distribution",
+          "calculated_at"
+        ],
+        "title": "PortfolioLevelAnalysisResponse",
+        "type": "object"
+      },
+      "PortfolioLevelCorrelationHighlight": {
+        "additionalProperties": false,
+        "properties": {
+          "abs_correlation": {
+            "title": "Abs Correlation",
+            "type": "number"
+          },
+          "correlation": {
+            "title": "Correlation",
+            "type": "number"
+          },
+          "direction": {
+            "enum": [
+              "positive",
+              "negative"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "left": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Left",
+            "type": "string"
+          },
+          "right": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Right",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left",
+          "right",
+          "correlation",
+          "abs_correlation",
+          "direction"
+        ],
+        "title": "PortfolioLevelCorrelationHighlight",
+        "type": "object"
+      },
+      "PortfolioLevelDegradedSymbol": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "reason": {
+            "maxLength": 64,
+            "title": "Reason",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "reason"
+        ],
+        "title": "PortfolioLevelDegradedSymbol",
+        "type": "object"
+      },
+      "PortfolioLevelSharedRisk": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "maxLength": 64,
+            "title": "Kind",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "summary": {
+            "maxLength": 512,
+            "title": "Summary",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Symbols",
+            "type": "array"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          }
+        },
+        "required": [
+          "kind",
+          "summary"
+        ],
+        "title": "PortfolioLevelSharedRisk",
+        "type": "object"
+      },
+      "PortfolioLevelStanceDistribution": {
+        "additionalProperties": false,
+        "properties": {
+          "average_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Score"
+          },
+          "by_operation_advice": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Operation Advice",
+            "type": "object"
+          },
+          "formula_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula Version"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelStanceItem"
+            },
+            "maxItems": 20,
+            "title": "Items",
+            "type": "array"
+          },
+          "scored_count": {
+            "default": 0,
+            "title": "Scored Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unanalyzed_count": {
+            "default": 0,
+            "title": "Unanalyzed Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioLevelStanceDistribution",
+        "type": "object"
+      },
+      "PortfolioLevelStanceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          }
+        },
+        "title": "PortfolioLevelStanceItem",
+        "type": "object"
+      },
+      "PortfolioLevelWeightItem": {
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "PortfolioLevelWeightItem",
+        "type": "object"
+      },
       "PortfolioPositionAnalysisRequest": {
         "properties": {
           "account_id": {
@@ -33368,6 +34025,68 @@
           }
         },
         "summary": "触发大盘复盘",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/portfolio": {
+      "post": {
+        "description": "Analyze a list of symbols as one portfolio rather than stacking per-symbol conclusions. Returns correlation highlights, concentration/diversification, shared risk exposures, stance distribution from existing analyses, structural health, and an optional stress overlay. At most 20 symbols. Missing single-symbol price data degrades the result (status=partial) and never fails the whole request. Reuses the portfolio health and stress-test data planes via a synthetic equal/custom-weight snapshot — no separate holdings model.",
+        "operationId": "analyzePortfolioLevel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioLevelAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioLevelAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portfolio-level analysis failed"
+          }
+        },
+        "summary": "Run portfolio-level analysis for a multi-symbol basket",
         "tags": [
           "Analysis"
         ]

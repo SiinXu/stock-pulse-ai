@@ -510,6 +510,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run portfolio-level analysis for a multi-symbol basket
+         * @description Analyze a list of symbols as one portfolio rather than stacking per-symbol conclusions. Returns correlation highlights, concentration/diversification, shared risk exposures, stance distribution from existing analyses, structural health, and an optional stress overlay. At most 20 symbols. Missing single-symbol price data degrades the result (status=partial) and never fails the whole request. Reuses the portfolio health and stress-test data planes via a synthetic equal/custom-weight snapshot — no separate holdings model.
+         */
+        post: operations["analyzePortfolioLevel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis/status/{task_id}": {
         parameters: {
             query?: never;
@@ -11043,6 +11063,241 @@ export interface components {
             /** Trade Uid */
             trade_uid?: string | null;
         };
+        /** PortfolioLevelAnalysisRequest */
+        PortfolioLevelAnalysisRequest: {
+            /**
+             * As Of
+             * @description As-of date for price history and synthetic snapshot; default today
+             */
+            as_of?: string | null;
+            /**
+             * Confidence
+             * @default 0.95
+             */
+            confidence: number;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency: string;
+            /**
+             * High Correlation Threshold
+             * @default 0.7
+             */
+            high_correlation_threshold: number;
+            /**
+             * Horizon Days
+             * @default 1
+             */
+            horizon_days: number;
+            /**
+             * Include Stress
+             * @description When true, overlay a deterministic stress scenario on the basket
+             * @default true
+             */
+            include_stress: boolean;
+            /**
+             * Lookback Trading Days
+             * @default 252
+             */
+            lookback_trading_days: number;
+            /**
+             * Scenario Id
+             * @default market_down_10
+             */
+            scenario_id: string;
+            /**
+             * Sector Map
+             * @description Optional caller-provided sector labels for shared-risk clustering
+             */
+            sector_map?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Stock Codes
+             * @description Symbols to analyze as one basket (1..20). Duplicates are rejected.
+             */
+            stock_codes: string[];
+            /**
+             * Weights
+             * @description Optional non-negative weights keyed by stock code. Missing symbols use equal weight among usable names; weights for degraded symbols are ignored when rebasing.
+             */
+            weights?: {
+                [key: string]: number;
+            } | null;
+        };
+        /** PortfolioLevelAnalysisResponse */
+        PortfolioLevelAnalysisResponse: {
+            /**
+             * Analysis Mode
+             * @constant
+             */
+            analysis_mode: "portfolio_level_basket";
+            /** Annotations */
+            annotations?: string[];
+            /** As Of */
+            as_of: string;
+            /** Assumptions */
+            assumptions?: {
+                [key: string]: unknown;
+            };
+            /** Calculated At */
+            calculated_at: string;
+            /** Concentration */
+            concentration?: {
+                [key: string]: unknown;
+            };
+            /** Correlation */
+            correlation?: {
+                [key: string]: unknown;
+            };
+            /** Correlation Highlights */
+            correlation_highlights?: components["schemas"]["PortfolioLevelCorrelationHighlight"][];
+            /** Currency */
+            currency: string;
+            /** Degraded Symbols */
+            degraded_symbols?: components["schemas"]["PortfolioLevelDegradedSymbol"][];
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "portfolio_level_analysis_v1";
+            /** Health */
+            health?: {
+                [key: string]: unknown;
+            };
+            /** Max Symbols */
+            max_symbols: number;
+            /** Requested Symbols */
+            requested_symbols: string[];
+            /** Risk History */
+            risk_history?: {
+                [key: string]: unknown;
+            };
+            /** Risk Metrics Status */
+            risk_metrics_status?: string | null;
+            /** Shared Risk Exposures */
+            shared_risk_exposures?: components["schemas"]["PortfolioLevelSharedRisk"][];
+            /**
+             * Snapshot Kind
+             * @constant
+             */
+            snapshot_kind: "synthetic_basket_v1";
+            stance_distribution: components["schemas"]["PortfolioLevelStanceDistribution"];
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /** Stress */
+            stress?: {
+                [key: string]: unknown;
+            } | null;
+            /** Symbols Requested Count */
+            symbols_requested_count: number;
+            /** Symbols Used */
+            symbols_used?: string[];
+            /** Symbols Used Count */
+            symbols_used_count: number;
+            /** Var */
+            var?: {
+                [key: string]: unknown;
+            };
+            /** Weighting Mode */
+            weighting_mode: string;
+            /** Weights */
+            weights?: components["schemas"]["PortfolioLevelWeightItem"][];
+        };
+        /** PortfolioLevelCorrelationHighlight */
+        PortfolioLevelCorrelationHighlight: {
+            /** Abs Correlation */
+            abs_correlation: number;
+            /** Correlation */
+            correlation: number;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "positive" | "negative";
+            /** Left */
+            left: string;
+            /** Right */
+            right: string;
+        };
+        /** PortfolioLevelDegradedSymbol */
+        PortfolioLevelDegradedSymbol: {
+            /** Detail */
+            detail?: string | null;
+            /** Reason */
+            reason: string;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** PortfolioLevelSharedRisk */
+        PortfolioLevelSharedRisk: {
+            /** Kind */
+            kind: string;
+            /** Rank */
+            rank?: number | null;
+            /** Sector */
+            sector?: string | null;
+            /** Size */
+            size?: number | null;
+            /** Summary */
+            summary: string;
+            /** Symbols */
+            symbols?: string[];
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+        };
+        /** PortfolioLevelStanceDistribution */
+        PortfolioLevelStanceDistribution: {
+            /** Average Score */
+            average_score?: number | null;
+            /** By Operation Advice */
+            by_operation_advice?: {
+                [key: string]: number;
+            };
+            /** Formula Version */
+            formula_version?: string | null;
+            /** Items */
+            items?: components["schemas"]["PortfolioLevelStanceItem"][];
+            /**
+             * Scored Count
+             * @default 0
+             */
+            scored_count: number;
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /**
+             * Unanalyzed Count
+             * @default 0
+             */
+            unanalyzed_count: number;
+        };
+        /** PortfolioLevelStanceItem */
+        PortfolioLevelStanceItem: {
+            /** Freshness */
+            freshness?: string | null;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Stock Code */
+            stock_code?: string | null;
+        };
+        /** PortfolioLevelWeightItem */
+        PortfolioLevelWeightItem: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
+        };
         /** PortfolioPositionAnalysisRequest */
         PortfolioPositionAnalysisRequest: {
             /**
@@ -17282,6 +17537,57 @@ export interface operations {
                 };
             };
             /** @description 提交失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analyzePortfolioLevel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioLevelAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioLevelAnalysisResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Portfolio-level analysis failed */
             500: {
                 headers: {
                     [name: string]: unknown;
