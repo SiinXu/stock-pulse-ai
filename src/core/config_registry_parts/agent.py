@@ -849,7 +849,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 1, "max": 3650},
         "display_order": 667,
-        "help_key": "settings.agent.AGENT_EPISODE_LOG_ENABLED",
+        "help_key": "settings.agent.AGENT_EPISODE_RETENTION_DAYS",
         "examples": ["AGENT_EPISODE_RETENTION_DAYS=90"],
         "docs": [{
             "label": "Agent episode log (EN)",
@@ -870,7 +870,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 100, "max": 1000000},
         "display_order": 668,
-        "help_key": "settings.agent.AGENT_EPISODE_LOG_ENABLED",
+        "help_key": "settings.agent.AGENT_EPISODE_MAX_ROWS",
         "examples": ["AGENT_EPISODE_MAX_ROWS=50000"],
         "docs": [{
             "label": "Agent episode log (EN)",
