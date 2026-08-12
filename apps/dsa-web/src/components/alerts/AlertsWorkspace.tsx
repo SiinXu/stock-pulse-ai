@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useRouteFocusTarget } from '../routing';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BellRing, RefreshCw } from 'lucide-react';
 import { alertsApi } from '../../api/alerts';
@@ -44,6 +45,7 @@ import {
 } from '../../locales/alerts';
 import { formatUiDateTime } from '../../utils/uiLocale';
 import {
+  LEGACY_ROUTE_PATHS,
   SIGNAL_CENTER_SCOPE_VALUES,
   type SignalCenterScope,
 } from '../../routing/routes';
@@ -142,6 +144,13 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   selectedTriggerId: selectedTriggerIdProp = null,
 }) => {
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Standalone Alert Center owns route focus; Signal Center embed defers to the parent page.
+  useRouteFocusTarget({
+    routeId: LEGACY_ROUTE_PATHS.alerts,
+    headingRef: pageHeadingRef,
+    ready: !embedded,
+  });
   const text = ALERT_PAGE_TEXT[language];
   const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
   const {
@@ -599,6 +608,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   return (
     <Root className="max-w-none space-y-5">
       {!embedded ? <PageHeader
+        ref={pageHeadingRef}
         title={text.title}
         description={text.description}
         actions={(

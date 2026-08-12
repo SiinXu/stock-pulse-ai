@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useRouteFocusTarget } from '../routing';
 import {
   usageApi,
   type UsageCallRecord,
@@ -24,7 +25,7 @@ import {
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../../i18n/uiText';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
 import { getUiLocale } from '../../utils/uiLocale';
 import {
   defineUrlStateSchema,
@@ -148,6 +149,13 @@ type TokenUsagePageProps = {
 
 const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => {
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Standalone/legacy usage entry owns focus; Settings embed defers to Settings H1.
+  useRouteFocusTarget({
+    routeId: LEGACY_ROUTE_PATHS.usage,
+    headingRef: pageHeadingRef,
+    ready: !embedded,
+  });
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
@@ -435,6 +443,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
   ) : (
     <div className="space-y-5">
       <PageHeader
+        ref={pageHeadingRef}
         eyebrow={t('usage.eyebrow')}
         title={t('usage.title')}
         description={t('usage.description')}
