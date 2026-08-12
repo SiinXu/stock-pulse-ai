@@ -28,7 +28,7 @@ POST /api/v1/analysis/portfolio
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
 | `stock_codes` | 必填 | `1..20` 个不重复代码；超限在校验阶段拒绝并给出上限提示 |
-| `weights` | 等权 | 可选非负权重；键必须属于 `stock_codes` |
+| `weights` | 等权 | 可选非负权重；键必须属于 `stock_codes`。可用标的若未给出权重，按等权单位补齐后再归一化。 |
 | `include_stress` | `true` | 是否对合成快照跑压力情景 |
 | `sector_map` | 无 | 可选行业标签，用于共同风险聚类 |
 | `high_correlation_threshold` | `0.70` | 高相关高亮阈值 |
@@ -40,6 +40,8 @@ POST /api/v1/analysis/portfolio
 - 全部缺失时返回 `status=unavailable`（HTTP 200），而非 500。
 
 规模上界：`MAX_SYMBOLS = 20`。
+
+合成 basket 的 health 将 `cash_ratio` / `pnl` 标为 unavailable；非法 `scenario_id` 返回 HTTP 400。
 
 ## 范围外（后续）
 

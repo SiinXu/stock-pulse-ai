@@ -188,7 +188,10 @@ class PortfolioLevelAnalysisService:
                     sector_map=sector_map,
                     snapshot=snapshot,
                 )
-            except Exception as exc:  # broad-exception: fallback_recorded - stress optional
+            except ValueError:
+                # Invalid scenario / input is a caller error, not optional degradation.
+                raise
+            except Exception as exc:  # broad-exception: fallback_recorded - stress optional runtime
                 logger.warning(
                     "Portfolio-level stress overlay skipped: %s",
                     type(exc).__name__,
@@ -788,23 +791,40 @@ class PortfolioLevelAnalysisService:
         usable_codes: Sequence[str],
         requested: Optional[Mapping[str, float]],
     ) -> Tuple[Dict[str, float], str]:
+        """Return weights covering every usable code.
+
+        Contract:
+        - No map → equal weight across usable symbols.
+        - Custom map → keep positive specified weights; any usable symbol missing
+          from the map receives a unit share (equal baseline), then all weights
+          are renormalized to 1.0. Degraded (unusable) symbols are already
+          excluded before this step.
+        """
         if not usable_codes:
             return {}, WEIGHTING_MODE_EQUAL
         if requested is None:
             equal = 1.0 / float(len(usable_codes))
             return {code: equal for code in usable_codes}, WEIGHTING_MODE_EQUAL
 
-        selected = {
-            code: float(requested[code])
-            for code in usable_codes
-            if code in requested and float(requested[code]) > _EPS
-        }
-        if not selected:
+        units: Dict[str, float] = {}
+        has_custom = False
+        for code in usable_codes:
+            raw = requested.get(code)
+            if raw is not None and float(raw) > _EPS:
+                units[code] = float(raw)
+                has_custom = True
+            else:
+                # Missing custom entry: equal unit baseline among usable names.
+                units[code] = 1.0
+        if not has_custom:
             equal = 1.0 / float(len(usable_codes))
             return {code: equal for code in usable_codes}, WEIGHTING_MODE_EQUAL
-        total = sum(selected.values())
+        total = sum(units.values())
+        if total <= _EPS:
+            equal = 1.0 / float(len(usable_codes))
+            return {code: equal for code in usable_codes}, WEIGHTING_MODE_EQUAL
         return (
-            {code: value / total for code, value in selected.items()},
+            {code: value / total for code, value in units.items()},
             WEIGHTING_MODE_CUSTOM,
         )
 

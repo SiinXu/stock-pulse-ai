@@ -31,7 +31,7 @@ Auth matches neighboring `/api/v1/analysis/*` and `/api/v1/portfolio/*` routes
 | Field | Default | Notes |
 | --- | --- | --- |
 | `stock_codes` | required | `1..20` unique codes; overflow is rejected with a clear limit message |
-| `weights` | equal weight | Optional non-negative map; must only use codes from `stock_codes` |
+| `weights` | equal weight | Optional non-negative map; must only use codes from `stock_codes`. Usable symbols missing from the map receive an equal unit baseline, then all usable weights are renormalized. |
 | `as_of` | today | End date for stored closes / snapshot |
 | `lookback_trading_days` | `252` | Passed to risk metrics (`60..1000`) |
 | `confidence` | `0.95` | VaR confidence |
@@ -77,9 +77,10 @@ Single-symbol data gaps must never abort the whole basket.
 - Custom weights: positive values only; degraded codes are dropped, then the
   remaining weights are renormalized to 1.0.
 
-Cash is zero and holdings PnL is not modeled. Health dimensions that depend on
-real cash / unrealized PnL therefore stay honest (`partial` / unavailable) rather
-than inventing complete scores.
+Cash is zero and holdings PnL is not modeled. For synthetic baskets, health marks
+`cash_ratio` and `pnl` **unavailable** (they never score 0/neutral as if real).
+Invalid `scenario_id` returns HTTP 400; unexpected stress runtime failures degrade
+only the stress block.
 
 ## Out of scope (follow-up)
 

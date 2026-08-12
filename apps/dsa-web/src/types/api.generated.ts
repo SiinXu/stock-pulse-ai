@@ -11120,7 +11120,7 @@ export interface components {
             stock_codes: string[];
             /**
              * Weights
-             * @description Optional non-negative weights keyed by stock code. Missing symbols use equal weight among usable names; weights for degraded symbols are ignored when rebasing.
+             * @description Optional non-negative weights keyed by stock code. Usable symbols missing from the map receive an equal unit baseline, then all usable weights are renormalized to 1.0. Degraded (unpriced) symbols are excluded before weighting.
              */
             weights?: {
                 [key: string]: number;
@@ -11143,14 +11143,8 @@ export interface components {
             };
             /** Calculated At */
             calculated_at: string;
-            /** Concentration */
-            concentration?: {
-                [key: string]: unknown;
-            };
-            /** Correlation */
-            correlation?: {
-                [key: string]: unknown;
-            };
+            concentration: components["schemas"]["PortfolioConcentrationBlock"];
+            correlation: components["schemas"]["PortfolioCorrelationBlock"];
             /** Correlation Highlights */
             correlation_highlights?: components["schemas"]["PortfolioLevelCorrelationHighlight"][];
             /** Currency */
@@ -11164,10 +11158,7 @@ export interface components {
              * @constant
              */
             formula_version: "portfolio_level_analysis_v1";
-            /** Health */
-            health?: {
-                [key: string]: unknown;
-            };
+            health?: components["schemas"]["PortfolioLevelHealthBlock"];
             /** Max Symbols */
             max_symbols: number;
             /** Requested Symbols */
@@ -11190,20 +11181,14 @@ export interface components {
             status: string;
             /** Status Message */
             status_message?: string | null;
-            /** Stress */
-            stress?: {
-                [key: string]: unknown;
-            } | null;
+            stress?: components["schemas"]["PortfolioLevelStressBlock"] | null;
             /** Symbols Requested Count */
             symbols_requested_count: number;
             /** Symbols Used */
             symbols_used?: string[];
             /** Symbols Used Count */
             symbols_used_count: number;
-            /** Var */
-            var?: {
-                [key: string]: unknown;
-            };
+            var: components["schemas"]["PortfolioHistoricalVaRBlock"];
             /** Weighting Mode */
             weighting_mode: string;
             /** Weights */
@@ -11233,6 +11218,52 @@ export interface components {
             reason: string;
             /** Stock Code */
             stock_code: string;
+        };
+        /**
+         * PortfolioLevelHealthBlock
+         * @description Projected health payload; extra fields allowed for forward compatibility.
+         */
+        PortfolioLevelHealthBlock: {
+            /** Band */
+            band?: string | null;
+            /** Comparable */
+            comparable?: boolean | null;
+            /** Coverage Ratio */
+            coverage_ratio?: number | null;
+            /** Data Quality */
+            data_quality?: {
+                [key: string]: unknown;
+            } | null;
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: unknown;
+            } | null;
+            /** Disclaimer */
+            disclaimer?: string | null;
+            /** Effective Weights */
+            effective_weights?: {
+                [key: string]: unknown;
+            } | null;
+            /** Formula Version */
+            formula_version?: string | null;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            } | null;
+            /** Insights */
+            insights?: unknown[] | null;
+            /** Partial Score */
+            partial_score?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Status Message */
+            status_message?: string | null;
+            /** Unavailable Dimensions */
+            unavailable_dimensions?: string[] | null;
+        } & {
+            [key: string]: unknown;
         };
         /** PortfolioLevelSharedRisk */
         PortfolioLevelSharedRisk: {
@@ -11290,6 +11321,22 @@ export interface components {
             status?: string | null;
             /** Stock Code */
             stock_code?: string | null;
+        };
+        /**
+         * PortfolioLevelStressBlock
+         * @description Stress overlay; reuses stress-test payload shape when available.
+         */
+        PortfolioLevelStressBlock: {
+            /** Scenario */
+            scenario?: {
+                [key: string]: unknown;
+            } | null;
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** PortfolioLevelWeightItem */
         PortfolioLevelWeightItem: {

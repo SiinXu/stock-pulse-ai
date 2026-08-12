@@ -270,3 +270,73 @@ class PortfolioLevelAnalysisServiceTests(TestCase):
         self.assertIn(result["status"], {"ok", "partial"})
         self.assertEqual(result["stress"]["status"], "unavailable")
         self.assertTrue(any("Stress overlay unavailable" in a for a in result["annotations"]))
+
+    def test_partial_custom_weights_fill_missing_usable_symbol(self) -> None:
+        """Review counterexample: weights only for AAA must not KeyError on BBB."""
+        as_of = date(2026, 6, 1)
+        n_closes = MIN_RETURN_OBSERVATIONS + 5
+        start = as_of - timedelta(days=n_closes - 1)
+        returns = [0.001] * (n_closes - 1)
+        service = self._build_service(
+            closes_by_symbol={
+                "AAA": self._close_rows("AAA", start, n_closes, returns),
+                "BBB": self._close_rows("BBB", start, n_closes, returns),
+            }
+        )
+        result = service.analyze(
+            ["AAA", "BBB"],
+            weights={"AAA": 1.0},
+            as_of=as_of,
+            include_stress=False,
+        )
+        self.assertIn(result["status"], {"ok", "partial"})
+        self.assertEqual(result["symbols_used"], ["AAA", "BBB"])
+        by_symbol = {row["symbol"]: row["weight_pct"] for row in result["weights"]}
+        self.assertIn("AAA", by_symbol)
+        self.assertIn("BBB", by_symbol)
+        # AAA custom unit=1, BBB missing unit=1 → equal after renorm.
+        self.assertAlmostEqual(by_symbol["AAA"], 50.0, places=4)
+        self.assertAlmostEqual(by_symbol["BBB"], 50.0, places=4)
+        self.assertAlmostEqual(by_symbol["AAA"] + by_symbol["BBB"], 100.0, places=4)
+
+    def test_invalid_scenario_id_raises_validation_error(self) -> None:
+        as_of = date(2026, 6, 1)
+        n_closes = MIN_RETURN_OBSERVATIONS + 5
+        start = as_of - timedelta(days=n_closes - 1)
+        returns = [0.0] * (n_closes - 1)
+        service = self._build_service(
+            closes_by_symbol={
+                "AAA": self._close_rows("AAA", start, n_closes, returns),
+                "BBB": self._close_rows("BBB", start, n_closes, returns),
+            }
+        )
+        with self.assertRaises(ValueError):
+            service.analyze(
+                ["AAA", "BBB"],
+                as_of=as_of,
+                include_stress=True,
+                scenario_id="does_not_exist_scenario",
+            )
+
+    def test_synthetic_health_marks_cash_and_pnl_unavailable(self) -> None:
+        as_of = date(2026, 6, 1)
+        n_closes = MIN_RETURN_OBSERVATIONS + 10
+        start = as_of - timedelta(days=n_closes - 1)
+        base = [0.01 if i % 2 == 0 else -0.01 for i in range(n_closes - 1)]
+        service = self._build_service(
+            closes_by_symbol={
+                "AAA": self._close_rows("AAA", start, n_closes, base),
+                "BBB": self._close_rows("BBB", start, n_closes, [x * 1.1 for x in base]),
+            }
+        )
+        result = service.analyze(["AAA", "BBB"], as_of=as_of, include_stress=False)
+        health = result["health"]
+        self.assertEqual(health.get("status"), "partial")
+        self.assertIsNone(health.get("score"))
+        self.assertFalse(health.get("comparable"))
+        dimensions = health.get("dimensions") or {}
+        self.assertEqual(dimensions.get("cash_ratio", {}).get("status"), "unavailable")
+        self.assertEqual(dimensions.get("pnl", {}).get("status"), "unavailable")
+        self.assertIn("cash_ratio", health.get("unavailable_dimensions") or [])
+        self.assertIn("pnl", health.get("unavailable_dimensions") or [])
+

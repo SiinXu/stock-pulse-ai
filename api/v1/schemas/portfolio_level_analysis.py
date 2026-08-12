@@ -16,6 +16,11 @@ from pydantic import (
     model_validator,
 )
 
+from api.v1.schemas.portfolio_risk_metrics import (
+    PortfolioConcentrationBlock,
+    PortfolioCorrelationBlock,
+    PortfolioHistoricalVaRBlock,
+)
 from src.services.portfolio_level_analysis_service import (
     DEFAULT_STRESS_SCENARIO_ID,
     HIGH_CORRELATION_THRESHOLD,
@@ -59,9 +64,10 @@ class PortfolioLevelAnalysisRequest(StrictPortfolioLevelModel):
     weights: Optional[Dict[StockCode, FiniteFloat]] = Field(
         default=None,
         description=(
-            "Optional non-negative weights keyed by stock code. Missing symbols "
-            "use equal weight among usable names; weights for degraded symbols "
-            "are ignored when rebasing."
+            "Optional non-negative weights keyed by stock code. Usable symbols "
+            "missing from the map receive an equal unit baseline, then all usable "
+            "weights are renormalized to 1.0. Degraded (unpriced) symbols are "
+            "excluded before weighting."
         ),
     )
     as_of: Optional[date] = Field(
@@ -179,6 +185,38 @@ class PortfolioLevelStanceDistribution(StrictPortfolioLevelModel):
     formula_version: Optional[str] = None
 
 
+class PortfolioLevelHealthBlock(BaseModel):
+    """Projected health payload; extra fields allowed for forward compatibility."""
+
+    model_config = ConfigDict(extra="allow")
+
+    status: Optional[str] = None
+    status_message: Optional[str] = None
+    score: Optional[FiniteFloat] = None
+    partial_score: Optional[FiniteFloat] = None
+    band: Optional[str] = None
+    comparable: Optional[bool] = None
+    coverage_ratio: Optional[FiniteFloat] = None
+    dimensions: Optional[Dict[str, Any]] = None
+    unavailable_dimensions: Optional[List[str]] = None
+    effective_weights: Optional[Dict[str, Any]] = None
+    insights: Optional[List[Any]] = None
+    data_quality: Optional[Dict[str, Any]] = None
+    inputs: Optional[Dict[str, Any]] = None
+    formula_version: Optional[str] = None
+    disclaimer: Optional[str] = None
+
+
+class PortfolioLevelStressBlock(BaseModel):
+    """Stress overlay; reuses stress-test payload shape when available."""
+
+    model_config = ConfigDict(extra="allow")
+
+    status: str
+    status_message: Optional[str] = None
+    scenario: Optional[Dict[str, Any]] = None
+
+
 class PortfolioLevelAnalysisResponse(StrictPortfolioLevelModel):
     formula_version: Literal["portfolio_level_analysis_v1"]
     analysis_mode: Literal["portfolio_level_basket"]
@@ -199,18 +237,18 @@ class PortfolioLevelAnalysisResponse(StrictPortfolioLevelModel):
         default_factory=list, max_length=MAX_SYMBOLS
     )
     annotations: List[str] = Field(default_factory=list, max_length=32)
-    correlation: Dict[str, Any] = Field(default_factory=dict)
+    correlation: PortfolioCorrelationBlock
     correlation_highlights: List[PortfolioLevelCorrelationHighlight] = Field(
         default_factory=list, max_length=32
     )
-    concentration: Dict[str, Any] = Field(default_factory=dict)
-    var: Dict[str, Any] = Field(default_factory=dict)
+    concentration: PortfolioConcentrationBlock
+    var: PortfolioHistoricalVaRBlock
     shared_risk_exposures: List[PortfolioLevelSharedRisk] = Field(
         default_factory=list, max_length=32
     )
     stance_distribution: PortfolioLevelStanceDistribution
-    health: Dict[str, Any] = Field(default_factory=dict)
-    stress: Optional[Dict[str, Any]] = None
+    health: PortfolioLevelHealthBlock = Field(default_factory=PortfolioLevelHealthBlock)
+    stress: Optional[PortfolioLevelStressBlock] = None
     risk_metrics_status: Optional[str] = None
     risk_history: Dict[str, Any] = Field(default_factory=dict)
     assumptions: Dict[str, Any] = Field(default_factory=dict)

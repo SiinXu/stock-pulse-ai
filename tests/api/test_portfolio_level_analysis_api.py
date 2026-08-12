@@ -165,3 +165,19 @@ def test_openapi_registers_operation(monkeypatch) -> None:
     schema = _client(monkeypatch).app.openapi()
     path = schema["paths"]["/api/v1/analysis/portfolio"]["post"]
     assert path["operationId"] == "analyzePortfolioLevel"
+
+def test_invalid_scenario_maps_to_400(monkeypatch) -> None:
+    response = _client(
+        monkeypatch,
+        error=ValueError("unknown scenario id: does_not_exist"),
+    ).post(
+        "/api/v1/analysis/portfolio",
+        json={
+            "stock_codes": ["AAA", "BBB"],
+            "include_stress": True,
+            "scenario_id": "does_not_exist",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"]["error"] == "validation_error"
+

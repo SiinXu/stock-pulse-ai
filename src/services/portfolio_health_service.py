@@ -1051,9 +1051,25 @@ class PortfolioHealthService:
             }
             partial_reasons.append("diversification_unavailable")
 
+        # Synthetic code-list baskets have no cash ledger / holdings PnL. Do not
+        # invent a cash_ratio=0 or neutral PnL score that looks like a real account.
+        limitations_set = {str(item) for item in limitations}
+        is_synthetic_basket = (
+            str(snapshot.get("snapshot_kind") or "") == "synthetic_basket_v1"
+            or "no_cash_ledger" in limitations_set
+            or "synthetic_basket_equal_or_custom_weights" in limitations_set
+        )
+
         # --- pnl ---
         # Prefer equity as base; if equity ~0 but we have cost context, skip.
-        if total_equity > _EPS:
+        if is_synthetic_basket:
+            dim_details["pnl"] = {
+                "status": "unavailable",
+                "score": None,
+                "reason": "synthetic_basket_no_holdings_pnl",
+            }
+            partial_reasons.append("pnl_synthetic_basket")
+        elif total_equity > _EPS:
             pnl_pct = unrealized / total_equity * 100.0
             # If prices missing, PnL is not trustworthy
             if missing_price_symbols or fx_stale:
@@ -1084,7 +1100,14 @@ class PortfolioHealthService:
             partial_reasons.append("pnl_zero_equity")
 
         # --- cash ratio ---
-        if total_equity > _EPS:
+        if is_synthetic_basket:
+            dim_details["cash_ratio"] = {
+                "status": "unavailable",
+                "score": None,
+                "reason": "synthetic_basket_no_cash_ledger",
+            }
+            partial_reasons.append("cash_synthetic_basket")
+        elif total_equity > _EPS:
             cash_pct = total_cash / total_equity * 100.0
             if fx_stale:
                 dim_details["cash_ratio"] = {
