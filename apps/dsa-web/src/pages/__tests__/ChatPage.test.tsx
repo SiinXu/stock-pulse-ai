@@ -502,14 +502,15 @@ describe('ChatPage', () => {
   it('loads and saves the global context compression setting from the chat input area', async () => {
     renderChat(<ChatPage />);
 
-    const compressionToggle = await screen.findByRole('button', { name: '上下文压缩' });
+    const compressionToggle = await screen.findByRole('switch', { name: '上下文压缩' });
 
     await waitFor(() => {
       expect(compressionToggle).not.toBeDisabled();
     });
 
     expect(screen.getByTestId('chat-composer-input')).toContainElement(compressionToggle);
-    expect(compressionToggle).toHaveAttribute('aria-pressed', 'false');
+    expect(compressionToggle).toHaveAttribute('aria-checked', 'false');
+    expect(compressionToggle).toHaveAttribute('data-size', 'navigation');
 
     fireEvent.click(compressionToggle);
 
@@ -527,7 +528,7 @@ describe('ChatPage', () => {
       });
     });
 
-    expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
+    expect(compressionToggle).toHaveAttribute('aria-checked', 'true');
 
     const whatIfButton = screen.getByRole('button', { name: 'What-if 情景分析' });
     expect(whatIfButton).toHaveAttribute('aria-pressed', 'false');
@@ -539,6 +540,19 @@ describe('ChatPage', () => {
     expect(whatIfConfiguration).not.toHaveClass('absolute', 'fixed');
     expect(within(whatIfConfiguration).getByTestId('chat-what-if-fields')).toHaveClass('grid-cols-2');
     expect(within(whatIfConfiguration).getAllByRole('combobox')).toHaveLength(2);
+  });
+
+  it('lets a user reach the analysis workbench handoff from a stock-scoped chat', async () => {
+    renderChat(<ChatPage />, ['/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0']);
+
+    expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'What-if 情景分析' }));
+
+    const whatIfConfiguration = await screen.findByRole('region', { name: 'What-if 情景分析' });
+    expect(await within(whatIfConfiguration).findByRole('link', { name: '在分析工作台打开该股票' })).toHaveAttribute(
+      'href',
+      '/research/analysis?stock=600519',
+    );
   });
 
   it('rolls back the context compression switch when saving fails', async () => {
@@ -564,10 +578,10 @@ describe('ChatPage', () => {
 
     renderChat(<ChatPage />);
 
-    const compressionToggle = await screen.findByRole('button', { name: '上下文压缩' });
+    const compressionToggle = await screen.findByRole('switch', { name: '上下文压缩' });
 
     await waitFor(() => {
-      expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
+      expect(compressionToggle).toHaveAttribute('aria-checked', 'true');
       expect(compressionToggle).not.toBeDisabled();
     });
 
@@ -582,7 +596,7 @@ describe('ChatPage', () => {
           },
         ],
       }));
-      expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
+      expect(compressionToggle).toHaveAttribute('aria-checked', 'true');
     });
     expect(screen.getByText('配置服务不可用')).toBeInTheDocument();
   });
