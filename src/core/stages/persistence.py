@@ -136,7 +136,10 @@ class _PersistenceStageMixin:
         if news_result_count is not None:
             snapshot["news_result_count"] = news_result_count
         if analysis_context_pack_overview is not None:
-            snapshot["analysis_context_pack_overview"] = analysis_context_pack_overview
+            overview = dict(analysis_context_pack_overview)
+            overview.pop("_pack_audit", None)
+            snapshot["analysis_context_pack_overview"] = overview
+            analysis_context_pack_overview = overview
             # Issue #182: surface low-sensitivity snapshot identity at the
             # context_snapshot top level for audit/diagnostics consumers.
             snapshot_identity = {
@@ -778,12 +781,22 @@ class _PersistenceStageMixin:
                 pack,
                 report_language=report_language,
             )
-            # Issue #182: record snapshot identity on diagnostics without
-            # exposing full pack item values to public consumers.
+            # Issue #182: attach value-stripped pack audit for multi-agent reseal
+            # under the same snapshot identity (not public overview fields).
             try:
+                from src.analysis_context_pack.snapshot import strip_pack_item_values
                 from src.services.run_diagnostics import get_current_diagnostic_context
 
                 identity = pack.audit_identity()
+                if isinstance(overview, dict):
+                    overview_meta = overview.get("metadata")
+                    if not isinstance(overview_meta, dict):
+                        overview_meta = {}
+                        overview["metadata"] = overview_meta
+                    # Keep digest on public metadata; pack audit is internal only.
+                    if identity.get("content_digest") and not overview_meta.get("content_digest"):
+                        overview_meta["content_digest"] = identity["content_digest"]
+                    overview["_pack_audit"] = strip_pack_item_values(pack.model_dump(mode="json"))
                 diag = get_current_diagnostic_context()
                 if diag is not None:
                     diag.record_agent_event(

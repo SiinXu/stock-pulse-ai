@@ -170,31 +170,32 @@ class _DashboardMethods:
                 SNAPSHOT_DATA_KEYS,
                 seal_analysis_context_snapshot,
             )
-            from src.schemas.analysis_context_pack import (
-                AnalysisContextPack,
-                AnalysisSubject,
-            )
+            from src.schemas.analysis_context_pack import AnalysisContextPack
 
             request = request_context if isinstance(request_context, dict) else {}
-            pack_payload = request.get("analysis_context_pack")
+            pack_payload = request.get("analysis_context_pack_audit")
+            if pack_payload is None:
+                pack_payload = request.get("analysis_context_pack")
             pack: Any
             if isinstance(pack_payload, AnalysisContextPack):
                 pack = pack_payload
             elif isinstance(pack_payload, dict) and pack_payload.get("subject"):
-                pack = AnalysisContextPack.model_validate(pack_payload)
+                pack = pack_payload
             else:
                 subject_code = ctx.stock_code or "unknown"
-                pack = AnalysisContextPack(
-                    subject=AnalysisSubject(
-                        code=subject_code,
-                        stock_name=ctx.stock_name or None,
-                        market=None,
-                    ),
-                    metadata={
+                pack = {
+                    "subject": {
+                        "code": subject_code,
+                        "stock_name": ctx.stock_name or None,
+                        "market": None,
+                    },
+                    "pack_version": "1.0",
+                    "blocks": {},
+                    "metadata": {
                         "source": "agent_orchestrator_seed",
                         "trigger_source": "multi_agent",
                     },
-                )
+                }
 
             data_bag: Dict[str, Any] = {}
             for key in SNAPSHOT_DATA_KEYS:
@@ -204,17 +205,28 @@ class _DashboardMethods:
                     data_bag[key] = request[key]
 
             prior = request.get("analysis_context_snapshot")
+            if not isinstance(prior, dict):
+                prior = ctx.meta.get("analysis_context_snapshot")
             snapshot_id = None
             snapshot_revision = None
             as_of = None
+            content_digest = None
             if isinstance(prior, dict):
                 snapshot_id = prior.get("snapshot_id")
                 snapshot_revision = prior.get("snapshot_revision")
                 as_of = prior.get("as_of")
+                content_digest = prior.get("content_digest")
             if snapshot_id is None and isinstance(pack, AnalysisContextPack):
                 snapshot_id = pack.snapshot_id
                 snapshot_revision = pack.snapshot_revision
                 as_of = pack.as_of
+                content_digest = (pack.metadata or {}).get("content_digest")
+            elif snapshot_id is None and isinstance(pack, dict):
+                snapshot_id = pack.get("snapshot_id")
+                snapshot_revision = pack.get("snapshot_revision")
+                as_of = pack.get("as_of")
+                meta = pack.get("metadata") if isinstance(pack.get("metadata"), dict) else {}
+                content_digest = content_digest or meta.get("content_digest")
 
             snapshot = seal_analysis_context_snapshot(
                 pack,
@@ -222,9 +234,14 @@ class _DashboardMethods:
                 snapshot_id=str(snapshot_id) if snapshot_id else None,
                 snapshot_revision=int(snapshot_revision) if snapshot_revision else None,
                 as_of=str(as_of) if as_of else None,
+                content_digest=str(content_digest) if content_digest else None,
             )
             ctx.seal_input_snapshot(snapshot)
+            ctx.meta["analysis_context_snapshot_sealed"] = True
+            ctx.meta.pop("analysis_context_snapshot_seal_failed", None)
         except Exception as exc:  # broad-exception: fallback_recorded - Seal is best-effort; multi-agent continues without freeze.
+            ctx.meta["analysis_context_snapshot_sealed"] = False
+            ctx.meta["analysis_context_snapshot_seal_failed"] = True
             log_safe_exception(
                 logger,
                 "[Orchestrator] analysis context snapshot seal failed",

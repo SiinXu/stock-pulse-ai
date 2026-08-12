@@ -201,15 +201,29 @@ def test_inconsistent_snapshot_identity_is_detected() -> None:
     with pytest.raises(SnapshotConsistencyError):
         assert_snapshots_consistent(left, right)
 
-    # Same id but different market inputs => digest mismatch.
-    mutated = seal_analysis_context_snapshot(
+    # Same id with different market inputs keeps pack content_digest, but
+    # market_digest must diverge for runtime integrity checks.
+    mutated_market = seal_analysis_context_snapshot(
         _pack(),
         {"realtime_quote": {"price": 1.0}},
         snapshot_id="snap-a",
         snapshot_revision=1,
+        content_digest=left.content_digest,
+    )
+    assert mutated_market.content_digest == left.content_digest
+    assert mutated_market.market_digest != left.market_digest
+
+    # Same id but different pack blocks => content_digest mismatch.
+    other_pack = _pack()
+    other_pack.blocks["quote"].status = ContextFieldStatus.STALE
+    mutated_pack = seal_analysis_context_snapshot(
+        other_pack,
+        {"realtime_quote": {"price": 1880.0}},
+        snapshot_id="snap-a",
+        snapshot_revision=1,
     )
     with pytest.raises(SnapshotConsistencyError):
-        assert_snapshots_consistent(left, mutated)
+        assert_snapshots_consistent(left, mutated_pack)
 
 
 def test_orchestrator_seals_shared_context_for_multi_agent() -> None:
@@ -240,3 +254,83 @@ def test_orchestrator_seals_shared_context_for_multi_agent() -> None:
     # Direct nested mutation of the sealed bag is blocked by FrozenMapping.
     with pytest.raises((TypeError, AttributeError)):
         ctx.data["realtime_quote"]["price"] = 0  # type: ignore[index]
+
+
+def test_pack_content_digest_preserved_across_market_reseal() -> None:
+    """Pipeline pack identity and multi-agent market seal share content_digest."""
+    pack = stamp_pack_snapshot_identity(_pack())
+    pack_digest = pack.metadata["content_digest"]
+    runtime = seal_analysis_context_snapshot(
+        AnalysisContextPack(subject=_pack().subject),
+        {
+            "realtime_quote": {"price": 1880.0},
+            "news_context": "headline",
+        },
+        snapshot_id=pack.snapshot_id,
+        snapshot_revision=pack.snapshot_revision,
+        as_of=pack.as_of,
+        content_digest=pack_digest,
+    )
+    assert runtime.snapshot_id == pack.snapshot_id
+    assert runtime.content_digest == pack_digest
+    assert runtime.market_digest
+    assert runtime.market_digest != pack_digest
+
+
+def test_orchestrator_preserves_pack_digest_and_marks_sealed() -> None:
+    methods = _DashboardMethods()
+    pack = stamp_pack_snapshot_identity(_pack())
+    digest = pack.metadata["content_digest"]
+    ctx = methods._build_context(
+        "Analyze 600519",
+        {
+            "stock_code": "600519",
+            "stock_name": "贵州茅台",
+            "realtime_quote": {"price": 1880.0},
+            "news_context": "headline",
+            "analysis_context_snapshot": {
+                "snapshot_id": pack.snapshot_id,
+                "snapshot_revision": 1,
+                "as_of": pack.as_of,
+                "pack_version": PACK_VERSION,
+                "content_digest": digest,
+            },
+            "analysis_context_pack_audit": {
+                "subject": pack.subject.model_dump(mode="json"),
+                "pack_version": PACK_VERSION,
+                "snapshot_id": pack.snapshot_id,
+                "snapshot_revision": 1,
+                "as_of": pack.as_of,
+                "blocks": {},
+                "metadata": {"content_digest": digest},
+            },
+        },
+    )
+    assert ctx.meta.get("analysis_context_snapshot_sealed") is True
+    assert ctx.meta.get("analysis_context_snapshot_seal_failed") is not True
+    assert ctx.meta["analysis_context_snapshot"]["content_digest"] == digest
+    assert ctx.meta["analysis_context_snapshot"]["snapshot_id"] == pack.snapshot_id
+
+
+def test_orchestrator_records_seal_failure_flag(monkeypatch) -> None:
+    methods = _DashboardMethods()
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("seal boom")
+
+    monkeypatch.setattr(
+        "src.analysis_context_pack.snapshot.seal_analysis_context_snapshot",
+        _boom,
+    )
+    ctx = methods._build_context(
+        "Analyze 600519",
+        {
+            "stock_code": "600519",
+            "realtime_quote": {"price": 1880.0},
+        },
+    )
+    assert ctx.meta.get("analysis_context_snapshot_sealed") is False
+    assert ctx.meta.get("analysis_context_snapshot_seal_failed") is True
+    # Fail-open: market key remains writable when seal failed.
+    ctx.set_data("realtime_quote", {"price": 1.0})
+    assert ctx.get_data("realtime_quote")["price"] == 1.0

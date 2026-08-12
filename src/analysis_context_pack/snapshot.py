@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -58,7 +59,12 @@ class SnapshotConsistencyError(ValueError):
 
 @dataclass(frozen=True)
 class AnalysisContextSnapshot:
-    """Immutable shared snapshot for one analysis run."""
+    """Immutable shared snapshot for one analysis run.
+
+    ``content_digest`` is the pack-only audit digest (subject/blocks/quality/as_of,
+    without market-bag payload and without item values). ``market_digest`` covers
+    the sealed multi-agent market inputs. Both share the same ``snapshot_id``.
+    """
 
     snapshot_id: str
     snapshot_revision: int
@@ -68,6 +74,8 @@ class AnalysisContextSnapshot:
     pack: Mapping[str, Any]
     data: Mapping[str, Any]
     created_at: Optional[str] = None
+    market_digest: Optional[str] = None
+    sealed: bool = True
 
     def read_data(self, key: str, default: Any = None) -> Any:
         """Return a detached mutable copy of one sealed data field."""
@@ -87,7 +95,9 @@ class AnalysisContextSnapshot:
             "pack_version": self.pack_version,
             "as_of": self.as_of,
             "content_digest": self.content_digest,
+            "market_digest": self.market_digest,
             "created_at": self.created_at,
+            "sealed": self.sealed,
         }
 
     def fingerprint(self) -> str:
@@ -142,6 +152,58 @@ def compute_content_digest(payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def strip_pack_item_values(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """Return a pack projection without item values (safe for reseal identity)."""
+    normalized = normalize_snapshot_value(dict(payload))
+    if not isinstance(normalized, dict):
+        raise TypeError("pack payload must normalize to a dict")
+    blocks = normalized.get("blocks")
+    if isinstance(blocks, dict):
+        stripped_blocks: Dict[str, Any] = {}
+        for key, block in blocks.items():
+            if not isinstance(block, dict):
+                stripped_blocks[str(key)] = block
+                continue
+            block_copy = dict(block)
+            items = block_copy.get("items")
+            if isinstance(items, dict):
+                stripped_items: Dict[str, Any] = {}
+                for item_key, item in items.items():
+                    if isinstance(item, dict):
+                        item_copy = dict(item)
+                        item_copy.pop("value", None)
+                        stripped_items[str(item_key)] = item_copy
+                    else:
+                        stripped_items[str(item_key)] = item
+                block_copy["items"] = stripped_items
+            stripped_blocks[str(key)] = block_copy
+        normalized["blocks"] = stripped_blocks
+    return normalized
+
+
+def pack_content_digest_payload(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """Stable pack-only payload used for ``content_digest`` (no market bag)."""
+    stripped = strip_pack_item_values(payload)
+    return {
+        "subject": stripped.get("subject"),
+        "pack_version": stripped.get("pack_version"),
+        "phase": stripped.get("phase"),
+        "blocks": stripped.get("blocks") or {},
+        "data_quality": stripped.get("data_quality"),
+        "as_of": stripped.get("as_of"),
+    }
+
+
+def compute_pack_content_digest(payload: Mapping[str, Any]) -> str:
+    """SHA-256 over the pack-only audit projection."""
+    return compute_content_digest(pack_content_digest_payload(payload))
+
+
+def compute_market_digest(data: Optional[Mapping[str, Any]]) -> str:
+    """SHA-256 over sealed market-input bags only."""
+    return compute_content_digest({"data": _select_snapshot_data(data)})
+
+
 def derive_pack_as_of(pack: AnalysisContextPack | Mapping[str, Any]) -> Optional[str]:
     """Pick the latest ISO timestamp among block/item stamps and pack created_at."""
     payload = (
@@ -186,24 +248,21 @@ def stamp_pack_snapshot_identity(
     as_of: Optional[str] = None,
     data: Optional[Mapping[str, Any]] = None,
 ) -> AnalysisContextPack:
-    """Fill per-run snapshot identity and content digest on a built pack."""
+    """Fill per-run snapshot identity and pack-only content digest.
+
+    ``data`` is accepted for API stability but is intentionally excluded from
+    ``content_digest`` so multi-agent market bags can be sealed later under the
+    same snapshot identity (Issue #182 review convergence).
+    """
+    del data  # pack-only digest contract; market bag uses market_digest at seal time
     if snapshot_revision < 1:
         raise ValueError("snapshot_revision must be >= 1")
     resolved_id = (snapshot_id or pack.snapshot_id or new_analysis_context_snapshot_id()).strip()
     resolved_as_of = as_of if as_of is not None else (pack.as_of or derive_pack_as_of(pack))
     metadata = dict(pack.metadata or {})
-    identity_payload = {
-        "subject": pack.subject.model_dump(mode="json"),
-        "pack_version": pack.pack_version,
-        "phase": pack.phase,
-        "blocks": {
-            key: block.model_dump(mode="json") for key, block in (pack.blocks or {}).items()
-        },
-        "data_quality": pack.data_quality.model_dump(mode="json"),
-        "as_of": resolved_as_of,
-        "data": normalize_snapshot_value(dict(data or {})),
-    }
-    digest = compute_content_digest(identity_payload)
+    pack_payload = pack.model_dump(mode="json")
+    pack_payload["as_of"] = resolved_as_of
+    digest = compute_pack_content_digest(pack_payload)
     metadata["content_digest"] = digest
     metadata["snapshot_sealed"] = True
     return pack.model_copy(
@@ -224,25 +283,32 @@ def seal_analysis_context_snapshot(
     snapshot_id: Optional[str] = None,
     snapshot_revision: Optional[int] = None,
     as_of: Optional[str] = None,
+    content_digest: Optional[str] = None,
 ) -> AnalysisContextSnapshot:
-    """Seal pack + market inputs into one immutable shared snapshot."""
+    """Seal pack + market inputs under one shared snapshot identity.
+
+    ``content_digest`` is always pack-only. When *content_digest* is supplied
+    (from a prior pipeline stamp), it is preserved so runtime reseal cannot
+    diverge from overview/history audit identity for the same ``snapshot_id``.
+    Market bags are covered by ``market_digest`` instead.
+    """
     if isinstance(pack, AnalysisContextPack):
         stamped = stamp_pack_snapshot_identity(
             pack,
             snapshot_id=snapshot_id,
             snapshot_revision=snapshot_revision or pack.snapshot_revision or 1,
             as_of=as_of,
-            data=data,
         )
-        pack_payload = stamped.model_dump(mode="json")
+        pack_payload = strip_pack_item_values(stamped.model_dump(mode="json"))
         resolved_id = stamped.snapshot_id
         resolved_revision = stamped.snapshot_revision
         resolved_as_of = stamped.as_of
         pack_version = stamped.pack_version
         created_at = pack_payload.get("created_at")
-        digest = str((stamped.metadata or {}).get("content_digest") or "")
+        stamped_digest = str((stamped.metadata or {}).get("content_digest") or "")
+        digest = str(content_digest or stamped_digest or compute_pack_content_digest(pack_payload))
     else:
-        pack_payload = normalize_snapshot_value(dict(pack))
+        pack_payload = strip_pack_item_values(dict(pack))
         if not isinstance(pack_payload, dict):
             raise TypeError("pack mapping must normalize to a dict")
         resolved_id = str(
@@ -272,30 +338,26 @@ def seal_analysis_context_snapshot(
         if not isinstance(metadata, dict):
             metadata = {}
             pack_payload["metadata"] = metadata
-        digest = compute_content_digest(
-            {
-                "subject": pack_payload.get("subject"),
-                "pack_version": pack_version,
-                "phase": pack_payload.get("phase"),
-                "blocks": pack_payload.get("blocks"),
-                "data_quality": pack_payload.get("data_quality"),
-                "as_of": resolved_as_of,
-                "data": normalize_snapshot_value(dict(data or {})),
-            }
-        )
+        prior_digest = None
+        if isinstance(content_digest, str) and content_digest.strip():
+            prior_digest = content_digest.strip()
+        elif isinstance(metadata.get("content_digest"), str):
+            prior_digest = str(metadata.get("content_digest")).strip() or None
+        digest = prior_digest or compute_pack_content_digest(pack_payload)
         metadata["content_digest"] = digest
         metadata["snapshot_sealed"] = True
 
     normalized_data = _select_snapshot_data(data)
-    frozen_pack = deep_freeze(normalize_snapshot_value(pack_payload))
+    market_digest = compute_market_digest(normalized_data)
+    metadata = pack_payload.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+        pack_payload["metadata"] = metadata
+    metadata["content_digest"] = digest
+    metadata["market_digest"] = market_digest
+    metadata["snapshot_sealed"] = True
+    frozen_pack = deep_freeze(pack_payload)
     frozen_data = deep_freeze(normalized_data)
-    if not digest:
-        digest = compute_content_digest(
-            {
-                "pack": normalize_snapshot_value(pack_payload),
-                "data": normalized_data,
-            }
-        )
     return AnalysisContextSnapshot(
         snapshot_id=resolved_id,
         snapshot_revision=resolved_revision,
@@ -305,6 +367,8 @@ def seal_analysis_context_snapshot(
         pack=frozen_pack,
         data=frozen_data,
         created_at=created_at if isinstance(created_at, str) else None,
+        market_digest=market_digest,
+        sealed=True,
     )
 
 
@@ -338,46 +402,28 @@ def concurrent_snapshot_reads(
         raise ValueError("workers must be >= 1")
     selected = list(keys) if keys is not None else list(snapshot.data.keys())
     barrier = threading.Barrier(workers)
-    results: List[Optional[Dict[str, Any]]] = [None] * workers
-    errors: List[BaseException] = []
-    lock = threading.Lock()
 
-    def _worker(index: int) -> None:
-        try:
-            barrier.wait(timeout=5)
-            payload = {
-                "audit": snapshot.audit_metadata(),
-                "data": {key: snapshot.read_data(key) for key in selected},
-                "pack": snapshot.read_pack(),
-            }
-            results[index] = payload
-        except BaseException as exc:  # noqa: BLE001 - surface worker failures in tests
-            with lock:
-                errors.append(exc)
+    def _read_once() -> Dict[str, Any]:
+        barrier.wait(timeout=5)
+        return {
+            "audit": snapshot.audit_metadata(),
+            "data": {key: snapshot.read_data(key) for key in selected},
+            "pack": snapshot.read_pack(),
+        }
 
-    threads = [
-        threading.Thread(target=_worker, args=(index,), name=f"snapshot-reader-{index}")
-        for index in range(workers)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(timeout=10)
-    if errors:
-        raise errors[0]
-    if any(item is None for item in results):
-        raise RuntimeError("concurrent snapshot read did not complete")
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_read_once) for _ in range(workers)]
+        results = [future.result(timeout=10) for future in futures]
+
     first = results[0]
-    assert first is not None
     for other in results[1:]:
-        assert other is not None
         if other["audit"] != first["audit"]:
             raise SnapshotConsistencyError("concurrent readers saw different audit metadata")
         if other["data"] != first["data"]:
             raise SnapshotConsistencyError("concurrent readers saw different data payloads")
         if other["pack"] != first["pack"]:
             raise SnapshotConsistencyError("concurrent readers saw different pack payloads")
-    return [item for item in results if item is not None]
+    return results
 
 
 def freeze_market_data_mapping(data: Mapping[str, Any]) -> Dict[str, Any]:
@@ -421,6 +467,10 @@ __all__ = [
     "SnapshotMutationError",
     "assert_snapshots_consistent",
     "compute_content_digest",
+    "compute_market_digest",
+    "compute_pack_content_digest",
+    "pack_content_digest_payload",
+    "strip_pack_item_values",
     "concurrent_snapshot_reads",
     "derive_pack_as_of",
     "freeze_market_data_mapping",

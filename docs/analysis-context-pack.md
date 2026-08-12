@@ -328,9 +328,13 @@ What is added:
 | `snapshot_id` | Opaque id for one sealed input snapshot within a run |
 | `snapshot_revision` | Monotone revision (>= 1); schema contract remains `pack_version=1.0` |
 | `as_of` | Pack-level ISO-8601 as-of derived from block/item timestamps or `created_at` |
-| `metadata.content_digest` | SHA-256 of subject/blocks/data_quality/as_of + sealed market inputs |
+| `metadata.content_digest` | SHA-256 of pack-only audit projection (subject/blocks without item values/data_quality/as_of); stable across multi-agent market reseal |
+| `market_digest` | SHA-256 of sealed multi-agent market inputs only (runtime seal) |
+| `analysis_context_snapshot_sealed` / `..._seal_failed` | AgentContext meta flags; seal remains fail-open but is always observable |
 | `src/analysis_context_pack/snapshot.py` | `seal_analysis_context_snapshot`, freeze helpers, consistency asserts |
 | `AgentContext.seal_input_snapshot` | Freezes market-input keys; stage outputs stay writable |
+
+Identity contract: `content_digest` is pack-only and must match between pipeline overview/history and multi-agent runtime for the same `snapshot_id`. Market bags use a separate `market_digest` and never rewrite pack `content_digest`.
 
 Runtime contract:
 
