@@ -1,11 +1,24 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import axios from 'axios';
+import { z } from 'zod';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+
+type OpenApiCapabilities = components['schemas']['ReportExportCapabilitiesResponse'];
+type OpenApiFormatCapability = components['schemas']['ReportExportFormatCapability'];
+type _AssertCapabilities = keyof OpenApiCapabilities;
+type _AssertFormatCapability = keyof OpenApiFormatCapability;
+const _capabilitiesAnchor: _AssertCapabilities = 'supported_query_formats';
+const _formatCapabilityAnchor: _AssertFormatCapability = 'dependency_installed';
+void _capabilitiesAnchor;
+void _formatCapabilityAnchor;
 
 export type ReportExportFormat = 'md' | 'html' | 'pdf';
 
+/** UI projection of capabilities (subset of OpenAPI ReportExportCapabilitiesResponse). */
 export type ReportExportCapabilities = {
   formats: {
     md: { available: boolean };
@@ -13,6 +26,47 @@ export type ReportExportCapabilities = {
     pdf: { available: boolean; reason?: string | null };
   };
 };
+
+const formatCapabilitySchema = z
+  .object({
+    available: z.boolean(),
+    status: z.string(),
+    mediaType: z.string(),
+    dependencyInstalled: z.boolean(),
+    dependency: z.string().nullable().optional(),
+    dependencyVersion: z.string().nullable().optional(),
+    fontValidated: z.boolean().nullable().optional(),
+    missingGlyphCount: z.number().int().optional(),
+    reason: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+const reportExportCapabilitiesSchema = z
+  .object({
+    formats: z
+      .object({
+        md: formatCapabilitySchema,
+        html: formatCapabilitySchema,
+        pdf: formatCapabilitySchema,
+      })
+      .passthrough(),
+    requestedLanguage: z.string(),
+    supportedQueryFormats: z.array(z.string()),
+    officeFormatsStatus: z.string(),
+    chartHandling: z.string(),
+    pdfLimits: z
+      .object({
+        maxInputBytes: z.number(),
+        maxPages: z.number(),
+        maxTableRows: z.number(),
+        maxTableColumns: z.number(),
+        maxOutputBytes: z.number(),
+        maxRenderSeconds: z.number(),
+        maxConcurrency: z.number(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 
 const EXPORT_EXTENSION: Record<ReportExportFormat, string> = {
   md: 'md',
@@ -84,23 +138,28 @@ export const reportExportApi = {
       const response = await apiClient.get<Record<string, unknown>>('/api/v1/history/export/capabilities', {
         params: { language },
       });
-      const data = response.data as {
-        formats?: {
-          md?: { available?: boolean };
-          html?: { available?: boolean; reason?: string | null };
-          pdf?: { available?: boolean; reason?: string | null };
+      const data = parseCamelCasePayload<{
+        formats: {
+          md: { available: boolean; reason?: string | null };
+          html: { available: boolean; reason?: string | null };
+          pdf: { available: boolean; reason?: string | null };
         };
-      };
+      }>(
+        response.data,
+        reportExportCapabilitiesSchema,
+        'ReportExportCapabilitiesResponse',
+        'reportExport',
+      );
       return {
         formats: {
-          md: { available: data.formats?.md?.available !== false },
+          md: { available: data.formats.md.available !== false },
           html: {
-            available: Boolean(data.formats?.html?.available),
-            reason: data.formats?.html?.reason ?? null,
+            available: Boolean(data.formats.html.available),
+            reason: data.formats.html.reason ?? null,
           },
           pdf: {
-            available: Boolean(data.formats?.pdf?.available),
-            reason: data.formats?.pdf?.reason ?? null,
+            available: Boolean(data.formats.pdf.available),
+            reason: data.formats.pdf.reason ?? null,
           },
         },
       };

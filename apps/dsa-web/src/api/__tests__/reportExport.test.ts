@@ -15,15 +15,46 @@ describe('reportExportApi', () => {
     vi.clearAllMocks();
   });
 
+  const fullCapabilities = {
+    formats: {
+      md: {
+        available: true,
+        status: 'ready',
+        media_type: 'text/markdown',
+        dependency_installed: true,
+      },
+      html: {
+        available: true,
+        status: 'ready',
+        media_type: 'text/html',
+        dependency_installed: true,
+      },
+      pdf: {
+        available: false,
+        status: 'dependency_missing',
+        media_type: 'application/pdf',
+        dependency_installed: false,
+        dependency: 'weasyprint',
+      },
+    },
+    requested_language: 'en',
+    supported_query_formats: ['md', 'html', 'pdf'],
+    office_formats_status: 'html_only',
+    chart_handling: 'markdown_images_omitted_without_destinations',
+    pdf_limits: {
+      max_input_bytes: 1_000_000,
+      max_pages: 50,
+      max_table_rows: 500,
+      max_table_columns: 20,
+      max_output_bytes: 5_000_000,
+      max_render_seconds: 30,
+      max_concurrency: 1,
+    },
+  };
+
   it('maps html capability and download format onto the history export API', async () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({
-      data: {
-        formats: {
-          md: { available: true },
-          html: { available: true },
-          pdf: { available: false },
-        },
-      },
+      data: fullCapabilities,
     });
 
     const caps = await reportExportApi.getCapabilities('en');
@@ -62,6 +93,19 @@ describe('reportExportApi', () => {
     );
     expect(anchor.download).toBe('stockpulse-report-3.html');
     expect(click).toHaveBeenCalled();
+  });
+
+  it('surfaces capability shape mismatches through ParsedApiError', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        formats: {
+          md: { available: true },
+        },
+      },
+    });
+    await expect(reportExportApi.getCapabilities('en')).rejects.toMatchObject({
+      name: 'ApiRequestError',
+    });
   });
 
   it('rehydrates JSON error blobs so callers get a parseable ApiRequestError', async () => {

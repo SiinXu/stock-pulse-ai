@@ -84,13 +84,82 @@ When migrating another `apps/dsa-web/src/api/*.ts` module:
 1. Identify OpenAPI path + `components.schemas` entries in `api.generated.ts`.
 2. Add a camelCase Zod schema for each response shape the module returns.
 3. Replace `toCamelCase<T>(...)` return sites with the parse helper (success path
-   still returns the camelCase object).
+   still returns the camelCase object). Prefer shared
+   `apps/dsa-web/src/api/parseCamelCasePayload.ts` over a local copy.
 4. Extend the module's vitest file for pass-through (including unexpected extra
    keys when using `.passthrough()`) and mismatch → `api_response_validation_failed`.
 5. Keep request encoding (snake_case bodies) unchanged unless the module already
    validates requests.
 6. Do not delete the hand-written type module until all call sites and the UI
    agree on generated/camelCase projection helpers (follow-up work).
+
+
+## Convention for new Web API modules (required)
+
+Any **new** resource client under `apps/dsa-web/src/api/` that returns JSON from
+the FastAPI surface **must**:
+
+1. Anchor response (and request, when useful) shapes on
+   `components['schemas'][...]` from `api.generated.ts`.
+2. Validate camelCase responses with Zod (or the shared parse helper) before
+   returning to UI code.
+3. On mismatch throw `createApiError(createParsedApiError({ code:
+   'api_response_validation_failed', ... }))` — no parallel error UX.
+4. Ship vitest coverage for pass-through and at least one mismatch path.
+5. Regenerate and commit `openapi.json` + `api.generated.ts` in the same change
+   when the backend schema changes (`openapi-types-gate` is blocking).
+
+**Documented skips** (do not invent a second contract system for these):
+
+- SSE / streaming (`EventSource`, chunked chat stream)
+- Binary blob downloads (`responseType: 'blob'`) and browser download helpers
+- Pure URL builders with no response body
+- Shared infrastructure (`error/`, `utils.ts`, `parseCamelCasePayload.ts`,
+  `index.ts`)
+
+If a backend route cannot be anchored because OpenAPI emits an empty response
+schema (example: historical `/api/v1/auth/status`), keep runtime validation and
+file a backend schema fix; do not reintroduce unchecked casts.
+
+## Suggested optional guard (owner decides whether to gate)
+
+A lightweight inventory helper can flag resource clients that still use unchecked
+`toCamelCase` without importing `api.generated` or `parseCamelCasePayload`:
+
+```bash
+python scripts/check_web_api_openapi_migration.py
+# optional strict mode for CI later:
+# python scripts/check_web_api_openapi_migration.py --fail-on-pending
+```
+
+**Default:** advisory only (exit 0, prints pending modules). Turning
+`--fail-on-pending` into a blocking CI job is an **owner decision** — do not
+enable it until the remaining documented skips and intentional projections are
+explicitly allowlisted. Existing blocking gate remains `openapi-types-gate`
+(artifact drift only).
+
+## Migration status snapshot (issue #721)
+
+Clusters already on generated types + runtime validation:
+
+- Pilot: `stocks`
+- Portfolio: `portfolio`, `backtest`, `decisionSignals`, `scorecard`
+- System: `systemConfig`, `approvals`, `usage`, `securityAudit`
+- Integrations: `alerts`, `alphasift`, `intelligence`, `investmentFramework`,
+  `localModels`, `modelPacks`, `plugins`, `calculators`
+- Analysis: `analysis`, `history`, `scheduledTasks`, `agent` (plain JSON)
+
+Additional modules completed in the remaining-module batch:
+
+- Full migrate: `configProfiles`, `skillOutcomes`, `reportVersionCompare`,
+  `valuation`, `reportExport` (capabilities JSON; blob download remains a skip)
+- Anchors on already-validated clients: `auth` (request-only until status schema
+  exists), `notificationInbox`, `outboundActivity`, `onboarding`, `todaysFocus`,
+  `watchlistGroups`, `watchlistScores`, `portfolioRiskMetrics`, `eventCalendar`
+  (alert-trigger list composition)
+
+Keep issue #721 open until any residual intentional skips are documented and
+owners accept residual risk; use `Refs #721` / `Refs #226` on incremental PRs.
 
 ## CI drift gate
 
