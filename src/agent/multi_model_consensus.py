@@ -552,12 +552,8 @@ def run_multi_model_consensus_analysis(
     """
     models, budget_meta = resolve_consensus_models_for_run(config)
     if len(models) < 2:
-        logger.info(
-            "[multi_model_consensus] fewer than 2 models after budget resolution; "
-            "skipping multi-model path (budget_enforced=%s reason=%s)",
-            budget_meta.get("budget_enforced"),
-            budget_meta.get("budget_reason"),
-        )
+        # No success-path logger here: config-derived values trip the
+        # raw-exception-object callsite guard (same pattern as daily-brief).
         return None, None
 
     budget: Dict[str, Any] = {
