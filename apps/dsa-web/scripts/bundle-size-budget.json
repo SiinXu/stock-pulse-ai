@@ -27,30 +27,30 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 158218,
-      "measuredGzipBytes": 157247,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 160036,
+      "measuredGzipBytes": 158251,
+      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151481,
-      "measuredGzipBytes": 150528,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 153050,
+      "measuredGzipBytes": 151534,
+      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151248,
-      "measuredGzipBytes": 150414,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 152857,
+      "measuredGzipBytes": 151343,
+      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 151302,
-      "measuredGzipBytes": 150355,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 152817,
+      "measuredGzipBytes": 151303,
+      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-es",
@@ -62,23 +62,23 @@
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 143635,
-      "measuredGzipBytes": 142893,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 145236,
+      "measuredGzipBytes": 143798,
+      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 137080,
-      "measuredGzipBytes": 136200,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 138477,
+      "measuredGzipBytes": 137105,
+      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 137136,
-      "measuredGzipBytes": 136287,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 138532,
+      "measuredGzipBytes": 137160,
+      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
     },
     {
       "id": "vendor-charts",
