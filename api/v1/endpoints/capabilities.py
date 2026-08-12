@@ -529,7 +529,13 @@ def route_task_model(body: TaskRouteRequest) -> TaskRouteResponse:
 
     try:
         config = Config.get_instance()
-    except Exception:  # broad-exception: fallback_recorded - route with no config
+    except Exception as exc:  # broad-exception: fallback_recorded - route with no config
+        log_safe_exception(
+            logger,
+            "Config unavailable for task route; continuing without config pins",
+            exc,
+            error_code="task_route_config_unavailable",
+        )
         config = None
 
     try:
