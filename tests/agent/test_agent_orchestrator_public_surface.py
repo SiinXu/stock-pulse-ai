@@ -50,6 +50,7 @@ EXPECTED_EXECUTION_METHODS = (
     "_build_timeout_result",
     "_build_budget_skip_result",
     "_build_cancelled_result",
+    "_with_budget_snapshot",
     "_prepare_agent",
     "_callable_accepts_kwarg",
     "_agent_run_accepts_kwarg",
@@ -114,9 +115,9 @@ EXPECTED_DASHBOARD_METHODS = (
 )
 
 EXPECTED_AST_HASHES = {
-    "_ExecutionMethods": "874bde2ce8e46d268096bafa929a23c6532462fcde6e887f052f72f7ff2d6cde",
+    "_ExecutionMethods": "03b1befb5752d439b5d2aeb35bcee5d50300c89eedb1ebd2aa7564c51f778e25",
     "_ChatMethods": "1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d",
-    "_PipelineMethods": "4611d9230b5c31e916ef72fc5125fafd580a4f5ee002e3ddee8b615352c7914e",
+    "_PipelineMethods": "2ce43490bd8ca5641efe476cd8772a2460b1e9af2b8707d4e46337353fabcc0c",
     "_DashboardMethods": "3aac353fb950aa588b71dc59eca0db793b131150949df7b8d08bf9731f5b611f",
 }
 

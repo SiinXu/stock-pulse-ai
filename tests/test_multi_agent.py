@@ -1049,7 +1049,9 @@ class TestOrchestratorExecution(unittest.TestCase):
         orch.max_steps = 12
         agent.max_steps = 6
         orch._prepare_agent(agent)
-        self.assertEqual(agent.max_steps, 12)
+        # Explicit raise is still bounded by the mode hard turn budget (standard=10).
+        mode_cap = orch.mode_budget_limits.effective_max_steps(12)
+        self.assertEqual(agent.max_steps, mode_cap)
 
         orch.max_steps = 5
         agent.max_steps = 6
