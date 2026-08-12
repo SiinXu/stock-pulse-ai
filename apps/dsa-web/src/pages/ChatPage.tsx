@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
-import { APP_ROUTE_PATHS } from '../routing/routes';
 import { History } from 'lucide-react';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -37,36 +36,25 @@ import { isNearBottom } from '../utils/chatScroll';
 import { getReportText } from '../utils/reportLanguage';
 import { findMatchingStockCode, includesStockCode } from '../utils/stockCode';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import type { UiTextKey } from '../i18n/uiText';
 import { getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
-import { REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
+import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
 import { cn } from '../utils/cn';
-// Quick question examples shown on empty state
-const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
-  { labelKey: 'chat.quick.chan', skill: 'chan_theory' },
-  { labelKey: 'chat.quick.wave', skill: 'wave_theory' },
-  { labelKey: 'chat.quick.trend', skill: 'bull_trend' },
-  { labelKey: 'chat.quick.box', skill: 'box_oscillation' },
-  { labelKey: 'chat.quick.tencent', skill: 'bull_trend' },
-  { labelKey: 'chat.quick.emotion', skill: 'emotion_cycle' },
-];
-const MAX_SELECTED_SKILLS = 3;
-const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
-const CHAT_SESSION_QUERY_KEY = 'session';
-const CHAT_CONTEXT_STATE_QUERY_KEY = 'context';
-const CHAT_ACTIVE_CONTEXT_STATE = 'active';
-const CHAT_UNKNOWN_CONTEXT_STATE = 'unknown';
-const CHAT_DESKTOP_RAIL_QUERY = '(min-width: 1280px)';
+import {
+  CHAT_ACTIVE_CONTEXT_STATE,
+  CHAT_CONTEXT_STATE_QUERY_KEY,
+  CHAT_DESKTOP_RAIL_QUERY,
+  CHAT_SESSION_QUERY_KEY,
+  CHAT_UNKNOWN_CONTEXT_STATE,
+  CONTEXT_COMPRESSION_CONFIG_KEY,
+  MAX_SELECTED_SKILLS,
+  QUICK_QUESTION_DEFINITIONS,
+} from '../components/chat/chatPageConstants';
 const ChatPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
-  useRouteFocusTarget({
-    routeId: APP_ROUTE_PATHS.agent,
-    headingRef: pageHeadingRef,
-    ready: true,
-  });
+  useRouteFocusTarget({ routeId: APP_ROUTE_PATHS.agent, headingRef: pageHeadingRef, ready: true });
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlSessionIdRef = useRef(
     searchParams.get(CHAT_SESSION_QUERY_KEY)?.trim() || undefined,
