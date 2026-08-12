@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getParsedApiError, isApiRequestError } from '../error';
 import apiClient from '../index';
 import { reportExportApi } from '../reportExport';
 
@@ -103,8 +104,10 @@ describe('reportExportApi', () => {
         },
       },
     });
-    await expect(reportExportApi.getCapabilities('en')).rejects.toMatchObject({
-      name: 'ApiRequestError',
+    await expect(reportExportApi.getCapabilities('en')).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
     });
   });
 

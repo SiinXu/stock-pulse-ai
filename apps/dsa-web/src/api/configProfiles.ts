@@ -53,8 +53,8 @@ const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
 const configProfileChangeSchema = z
   .object({
     key: z.string(),
-    fromValue: z.string().optional(),
-    to: z.string().optional(),
+    fromValue: z.string(),
+    to: z.string(),
   })
   .passthrough();
 

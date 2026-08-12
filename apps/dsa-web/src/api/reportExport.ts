@@ -4,7 +4,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import type { components } from '../types/api.generated';
 import apiClient from './index';
-import { createApiError, getParsedApiError } from './error';
+import { createApiError, getParsedApiError, isApiRequestError } from './error';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 
 type OpenApiCapabilities = components['schemas']['ReportExportCapabilitiesResponse'];
@@ -164,6 +164,8 @@ export const reportExportApi = {
         },
       };
     } catch (error) {
+      // Preserve fail-closed validation errors from parseCamelCasePayload.
+      if (isApiRequestError(error)) throw error;
       throw createApiError(getParsedApiError(error), { cause: error });
     }
   },
