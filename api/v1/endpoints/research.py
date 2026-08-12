@@ -320,7 +320,6 @@ def get_research_conclusion_by_record_id(
         ),
     )
 
-
 @router.get(
     "/conclusions",
     response_model=ResearchConclusionResponse,
@@ -374,4 +373,3 @@ def get_latest_research_conclusion(
             language=language,
         ),
     )
-
