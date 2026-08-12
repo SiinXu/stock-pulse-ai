@@ -92,17 +92,25 @@ function sanitizeDiagnosticsForRenderer(diagnostics) {
     : [];
 
   return {
-    schemaVersion: Number(diagnostics && diagnostics.schemaVersion) || 2,
+    schemaVersion: sanitizeNonNegativeInteger(diagnostics && diagnostics.schemaVersion, 2),
     generatedAt: typeof diagnostics?.generatedAt === 'string' ? diagnostics.generatedAt : null,
     platform: typeof diagnostics?.platform === 'string' ? diagnostics.platform : 'unknown',
     path: {
-      effectiveEntryCount: Number(pathInfo.effectiveEntryCount) || 0,
+      effectiveEntryCount: sanitizeNonNegativeInteger(pathInfo.effectiveEntryCount, 0),
       limited: Boolean(pathInfo.limited),
       augmented: Boolean(pathInfo.augmented),
       policy: typeof pathInfo.policy === 'string' ? pathInfo.policy : 'unknown',
     },
     cli,
   };
+}
+
+function sanitizeNonNegativeInteger(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return Math.floor(parsed);
 }
 
 function assertRendererSafePayload(payload) {
@@ -201,7 +209,7 @@ function resolveCliInstallGuideUrl(commandName) {
   }
 }
 
-function openOperatorTerminal({
+async function openOperatorTerminal({
   platform = process.platform,
   spawnImpl = spawn,
 } = {}) {
@@ -224,7 +232,17 @@ function openOperatorTerminal({
         stdio: 'ignore',
       });
     }
-    if (child && typeof child.unref === 'function') {
+    if (!child || typeof child.once !== 'function') {
+      return { ok: false, error: 'terminal_launch_failed' };
+    }
+    const launched = await new Promise((resolve) => {
+      child.once('spawn', () => resolve(true));
+      child.once('error', () => resolve(false));
+    });
+    if (!launched) {
+      return { ok: false, error: 'terminal_launch_failed' };
+    }
+    if (typeof child.unref === 'function') {
       child.unref();
     }
     return { ok: true };
@@ -243,7 +261,11 @@ async function openCliInstallGuide(commandName, {
   if (!url) {
     return { ok: false, error: 'guide_unsupported' };
   }
-  await openExternal(url);
+  try {
+    await openExternal(url);
+  } catch (_error) {
+    return { ok: false, error: 'guide_open_failed' };
+  }
   return { ok: true, urlHost: new URL(url).hostname };
 }
 

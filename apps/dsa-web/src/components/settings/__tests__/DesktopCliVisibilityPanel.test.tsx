@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertDesktopCliGuidancePathSafe } from '../desktopCliGuidance';
-import { DesktopCliVisibilityPanel } from '../DesktopCliVisibilityPanel';
+import DesktopCliVisibilityPanel from '../DesktopCliVisibilityPanel';
 
 describe('DesktopCliVisibilityPanel', () => {
   beforeEach(() => {

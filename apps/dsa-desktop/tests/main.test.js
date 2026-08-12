@@ -2417,7 +2417,12 @@ test('desktop env diagnostics IPC returns path-safe guidance and open-terminal h
     childProcess: {
       spawn: (command, args, options) => {
         spawnCalls.push({ command, args, options });
-        return { unref() {}, on() {}, stdout: null, stderr: null };
+        const child = new EventEmitter();
+        child.unref = () => undefined;
+        child.stdout = null;
+        child.stderr = null;
+        process.nextTick(() => child.emit('spawn'));
+        return child;
       },
     },
   });

@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
 const test = require('node:test');
 
 const guidance = require('../cli-operator-guidance');
@@ -56,13 +57,16 @@ test('fail-open is rejected: unknown stays unknown and available is never invent
   assert.match(payload.copy.title, /可见性/);
 });
 
-test('openOperatorTerminal launches without path arguments', () => {
+test('openOperatorTerminal launches without path arguments', async () => {
   const calls = [];
-  const result = guidance.openOperatorTerminal({
+  const result = await guidance.openOperatorTerminal({
     platform: 'darwin',
     spawnImpl: (command, args, options) => {
       calls.push({ command, args, options });
-      return { unref() {} };
+      const child = new EventEmitter();
+      child.unref = () => undefined;
+      process.nextTick(() => child.emit('spawn'));
+      return child;
     },
   });
   assert.equal(result.ok, true);
@@ -70,6 +74,19 @@ test('openOperatorTerminal launches without path arguments', () => {
   assert.deepEqual(calls[0].args, ['-a', 'Terminal']);
   assert.equal(JSON.stringify(calls[0].args).includes('/Users'), false);
   assert.equal(JSON.stringify(calls[0].args).includes('StockPulse'), false);
+});
+
+test('openOperatorTerminal contains asynchronous spawn failures', async () => {
+  const result = await guidance.openOperatorTerminal({
+    platform: 'linux',
+    spawnImpl: () => {
+      const child = new EventEmitter();
+      process.nextTick(() => child.emit('error', new Error('missing terminal')));
+      return child;
+    },
+  });
+
+  assert.deepEqual(result, { ok: false, error: 'terminal_launch_failed' });
 });
 
 test('install guide URLs stay on the HTTPS allowlist and expose host only', async () => {
@@ -83,6 +100,29 @@ test('install guide URLs stay on the HTTPS allowlist and expose host only', asyn
   assert.equal(result.urlHost, 'opencode.ai');
   assert.equal(opened[0].startsWith('https://'), true);
   assert.equal(guidance.resolveCliInstallGuideUrl('not-a-cli'), null);
+});
+
+test('install guide failures are returned instead of rejecting IPC', async () => {
+  const result = await guidance.openCliInstallGuide('codex', {
+    openExternal: async () => {
+      throw new Error('browser unavailable');
+    },
+  });
+
+  assert.deepEqual(result, { ok: false, error: 'guide_open_failed' });
+});
+
+test('renderer guidance replaces non-finite and negative counters', () => {
+  const payload = guidance.buildCliOperatorGuidance({
+    schemaVersion: Number.POSITIVE_INFINITY,
+    path: { effectiveEntryCount: Number.NaN },
+    cli: [],
+  });
+
+  assert.equal(payload.schemaVersion, 2);
+  assert.equal(payload.path.effectiveEntryCount, 0);
+  assert.equal(Number.isFinite(payload.schemaVersion), true);
+  assert.equal(Number.isFinite(payload.path.effectiveEntryCount), true);
 });
 
 test('deep-link rejection copy never echoes a raw URL', () => {

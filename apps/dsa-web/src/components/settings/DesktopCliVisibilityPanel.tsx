@@ -13,7 +13,7 @@ type DesktopCliVisibilityPanelProps = {
   language: UiLanguage;
 };
 
-export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPanelProps) {
+export default function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPanelProps) {
   const [payload, setPayload] = useState<DesktopCliGuidancePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);

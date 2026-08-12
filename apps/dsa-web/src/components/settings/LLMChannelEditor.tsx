@@ -33,7 +33,7 @@ import {
   type HubAvailability,
   type HubProbeState,
 } from './modelSourcesHubStatus';
-import { DesktopCliVisibilityPanel } from './DesktopCliVisibilityPanel';
+import DesktopCliVisibilityPanel from './DesktopCliVisibilityPanel';
 import {
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,

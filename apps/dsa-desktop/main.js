@@ -3556,7 +3556,7 @@ async function getDesktopEnvDiagnosticsForRenderer({
 
 async function handleOpenOperatorTerminal({ locale } = {}) {
   const copy = getGuidanceCopyForTerminal(locale);
-  const result = openOperatorTerminal({ platform: process.platform, spawnImpl: spawn });
+  const result = await openOperatorTerminal({ platform: process.platform, spawnImpl: spawn });
   if (!result.ok) {
     return {
       ok: false,
