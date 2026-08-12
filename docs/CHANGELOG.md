@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Added] Research presentation profiles (`RESEARCH_PRESENTATION_PROFILE`: conservative/balanced/aggressive) reorder report emphasis without changing facts or equal risk disclosure; config registry + renderer framing banner (Refs #205).
+- [Added] Research presentation profiles (`RESEARCH_PRESENTATION_PROFILE`: conservative/balanced/aggressive) reorder Jinja report emphasis without changing facts; equal risk disclosure including compact strata; brief push omits framing banner; Settings registry only (chat out of scope for v1) (Refs #205).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).

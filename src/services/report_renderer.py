@@ -56,6 +56,7 @@ from src.services.research_presentation_profile import (
     get_presentation_plan,
     profile_framing_notice,
     resolve_research_presentation_profile,
+    should_emit_framing_notice,
 )
 from src.services.valuation_projection import (
     extract_valuation_payload,
@@ -315,8 +316,18 @@ def render(
         )
     )
     presentation_plan = get_presentation_plan(research_presentation_profile)
+    # Brief push budgets (#861/#874): skip long framing banner; reordering still
+    # applies where sections exist (wechat/markdown). Agent chat is out of scope
+    # for #205 v1 (Jinja reports + Settings only).
+    framing_style = (
+        "full"
+        if should_emit_framing_notice(report_mode=report_mode, platform=platform)
+        else "none"
+    )
     presentation_framing_notice = profile_framing_notice(
-        research_presentation_profile, report_language
+        research_presentation_profile,
+        report_language,
+        style=framing_style,
     )
 
     sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)

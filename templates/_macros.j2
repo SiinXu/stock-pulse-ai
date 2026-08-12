@@ -140,6 +140,8 @@
 {% endif %}
 {% endfor %}
 {% else %}
+{# Compact strata intentionally includes risks_counter_evidence when present so
+   risk disclosure stays equal across research presentation profiles (#205). #}
 **🧾 {{ labels.report_strata_heading }}**
 {% for block_key in _strata_order %}
 {% if block_key == 'verified_facts' and strata.verified_facts %}

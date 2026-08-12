@@ -954,7 +954,7 @@ When `REPORT_RENDERER_ENABLED=true`, Jinja stock reports also support research p
 | `balanced` (default) | Historical default section order | Full |
 | `aggressive` | Catalysts / opportunities first | Full (risks still complete, just later) |
 
-This axis is **orthogonal** to `REPORT_MODE` (depth/limits) and to `RISK_GATE_PROFILE` (final-action thresholds). Profiles must not change facts, scores, actions, or risk-disclosure completeness; they only reorder presentation emphasis and show an explicit research-framing banner.
+This axis is **orthogonal** to `REPORT_MODE` (depth/limits) and to `RISK_GATE_PROFILE` (final-action thresholds). Profiles must not change facts, scores, actions, or risk-disclosure completeness; they only reorder presentation emphasis and show an explicit research-framing banner on non-brief surfaces. **v1 scope** is Jinja stock reports plus Settings (`RESEARCH_PRESENTATION_PROFILE`); Agent chat conversation presentation is out of scope for this issue. `REPORT_MODE=brief` / the brief push template omit the long framing banner to protect push length budgets. Compact evidence strata intentionally include risk counter-evidence lines when present so disclosure stays equal across profiles.
 
 ### Signal Attribution Analysis (Issue #1742)
 

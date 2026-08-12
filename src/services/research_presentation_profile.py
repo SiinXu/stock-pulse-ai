@@ -164,42 +164,64 @@ def get_presentation_plan(profile: str) -> Dict[str, Any]:
     return plan
 
 
-def profile_framing_notice(profile: str, report_language: str = "zh") -> str:
-    """Explicit research-framing banner. Always non-empty for a resolved profile."""
+def should_emit_framing_notice(
+    *,
+    report_mode: Optional[str] = None,
+    platform: Optional[str] = None,
+) -> bool:
+    """Return False on push-budget brief surfaces (#861/#874).
+
+    Brief mode / platform have almost no profile reordering surface (Decision Card
+    stays risk-leading) and must not spend characters on a long framing banner.
+    """
+    from src.services.report_mode import REPORT_MODE_BRIEF, normalize_report_mode
+
+    mode = normalize_report_mode(report_mode) if report_mode is not None else None
+    plat = (platform or "").strip().lower()
+    if mode == REPORT_MODE_BRIEF or plat == "brief":
+        return False
+    return True
+
+
+def profile_framing_notice(
+    profile: str,
+    report_language: str = "zh",
+    *,
+    style: str = "full",
+) -> str:
+    """Explicit research-framing banner.
+
+    ``style``:
+    - ``full``: long research-framing line for markdown / wechat detail
+    - ``none``: empty (brief push budget path)
+    """
+    if (style or "full").strip().lower() == "none":
+        return ""
     normalized = normalize_research_presentation_profile(profile)
-    lang = (report_language or "zh").lower()
-    if lang.startswith("en"):
-        labels = {
-            PROFILE_CONSERVATIVE: "conservative",
-            PROFILE_BALANCED: "balanced",
-            PROFILE_AGGRESSIVE: "aggressive",
-        }
-        return (
-            f"_Research presentation profile: **{labels[normalized]}** "
-            "(emphasis/ordering only; same evidence and full risk disclosure "
-            "as other profiles. Research framing aid — not personalized advice.)_"
-        )
-    if lang.startswith("ko"):
-        labels = {
-            PROFILE_CONSERVATIVE: "보수적",
-            PROFILE_BALANCED: "균형",
-            PROFILE_AGGRESSIVE: "공격적",
-        }
-        return (
-            f"_연구 프레젠테이션 프로필: **{labels[normalized]}** "
-            "(강조/순서만 변경; 근거와 리스크 공개는 모든 프로필에서 동일. "
-            "연구용 프레이밍이며 맞춤 투자 권유가 아닙니다.)_"
-        )
-    labels = {
-        PROFILE_CONSERVATIVE: "保守",
-        PROFILE_BALANCED: "均衡",
-        PROFILE_AGGRESSIVE: "积极",
-    }
-    return (
-        f"_研究呈现偏好：**{labels[normalized]}**"
-        "（仅调整排序与强调；同一证据，风险披露完整度与其他偏好相同。"
-        "研究框架辅助，非个性化投资建议。）_"
+    # Prefer report labels so zh/en/ko stay single-sourced with templates.
+    from src.report_language import get_report_labels
+
+    labels = get_report_labels(report_language)
+    name = {
+        PROFILE_CONSERVATIVE: labels.get(
+            "presentation_profile_conservative", PROFILE_CONSERVATIVE
+        ),
+        PROFILE_BALANCED: labels.get(
+            "presentation_profile_balanced", PROFILE_BALANCED
+        ),
+        PROFILE_AGGRESSIVE: labels.get(
+            "presentation_profile_aggressive", PROFILE_AGGRESSIVE
+        ),
+    }[normalized]
+    heading = labels.get(
+        "presentation_profile_heading", "Research presentation profile"
     )
+    detail = labels.get(
+        "presentation_profile_framing_detail",
+        "emphasis/ordering only; same evidence and full risk disclosure; "
+        "research framing aid, not personalized advice",
+    )
+    return f"_{heading}: **{name}** ({detail})_"
 
 
 def risk_content_fingerprint(
@@ -261,6 +283,7 @@ __all__ = [
     "normalize_research_presentation_profile",
     "resolve_research_presentation_profile",
     "get_presentation_plan",
+    "should_emit_framing_notice",
     "profile_framing_notice",
     "risk_content_fingerprint",
     "assert_profile_does_not_change_limits",

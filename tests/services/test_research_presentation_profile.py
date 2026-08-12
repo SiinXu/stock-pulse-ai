@@ -17,6 +17,7 @@ from src.services.research_presentation_profile import (
     profile_framing_notice,
     resolve_research_presentation_profile,
     risk_content_fingerprint,
+    should_emit_framing_notice,
 )
 
 
@@ -113,6 +114,21 @@ class TestResearchPresentationProfileContract(unittest.TestCase):
             self.assertIn("not personalized advice", en)
             self.assertIn("研究呈现偏好", zh)
             self.assertIn("연구", ko)
+            self.assertEqual(profile_framing_notice(profile, "en", style="none"), "")
+
+    def test_should_emit_framing_notice_skips_brief(self) -> None:
+        self.assertFalse(
+            should_emit_framing_notice(report_mode="brief", platform="markdown")
+        )
+        self.assertFalse(
+            should_emit_framing_notice(report_mode="standard", platform="brief")
+        )
+        self.assertTrue(
+            should_emit_framing_notice(report_mode="research", platform="markdown")
+        )
+        self.assertTrue(
+            should_emit_framing_notice(report_mode="standard", platform="wechat")
+        )
 
     def test_risk_fingerprint_order_independent(self) -> None:
         dash_a = {
@@ -295,6 +311,73 @@ class TestResearchPresentationProfileRenderer(unittest.TestCase):
         self.assertIn("aggressive", out.lower())
         intel = out[out.index("Key Updates"):]
         self.assertLess(intel.index("Positive Catalysts"), intel.index("Risk Alerts"))
+
+    def test_brief_platform_omits_framing_banner(self) -> None:
+        """Push-budget brief must not spend characters on framing (#861/#874)."""
+        from src.services.report_renderer import render
+
+        result = self._make_result()
+        cfg = MagicMock()
+        cfg.report_language = "en"
+        cfg.report_mode = "brief"
+        cfg.research_presentation_profile = "conservative"
+        cfg.report_show_llm_model = False
+        cfg.report_templates_dir = "templates"
+        cfg.report_renderer_enabled = True
+        with patch("src.services.report_renderer.get_config", return_value=cfg):
+            out = render(
+                "brief",
+                [result],
+                extra_context={
+                    "report_mode": "brief",
+                    "research_presentation_profile": "conservative",
+                },
+            )
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertNotIn("Research presentation profile", out)
+        self.assertNotIn("research framing aid", out.lower())
+        self.assertIn("Not investment advice", out)
+
+    def test_compact_strata_includes_risks_for_all_profiles(self) -> None:
+        """Compact strata intentionally surfaces risk counter-evidence (#205)."""
+        from src.services.report_renderer import render
+
+        result = self._make_result()
+        cfg = MagicMock()
+        cfg.report_language = "en"
+        cfg.report_mode = "standard"
+        cfg.research_presentation_profile = "balanced"
+        cfg.report_show_llm_model = False
+        cfg.report_templates_dir = "templates"
+        cfg.report_renderer_enabled = True
+        # Compact truncates long lines; assert label + distinctive prefix for parity.
+        risk_label = "Risks / Counter-Evidence"
+        risk_prefix = "Break below support invalidates"
+        with patch("src.services.report_renderer.get_config", return_value=cfg):
+            for profile in (
+                PROFILE_CONSERVATIVE,
+                PROFILE_BALANCED,
+                PROFILE_AGGRESSIVE,
+            ):
+                out = render(
+                    "markdown",
+                    [result],
+                    summary_only=False,
+                    extra_context={
+                        "report_mode": "standard",
+                        "research_presentation_profile": profile,
+                    },
+                )
+                self.assertIsNotNone(out, profile)
+                assert out is not None
+                # compact (no #### headings) but risks present for equal disclosure
+                self.assertNotIn("#### 1. Verified Facts", out)
+                self.assertIn("Evidence Strata", out)
+                self.assertIn(risk_label, out)
+                self.assertIn(risk_prefix, out)
+                self.assertIn("Research presentation profile", out)
+
 
 
 if __name__ == "__main__":

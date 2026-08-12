@@ -1053,7 +1053,7 @@ P5 在个股分析报告的 `dashboard.phase_decision` 中追加阶段化决策�
 
 #### 报告三模式与 Decision Card（Issue #861）
 
-在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。另支持 `RESEARCH_PRESENTATION_PROFILE`（或 `extra_context.research_presentation_profile`）三偏好：`conservative` / `balanced`（默认）/ `aggressive`——仅调整段落与列表的排序/强调（保守风险优先、积极催化优先），**不改变底层证据、不缩减风险披露**，也不影响 `RISK_GATE_PROFILE`。分层阅读顺序：每股块内 **Decision Card 开篇 → 按模式密度的证据分层（none / compact / full）→ 长文分析段落**。`ReportType.BRIEF` 通知生成会强制 `report_mode=brief`，即使全局 `REPORT_MODE` 为 standard/research 也不突破推送长度预算。导出链路（`export_report`）消费已渲染 Markdown，不再二次套用模式。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
+在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。另支持 `RESEARCH_PRESENTATION_PROFILE`（或 `extra_context.research_presentation_profile`）三偏好：`conservative` / `balanced`（默认）/ `aggressive`——仅调整 Jinja 个股报告段落与列表的排序/强调（保守风险优先、积极催化优先），**不改变底层证据、不缩减风险披露**，也不影响 `RISK_GATE_PROFILE`。v1 范围是报告渲染 + Settings 配置；Agent chat 对话呈现不在本项内。`REPORT_MODE=brief` / brief 推送模板不输出长 framing banner，以免挤占推送字数预算。compact strata 在有风险反证时会展示（三种偏好完整度等同）。分层阅读顺序：每股块内 **Decision Card 开篇 → 按模式密度的证据分层（none / compact / full）→ 长文分析段落**。`ReportType.BRIEF` 通知生成会强制 `report_mode=brief`，即使全局 `REPORT_MODE` 为 standard/research 也不突破推送长度预算。导出链路（`export_report`）消费已渲染 Markdown，不再二次套用模式。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
 
 #### 信号归因分析（Issue #1742）
 
