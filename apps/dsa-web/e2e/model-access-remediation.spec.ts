@@ -124,7 +124,8 @@ async function openConnections(page: Page, reset = true) {
 
 async function openAddDialog(page: Page) {
   await page.getByRole('button', { name: /添加模型来源/ }).first().click();
-  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  await page.getByTestId('source-type-cloud').click();
+  const dialog = page.getByRole('region', { name: '添加模型服务' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -301,7 +302,7 @@ test.describe('model access product convergence', () => {
   test('03 Model Access has the concise title, description, and one primary action', async ({ page }) => {
     await openConnections(page);
     await selectTheme(page, '浅色');
-    await expect(page.getByText('统一管理云端 API、本地模型服务与本地 CLI，并将可用模型分配到任务。')).toBeVisible();
+    await expect(page.getByText('统一管理云端 API、本地模型服务与本地 CLI：添加来源 → 测试 → 启用模型 → 分配到任务。')).toBeVisible();
     await expect(page.getByRole('button', { name: /添加模型来源/ })).toHaveCount(1);
   });
 
@@ -329,7 +330,7 @@ test.describe('model access product convergence', () => {
     }
   });
 
-  test('07 Add opens one modal with backend-catalog and custom providers', async ({ page }) => {
+  test('07 Add opens one route-backed setup with backend-catalog and custom providers', async ({ page }) => {
     await openConnections(page);
     const dialog = await openAddDialog(page);
     await page.getByLabel('选择模型服务商').click();
@@ -422,7 +423,7 @@ test.describe('model access product convergence', () => {
     await configureOpenAiConnection(page, 'openai', 'fake-report-model');
 
     await page.getByTestId('connection-card-openai').getByRole('button', { name: '编辑' }).click();
-    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    const dialog = page.getByRole('region', { name: '编辑模型服务' });
     await dialog.getByLabel('连接名称').fill('primary_gateway');
     await waitForAiAutosave(page, async () => {
       await dialog.getByRole('button', { name: '保存修改' }).click();
@@ -584,7 +585,7 @@ test.describe('model access product convergence', () => {
     await chooseProvider(page, 'openai');
     await dialog.getByRole('button', { name: '上一步' }).click();
     await expect(dialog.getByLabel('选择模型服务商')).toBeVisible();
-    await expect(page.getByRole('dialog', { name: '添加模型服务' })).toHaveCount(1);
+    await expect(page.getByRole('region', { name: '添加模型服务' })).toHaveCount(1);
   });
 
   test('17 Add to configuration schedules the AI group autosave without a global Save', async ({ page }) => {
@@ -635,15 +636,15 @@ test.describe('model access product convergence', () => {
   test('19 Edit reuses the connection modal and keeps the page compact', async ({ page }) => {
     await createSavedConnection(page);
     await page.getByTestId('connection-card-custom').getByRole('button', { name: '编辑' }).click();
-    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    const dialog = page.getByRole('region', { name: '编辑模型服务' });
     await expect(dialog.getByLabel('连接名称')).toHaveValue('e2e');
-    await expect(page.getByRole('dialog', { name: '编辑模型服务' })).toHaveCount(1);
+    await expect(page.getByRole('region', { name: '编辑模型服务' })).toHaveCount(1);
   });
 
   test('20 clicking the model region reuses the modal and focuses model management', async ({ page }) => {
     await createSavedConnection(page);
     await page.getByRole('button', { name: '管理模型 e2e' }).click();
-    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    const dialog = page.getByRole('region', { name: '编辑模型服务' });
     await expect(dialog.getByRole('button', { name: '获取模型' })).toBeFocused();
   });
 
@@ -839,7 +840,7 @@ test.describe('model access product convergence', () => {
 
     await page.getByRole('radio', { name: '模型来源' }).click();
     await page.getByRole('button', { name: '管理模型 e2e' }).click();
-    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    const dialog = page.getByRole('region', { name: '编辑模型服务' });
     await dialog.getByRole('button', { name: '移除模型 fake-report-model' }).click();
     const conflict = dialog.getByRole('status').filter({ hasText: '无法直接删除模型' });
     await expect(dialog.getByText('无法直接删除模型')).toBeVisible();
@@ -928,7 +929,7 @@ test.describe('model access product convergence', () => {
     });
     expect(mutation).toBe(200);
     await page.getByTestId('connection-card-custom').getByRole('button', { name: '编辑' }).click();
-    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    const dialog = page.getByRole('region', { name: '编辑模型服务' });
     await addManualModel(page, 'local-only-model');
     await waitForAiAutosave(page, async () => {
       await dialog.getByRole('button', { name: '保存修改' }).click();
@@ -938,22 +939,28 @@ test.describe('model access product convergence', () => {
     await expect(page.getByTestId('connection-card-custom')).toContainText('local-only-model');
   });
 
-  test('30 mobile modal is a bottom sheet and both themes remain usable', async ({ page }) => {
+  test('30 mobile route-backed setup stays within the viewport in both themes', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openConnections(page);
     await selectTheme(page, '浅色');
     let dialog = await openAddDialog(page);
     let box = await dialog.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThanOrEqual(389);
-    expect(Math.abs(box!.y + box!.height - 844)).toBeLessThanOrEqual(2);
-    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.width).toBeGreaterThanOrEqual(300);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
 
     await selectTheme(page, '深色');
     dialog = await openAddDialog(page);
     box = await dialog.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThanOrEqual(389);
-    expect(Math.abs(box!.y + box!.height - 844)).toBeLessThanOrEqual(2);
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.width).toBeGreaterThanOrEqual(300);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(844);
   });
 });
