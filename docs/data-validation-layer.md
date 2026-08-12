@@ -13,8 +13,11 @@ Every non-empty daily or realtime provider candidate is validated before the man
 | `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | Comma-separated `market/instrument` selectors, for example `cn/equity,hk/etf,us/index`. `*` is a wildcard. |
 | `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | empty | Comma-separated authoritative `SYMBOL=instrument` identities for offshore symbols that cannot be classified safely from code alone, for example `SPY=etf,HK02800=etf,1306.T=etf`. |
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | Aggregated fundamental results remain warn/evidence-only by default. `reject` explicitly raises at that separate upper boundary; it is not described as provider failover. |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | `200` | Soft absolute PE bound. Finite PE values at or above this magnitude are WARN/suspect and **kept**. Hard feed extremes still reject. |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | `50` | Soft absolute PB bound. Finite PB values at or above this magnitude are WARN/suspect and **kept**. Hard feed extremes still reject. |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | `0.05` | Relative divergence threshold for multi-provider field comparison. Differences above the threshold emit WARN evidence with provider attribution; values are kept. |
 
-All five fields are loaded by the typed `Config` owner and remain environment-managed; this change does not add a parallel Web-settings surface. Explicit provider/caller `instrument_type` metadata takes precedence, then the configured symbol override, then conservative code inference. Disabling validation is the immediate rollback switch.
+All eight fields are loaded by the typed `Config` owner and remain environment-managed; this change does not add a parallel Web-settings surface. Explicit provider/caller `instrument_type` metadata takes precedence, then the configured symbol override, then conservative code inference. Disabling validation is the immediate rollback switch.
 Malformed strict selectors do not silently disable rejection: when no selector is valid, strict mode falls back to `*/*`.
 
 ## Numeric contract
@@ -33,10 +36,20 @@ Field-specific code families are version-stable:
 
 - Daily OHLCV: `dv_ohlcv_<field>_<reason>`
 - Realtime quote: `dv_quote_<field>_<reason>`
-- Fundamentals: `dv_fund_pe_<reason>` and `dv_fund_pb_<reason>`
-- Selected technical indicators: `dv_technical_<field>_<reason>` for `ma5`, `ma10`, `ma20`, `bias_ma5`, `bias_ma10`, `trend_strength`, and `signal_score`
+- Fundamentals: `dv_fund_pe_<reason>` and `dv_fund_pb_<reason>` (including `*_suspect` for soft plausibility)
+- Indicator inputs (pre-synthesis): `dv_indicator_input_<field>_<reason>` and `dv_indicator_input_insufficient`
+- Technical indicators (post-synthesis): `dv_technical_<field>_<reason>` for contract fields and any nested numeric leaf (non-finite values are scrubbed and never returned)
+- Cross-source comparison: `dv_cross_source_divergence`
 
-Cross-field codes cover high below low, close/price outside the high-low range, percentage-change inconsistency, volume-unit suspicion, duplicate dates, and out-of-order dates. Negative PE is warn-only because it is valid for loss-making issuers. Zero volume and amount are valid for suspended instruments. Missing PE/PB is valid for ETFs and partial/offshore providers. Provider rounding within ±0.51 percentage points is accepted.
+Cross-field codes cover high below low, close/price outside the high-low range, percentage-change inconsistency, volume-unit suspicion, duplicate dates, and out-of-order dates. Negative PE is warn-only because it is valid for loss-making issuers. Soft PE/PB plausibility bands mark values as suspect without discarding them. Zero volume and amount are valid for suspended instruments. Missing PE/PB is valid for ETFs and partial/offshore providers. Provider rounding within ±0.51 percentage points is accepted.
+
+### Pre-synthesis indicator inputs
+
+Before technical-indicator synthesis, OHLCV frames are validated through `prepare_indicator_inputs`. Non-finite or invalid required price fields reject the affected rows; when no clean rows remain, synthesis is skipped with explicit diagnostic evidence. Callers must not synthesize indicators from dirty rows.
+
+### Cross-source consistency
+
+When a realtime quote is supplemented from a secondary provider, matching finite fields are compared. Divergences above `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` emit WARN evidence with provider attribution. Values are always kept; a single missing provider is a no-op so one source failure cannot interrupt overall analysis.
 
 ## Evidence and diagnostics
 
