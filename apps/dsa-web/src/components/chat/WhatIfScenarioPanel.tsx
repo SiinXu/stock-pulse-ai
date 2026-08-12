@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FlaskConical } from 'lucide-react';
-import { InlineAlert, Input, Select, Switch } from '../common';
+import { Button, InlineAlert, Input, Select, Switch } from '../common';
 import { cn } from '../../utils/cn';
 import type { UiTextKey } from '../../i18n/uiText';
 import {
@@ -158,20 +158,16 @@ export function WhatIfScenarioPanel({
             <p className="text-xs text-secondary-text">{t('chat.whatIf.promoteHint')}</p>
             {promoteHref ? (
               disabled ? (
-                <span
-                  data-testid="chat-what-if-promote-link"
-                  aria-disabled="true"
-                  className={cn(
-                    'inline-flex h-5 min-w-5 cursor-not-allowed items-center justify-center gap-1.5 rounded-md',
-                    'border border-border bg-hover px-2 text-xs font-medium text-foreground opacity-50 shadow-soft-card',
-                  )}
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  disabled
                 >
                   {t('chat.whatIf.promote')}
-                </span>
+                </Button>
               ) : (
                 <Link
                   to={promoteHref}
-                  data-testid="chat-what-if-promote-link"
                   className={cn(
                     'control-hit-target inline-flex h-5 min-w-5 items-center justify-center gap-1.5 rounded-md',
                     'border border-border bg-hover px-2 text-xs font-medium text-foreground shadow-soft-card',
@@ -183,7 +179,7 @@ export function WhatIfScenarioPanel({
                 </Link>
               )
             ) : (
-              <p className="text-xs text-muted-text" data-testid="chat-what-if-promote-need-stock">
+              <p className="text-xs text-muted-text">
                 {t('chat.whatIf.promoteNeedStock')}
               </p>
             )}

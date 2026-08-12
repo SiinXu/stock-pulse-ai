@@ -61,26 +61,20 @@ function renderPanel(props: {
 describe('WhatIfScenarioPanel promote handoff', () => {
   it('shows need-stock guidance when promote href is missing', () => {
     renderPanel({ promoteHref: null });
-    expect(screen.getByTestId('chat-what-if-promote-need-stock')).toHaveTextContent(
-      'Bind a stock context first to open the analysis workbench.',
-    );
-    expect(screen.queryByTestId('chat-what-if-promote-link')).not.toBeInTheDocument();
+    expect(screen.getByText('Bind a stock context first to open the analysis workbench.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open this stock in the analysis workbench' })).not.toBeInTheDocument();
   });
 
   it('renders an enabled handoff link for the analysis workbench', () => {
     renderPanel({ promoteHref: '/research/analysis?stock=600519' });
-    const link = screen.getByTestId('chat-what-if-promote-link');
-    expect(link.tagName).toBe('A');
+    const link = screen.getByRole('link', { name: 'Open this stock in the analysis workbench' });
     expect(link).toHaveAttribute('href', '/research/analysis?stock=600519');
-    expect(link).toHaveTextContent('Open this stock in the analysis workbench');
     expect(link).not.toHaveAttribute('aria-disabled');
   });
 
   it('disables the handoff control while the panel is disabled', () => {
     renderPanel({ promoteHref: '/research/analysis?stock=600519', disabled: true });
-    const control = screen.getByTestId('chat-what-if-promote-link');
-    expect(control.tagName).toBe('SPAN');
-    expect(control).toHaveAttribute('aria-disabled', 'true');
-    expect(control).not.toHaveAttribute('href');
+    expect(screen.getByRole('button', { name: 'Open this stock in the analysis workbench' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Open this stock in the analysis workbench' })).not.toBeInTheDocument();
   });
 });
