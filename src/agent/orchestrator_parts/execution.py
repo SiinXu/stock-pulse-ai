@@ -108,19 +108,23 @@ class _ExecutionMethods:
                 ctx.set_data("final_dashboard", dashboard)
                 content = json.dumps(dashboard, ensure_ascii=False, indent=2)
 
-        return OrchestratorResult(
-            success=bool(content) if (not parse_dashboard or dashboard is not None) else False,
-            content=content,
-            dashboard=dashboard,
-            error=error,
-            stats=stats,
-            total_steps=stats.total_stages,
-            total_tokens=stats.total_tokens,
-            tool_calls_log=all_tool_calls,
-            provider=provider,
-            model=model,
-            runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
-            timed_out=True,
+        return self._with_budget_snapshot(
+            OrchestratorResult(
+                success=bool(content) if (not parse_dashboard or dashboard is not None) else False,
+                content=content,
+                dashboard=dashboard,
+                error=error,
+                stats=stats,
+                total_steps=stats.total_stages,
+                total_tokens=stats.total_tokens,
+                tool_calls_log=all_tool_calls,
+                provider=provider,
+                model=model,
+                runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
+                timed_out=True,
+                failure_reason=StageFailureReason.TIMEOUT.value,
+            ),
+            ctx,
         )
 
     def _build_budget_skip_result(
@@ -151,21 +155,25 @@ class _ExecutionMethods:
                 ctx.set_data("final_dashboard", dashboard)
                 content = json.dumps(dashboard, ensure_ascii=False, indent=2)
 
-        return OrchestratorResult(
-            success=bool(content) if (not parse_dashboard or dashboard is not None) else False,
-            content=content,
-            dashboard=dashboard,
-            error=(
-                f"Pipeline skipped before stage '{stage_name}' due to insufficient budget "
-                f"({remaining_budget:.1f}s remaining, minimum {min_stage_budget_s}s required)"
+        return self._with_budget_snapshot(
+            OrchestratorResult(
+                success=bool(content) if (not parse_dashboard or dashboard is not None) else False,
+                content=content,
+                dashboard=dashboard,
+                error=(
+                    f"Pipeline skipped before stage '{stage_name}' due to insufficient budget "
+                    f"({remaining_budget:.1f}s remaining, minimum {min_stage_budget_s}s required)"
+                ),
+                stats=stats,
+                total_steps=stats.total_stages,
+                total_tokens=stats.total_tokens,
+                tool_calls_log=all_tool_calls,
+                provider=stats.models_used[0] if stats.models_used else "",
+                model=", ".join(stats.models_used),
+                runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
+                failure_reason=StageFailureReason.BUDGET_SKIP.value,
             ),
-            stats=stats,
-            total_steps=stats.total_stages,
-            total_tokens=stats.total_tokens,
-            tool_calls_log=all_tool_calls,
-            provider=stats.models_used[0] if stats.models_used else "",
-            model=", ".join(stats.models_used),
-            runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
+            ctx,
         )
 
     def _build_cancelled_result(
@@ -185,20 +193,51 @@ class _ExecutionMethods:
         """
         stats.total_duration_s = round(elapsed_s, 2)
         stats.models_used = list(dict.fromkeys(models_used))
-        return OrchestratorResult(
-            success=False,
-            content="",
-            dashboard=None,
-            error="Pipeline cancelled",
-            stats=stats,
-            total_steps=stats.total_stages,
-            total_tokens=stats.total_tokens,
-            tool_calls_log=all_tool_calls,
-            provider=stats.models_used[0] if stats.models_used else "",
-            model=", ".join(stats.models_used),
-            runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
-            cancelled=True,
+        return self._with_budget_snapshot(
+            OrchestratorResult(
+                success=False,
+                content="",
+                dashboard=None,
+                error="Pipeline cancelled",
+                stats=stats,
+                total_steps=stats.total_stages,
+                total_tokens=stats.total_tokens,
+                tool_calls_log=all_tool_calls,
+                provider=stats.models_used[0] if stats.models_used else "",
+                model=", ".join(stats.models_used),
+                runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
+                cancelled=True,
+            ),
+            ctx,
         )
+
+
+    def _with_budget_snapshot(
+        self,
+        result: "OrchestratorResult",
+        ctx: Optional[AgentContext] = None,
+    ) -> "OrchestratorResult":
+        """Attach the unified mode-budget diagnostic snapshot when available."""
+        if ctx is None:
+            return result
+        from src.agent.runtime.mode_budget import (
+            MODE_BUDGET_ACCOUNT_META_KEY,
+            MODE_BUDGET_META_KEY,
+            store_budget_snapshot,
+        )
+
+        account = (
+            ctx.meta.get(MODE_BUDGET_ACCOUNT_META_KEY)
+            if isinstance(ctx.meta, dict)
+            else None
+        )
+        if account is not None:
+            result.budget_snapshot = store_budget_snapshot(ctx, account)
+        elif isinstance(ctx.meta, dict):
+            snap = ctx.meta.get(MODE_BUDGET_META_KEY)
+            if isinstance(snap, dict):
+                result.budget_snapshot = snap
+        return result
 
     def _prepare_agent(self, agent: Any) -> Any:
         """Apply orchestrator-level runtime settings to a child agent.
@@ -222,6 +261,9 @@ class _ExecutionMethods:
             else:
                 # Default or lowered — keep per-agent limit as ceiling.
                 agent.max_steps = min(agent.max_steps, self.max_steps)
+            mode_limits = getattr(self, "mode_budget_limits", None)
+            if mode_limits is not None:
+                agent.max_steps = mode_limits.effective_max_steps(agent.max_steps)
         agent.runtime_guard_policy = self.runtime_guard_policy
         return agent
 
