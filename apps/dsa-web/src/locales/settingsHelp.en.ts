@@ -1699,6 +1699,23 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'The hard-coded notification fallback path is unchanged when the renderer is off.',
     ],
   },
+  'settings.report.RESEARCH_PRESENTATION_PROFILE': {
+    title: 'Research Presentation Profile',
+    summary: 'Risk-preference framing for the same analysis evidence: reorder emphasis only.',
+    usage: 'Choose conservative, balanced (default), or aggressive. Options come from the runtime research-presentation-profile contract. Per-request override: extra_context.research_presentation_profile.',
+    valueNotes: [
+      'conservative leads with risks and monitoring posture.',
+      'balanced keeps the default section order.',
+      'aggressive leads with catalysts/opportunities.',
+      'Risk disclosure completeness is equal across all three profiles.',
+      'Does not change facts, scores, actions, REPORT_MODE limits, or RISK_GATE_PROFILE.',
+    ],
+    impact: ['Affects report section ordering and emphasis labels only.'],
+    notes: [
+      'Only takes effect when REPORT_RENDERER_ENABLED=true.',
+      'Profiles are research framing aids, not personalized investment advice.',
+    ],
+  },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: 'Report Rendering Engine',
     summary: 'Enable the Jinja2 template rendering engine for report output.',

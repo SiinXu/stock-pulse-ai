@@ -131,6 +131,7 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `REPORT_TYPE` | Report type: `simple` (concise), `full` (complete), `brief` (3-5 sentences), Docker recommended: `full` | Optional |
 | `REPORT_LANGUAGE` | Default output language for reports and Agent Chat: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, fixed copy in the Web report view, and Agent Chat replies that do not set `context.report_language`. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
 | `REPORT_MODE` | Jinja report presentation mode (`brief` / `standard` / `research`, default `standard`). `brief` keeps Decision Card + key risk; `standard` is Decision Card + main analysis; `research` is full detail with expanded strata limits. Hard limits apply; Decision Card is never dropped. Per-request override: `extra_context.report_mode`. Presentation only when `REPORT_RENDERER_ENABLED=true`. | Optional |
+| `RESEARCH_PRESENTATION_PROFILE` | Research framing profile (`conservative` / `balanced` / `aggressive`, default `balanced`). Reorders emphasis only: conservative leads with risk, aggressive leads with catalysts; **same underlying evidence**, equal risk-disclosure completeness across profiles, and no change to facts, scores, or actions. Orthogonal to `REPORT_MODE` hard limits and `RISK_GATE_PROFILE` action thresholds. Per-request override: `extra_context.research_presentation_profile`. Only when `REPORT_RENDERER_ENABLED=true`. | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
 | `NOTIFICATION_DELTA_FIRST` | Prepend a compact, deterministic “changes since previous analysis” section to outbound stock notifications. Defaults to `false`; first analysis, no material change, and unavailable comparison remain distinct. Uses persisted history only and makes no extra model call. Local saved reports are unchanged. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
@@ -942,6 +943,18 @@ When `REPORT_RENDERER_ENABLED=true`, Jinja stock reports support three presentat
 Layer order (Jinja, `REPORT_RENDERER_ENABLED=true`): within each stock block the Decision Card is always first, then mode-density evidence strata (`none` / compact / full), then long-form detail sections. `ReportType.BRIEF` notification generation always passes `report_mode=brief` so push length budgets hold even when global `REPORT_MODE` is `standard` or `research`. Export (`export_report`) consumes already-rendered Markdown and does not re-apply modes.
 
 The existing Decision Card template continues to use dashboard/result fields, and missing fields omit their rows. Hard limits never drop the Decision Card block; omitted lower-priority items are annotated. Unconfigured `REPORT_MODE` keeps `standard` on every report platform (except the brief report-type path above). The hard-coded notification fallback path (`REPORT_RENDERER_ENABLED=false`) is unchanged.
+
+### Research Presentation Profiles (Issue #205)
+
+When `REPORT_RENDERER_ENABLED=true`, Jinja stock reports also support research presentation profiles via `RESEARCH_PRESENTATION_PROFILE` (or per-request `extra_context.research_presentation_profile`):
+
+| Profile | Emphasis | Risk disclosure |
+|---------|----------|-----------------|
+| `conservative` | Risks and monitoring posture first | Full (same completeness as other profiles) |
+| `balanced` (default) | Historical default section order | Full |
+| `aggressive` | Catalysts / opportunities first | Full (risks still complete, just later) |
+
+This axis is **orthogonal** to `REPORT_MODE` (depth/limits) and to `RISK_GATE_PROFILE` (final-action thresholds). Profiles must not change facts, scores, actions, or risk-disclosure completeness; they only reorder presentation emphasis and show an explicit research-framing banner.
 
 ### Signal Attribution Analysis (Issue #1742)
 

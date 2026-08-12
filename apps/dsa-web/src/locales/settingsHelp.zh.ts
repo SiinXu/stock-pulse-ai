@@ -1728,6 +1728,23 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '渲染关闭时的硬编码通知 fallback 路径不变。',
     ],
   },
+  'settings.report.RESEARCH_PRESENTATION_PROFILE': {
+    title: '研究呈现偏好',
+    summary: '同一分析证据的风险偏好呈现：仅调整排序与强调。',
+    usage: '可选 conservative、balanced（默认）或 aggressive。选项来自运行时 research-presentation-profile 契约。单次可通过 extra_context.research_presentation_profile 覆盖。',
+    valueNotes: [
+      'conservative 优先展示风险与监控姿态。',
+      'balanced 保持默认段落顺序。',
+      'aggressive 优先展示催化与机会。',
+      '三种偏好的风险披露完整度等同。',
+      '不改变事实、评分、动作、REPORT_MODE 上限或 RISK_GATE_PROFILE。',
+    ],
+    impact: ['仅影响报告段落排序与强调。'],
+    notes: [
+      '仅在 REPORT_RENDERER_ENABLED=true 时生效。',
+      '呈现偏好是研究框架辅助，不是个性化投资建议。',
+    ],
+  },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: '报告渲染引擎',
     summary: '启用 Jinja2 模板渲染引擎处理报告输出。',

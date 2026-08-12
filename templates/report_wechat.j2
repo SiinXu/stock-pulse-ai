@@ -5,6 +5,9 @@
 {% if market_status_line %}
 {{ market_status_line }}
 {% endif %}
+{% if presentation_framing_notice %}
+{{ presentation_framing_notice }}
+{% endif %}
 
 {% if summary_only %}
 **📊 {{ labels.summary_heading }}**
@@ -43,19 +46,20 @@
 💭 {{ labels.sentiment_summary_label }}: {{ intel.sentiment_summary[:50] }}
 {% endif %}
 
-{% if intel.get('risk_alerts') %}
+{% set _wechat_order = presentation_plan.wechat_emphasis_order if presentation_plan is defined and presentation_plan.wechat_emphasis_order is defined else ['risk_alerts', 'positive_catalysts'] %}
+{% for block_key in _wechat_order %}
+{% if block_key == 'risk_alerts' and intel.get('risk_alerts') %}
 🚨 **{{ labels.risk_alerts_label }}**:
 {% for risk in intel.risk_alerts[:2] %}
    • {{ risk[:50] }}{{ '...' if risk|length > 50 else '' }}
 {% endfor %}
-{% endif %}
-
-{% if intel.get('positive_catalysts') %}
+{% elif block_key == 'positive_catalysts' and intel.get('positive_catalysts') %}
 ✨ **{{ labels.positive_catalysts_label }}**:
 {% for cat in intel.positive_catalysts[:2] %}
    • {{ cat[:50] }}{{ '...' if cat|length > 50 else '' }}
 {% endfor %}
 {% endif %}
+{% endfor %}
 
 {% set sniper = battle.get('sniper_points', {}) if battle else {} %}
 {% if sniper.ideal_buy or sniper.stop_loss or sniper.take_profit %}

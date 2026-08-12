@@ -51,6 +51,12 @@ from src.services.report_mode import (
     resolve_report_mode,
     truncation_notice,
 )
+from src.services.research_presentation_profile import (
+    assert_profile_does_not_change_limits,
+    get_presentation_plan,
+    profile_framing_notice,
+    resolve_research_presentation_profile,
+)
 from src.services.valuation_projection import (
     extract_valuation_payload,
     project_valuation_for_report,
@@ -290,6 +296,7 @@ def render(
     labels = get_report_labels(report_language)
 
     # Issue #861 Phase 2: brief / standard / research modes + hard limits.
+    # Issue #205: research presentation profile (emphasis/order only; orthogonal).
     config = get_config()
     report_mode = resolve_report_mode(
         platform,
@@ -297,6 +304,20 @@ def render(
         config_mode=getattr(config, "report_mode", None),
     )
     mode_limits = get_mode_limits(report_mode)
+    research_presentation_profile = resolve_research_presentation_profile(
+        explicit=(extra_context or {}).get("research_presentation_profile"),
+        config_profile=getattr(config, "research_presentation_profile", None),
+    )
+    # Hard limits stay owned by REPORT_MODE only (risk disclosure parity across profiles).
+    mode_limits = dict(
+        assert_profile_does_not_change_limits(
+            mode_limits, research_presentation_profile
+        )
+    )
+    presentation_plan = get_presentation_plan(research_presentation_profile)
+    presentation_framing_notice = profile_framing_notice(
+        research_presentation_profile, report_language
+    )
 
     sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)
     sorted_enriched = []
@@ -432,6 +453,9 @@ def render(
         "report_language": report_language,
         "report_mode": report_mode,
         "mode_limits": mode_limits,
+        "research_presentation_profile": research_presentation_profile,
+        "presentation_plan": presentation_plan,
+        "presentation_framing_notice": presentation_framing_notice,
         "report_truncation_notice": truncation_notice(
             sum(int(item.get("omitted_count") or 0) for item in sorted_enriched),
             report_language,
@@ -468,6 +492,9 @@ def render(
         safe_extra_context.pop("report_language", None)
         safe_extra_context.pop("report_mode", None)
         safe_extra_context.pop("mode_limits", None)
+        safe_extra_context.pop("research_presentation_profile", None)
+        safe_extra_context.pop("presentation_plan", None)
+        safe_extra_context.pop("presentation_framing_notice", None)
         safe_extra_context.pop("report_truncation_notice", None)
         context.update(safe_extra_context)
 
