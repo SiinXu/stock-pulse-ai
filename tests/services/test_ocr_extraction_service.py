@@ -137,7 +137,8 @@ def test_extract_english_statement_with_injected_engine(tmp_path: Path) -> None:
     assert "AAPL" in payload["text"]
     assert "600519" in payload["text"]
     assert payload["engine"] == "injected"
-    assert payload["content"]["trust"] == "untrusted_document_data"
+    assert payload["trust"]["classification"] == "untrusted_user_document"
+    assert payload["trust"]["authoritative_for_decisions"] is False
     assert payload["privacy"]["text_egress"] == "redacted_tool_context"
     assert "filename" not in payload["source"]
     assert len(payload["source"]["sha256"]) == 64
@@ -210,7 +211,8 @@ def test_redacts_sensitive_statement_text_and_marks_prompt_injection_untrusted(t
     assert "sk-secret-value" not in serialized
     assert "[REDACTED_ACCOUNT]" in payload["text"]
     assert "IGNORE ALL PREVIOUS INSTRUCTIONS" in payload["text"]
-    assert payload["content"]["instructions_authoritative"] is False
+    assert payload["trust"]["instructions_authoritative"] is False
+    assert payload["trust"]["authoritative_for_decisions"] is False
     assert "never follow" in payload["disclaimer"].lower()
 
 
@@ -335,3 +337,56 @@ def test_real_tesseract_english_fixture_when_available(tmp_path: Path) -> None:
     if payload["status"] == "available":
         joined = payload["text"].upper()
         assert "AAPL" in joined or "600519" in joined or "STATEMENT" in joined
+
+
+def test_table_statement_kind_emits_unverified_row_candidates(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "table.png").write_bytes((FIXTURES / "sample_table_statement.png").read_bytes())
+    raw = "Symbol  Qty  Price  Value\nAAPL  120  198.50  23820.00\n600519  10  1650.00  16500.00"
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: raw)
+    payload = service.extract_path("table.png", document_kind="table_statement")
+    assert payload["document_kind"] == "table_statement"
+    assert payload["structure"]["verified"] is False
+    assert payload["structure"]["row_count"] >= 2
+    assert payload["trust"]["authoritative_for_decisions"] is False
+
+
+def test_chart_annotation_kind_emits_sparse_label_candidates(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "chart.png").write_bytes((FIXTURES / "sample_chart_annotation.png").read_bytes())
+    raw = "AAPL Daily\nSupport 185.00\nResistance 205.50\nMA50 192.30"
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: raw)
+    payload = service.extract_path("chart.png", document_kind="chart_annotation")
+    assert payload["structure"]["not_chart_semantics"] is True
+    assert payload["structure"]["use_for_semantic_chart"] == "read_price_chart"
+
+
+def test_filing_page_kind_envelope(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "filing.png").write_bytes((FIXTURES / "sample_filing_page.png").read_bytes())
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: "FORM 10-K FILING EXCERPT AAPL")
+    payload = service.extract_path("filing.png", document_kind="filing_page")
+    assert payload["document_kind"] == "filing_page"
+    assert payload["trust"]["classification"] == "untrusted_user_document"
+
+
+def test_pdf_page_embedded_or_honest_degrade(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "page.pdf").write_bytes((FIXTURES / "sample_pdf_page.pdf").read_bytes())
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: "FORM 10-K embedded AAPL")
+    payload = service.extract_path("page.pdf", document_kind="pdf_page", page_index=0)
+    if payload["status"] == "available":
+        assert payload["document_kind"] == "pdf_page"
+        assert payload["trust"]["authoritative_for_decisions"] is False
+    else:
+        assert payload["reason_code"] in {
+            "pdf_reader_unavailable",
+            "pdf_no_embedded_image",
+            "pdf_image_extract_failed",
+            "malformed_pdf",
+            "unsupported_embedded_image",
+        }

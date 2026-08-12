@@ -1,6 +1,6 @@
 # 有界图片 OCR Agent 工具
 
-StockPulse 可选用 Tesseract 从本地图片提取**原始文字**。本阶段只交付有界文字恢复，不声称已提供可靠表格单元格、OCR 置信度、券商对账单精度或图表语义理解；Issue #196 的这些范围继续保持开放。#218 仅作关联引用，OCR 本身不等于离线模式。
+StockPulse 可选用 Tesseract 从本地图片提取**原始文字**。`document_kind` 覆盖截图、公告/PDF 页图像、表格型对账单与图表标注；结果始终为不可信文档信封，**不得**作为权威决策结论。本工具仍不声称可靠表格单元格、OCR 置信度、对账单精度或 K 线语义（语义图表请用 `read_price_chart`）。高影响结论前的可选二次校验、与其它 Agent 工具共享的预算/限流仍开放。#218 仅作关联引用。
 
 ## 能力分工
 
@@ -10,6 +10,17 @@ StockPulse 可选用 Tesseract 从本地图片提取**原始文字**。本阶段
 | `read_price_chart` | 发给配置的 Vision 模型 | 图表语义 | K 线趋势/价位 |
 | 图片提股票 | 发给配置的 Vision 模型 | 股票代码/名称 | 标的提取 |
 | PDF 解析 | 留在本机 | 既有文字层 | 非扫描 PDF |
+
+## 目标类型
+
+| `document_kind` | 用途 | 明确不声称 |
+| --- | --- | --- |
+| `screenshot` | 通用截图 | 版面结构 |
+| `filing_page` / `pdf_page` | 公告/PDF 页图像（含嵌入位图 PDF） | 完整 PDF 文字层解析 |
+| `table_statement` | 表格型对账单候选行 | 已校验单元格 |
+| `chart_annotation` | 图表标注/价位标签 | K 线语义 |
+
+成功 OCR 后，同一执行轮次内 BoundToolSession 会阻止 follow-on 工具，直至新的用户回合。
 
 ## 隐私与信任边界
 

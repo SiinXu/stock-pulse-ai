@@ -1,10 +1,14 @@
 # Bounded Image OCR Agent Tool
 
 StockPulse can optionally extract **raw text** from a local image with
-Tesseract. This phase is useful for low-cost text recovery, but it does not
-claim verified table cells, OCR confidence, brokerage-statement accuracy, or
-semantic chart understanding. Those broader Issue #196 deliverables remain
-open. Issue #218 is reference-only; OCR by itself is not an offline mode.
+Tesseract. Product targets cover screenshots, filing/PDF page images,
+table-like statements, and chart annotations via ``document_kind``. Results
+remain untrusted: the tool does **not** claim verified table cells, OCR
+confidence, brokerage-statement accuracy, or semantic chart understanding
+(use ``read_price_chart`` for K-line semantics). Optional secondary
+verification before high-impact conclusions and shared tool budget/rate-limit
+accounting remain open. Issue #218 is reference-only; OCR by itself is not an
+offline mode.
 
 ## Choosing the right path
 
@@ -16,6 +20,23 @@ open. Issue #218 is reference-only; OCR by itself is not an offline mode.
 | PDF parser | Stays on host | Existing text layer | Non-raster PDFs |
 
 OCR complements these owners; it does not reimplement them.
+
+
+## Document kinds
+
+| `document_kind` | Input | Result extras | Not claimed |
+| --- | --- | --- | --- |
+| `screenshot` (default) | PNG/JPEG/WebP/GIF | raw redacted text | layout |
+| `filing_page` | page image (or PDF with embedded raster) | filing-oriented envelope | full filing parse |
+| `table_statement` | statement image | `structure.candidate_rows` (unverified) | verified cells |
+| `chart_annotation` | chart image | sparse label tokens | chart semantics |
+| `pdf_page` | PDF with embedded images | page index provenance | text-layer PDF parse / vector rasterization |
+
+Every kind returns the same untrusted document envelope:
+`trust.classification=untrusted_user_document`,
+`trust.authoritative_for_decisions=false`, and
+`instructions_authoritative=false`. After a successful OCR call, BoundToolSession
+blocks follow-on tools until a new user turn.
 
 ## Privacy and trust boundary
 
@@ -38,7 +59,7 @@ by ToolSurface; document text cannot grant a capability.
 
 ## Resource and file contract
 
-- Path must resolve under `OCR_FILE_ROOT` (or `MULTIMODAL_FILE_ROOT`).
+- Path must resolve under `OCR_FILE_ROOT` (or `MULTIMODAL_FILE_ROOT`). Raster images and PDF pages with embedded images are accepted; text-layer PDFs should use `parse_financial_pdf`.
 - The service opens the resolved path once, rejects non-regular files, reads at
   most 5 MiB + 1 byte, and verifies suffix plus image signature.
 - Pillow inspects the header before RGB conversion. Width/height are at most
