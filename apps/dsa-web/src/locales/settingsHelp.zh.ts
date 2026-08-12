@@ -1600,6 +1600,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['为多步骤 Agent 排障提供低开销时间线细节。'],
     notes: ['隐私与开销说明见 docs/agent-observability.md。'],
   },
+  'settings.agent.performance': {
+    title: '性能基线',
+    summary: '为关键分析路径提供可关闭的性能 span 采集与离线剖析入口。',
+    usage: 'PERF_COLLECTION_ENABLED 在 collector 激活时记录轻量 span（默认关闭）。PERF_PROFILE_ENABLED 仅表达离线 cProfile 意图，不会自动包装生产请求。',
+    valueNotes: [
+      '关闭时为 no-op，生产路径开销接近零。',
+      '离线基线与可选 cProfile 请使用 scripts/run_perf_baseline.py。',
+    ],
+    impact: ['在不改变默认运行时行为的前提下，支持本地基线对比与 pipeline 阶段耗时镜像。'],
+    notes: ['workload、CI 影响与刷新方式见 docs/performance-baseline.md。'],
+  },
   'settings.agent.event_monitor': {
     title: '事件监控',
     summary: '在定时模式下启用后台事件监控，定期轮询告警规则。',
@@ -1952,16 +1963,19 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.system.daily_brief': {
     title: '每日简报',
-    summary: '按计划生成每日简报，并回顾历史简报准确率。',
-    usage:
-      'DAILY_BRIEF_ENABLED 控制开关；DAILY_BRIEF_SCHEDULE_TIME 与 DAILY_BRIEF_TIMEZONE 控制计划时间；DAILY_BRIEF_MIN_SAMPLES 控制展示准确率前的最小样本数；DAILY_BRIEF_NOTIFY 控制成功后是否推送；DAILY_BRIEF_PERSIST_HISTORY 控制是否保留回顾历史；DAILY_BRIEF_SAVE_REPORT_FILE 控制是否写入报告文件。',
-    valueNotes: [
-      '默认关闭，不影响既有计划任务。',
-      '准确率回顾仅供参考，不会自动交易。',
-      '推送/持久化/写文件在简报启用后默认均为 true。',
-    ],
-    impact: ['影响计划简报生成、推送、历史与准确率回顾展示。'],
+    summary: '按计划生成个人晨报：持仓成员、隔夜要点、近期财报事件上下文、昨日分析、自选与历史准确率复盘。',
+    usage: 'DAILY_BRIEF_ENABLED 控制开关；SCHEDULE_TIME/TIMEZONE 控制时间；MIN_SAMPLES 控制准确率样本门槛；NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE 控制投递；QUIET_WHEN_EMPTY 在无实质内容时跳过推送。',
+    valueNotes: ['默认关闭。', '准确率仅供参考。', '安静模式仍可生成与落库。'],
+    impact: ['影响计划简报生成、统一报告路由推送、历史与准确率复盘面板。'],
     notes: ['定时投递需要 schedule 模式。'],
+  },
+  'settings.system.event_research_brief': {
+    title: '事件研究简报',
+    summary: '可选的已观测财报事件触发复盘：关注指标、超预期定义与事后核对清单。',
+    usage: 'EVENT_RESEARCH_BRIEF_ENABLED 打开独立调度；NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE 控制投递；LOOKBACK_HOURS 与 CATEGORIES 限定近期托管触发（首日 earnings）。每日晨报会嵌入近期事件上下文；这不是未来事件目录。',
+    valueNotes: ['默认关闭。', '仅托管公司事件触发。', '不编造一致预期。'],
+    impact: ['影响近期事件上下文通知与可选历史。'],
+    notes: ['独立路径需要 schedule 模式。'],
   },
   'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
     title: '管理员会话最长有效期（小时）',

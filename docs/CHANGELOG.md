@@ -9,10 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Chore] Localize evidence-chain and audit-export Web copy and rebaseline affected gzip budgets (Refs #179).
+- [Added] Personal daily morning brief aggregates portfolio membership, overnight Today's Focus highlights, and observed earnings-event context with optional quiet notify; event research briefs ship bounded metrics and post-event checklists through the shared report notification route (Refs #149, #1131).
+- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after observed-event Daily Brief and Event Research settings help (Refs #149, #1131).
+- [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
+- [Fixed] Restore the Chat context-compression switch semantics and shared 44px touch target after the compact workspace migration.
+- [Added] Web runtime performance budgets for HistoryList virtualization, Settings field isolation, and SSE progress batching, with soft-gate CI measurement entry points (Refs #883).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
+- [Changed] Migrate Agent Web Search tools (`search_stock_news`, `search_comprehensive_intel`) to the always-on `builtin.web_search` agent_tool plugin following the OCR registration paradigm; ToolSurface call path and default availability unchanged, with deferred agent_tool attach so `start_plugins` does not force process ToolRegistry construction (Refs #432).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
+- [Chore] Rebaseline Web locale gzip budgets after PERF_* Settings help i18n strings (Refs #227).
+- [Tests] CI report-export-stack job installs optional report-export dependencies and host fonts, and fails when HTML/PDF fixture, Chinese glyph-coverage, or bound export tests skip (Refs #163).
+- [Fixed] Split notification/report chunks on true H1 headings and flush max-words buffers after oversize sections (Ported-from upstream 5698068fe; Refs #1219).
+- [Docs] Add bilingual engineering-efficiency playbook for parallel merge trains (batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, worktree safety) and link it from CONTRIBUTING and the docs index (Refs #891).
+- [Chore] Pin the desktop Electron runtime to 43.4.0 (supported 43-x-y) while keeping electron-builder 26.15.7, electron-updater 6.8.9, tar 7.5.22, and js-yaml 4.3.1 overrides for the #1060 / #615 security stack.
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Added] Evidence chain (conclusion→evidence with explicit missing markers) and redacted exportable audit package ZIP/JSON, reusing reasoning-trace export and the security-audit trail (Refs #986, #127).
 - [Fixed] Bound audit-package artifacts, include redacted raw intermediates only when enabled, keep ZIP/JSON artifact parity, and prevent failed source runs from supporting conclusions (Refs #986, #127).
@@ -24,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Strict PredictionRecord schema with typed verifiable claims, no_verifiable_claim path for unparseable prose, and finite-number rejection (Refs #1101, #1107).
 - [Tests] Offline provider fallback / circuit / cache contract suite covers multi-hop order, circuit open-close, cache hit and expiry, multi-provider stale degradation, and multi-symbol isolation (Refs #1069).
 - [Added] Unified hard per-mode Agent budgets (LLM turns, tool calls, estimated cost, optional tokens) with explicit terminate reason codes and diagnostic snapshots; residual wall-clock budget_skip/timeout share the same budget account (Refs #1121, #125).
+- [Added] Offline key-path performance baselines and opt-in profiling infrastructure (data fetch, analysis, report generation) with comparable baseline artifacts (Refs #227).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).
@@ -39,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
 - [Changed] Agent Behavior settings use Essentials · Behavior · Governance/Expert progressive disclosure, move expert JSON behind the expert layer, and add a default preset-to-ask path without changing config semantics (#868).
 - [Added] Render a top-of-report analysis delta section from history_comparison_service for both scheduled and manual report generation, distinguishing first analysis from no material change and rejecting non-finite values (Refs #148).
+- [Changed] Expose the Event Calendar production entry from Research navigation and the Research overview cards so users can reach `/events` without typing the URL (Refs #153, #1008, #1058).
 - [Added] Expand offline OCR Agent tool coverage to filing pages, table-like statements, chart annotations, and embedded PDF page rasters with typed untrusted non-decision envelopes, BoundToolSession allowlist/runtime proofs, and follow-on fencing (Refs #196).
 - [Tests] Add Playwright product-surface smoke for Stock Details K-line and Portfolio risk heatmap (render/empty/loading/error and non-finite or out-of-range rejection) (Refs #142).
 - [Fixed] Signal Center mobile filters collapse basic and advanced fields behind one Filters control so results lead the first screen (Refs #879 B2).
@@ -112,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Overflowing pagination controls use safe centering so the leading prev control remains reachable under horizontal scroll (follow-up to #910 / #879 B4).
 - [Fixed] Keep Backtest strategy run options (`minAge`/`limit`) in shareable URLs while preserving stable research-route wire keys (#879 A1).
 - [Added] Agent Chat what-if scenario mode with structured assumptions, hypothetical markers, turn limits, and hard isolation from AnalysisHistory / DecisionSignal / Agent memory (#130).
+- [Added] Agent Chat what-if optional handoff opens the analysis workbench with the active stock prefilled; does not auto-start a run or carry hypothetical assumptions (#130).
 - [Fixed] Accept bare 4-digit Hong Kong stock codes (e.g. `0001`, `0941`, `1810`) across CLI, Web, analysis/watchlist APIs, imports, providers, and Bot flows, while preserving indexed Japanese codes and explicit market hints or suffixes.
 - [Added] SmartMoney money-flow tracking with a default-off composition gate, typed provider outcomes, cancellable AkShare deadlines, bounded cache/circuit fallback, strict calibration and freshness metadata, and optional analysis-context injection (#862).
 - [Fixed] Screening/Discover URL contract: persist candidate/hotspot view via urlState, keep filter params shareable on refresh, and hand off hotspot analyze intent through Home `?stock=` query instead of location.state (#879 A1/A4).

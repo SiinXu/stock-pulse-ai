@@ -162,7 +162,8 @@ class ApplicationServices:
                     )
                 ),
                 "agent_tool": build_agent_tool_extension_contract(
-                    _get_process_agent_tool_registry
+                    _get_process_agent_tool_registry,
+                    defer_until_process_registry=True,
                 ),
                 "event_hook": event_hook_extension_contract(),
             }
@@ -204,6 +205,7 @@ class ApplicationServices:
                 registry = build_application_extension_registry(
                     _get_process_agent_tool_registry,
                     additional_contracts=process_contracts,
+                    defer_agent_tool_registration=True,
                 )
             plugin_manager = PluginManager(
                 application_version=plugin_application_version,
