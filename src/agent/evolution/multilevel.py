@@ -112,10 +112,7 @@ def run_trajectory_layer(
         if isinstance(step_payload, dict) and step_payload.get("lessons"):
             from src.agent.evolution.lessons import parse_lessons_payload
 
-            try:
-                seed = parse_lessons_payload(step_payload.get("lessons") or [])
-            except (TypeError, ValueError):
-                seed = None
+            seed = parse_lessons_payload(step_payload.get("lessons") or [])
 
     result = run_reflection_loop(
         ctx,

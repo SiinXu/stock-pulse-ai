@@ -431,10 +431,12 @@ class PlanningEngine:
         if isinstance(context, dict):
             reason_kinds = context.get("replan_reason_kinds")
             if isinstance(reason_kinds, (list, tuple)) and reason_kinds:
+                from src.agent.evolution.lessons import LESSON_KINDS
+
                 codes = [
                     str(code).strip()
                     for code in reason_kinds
-                    if str(code).strip()
+                    if str(code).strip() in LESSON_KINDS
                 ][:8]
                 if codes:
                     observation_hint = (

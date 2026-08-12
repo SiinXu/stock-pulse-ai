@@ -3,8 +3,9 @@
 
 Triggered after tool failure or contradictory observations. Emits typed
 ``ReflectionLesson`` values and standardized replan reason codes aligned with
-the shared lesson taxonomy. Optional LLM enrichment is hard-budgeted (default 0
-= deterministic only). Never mutates Agent Soul or ToolSurface denials.
+the shared lesson taxonomy. Product execution is deterministic; library callers
+may inject an explicit budget and LLM callback for bounded enrichment. Never
+mutates Agent Soul or ToolSurface denials.
 """
 
 from __future__ import annotations
@@ -82,6 +83,24 @@ _JSON_FENCE_PATTERN = re.compile(
 )
 
 LlmCompleteFn = Callable[[str, str], str]
+MAX_STEP_CRITIQUE_OBSERVATIONS = 16
+MAX_STEP_CRITIQUE_LESSONS = 8
+
+
+def _bounded_observations(observations: Sequence[Any]) -> List[Any]:
+    if isinstance(observations, (str, bytes)) or not isinstance(
+        observations, Sequence
+    ):
+        raise TypeError("observations must be a sequence")
+    if len(observations) > MAX_STEP_CRITIQUE_OBSERVATIONS:
+        raise ValueError(
+            f"observations exceeds {MAX_STEP_CRITIQUE_OBSERVATIONS} items"
+        )
+    return list(observations)
+
+
+def _bounded_source(value: Any) -> str:
+    return sanitize_agent_diagnostic(str(value or "step"))[:64] or "step"
 
 
 def is_step_critique_enabled(config: Any) -> bool:
@@ -137,9 +156,12 @@ def should_trigger_step_critique(
     force: bool = False,
 ) -> bool:
     """True when the latest observations indicate tool failure or contradiction."""
+    if type(force) is not bool:
+        raise TypeError("force must be a boolean")
+    bounded = _bounded_observations(observations)
     if force:
         return True
-    for obs in observations:
+    for obs in bounded:
         status = str(getattr(obs, "status", "") or "").lower()
         if status in {"failed", "timed_out", "budget_exhausted"}:
             return True
@@ -153,14 +175,20 @@ def should_trigger_step_critique(
             if any(hint in summary for hint in _CONTRADICTION_HINTS):
                 return True
         if isinstance(obs, dict):
-            if obs.get("status") in {"failed", "timed_out", "budget_exhausted"}:
+            mapping_status = str(obs.get("status") or "").lower()
+            if mapping_status in {"failed", "timed_out", "budget_exhausted"}:
                 return True
             if obs.get("failure_reason"):
                 return True
-            for call in obs.get("tool_calls") or []:
+            raw_calls = obs.get("tool_calls") or []
+            if not isinstance(raw_calls, (list, tuple)):
+                continue
+            for call in raw_calls:
                 if isinstance(call, dict) and call.get("ok") is False:
                     return True
-                summary = str((call or {}).get("summary") or "").lower()
+                if not isinstance(call, dict):
+                    continue
+                summary = str(call.get("summary") or "").lower()
                 if any(hint in summary for hint in _CONTRADICTION_HINTS):
                     return True
     return False
@@ -172,6 +200,13 @@ def deterministic_step_lessons(
     max_lessons: int = 8,
 ) -> Tuple[List[ReflectionLesson], List[str]]:
     """Build typed lessons and replan reason codes from observations (no LLM)."""
+    bounded = _bounded_observations(observations)
+    if type(max_lessons) is not int:
+        raise TypeError("max_lessons must be an integer")
+    if not 1 <= max_lessons <= MAX_STEP_CRITIQUE_LESSONS:
+        raise ValueError(
+            f"max_lessons must be between 1 and {MAX_STEP_CRITIQUE_LESSONS}"
+        )
     lessons: List[ReflectionLesson] = []
     reason_codes: List[str] = []
     seen_kinds: set = set()
@@ -194,19 +229,23 @@ def deterministic_step_lessons(
             )
         )
 
-    for obs in observations:
+    for obs in bounded:
         if isinstance(obs, dict):
             step_id = obs.get("step_id")
-            status = str(obs.get("status") or "")
+            status = str(obs.get("status") or "").lower()
             failure_reason = obs.get("failure_reason")
             tool_calls = obs.get("tool_calls") or []
+            if not isinstance(tool_calls, (list, tuple)):
+                tool_calls = []
         else:
             step_id = getattr(obs, "step_id", None)
-            status = str(getattr(obs, "status", "") or "")
+            status = str(getattr(obs, "status", "") or "").lower()
             failure_reason = getattr(obs, "failure_reason", None)
             tool_calls = list(getattr(obs, "tool_calls", None) or ())
 
-        source = f"step:{step_id}" if step_id is not None else "step"
+        source = _bounded_source(
+            f"step:{step_id}" if step_id is not None else "step"
+        )
         if status in {"failed", "timed_out", "budget_exhausted"} or failure_reason:
             kind = map_replan_reason_kind(
                 failure_reason=str(failure_reason) if failure_reason else status,
@@ -244,11 +283,11 @@ def deterministic_step_lessons(
             )
             _add(
                 kind,
-                source_step=f"{source}:{tool_name}",
-                remedy=(
+                source_step=_bounded_source(f"{source}:{tool_name}"),
+                remedy=sanitize_agent_diagnostic(
                     f"Tool {tool_name} produced a {kind} signal; replan with "
                     "alternatives and do not invent missing data."
-                ),
+                )[:300],
                 severity="high" if ok is False else "medium",
             )
 
@@ -320,16 +359,7 @@ def critique_step_observations(
 
     call_budget = budget
     if call_budget is None:
-        raw = (
-            getattr(config, "agent_step_critique_llm_budget", None)
-            if config is not None
-            else None
-        )
-        try:
-            total = int(raw) if raw is not None else DEFAULT_STEP_CRITIQUE_LLM_BUDGET
-        except (TypeError, ValueError):
-            total = DEFAULT_STEP_CRITIQUE_LLM_BUDGET
-        call_budget = LlmCallBudget(total=max(0, total))
+        call_budget = LlmCallBudget(total=DEFAULT_STEP_CRITIQUE_LLM_BUDGET)
 
     _emit("step_critique_start", {"llm_budget_total": call_budget.total})
 
@@ -357,7 +387,10 @@ def critique_step_observations(
                     _step_critique_user_payload(observations, lessons),
                 )
                 enriched = _parse_optional_lessons(raw)
-                if enriched:
+                if enriched is None:
+                    validation_status = "invalid"
+                    skip_reason = "Step critique LLM output was invalid."
+                elif enriched:
                     lessons = _merge_lessons(lessons, enriched)
             except Exception as exc:  # broad-exception: fallback_recorded - optional LLM fail-soft
                 log_safe_exception(
@@ -370,6 +403,7 @@ def critique_step_observations(
                 skip_reason = sanitize_agent_diagnostic(
                     f"Step critique LLM failed: {type(exc).__name__}"
                 )
+                validation_status = "error"
 
     for lesson in lessons:
         if lesson.kind not in reason_codes:
@@ -489,25 +523,25 @@ def _step_critique_user_payload(
     )
 
 
-def _parse_optional_lessons(raw_text: str) -> List[ReflectionLesson]:
+def _parse_optional_lessons(raw_text: str) -> Optional[List[ReflectionLesson]]:
     if not isinstance(raw_text, str):
-        return []
+        return None
     candidate = raw_text.strip()
     if not candidate:
-        return []
+        return None
     fenced = _JSON_FENCE_PATTERN.fullmatch(candidate)
     if fenced is not None:
         candidate = fenced.group("body").strip()
     try:
         parsed = json.loads(candidate)
     except (json.JSONDecodeError, TypeError, ValueError):
-        return []
+        return None
     if not isinstance(parsed, dict):
-        return []
+        return None
     try:
         return parse_lessons_payload(parsed.get("lessons", []))
     except (TypeError, ValueError):
-        return []
+        return None
 
 
 def _merge_lessons(

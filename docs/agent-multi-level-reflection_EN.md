@@ -16,9 +16,9 @@ the prediction post-mortem / reflection track (**#1196**, kinds in
 
 | Layer | Trigger | Budget (default) | Output |
 | --- | --- | --- | --- |
-| **Immediate** (in-loop step critique) | Tool failure or contradictory observation during plan→act→observe | `AGENT_STEP_CRITIQUE_LLM_BUDGET` (default **0** = deterministic) | Typed lessons + standardized `replan_reason_kinds` |
-| **Trajectory** (end-of-run) | Config-enabled end-of-run reflection | `AGENT_REFLECTION_LLM_BUDGET` (default **1**) | Full `ReflectionResult` on run meta |
-| **Meta** (cross-run offline job) | Offline CLI/job when sample count ≥ threshold | `AGENT_META_REVIEW_LLM_BUDGET` (default **0**) | Markdown/JSON evolution report with recommended actions |
+| **Immediate** (in-loop step critique) | Tool failure or contradictory observation during plan→act→observe | Deterministic in production | Typed lessons + standardized `replan_reason_kinds` |
+| **Trajectory** (end-of-run) | Config-enabled end-of-run reflection | `AGENT_REFLECTION_LLM_BUDGET` (**0–1**, default **1**) | Full `ReflectionResult` on run meta |
+| **Meta** (cross-run offline job) | Offline CLI/job when sample count ≥ threshold | Deterministic | Markdown/JSON evolution report with recommended actions |
 
 Shared taxonomy (`LESSON_KINDS`):
 
@@ -32,12 +32,18 @@ episode log (`kind` / `severity` / `claim_ref` / `remedy` / `source_step`).
 See `src/agent/evolution/episode_lessons.py`.
 
 - In-memory sink: offline tests / meta-review fixtures.
-- Soft adapter: `try_append_lessons_to_episode_service` best-effort imports
-  `AgentEpisodeService` when Issue #1090/#1210 is merged and
-  `AGENT_EPISODE_LOG_ENABLED` is on. Missing service → no-op (never fails analysis).
 - Production planning path (`run_with_planning`) harvests step-critique artifacts
   into `planning_metadata` and, when `AGENT_REFLECTION_ENABLED`, runs trajectory
   reflection at end-of-run (success or plan failure).
+- Episode persistence remains owned by the single end-of-run finalizer from
+  #1210. This change does not create or soft-append a second episode. Until that
+  integration lands, reflection output remains available in `planning_metadata`.
+
+The trajectory layer calls the executor's configured provider with bounded,
+redacted run success, tool trajectory, and planning outcome evidence. Provider
+failure is recorded as `status=error` / `validation_status=error`; it never
+fabricates a successful reflection or a new lesson. Deterministic immediate
+lessons, when present, are preserved as evidence.
 
 ## Planning replan alignment
 
@@ -53,6 +59,10 @@ honored on real runs (not only library callers that hand-build context).
 
 `AGENT_META_REVIEW_MIN_EPISODES` (default **30**). Below the threshold the job
 returns `status=threshold_not_met` and does **not** invent recommended actions.
+Input is capped at 50,000 unique episodes and 16 MiB for the CLI JSON file.
+Malformed or duplicate episode records fail the job instead of being filtered.
+Counts and tie ordering are deterministic, and report basenames reject path
+traversal. Markdown and JSON artifacts are replaced atomically per file.
 
 Offline CLI:
 
@@ -73,21 +83,21 @@ Report includes:
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `AGENT_STEP_CRITIQUE_ENABLED` | `false` | Enable immediate step critique |
-| `AGENT_STEP_CRITIQUE_LLM_BUDGET` | `0` | Optional LLM enrichment per critique |
 | `AGENT_REFLECTION_ENABLED` | `false` | Enable trajectory reflection |
-| `AGENT_REFLECTION_LLM_BUDGET` | `1` | Max LLM calls per trajectory loop |
-| `AGENT_REFLECTION_MAX_REVISE` | `1` | Max in-run revise passes |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | Max provider calls per trajectory loop (`0` or `1`) |
 | `AGENT_META_REVIEW_ENABLED` | `false` | Enable offline meta-review path |
-| `AGENT_META_REVIEW_MIN_EPISODES` | `30` | Sample threshold |
-| `AGENT_META_REVIEW_LLM_BUDGET` | `0` | Optional LLM enrichment for meta report |
+| `AGENT_META_REVIEW_MIN_EPISODES` | `30` | Sample threshold (`1`–`50000`) |
+
+Library callers can still inject an explicit `LlmCallBudget` and callback into
+the immediate/meta functions for bounded experiments. Those are not runtime
+configuration capabilities and are not used by the production paths above.
 
 ## Dependency note
 
-Prediction verification layer (#1186–#1210) and typed post-mortem (#1196) were
-**not merged** when this work landed. This package **reuses the #1196 lesson
-structure** (`ReflectionLesson` / `ReflectionResult` / `LESSON_KINDS`) and the
-episode lesson projection shape from #1210 so later merges can converge on the
-same contracts.
+This package reuses the #1196 lesson structure (`ReflectionLesson` /
+`ReflectionResult` / `LESSON_KINDS`). Episode persistence integration remains
+dependent on #1210's single end-of-run finalizer; this PR deliberately does not
+add a competing writer.
 
 ## Rollback
 

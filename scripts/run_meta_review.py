@@ -12,17 +12,35 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+MAX_EPISODE_FILE_BYTES = 16 * 1024 * 1024
+MAX_META_EPISODES = 50_000
 
 
 def _load_episodes(path: Path) -> List[Dict[str, Any]]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    with path.open("rb") as stream:
+        payload = stream.read(MAX_EPISODE_FILE_BYTES + 1)
+    if len(payload) > MAX_EPISODE_FILE_BYTES:
+        raise ValueError(
+            f"episodes JSON exceeds {MAX_EPISODE_FILE_BYTES} bytes"
+        )
+    raw = json.loads(payload.decode("utf-8"))
     if isinstance(raw, list):
-        return [item for item in raw if isinstance(item, dict)]
-    if isinstance(raw, dict) and isinstance(raw.get("episodes"), list):
-        return [item for item in raw["episodes"] if isinstance(item, dict)]
-    raise SystemExit("episodes JSON must be a list or {\"episodes\": [...]}")
+        episodes = raw
+    elif isinstance(raw, dict) and isinstance(raw.get("episodes"), list):
+        episodes = raw["episodes"]
+    else:
+        raise ValueError("episodes JSON must be a list or {\"episodes\": [...]}")
+    if len(episodes) > MAX_META_EPISODES:
+        raise ValueError(f"episodes JSON exceeds {MAX_META_EPISODES} items")
+    if any(not isinstance(item, dict) for item in episodes):
+        raise ValueError("every episodes JSON item must be an object")
+    return episodes
 
 
 def resolve_cli_runtime(
@@ -34,35 +52,22 @@ def resolve_cli_runtime(
     """Resolve the config object used by the CLI.
 
     ``force`` is a real gate: when false, the job respects
-    ``AGENT_META_REVIEW_ENABLED`` on live config (or falls back to disabled).
+    ``AGENT_META_REVIEW_ENABLED`` on live config.
     When true, ``run_meta_review(..., force=True)`` bypasses the enable flag.
     """
-    force = bool(force)
-    # Fallback only used when live config cannot be loaded.
-    config: Any = SimpleNamespace(
-        agent_meta_review_enabled=False,
-        agent_meta_review_min_episodes=int(min_episodes or 30),
-        agent_meta_review_llm_budget=0,
-    )
+    if type(force) is not bool:
+        raise TypeError("force must be a boolean")
     loader = get_config
     if loader is None:
         try:
             from src.config import get_config as _default_get_config
 
             loader = _default_get_config
-        except Exception:
-            loader = None
+        except ImportError as exc:
+            raise RuntimeError("cannot import repository configuration") from exc
     if loader is not None:
-        try:
-            config = loader()
-        except Exception:
-            pass
-    # Attach force for callers that want to inspect CLI intent.
-    try:
-        setattr(config, "_meta_review_cli_force", force)
-    except Exception:
-        pass
-    return config
+        return loader()
+    raise RuntimeError("repository configuration loader is unavailable")
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -99,21 +104,24 @@ def main(argv: List[str] | None = None) -> int:
     # Local import after path setup for repo-root execution.
     from src.agent.evolution.meta_review import run_meta_review, write_meta_review_report
 
-    episodes = _load_episodes(Path(args.episodes))
-    force = bool(args.force)
-    config = resolve_cli_runtime(
-        force=force,
-        min_episodes=args.min_episodes,
-    )
-
-    report = run_meta_review(
-        episodes,
-        config=config,
-        min_episodes=args.min_episodes,
-        min_kind_count=args.min_kind_count,
-        force=force,
-    )
-    paths = write_meta_review_report(report, args.output_dir)
+    try:
+        episodes = _load_episodes(Path(args.episodes))
+        force = bool(args.force)
+        config = resolve_cli_runtime(
+            force=force,
+            min_episodes=args.min_episodes,
+        )
+        report = run_meta_review(
+            episodes,
+            config=config,
+            min_episodes=args.min_episodes,
+            min_kind_count=args.min_kind_count,
+            force=force,
+        )
+        paths = write_meta_review_report(report, args.output_dir)
+    except (OSError, ValueError, TypeError, RuntimeError, json.JSONDecodeError) as exc:
+        print(f"meta-review failed: {exc}", file=sys.stderr)
+        return 2
     print(
         json.dumps(
             {

@@ -213,6 +213,17 @@ def execute_plan_loop(
                 attrs={"failure_reason": step_obs.failure_reason or ""},
             )
 
+            # Standardize every failed/contradictory observation before any
+            # terminal fence returns. This keeps immediate reflection reachable
+            # even when retry budget is zero or the failure policy terminates.
+            replan_reason_kinds: List[str] = []
+            if _observation_requires_step_critique(step_obs):
+                replan_reason_kinds = _step_critique_replan_reasons(
+                    observations=observations,
+                    context=context,
+                    failed_step=step,
+                )
+
             if budget_hit == "cancelled":
                 return _finish(
                     success=False,
@@ -300,11 +311,6 @@ def execute_plan_loop(
                     phase_status="failed",
                 )
 
-            replan_reason_kinds = _step_critique_replan_reasons(
-                observations=observations,
-                context=context,
-                failed_step=step,
-            )
             replan_outcome = _replan(
                 task=task or current_plan.goal,
                 available_tools=tools,
@@ -596,6 +602,10 @@ def _execute_step(
         None,
     )
 
+def _observation_requires_step_critique(observation: StepObservation) -> bool:
+    from src.agent.evolution.step_critique import should_trigger_step_critique
+
+    return should_trigger_step_critique([observation])
 
 
 def _step_critique_replan_reasons(

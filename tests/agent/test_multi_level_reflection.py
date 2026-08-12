@@ -4,20 +4,31 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
-from src.agent.evolution.budget import LlmCallBudget
+import pytest
+
+from src.agent.evolution.budget import (
+    MAX_REFLECTION_LLM_CALL_BUDGET,
+    LlmCallBudget,
+)
 from src.agent.evolution.episode_lessons import (
     InMemoryEpisodeLessonSink,
     record_reflection_lessons,
 )
 from src.agent.evolution.lessons import LESSON_KINDS, ReflectionLesson
-from src.agent.evolution.meta_review import run_meta_review, write_meta_review_report
+from src.agent.evolution.meta_review import (
+    MAX_META_EPISODES,
+    run_meta_review,
+    write_meta_review_report,
+)
 from src.agent.evolution.multilevel import (
     run_cross_run_layer,
     run_immediate_layer,
     run_trajectory_layer,
 )
+from src.agent.evolution.reflection import parse_reflection_output
 from src.agent.evolution.step_critique import (
     critique_step_observations,
     map_replan_reason_kind,
@@ -62,7 +73,7 @@ def test_immediate_step_critique_trigger_and_typed_lessons():
     ]
     assert should_trigger_step_critique(observations) is True
 
-    config = SimpleNamespace(agent_step_critique_enabled=True, agent_step_critique_llm_budget=0)
+    config = SimpleNamespace(agent_step_critique_enabled=True)
     ctx = _Ctx(run_id="run-1", episode_id="ep-1")
     result = critique_step_observations(observations, config=config, ctx=ctx)
     assert result.status == "completed"
@@ -94,7 +105,7 @@ def test_immediate_disabled_and_budget_skip_explicit():
 
     budgeted = critique_step_observations(
         observations,
-        config=SimpleNamespace(agent_step_critique_enabled=True, agent_step_critique_llm_budget=0),
+        config=SimpleNamespace(agent_step_critique_enabled=True),
         ctx=_Ctx(run_id="r2"),
         budget=LlmCallBudget(total=0),
         llm_complete=boom,
@@ -108,10 +119,8 @@ def test_immediate_disabled_and_budget_skip_explicit():
 def test_trajectory_layer_seeds_from_immediate_and_records_episode_lessons():
     config = SimpleNamespace(
         agent_step_critique_enabled=True,
-        agent_step_critique_llm_budget=0,
         agent_reflection_enabled=True,
         agent_reflection_llm_budget=0,
-        agent_reflection_max_revise=0,
         agent_reflection_in_chat=False,
     )
     ctx = _Ctx(run_id="run-t1", episode_id="ep-t1")
@@ -136,11 +145,26 @@ def test_trajectory_layer_seeds_from_immediate_and_records_episode_lessons():
     assert all(rec["lessons"] for rec in sink.records)
 
 
+def test_trajectory_layer_rejects_corrupt_immediate_lesson_payload() -> None:
+    ctx = _Ctx(run_id="run-corrupt")
+    ctx.meta["step_critique_result"] = {
+        "lessons": [{"kind": "invented", "severity": "high"}]
+    }
+    with pytest.raises(ValueError, match="kind"):
+        run_trajectory_layer(
+            ctx,
+            config=SimpleNamespace(
+                agent_reflection_enabled=True,
+                agent_reflection_llm_budget=0,
+                agent_reflection_in_chat=False,
+            ),
+        )
+
+
 def test_meta_review_sample_threshold_and_actions(tmp_path):
     config = SimpleNamespace(
         agent_meta_review_enabled=True,
         agent_meta_review_min_episodes=30,
-        agent_meta_review_llm_budget=0,
     )
     # Below threshold.
     few = [{"run_id": f"r{i}", "lessons": [{"kind": "tool_failure", "severity": "high"}]} for i in range(5)]
@@ -183,7 +207,6 @@ def test_meta_review_sample_threshold_and_actions(tmp_path):
     assert report.top_failure_kinds
     assert report.worst_tools
     assert report.recommended_actions
-    assert report.mutates_soul is False if hasattr(report, "mutates_soul") else True
     payload = report.to_dict()
     assert payload["mutates_soul"] is False
     assert payload["mutates_tool_surface"] is False
@@ -191,17 +214,12 @@ def test_meta_review_sample_threshold_and_actions(tmp_path):
     assert any("investigate" in a or "tighten" in a or "promote" in a for a in report.recommended_actions)
 
     paths = write_meta_review_report(report, tmp_path)
-    assert Path_exists(paths["markdown"])
-    assert Path_exists(paths["json"])
-    md = open(paths["markdown"], encoding="utf-8").read()
+    assert Path(paths["markdown"]).is_file()
+    assert Path(paths["json"]).is_file()
+    md = Path(paths["markdown"]).read_text(encoding="utf-8")
     assert "Top failure kinds" in md
     assert "Recommended actions" in md
-
-
-def Path_exists(p: str) -> bool:
-    from pathlib import Path
-
-    return Path(p).is_file()
+    assert report.worst_tools[0]["count"] == 35
 
 
 def test_meta_review_does_not_mutate_soul():
@@ -218,7 +236,6 @@ def test_meta_review_does_not_mutate_soul():
         config=SimpleNamespace(
             agent_meta_review_enabled=True,
             agent_meta_review_min_episodes=30,
-            agent_meta_review_llm_budget=0,
         ),
         min_kind_count=1,
     )
@@ -235,7 +252,6 @@ def test_cross_run_layer_facade():
         config=SimpleNamespace(
             agent_meta_review_enabled=True,
             agent_meta_review_min_episodes=10,
-            agent_meta_review_llm_budget=0,
         ),
         min_episodes=10,
     )
@@ -259,6 +275,186 @@ def test_record_reflection_lessons_rejects_freeform_kinds_via_projection():
     assert sink.records[0]["layer"] == "immediate"
 
 
+def test_reflection_budget_and_parser_reject_coercions():
+    for value in (True, 1.0, -1, MAX_REFLECTION_LLM_CALL_BUDGET + 1):
+        with pytest.raises((TypeError, ValueError)):
+            LlmCallBudget(total=value)
+
+    budget = LlmCallBudget(total=0)
+    with pytest.raises(TypeError):
+        budget.record_skip(reason=1)  # type: ignore[arg-type]
+    assert budget.skips == 0
+    with pytest.raises(ValueError, match="consumed"):
+        LlmCallBudget(total=1, consumed=2)
+    with pytest.raises(TypeError, match="skip reason"):
+        LlmCallBudget(total=1, skip_reasons=[1])
+
+    parsed = parse_reflection_output(
+        json.dumps({"lessons": [], "revised": "false"})
+    )
+    assert parsed.validation_status == "invalid"
+    assert parsed.revised is False
+
+
+def test_immediate_layer_bounds_inputs_and_records_llm_failures():
+    with pytest.raises(ValueError, match="observations exceeds"):
+        should_trigger_step_critique([{}] * 17)
+
+    observation = [
+        {
+            "step_id": "x" * 200,
+            "status": "FAILED",
+            "tool_calls": [
+                {
+                    "tool_name": "provider" + ("x" * 200),
+                    "ok": False,
+                    "error_code": "provider_error",
+                },
+                "malformed",
+            ],
+        }
+    ]
+    invalid = critique_step_observations(
+        observation,
+        config=SimpleNamespace(agent_step_critique_enabled=True),
+        budget=LlmCallBudget(total=1),
+        llm_complete=lambda _system, _user: "not-json",
+    )
+    assert invalid.lessons
+    assert invalid.validation_status == "invalid"
+    assert all(len(lesson.source_step or "") <= 64 for lesson in invalid.lessons)
+
+    def provider_failure(_system: str, _user: str) -> str:
+        raise RuntimeError("provider down")
+
+    failed = critique_step_observations(
+        observation,
+        config=SimpleNamespace(agent_step_critique_enabled=True),
+        budget=LlmCallBudget(total=1),
+        llm_complete=provider_failure,
+    )
+    assert failed.lessons
+    assert failed.validation_status == "error"
+    assert "RuntimeError" in (failed.skip_reason or "")
+
+
+def test_meta_review_is_deterministic_strict_and_path_safe(tmp_path):
+    episodes = [
+        {
+            "run_id": "run-b",
+            "mode": "single",
+            "revised": True,
+            "lessons": [
+                {
+                    "kind": "tool_failure",
+                    "remedy": "retry",
+                    "source_step": "step:1:quotes",
+                },
+                {
+                    "kind": "tool_failure",
+                    "remedy": "retry",
+                    "source_step": "step:1:quotes",
+                },
+            ],
+            "trajectory_summary": [{"tool": "quotes", "success": False}],
+        },
+        {
+            "run_id": "run-a",
+            "mode": "single",
+            "revised": False,
+            "lessons": [
+                {
+                    "kind": "evidence_gap",
+                    "remedy": "fetch",
+                    "source_step": "step:2:news",
+                }
+            ],
+            "trajectory_summary": [{"tool": "news", "success": False}],
+        },
+    ]
+    config = SimpleNamespace(
+        agent_meta_review_enabled=True,
+        agent_meta_review_min_episodes=1,
+    )
+    first = run_meta_review(episodes, config=config, min_kind_count=1).to_dict()
+    second = run_meta_review(
+        list(reversed(episodes)), config=config, min_kind_count=1
+    ).to_dict()
+    first.pop("generated_at")
+    second.pop("generated_at")
+    assert first == second
+    assert next(item for item in first["worst_tools"] if item["tool"] == "quotes")[
+        "count"
+    ] == 1
+
+    with pytest.raises(ValueError, match="duplicate"):
+        run_meta_review([episodes[0], episodes[0]], config=config)
+    with pytest.raises(ValueError, match="trajectory_summary"):
+        run_meta_review(
+            [{"run_id": "bad", "trajectory_summary": "not-a-list"}],
+            config=config,
+        )
+    with pytest.raises(ValueError, match="trajectory success"):
+        run_meta_review(
+            [
+                {
+                    "run_id": "bad-success",
+                    "trajectory_summary": [{"tool": "quotes", "success": "false"}],
+                }
+            ],
+            config=config,
+        )
+    with pytest.raises(ValueError, match="episode meta"):
+        run_meta_review([{"run_id": "bad-meta", "meta": []}], config=config)
+    with pytest.raises(ValueError, match="revised"):
+        run_meta_review(
+            [{"run_id": "bad-revised", "revised": "false"}], config=config
+        )
+    with pytest.raises(ValueError, match="reflection_result"):
+        run_meta_review(
+            [{"run_id": "bad-reflection", "reflection_result": ""}],
+            config=config,
+        )
+    with pytest.raises(ValueError, match="kind"):
+        run_meta_review(
+            [{"run_id": "bad-kind", "lessons": [{"kind": "invented"}]}],
+            config=config,
+        )
+    with pytest.raises(ValueError, match="episode meta"):
+        run_meta_review(
+            [{"run_id": "bad-below-threshold", "meta": []}],
+            config=SimpleNamespace(
+                agent_meta_review_enabled=True,
+                agent_meta_review_min_episodes=30,
+            ),
+        )
+    with pytest.raises(ValueError, match="basename"):
+        write_meta_review_report(
+            run_meta_review(episodes, config=config, min_kind_count=1),
+            tmp_path,
+            basename="../escape",
+        )
+
+    invalid_llm = run_meta_review(
+        episodes,
+        config=config,
+        min_kind_count=1,
+        budget=LlmCallBudget(total=1),
+        llm_complete=lambda _system, _user: "prose is not accepted",
+    )
+    assert invalid_llm.validation_status == "invalid"
+    assert invalid_llm.strategy_note is None
+
+    with pytest.raises(ValueError, match="episodes exceeds"):
+        run_meta_review(
+            [
+                {"run_id": f"run-{index}"}
+                for index in range(MAX_META_EPISODES + 1)
+            ],
+            config=config,
+        )
+
+
 def test_meta_review_cli_force_is_not_always_true(tmp_path):
     """Regression: ``force=args.force or True`` used to ignore --force semantics."""
     import importlib.util
@@ -273,7 +469,6 @@ def test_meta_review_cli_force_is_not_always_true(tmp_path):
     disabled = SimpleNamespace(
         agent_meta_review_enabled=False,
         agent_meta_review_min_episodes=30,
-        agent_meta_review_llm_budget=0,
     )
     cfg = mod.resolve_cli_runtime(
         force=False,
@@ -281,6 +476,16 @@ def test_meta_review_cli_force_is_not_always_true(tmp_path):
         get_config=lambda: disabled,
     )
     assert cfg is disabled
+
+    def config_failure():
+        raise RuntimeError("config unavailable")
+
+    with pytest.raises(RuntimeError, match="config unavailable"):
+        mod.resolve_cli_runtime(
+            force=False,
+            min_episodes=30,
+            get_config=config_failure,
+        )
 
     episodes = [
         {"run_id": f"r{i}", "lessons": [{"kind": "tool_failure", "severity": "high"}]}
@@ -290,6 +495,7 @@ def test_meta_review_cli_force_is_not_always_true(tmp_path):
     ep_path.write_text(json.dumps(episodes), encoding="utf-8")
     out_dir = tmp_path / "out"
 
+    mod.resolve_cli_runtime = lambda **_kwargs: disabled
     # Without --force and with disabled config → status disabled.
     code = mod.main(
         [
@@ -301,96 +507,31 @@ def test_meta_review_cli_force_is_not_always_true(tmp_path):
             "3",
         ]
     )
-    # get_config may load real config; force the disabled path via resolve + run_meta_review
-    from src.agent.evolution.meta_review import run_meta_review
+    assert code == 0
+    off_payload = json.loads((out_dir / "off" / "meta_review.json").read_text())
+    assert off_payload["status"] == "disabled"
 
-    report_off = run_meta_review(episodes, config=disabled, min_episodes=3, force=False)
-    assert report_off.status == "disabled"
-    assert code in (0, 1)  # CLI may use live config; contract checked via run_meta_review
-
-    report_on = run_meta_review(episodes, config=disabled, min_episodes=3, force=True)
-    assert report_on.status in {"completed", "threshold_not_met"}
-    assert report_on.status != "disabled"
-
-
-def test_product_planning_context_binds_config_for_step_critique():
-    """Regression: product path must inject config so step critique can arm.
-
-    Avoid importing ``src.agent.planning`` package (pulls product → runtime →
-    storage and is sensitive to local Python versions). Pin the product bind
-    and exercise the same critique semantics the loop uses when config is present.
-    """
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[2]
-    product_src = (root / "src" / "agent" / "planning" / "product.py").read_text(
-        encoding="utf-8"
+    code = mod.main(
+        [
+            "--episodes",
+            str(ep_path),
+            "--output-dir",
+            str(out_dir / "on"),
+            "--min-episodes",
+            "3",
+            "--force",
+        ]
     )
-    loop_src = (root / "src" / "agent" / "planning" / "loop.py").read_text(
-        encoding="utf-8"
-    )
-    assert 'effective_context["config"] = cfg' in product_src
-    assert 'context.get("config")' in loop_src
-    assert "critique_step_observations" in loop_src
+    assert code == 0
+    on_payload = json.loads((out_dir / "on" / "meta_review.json").read_text())
+    assert on_payload["status"] == "completed"
 
-    observations = [
-        {
-            "step_id": 1,
-            "status": "failed",
-            "failure_reason": "tool_failed",
-            "tool_calls": [
-                {
-                    "tool_name": "get_realtime_quote",
-                    "ok": False,
-                    "error_code": "provider_error",
-                    "summary": "timeout",
-                }
-            ],
-        }
-    ]
-    # Same enable path the loop takes after product injects context["config"].
-    ctx = _Ctx(run_id="run-prod-1", episode_id="ep-prod-1")
-    enabled = SimpleNamespace(
-        agent_step_critique_enabled=True,
-        agent_step_critique_llm_budget=0,
-    )
-    result = critique_step_observations(
-        observations, config=enabled, ctx=ctx, force=True
-    )
-    assert result.status == "completed"
-    assert ctx.meta["step_critique_result"]["layer"] == "immediate"
-    assert ctx.meta["step_critique_result"]["lessons"]
-    assert "tool_failure" in ctx.meta["replan_reason_kinds"]
+    mixed = tmp_path / "mixed.json"
+    mixed.write_text(json.dumps([episodes[0], "bad"]), encoding="utf-8")
+    assert mod.main(["--episodes", str(mixed), "--force"]) == 2
 
-    ctx_off = _Ctx(run_id="run-prod-2")
-    disabled = SimpleNamespace(agent_step_critique_enabled=False)
-    off = critique_step_observations(observations, config=disabled, ctx=ctx_off)
-    assert off.status == "disabled"
-    assert "step_critique_result" in ctx_off.meta
-    assert ctx_off.meta["step_critique_result"]["status"] == "disabled"
-
-
-def test_try_append_lessons_to_episode_service_fail_soft_without_service():
-    """When #1210 service is absent, soft adapter returns None and does not raise."""
-    from src.agent.evolution.episode_lessons import try_append_lessons_to_episode_service
-
-    out = try_append_lessons_to_episode_service(
-        run_id="run-soft-1",
-        lessons=[{"kind": "tool_failure", "severity": "high", "remedy": "retry"}],
-        config=SimpleNamespace(agent_episode_log_enabled=True),
-    )
-    assert out is None
-
-
-def test_product_path_wires_trajectory_and_episode_hooks():
-    """Source contract: planning product harvests critique and runs end reflection."""
-    from pathlib import Path
-
-    product_src = (
-        Path(__file__).resolve().parents[2] / "src" / "agent" / "planning" / "product.py"
-    ).read_text(encoding="utf-8")
-    assert "_merge_reflection_context" in product_src
-    assert "_maybe_attach_end_of_run_reflection" in product_src
-    assert "run_trajectory_layer" in product_src
-    assert "try_append_lessons_to_episode_service" in product_src
-    assert "agent_reflection_enabled" in product_src
+    oversized = tmp_path / "oversized.json"
+    with oversized.open("wb") as stream:
+        stream.seek(mod.MAX_EPISODE_FILE_BYTES)
+        stream.write(b"x")
+    assert mod.main(["--episodes", str(oversized), "--force"]) == 2

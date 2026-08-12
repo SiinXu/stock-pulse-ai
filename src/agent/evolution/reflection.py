@@ -101,9 +101,12 @@ def parse_reflection_output(raw_text: str) -> ReflectionResult:
         strategy_note = parsed.get("strategy_note")
         if strategy_note is not None and not isinstance(strategy_note, str):
             raise ValueError("strategy_note must be a string")
+        revised = parsed.get("revised", False)
+        if type(revised) is not bool:
+            raise ValueError("revised must be a boolean")
         return ReflectionResult(
             lessons=lessons,
-            revised=bool(parsed.get("revised", False)),
+            revised=revised,
             terminate_reason="ok",
             status="completed",
             strategy_note=strategy_note,
@@ -199,10 +202,24 @@ def run_reflection_loop(
         return result
 
     call_budget = budget or LlmCallBudget(total=DEFAULT_REFLECTION_LLM_BUDGET)
-    max_revise = max(0, int(max_revise))
+    if type(max_revise) is not int:
+        raise TypeError("max_revise must be an integer")
+    if not 0 <= max_revise <= DEFAULT_MAX_REVISE:
+        raise ValueError(f"max_revise must be between 0 and {DEFAULT_MAX_REVISE}")
     _emit("reflect_start", {"llm_budget_total": call_budget.total})
 
-    lessons: List[ReflectionLesson] = list(seed_lessons or [])
+    if seed_lessons is None:
+        lessons: List[ReflectionLesson] = []
+    else:
+        if isinstance(seed_lessons, (str, bytes)) or not isinstance(
+            seed_lessons, Sequence
+        ):
+            raise TypeError("seed_lessons must be a sequence")
+        if len(seed_lessons) > 8:
+            raise ValueError("seed_lessons exceeds 8 items")
+        if any(not isinstance(lesson, ReflectionLesson) for lesson in seed_lessons):
+            raise TypeError("every seed lesson must be a ReflectionLesson")
+        lessons = list(seed_lessons)
     terminate_reason = "ok"
     status = "completed"
     validation_status = "valid"
@@ -216,21 +233,22 @@ def run_reflection_loop(
             status = "budget_skipped"
             validation_status = BUDGET_SKIPPED
             skip_reason = "Reflection LLM call skipped: budget exhausted."
-            lessons = []
         else:
             user_payload = _build_reflection_user_payload(ctx)
             try:
                 raw = llm_complete(_critique_system_prompt(), user_payload)
                 parsed = parse_reflection_output(raw)
                 if parsed.validation_status == "valid":
-                    lessons = list(parsed.lessons)
+                    by_kind = {lesson.kind: lesson for lesson in lessons}
+                    for lesson in parsed.lessons:
+                        by_kind.setdefault(lesson.kind, lesson)
+                    lessons = list(by_kind.values())[:8]
                     strategy_note = parsed.strategy_note
                 else:
                     terminate_reason = "error"
                     status = "error"
                     validation_status = "invalid"
                     skip_reason = parsed.skip_reason
-                    lessons = []
             except Exception as exc:  # broad-exception: fallback_recorded - Reflection LLM failures are fail-soft and recorded.
                 log_safe_exception(
                     logger,
@@ -245,7 +263,6 @@ def run_reflection_loop(
                 skip_reason = sanitize_agent_diagnostic(
                     f"Reflection LLM failed: {type(exc).__name__}"
                 )
-                lessons = []
 
     for lesson in lessons:
         _emit(
@@ -355,6 +372,9 @@ def _build_reflection_user_payload(ctx: Any) -> str:
         "stock_code": getattr(ctx, "stock_code", None),
         "opinions": opinions,
         "risk_flags": list(getattr(ctx, "risk_flags", None) or [])[:10],
+        "run_success": meta.get("run_success"),
+        "trajectory_summary": list(meta.get("trajectory_summary") or [])[:64],
+        "planning_outcome": meta.get("planning_outcome"),
         "degraded_stages": meta.get("degraded_stages", []),
         "critic_trace": meta.get("critic_trace"),
     }

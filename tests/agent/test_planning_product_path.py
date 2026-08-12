@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import os
 from types import SimpleNamespace
 from typing import Any, Dict, List
@@ -76,6 +77,18 @@ def _enabled_config(**overrides: Any) -> SimpleNamespace:
     )
     base.update(overrides)
     return SimpleNamespace(**base)
+
+
+class _SuccessfulSession:
+    def execute(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "ok": True,
+            "result_text": f"{name}-ok",
+            "summary": f"{name}-ok",
+        }
+
+    def close(self) -> None:
+        return None
 
 
 def test_default_config_keeps_planning_disabled() -> None:
@@ -183,6 +196,91 @@ def test_agent_executor_run_uses_planning_loop_when_enabled() -> None:
     messages = run_loop.call_args.args[0]
     user = next(m for m in messages if m.get("role") == "user")
     assert "Plan execution evidence" in user["content"]
+
+
+def test_product_path_calls_real_reflection_adapter_with_trajectory_evidence() -> None:
+    tools = ["get_realtime_quote", "get_daily_history", "analyze_trend"]
+    llm = MagicMock()
+    llm.call_completion.return_value = SimpleNamespace(
+        provider="test",
+        content=json.dumps(
+            {
+                "lessons": [
+                    {
+                        "kind": "evidence_gap",
+                        "severity": "medium",
+                        "remedy": "fetch another source",
+                    }
+                ],
+                "revised": False,
+            }
+        ),
+    )
+    executor = AgentExecutor(_registry_with_tools(tools), llm, max_steps=3)
+    synth = AgentResult(
+        success=True,
+        content='{"action":"hold"}',
+        dashboard={"action": "hold"},
+        total_steps=1,
+    )
+
+    with patch(
+        "src.agent.planning.product._resolve_config",
+        return_value=_enabled_config(
+            agent_step_critique_enabled=True,
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+        ),
+    ), patch(
+        "src.agent.planning.product._open_plan_tool_session",
+        return_value=_SuccessfulSession(),
+    ), patch.object(executor, "_run_loop", return_value=synth):
+        result = executor.run("Analyze stock 600519", context={"stock_code": "600519"})
+
+    assert result.success is True
+    llm.call_completion.assert_called_once()
+    messages = llm.call_completion.call_args.args[0]
+    reflection_user = next(row["content"] for row in messages if row["role"] == "user")
+    assert '"run_success": true' in reflection_user
+    assert '"trajectory_summary"' in reflection_user
+    reflection = result.planning_metadata["reflection_result"]
+    assert reflection["status"] == "completed"
+    assert reflection["validation_status"] == "valid"
+    assert reflection["lessons"][0]["kind"] == "evidence_gap"
+
+
+def test_reflection_provider_failure_is_explicit_without_changing_run_success() -> None:
+    tools = ["get_realtime_quote", "get_daily_history", "analyze_trend"]
+    llm = MagicMock()
+    llm.call_completion.side_effect = RuntimeError("provider unavailable")
+    executor = AgentExecutor(_registry_with_tools(tools), llm, max_steps=3)
+    synth = AgentResult(
+        success=True,
+        content='{"action":"hold"}',
+        dashboard={"action": "hold"},
+        total_steps=1,
+    )
+
+    with patch(
+        "src.agent.planning.product._resolve_config",
+        return_value=_enabled_config(
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+        ),
+    ), patch(
+        "src.agent.planning.product._open_plan_tool_session",
+        return_value=_SuccessfulSession(),
+    ), patch.object(executor, "_run_loop", return_value=synth):
+        result = executor.run("Analyze stock 600519", context={"stock_code": "600519"})
+
+    assert result.success is True
+    reflection = result.planning_metadata["reflection_result"]
+    assert reflection["status"] == "error"
+    assert reflection["validation_status"] == "error"
+    assert reflection["lessons"] == []
+    assert "RuntimeError" in reflection["skip_reason"]
 
 
 def test_agent_executor_run_uses_real_bound_session_and_durable_audit(tmp_path) -> None:

@@ -299,13 +299,10 @@ class Config:
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     # Multi-level reflection (#1094): immediate / trajectory / meta-review. Default off.
     agent_step_critique_enabled: bool = False
-    agent_step_critique_llm_budget: int = 0  # 0 = deterministic only
     agent_reflection_enabled: bool = False
     agent_reflection_llm_budget: int = 1
-    agent_reflection_max_revise: int = 1
     agent_meta_review_enabled: bool = False
     agent_meta_review_min_episodes: int = 30
-    agent_meta_review_llm_budget: int = 0
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
