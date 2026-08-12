@@ -85,6 +85,50 @@ def test_projects_complete_dashboard_payload() -> None:
                         "invalid_opinion_count": 1,
                     },
                 },
+                "committee_deliberation": {
+                    "schema_version": "committee-deliberation-v1",
+                    "status": "split",
+                    "outcome": "buy",
+                    "members": [
+                        {
+                            "persona_id": "persona_value_moat",
+                            "display_name": "Value & Moat",
+                            "signal": "buy",
+                            "confidence": 0.8,
+                            "reasoning_excerpt": "Moat durable",
+                        },
+                        {
+                            "persona_id": "persona_tail_risk",
+                            "display_name": "Tail Risk",
+                            "signal": "sell",
+                            "confidence": 0.7,
+                            "reasoning_excerpt": "Fragile balance sheet",
+                        },
+                    ],
+                    "conclusion": {
+                        "final_signal": "buy",
+                        "consensus_level": "medium",
+                        "conflict_severity": "medium",
+                        "confidence": 0.74,
+                        "conflict_count": 1,
+                    },
+                    "dissenting_opinions": [
+                        {
+                            "persona_id": "persona_tail_risk",
+                            "display_name": "Tail Risk",
+                            "signal": "sell",
+                            "confidence": 0.7,
+                        }
+                    ],
+                    "divergence_points": [
+                        {
+                            "source": "strategy_conflict",
+                            "conflict_type": "directional_opposition",
+                            "severity": "medium",
+                            "participants": ["persona_value_moat", "persona_tail_risk"],
+                        }
+                    ],
+                },
             }
         }
     )
@@ -103,6 +147,13 @@ def test_projects_complete_dashboard_payload() -> None:
         "participants": ["volume_breakout", "box_oscillation"],
     }
     assert synthesis["summary_params"]["invalid_opinion_count"] == 1
+    committee = projected["committee_deliberation"]
+    assert committee["status"] == "split"
+    assert committee["conclusion"]["final_signal"] == "buy"
+    assert committee["conclusion"]["consensus_level"] == "medium"
+    assert len(committee["members"]) == 2
+    assert committee["dissenting_opinions"][0]["persona_id"] == "persona_tail_risk"
+    assert committee["divergence_points"][0]["conflict_type"] == "directional_opposition"
 
 
 def test_projects_partial_payload_without_synthesizing_missing_sections() -> None:

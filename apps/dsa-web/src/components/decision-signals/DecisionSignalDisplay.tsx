@@ -29,7 +29,10 @@ import {
 } from '../../utils/decisionSignalLabels';
 import { getReportLanguageForUi } from '../../utils/reportLanguage';
 import { ReportRiskGateBanner } from '../report/ReportRiskGateBanner';
+import { ReportStructuredInsights } from '../report/ReportStructuredInsights';
+import { normalizeCommitteeDeliberation } from '../report/reportStructuredInsightsUtils';
 import { buildRiskGatePresentation } from '../report/reportRiskGateUtils';
+import type { ReportStructuredInsights as ReportStructuredInsightsType } from '../../types/analysis';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'history';
 
@@ -130,6 +133,26 @@ function asJsonViewerData(value: unknown): Record<string, unknown> | unknown[] |
   if (Array.isArray(value)) return value;
   if (value && typeof value === 'object') return value as Record<string, unknown>;
   return null;
+}
+
+function extractCommitteeInsightsFromEvidence(
+  evidence: unknown,
+): ReportStructuredInsightsType | null {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
+    return null;
+  }
+  const record = evidence as Record<string, unknown>;
+  const raw =
+    record.committeeDeliberation
+    ?? record.committee_deliberation;
+  const deliberation = normalizeCommitteeDeliberation(raw);
+  if (!deliberation) {
+    return null;
+  }
+  return {
+    schemaVersion: 'report-structured-insights-v1',
+    committeeDeliberation: deliberation,
+  };
 }
 
 function getActionVariant(action: DecisionSignalItem['action']): BadgeVariant {
@@ -363,6 +386,8 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
   const evidenceData = asJsonViewerData(item.evidence);
   const qualityData = asJsonViewerData(item.dataQualitySummary);
   const metadataData = asJsonViewerData(item.metadata);
+  const reportLanguage = getReportLanguageForUi(language);
+  const committeeInsights = extractCommitteeInsightsFromEvidence(item.evidence);
 
   return (
     <div className="space-y-5">
@@ -386,8 +411,17 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
               ? (item.metadata as Record<string, unknown>)
               : null,
         })}
-        language={getReportLanguageForUi(language)}
+        language={reportLanguage}
       />
+
+      {committeeInsights ? (
+        <div data-testid="decision-signal-committee-deliberation">
+          <ReportStructuredInsights
+            insights={committeeInsights}
+            language={reportLanguage}
+          />
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <DetailRow label={t('decisionSignals.score')} value={formatNumber(item.score)} />

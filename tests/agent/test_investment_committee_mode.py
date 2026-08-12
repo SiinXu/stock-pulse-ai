@@ -264,6 +264,18 @@ def test_two_personas_deliberation_and_synthesis():
     assert any("Value" in line or "Moat" in line for line in section["model_inference"])
     assert section["risks_counter_evidence"]
 
+    # Conclusion + dissent are deterministic traces from synthesis (#546 / #985).
+    assert section["conclusion"] is not None
+    assert section["conclusion"]["final_signal"]
+    assert section["conclusion"]["consensus_level"]
+    assert section["status"] in {"consensus", "split", "deliberated", "insufficient"}
+    assert section["outcome"]
+    assert isinstance(section["dissenting_opinions"], list)
+    assert isinstance(section["divergence_points"], list)
+    assert section["dissenting_opinions"] or section["divergence_points"] or (
+        section["conclusion"].get("conflict_count", 0) >= 0
+    )
+
 
 def test_invalid_skill_signal_isolated_in_section():
     opinions = [

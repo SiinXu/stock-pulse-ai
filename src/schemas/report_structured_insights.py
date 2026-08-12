@@ -121,6 +121,70 @@ class ReportStructuredStrategySynthesis(TypedDict, total=False):
     summary_params: ReportStructuredStrategySummary
 
 
+
+class ReportStructuredCommitteeMember(TypedDict, total=False):
+    """One committee persona stance projected for report / Signal / History UI."""
+
+    persona_id: str
+    display_name: str
+    agent_name: str
+    signal: str
+    confidence: float | int
+    lens_verdict: str
+    reasoning_excerpt: str
+    invalid: bool
+    invalid_reason: str
+
+
+class ReportStructuredCommitteeConclusion(TypedDict, total=False):
+    """Authoritative committee conclusion projected from strategy_synthesis."""
+
+    final_signal: str
+    consensus_level: str
+    conflict_severity: str
+    confidence: float | int
+    conflict_count: float | int
+    weighted_score: float | int
+
+
+class ReportStructuredCommitteeOpinion(TypedDict, total=False):
+    """Supporting or dissenting persona opinion from real synthesis rows."""
+
+    persona_id: str
+    display_name: str
+    agent_name: str
+    signal: str
+    confidence: float | int
+    reasoning_excerpt: str
+
+
+class ReportStructuredCommitteeDivergence(TypedDict, total=False):
+    """Divergence point aligned with multi-strategy conflict / #1205 records."""
+
+    source: str
+    conflict_type: str
+    severity: str
+    participants: List[str]
+    description_key: str
+
+
+class ReportStructuredCommitteeDeliberation(TypedDict, total=False):
+    """Bounded Investment Committee deliberation for report consumers."""
+
+    schema_version: str
+    mode: str
+    source: str
+    status: str
+    outcome: str
+    members: List[ReportStructuredCommitteeMember]
+    conclusion: ReportStructuredCommitteeConclusion
+    supporting_opinions: List[ReportStructuredCommitteeOpinion]
+    dissenting_opinions: List[ReportStructuredCommitteeOpinion]
+    divergence_points: List[ReportStructuredCommitteeDivergence]
+    personas_invalid: List[str]
+    personas_truncated: List[str]
+
+
 class ReportStructuredInsights(TypedDict):
     """Versioned structured-insight projection returned by report APIs."""
 
@@ -128,6 +192,7 @@ class ReportStructuredInsights(TypedDict):
     phase_decision: NotRequired[ReportStructuredPhaseDecision]
     signal_attribution: NotRequired[ReportStructuredSignalAttribution]
     strategy_synthesis: NotRequired[ReportStructuredStrategySynthesis]
+    committee_deliberation: NotRequired[ReportStructuredCommitteeDeliberation]
 
 
 _PHASE_CONTEXT_TEXT_FIELDS = (
@@ -444,6 +509,175 @@ def _project_strategy_synthesis(
     return cast(ReportStructuredStrategySynthesis, projected) if meaningful else None
 
 
+
+def _project_committee_member(
+    value: Any,
+) -> Optional[ReportStructuredCommitteeMember]:
+    """Project one committee member stance without unbounded free text."""
+
+    if not isinstance(value, dict):
+        return None
+    projected: Dict[str, Any] = {}
+    for field in (
+        "persona_id",
+        "display_name",
+        "agent_name",
+        "signal",
+        "lens_verdict",
+        "reasoning_excerpt",
+        "invalid_reason",
+    ):
+        text = _clean_text(value.get(field))
+        if text is not None:
+            if field == "reasoning_excerpt" and len(text) > 240:
+                text = text[:239].rstrip() + "…"
+            projected[field] = text
+    confidence = _clean_number(value.get("confidence"))
+    if confidence is not None:
+        projected["confidence"] = confidence
+    if isinstance(value.get("invalid"), bool):
+        projected["invalid"] = value["invalid"]
+    meaningful = bool(
+        projected.get("persona_id")
+        or projected.get("display_name")
+        or projected.get("signal")
+    )
+    return cast(ReportStructuredCommitteeMember, projected) if meaningful else None
+
+
+def _project_committee_opinion(
+    value: Any,
+) -> Optional[ReportStructuredCommitteeOpinion]:
+    """Project one supporting/dissenting opinion row."""
+
+    if not isinstance(value, dict):
+        return None
+    projected: Dict[str, Any] = {}
+    for field in (
+        "persona_id",
+        "display_name",
+        "agent_name",
+        "signal",
+        "reasoning_excerpt",
+    ):
+        text = _clean_text(value.get(field))
+        if text is not None:
+            if field == "reasoning_excerpt" and len(text) > 240:
+                text = text[:239].rstrip() + "…"
+            projected[field] = text
+    confidence = _clean_number(value.get("confidence"))
+    if confidence is not None:
+        projected["confidence"] = confidence
+    meaningful = bool(
+        projected.get("persona_id")
+        or projected.get("display_name")
+        or projected.get("signal")
+    )
+    return cast(ReportStructuredCommitteeOpinion, projected) if meaningful else None
+
+
+def _project_committee_divergence(
+    value: Any,
+) -> Optional[ReportStructuredCommitteeDivergence]:
+    """Project one divergence point from the deterministic committee payload."""
+
+    if not isinstance(value, dict):
+        return None
+    projected: Dict[str, Any] = {}
+    for field in ("source", "conflict_type", "severity", "description_key"):
+        text = _clean_text(value.get(field))
+        if text is not None:
+            projected[field] = text
+    participants = _clean_string_list(value.get("participants"))
+    if participants:
+        projected["participants"] = participants
+    if not projected.get("conflict_type") and not projected.get("participants"):
+        return None
+    return cast(ReportStructuredCommitteeDivergence, projected)
+
+
+def _project_committee_deliberation(
+    value: Any,
+) -> Optional[ReportStructuredCommitteeDeliberation]:
+    """Project a bounded Investment Committee deliberation section."""
+
+    if not isinstance(value, dict):
+        return None
+
+    projected: Dict[str, Any] = {}
+    for field in ("schema_version", "mode", "source", "status", "outcome"):
+        text = _clean_text(value.get(field))
+        if text is not None:
+            projected[field] = text
+
+    members = [
+        item
+        for item in (
+            _project_committee_member(raw)
+            for raw in (value.get("members") or [])
+        )
+        if item is not None
+    ][:30]
+    if members:
+        projected["members"] = members
+
+    conclusion_raw = value.get("conclusion")
+    if isinstance(conclusion_raw, dict):
+        conclusion: Dict[str, Any] = {}
+        for field in ("final_signal", "consensus_level", "conflict_severity"):
+            text = _clean_text(conclusion_raw.get(field))
+            if text is not None:
+                conclusion[field] = text
+        for field in ("confidence", "conflict_count", "weighted_score"):
+            number = _clean_number(conclusion_raw.get(field))
+            if number is not None:
+                conclusion[field] = number
+        if conclusion:
+            projected["conclusion"] = cast(
+                ReportStructuredCommitteeConclusion, conclusion
+            )
+
+    for field in ("supporting_opinions", "dissenting_opinions"):
+        items = [
+            item
+            for item in (
+                _project_committee_opinion(raw)
+                for raw in (value.get(field) or [])
+            )
+            if item is not None
+        ][:30]
+        if items:
+            projected[field] = items
+
+    divergences = [
+        item
+        for item in (
+            _project_committee_divergence(raw)
+            for raw in (value.get("divergence_points") or [])
+        )
+        if item is not None
+    ][:30]
+    if divergences:
+        projected["divergence_points"] = divergences
+
+    for field in ("personas_invalid", "personas_truncated"):
+        values = _clean_string_list(value.get(field))
+        if values:
+            projected[field] = values
+
+    meaningful = bool(
+        projected.get("members")
+        or projected.get("conclusion")
+        or projected.get("dissenting_opinions")
+        or projected.get("divergence_points")
+    )
+    return (
+        cast(ReportStructuredCommitteeDeliberation, projected)
+        if meaningful
+        else None
+    )
+
+
 def _first_projected_section(
     sources: Iterable[Any],
     key: str,
@@ -482,7 +716,19 @@ def project_report_structured_insights_for_api(
             "strategy_synthesis",
             _project_strategy_synthesis,
         )
-        if not any((phase_decision, signal_attribution, strategy_synthesis)):
+        committee_deliberation = _first_projected_section(
+            sources,
+            "committee_deliberation",
+            _project_committee_deliberation,
+        )
+        if not any(
+            (
+                phase_decision,
+                signal_attribution,
+                strategy_synthesis,
+                committee_deliberation,
+            )
+        ):
             return None
 
         result: ReportStructuredInsights = {
@@ -499,6 +745,10 @@ def project_report_structured_insights_for_api(
         if strategy_synthesis is not None:
             result["strategy_synthesis"] = cast(
                 ReportStructuredStrategySynthesis, strategy_synthesis
+            )
+        if committee_deliberation is not None:
+            result["committee_deliberation"] = cast(
+                ReportStructuredCommitteeDeliberation, committee_deliberation
             )
         return result
     except Exception as exc:  # broad-exception: fallback_recorded - projection failure must not break report delivery

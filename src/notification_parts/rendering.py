@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
     from src.notification import (
+        _append_committee_deliberation_block,
         _append_strategy_synthesis_block,
         _safe_float,
         display_action_fields_for_result,
@@ -793,6 +794,15 @@ class _RenderingMethods:
                 )
                 _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
 
+                # ========== Investment Committee (compact for notifications) ==========
+                _append_committee_deliberation_block(
+                    report_lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
+
                 # Financial summary / shareholder returns / related sectors (hidden when data is missing)
                 self._append_fundamental_blocks(report_lines, result)
 
@@ -1360,6 +1370,15 @@ class _RenderingMethods:
             dashboard.get('strategy_synthesis') if dashboard else None
         )
         _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
+
+        # ========== Investment Committee (compact for notifications) ==========
+        _append_committee_deliberation_block(
+            lines,
+            dashboard.get("committee_deliberation") if dashboard else None,
+            labels,
+            report_language,
+            compact=True,
+        )
 
         # Position recommendation
         pos_advice = core.get('position_advice', {}) if core else {}

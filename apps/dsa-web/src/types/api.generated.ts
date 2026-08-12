@@ -11861,7 +11861,7 @@ export interface components {
              * @description 板块涨跌榜（结构 {top, bottom}）
              */
             sector_rankings?: unknown | null;
-            /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis */
+            /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, multi-strategy synthesis, and committee deliberation */
             structured_insights?: components["schemas"]["ReportStructuredInsights"] | null;
         };
         /**
@@ -12051,10 +12051,116 @@ export interface components {
             take_profit?: string | null;
         };
         /**
+         * ReportStructuredCommitteeConclusion
+         * @description Authoritative committee conclusion projected from strategy_synthesis.
+         */
+        ReportStructuredCommitteeConclusion: {
+            /** Confidence */
+            confidence?: number;
+            /** Conflict Count */
+            conflict_count?: number;
+            /** Conflict Severity */
+            conflict_severity?: string;
+            /** Consensus Level */
+            consensus_level?: string;
+            /** Final Signal */
+            final_signal?: string;
+            /** Weighted Score */
+            weighted_score?: number;
+        };
+        /**
+         * ReportStructuredCommitteeDeliberation
+         * @description Bounded Investment Committee deliberation for report consumers.
+         */
+        ReportStructuredCommitteeDeliberation: {
+            conclusion?: components["schemas"]["ReportStructuredCommitteeConclusion"];
+            /** Dissenting Opinions */
+            dissenting_opinions?: components["schemas"]["ReportStructuredCommitteeOpinion"][];
+            /** Divergence Points */
+            divergence_points?: components["schemas"]["ReportStructuredCommitteeDivergence"][];
+            /** Members */
+            members?: components["schemas"]["ReportStructuredCommitteeMember"][];
+            /** Mode */
+            mode?: string;
+            /** Outcome */
+            outcome?: string;
+            /** Personas Invalid */
+            personas_invalid?: string[];
+            /** Personas Truncated */
+            personas_truncated?: string[];
+            /** Schema Version */
+            schema_version?: string;
+            /** Source */
+            source?: string;
+            /** Status */
+            status?: string;
+            /** Supporting Opinions */
+            supporting_opinions?: components["schemas"]["ReportStructuredCommitteeOpinion"][];
+        };
+        /**
+         * ReportStructuredCommitteeDivergence
+         * @description Divergence point aligned with multi-strategy conflict / #1205 records.
+         */
+        ReportStructuredCommitteeDivergence: {
+            /** Conflict Type */
+            conflict_type?: string;
+            /** Description Key */
+            description_key?: string;
+            /** Participants */
+            participants?: string[];
+            /** Severity */
+            severity?: string;
+            /** Source */
+            source?: string;
+        };
+        /**
+         * ReportStructuredCommitteeMember
+         * @description One committee persona stance projected for report / Signal / History UI.
+         */
+        ReportStructuredCommitteeMember: {
+            /** Agent Name */
+            agent_name?: string;
+            /** Confidence */
+            confidence?: number;
+            /** Display Name */
+            display_name?: string;
+            /** Invalid */
+            invalid?: boolean;
+            /** Invalid Reason */
+            invalid_reason?: string;
+            /** Lens Verdict */
+            lens_verdict?: string;
+            /** Persona Id */
+            persona_id?: string;
+            /** Reasoning Excerpt */
+            reasoning_excerpt?: string;
+            /** Signal */
+            signal?: string;
+        };
+        /**
+         * ReportStructuredCommitteeOpinion
+         * @description Supporting or dissenting persona opinion from real synthesis rows.
+         */
+        ReportStructuredCommitteeOpinion: {
+            /** Agent Name */
+            agent_name?: string;
+            /** Confidence */
+            confidence?: number;
+            /** Display Name */
+            display_name?: string;
+            /** Persona Id */
+            persona_id?: string;
+            /** Reasoning Excerpt */
+            reasoning_excerpt?: string;
+            /** Signal */
+            signal?: string;
+        };
+        /**
          * ReportStructuredInsights
          * @description Versioned structured-insight projection returned by report APIs.
          */
         ReportStructuredInsights: {
+            committee_deliberation?: components["schemas"]["ReportStructuredCommitteeDeliberation"];
             phase_decision?: components["schemas"]["ReportStructuredPhaseDecision"];
             /**
              * Schema Version

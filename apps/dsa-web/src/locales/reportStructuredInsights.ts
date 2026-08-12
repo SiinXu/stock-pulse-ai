@@ -32,6 +32,13 @@ type StructuredInsightContent = {
   invalidOpinions: string;
   participants: string;
   noParticipants: string;
+  committeeEyebrow: string;
+  committeeTitle: string;
+  committeeConclusion: string;
+  committeeMembers: string;
+  committeeDissent: string;
+  committeeDivergence: string;
+  committeeStatus: string;
   attributionLabels: Record<string, string>;
   phaseLabels: Record<string, string>;
   signalLabels: Record<string, string>;
@@ -74,6 +81,13 @@ export const REPORT_STRUCTURED_INSIGHTS_TEXT: Record<
     invalidOpinions: '未采纳意见',
     participants: '涉及策略',
     noParticipants: '未记录',
+    committeeEyebrow: '投资委员会',
+    committeeTitle: '委员会审议',
+    committeeConclusion: '委员会结论',
+    committeeMembers: '委员立场',
+    committeeDissent: '保留意见',
+    committeeDivergence: '分歧记录',
+    committeeStatus: '状态',
     attributionLabels: {
       technicalIndicators: '技术指标',
       newsSentiment: '新闻情绪',
@@ -148,6 +162,13 @@ export const REPORT_STRUCTURED_INSIGHTS_TEXT: Record<
     invalidOpinions: 'Excluded Opinions',
     participants: 'Strategies',
     noParticipants: 'Not recorded',
+    committeeEyebrow: 'INVESTMENT COMMITTEE',
+    committeeTitle: 'Committee Deliberation',
+    committeeConclusion: 'Committee Conclusion',
+    committeeMembers: 'Member Stances',
+    committeeDissent: 'Reserved Opinions',
+    committeeDivergence: 'Divergence Record',
+    committeeStatus: 'Status',
     attributionLabels: {
       technicalIndicators: 'Technical Indicators',
       newsSentiment: 'News Sentiment',
@@ -222,6 +243,13 @@ export const REPORT_STRUCTURED_INSIGHTS_TEXT: Record<
     invalidOpinions: '제외된 의견',
     participants: '관련 전략',
     noParticipants: '기록 없음',
+    committeeEyebrow: '투자위원회',
+    committeeTitle: '위원회 심의',
+    committeeConclusion: '위원회 결론',
+    committeeMembers: '위원 입장',
+    committeeDissent: '유보 의견',
+    committeeDivergence: '이견 기록',
+    committeeStatus: '상태',
     attributionLabels: {
       technicalIndicators: '기술 지표',
       newsSentiment: '뉴스 심리',

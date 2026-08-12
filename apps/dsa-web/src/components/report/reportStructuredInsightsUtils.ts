@@ -1,6 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {
+  ReportCommitteeConclusion,
+  ReportCommitteeDeliberation,
+  ReportCommitteeDivergence,
+  ReportCommitteeMember,
+  ReportCommitteeOpinion,
   ReportPhaseContext,
   ReportPhaseDecision,
   ReportSignalAttribution,
@@ -356,6 +361,222 @@ const normalizeStrategySynthesis = (value: unknown): ReportStrategySynthesis | u
   return meaningful ? synthesis : undefined;
 };
 
+
+const normalizeCommitteeMember = (value: unknown): ReportCommitteeMember | null => {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+  const member: ReportCommitteeMember = {};
+  const textFields = [
+    ['personaId', 'persona_id'],
+    ['displayName', 'display_name'],
+    ['agentName', 'agent_name'],
+    ['signal', 'signal'],
+    ['lensVerdict', 'lens_verdict'],
+    ['reasoningExcerpt', 'reasoning_excerpt'],
+    ['invalidReason', 'invalid_reason'],
+  ] as const;
+  textFields.forEach(([camelKey, snakeKey]) => {
+    const text = cleanText(pick(record, camelKey, snakeKey));
+    if (text !== undefined) {
+      member[camelKey] = text;
+    }
+  });
+  const confidence = cleanNumber(pick(record, 'confidence', 'confidence'));
+  if (confidence !== undefined) {
+    member.confidence = confidence;
+  }
+  const invalid = pick(record, 'invalid', 'invalid');
+  if (typeof invalid === 'boolean') {
+    member.invalid = invalid;
+  }
+  const meaningful = Boolean(
+    member.personaId || member.displayName || member.signal,
+  );
+  return meaningful ? member : null;
+};
+
+const normalizeCommitteeOpinion = (value: unknown): ReportCommitteeOpinion | null => {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+  const opinion: ReportCommitteeOpinion = {};
+  const textFields = [
+    ['personaId', 'persona_id'],
+    ['displayName', 'display_name'],
+    ['agentName', 'agent_name'],
+    ['signal', 'signal'],
+    ['reasoningExcerpt', 'reasoning_excerpt'],
+  ] as const;
+  textFields.forEach(([camelKey, snakeKey]) => {
+    const text = cleanText(pick(record, camelKey, snakeKey));
+    if (text !== undefined) {
+      opinion[camelKey] = text;
+    }
+  });
+  const confidence = cleanNumber(pick(record, 'confidence', 'confidence'));
+  if (confidence !== undefined) {
+    opinion.confidence = confidence;
+  }
+  const meaningful = Boolean(
+    opinion.personaId || opinion.displayName || opinion.signal,
+  );
+  return meaningful ? opinion : null;
+};
+
+const normalizeCommitteeDivergence = (
+  value: unknown,
+): ReportCommitteeDivergence | null => {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+  const point: ReportCommitteeDivergence = {};
+  const textFields = [
+    ['source', 'source'],
+    ['conflictType', 'conflict_type'],
+    ['severity', 'severity'],
+    ['descriptionKey', 'description_key'],
+  ] as const;
+  textFields.forEach(([camelKey, snakeKey]) => {
+    const text = cleanText(pick(record, camelKey, snakeKey));
+    if (text !== undefined) {
+      point[camelKey] = text;
+    }
+  });
+  const participants = cleanStringList(
+    pick(record, 'participants', 'participants'),
+  );
+  if (participants.length > 0) {
+    point.participants = participants;
+  }
+  if (!point.conflictType && !point.participants?.length) {
+    return null;
+  }
+  return point;
+};
+
+export const normalizeCommitteeDeliberation = (
+  value: unknown,
+): ReportCommitteeDeliberation | undefined => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+  const deliberation: ReportCommitteeDeliberation = {};
+  const textFields = [
+    ['schemaVersion', 'schema_version'],
+    ['mode', 'mode'],
+    ['source', 'source'],
+    ['status', 'status'],
+    ['outcome', 'outcome'],
+  ] as const;
+  textFields.forEach(([camelKey, snakeKey]) => {
+    const text = cleanText(pick(record, camelKey, snakeKey));
+    if (text !== undefined) {
+      deliberation[camelKey] = text;
+    }
+  });
+
+  const rawMembers = pick(record, 'members', 'members');
+  const members = Array.isArray(rawMembers)
+    ? rawMembers
+      .map(normalizeCommitteeMember)
+      .filter((item): item is ReportCommitteeMember => item !== null)
+      .slice(0, 30)
+    : [];
+  if (members.length > 0) {
+    deliberation.members = members;
+  }
+
+  const conclusionRecord = asRecord(
+    pick(record, 'conclusion', 'conclusion'),
+  );
+  if (conclusionRecord) {
+    const conclusion: ReportCommitteeConclusion = {};
+    const conclusionText = [
+      ['finalSignal', 'final_signal'],
+      ['consensusLevel', 'consensus_level'],
+      ['conflictSeverity', 'conflict_severity'],
+    ] as const;
+    conclusionText.forEach(([camelKey, snakeKey]) => {
+      const text = cleanText(pick(conclusionRecord, camelKey, snakeKey));
+      if (text !== undefined) {
+        conclusion[camelKey] = text;
+      }
+    });
+    const conclusionNumbers = [
+      ['confidence', 'confidence'],
+      ['conflictCount', 'conflict_count'],
+      ['weightedScore', 'weighted_score'],
+    ] as const;
+    conclusionNumbers.forEach(([camelKey, snakeKey]) => {
+      const number = cleanNumber(pick(conclusionRecord, camelKey, snakeKey));
+      if (number !== undefined) {
+        conclusion[camelKey] = number;
+      }
+    });
+    if (
+      conclusion.finalSignal
+      || conclusion.consensusLevel
+      || conclusion.confidence !== undefined
+    ) {
+      deliberation.conclusion = conclusion;
+    }
+  }
+
+  const opinionFields = [
+    ['supportingOpinions', 'supporting_opinions'],
+    ['dissentingOpinions', 'dissenting_opinions'],
+  ] as const;
+  opinionFields.forEach(([camelKey, snakeKey]) => {
+    const rawItems = pick(record, camelKey, snakeKey);
+    const items = Array.isArray(rawItems)
+      ? rawItems
+        .map(normalizeCommitteeOpinion)
+        .filter((item): item is ReportCommitteeOpinion => item !== null)
+        .slice(0, 30)
+      : [];
+    if (items.length > 0) {
+      deliberation[camelKey] = items;
+    }
+  });
+
+  const rawDivergences = pick(record, 'divergencePoints', 'divergence_points');
+  const divergences = Array.isArray(rawDivergences)
+    ? rawDivergences
+      .map(normalizeCommitteeDivergence)
+      .filter((item): item is ReportCommitteeDivergence => item !== null)
+      .slice(0, 30)
+    : [];
+  if (divergences.length > 0) {
+    deliberation.divergencePoints = divergences;
+  }
+
+  const invalid = cleanStringList(
+    pick(record, 'personasInvalid', 'personas_invalid'),
+  );
+  if (invalid.length > 0) {
+    deliberation.personasInvalid = invalid;
+  }
+  const truncated = cleanStringList(
+    pick(record, 'personasTruncated', 'personas_truncated'),
+  );
+  if (truncated.length > 0) {
+    deliberation.personasTruncated = truncated;
+  }
+
+  const meaningful = Boolean(
+    deliberation.members?.length
+      || deliberation.conclusion
+      || deliberation.dissentingOpinions?.length
+      || deliberation.divergencePoints?.length,
+  );
+  return meaningful ? deliberation : undefined;
+};
+
 export const normalizeReportStructuredInsights = (
   value: unknown,
 ): ReportStructuredInsights | null => {
@@ -377,7 +598,15 @@ export const normalizeReportStructuredInsights = (
   const strategySynthesis = normalizeStrategySynthesis(
     pick(record, 'strategySynthesis', 'strategy_synthesis'),
   );
-  if (!phaseDecision && !signalAttribution && !strategySynthesis) {
+  const committeeDeliberation = normalizeCommitteeDeliberation(
+    pick(record, 'committeeDeliberation', 'committee_deliberation'),
+  );
+  if (
+    !phaseDecision
+    && !signalAttribution
+    && !strategySynthesis
+    && !committeeDeliberation
+  ) {
     return null;
   }
 
@@ -386,5 +615,6 @@ export const normalizeReportStructuredInsights = (
     ...(phaseDecision ? { phaseDecision } : {}),
     ...(signalAttribution ? { signalAttribution } : {}),
     ...(strategySynthesis ? { strategySynthesis } : {}),
+    ...(committeeDeliberation ? { committeeDeliberation } : {}),
   };
 };

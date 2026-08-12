@@ -41,6 +41,7 @@ from src.notification_noise import (
     release_notification_noise,
 )
 from src.report_language import (
+    append_committee_deliberation_lines,
     format_strategy_skill_items,
     get_localized_stock_name,
     get_report_labels,
@@ -230,6 +231,26 @@ def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, 
                 f"{localize_strategy_conflict_description(conflict.get('conflict_type'), report_language)}{suffix}"
             )
     lines.append("")
+
+
+def _append_committee_deliberation_block(
+    lines: List[str],
+    committee: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    compact: bool = False,
+) -> None:
+    """Append the Investment Committee block from the real deliberation payload."""
+    append_committee_deliberation_lines(
+        lines,
+        committee,
+        labels,
+        report_language,
+        compact=compact,
+    )
+
+
 
 
 if TYPE_CHECKING:

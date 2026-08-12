@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from src.schemas.decision_scale import signal_key_for_score
 
@@ -534,6 +534,9 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "strategy_invalid_opinions_label": "另有 {count} 个策略解析失败",
         "committee_deliberation_heading": "投资委员会审议",
         "committee_members_label": "委员视角",
+        "committee_conclusion_label": "委员会结论",
+        "committee_dissent_label": "保留意见",
+        "committee_divergence_label": "分歧记录",
         "committee_invalid_personas_label": "无效人格",
         "committee_truncated_personas_label": "超出上限未执行",
         "committee_persona_signal_label": "信号",
@@ -722,6 +725,9 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "strategy_invalid_opinions_label": "{count} additional strategies failed to produce valid signals",
         "committee_deliberation_heading": "Investment Committee Deliberation",
         "committee_members_label": "Committee Lenses",
+        "committee_conclusion_label": "Committee Conclusion",
+        "committee_dissent_label": "Reserved / Dissenting Opinions",
+        "committee_divergence_label": "Divergence Record",
         "committee_invalid_personas_label": "Invalid Personas",
         "committee_truncated_personas_label": "Truncated (over max)",
         "committee_persona_signal_label": "Signal",
@@ -912,6 +918,9 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "strategy_invalid_opinions_label": "추가로 {count}개 전략이 유효한 신호를 생성하지 못했습니다",
         "committee_deliberation_heading": "투자위원회 심의",
         "committee_members_label": "위원 관점",
+        "committee_conclusion_label": "위원회 결론",
+        "committee_dissent_label": "유보/반대 의견",
+        "committee_divergence_label": "이견 기록",
         "committee_invalid_personas_label": "유효하지 않은 페르소나",
         "committee_truncated_personas_label": "상한 초과로 미실행",
         "committee_persona_signal_label": "신호",
@@ -1262,6 +1271,161 @@ def format_strategy_skill_items(
                 text += f"/{confidence:.0%}"
         formatted.append(text)
     return "、".join(formatted) if formatted else none_text
+
+
+# Cap for committee dissent / divergence rows in text renderers.
+_COMMITTEE_TRACE_LIMIT = 8
+
+
+def append_committee_deliberation_lines(
+    lines: List[str],
+    committee: Any,
+    labels: Dict[str, str],
+    report_language: Optional[str],
+    *,
+    compact: bool = False,
+) -> None:
+    """Append a localized Investment Committee block from a real deliberation payload.
+
+    Renders only when ``members`` (or conclusion) are present. Values come from the
+    deterministic ``dashboard.committee_deliberation`` builder — never invented here.
+    """
+    if not isinstance(committee, dict):
+        return
+    members = committee.get("members") if isinstance(committee.get("members"), list) else []
+    conclusion = (
+        committee.get("conclusion")
+        if isinstance(committee.get("conclusion"), dict)
+        else None
+    )
+    if not members and not conclusion:
+        return
+
+    lines.extend(
+        [
+            f"### 🏛 {labels.get('committee_deliberation_heading', 'Investment Committee')}",
+            "",
+        ]
+    )
+
+    if conclusion:
+        conf = conclusion.get("confidence")
+        conf_text = (
+            f"{conf:.0%}"
+            if isinstance(conf, (int, float)) and not isinstance(conf, bool)
+            else "N/A"
+        )
+        lines.append(
+            f"**{labels.get('committee_conclusion_label', 'Committee Conclusion')}**"
+        )
+        lines.append(
+            (
+                f"- {labels.get('strategy_final_signal_label', 'Final signal')}: "
+                f"{localize_strategy_signal(conclusion.get('final_signal', 'N/A'), report_language)} | "
+                f"{labels.get('strategy_consensus_level_label', 'Consensus')}: "
+                f"{localize_consensus_level(conclusion.get('consensus_level', 'N/A'), report_language)} | "
+                f"{labels.get('strategy_conflict_label', 'Conflict')}: "
+                f"{localize_conflict_severity(conclusion.get('conflict_severity', 'none'), report_language)} "
+                f"({conclusion.get('conflict_count', 0)}) | "
+                f"{labels.get('strategy_confidence_label', 'Confidence')}: {conf_text}"
+            )
+        )
+        lines.append("")
+
+    member_limit = 3 if compact else None
+    member_rows = members[:member_limit] if member_limit is not None else members
+    if member_rows:
+        lines.append(f"**{labels.get('committee_members_label', 'Committee Lenses')}**")
+        for member in member_rows:
+            if not isinstance(member, dict):
+                continue
+            name = member.get("display_name") or member.get("persona_id") or "n/a"
+            conf = member.get("confidence")
+            conf_text = (
+                f"{conf:.0%}"
+                if isinstance(conf, (int, float)) and not isinstance(conf, bool)
+                else "N/A"
+            )
+            invalid_suffix = ""
+            if member.get("invalid"):
+                invalid_suffix = f" ({member.get('invalid_reason') or 'invalid'})"
+            line = (
+                f"- {name}: {labels.get('committee_persona_signal_label', 'Signal')} "
+                f"{localize_strategy_signal(member.get('signal') or 'N/A', report_language)} | "
+                f"{labels.get('committee_persona_confidence_label', 'Confidence')} {conf_text}"
+                f"{invalid_suffix}"
+            )
+            if not compact:
+                excerpt = str(member.get("reasoning_excerpt") or "").strip()
+                if excerpt:
+                    line = f"{line} — {excerpt}"
+            lines.append(line)
+        lines.append("")
+
+    if not compact:
+        dissent = (
+            committee.get("dissenting_opinions")
+            if isinstance(committee.get("dissenting_opinions"), list)
+            else []
+        )
+        if dissent:
+            lines.append(
+                f"**{labels.get('committee_dissent_label', 'Reserved / Dissenting Opinions')}**"
+            )
+            for item in dissent[:_COMMITTEE_TRACE_LIMIT]:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("display_name") or item.get("persona_id") or "n/a"
+                excerpt = str(item.get("reasoning_excerpt") or "").strip()
+                line = (
+                    f"- {name}: "
+                    f"{localize_strategy_signal(item.get('signal') or 'N/A', report_language)}"
+                )
+                if excerpt:
+                    line = f"{line} — {excerpt}"
+                lines.append(line)
+            lines.append("")
+
+        divergences = (
+            committee.get("divergence_points")
+            if isinstance(committee.get("divergence_points"), list)
+            else []
+        )
+        if divergences:
+            lines.append(
+                f"**{labels.get('committee_divergence_label', 'Divergence Record')}**"
+            )
+            for point in divergences[:_COMMITTEE_TRACE_LIMIT]:
+                if not isinstance(point, dict):
+                    continue
+                severity = localize_conflict_severity(
+                    point.get("severity", "medium"), report_language
+                )
+                description = localize_strategy_conflict_description(
+                    point.get("conflict_type"), report_language
+                )
+                participants = point.get("participants") or []
+                participant_text = ""
+                if isinstance(participants, list) and participants:
+                    participant_text = "、".join(
+                        localize_strategy_skill(p, report_language) for p in participants
+                    )
+                    participant_text = f"（{participant_text}）"
+                lines.append(f"- {severity}: {description}{participant_text}")
+            lines.append("")
+
+        if committee.get("personas_invalid"):
+            lines.append(
+                f"- {labels.get('committee_invalid_personas_label', 'Invalid personas')}: "
+                f"{', '.join(str(x) for x in (committee.get('personas_invalid') or []))}"
+            )
+        if committee.get("personas_truncated"):
+            lines.append(
+                f"- {labels.get('committee_truncated_personas_label', 'Truncated')}: "
+                f"{', '.join(str(x) for x in (committee.get('personas_truncated') or []))}"
+            )
+        if committee.get("personas_invalid") or committee.get("personas_truncated"):
+            lines.append("")
 
 
 def localize_chip_health(value: Any, language: Optional[str]) -> str:
