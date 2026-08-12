@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { ChevronDown, ListOrdered } from 'lucide-react';
-import { Card, Spinner } from '../common';
+import { Card } from '../common';
 import { useRunFlowSnapshot } from '../../hooks/useRunFlowSnapshot';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { ProcessTimeline } from '../run-flow/ProcessTimeline';
@@ -33,19 +33,11 @@ export const ReportProcessTimeline: React.FC<ReportProcessTimelineProps> = ({
     [snapshot],
   );
 
-  if (recordId === undefined) return null;
-  if (isLoading && !snapshot) {
-    return (
-      <Card variant="bordered" padding="none" className="text-left" data-testid="report-process-loading">
-        <div className="flex min-h-11 items-center gap-3 px-4 py-3">
-          <Spinner size="sm" label={t('runFlow.loadingTitle')} className="h-3.5 w-3.5" />
-          <span className="text-sm text-secondary-text">{t('runFlow.loadingTitle')}</span>
-        </div>
-      </Card>
-    );
+  // Progressive disclosure: stay hidden while loading/error/empty so single-pass
+  // reports never flash a loading shell for a section that may not apply.
+  if (recordId === undefined || isLoading || error || !model.hasAgentEvents || !snapshot) {
+    return null;
   }
-  if (error && !snapshot) return null;
-  if (!model.hasAgentEvents) return null;
 
   return (
     <Card variant="bordered" padding="none" className="text-left">
@@ -70,7 +62,7 @@ export const ReportProcessTimeline: React.FC<ReportProcessTimelineProps> = ({
           </span>
         </summary>
         <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
-          {snapshot ? <ProcessTimeline snapshot={snapshot} hideWhenEmpty /> : null}
+          <ProcessTimeline snapshot={snapshot} hideWhenEmpty />
           {onOpenRunFlow ? (
             <button type="button" className="text-xs text-primary hover:underline" onClick={() => onOpenRunFlow(recordId)}>
               {t('runFlow.open')}
