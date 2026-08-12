@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
 import { Badge, Button, CredentialInput, IconButton, Input, Select, Textarea, TimePicker } from '../common';
@@ -387,7 +387,7 @@ function renderFieldControl(
   );
 }
 
-export const SettingsField: React.FC<SettingsFieldProps> = ({
+function SettingsFieldComponent({
   item,
   value,
   disabled = false,
@@ -398,7 +398,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   readOnlyDiagnostic,
   enumOptionFilter,
   enumEmptyState,
-}) => {
+}: SettingsFieldProps) {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
   // Resolve once per render and share across layout, default backfill, and control.
@@ -513,4 +513,44 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
       </div>
     </div>
   );
-};
+}
+
+export function areSettingsFieldPropsEqual(
+  previous: SettingsFieldProps,
+  next: SettingsFieldProps,
+): boolean {
+  if (previous.item.key !== next.item.key) return false;
+  if (previous.item.value !== next.item.value) return false;
+  if (previous.item.isMasked !== next.item.isMasked) return false;
+  if (previous.item.rawValueExists !== next.item.rawValueExists) return false;
+  if (previous.item.persistedValue !== next.item.persistedValue) return false;
+  if (previous.item.schema !== next.item.schema) return false;
+  if (previous.value !== next.value) return false;
+  if (Boolean(previous.disabled) !== Boolean(next.disabled)) return false;
+  if (previous.requirement !== next.requirement) return false;
+  if (Boolean(previous.dependencyLocked) !== Boolean(next.dependencyLocked)) return false;
+  if (previous.readOnlyDiagnostic !== next.readOnlyDiagnostic) return false;
+  if (previous.onChange !== next.onChange) return false;
+  if (previous.enumOptionFilter !== next.enumOptionFilter) return false;
+  if (previous.enumEmptyState !== next.enumEmptyState) return false;
+
+  const previousIssues = previous.issues ?? [];
+  const nextIssues = next.issues ?? [];
+  if (previousIssues.length !== nextIssues.length) return false;
+  for (let index = 0; index < previousIssues.length; index += 1) {
+    const left = previousIssues[index];
+    const right = nextIssues[index];
+    if (
+      left.code !== right.code
+      || left.key !== right.key
+      || left.severity !== right.severity
+      || left.message !== right.message
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export const SettingsField = memo(SettingsFieldComponent, areSettingsFieldPropsEqual);
+

@@ -1,4 +1,5 @@
 import type React from 'react';
+import { memo } from 'react';
 import { Badge, Checkbox } from '../common';
 import { Pressable } from '../common/Pressable';
 import type { HistoryItem } from '../../types/analysis';
@@ -19,14 +20,14 @@ interface HistoryListItemProps {
   onClick: (recordId: number) => void;
 }
 
-export const HistoryListItem: React.FC<HistoryListItemProps> = ({
+function HistoryListItemComponent({
   item,
   isViewing,
   isChecked,
   isDeleting,
   onToggleChecked,
   onClick,
-}) => {
+}: HistoryListItemProps) {
   const { language, t } = useUiLanguage();
   const isMarketReview = item.reportType === 'market_review'
     || item.stockCode.trim().toUpperCase() === 'MARKET';
@@ -47,7 +48,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
   );
 
   return (
-    <div className="flex items-start gap-2 group">
+    <div className="flex items-start gap-2 group" data-history-list-item={item.id}>
       <Checkbox
         checked={isChecked}
         onChange={() => onToggleChecked(item.id)}
@@ -118,4 +119,6 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
       </Pressable>
     </div>
   );
-};
+}
+
+export const HistoryListItem = memo(HistoryListItemComponent);
