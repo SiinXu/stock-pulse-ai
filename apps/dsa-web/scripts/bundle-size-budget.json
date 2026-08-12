@@ -27,57 +27,57 @@
       "id": "locale-ja",
       "match": "assets/ja-*.js",
       "maxGzipBytes": 152852,
-      "measuredGzipBytes": 152452,
-      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 152452 B, cap 152852 B."
+      "measuredGzipBytes": 152478,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 152478 B, cap 152852 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
       "maxGzipBytes": 146108,
-      "measuredGzipBytes": 145708,
-      "note": "Merged #1166 + #1159 locale growth; measured baseline 145708 B, cap 146108 B."
+      "measuredGzipBytes": 145866,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145866 B, cap 146108 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
       "maxGzipBytes": 146229,
-      "measuredGzipBytes": 145829,
-      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 145829 B, cap 146229 B."
+      "measuredGzipBytes": 145847,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 145847 B, cap 146229 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
       "maxGzipBytes": 146509,
-      "measuredGzipBytes": 146109,
-      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 146109 B, cap 146509 B."
+      "measuredGzipBytes": 146126,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 146126 B, cap 146509 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
       "maxGzipBytes": 142289,
-      "measuredGzipBytes": 141889,
-      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 141889 B, cap 142289 B."
+      "measuredGzipBytes": 141915,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 141915 B, cap 142289 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
       "maxGzipBytes": 138832,
-      "measuredGzipBytes": 138432,
-      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 138432 B, cap 138832 B."
+      "measuredGzipBytes": 138450,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 138450 B, cap 138832 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
       "maxGzipBytes": 132253,
-      "measuredGzipBytes": 131853,
-      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 131853 B, cap 132253 B."
+      "measuredGzipBytes": 131875,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131875 B, cap 132253 B (measured + \u2265200 B)."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
       "maxGzipBytes": 132328,
-      "measuredGzipBytes": 131928,
-      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 131928 B, cap 132328 B."
+      "measuredGzipBytes": 131950,
+      "note": "Stacked #1166 progressive-disclosure + #1159 HTML export chrome; local measured 131950 B, cap 132328 B (measured + \u2265200 B)."
     },
     {
       "id": "vendor-charts",
