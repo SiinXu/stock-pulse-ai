@@ -1616,6 +1616,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds low-overhead agent timeline detail for debugging multi-step runs.'],
     notes: ['See docs/agent-observability_EN.md for privacy and overhead notes.'],
   },
+  'settings.agent.performance': {
+    title: 'Performance Baselines',
+    summary: 'Opt-in performance span collection and offline profiling for key analysis paths.',
+    usage: 'PERF_COLLECTION_ENABLED records lightweight spans when a collector is active (default off). PERF_PROFILE_ENABLED documents offline cProfile intent and does not auto-wrap production requests.',
+    valueNotes: [
+      'Disabled path is a no-op so production overhead stays near zero.',
+      'Use scripts/run_perf_baseline.py for offline baselines and optional cProfile.',
+    ],
+    impact: ['Enables local baseline compare and pipeline stage duration mirrors without changing default runtime behavior.'],
+    notes: ['See docs/performance-baseline_EN.md for workloads, CI impact, and refresh guidance.'],
+  },
   'settings.agent.event_monitor': {
     title: 'Event Monitor',
     summary: 'Enables background event monitoring in schedule mode with periodic rule polling.',
@@ -1968,16 +1979,19 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.system.daily_brief': {
     title: 'Daily Brief',
-    summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
-    usage:
-      'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown. DAILY_BRIEF_NOTIFY controls channel push after a successful brief. DAILY_BRIEF_PERSIST_HISTORY keeps review history. DAILY_BRIEF_SAVE_REPORT_FILE writes a report file under the report directory.',
-    valueNotes: [
-      'Default off keeps existing schedules unchanged.',
-      'Accuracy review is informational and does not auto-trade.',
-      'Notify/persist/save-file defaults are true once the brief itself is enabled.',
-    ],
-    impact: ['Affects scheduled brief generation, push, history, and accuracy review panels.'],
+    summary: 'Scheduled personal morning brief: portfolio membership, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, and historical accuracy review.',
+    usage: 'DAILY_BRIEF_ENABLED turns the feature on. SCHEDULE_TIME/TIMEZONE control timing. MIN_SAMPLES gates accuracy stats. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. QUIET_WHEN_EMPTY skips notify without material content.',
+    valueNotes: ['Default off.', 'Accuracy is informational.', 'Quiet mode still generates and may persist.'],
+    impact: ['Affects scheduled brief generation, shared report-route notification, history, and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
+  },
+  'settings.system.event_research_brief': {
+    title: 'Event Research Brief',
+    summary: 'Optional standalone review of observed earnings-event triggers with metrics, surprise criteria, and a post-event checklist.',
+    usage: 'EVENT_RESEARCH_BRIEF_ENABLED turns the standalone scheduler on. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. LOOKBACK_HOURS and CATEGORIES bound recent managed triggers (day one: earnings). The daily brief embeds recent event context; this is not a future-event catalog.',
+    valueNotes: ['Default off.', 'Managed corporate-event triggers only.', 'Consensus figures are never fabricated.'],
+    impact: ['Affects recent event-context notifications and optional history rows.'],
+    notes: ['Requires schedule mode for the standalone path.'],
   },
   'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
     title: 'Admin Session Max Age (Hours)',

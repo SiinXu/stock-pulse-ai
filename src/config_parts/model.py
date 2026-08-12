@@ -134,7 +134,7 @@ class Config:
     security_audit_retention_days: int = 90
     security_audit_max_events: int = 10_000
 
-    # === Daily brief with historical accuracy review (Issue #466) ===
+    # === Daily brief: personal morning + accuracy review (#149 / #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
     daily_brief_timezone: str = "Asia/Shanghai"
@@ -142,6 +142,15 @@ class Config:
     daily_brief_notify: bool = True
     daily_brief_persist_history: bool = True
     daily_brief_save_report_file: bool = True
+    daily_brief_quiet_when_empty: bool = False
+
+    # === Event-driven research briefs (Issue #1131; default off) ===
+    event_research_brief_enabled: bool = False
+    event_research_brief_notify: bool = True
+    event_research_brief_persist_history: bool = True
+    event_research_brief_save_report_file: bool = True
+    event_research_brief_lookback_hours: int = 48
+    event_research_brief_categories: str = "earnings"
 
     # === Paper trading portfolio (Issue #370) ===
     paper_portfolio_initial_cash: float = 1_000_000.0
@@ -344,6 +353,9 @@ class Config:
     agent_context_protected_turns: int = 4
     agent_observability_enabled: bool = True  # Lightweight agent run events (default on)
     agent_observability_deep_payload: bool = False  # Capture sanitized tool/model payloads (default off)
+    # Performance baseline collection / optional cProfile (Issue #227). Default off.
+    perf_collection_enabled: bool = False
+    perf_profile_enabled: bool = False
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules

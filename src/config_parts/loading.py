@@ -1137,6 +1137,8 @@ class _ConfigLoadingMethods:
             agent_context_protected_turns=agent_context_protected_turns,
             agent_observability_enabled=os.getenv('AGENT_OBSERVABILITY_ENABLED', 'true').lower() == 'true',
             agent_observability_deep_payload=os.getenv('AGENT_OBSERVABILITY_DEEP_PAYLOAD', 'false').lower() == 'true',
+            perf_collection_enabled=os.getenv('PERF_COLLECTION_ENABLED', 'false').lower() == 'true',
+            perf_profile_enabled=os.getenv('PERF_PROFILE_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_enabled=os.getenv('AGENT_EVENT_MONITOR_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_interval_minutes=parse_env_int(
                 os.getenv('AGENT_EVENT_MONITOR_INTERVAL_MINUTES'),
@@ -1633,6 +1635,28 @@ class _ConfigLoadingMethods:
             ),
             daily_brief_save_report_file=parse_env_bool(
                 os.getenv('DAILY_BRIEF_SAVE_REPORT_FILE'), default=True
+            ),
+            daily_brief_quiet_when_empty=parse_env_bool(
+                os.getenv('DAILY_BRIEF_QUIET_WHEN_EMPTY'), default=False
+            ),
+            event_research_brief_enabled=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_ENABLED'), default=False
+            ),
+            event_research_brief_notify=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_NOTIFY'), default=True
+            ),
+            event_research_brief_persist_history=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_PERSIST_HISTORY'), default=True
+            ),
+            event_research_brief_save_report_file=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE'), default=True
+            ),
+            event_research_brief_lookback_hours=parse_env_int(
+                os.getenv('EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS'), 48,
+                field_name='EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS', minimum=1,
+            ),
+            event_research_brief_categories=(
+                os.getenv('EVENT_RESEARCH_BRIEF_CATEGORIES', 'earnings').strip() or 'earnings'
             ),
             paper_portfolio_initial_cash=parse_env_float(
                 os.getenv('PAPER_PORTFOLIO_INITIAL_CASH'), 1_000_000.0, field_name='PAPER_PORTFOLIO_INITIAL_CASH', minimum=0.0
