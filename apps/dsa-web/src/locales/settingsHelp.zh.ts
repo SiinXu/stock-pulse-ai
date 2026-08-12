@@ -1869,6 +1869,26 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响分析总耗时和 API 调用频率。'],
     notes: ['并发过高可能导致 API 返回限流错误。'],
   },
+  'settings.system.ANALYSIS_PARALLEL_FETCH': {
+    title: '分析内并行取数',
+    summary:
+      '在单只股票分析内，对无依赖的行情输入（实时行情、筹码、资金流、基本面）并发拉取。',
+    usage:
+      'ANALYSIS_PARALLEL_FETCH_ENABLED 控制并行/串行；MAX_CONCURRENT 为全局并发上限；PER_PROVIDER_LIMIT 限制同一逻辑 provider key 的并发；BUDGET_SECONDS 为可选墙钟预算（0 关闭），未启动分支会以 budget_skipped 缺口返回。',
+    valueNotes: [
+      '仍走 DataFetcherManager（故障切换、缓存、熔断、校验），并行层不是旁路 HTTP。',
+      '默认并发 3、单源 1，在重叠无依赖能力的同时降低踩限流风险。',
+      '排查数据源问题时可关闭开关，强制按声明顺序串行。',
+    ],
+    impact: [
+      '影响单股分析延迟，以及单次运行内对数据源的峰值并发。',
+      '不改变跨股票队列的 MAX_WORKERS 并发语义。',
+    ],
+    notes: [
+      '写入 stage IO / AgentContext 的合并顺序按声明 key，不按完成先后。',
+      '与预测 ActualsFetcher 的 coalesce 兼容：重叠标的仍经 provider manager 路径。',
+    ],
+  },
   'settings.system.ANALYSIS_DELAY': {
     title: '分析间隔',
     summary: '控制每只股票分析之间的间隔秒数，用于限速。',
