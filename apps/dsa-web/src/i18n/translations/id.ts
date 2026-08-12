@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
+  ...DR.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -201,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "Persetujuan manusia",
   "approvals.APPROVALS_TEXT.unavailableRule": "Aturan persetujuan tidak tersedia",
   "components.settings.agentSetupPresets.COPY.active": "Cocok saat ini",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "Jalur strategi, anggaran riset, tata kelola, dan sakelar diagnostik. Dilipat secara default; buka untuk mengedit set lengkap.",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "Bidang lanjutan",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "Jalur strategi, perutean, memori, dan detail orkestrator. Dilipat secara default; buka untuk mengedit set lengkap.",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "Konfigurasi sumber model",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "Saat preset siap, lanjut ke Q&A tanpa membuka lapisan Perilaku atau Tata kelola.",
+  "components.settings.agentSetupPresets.COPY.askCta": "Ajukan pertanyaan",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "Risiko dan HITL, anggaran deep research, kebijakan alat, dan JSON ahli. Dilipat secara default; buka agar semua kontrol tetap dapat dijangkau.",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "Tata kelola / Ahli",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "Perilaku",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "Penggunaan Agent dikonfirmasi nonaktif",
   "components.settings.agentSetupPresets.COPY.apply": "Terapkan preset",
   "components.settings.agentSetupPresets.COPY.cancel": "Batal",
@@ -2987,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Salin sumber Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Salin teks biasa",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Ekspor gagal",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Unduh HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "Ekspor HTML tidak tersedia",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Unduh Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Unduh PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "Ekspor PDF tidak tersedia",

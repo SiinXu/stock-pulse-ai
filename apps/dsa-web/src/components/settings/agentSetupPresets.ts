@@ -44,8 +44,45 @@ export const AGENT_ESSENTIAL_KEYS = [
 
 export type AgentEssentialKey = (typeof AGENT_ESSENTIAL_KEYS)[number];
 
+/**
+ * Governance / Expert layer (collapsed by default): risk/HITL, deep research
+ * budgets, valuation tools, calibration, event-monitor controls, and raw JSON.
+ * Presentation only — does not change registry defaults or write semantics.
+ */
+export const AGENT_GOVERNANCE_EXPERT_KEYS = [
+  'AGENT_RISK_OVERRIDE',
+  'RISK_GATE_PROFILE',
+  'AGENT_DEEP_RESEARCH_BUDGET',
+  'AGENT_DEEP_RESEARCH_TIMEOUT',
+  'AGENT_EVENT_MONITOR_ENABLED',
+  'AGENT_EVENT_MONITOR_INTERVAL_MINUTES',
+  'AGENT_EVENT_ALERT_RULES_JSON',
+  'VALUATION_AGENT_TOOL_ENABLED',
+  'SKILL_OPINION_RECORDING_ENABLED',
+  'SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED',
+  'DECISION_PROFILE_CALIBRATION_ENABLED',
+] as const;
+
+export type AgentGovernanceExpertKey = (typeof AGENT_GOVERNANCE_EXPERT_KEYS)[number];
+
+/**
+ * Expert JSON blobs that should never sit on a non-expert default surface.
+ * Keys here are also covered by the governance set; the helper remains
+ * available for host surfaces (e.g. Alerts → Event Monitor) that split JSON
+ * out of otherwise ordinary field lists.
+ */
+export const AGENT_EXPERT_JSON_KEYS = [
+  'AGENT_EVENT_ALERT_RULES_JSON',
+] as const;
+
+export type AgentExpertJsonKey = (typeof AGENT_EXPERT_JSON_KEYS)[number];
+
+export type AgentDisclosureLayer = 'essentials' | 'behavior' | 'governance';
+
 const ESSENTIAL_KEY_SET = new Set<string>(AGENT_ESSENTIAL_KEYS);
 const MANAGED_KEY_SET = new Set<string>(AGENT_PRESET_MANAGED_KEYS);
+const GOVERNANCE_KEY_SET = new Set<string>(AGENT_GOVERNANCE_EXPERT_KEYS);
+const EXPERT_JSON_KEY_SET = new Set<string>(AGENT_EXPERT_JSON_KEYS);
 
 export type AgentPresetValues = Readonly<Record<AgentPresetManagedKey, string>>;
 
@@ -165,8 +202,13 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       deepToolsDisabled: '估值 Agent 工具已关闭',
       noChanges: '当前值已与该预设一致',
       essentialsTitle: '基础配置',
-      advancedTitle: '高级字段',
-      advancedDescription: '策略目录、研究预算、治理与诊断类开关。默认折叠，展开后可完整编辑。',
+      advancedTitle: '行为',
+      advancedDescription: '策略路径、路由、内存与编排细节。默认折叠，展开后可完整编辑。',
+      governanceTitle: '治理 / 专家',
+      governanceDescription: '风险与 HITL、深度研究预算、工具策略与专家级 JSON。默认折叠，展开后仍可完整访问。',
+      askCta: '去提问',
+      askCtaDescription: '预设已就绪时，可直接前往问答，无需展开行为或治理层。',
+      configureModelCta: '配置模型来源',
       emptyValue: '（空）',
       simple_qa: {
         name: '简单问答',
@@ -220,8 +262,13 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       deepToolsDisabled: 'Valuation Agent tool disabled',
       noChanges: 'Values already match this preset',
       essentialsTitle: 'Essentials',
-      advancedTitle: 'Advanced fields',
-      advancedDescription: 'Strategy paths, research budgets, governance, and diagnostic toggles. Collapsed by default; expand to edit the full set.',
+      advancedTitle: 'Behavior',
+      advancedDescription: 'Strategy paths, routing, memory, and orchestrator details. Collapsed by default; expand to edit the full set.',
+      governanceTitle: 'Governance / Expert',
+      governanceDescription: 'Risk and HITL, deep-research budgets, tool policy, and expert JSON. Collapsed by default; expand to keep every control reachable.',
+      askCta: 'Ask a question',
+      askCtaDescription: 'When a preset is ready, continue to Q&A without opening Behavior or Governance layers.',
+      configureModelCta: 'Configure model source',
       emptyValue: '(empty)',
       simple_qa: {
         name: 'Simple Q&A',
@@ -245,6 +292,34 @@ export function isAgentEssentialKey(key: string): boolean {
 
 export function isAgentPresetManagedKey(key: string): boolean {
   return MANAGED_KEY_SET.has(key.toUpperCase());
+}
+
+export function isAgentExpertJsonKey(key: string): boolean {
+  const upper = key.toUpperCase();
+  return EXPERT_JSON_KEY_SET.has(upper) || upper.endsWith('_JSON');
+}
+
+export function isAgentGovernanceExpertKey(key: string): boolean {
+  const upper = key.toUpperCase();
+  return GOVERNANCE_KEY_SET.has(upper) || isAgentExpertJsonKey(upper);
+}
+
+export function isAgentBehaviorKey(key: string): boolean {
+  return resolveAgentDisclosureLayer(key) === 'behavior';
+}
+
+/**
+ * Resolve progressive-disclosure layer for an Agent execution field.
+ * Layering is presentation-only and never invents keys or defaults.
+ */
+export function resolveAgentDisclosureLayer(key: string): AgentDisclosureLayer {
+  if (isAgentEssentialKey(key)) {
+    return 'essentials';
+  }
+  if (isAgentGovernanceExpertKey(key)) {
+    return 'governance';
+  }
+  return 'behavior';
 }
 
 export function normalizeAgentConfigValue(value: string | undefined | null): string {

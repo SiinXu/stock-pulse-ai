@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.fr,
+  ...DR.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -201,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "Approbations humaines",
   "approvals.APPROVALS_TEXT.unavailableRule": "La règle d’approbation est indisponible",
   "components.settings.agentSetupPresets.COPY.active": "Correspondance actuelle",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "Chemins de stratégies, budgets de recherche, gouvernance et diagnostics. Replié par défaut ; développez pour tout modifier.",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "Champs avancés",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "Chemins de stratégie, routage, mémoire et détails d’orchestration. Replié par défaut ; développez pour modifier l’ensemble complet.",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "Configurer la source du modèle",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "Lorsqu’un préréglage est prêt, continuez vers la Q&R sans ouvrir les couches Comportement ou Gouvernance.",
+  "components.settings.agentSetupPresets.COPY.askCta": "Poser une question",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "Risque et HITL, budgets de deep research, politique d’outils et JSON expert. Replié par défaut ; développez pour garder tous les contrôles accessibles.",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "Gouvernance / Expert",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "Comportement",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "Utilisation de l’Agent confirmée comme désactivée",
   "components.settings.agentSetupPresets.COPY.apply": "Appliquer le préréglage",
   "components.settings.agentSetupPresets.COPY.cancel": "Annuler",
@@ -2987,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Copier la source Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Copier le texte brut",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Échec de l'export",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Télécharger HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "L'export HTML n'est pas disponible",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Télécharger Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Télécharger PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "L'export PDF n'est pas disponible",

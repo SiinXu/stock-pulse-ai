@@ -8,6 +8,7 @@ import { Badge, Modal, SearchInput, SelectionChip } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { SettingsField } from './SettingsField';
+import { DataProviderRuntimeStatusPanel } from './DataProviderRuntimeStatusPanel';
 import { DATA_PROVIDERS, getDataProviderFieldOrder } from './dataProviders';
 
 interface DataProvidersPanelProps {
@@ -82,7 +83,10 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-6">
+        <DataProviderRuntimeStatusPanel disabled={disabled} />
+
+        <div className="space-y-4">
         <p className="px-1 text-xs leading-5 text-secondary-text sm:text-sm">
           {t('settings.dataDirectoryDescription')}
         </p>
@@ -149,6 +153,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
             })}
           </div>
         )}
+        </div>
       </div>
 
       {openProvider ? (

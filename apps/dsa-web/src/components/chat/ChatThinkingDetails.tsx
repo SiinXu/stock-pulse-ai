@@ -39,7 +39,7 @@ export function ChatThinkingDetails({
   t: Translate;
 }): React.ReactElement {
   return (
-    <div className="mb-3 pl-5 border-l border-border/40 space-y-1.5 animate-fade-in">
+    <div className="mb-3 space-y-1.5 animate-fade-in">
       {steps.map((step, idx) => {
         let statusClass = 'chat-progress-item-muted';
         let iconClass = 'chat-progress-dot-muted';
@@ -92,7 +92,7 @@ export function ChatThinkingDetails({
                 <span className={cn('chat-progress-dot', iconClass)} />
                 <span className="min-w-0 flex-1 leading-relaxed">{text}</span>
                 <ChevronRight
-                  className="h-4 w-4 shrink-0 transition-transform group-open/tool:rotate-90"
+                  className="h-4 w-4 shrink-0 text-muted-text/70 transition-transform group-open/tool:rotate-90"
                   aria-hidden="true"
                 />
               </summary>

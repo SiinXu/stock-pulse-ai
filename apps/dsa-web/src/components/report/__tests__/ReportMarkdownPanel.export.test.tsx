@@ -29,13 +29,14 @@ describe('ReportMarkdownPanel export controls', () => {
     vi.mocked(reportExportApi.getCapabilities).mockResolvedValue({
       formats: {
         md: { available: true },
+        html: { available: true },
         pdf: { available: true },
       },
     });
     vi.mocked(reportExportApi.download).mockResolvedValue({ filename: 'stockpulse-report-7.md' });
   });
 
-  it('exposes markdown and pdf export actions that call the export API', async () => {
+  it('exposes markdown, html, and pdf export actions that call the export API', async () => {
     render(
       <UiLanguageProvider initialLanguage="en">
         <ReportMarkdownPanel
@@ -48,6 +49,7 @@ describe('ReportMarkdownPanel export controls', () => {
     );
 
     expect(await screen.findByTestId('report-export-md')).toBeInTheDocument();
+    expect(screen.getByTestId('report-export-html')).toBeInTheDocument();
     expect(screen.getByTestId('report-export-pdf')).toBeInTheDocument();
 
     await waitFor(() => {
@@ -58,5 +60,37 @@ describe('ReportMarkdownPanel export controls', () => {
     await waitFor(() => {
       expect(reportExportApi.download).toHaveBeenCalledWith(7, 'md');
     });
+
+    fireEvent.click(screen.getByTestId('report-export-html'));
+    await waitFor(() => {
+      expect(reportExportApi.download).toHaveBeenCalledWith(7, 'html');
+    });
+  });
+
+  it('disables html export when capabilities report it unavailable', async () => {
+    vi.mocked(reportExportApi.getCapabilities).mockResolvedValue({
+      formats: {
+        md: { available: true },
+        html: { available: false },
+        pdf: { available: false },
+      },
+    });
+
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ReportMarkdownPanel
+          recordId={7}
+          stockName="Demo"
+          stockCode="600519"
+          onRequestClose={() => undefined}
+        />
+      </UiLanguageProvider>,
+    );
+
+    const htmlButton = await screen.findByTestId('report-export-html');
+    await waitFor(() => {
+      expect(htmlButton).toBeDisabled();
+    });
+    expect(htmlButton).toHaveAttribute('aria-label', 'HTML export is unavailable');
   });
 });

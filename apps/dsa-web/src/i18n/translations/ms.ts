@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ms,
+  ...DR.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",
@@ -201,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "Kelulusan manusia",
   "approvals.APPROVALS_TEXT.unavailableRule": "Peraturan kelulusan tidak tersedia",
   "components.settings.agentSetupPresets.COPY.active": "Padanan semasa",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "Laluan strategi, belanjawan penyelidikan, tadbir urus dan togol diagnostik. Dilipat secara lalai; kembangkan untuk suntingan penuh.",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "Medan lanjutan",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "Laluan strategi, penghalaan, memori dan butiran orkestrator. Dilipat secara lalai; kembangkan untuk mengedit set penuh.",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "Konfigurasikan sumber model",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "Apabila pratetap sedia, terus ke Q&A tanpa membuka lapisan Tingkah laku atau Tadbir urus.",
+  "components.settings.agentSetupPresets.COPY.askCta": "Tanya soalan",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "Risiko dan HITL, belanjawan deep research, dasar alat dan JSON pakar. Dilipat secara lalai; kembangkan supaya semua kawalan kekal boleh dicapai.",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "Tadbir urus / Pakar",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "Tingkah laku",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "Penggunaan Agent disahkan dimatikan",
   "components.settings.agentSetupPresets.COPY.apply": "Guna pratetap",
   "components.settings.agentSetupPresets.COPY.cancel": "Batal",
@@ -2987,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Salin sumber Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Salin Teks Biasa",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Eksport gagal",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Muat turun HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "Eksport HTML tidak tersedia",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Muat turun Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Muat turun PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "Eksport PDF tidak tersedia",

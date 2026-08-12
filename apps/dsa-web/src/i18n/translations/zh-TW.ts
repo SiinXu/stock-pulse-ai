@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M['zh-TW'],
+  ...DR["zh-TW"],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -201,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "人工審批",
   "approvals.APPROVALS_TEXT.unavailableRule": "審批規則不可用",
   "components.settings.agentSetupPresets.COPY.active": "目前相符",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "策略目錄、研究預算、治理與診斷類開關。預設摺疊，展開後可完整編輯。",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "進階欄位",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "策略路徑、路由、記憶體與編排細節。預設摺疊，展開後可完整編輯。",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "設定模型來源",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "預設就緒時，可直接前往問答，無需展開行為或治理層。",
+  "components.settings.agentSetupPresets.COPY.askCta": "去提問",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "風險與 HITL、深度研究預算、工具策略與專家級 JSON。預設摺疊，展開後仍可完整存取。",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "治理 / 專家",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "行為",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "已確認暫不使用 Agent",
   "components.settings.agentSetupPresets.COPY.apply": "套用預設",
   "components.settings.agentSetupPresets.COPY.cancel": "取消",
@@ -2987,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "複製 Markdown 原始碼",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "複製純文字",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "匯出失敗",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "下載 HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML 匯出目前不可用",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "下載 Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "下載 PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF 匯出目前不可用",

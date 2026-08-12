@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.es,
+  ...DR.es,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activa el modo Agente e inténtalo de nuevo.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "El modo agente no está activado",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Solicitud no completada; por favor, revisa los detalles e inténtalo de nuevo.",
@@ -201,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "Aprobaciones humanas",
   "approvals.APPROVALS_TEXT.unavailableRule": "La regla de aprobación no está disponible",
   "components.settings.agentSetupPresets.COPY.active": "Coincidencia actual",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "Rutas de estrategia, presupuestos de investigación, gobernanza y diagnósticos. Colapsado por defecto; expanda para editar todo el conjunto.",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "Campos avanzados",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "Rutas de estrategia, enrutamiento, memoria y detalles del orquestador. Plegado por defecto; expanda para editar el conjunto completo.",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "Configurar origen del modelo",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "Cuando un preset esté listo, continúe a Q&A sin abrir las capas de Comportamiento o Gobernanza.",
+  "components.settings.agentSetupPresets.COPY.askCta": "Hacer una pregunta",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "Riesgo y HITL, presupuestos de deep research, política de herramientas y JSON experto. Plegado por defecto; expanda para mantener todos los controles accesibles.",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "Gobernanza / Experto",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "Comportamiento",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "Uso de Agent marcado como desactivado",
   "components.settings.agentSetupPresets.COPY.apply": "Aplicar preajuste",
   "components.settings.agentSetupPresets.COPY.cancel": "Cancelar",
@@ -2987,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Copiar fuente Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Copiar texto plano",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Error al exportar",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Descargar HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "La exportación a HTML no está disponible",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Descargar Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Descargar PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "La exportación a PDF no está disponible",

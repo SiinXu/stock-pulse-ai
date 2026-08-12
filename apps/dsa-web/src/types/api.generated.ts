@@ -3280,6 +3280,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/config/data-providers/runtime-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get data provider runtime status
+         * @description Read a side-effect-free projection of the live market-data provider runtime: CN/HK/US daily routing (primary/fallback), process-local health, cache quality, and enhancer configured state. Probe failures and missing owners are explicit; availability is never defaulted to true on failure. Does not call third-party APIs or mutate config.
+         */
+        get: operations["getDataProviderRuntimeStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/config/export": {
         parameters: {
             query?: never;
@@ -6320,6 +6340,142 @@ export interface components {
             type: "data_provider" | "data_method";
             /** Version */
             version: string;
+        };
+        /**
+         * DataProviderRuntimeCacheStatus
+         * @description Daily-data cache counters projected for Hub quality labels.
+         */
+        DataProviderRuntimeCacheStatus: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Fetch Mode */
+            fetch_mode?: string | null;
+            /** Hits */
+            hits?: number | null;
+            /** Misses */
+            misses?: number | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Quality
+             * @default unknown
+             * @enum {string}
+             */
+            quality: "active" | "idle" | "cold" | "stale" | "local_only" | "unknown";
+            /** Stale Hits */
+            stale_hits?: number | null;
+            /** Writes */
+            writes?: number | null;
+        };
+        /**
+         * DataProviderRuntimeMarketChain
+         * @description Active daily-data routing chain for one overview market.
+         */
+        DataProviderRuntimeMarketChain: {
+            /** As Of */
+            as_of?: string | null;
+            /** Data Type */
+            data_type: string;
+            /** Fallback Provider Ids */
+            fallback_provider_ids?: string[];
+            /** Market */
+            market: string;
+            /** Ordered Provider Ids */
+            ordered_provider_ids?: string[];
+            /** Primary Provider Id */
+            primary_provider_id?: string | null;
+            /** Primary Selection */
+            primary_selection?: string | null;
+            /**
+             * Quality
+             * @default unknown
+             * @enum {string}
+             */
+            quality: "ok" | "degraded" | "unknown" | "unavailable";
+        };
+        /**
+         * DataProviderRuntimeProviderStatus
+         * @description Process-local health and role for one registered market-data provider.
+         */
+        DataProviderRuntimeProviderStatus: {
+            /** Available */
+            available: boolean;
+            /** Capabilities */
+            capabilities?: string[];
+            /** Circuit State */
+            circuit_state?: string | null;
+            /**
+             * Config Directory
+             * @default false
+             */
+            config_directory: boolean;
+            /** Configured */
+            configured?: boolean | null;
+            /** Display Name */
+            display_name: string;
+            /** Failure Reason */
+            failure_reason?: string | null;
+            /** Health Score */
+            health_score?: number | null;
+            /**
+             * Health Status
+             * @enum {string}
+             */
+            health_status: "healthy" | "degraded" | "unknown" | "unavailable" | "not_configured" | "circuit_open" | "failed";
+            /** Is Fallback For */
+            is_fallback_for?: string[];
+            /** Is Primary For */
+            is_primary_for?: string[];
+            /** Last Failure At */
+            last_failure_at?: string | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Markets */
+            markets?: string[];
+            /** Provider Id */
+            provider_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "baseline" | "enhancer" | "specialist";
+            /**
+             * Sample Count
+             * @default 0
+             */
+            sample_count: number;
+            /** Static Priority */
+            static_priority?: number | null;
+        };
+        /**
+         * DataProviderRuntimeStatusResponse
+         * @description Read-only Data Sources Hub runtime projection.
+         *
+         *     Observes the live ``DataFetcherManager`` only. Probe failures and missing
+         *     owners are explicit; availability is never defaulted to true on failure.
+         *     Does not open third-party connections or mutate circuits/config.
+         */
+        DataProviderRuntimeStatusResponse: {
+            /** As Of */
+            as_of: string;
+            cache?: components["schemas"]["DataProviderRuntimeCacheStatus"] | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+            /** Markets */
+            markets?: components["schemas"]["DataProviderRuntimeMarketChain"][];
+            /** Partial */
+            partial: boolean;
+            /** Providers */
+            providers?: components["schemas"]["DataProviderRuntimeProviderStatus"][];
+            /** Schema Version */
+            schema_version: string;
+            /**
+             * Source State
+             * @enum {string}
+             */
+            source_state: "ok" | "not_initialized" | "error";
         };
         /** DecisionSignalCreateRequest */
         DecisionSignalCreateRequest: {
@@ -25900,6 +26056,35 @@ export interface operations {
             };
             /** @description Security audit unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getDataProviderRuntimeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Data provider runtime status loaded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataProviderRuntimeStatusResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

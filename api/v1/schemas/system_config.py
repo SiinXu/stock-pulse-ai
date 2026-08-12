@@ -431,6 +431,96 @@ class KronosStatusResponse(BaseModel):
     download_size_hint: Optional[str] = None
 
 
+DataProviderRuntimeSourceState = Literal["ok", "not_initialized", "error"]
+DataProviderRole = Literal["baseline", "enhancer", "specialist"]
+DataProviderHealthStatus = Literal[
+    "healthy",
+    "degraded",
+    "unknown",
+    "unavailable",
+    "not_configured",
+    "circuit_open",
+    "failed",
+]
+DataProviderMarketQuality = Literal["ok", "degraded", "unknown", "unavailable"]
+DataProviderCacheQuality = Literal[
+    "active",
+    "idle",
+    "cold",
+    "stale",
+    "local_only",
+    "unknown",
+]
+
+
+class DataProviderRuntimeMarketChain(BaseModel):
+    """Active daily-data routing chain for one overview market."""
+
+    market: str
+    data_type: str
+    ordered_provider_ids: List[str] = Field(default_factory=list)
+    primary_provider_id: Optional[str] = None
+    fallback_provider_ids: List[str] = Field(default_factory=list)
+    primary_selection: Optional[str] = None
+    quality: DataProviderMarketQuality = "unknown"
+    as_of: Optional[str] = None
+
+
+class DataProviderRuntimeProviderStatus(BaseModel):
+    """Process-local health and role for one registered market-data provider."""
+
+    provider_id: str
+    display_name: str
+    role: DataProviderRole
+    markets: List[str] = Field(default_factory=list)
+    capabilities: List[str] = Field(default_factory=list)
+    configured: Optional[bool] = None
+    available: bool
+    health_status: DataProviderHealthStatus
+    health_score: Optional[float] = None
+    circuit_state: Optional[str] = None
+    sample_count: int = 0
+    static_priority: Optional[int] = None
+    last_success_at: Optional[str] = None
+    last_failure_at: Optional[str] = None
+    failure_reason: Optional[str] = None
+    is_primary_for: List[str] = Field(default_factory=list)
+    is_fallback_for: List[str] = Field(default_factory=list)
+    config_directory: bool = False
+
+
+class DataProviderRuntimeCacheStatus(BaseModel):
+    """Daily-data cache counters projected for Hub quality labels."""
+
+    enabled: Optional[bool] = None
+    fetch_mode: Optional[str] = None
+    hits: Optional[int] = None
+    misses: Optional[int] = None
+    stale_hits: Optional[int] = None
+    writes: Optional[int] = None
+    quality: DataProviderCacheQuality = "unknown"
+    note: Optional[str] = None
+
+
+class DataProviderRuntimeStatusResponse(BaseModel):
+    """Read-only Data Sources Hub runtime projection.
+
+    Observes the live ``DataFetcherManager`` only. Probe failures and missing
+    owners are explicit; availability is never defaulted to true on failure.
+    Does not open third-party connections or mutate circuits/config.
+    """
+
+    schema_version: str
+    as_of: str
+    partial: bool
+    source_state: DataProviderRuntimeSourceState
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    markets: List[DataProviderRuntimeMarketChain] = Field(default_factory=list)
+    providers: List[DataProviderRuntimeProviderStatus] = Field(default_factory=list)
+    cache: Optional[DataProviderRuntimeCacheStatus] = None
+
+
 class ExportSystemConfigResponse(BaseModel):
     """Export payload for raw `.env` backups."""
 

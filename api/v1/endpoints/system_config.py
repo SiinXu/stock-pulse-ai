@@ -21,6 +21,7 @@ from api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
     DiscoverLLMChannelModelsResponse,
     ExportSystemConfigResponse,
+    DataProviderRuntimeStatusResponse,
     GenerationBackendStatusPreviewRequest,
     GenerationBackendStatusResponse,
     ImportSystemConfigRequest,
@@ -445,6 +446,48 @@ def get_kronos_status() -> KronosStatusResponse:
             detail={
                 "error": "internal_error",
                 "message": "Failed to load Kronos status",
+            },
+        )
+
+
+@router.get(
+    "/config/data-providers/runtime-status",
+    response_model=DataProviderRuntimeStatusResponse,
+    responses={
+        200: {"description": "Data provider runtime status loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get data provider runtime status",
+    description=(
+        "Read a side-effect-free projection of the live market-data provider "
+        "runtime: CN/HK/US daily routing (primary/fallback), process-local "
+        "health, cache quality, and enhancer configured state. Probe failures "
+        "and missing owners are explicit; availability is never defaulted to "
+        "true on failure. Does not call third-party APIs or mutate config."
+    ),
+    operation_id="getDataProviderRuntimeStatus",
+)
+def get_data_provider_runtime_status() -> DataProviderRuntimeStatusResponse:
+    """Return live Data Sources Hub runtime projection without writing config."""
+    try:
+        from src.services.data_provider_runtime_status_service import (
+            build_data_provider_runtime_status,
+        )
+
+        payload = build_data_provider_runtime_status()
+        return DataProviderRuntimeStatusResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - map projection failures to sanitized API error
+        log_safe_exception(
+            logger,
+            "Data provider runtime status load failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to load data provider runtime status",
             },
         )
 
