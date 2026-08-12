@@ -387,7 +387,7 @@ def resolve_capabilities(request: ResolveCapabilitiesRequest) -> ResolveCapabili
     if request.include_inventory:
         try:
             inventory_items = collect_capability_records().items
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - inventory optional for resolve
             log_safe_exception(
                 logger, "Capability inventory unavailable during resolve", exc,
                 error_code="capability_inventory_unavailable_for_resolve",
@@ -447,7 +447,7 @@ def route_task_model(request: TaskRouteRequest) -> TaskRouteDecisionResponse:
 
     try:
         config = Config()
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - routing still returns explicit decision
         log_safe_exception(
             logger, "Config unavailable for task routing", exc,
             error_code="task_routing_config_unavailable",

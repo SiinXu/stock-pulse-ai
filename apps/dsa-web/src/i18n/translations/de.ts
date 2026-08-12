@@ -5966,7 +5966,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.notes.0": "Optionales Ensemble ist in dieser Steuerung nicht enthalten.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.summary": "Optionale automatische Modellwahl nach Aufgabenklasse über registrierte LLM-Capability-Tags.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.title": "Aufgabenbewusstes Modell-Routing",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.usage": "False belassen, um die bestehende Modellzuweisung beizubehalten. Manuelle Pins gewinnen immer.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.usage": "false belassen, um die bestehende Modellzuweisung beizubehalten. Manuelle Pins gewinnen immer.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.valueNotes.0": "Entscheidungen sind über POST /api/v1/capabilities/route erklärbar.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_PIN_AGENT.summary": "Optionaler expliziter Modell-Pin für Agent-Aufgaben.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_PIN_AGENT.title": "Aufgaben-Route-Pin (Agent)",

@@ -5962,7 +5962,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.CAPABILITY_WRITE_REGISTRY_PATH.title": "能力寫入註冊表路徑",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.CAPABILITY_WRITE_REGISTRY_PATH.usage": "留空則使用 <DATABASE_PATH 目錄>/capability_write_registry.json。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.CAPABILITY_WRITE_REGISTRY_PATH.valueNotes.0": "僅保存寫入側元數據；執行時清單仍由各 owner 即時探測。",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.impact.0": "開啟且未釘選時，不同任務類可能按策略選擇不同模型。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.impact.0": "開啟且未釘選時，不同任務類可能按策略選擇不同模型。 (TASK_ROUTING_POLICY)",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.notes.0": "可選 ensemble 不在本開關範圍內。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.summary": "按任務類型與已登記 LLM 能力標籤自動選擇模型（預設關閉）。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.TASK_ROUTING_ENABLED.title": "任務感知模型路由",

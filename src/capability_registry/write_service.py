@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +17,7 @@ from src.capability_registry.write_models import (
     WriteCapabilityStatus,
     WriteRegistrySnapshot,
 )
+from src.utils.sanitize import log_safe_exception
 from src.capability_registry.write_store import (
     CapabilityWriteStore,
     WriteRegistryStoreError,
@@ -22,6 +25,7 @@ from src.capability_registry.write_store import (
 )
 
 Clock = Callable[[], datetime]
+logger = logging.getLogger(__name__)
 
 
 class CapabilityWriteError(Exception):
@@ -84,6 +88,16 @@ class CapabilityWriteService:
         except Exception as exc:  # broad-exception: fallback_recorded - map to completion-unavailable
             from src.services.security_audit_service import SecurityAuditUnavailable
 
+            log_safe_exception(
+                logger,
+                "Capability write audit completion unavailable after mutation",
+                exc,
+                error_code="capability_write_audit_completion_unavailable",
+                context={
+                    "capability_id": capability_id,
+                    "operation": operation,
+                },
+            )
             if isinstance(exc, SecurityAuditUnavailable):
                 raise CapabilityWriteAuditCompletionUnavailable(entry) from None
             raise CapabilityWriteAuditCompletionUnavailable(entry) from exc
