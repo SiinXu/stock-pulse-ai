@@ -330,7 +330,7 @@ def persist_llm_usage(
             stock_code=resolved_stock,
             **telemetry,
         )
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - usage persistence is fire-and-forget
         log_safe_exception(
             logger,
             "LLM usage record persistence failed",
