@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after Agent Behavior Essentials/Behavior/Governance disclosure copy (Refs #868 / PR #1166); failed locales use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
+  "baselineNote": "Merged concurrent rebaselines for Agent three-layer disclosure (#868) and Data Sources Hub runtime projection (#867); locale conflicts take the larger measured value + 200 B headroom. Untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
