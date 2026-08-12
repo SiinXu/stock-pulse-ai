@@ -1,8 +1,11 @@
 # SmartMoney Money Flow
 
 Optional main-force / large-order capital-flow tracking for individual stocks.
-This is the Issue #862 Phase-1 backend foundation; it does not add a Web UI,
-alerts, screening, or agent-core behavior.
+
+- **Phase 1 (Issue #862 / PR #980):** provider capability, typed outcomes, default-off gate, analysis-context injection.
+- **Phase 2 (Issue #989):** user-reachable stock footprint view + HTTP API with as-of/source labeling and honest degradation.
+
+This document does not cover Dragon-Tiger seats, Northbound flow, observation pools, or push alerts.
 
 ## Feature flag
 
@@ -80,25 +83,49 @@ buckets differ between Eastmoney, Tushare, and Tonghuashun.
 3. Optional analysis injection when enabled:
    - `enhanced_context["money_flow"]`
    - `AnalysisContextPack.blocks["money_flow"]` with explicit quality status
+     (labeled **资金流 / money flow** in report context overview)
+4. User-reachable view (Issue #989):
+   - `GET /api/v1/stocks/{stock_code}/money-flow?days=5`
+   - `src.services.smartmoney_flow_service.build_money_flow_view`
+   - Stock Details Web panel (`MoneyFlowPanel`) — loads independently of quote/history
 
 AkShare calls use a process-owned deadline so timeout cancellation terminates
 the worker. Timeout and transport failures receive one bounded retry. A manager
 cache entry is scoped to symbol, market, effective CN session, requested window,
 provider route, and calibration identity; stale cache use is explicit fallback.
 
-## Remaining scope (not in this PR)
+## HTTP API (stock footprint view)
+
+| Item | Value |
+| --- | --- |
+| Method / path | `GET /api/v1/stocks/{stock_code}/money-flow` |
+| Query | `days` (1–20, default 5) |
+| Gate | When `SMARTMONEY_ENABLED=false`, response is `status=disabled`, `enabled=false`, **no provider I/O** |
+| Success body | `schema_version=money_flow_view/1.0`, `status`, `as_of`, `provider_date`, `source`, `source_chain`, `warnings`, optional `snapshot` (ratios / calibrated amounts only), `disclaimer` |
+| Degradation | `not_supported` / `fetch_failed` / `empty` / `stale` / `fallback` / `partial` keep explicit `message` and never invent bucket numbers |
+
+Absolute amount fields are omitted unless the provider calibrates both currency
+and scale. The Web panel therefore prioritizes **ratio** fields and shows unit /
+amount_scale / bucket_definition for honesty.
+
+## Web reachability
+
+| Surface | Entry |
+| --- | --- |
+| Stock Details | `/stocks/{code}` → section `data-testid=stock-details-money-flow-section` |
+| Settings | `SMARTMONEY_ENABLED` system switch (default off) |
+
+## Remaining scope
 
 - Dragon-Tiger list / seat-level institutional identification
 - Northbound flow, block trades, margin supporting data
-- Observation pool / screener / Web UI (see T24 boundary)
+- Observation pool / screener ranking boards
 - Push brief / portfolio anomaly alerts
 - Tushare / efinance / THS providers and HK/US coverage
-- Settings UI registry entry for `SMARTMONEY_ENABLED` (config works via env)
-- Agent-core injection (kept out of this market-data lane)
 
 ## Integration Point
 
-After merge, Settings owners (if desired) can register
-`SMARTMONEY_ENABLED` in `src/core/config_registry_parts/data_source.py` following
-the `ENABLE_CHIP_DISTRIBUTION` pattern. Runtime already reads the env var via
-`src/config_parts/loading.py`.
+`SMARTMONEY_ENABLED` is registered under system settings
+(`src/core/config_registry_parts/system.py`). Runtime loads the env via
+`src/config_parts/loading.py`. Analysis pipelines and the stock money-flow
+view both honor the same gate.

@@ -9,7 +9,7 @@
 2. 定义历史 K 线数据模型
 """
 
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -72,6 +72,42 @@ class KLineData(BaseModel):
             "change_percent": 0.84
         }
     })
+
+
+class MoneyFlowViewResponse(BaseModel):
+    """User-facing SmartMoney / main-force money-flow view (Issue #989)."""
+
+    schema_version: str = Field(..., description="money_flow_view schema version")
+    stock_code: str = Field(..., description="Canonical stock code")
+    enabled: bool = Field(..., description="Whether SMARTMONEY_ENABLED is on")
+    status: str = Field(
+        ...,
+        description=(
+            "disabled | available | partial | not_supported | fetch_failed | "
+            "empty | stale | fallback"
+        ),
+    )
+    requested_days: int = Field(..., ge=1, le=20, description="Requested history window")
+    fetched_at: Optional[str] = Field(None, description="UTC fetch timestamp (ISO 8601)")
+    as_of: Optional[str] = Field(None, description="Observation as-of timestamp (ISO 8601)")
+    provider_date: Optional[str] = Field(None, description="Provider session date YYYY-MM-DD")
+    age_days: Optional[int] = Field(None, description="Session age in days")
+    source: Optional[str] = Field(None, description="Primary data source label")
+    source_chain: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Provider attempt chain"
+    )
+    market: Optional[str] = Field(None, description="Market tag (cn/hk/us/...)")
+    error_code: Optional[str] = Field(None, description="Machine-readable failure code")
+    warnings: List[str] = Field(default_factory=list, description="Quality / calibration warnings")
+    cache_state: Optional[str] = Field(None, description="miss | fresh | stale")
+    fallback_from: Optional[str] = Field(None, description="Fallback provenance when applicable")
+    snapshot: Optional[Dict[str, Any]] = Field(
+        None, description="Normalized bucket ratios/amounts when data-bearing"
+    )
+    message: Optional[str] = Field(None, description="Human-readable degradation note")
+    disclaimer: str = Field(..., description="Honesty disclaimer for research use")
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExtractItem(BaseModel):

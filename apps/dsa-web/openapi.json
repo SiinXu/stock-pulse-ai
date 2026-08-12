@@ -14469,6 +14469,204 @@
         "title": "ModelPackImportStatus",
         "type": "object"
       },
+      "MoneyFlowViewResponse": {
+        "additionalProperties": false,
+        "description": "User-facing SmartMoney / main-force money-flow view (Issue #989).",
+        "properties": {
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Session age in days",
+            "title": "Age Days"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Observation as-of timestamp (ISO 8601)",
+            "title": "As Of"
+          },
+          "cache_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "miss | fresh | stale",
+            "title": "Cache State"
+          },
+          "disclaimer": {
+            "description": "Honesty disclaimer for research use",
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Whether SMARTMONEY_ENABLED is on",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Machine-readable failure code",
+            "title": "Error Code"
+          },
+          "fallback_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fallback provenance when applicable",
+            "title": "Fallback From"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UTC fetch timestamp (ISO 8601)",
+            "title": "Fetched At"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Market tag (cn/hk/us/...)",
+            "title": "Market"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Human-readable degradation note",
+            "title": "Message"
+          },
+          "provider_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider session date YYYY-MM-DD",
+            "title": "Provider Date"
+          },
+          "requested_days": {
+            "description": "Requested history window",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Requested Days",
+            "type": "integer"
+          },
+          "schema_version": {
+            "description": "money_flow_view schema version",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Normalized bucket ratios/amounts when data-bearing",
+            "title": "Snapshot"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Primary data source label",
+            "title": "Source"
+          },
+          "source_chain": {
+            "description": "Provider attempt chain",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Source Chain",
+            "type": "array"
+          },
+          "status": {
+            "description": "disabled | available | partial | not_supported | fetch_failed | empty | stale | fallback",
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "description": "Canonical stock code",
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "Quality / calibration warnings",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "stock_code",
+          "enabled",
+          "status",
+          "requested_days",
+          "disclaimer"
+        ],
+        "title": "MoneyFlowViewResponse",
+        "type": "object"
+      },
       "NewsIntelItem": {
         "description": "新闻情报条目",
         "example": {
@@ -46559,6 +46757,83 @@
           }
         },
         "summary": "获取股票历史行情",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/{stock_code}/money-flow": {
+      "get": {
+        "description": "Returns main-force order-size bucket ratios (when available) with as-of, source, and explicit degradation. Gated by SMARTMONEY_ENABLED: when disabled the response is status=disabled with no provider network I/O. Decoupled from quote/history fetches. Research evidence only.",
+        "operationId": "getStockMoneyFlow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "History window in sessions (1–20)",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "History window in sessions (1–20)",
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyFlowViewResponse"
+                }
+              }
+            },
+            "description": "Money-flow / SmartMoney footprint view"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid stock code or days"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Get SmartMoney money-flow footprint for a stock",
         "tags": [
           "Stocks"
         ]

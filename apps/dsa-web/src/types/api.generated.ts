@@ -3236,6 +3236,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocks/{stock_code}/money-flow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get SmartMoney money-flow footprint for a stock
+         * @description Returns main-force order-size bucket ratios (when available) with as-of, source, and explicit degradation. Gated by SMARTMONEY_ENABLED: when disabled the response is status=disabled with no provider network I/O. Decoupled from quote/history fetches. Research evidence only.
+         */
+        get: operations["getStockMoneyFlow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/{stock_code}/quote": {
         parameters: {
             query?: never;
@@ -9352,6 +9372,111 @@ export interface components {
             status: components["schemas"]["TaskStatusEnum"];
             /** Task Id */
             task_id: string;
+        };
+        /**
+         * MoneyFlowViewResponse
+         * @description User-facing SmartMoney / main-force money-flow view (Issue #989).
+         */
+        MoneyFlowViewResponse: {
+            /**
+             * Age Days
+             * @description Session age in days
+             */
+            age_days?: number | null;
+            /**
+             * As Of
+             * @description Observation as-of timestamp (ISO 8601)
+             */
+            as_of?: string | null;
+            /**
+             * Cache State
+             * @description miss | fresh | stale
+             */
+            cache_state?: string | null;
+            /**
+             * Disclaimer
+             * @description Honesty disclaimer for research use
+             */
+            disclaimer: string;
+            /**
+             * Enabled
+             * @description Whether SMARTMONEY_ENABLED is on
+             */
+            enabled: boolean;
+            /**
+             * Error Code
+             * @description Machine-readable failure code
+             */
+            error_code?: string | null;
+            /**
+             * Fallback From
+             * @description Fallback provenance when applicable
+             */
+            fallback_from?: string | null;
+            /**
+             * Fetched At
+             * @description UTC fetch timestamp (ISO 8601)
+             */
+            fetched_at?: string | null;
+            /**
+             * Market
+             * @description Market tag (cn/hk/us/...)
+             */
+            market?: string | null;
+            /**
+             * Message
+             * @description Human-readable degradation note
+             */
+            message?: string | null;
+            /**
+             * Provider Date
+             * @description Provider session date YYYY-MM-DD
+             */
+            provider_date?: string | null;
+            /**
+             * Requested Days
+             * @description Requested history window
+             */
+            requested_days: number;
+            /**
+             * Schema Version
+             * @description money_flow_view schema version
+             */
+            schema_version: string;
+            /**
+             * Snapshot
+             * @description Normalized bucket ratios/amounts when data-bearing
+             */
+            snapshot?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Source
+             * @description Primary data source label
+             */
+            source?: string | null;
+            /**
+             * Source Chain
+             * @description Provider attempt chain
+             */
+            source_chain?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Status
+             * @description disabled | available | partial | not_supported | fetch_failed | empty | stale | fallback
+             */
+            status: string;
+            /**
+             * Stock Code
+             * @description Canonical stock code
+             */
+            stock_code: string;
+            /**
+             * Warnings
+             * @description Quality / calibration warnings
+             */
+            warnings?: string[];
         };
         /**
          * NewsIntelItem
@@ -25894,6 +26019,58 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getStockMoneyFlow: {
+        parameters: {
+            query?: {
+                /** @description History window in sessions (1–20) */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Money-flow / SmartMoney footprint view */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoneyFlowViewResponse"];
+                };
+            };
+            /** @description Invalid stock code or days */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
             500: {
                 headers: {
                     [name: string]: unknown;
