@@ -2062,6 +2062,19 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
 
+  'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
+    title: '就绪自检超时',
+    summary: '结构化就绪/自检报告的单检查超时。',
+    usage:
+      '默认 1.0 秒（限制在 0.1–5.0）。仅用于按需调用 GET /api/v1/system/readiness，' +
+      '不会在进程启动时自动运行。超时或失败的探测不得报就绪。',
+    examples: [
+      'READINESS_CHECK_TIMEOUT_SECONDS=1.0',
+      'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
+    ],
+  },
+
+
   'settings.system.portfolio_health': {
     title: '投资组合健康度公式',
     summary: '配置健康度的固定分母权重和预警阈值。',

@@ -2029,6 +2029,19 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
   },
 
+  'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
+    title: 'Readiness Check Timeout',
+    summary: 'Per-check timeout for the structured readiness/self-check report.',
+    usage:
+      'Default 1.0s (clamped to 0.1–5.0). Applies to on-demand GET /api/v1/system/readiness only; ' +
+      'never runs automatically at process startup. Timed-out or failed probes are never reported as ready.',
+    examples: [
+      'READINESS_CHECK_TIMEOUT_SECONDS=1.0',
+      'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
+    ],
+  },
+
+
   'settings.system.portfolio_health': {
     title: 'Portfolio Health Formula',
     summary: 'Controls the fixed-denominator health-score weights and alert thresholds.',

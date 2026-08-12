@@ -21,6 +21,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
 )
 from src.config_parts.domain_facade import (
     install_flat_domain_facade,
@@ -368,6 +369,8 @@ class Config:
 
     # System Configuration
     max_workers: int = 3  # Low concurrency anti-ban
+    # Per-check timeout for structured readiness/self-check (on-demand only; never auto-run at startup).
+    readiness_check_timeout_seconds: float = READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT
     debug: bool = False
     http_proxy: Optional[str] = None  # HTTP Proxy (e.g., http://127.0.0.1:10809)
     https_proxy: Optional[str] = None # HTTPS Proxy
