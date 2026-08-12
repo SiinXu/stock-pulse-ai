@@ -32,7 +32,6 @@ export function buildModelSelectorOptions(
     };
   });
 }
-
 export function buildAvailableModelRefSet(availableModels: AvailableModelEntry[]): Set<string> {
   return new Set(availableModels.map((entry) => entry.modelRef || entry.route));
 }
@@ -99,4 +98,3 @@ export function filterAssignableAvailableModels(
     return !failed.has(connectionLabel);
   });
 }
-

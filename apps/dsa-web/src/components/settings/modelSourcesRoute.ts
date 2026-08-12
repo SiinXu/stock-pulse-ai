@@ -193,4 +193,3 @@ export function resolveModelSourceSetupRestore(
   }
   return { kind: 'cloud_add' };
 }
-
