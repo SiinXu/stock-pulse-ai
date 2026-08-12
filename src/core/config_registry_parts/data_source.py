@@ -1135,6 +1135,65 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
     },
+    "INFO_QUALITY_GRADING_ENABLED": {
+        "title": "Information Quality Grading",
+        "description": (
+            "Derive A/B/C information quality grades from the existing data "
+            "validation evidence and AnalysisContextPack block statuses "
+            "(source reliability, timeliness, consistency). Grade C blocks "
+            "evidence-free Pass conclusions. Default true."
+        ),
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 98,
+        "help_key": "settings.data_source.INFO_QUALITY_GRADING_ENABLED",
+        "examples": [
+            "INFO_QUALITY_GRADING_ENABLED=true",
+            "INFO_QUALITY_GRADING_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Information quality grading",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/info-quality-grading.md",
+            },
+        ],
+    },
+    "FORCED_CONCLUSION_ENABLED": {
+        "title": "Forced Conclusion Structure",
+        "description": (
+            "Require reports and DecisionSignal metadata to include an explicit "
+            "Pass / Fail / Watch forced conclusion constrained by information "
+            "quality. Default true."
+        ),
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 99,
+        "help_key": "settings.data_source.FORCED_CONCLUSION_ENABLED",
+        "examples": [
+            "FORCED_CONCLUSION_ENABLED=true",
+            "FORCED_CONCLUSION_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Information quality grading",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/info-quality-grading.md",
+            },
+        ],
+    },
     "DATA_VALIDATION_STRICT": {
         "title": "Data Validation Strict Mode",
         "description": (

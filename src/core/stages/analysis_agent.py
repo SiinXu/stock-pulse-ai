@@ -475,6 +475,16 @@ class _AgentAnalysisStageMixin:
                         code,
                         market_context_adjustments,
                     )
+                info_quality_adjustments = self._apply_info_quality_constraints(
+                    result,
+                    analysis_context_pack_overview=analysis_context_pack_overview,
+                )
+                if info_quality_adjustments:
+                    logger.info(
+                        "[info_quality] Applied agent constraints for %s: %s",
+                        code,
+                        info_quality_adjustments,
+                    )
                 if isinstance(fundamental_context, dict):
                     result.fundamental_context = fundamental_context
                 if isinstance(market_structure_context, dict):
@@ -545,6 +555,12 @@ class _AgentAnalysisStageMixin:
                     explicit_action=final_gate.final_action,
                     use_existing_action=False,
                     align_with_score=False,
+                )
+                # Refresh forced conclusion after Risk Manager final action.
+                self._apply_info_quality_constraints(
+                    result,
+                    analysis_context_pack_overview=analysis_context_pack_overview,
+                    enforce_action_downgrade=False,
                 )
 
                 if getattr(self.config, "agent_multi_strategy_deliberation", False):

@@ -206,12 +206,48 @@ def _sanitize_data_quality(value: Any) -> Optional[Dict[str, Any]]:
         if isinstance(metadata, Mapping)
         else None
     )
-    return {
+    info_quality = None
+    if isinstance(metadata, Mapping):
+        raw_info = metadata.get("info_quality")
+        if isinstance(raw_info, Mapping):
+            info_quality = _sanitize_info_quality(raw_info)
+        elif metadata.get("info_quality_grade") is not None:
+            info_quality = _sanitize_info_quality(
+                {"grade": metadata.get("info_quality_grade")}
+            )
+    payload: Dict[str, Any] = {
         "overall_score": _safe_score(value.get("overall_score")),
         "level": _safe_quality_level(value.get("level")),
         "block_scores": _safe_block_scores(value.get("block_scores")),
         "limitations": _list_strings(value.get("limitations"), limit=5),
         "validation_evidence": _sanitize_validation_evidence(evidence),
+    }
+    if info_quality is not None:
+        payload["info_quality"] = info_quality
+        payload["info_quality_grade"] = info_quality.get("grade")
+    return payload
+
+
+def _sanitize_info_quality(value: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(value, Mapping):
+        return None
+    grade = _safe_text(value.get("grade")).upper()
+    if grade not in {"A", "B", "C"}:
+        return None
+    dimensions_raw = value.get("dimensions")
+    dimensions: Dict[str, str] = {}
+    if isinstance(dimensions_raw, Mapping):
+        for key in ("source_reliability", "timeliness", "consistency"):
+            dim = _safe_text(dimensions_raw.get(key)).upper()
+            if dim in {"A", "B", "C"}:
+                dimensions[key] = dim
+    return {
+        "schema_version": "info-quality-v1",
+        "grade": grade,
+        "dimensions": dimensions,
+        "evidence_backed": value.get("evidence_backed") is True,
+        "reasons": _list_strings(value.get("reasons"), limit=8),
+        "source": _safe_text(value.get("source")) or None,
     }
 
 

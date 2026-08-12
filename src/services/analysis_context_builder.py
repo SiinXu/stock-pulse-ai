@@ -666,17 +666,52 @@ def _build_data_quality(
         weighted_sum += score * weight
 
     overall_score = int(round(weighted_sum / 100))
-    return DataQuality(
+    limitations = _quality_limitations(blocks)
+    quality = DataQuality(
         overall_score=overall_score,
         level=_quality_level(overall_score),
         block_scores=block_scores,
-        limitations=_quality_limitations(blocks),
+        limitations=limitations,
         warnings=warnings,
         metadata={
             "validation_evidence_schema": "data_quality_evidence.v1",
             "validation_evidence": list(validation_evidence or [])[:24],
         },
     )
+    # Issue #123: derive A/B/C from validation-backed quality artifacts only.
+    try:
+        from src.services.info_quality_grading import grade_info_quality
+
+        block_status_map = {
+            key: {
+                "status": (
+                    block.status.value
+                    if isinstance(block.status, ContextFieldStatus)
+                    else str(block.status)
+                )
+            }
+            for key, block in blocks.items()
+        }
+        info_quality = grade_info_quality(
+            {
+                "overall_score": quality.overall_score,
+                "level": quality.level,
+                "block_scores": quality.block_scores,
+                "limitations": quality.limitations,
+                "warnings": quality.warnings,
+                "metadata": quality.metadata,
+            },
+            blocks=block_status_map,
+        )
+        quality.metadata = {
+            **quality.metadata,
+            "info_quality_schema": info_quality.get("schema_version"),
+            "info_quality_grade": info_quality.get("grade"),
+            "info_quality": info_quality,
+        }
+    except Exception:  # broad-exception: optional_metadata - Grading is additive.
+        pass
+    return quality
 
 
 def _validation_evidence_from_metadata(

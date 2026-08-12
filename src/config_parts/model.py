@@ -93,6 +93,9 @@ class Config:
     data_validation_fund_pb_suspect_abs: float = 50.0
     # Multi-provider relative divergence threshold (WARN with attribution).
     data_validation_cross_source_rel_threshold: float = 0.05
+    # Issue #123: information quality grade + forced conclusion (Pass/Fail/Watch).
+    info_quality_grading_enabled: bool = True
+    forced_conclusion_enabled: bool = True
     plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===

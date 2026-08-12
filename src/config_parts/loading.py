@@ -720,6 +720,14 @@ class _ConfigLoadingMethods:
                 minimum=0.0001,
                 maximum=1.0,
             ),
+            info_quality_grading_enabled=parse_env_bool(
+                os.getenv('INFO_QUALITY_GRADING_ENABLED'),
+                default=True,
+            ),
+            forced_conclusion_enabled=parse_env_bool(
+                os.getenv('FORCED_CONCLUSION_ENABLED'),
+                default=True,
+            ),
             plugin_data_provider_auto_bind_enabled=parse_env_bool(
                 os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
                 default=False,

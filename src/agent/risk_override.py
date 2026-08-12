@@ -592,6 +592,26 @@ def build_risk_context_for_exit(
         except ValueError:
             ctx.set_data("risk_evidence_invalid", True)
 
+    # Issue #123: grade C is deterministic risk evidence (consumes dashboard info_quality).
+    info_quality = (
+        dashboard.get("info_quality") if isinstance(dashboard, Mapping) else None
+    )
+    grade = ""
+    if isinstance(info_quality, Mapping):
+        grade = str(info_quality.get("grade") or "").strip().upper()
+    if grade == "C":
+        ctx.set_data("info_quality_grade", "C")
+        ctx.add_risk_flag(
+            "info_quality",
+            "information quality grade C",
+            severity="high",
+        )
+        raw = dict(raw)
+        if "signal_adjustment" not in raw:
+            raw["signal_adjustment"] = "buy_to_hold"
+        if "risk_level" not in raw:
+            raw["risk_level"] = "high"
+
     if raw or risk_signal not in {"", "hold"}:
         ctx.add_opinion(AgentOpinion(
             agent_name="risk",
@@ -891,6 +911,9 @@ def _collect_gate_evidence(
     if plan.risk_level_high:
         codes.append("high_risk_evidence")
         reasons.append("high_risk_evidence")
+    if str(ctx.get_data("info_quality_grade") or "").strip().upper() == "C":
+        codes.append("info_quality_grade_c")
+        reasons.append("info_quality_grade_c")
 
     thresholds = _PORTFOLIO_RISK_THRESHOLDS[profile]
     exposure, exposure_invalid = _unit_interval_fact(ctx, "portfolio_exposure")

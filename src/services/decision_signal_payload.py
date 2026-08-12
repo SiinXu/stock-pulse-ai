@@ -171,6 +171,25 @@ def build_decision_signal_payload_from_report(
     if market_structure_summary:
         metadata.update(market_structure_summary)
     metadata["holding_state"] = _extract_holding_state(portfolio_context)
+    info_quality = _extract_info_quality(dashboard, context_snapshot, result)
+    if info_quality:
+        metadata["info_quality"] = info_quality
+        metadata["info_quality_grade"] = info_quality.get("grade")
+        metadata["data_quality_level"] = _grade_to_data_quality_level(
+            info_quality.get("grade")
+        )
+    forced_conclusion = _extract_forced_conclusion(dashboard)
+    if forced_conclusion:
+        metadata["forced_conclusion"] = forced_conclusion
+        metadata["forced_conclusion_stance"] = forced_conclusion.get("stance")
+
+    data_quality_summary = _extract_data_quality(context_snapshot, result)
+    if isinstance(data_quality_summary, dict) and info_quality:
+        data_quality_summary = {
+            **data_quality_summary,
+            "info_quality": info_quality,
+            "info_quality_grade": info_quality.get("grade"),
+        }
 
     payload: Dict[str, Any] = {
         "stock_code": raw_code,
@@ -199,7 +218,7 @@ def build_decision_signal_payload_from_report(
         "catalyst_summary": _catalyst_summary(dashboard),
         "watch_conditions": _watch_conditions(dashboard),
         "evidence": _evidence(result, sniper_points),
-        "data_quality_summary": _extract_data_quality(context_snapshot, result),
+        "data_quality_summary": data_quality_summary,
         "metadata": metadata,
         "report_language": getattr(result, "report_language", None),
     }
@@ -404,6 +423,60 @@ def _extract_data_quality(context_snapshot: Optional[Mapping[str, Any]], result:
     if snapshot_quality:
         return snapshot_quality
     return _as_mapping(getattr(result, "analysis_context_pack_overview", None)).get("data_quality")
+
+
+def _extract_info_quality(
+    dashboard: Mapping[str, Any],
+    context_snapshot: Optional[Mapping[str, Any]],
+    result: AnalysisResult,
+) -> Optional[Dict[str, Any]]:
+    for candidate in (
+        dashboard.get("info_quality"),
+        _as_mapping(_extract_data_quality(context_snapshot, result)).get("info_quality"),
+        _as_mapping(
+            _as_mapping(_extract_data_quality(context_snapshot, result)).get("metadata")
+        ).get("info_quality"),
+    ):
+        payload = _as_mapping(candidate)
+        grade = str(payload.get("grade") or "").strip().upper()
+        if grade in {"A", "B", "C"}:
+            return {
+                "schema_version": str(payload.get("schema_version") or "info-quality-v1"),
+                "grade": grade,
+                "dimensions": _as_mapping(payload.get("dimensions")) or None,
+                "evidence_backed": payload.get("evidence_backed") is True,
+                "reasons": payload.get("reasons") if isinstance(payload.get("reasons"), list) else None,
+            }
+    return None
+
+
+def _extract_forced_conclusion(dashboard: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+    payload = _as_mapping(dashboard.get("forced_conclusion"))
+    stance = str(payload.get("stance") or "").strip()
+    if stance not in {"Pass", "Fail", "Watch"}:
+        return None
+    return {
+        "schema_version": str(payload.get("schema_version") or "forced-conclusion-v1"),
+        "stance": stance,
+        "uncertainty": payload.get("uncertainty") is True,
+        "evidence_backed": payload.get("evidence_backed") is True,
+        "info_quality_grade": str(payload.get("info_quality_grade") or "").strip().upper() or None,
+        "constraint_reasons": payload.get("constraint_reasons")
+        if isinstance(payload.get("constraint_reasons"), list)
+        else None,
+        "summary": _first_text(payload.get("summary")),
+    }
+
+
+def _grade_to_data_quality_level(grade: Any) -> Optional[str]:
+    text = str(grade or "").strip().upper()
+    if text == "A":
+        return "high"
+    if text == "B":
+        return "medium"
+    if text == "C":
+        return "poor"
+    return None
 
 
 def _extract_holding_state(portfolio_context: Optional[Mapping[str, Any]]) -> str:

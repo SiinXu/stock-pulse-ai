@@ -305,6 +305,10 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
                 line += f"（{level_text}）"
         lines.append(line)
 
+    grade_line = _info_quality_grade_line(data_quality, lang=lang)
+    if grade_line:
+        lines.append(grade_line)
+
     limitations = _localized_limitations(
         _list_strings(data_quality.get("limitations")),
         lang=lang,
@@ -315,6 +319,7 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
         lines.append(f"- {label}{separator}{_join_text(limitations, lang=lang)}")
 
     lines.extend(_phase_data_quality_constraint_lines(payload, lang=lang))
+    lines.extend(_info_quality_constraint_lines(data_quality, lang=lang))
 
     if _has_core_degraded_block(payload):
         if lang == "en":
@@ -339,6 +344,10 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
             "from this summary; do not reproduce raw payloads, news body text, "
             "raw trend values, secrets, tokens, or webhooks."
         )
+        lines.append(
+            "- Fact rule: never invent prices, fundamentals, or news facts absent "
+            "from available evidence; mark unsupported conclusions as uncertain Watch."
+        )
     else:
         lines.append(
             "- 分析规则：辅助数据块缺失只限制对应分析段落，不要把缺失本身解释为利好或利空。"
@@ -347,7 +356,72 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
             "- 安全规则：只使用本摘要中的 status、source、warnings 和 missing_reason；"
             "不要复述 raw payload、新闻正文、趋势原始值、secret、token 或 webhook。"
         )
+        lines.append(
+            "- 事实规则：不得编造证据中不存在的价格、基本面或新闻事实；"
+            "无证据支撑的结论必须标为不确定的 Watch，不得冒充事实。"
+        )
     return lines
+
+
+def _info_quality_grade_line(data_quality: Mapping[str, Any], *, lang: str) -> str:
+    grade = _safe_text(
+        data_quality.get("info_quality_grade")
+        or _nested(data_quality, "info_quality", "grade")
+        or _nested(data_quality, "metadata", "info_quality_grade")
+    ).upper()
+    if grade not in {"A", "B", "C"}:
+        return ""
+    dimensions = _nested(data_quality, "info_quality", "dimensions")
+    if not isinstance(dimensions, Mapping):
+        dimensions = _nested(data_quality, "metadata", "info_quality", "dimensions")
+    dim_parts: List[str] = []
+    if isinstance(dimensions, Mapping):
+        for key in ("source_reliability", "timeliness", "consistency"):
+            value = _safe_text(dimensions.get(key)).upper()
+            if value in {"A", "B", "C"}:
+                dim_parts.append(f"{key}={value}")
+    if lang == "en":
+        line = f"- Information quality grade: {grade}"
+        if dim_parts:
+            line += f" ({', '.join(dim_parts)})"
+        return line
+    line = f"- 信息质量等级：{grade}"
+    if dim_parts:
+        line += f"（{', '.join(dim_parts)}）"
+    return line
+
+
+def _info_quality_constraint_lines(
+    data_quality: Mapping[str, Any],
+    *,
+    lang: str,
+) -> List[str]:
+    grade = _safe_text(
+        data_quality.get("info_quality_grade")
+        or _nested(data_quality, "info_quality", "grade")
+        or _nested(data_quality, "metadata", "info_quality_grade")
+    ).upper()
+    if grade not in {"B", "C"}:
+        return []
+    if lang == "en":
+        if grade == "C":
+            return [
+                "- Information quality rule: grade C forbids Pass conclusions and "
+                "requires Watch wording with explicit uncertainty; do not present "
+                "low-quality evidence as verified fact."
+            ]
+        return [
+            "- Information quality rule: grade B requires cautious wording and "
+            "must not claim high confidence without stronger evidence."
+        ]
+    if grade == "C":
+        return [
+            "- 信息质量规则：等级 C 禁止 Pass 结论，必须使用 Watch 表述并明确不确定；"
+            "不得把低质量证据写成已证实事实。"
+        ]
+    return [
+        "- 信息质量规则：等级 B 必须谨慎表述，证据不足时不得给出高置信结论。"
+    ]
 
 
 def _localized_limitations(limitations: List[str], *, lang: str) -> List[str]:

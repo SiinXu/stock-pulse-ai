@@ -636,6 +636,28 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls when cross-source WARN evidence is written to run diagnostics.'],
     notes: ['Comparison is observational and fail-open on comparison errors.'],
   },
+  'settings.data_source.INFO_QUALITY_GRADING_ENABLED': {
+    title: 'Information Quality Grading',
+    summary: 'Derive A/B/C grades from validation evidence and context-pack block statuses.',
+    usage: 'Enabled by default. Disable only to hide grades and skip grade-driven conclusion constraints.',
+    valueNotes: [
+      'Grades consume data_quality_evidence.v1; they do not re-run provider validators.',
+      'Dimensions are source reliability, timeliness, and consistency.',
+    ],
+    impact: ['Surfaces grade on reports, DecisionSignal metadata, and prompt constraints.'],
+    notes: ['See docs/info-quality-grading.md. Complements DATA_VALIDATION_* rather than replacing it.'],
+  },
+  'settings.data_source.FORCED_CONCLUSION_ENABLED': {
+    title: 'Forced Conclusion Structure',
+    summary: 'Require an explicit Pass / Fail / Watch conclusion constrained by information quality.',
+    usage: 'Enabled by default. Disable only when you need the legacy free-form conclusion surface alone.',
+    valueNotes: [
+      'Pass maps to buy/add, Fail to sell/reduce/avoid, Watch to hold/watch/alert.',
+      'Grade C blocks evidence-free Pass conclusions and marks uncertainty.',
+    ],
+    impact: ['Writes forced_conclusion into the report dashboard and DecisionSignal metadata.'],
+    notes: ['Aligns with analysis quality-gate direction: no invented facts without evidence.'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
     summary: 'Sends analysis reports to a Feishu group through a custom bot webhook.',
