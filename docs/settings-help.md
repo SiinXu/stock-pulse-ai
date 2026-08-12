@@ -112,3 +112,8 @@ python scripts/check_config_doc_consistency.py
 - runtime scheduler 的 run-now API 仅在本 API 进程已挂载且启用遗留批处理、并且没有分析任务运行时接受请求；否则会返回稳定的未挂载、未启用、状态不可用或忙碌原因。
 - scheduler status 返回本进程的挂载状态、进程模式、调度时区和 run-now 可用性。时间戳带明确偏移；Web 不得借用浏览器时区补写服务端缺失的时区。
 - 每次被接受的 run-now 都有 `run_id`，状态接口会用同一 ID 报告运行中及最终成功/失败；旧版服务端缺少关联字段时，Web 必须显示结果无法确认，不能把空闲误报为成功。
+
+## 非设置页教育说明（Issue #201）
+
+风险等级、风险门裁决、组合结构健康与常用技术指标（MA / MACD / RSI）的平实解释复用同一套 `settingsHelp` 库存与 `getSettingsHelpContent` 解析路径，key 以 `education.*` 为前缀。Web 通过通用 `HelpKeyButton` 在真实展示点提供就地入口；不要在组件内散落硬编码正文。英文镜像见 `docs/settings-help_EN.md` 若存在对应段落，否则本段为中文维护说明。
+

@@ -31,7 +31,9 @@ import {
   ALERT_TARGET_SCOPE_OPTIONS,
   ALERT_THRESHOLD_DIRECTION_OPTIONS,
 } from '../../locales/alerts';
+import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
 import { validateStockCode } from '../../utils/validation';
+import { HelpKeyButton } from '../help';
 import {
   ALERT_COOLDOWN_SECONDS_KEY,
   DEFAULT_ALERT_COOLDOWN_SECONDS,
@@ -724,110 +726,137 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
         ) : null}
 
         {alertType === 'ma_price_cross' ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select
-              label={text.maDirection}
-              value={thresholdDirection}
-              options={ALERT_THRESHOLD_DIRECTION_OPTIONS[language]}
-              disabled={isSubmitting}
-              onChange={(value) => setThresholdDirection(value as 'above' | 'below')}
-            />
-            <Input
-              id="alert-ma-window"
-              label={text.maWindow}
-              type="number"
-              min="2"
-              max="250"
-              step="1"
-              value={window}
-              error={fieldErrors['alert-ma-window']}
-              onChange={(event) => setWindow(event.target.value)}
-              disabled={isSubmitting}
-            />
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1 text-xs text-muted-text">
+              <span>MA</span>
+              <HelpKeyButton
+                helpKey={EDUCATION_HELP_KEYS.indicatorMa}
+                data-testid="alert-ma-help"
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select
+                label={text.maDirection}
+                value={thresholdDirection}
+                options={ALERT_THRESHOLD_DIRECTION_OPTIONS[language]}
+                disabled={isSubmitting}
+                onChange={(value) => setThresholdDirection(value as 'above' | 'below')}
+              />
+              <Input
+                id="alert-ma-window"
+                label={text.maWindow}
+                type="number"
+                min="2"
+                max="250"
+                step="1"
+                value={window}
+                error={fieldErrors['alert-ma-window']}
+                onChange={(event) => setWindow(event.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
         ) : null}
 
         {alertType === 'rsi_threshold' ? (
-          <div className="grid gap-4 md:grid-cols-3">
-            <Select
-              label={text.thresholdDirection}
-              value={thresholdDirection}
-              options={ALERT_THRESHOLD_DIRECTION_OPTIONS[language]}
-              disabled={isSubmitting}
-              onChange={(value) => setThresholdDirection(value as 'above' | 'below')}
-            />
-            <Input
-              id="alert-rsi-period"
-              label={text.rsiPeriod}
-              type="number"
-              min="2"
-              max="250"
-              step="1"
-              value={period}
-              error={fieldErrors['alert-rsi-period']}
-              onChange={(event) => setPeriod(event.target.value)}
-              disabled={isSubmitting}
-            />
-            <Input
-              id="alert-rsi-threshold"
-              label={text.rsiThreshold}
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={threshold}
-              error={fieldErrors['alert-rsi-threshold']}
-              onChange={(event) => setThreshold(event.target.value)}
-              disabled={isSubmitting}
-            />
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1 text-xs text-muted-text">
+              <span>RSI</span>
+              <HelpKeyButton
+                helpKey={EDUCATION_HELP_KEYS.indicatorRsi}
+                data-testid="alert-rsi-help"
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Select
+                label={text.thresholdDirection}
+                value={thresholdDirection}
+                options={ALERT_THRESHOLD_DIRECTION_OPTIONS[language]}
+                disabled={isSubmitting}
+                onChange={(value) => setThresholdDirection(value as 'above' | 'below')}
+              />
+              <Input
+                id="alert-rsi-period"
+                label={text.rsiPeriod}
+                type="number"
+                min="2"
+                max="250"
+                step="1"
+                value={period}
+                error={fieldErrors['alert-rsi-period']}
+                onChange={(event) => setPeriod(event.target.value)}
+                disabled={isSubmitting}
+              />
+              <Input
+                id="alert-rsi-threshold"
+                label={text.rsiThreshold}
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={threshold}
+                error={fieldErrors['alert-rsi-threshold']}
+                onChange={(event) => setThreshold(event.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
         ) : null}
 
         {alertType === 'macd_cross' ? (
-          <div className="grid gap-4 md:grid-cols-4">
-            <Select
-              label={text.crossDirection}
-              value={crossDirection}
-              options={ALERT_CROSS_DIRECTION_OPTIONS[language]}
-              disabled={isSubmitting}
-              onChange={(value) => setCrossDirection(value as 'bullish_cross' | 'bearish_cross')}
-            />
-            <Input
-              id="alert-fast-period"
-              label={text.fastPeriod}
-              type="number"
-              min="2"
-              max="250"
-              step="1"
-              value={fastPeriod}
-              error={fieldErrors['alert-fast-period']}
-              onChange={(event) => setFastPeriod(event.target.value)}
-              disabled={isSubmitting}
-            />
-            <Input
-              id="alert-slow-period"
-              label={text.slowPeriod}
-              type="number"
-              min="2"
-              max="250"
-              step="1"
-              value={slowPeriod}
-              error={fieldErrors['alert-slow-period']}
-              onChange={(event) => setSlowPeriod(event.target.value)}
-              disabled={isSubmitting}
-            />
-            <Input
-              id="alert-signal-period"
-              label={text.signalPeriod}
-              type="number"
-              min="2"
-              max="250"
-              step="1"
-              value={signalPeriod}
-              error={fieldErrors['alert-signal-period']}
-              onChange={(event) => setSignalPeriod(event.target.value)}
-              disabled={isSubmitting}
-            />
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1 text-xs text-muted-text">
+              <span>MACD</span>
+              <HelpKeyButton
+                helpKey={EDUCATION_HELP_KEYS.indicatorMacd}
+                data-testid="alert-macd-help"
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              <Select
+                label={text.crossDirection}
+                value={crossDirection}
+                options={ALERT_CROSS_DIRECTION_OPTIONS[language]}
+                disabled={isSubmitting}
+                onChange={(value) => setCrossDirection(value as 'bullish_cross' | 'bearish_cross')}
+              />
+              <Input
+                id="alert-fast-period"
+                label={text.fastPeriod}
+                type="number"
+                min="2"
+                max="250"
+                step="1"
+                value={fastPeriod}
+                error={fieldErrors['alert-fast-period']}
+                onChange={(event) => setFastPeriod(event.target.value)}
+                disabled={isSubmitting}
+              />
+              <Input
+                id="alert-slow-period"
+                label={text.slowPeriod}
+                type="number"
+                min="2"
+                max="250"
+                step="1"
+                value={slowPeriod}
+                error={fieldErrors['alert-slow-period']}
+                onChange={(event) => setSlowPeriod(event.target.value)}
+                disabled={isSubmitting}
+              />
+              <Input
+                id="alert-signal-period"
+                label={text.signalPeriod}
+                type="number"
+                min="2"
+                max="250"
+                step="1"
+                value={signalPeriod}
+                error={fieldErrors['alert-signal-period']}
+                onChange={(event) => setSignalPeriod(event.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
         ) : null}
 
