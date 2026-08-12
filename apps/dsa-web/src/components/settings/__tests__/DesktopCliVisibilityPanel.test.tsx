@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  assertDesktopCliGuidancePathSafe,
-  DesktopCliVisibilityPanel,
-} from '../DesktopCliVisibilityPanel';
+import { assertDesktopCliGuidancePathSafe } from '../desktopCliGuidance';
+import { DesktopCliVisibilityPanel } from '../DesktopCliVisibilityPanel';
 
 describe('DesktopCliVisibilityPanel', () => {
   beforeEach(() => {
