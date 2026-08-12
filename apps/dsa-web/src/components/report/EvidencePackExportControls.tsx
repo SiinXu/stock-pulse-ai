@@ -21,7 +21,7 @@ function isExportDisabledError(code: string | undefined): boolean {
   return code === 'audit_export_disabled' || code === 'evidence_chain_disabled';
 }
 
-export const EvidencePackExportControls: React.FC<EvidencePackExportControlsProps> = ({
+const EvidencePackExportControls: React.FC<EvidencePackExportControlsProps> = ({
   recordId, className, disabled = false,
 }) => {
   const { language: uiLanguage } = useUiLanguage();

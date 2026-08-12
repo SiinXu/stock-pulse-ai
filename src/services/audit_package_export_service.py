@@ -34,6 +34,9 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 SCHEMA_VERSION = AUDIT_PACKAGE_SCHEMA_VERSION
+MAX_AUDIT_PACKAGE_UNCOMPRESSED_BYTES = 5_000_000
+MAX_RAW_INTERMEDIATES_BYTES = 2_000_000
+AUDIT_MANIFEST_RESERVE_BYTES = 64_000
 
 
 class AuditPackageExportDisabled(RuntimeError):
@@ -55,6 +58,7 @@ class AuditPackageExportResult:
     zip_bytes: bytes
     manifest: Dict[str, Any]
     evidence_chain: Dict[str, Any]
+    artifact_payloads: Dict[str, Any]
     truncated: bool
     schema_version: str = SCHEMA_VERSION
     resolved_record_id: Optional[str] = None
@@ -65,6 +69,7 @@ class AuditPackageExportResult:
             "schema_version": self.schema_version,
             "manifest": self.manifest,
             "evidence_chain": self.evidence_chain,
+            "artifacts": self.artifact_payloads,
             "truncated": self.truncated,
         }
 
@@ -75,7 +80,7 @@ def _resolve_runtime_config(config: Any = None) -> Any:
     try:
         from src.application_services import get_application_services
         return get_application_services().config
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Config lookup failure is logged before the feature fails closed.
         log_safe_exception(logger, "Audit package export config lookup failed", exc,
                            error_code="audit_export_config_lookup_failed", level=logging.DEBUG)
         return None
@@ -237,7 +242,7 @@ class AuditPackageExportService:
                 report_bytes = str(redacted if isinstance(redacted, str) else combined).encode("utf-8")
             else:
                 report_missing_reason = "markdown report could not be generated"
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional report failure is logged and represented as a missing artifact.
             log_safe_exception(logger, "Audit package report markdown generation failed", exc,
                                error_code="audit_package_report_failed",
                                context={"record_id": record_id}, level=logging.WARNING)
@@ -276,7 +281,7 @@ class AuditPackageExportService:
             )
             reasoning_schema = trace.schema_version
             reasoning_bytes = _json_bytes(trace.package)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional trace failure is logged and represented as a missing artifact.
             log_safe_exception(logger, "Audit package reasoning-trace embed failed", exc,
                                error_code="audit_package_reasoning_trace_failed",
                                context={"record_id": record_id}, level=logging.WARNING)
@@ -308,6 +313,68 @@ class AuditPackageExportService:
             if not include_raw else None
         )
 
+        required_bytes = len(evidence_json_bytes) + len(evidence_md_bytes) + len(gaps_bytes)
+        remaining_bytes = (
+            MAX_AUDIT_PACKAGE_UNCOMPRESSED_BYTES
+            - AUDIT_MANIFEST_RESERVE_BYTES
+            - required_bytes
+        )
+        if remaining_bytes < 0:
+            raise ValueError("required audit artifacts exceed the package byte budget")
+        budget_truncated = False
+
+        def admit_optional(data: Optional[bytes], missing_reason: Optional[str], name: str):
+            nonlocal remaining_bytes, budget_truncated
+            if data is None:
+                return None, missing_reason
+            if len(data) > remaining_bytes:
+                budget_truncated = True
+                return None, (
+                    f"{name} omitted because the redacted artifact exceeds the "
+                    "audit package byte budget"
+                )
+            remaining_bytes -= len(data)
+            return data, missing_reason
+
+        # Preserve the decision card before larger optional companions. Every
+        # omission remains explicit in both the manifest and ZIP/JSON package.
+        decision_bytes, decision_missing = admit_optional(
+            decision_bytes, decision_missing, "decision_signal.json"
+        )
+        report_bytes, report_missing_reason = admit_optional(
+            report_bytes, report_missing_reason, "report.md"
+        )
+        reasoning_bytes, reasoning_missing_reason = admit_optional(
+            reasoning_bytes, reasoning_missing_reason, "reasoning_trace.json"
+        )
+
+        raw_entries = []
+        if include_raw:
+            raw_candidates = []
+            for raw_name, raw_value in (
+                ("raw_intermediates/context_snapshot.json", context_snapshot),
+                ("raw_intermediates/raw_result.json", raw_result),
+            ):
+                if isinstance(raw_value, Mapping):
+                    raw_candidates.append(
+                        (raw_name, _json_bytes(redact_export_payload(dict(raw_value))))
+                    )
+                else:
+                    raw_candidates.append((raw_name, None))
+            raw_size = sum(len(data) for _, data in raw_candidates if data is not None)
+            raw_over_budget = raw_size > MAX_RAW_INTERMEDIATES_BYTES
+            if raw_over_budget:
+                budget_truncated = True
+            for raw_name, raw_data in raw_candidates:
+                missing = None
+                if raw_data is None:
+                    missing = "persisted raw intermediate was not present"
+                elif raw_over_budget:
+                    raw_data = None
+                    missing = "redacted raw intermediates exceed the raw-artifact byte budget"
+                raw_data, missing = admit_optional(raw_data, missing, raw_name)
+                raw_entries.append((raw_name, raw_data, missing))
+
         artifacts = [
             _artifact(name="report.md", content_type="text/markdown; charset=utf-8",
                       data=report_bytes, status="present" if report_bytes else "missing",
@@ -321,21 +388,36 @@ class AuditPackageExportService:
                       data=decision_bytes, status="present" if decision_bytes else "missing",
                       missing_reason=decision_missing),
             _artifact(name="gaps.json", content_type="application/json", data=gaps_bytes),
-            AuditPackageArtifact(
+        ]
+        if include_raw:
+            artifacts.extend(
+                _artifact(
+                    name=name,
+                    content_type="application/json",
+                    data=data,
+                    status="present" if data is not None else "missing",
+                    missing_reason=missing,
+                )
+                for name, data, missing in raw_entries
+            )
+        else:
+            artifacts.append(AuditPackageArtifact(
                 name="raw_intermediates/", content_type="application/octet-stream",
                 status="skipped", missing_reason=raw_missing_reason,
                 byte_length=None, sha256=None,
-            ),
-        ]
+            ))
 
         run_model = EvidenceChainRun.model_validate(chain_run)
         manifest = AuditPackageManifest(
             schema_version=SCHEMA_VERSION, run=run_model, artifacts=artifacts,
             evidence_chain_schema="evidence-chain-v1",
-            reasoning_trace_schema=reasoning_schema, redacted=True,
+            reasoning_trace_schema=reasoning_schema if reasoning_bytes is not None else None,
+            redacted=True,
             include_raw_artifacts=include_raw,
+            truncated=bool(evidence_chain.get("truncated")) or budget_truncated,
             notes="Redacted auditable package. Sensitive values are scrubbed. "
-                  "Artifacts with status=missing or skipped are listed explicitly.",
+                  "Artifacts with status=missing or skipped are listed explicitly. "
+                  "Uncompressed artifact content is bounded to 5,000,000 bytes.",
         )
         manifest_dict = redact_export_payload(manifest.model_dump(mode="json"))
         if not isinstance(manifest_dict, dict):
@@ -366,12 +448,51 @@ class AuditPackageExportService:
             if not include_raw:
                 zf.writestr("raw_intermediates/SKIPPED.txt",
                             (raw_missing_reason or "skipped").encode("utf-8"))
+            else:
+                for raw_name, raw_data, raw_reason in raw_entries:
+                    if raw_data is not None:
+                        zf.writestr(raw_name, raw_data)
+                    else:
+                        marker_name = raw_name.removesuffix(".json") + ".MISSING.txt"
+                        zf.writestr(marker_name, (raw_reason or "missing").encode("utf-8"))
+
+        artifact_payloads = {
+            "evidence_chain.json": {"$ref": "evidence_chain"},
+            "evidence_chain.md": evidence_md_bytes.decode("utf-8"),
+            "gaps.json": gaps_payload,
+            "report.md": (
+                report_bytes.decode("utf-8") if report_bytes is not None
+                else {"status": "missing", "reason": report_missing_reason}
+            ),
+            "reasoning_trace.json": (
+                json.loads(reasoning_bytes) if reasoning_bytes is not None
+                else {"status": "missing", "reason": reasoning_missing_reason}
+            ),
+            "decision_signal.json": (
+                json.loads(decision_bytes) if decision_bytes is not None
+                else {"status": "missing", "reason": decision_missing}
+            ),
+        }
+        if include_raw:
+            artifact_payloads.update({
+                name: (
+                    json.loads(data) if data is not None
+                    else {"status": "missing", "reason": missing}
+                )
+                for name, data, missing in raw_entries
+            })
+        else:
+            artifact_payloads["raw_intermediates/"] = {
+                "status": "skipped",
+                "reason": raw_missing_reason,
+            }
 
         return AuditPackageExportResult(
             zip_bytes=buf.getvalue(),
             manifest=manifest_dict,
             evidence_chain=evidence_chain,
-            truncated=bool(evidence_chain.get("truncated")),
+            artifact_payloads=artifact_payloads,
+            truncated=bool(evidence_chain.get("truncated")) or budget_truncated,
             schema_version=SCHEMA_VERSION,
             resolved_record_id=str(resolved_record_id) if resolved_record_id else selected_record_id,
             lookup_mode=str(lookup_mode) if lookup_mode else None,

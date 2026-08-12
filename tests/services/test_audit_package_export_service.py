@@ -110,3 +110,70 @@ def test_json_envelope_shape():
     envelope = result.to_json_envelope()
     assert envelope["schema_version"] == "audit-package-v1"
     assert envelope["evidence_chain"]["schema_version"] == "evidence-chain-v1"
+    assert envelope["artifacts"]["evidence_chain.json"] == {"$ref": "evidence_chain"}
+    assert isinstance(envelope["artifacts"]["report.md"], str)
+    assert envelope["artifacts"]["raw_intermediates/"]["status"] == "skipped"
+
+def test_raw_artifacts_are_redacted_and_included_only_when_enabled():
+    result = AuditPackageExportService(
+        history_service=_FakeHistory(),
+        config=SimpleNamespace(audit_export_enabled=True, evidence_chain_enabled=True,
+                               audit_include_raw_artifacts=True, report_language="en",
+                               reasoning_trace_export_max_chars=500_000),
+    ).export_for_record("42")
+    with zipfile.ZipFile(io.BytesIO(result.zip_bytes)) as zf:
+        names = set(zf.namelist())
+        assert "raw_intermediates/context_snapshot.json" in names
+        assert "raw_intermediates/raw_result.json" in names
+        raw_text = zf.read("raw_intermediates/raw_result.json").decode("utf-8")
+        assert "sk-test-SHOULD_NOT_LEAK" not in raw_text
+    statuses = {item["name"]: item["status"] for item in result.manifest["artifacts"]}
+    assert statuses["raw_intermediates/context_snapshot.json"] == "present"
+    assert statuses["raw_intermediates/raw_result.json"] == "present"
+    assert result.manifest["include_raw_artifacts"] is True
+
+def test_oversized_raw_artifacts_are_explicitly_omitted_and_mark_truncated():
+    history = _FakeHistory()
+    raw = json.loads(history._record.raw_result)
+    raw["oversized"] = "safe narrative " * 160_000
+    history._record.raw_result = json.dumps(raw)
+    result = AuditPackageExportService(
+        history_service=history,
+        config=SimpleNamespace(audit_export_enabled=True, evidence_chain_enabled=True,
+                               audit_include_raw_artifacts=True, report_language="en",
+                               reasoning_trace_export_max_chars=500_000),
+    ).export_for_record("42")
+    with zipfile.ZipFile(io.BytesIO(result.zip_bytes)) as zf:
+        assert "raw_intermediates/raw_result.MISSING.txt" in zf.namelist()
+        assert "raw-artifact byte budget" in zf.read(
+            "raw_intermediates/raw_result.MISSING.txt"
+        ).decode("utf-8")
+    assert result.truncated is True
+    assert result.manifest["truncated"] is True
+
+
+@pytest.mark.parametrize("report_mode", ["brief", "standard", "research"])
+def test_export_preserves_report_mode_decision_card(report_mode):
+    history = _FakeHistory()
+    history.get_markdown_report = lambda _record_id: (
+        f"# {report_mode.title()} Report\n\n"
+        "## Decision Card\n\n"
+        f"mode: {report_mode}\n"
+    )
+    result = AuditPackageExportService(
+        history_service=history,
+        config=SimpleNamespace(
+            audit_export_enabled=True,
+            evidence_chain_enabled=True,
+            audit_include_raw_artifacts=False,
+            report_language="en",
+            report_mode=report_mode,
+            reasoning_trace_export_max_chars=500_000,
+        ),
+    ).export_for_record("42")
+
+    with zipfile.ZipFile(io.BytesIO(result.zip_bytes)) as zf:
+        report = zf.read("report.md").decode("utf-8")
+    assert "## Decision Card" in report
+    assert f"mode: {report_mode}" in report
+    assert "Evidence & Audit" in report

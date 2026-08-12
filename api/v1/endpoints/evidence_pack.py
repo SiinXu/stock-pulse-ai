@@ -42,6 +42,23 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+analysis_alias_router = APIRouter()
+
+AUDIT_PACKAGE_RESPONSES = {
+    200: {
+        "description": "ZIP audit package or JSON envelope",
+        "model": AuditPackageJsonEnvelope,
+        "content": {
+            "application/zip": {"schema": {"type": "string", "format": "binary"}},
+        },
+    },
+    401: {"model": ErrorResponse},
+    403: {"model": ErrorResponse},
+    404: {"model": ErrorResponse},
+    422: {"model": ErrorResponse},
+    500: {"model": ErrorResponse},
+    503: {"model": ErrorResponse},
+}
 
 
 def _audit_target_id(record_id: str) -> str:
@@ -130,9 +147,10 @@ def export_evidence_chain(
                              record_id=record_id, action=action, format="json",
                              outcome="denied", reason_code="record_not_found")
         raise api_error(404, "not_found", "Analysis history record not found")
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Export failure is logged, audited, and mapped to a safe API error.
         log_safe_exception(logger, "Evidence chain export failed", exc,
-                           error_code="evidence_chain_export_failed", context={"record_id": record_id})
+                           error_code="evidence_chain_export_failed",
+                           context={"record_id": _audit_target_id(record_id)})
         _record_export_audit(security_audit, phase="completion", correlation_id=correlation_id,
                              record_id=record_id, action=action, format="json",
                              outcome="failure", reason_code="export_failed")
@@ -169,9 +187,7 @@ def export_evidence_chain(
 
 @router.get(
     "/{record_id}/evidence-pack",
-    responses={200: {"description": "ZIP audit package or JSON envelope"},
-               401: {"model": ErrorResponse}, 403: {"model": ErrorResponse},
-               404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+    responses=AUDIT_PACKAGE_RESPONSES,
     summary="Export auditable report package for an analysis history record",
     operation_id="exportAuditPackage",
     response_model=None,
@@ -209,29 +225,86 @@ def export_audit_package(
                              record_id=record_id, action=action, format=format,
                              outcome="denied", reason_code="record_not_found")
         raise api_error(404, "not_found", "Analysis history record not found")
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Export failure is logged, audited, and mapped to a safe API error.
         log_safe_exception(logger, "Audit package export failed", exc,
-                           error_code="audit_package_export_failed", context={"record_id": record_id})
+                           error_code="audit_package_export_failed",
+                           context={"record_id": _audit_target_id(record_id)})
         _record_export_audit(security_audit, phase="completion", correlation_id=correlation_id,
                              record_id=record_id, action=action, format=format,
                              outcome="failure", reason_code="export_failed")
         raise api_error(500, "internal_error", "Audit package export failed")
 
-    _record_export_audit(security_audit, phase="completion", correlation_id=correlation_id,
-                         record_id=record_id, action=action, format=format,
-                         outcome="success", reason_code="export_completed",
-                         resolved_record_id=result.resolved_record_id, lookup_mode=result.lookup_mode)
     if format == "json":
         envelope = result.to_json_envelope()
-        AuditPackageJsonEnvelope.model_validate(envelope)
+        try:
+            validated_envelope = AuditPackageJsonEnvelope.model_validate(envelope)
+            response_content = json.dumps(
+                validated_envelope.model_dump(mode="json"),
+                ensure_ascii=False,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+        except (TypeError, ValueError):
+            _record_export_audit(
+                security_audit,
+                phase="completion",
+                correlation_id=correlation_id,
+                record_id=record_id,
+                action=action,
+                format=format,
+                outcome="failure",
+                reason_code="response_contract_invalid",
+                resolved_record_id=result.resolved_record_id,
+                lookup_mode=result.lookup_mode,
+            )
+            raise api_error(500, "internal_error", "Audit package export failed")
+        _record_export_audit(security_audit, phase="completion", correlation_id=correlation_id,
+                             record_id=record_id, action=action, format=format,
+                             outcome="success", reason_code="export_completed",
+                             resolved_record_id=result.resolved_record_id,
+                             lookup_mode=result.lookup_mode)
         return Response(
-            content=json.dumps(envelope, ensure_ascii=False, separators=(",", ":")),
+            content=response_content,
             media_type="application/json",
             headers=_download_headers(record_id=record_id, extension="json",
                                       schema=result.schema_version, truncated=result.truncated),
         )
+    _record_export_audit(security_audit, phase="completion", correlation_id=correlation_id,
+                         record_id=record_id, action=action, format=format,
+                         outcome="success", reason_code="export_completed",
+                         resolved_record_id=result.resolved_record_id,
+                         lookup_mode=result.lookup_mode)
     return Response(
         content=result.zip_bytes, media_type="application/zip",
         headers=_download_headers(record_id=record_id, extension="zip",
                                   schema=result.schema_version, truncated=result.truncated),
     )
+
+
+# Keep the issue-compatible /analysis aliases in the same implementation while
+# assigning distinct operation ids so OpenAPI clients can generate both paths.
+analysis_alias_router.add_api_route(
+    "/{record_id}/evidence-chain",
+    export_evidence_chain,
+    methods=["GET"],
+    response_model=EvidenceChainExportResponse,
+    responses={
+        200: {"description": "Redacted evidence-chain-v1 package"},
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+    summary="Export evidence chain for an analysis history record",
+    operation_id="exportAnalysisEvidenceChain",
+)
+analysis_alias_router.add_api_route(
+    "/{record_id}/evidence-pack",
+    export_audit_package,
+    methods=["GET"],
+    response_model=None,
+    responses=AUDIT_PACKAGE_RESPONSES,
+    summary="Export auditable report package for an analysis history record",
+    operation_id="exportAnalysisAuditPackage",
+)

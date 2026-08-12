@@ -86,7 +86,7 @@ def _resolve_runtime_config(config: Any = None) -> Any:
     try:
         from src.application_services import get_application_services
         return get_application_services().config
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Config lookup failure is logged before safe defaults are applied.
         log_safe_exception(
             logger,
             "Evidence chain config lookup failed; using safe defaults",
@@ -135,6 +135,25 @@ def _status_pair(present: bool) -> Dict[str, bool]:
     return {"present": present, "absent": not present}
 
 
+def _recorded_run_evidence_status(value: Any) -> tuple[str, Optional[str]]:
+    status = str(value or "").strip().lower()
+    if status in {"ok", "success", "succeeded", "completed", "available", "present", "done"}:
+        return "present", None
+    if status in {"partial", "degraded", "fallback", "warning"}:
+        return "partial", f"recorded source run was partial: status={status}"
+    return "missing", f"recorded source run did not succeed: status={status or 'unknown'}"
+
+
+def _with_as_of_status(
+    status: str,
+    reason: Optional[str],
+    as_of: Optional[str],
+) -> tuple[str, Optional[str]]:
+    if status == "present" and not as_of:
+        return "partial", _MISSING_NOTE_NO_AS_OF
+    return status, reason or (None if as_of else _MISSING_NOTE_NO_AS_OF)
+
+
 def _extract_report_strata(raw_result: Mapping[str, Any]) -> Dict[str, Any]:
     dashboard = _as_mapping(raw_result.get("dashboard"))
     strata = dashboard.get("report_strata")
@@ -157,16 +176,21 @@ def _build_data_source_evidence(diagnostics: Mapping[str, Any], *, start_index: 
         data_type = _clip(raw.get("data_type"), limit=64)
         operation = _clip(raw.get("operation"), limit=64)
         status = _clip(raw.get("status"), limit=32) or "unknown"
+        evidence_status, status_reason = _recorded_run_evidence_status(status)
+        as_of = _clip(raw.get("as_of") or raw.get("timestamp") or raw.get("ts"), limit=64)
+        evidence_status, status_reason = _with_as_of_status(
+            evidence_status, status_reason, as_of
+        )
         snippet_parts = [p for p in (provider, data_type, operation, f"status={status}") if p]
         items.append(EvidenceItem(
             evidence_id=_make_evidence_id("ds", idx),
             source_type="data_source",
             source_id=provider,
             snippet=" · ".join(snippet_parts),
-            as_of=None,
-            as_of_status=MISSING_AS_OF,
-            status="present",
-            missing_reason=_MISSING_NOTE_NO_AS_OF,
+            as_of=as_of,
+            as_of_status="present" if as_of else MISSING_AS_OF,
+            status=evidence_status,  # type: ignore[arg-type]
+            missing_reason=status_reason,
         ))
         idx += 1
     for raw in _as_list(diagnostics.get("pipeline_stage_runs"))[:40]:
@@ -174,15 +198,20 @@ def _build_data_source_evidence(diagnostics: Mapping[str, Any], *, start_index: 
             continue
         stage = _clip(raw.get("stage") or raw.get("name"), limit=64) or "stage"
         status = _clip(raw.get("status"), limit=32) or "unknown"
+        evidence_status, status_reason = _recorded_run_evidence_status(status)
+        as_of = _clip(raw.get("as_of") or raw.get("timestamp") or raw.get("ts"), limit=64)
+        evidence_status, status_reason = _with_as_of_status(
+            evidence_status, status_reason, as_of
+        )
         items.append(EvidenceItem(
             evidence_id=_make_evidence_id("stage", idx),
             source_type="pipeline_stage",
             source_id=stage,
             snippet=f"{stage} status={status}",
-            as_of=None,
-            as_of_status=MISSING_AS_OF,
-            status="present",
-            missing_reason=_MISSING_NOTE_NO_AS_OF,
+            as_of=as_of,
+            as_of_status="present" if as_of else MISSING_AS_OF,
+            status=evidence_status,  # type: ignore[arg-type]
+            missing_reason=status_reason,
         ))
         idx += 1
     for raw in _as_list(diagnostics.get("llm_runs"))[:40]:
@@ -191,15 +220,20 @@ def _build_data_source_evidence(diagnostics: Mapping[str, Any], *, start_index: 
         model = _clip(raw.get("model"), limit=120) or "unknown_model"
         call_type = _clip(raw.get("call_type"), limit=64)
         status = _clip(raw.get("status"), limit=32) or "unknown"
+        evidence_status, status_reason = _recorded_run_evidence_status(status)
+        as_of = _clip(raw.get("as_of") or raw.get("timestamp") or raw.get("ts"), limit=64)
+        evidence_status, status_reason = _with_as_of_status(
+            evidence_status, status_reason, as_of
+        )
         items.append(EvidenceItem(
             evidence_id=_make_evidence_id("llm", idx),
             source_type="model",
             source_id=model,
             snippet=" · ".join(p for p in (model, call_type, f"status={status}") if p),
-            as_of=None,
-            as_of_status=MISSING_AS_OF,
-            status="present",
-            missing_reason=_MISSING_NOTE_NO_AS_OF,
+            as_of=as_of,
+            as_of_status="present" if as_of else MISSING_AS_OF,
+            status=evidence_status,  # type: ignore[arg-type]
+            missing_reason=status_reason,
         ))
         idx += 1
     return items
@@ -242,16 +276,21 @@ def _build_tool_call_evidence_and_steps(
                 eid = _make_evidence_id("tool", eidx)
                 eidx += 1
                 status_raw = _clip(raw.get("status"), limit=32)
+                evidence_status, status_reason = _recorded_run_evidence_status(status_raw)
+                as_of = _clip(raw.get("timestamp") or raw.get("ts"), limit=64)
+                evidence_status, status_reason = _with_as_of_status(
+                    evidence_status, status_reason, as_of
+                )
                 has_ts = bool(raw.get("timestamp") or raw.get("ts"))
                 items.append(EvidenceItem(
                     evidence_id=eid,
                     source_type="tool_call",
                     source_id=_clip(tool_name, limit=120),
                     snippet=_clip(f"tool={tool_name} status={status_raw or 'unknown'}", limit=200),
-                    as_of=_clip(raw.get("timestamp") or raw.get("ts"), limit=64),
+                    as_of=as_of,
                     as_of_status="present" if has_ts else MISSING_AS_OF,
-                    status="present",
-                    missing_reason=None if has_ts else _MISSING_NOTE_NO_AS_OF,
+                    status=evidence_status,  # type: ignore[arg-type]
+                    missing_reason=status_reason or (None if has_ts else _MISSING_NOTE_NO_AS_OF),
                 ))
                 tool_ids.append(eid)
         last = role_events[-1] if role_events else {}
@@ -259,6 +298,7 @@ def _build_tool_call_evidence_and_steps(
             last.get("summary") or last.get("message") or last.get("status") or f"{len(role_events)} event(s)",
             limit=500,
         )
+        step_status, step_reason = _recorded_run_evidence_status(last.get("status"))
         steps.append(ReasoningStep(
             step_id=_make_evidence_id("step", sidx),
             stage=_clip(last.get("phase") or last.get("event_type") or "agent", limit=120) or "agent",
@@ -267,7 +307,8 @@ def _build_tool_call_evidence_and_steps(
             output_summary=output,
             model_ref=None,
             tool_call_ids=tool_ids[:32],
-            status="present",
+            status=step_status,  # type: ignore[arg-type]
+            missing_reason=step_reason,
         ))
         sidx += 1
     return items, steps
@@ -285,9 +326,11 @@ def _conclusion_from_fact(
     as_of_status = "present" if as_of else MISSING_AS_OF
     refs: List[str] = []
     extra_item: Optional[EvidenceItem] = None
+    source_reference_only = False
 
     if source_id and source_id in evidence_index:
         refs.append(evidence_index[source_id])
+        source_reference_only = True
     elif source_id:
         eid = _make_evidence_id("strata", index)
         extra_item = EvidenceItem(
@@ -297,15 +340,23 @@ def _conclusion_from_fact(
             snippet=statement[:200],
             as_of=as_of,
             as_of_status=as_of_status,  # type: ignore[arg-type]
-            status="present",
-            missing_reason=None if as_of else _MISSING_NOTE_NO_AS_OF,
+            status="partial" if as_of else "missing",
+            missing_reason=(
+                "Source identifier was recorded, but the supporting source artifact was not persisted."
+            ),
         )
         refs.append(eid)
         evidence_index[source_id] = eid
+        source_reference_only = True
 
-    if refs:
-        evidence_status = "linked" if as_of else "partial"
-        missing_note = None if as_of else _MISSING_NOTE_NO_AS_OF
+    if refs and source_reference_only:
+        evidence_status = "partial" if as_of else "missing"
+        missing_note = (
+            "Source identifier/run metadata was recorded, but the direct supporting "
+            "source artifact was not persisted."
+        )
+        if not as_of:
+            missing_note = f"{missing_note} {_MISSING_NOTE_NO_AS_OF}."
     else:
         evidence_status = "missing"
         missing_note = _MISSING_NOTE_NO_EVIDENCE
@@ -370,6 +421,13 @@ def _build_conclusions(
                 path=f"conclusions.{link.conclusion_id}.evidence",
                 status="missing",
                 reason=link.missing_note or _MISSING_NOTE_NO_EVIDENCE,
+                related_conclusion_ids=[link.conclusion_id],
+            ))
+        elif link.evidence_status == "partial":
+            gaps.append(EvidenceGap(
+                path=f"conclusions.{link.conclusion_id}.direct_evidence",
+                status="partial",
+                reason=link.missing_note or "Direct supporting artifact was not persisted",
                 related_conclusion_ids=[link.conclusion_id],
             ))
         elif link.as_of_status == "missing":
@@ -509,7 +567,9 @@ def build_evidence_chain_package(
         if item.source_id:
             evidence_index.setdefault(item.source_id, item.evidence_id)
 
-    data_source_ids = [e.evidence_id for e in ds_items + tool_items]
+    data_source_ids = [
+        e.evidence_id for e in ds_items + tool_items if e.status in {"present", "partial"}
+    ]
     conclusions, extra, gaps = _build_conclusions(
         strata, raw_map, evidence_index=evidence_index, data_source_ids=data_source_ids,
     )

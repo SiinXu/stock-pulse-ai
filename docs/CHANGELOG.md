@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Added] Evidence chain (conclusion→evidence with explicit missing markers) and redacted exportable audit package ZIP/JSON, reusing reasoning-trace export and the security-audit trail (Refs #986, #127).
+- [Fixed] Bound audit-package artifacts, include redacted raw intermediates only when enabled, keep ZIP/JSON artifact parity, and prevent failed source runs from supporting conclusions (Refs #986, #127).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Added] Analysis stage-level checkpoints for exact-replay resume after interrupt, plus run-configuration snapshots and optional repro mode (seed/temperature pin); resume refuses fingerprint mismatch instead of silently changing conclusions (Refs #121, Refs #136).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).

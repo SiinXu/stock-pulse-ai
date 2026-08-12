@@ -490,19 +490,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 144,
-        "keySetSha256": "c74f46787bcd2c9a81c3ffd6bdfae37d394d1f64354ada0a08521e3b71bd58e6",
+        "keyCount": 150,
+        "keySetSha256": "bfd2bb4dd41363a477d86d9acc49afa89e2538c39870a068a6fa66d6072d6974",
         "bundleSha256": {
-          "zh": "5c8724b9086c3c96d8fc7f0cf8101c06a795c49b3c9072580daa0ff93e751b1a",
-          "zh-TW": "45554a100c380a9317b1b891d7e39c54b4fb455e5571bbf57c42e38f64ac0d5a",
-          "en": "7a6c37b92c2f31a758cae274d04d8f3a28216abe42c7b8fd47669d339b298b25",
-          "ja": "833779af9a006c1d707139f7648abf99bf8c7d5233d8220a2b750117f4c84e39",
-          "ko": "c9a43f1f64f541e291e56288fec3eeaa1c242d6bdc48b879c21bdee39c2a4b2a",
-          "de": "61656d9d7715fb2677f5fef5107b86de0b54ad49f1e779e146ff44afc952cfe6",
-          "es": "cf61cba12a7e7ec6e3f90520b187b7202c49274dd7206bb942555e4ad6441ecb",
-          "ms": "151c0303a6191efdf76f038bbfdc245c1dab959f1bebeb5156cffe6c2104f506",
-          "fr": "e580b2021d2651bbb119d0720ffea029b81483d1459e35e2317e09c8f628a9d3",
-          "id": "ae147ede7a1d250bdf7f04194cd6f29ec695d05265a650c25013ecc32b155155"
+          "zh": "d0a5ca80e3eba46da02fb143dac3f652401f4fa2c069b3f5a2bf4f930e8a67e6",
+          "zh-TW": "50578c228c15579cb63315c28528dfadfe5c2a05018fc4bd3d401b9e413b9d32",
+          "en": "d7bbd7c6064062912702744f24ee43ce62d31031d5a7ce7e95433a3b99839793",
+          "ja": "0890bb2c60602c1ed82b1ca8afbe4cab8c77f7e741a8733971a9bf828a66b2a2",
+          "ko": "1b0363abc32e1b78ef0ded0e81854f9ad6c86ac1ba955a8369cfc56dad293588",
+          "de": "fc962d34220f58c361f029e13bc603cc0f6c52c558085f98bacd284139de06a6",
+          "es": "c18b3a5132d02a91d667d53b0f4c3c35d1bf7fece1a66f5ec230754e3d856797",
+          "ms": "51f3791dde58ee20839ab3f18b1bf7f7f09b70a9fe477fe07fd92b4acc7ec684",
+          "fr": "2139c2f62774c357d95edbcb6c24b5accfaa33aacbe05afaa9fcb68c8a43bc4b",
+          "id": "53299e353f67aa8c11558e7aaf9e6707ef3001db76adda8d59e7351311f9dd9f"
         }
       }
     },
@@ -626,6 +626,8 @@
         "analysis_failed",
         "api_response_validation_failed",
         "approval_auth_required",
+        "audit_export_auth_required",
+        "audit_export_disabled",
         "auth_disabled",
         "config_conflict",
         "config_version_conflict",
@@ -635,6 +637,7 @@
         "duplicate_task",
         "empty_stock_code",
         "env_backup_access_denied",
+        "evidence_chain_disabled",
         "file_too_large",
         "idempotency_conflict",
         "internal_error",
@@ -726,6 +729,14 @@
           "api.error.STABLE_ERROR_TEXT.approval_auth_required.title",
           "api.error.STABLE_ERROR_TEXT.approval_auth_required.message"
         ],
+        "audit_export_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.message"
+        ],
+        "audit_export_disabled": [
+          "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message"
+        ],
         "auth_disabled": [
           "api.error.STABLE_ERROR_TEXT.auth_disabled.title",
           "api.error.STABLE_ERROR_TEXT.auth_disabled.message"
@@ -761,6 +772,10 @@
         "env_backup_access_denied": [
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title",
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"
+        ],
+        "evidence_chain_disabled": [
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message"
         ],
         "file_too_large": [
           "api.error.STABLE_ERROR_TEXT.file_too_large.title",

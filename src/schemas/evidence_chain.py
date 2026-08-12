@@ -149,4 +149,5 @@ class AuditPackageManifest(_StrictEvidenceModel):
     reasoning_trace_schema: Optional[str] = Field(default=None, max_length=64)
     redacted: bool = True
     include_raw_artifacts: bool = False
+    truncated: bool = False
     notes: str = Field(default="", max_length=500)

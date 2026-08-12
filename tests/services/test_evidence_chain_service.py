@@ -52,7 +52,10 @@ def test_build_links_verified_facts_to_evidence():
     EvidenceChainPackage.model_validate(package)
     facts = [c for c in package["conclusions"] if c["stratum"] == "verified_fact"]
     assert facts
-    assert any(c["evidence_status"] == "linked" for c in facts)
+    assert all(c["evidence_status"] == "partial" for c in facts)
+    assert all(c["missing_note"] for c in facts)
+    strata_items = [e for e in package["evidence_items"] if e["source_type"] == "report_strata"]
+    assert strata_items and all(e["status"] == "partial" for e in strata_items)
     source_types = {e["source_type"] for e in package["evidence_items"]}
     assert "data_source" in source_types and "tool_call" in source_types
     assert package["reasoning_steps"]
@@ -100,6 +103,22 @@ def test_render_markdown_mentions_missing_explicitly():
     ).package, language="en")
     assert "Evidence & Audit" in md
     assert "missing" in md.lower()
+
+def test_failed_source_runs_do_not_support_decisions():
+    diagnostics = _diagnostics()
+    for key in ("provider_runs", "llm_runs", "pipeline_stage_runs"):
+        for item in diagnostics[key]:
+            item["status"] = "failed"
+    for item in diagnostics["agent_events"]:
+        item["status"] = "failed"
+    package = build_evidence_chain_package(
+        run_id="run-failed", record_id="8", diagnostics=diagnostics,
+        raw_result=_base_raw_result(),
+    ).package
+    decision = next(item for item in package["conclusions"] if item["stratum"] == "decision")
+    assert decision["evidence_status"] == "missing"
+    assert decision["evidence_refs"] == []
+    assert any(item["status"] == "missing" for item in package["evidence_items"])
 
 def test_service_disabled_raises():
     service = EvidenceChainService(

@@ -97,7 +97,7 @@ router.include_router(
 
 # Evidence chain + auditable package export (Issues #986 / #127).
 router.include_router(evidence_pack.router, prefix="/history", tags=["EvidencePack"])
-router.include_router(evidence_pack.router, prefix="/analysis", tags=["EvidencePack"])
+router.include_router(evidence_pack.analysis_alias_router, prefix="/analysis", tags=["EvidencePack"])
 
 
 router.include_router(
