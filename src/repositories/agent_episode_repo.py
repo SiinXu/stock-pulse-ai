@@ -39,9 +39,35 @@ def _json_dumps(value: Any) -> str:
     )
 
 
+def _json_loads(raw: Optional[str], *, field: str, expected_type: type) -> Any:
+    if raw is None or raw == "":
+        raise RepositoryError(
+            f"agent episode {field} JSON is missing",
+            error_code="agent_episode_corrupt_json",
+            context={"field": field},
+        )
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise RepositoryError(
+            f"agent episode {field} JSON is invalid",
+            error_code="agent_episode_corrupt_json",
+            context={"field": field},
+        ) from exc
+    if not isinstance(parsed, expected_type):
+        raise RepositoryError(
+            f"agent episode {field} JSON has the wrong shape",
+            error_code="agent_episode_corrupt_json",
+            context={"field": field},
+        )
+    return parsed
+
+
 def _as_utc_aware(value: Optional[datetime]) -> Optional[datetime]:
     if value is None:
         return None
+    if not isinstance(value, datetime):
+        raise ValueError("timestamp must be a datetime")
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
@@ -50,9 +76,19 @@ def _as_utc_aware(value: Optional[datetime]) -> Optional[datetime]:
 def _as_utc_naive(value: Optional[datetime]) -> Optional[datetime]:
     if value is None:
         return None
+    if not isinstance(value, datetime):
+        raise ValueError("timestamp must be a datetime")
     if value.tzinfo is None:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _bounded_int(name: str, value: Any, *, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be an integer")
+    if not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be between {minimum} and {maximum}")
+    return value
 
 
 class AgentEpisodeRepository(BaseRepository):
@@ -69,18 +105,44 @@ class AgentEpisodeRepository(BaseRepository):
 
     @staticmethod
     def _row_to_episode(row: Any) -> AgentEpisode:
-        trajectory_raw = json.loads(row.trajectory_summary_json or "[]")
-        lessons_raw = json.loads(row.lessons_json or "[]")
-        outcome_raw = json.loads(row.outcome_labels_json) if row.outcome_labels_json else None
+        trajectory_raw = _json_loads(
+            row.trajectory_summary_json,
+            field="trajectory_summary",
+            expected_type=list,
+        )
+        lessons_raw = _json_loads(
+            row.lessons_json,
+            field="lessons",
+            expected_type=list,
+        )
+        outcome_raw = (
+            _json_loads(
+                row.outcome_labels_json,
+                field="outcome_labels",
+                expected_type=dict,
+            )
+            if row.outcome_labels_json
+            else None
+        )
+        if any(not isinstance(item, dict) for item in trajectory_raw):
+            raise RepositoryError(
+                "agent episode trajectory_summary JSON contains a non-object",
+                error_code="agent_episode_corrupt_json",
+                context={"field": "trajectory_summary"},
+            )
+        if any(not isinstance(item, dict) for item in lessons_raw):
+            raise RepositoryError(
+                "agent episode lessons JSON contains a non-object",
+                error_code="agent_episode_corrupt_json",
+                context={"field": "lessons"},
+            )
         trajectory = [
             TrajectoryStepSummary.model_validate(item)
             for item in trajectory_raw
-            if isinstance(item, dict)
         ]
         lessons = [
             EpisodeLesson.model_validate(item)
             for item in lessons_raw
-            if isinstance(item, dict)
         ]
         outcome = (
             EpisodeOutcomeLabels.model_validate(outcome_raw)
@@ -109,7 +171,9 @@ class AgentEpisodeRepository(BaseRepository):
         )
 
     def append(self, episode: AgentEpisodeCreate) -> AgentEpisode:
-        now = self._clock()
+        now = _as_utc_naive(self._clock())
+        if now is None:
+            raise ValueError("agent episode clock must return a datetime")
         values = {
             "schema_version": episode.schema_version or AGENT_EPISODE_SCHEMA_VERSION,
             "episode_id": episode.episode_id,
@@ -151,8 +215,17 @@ class AgentEpisodeRepository(BaseRepository):
             return stored
         except IntegrityError as exc:
             existing = self.get_by_episode_id(episode.episode_id)
-            if existing is not None:
+            if existing is not None and existing.model_dump(
+                mode="json",
+                exclude={"id", "created_at"},
+            ) == episode.model_dump(mode="json"):
                 return existing
+            if existing is not None:
+                raise RepositoryError(
+                    "agent episode id is already bound to a different payload",
+                    error_code="agent_episode_id_collision",
+                    context={"episode_id": episode.episode_id},
+                ) from exc
             self._log_and_raise(
                 logger,
                 "agent_episode_append_conflict",
@@ -173,15 +246,27 @@ class AgentEpisodeRepository(BaseRepository):
             ).first()
             return self._row_to_episode(row) if row is not None else None
 
-    def get_by_run_id(self, run_id: str) -> List[AgentEpisode]:
+    def get_by_run_id(
+        self,
+        run_id: str,
+        *,
+        limit: int = AGENT_EPISODE_MAX_PAGE_SIZE,
+    ) -> List[AgentEpisode]:
         key = str(run_id or "").strip()
         if not key:
             return []
+        bound = _bounded_int(
+            "limit",
+            limit,
+            minimum=1,
+            maximum=AGENT_EPISODE_MAX_PAGE_SIZE,
+        )
         with self.db.get_session() as session:
             rows = session.execute(
                 select(agent_episodes_table)
                 .where(agent_episodes_table.c.run_id == key)
                 .order_by(desc(agent_episodes_table.c.created_at), desc(agent_episodes_table.c.id))
+                .limit(bound)
             ).all()
             return [self._row_to_episode(row) for row in rows]
 
@@ -196,8 +281,18 @@ class AgentEpisodeRepository(BaseRepository):
         offset: int = 0,
         limit: int = 50,
     ) -> AgentEpisodePage:
-        safe_limit = max(1, min(int(limit), AGENT_EPISODE_MAX_PAGE_SIZE))
-        safe_offset = max(0, int(offset))
+        safe_limit = _bounded_int(
+            "limit",
+            limit,
+            minimum=1,
+            maximum=AGENT_EPISODE_MAX_PAGE_SIZE,
+        )
+        safe_offset = _bounded_int(
+            "offset",
+            offset,
+            minimum=0,
+            maximum=1_000_000_000,
+        )
         conditions = []
         if run_id:
             conditions.append(agent_episodes_table.c.run_id == str(run_id).strip())
@@ -239,7 +334,9 @@ class AgentEpisodeRepository(BaseRepository):
             return int(result.rowcount or 0)
 
     def apply_capacity(self, *, max_rows: int) -> int:
-        bound = int(max_rows)
+        if isinstance(max_rows, bool) or not isinstance(max_rows, int):
+            raise ValueError("agent episode capacity must be an integer")
+        bound = max_rows
         if bound < 1:
             raise ValueError("agent episode capacity must be at least one row")
         with self.db.get_session() as session:
@@ -269,7 +366,14 @@ class AgentEpisodeRepository(BaseRepository):
             return int(result.rowcount or 0)
 
     def list_for_replay(self, episode_ids: Sequence[str]) -> List[AgentEpisode]:
-        keys = [str(item).strip() for item in episode_ids if str(item).strip()]
+        if isinstance(episode_ids, (str, bytes, bytearray)):
+            raise ValueError("episode_ids must be a sequence of ids")
+        raw_ids = list(episode_ids)
+        if len(raw_ids) > AGENT_EPISODE_MAX_PAGE_SIZE:
+            raise ValueError(
+                f"episode_ids must contain at most {AGENT_EPISODE_MAX_PAGE_SIZE} ids"
+            )
+        keys = [str(item).strip() for item in raw_ids if str(item).strip()]
         if not keys:
             return []
         with self.db.get_session() as session:

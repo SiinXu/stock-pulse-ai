@@ -18,11 +18,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from src.services.agent_trajectory_eval_service import evaluate_agent_trajectory
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger(__name__)
 
 PREDICTION_EVAL_SCHEMA_VERSION = "prediction-eval-v1"
 PREDICTION_EVAL_ENGINE_VERSION = "prediction-eval-engine-v1"
@@ -201,35 +205,46 @@ def evaluate_prediction_case(case: Mapping[str, Any]) -> Dict[str, Any]:
         checks.append(
             _check(
                 "claim_contract",
-                "prose_outcome_not_hit",
-                observed_outcome != "hit",
-                "unstructured prose must not score as hit",
+                "prose_outcome_unavailable",
+                observed_outcome == "data_unavailable",
+                "unstructured prose must not enter hit/miss metrics",
             )
         )
 
-    scorer_report = _optional_claim_scorer(claims, actuals)
-    if scorer_report is not None and claims:
-        scored_outcome = str(
-            (scorer_report.get("aggregate") or {}).get("outcome")
-            or (scorer_report.get("aggregate") or {}).get("label")
-            or ""
+    if claims:
+        scorer_result = _optional_claim_scorer(claims, actuals)
+        scorer_status = str(scorer_result.get("status") or "error")
+        expected_scorer_outcome = str(
+            expected.get("scorer_outcome") or expected_outcome
         ).strip().lower()
-        if expected.get("scorer_outcome"):
+        if scorer_status == "unavailable":
             checks.append(
                 _check(
                     "claim_scoring",
-                    "scorer_matches_expected",
-                    scored_outcome == str(expected.get("scorer_outcome")).strip().lower(),
-                    f"scorer={scored_outcome!r} expected={expected.get('scorer_outcome')!r}",
+                    "claim_scorer_contract",
+                    True,
+                    "A5 ClaimScorer dependency is not present on this branch",
                 )
             )
-        if provider_failed or missing_prices:
+        elif scorer_status == "ok":
+            scored_outcome = _claim_scorer_aggregate_label(
+                scorer_result.get("report") or {}
+            )
             checks.append(
                 _check(
                     "claim_scoring",
-                    "scorer_never_hits_without_actuals",
-                    scored_outcome != "hit",
-                    f"scorer={scored_outcome!r}",
+                    "claim_scorer_contract",
+                    scored_outcome == expected_scorer_outcome,
+                    f"scorer={scored_outcome!r} expected={expected_scorer_outcome!r}",
+                )
+            )
+        else:
+            checks.append(
+                _check(
+                    "claim_scoring",
+                    "claim_scorer_contract",
+                    False,
+                    str(scorer_result.get("error") or "ClaimScorer failed")[:500],
                 )
             )
 
@@ -440,46 +455,67 @@ def compare_prediction_to_baseline(
     *,
     regression_threshold: float = REGRESSION_THRESHOLD,
 ) -> Dict[str, Any]:
-    if not math.isfinite(regression_threshold) or regression_threshold < 0:
-        raise ValueError("regression_threshold must be finite and non-negative")
-    cur_agg = current.get("aggregate") or {}
-    base_agg = baseline.get("aggregate") or {}
-    cur_score = float(cur_agg.get("score") or 0.0)
-    base_score = float(base_agg.get("score") or 0.0)
+    if (
+        isinstance(regression_threshold, bool)
+        or not math.isfinite(float(regression_threshold))
+        or float(regression_threshold) != REGRESSION_THRESHOLD
+    ):
+        raise ValueError("prediction regression threshold is fixed at 0.0")
+    cur_view = _validate_score_view(current, name="current")
+    base_view = _validate_score_view(baseline, name="baseline")
+    cur_agg = cur_view["aggregate"]
+    base_agg = base_view["aggregate"]
+    cur_score = cur_agg["score"]
+    base_score = base_agg["score"]
     delta = cur_score - base_score
     base_cases = {
-        str(item.get("case_id")): item
-        for item in (baseline.get("cases") or [])
-        if isinstance(item, Mapping)
+        item["case_id"]: item for item in base_view["cases"]
     }
+    current_cases = {
+        item["case_id"]: item for item in cur_view["cases"]
+    }
+    missing_case_ids = sorted(set(base_cases) - set(current_cases))
+    extra_case_ids = sorted(set(current_cases) - set(base_cases))
     case_deltas: List[Dict[str, Any]] = []
-    for item in current.get("cases") or []:
-        if not isinstance(item, Mapping):
-            continue
-        cid = str(item.get("case_id"))
-        prior = base_cases.get(cid) or {}
-        cur_s = float(item.get("score") or 0.0)
-        base_s = float(prior.get("score") or 0.0)
+    changed_check_counts: List[str] = []
+    for cid in sorted(set(base_cases) | set(current_cases)):
+        item = current_cases.get(cid)
+        prior = base_cases.get(cid)
+        cur_s = item["score"] if item is not None else 0.0
+        base_s = prior["score"] if prior is not None else 0.0
+        if item is not None and prior is not None and item["total"] != prior["total"]:
+            changed_check_counts.append(cid)
         case_deltas.append(
             {
                 "case_id": cid,
                 "score": cur_s,
                 "baseline_score": base_s,
                 "delta": cur_s - base_s,
-                "dropped": cur_s + 1e-12 < base_s - float(regression_threshold),
+                "dropped": prior is not None
+                and (item is None or cur_s + 1e-12 < base_s),
             }
         )
     drops = [row for row in case_deltas if row["dropped"]]
+    contract_drift = bool(
+        missing_case_ids
+        or extra_case_ids
+        or changed_check_counts
+        or cur_agg["checks_total"] != base_agg["checks_total"]
+    )
     return {
         "baseline_score": base_score,
         "current_score": cur_score,
         "delta": delta,
-        "regression_threshold": float(regression_threshold),
-        "dropped": delta + 1e-12 < -float(regression_threshold),
+        "regression_threshold": REGRESSION_THRESHOLD,
+        "dropped": delta + 1e-12 < 0.0,
         "drop_count": len(drops),
         "drops": drops,
         "case_deltas": case_deltas,
-        "regressed": (delta + 1e-12 < -float(regression_threshold)) or bool(drops),
+        "contract_drift": contract_drift,
+        "missing_case_ids": missing_case_ids,
+        "extra_case_ids": extra_case_ids,
+        "changed_check_counts": changed_check_counts,
+        "regressed": delta + 1e-12 < 0.0 or bool(drops) or contract_drift,
     }
 
 
@@ -490,6 +526,7 @@ def write_prediction_baseline(
     target = Path(path) if path is not None else default_baseline_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = score_only_prediction_view(report)
+    _validate_score_view(payload, name="generated baseline")
     target.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -521,23 +558,172 @@ def _actuals_missing_prices(actuals: Mapping[str, Any]) -> bool:
     return not (math.isfinite(start_f) and math.isfinite(end_f))
 
 
+def _require_int(value: Any, *, field: str, minimum: int = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValueError(f"{field} must be an integer >= {minimum}")
+    return value
+
+
+def _require_score(value: Any, *, field: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{field} must be a finite score")
+    try:
+        score = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{field} must be a finite score") from exc
+    if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+        raise ValueError(f"{field} must be between 0.0 and 1.0")
+    return score
+
+
+def _validate_score_view(view: Mapping[str, Any], *, name: str) -> Dict[str, Any]:
+    if not isinstance(view, Mapping):
+        raise ValueError(f"{name} prediction score view must be an object")
+    if view.get("schema_version") != PREDICTION_EVAL_SCHEMA_VERSION:
+        raise ValueError(f"{name} prediction score schema version is invalid")
+    if view.get("engine_version") != PREDICTION_EVAL_ENGINE_VERSION:
+        raise ValueError(f"{name} prediction score engine version is invalid")
+    threshold = _require_score(
+        view.get("regression_threshold"),
+        field=f"{name}.regression_threshold",
+    )
+    if threshold != REGRESSION_THRESHOLD:
+        raise ValueError(f"{name} prediction regression threshold must be 0.0")
+    raw_cases = view.get("cases")
+    if not isinstance(raw_cases, list) or not raw_cases:
+        raise ValueError(f"{name} prediction score cases must be non-empty")
+    cases: List[Dict[str, Any]] = []
+    seen = set()
+    for index, raw in enumerate(raw_cases):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"{name}.cases[{index}] must be an object")
+        case_id = str(raw.get("case_id") or "").strip()
+        if not case_id or case_id in seen:
+            raise ValueError(f"{name} prediction case ids must be unique and non-empty")
+        seen.add(case_id)
+        total = _require_int(raw.get("total"), field=f"{name}.{case_id}.total", minimum=1)
+        passed = _require_int(raw.get("passed"), field=f"{name}.{case_id}.passed")
+        if passed > total:
+            raise ValueError(f"{name}.{case_id}.passed must not exceed total")
+        score = _require_score(raw.get("score"), field=f"{name}.{case_id}.score")
+        expected_score = float(passed) / float(total)
+        if abs(score - expected_score) > 1e-12:
+            raise ValueError(f"{name}.{case_id}.score does not match passed/total")
+        cases.append(
+            {"case_id": case_id, "passed": passed, "total": total, "score": score}
+        )
+    aggregate = view.get("aggregate")
+    if not isinstance(aggregate, Mapping):
+        raise ValueError(f"{name}.aggregate must be an object")
+    aggregate_cases = _require_int(
+        aggregate.get("cases"), field=f"{name}.aggregate.cases", minimum=1
+    )
+    checks_passed = _require_int(
+        aggregate.get("checks_passed"), field=f"{name}.aggregate.checks_passed"
+    )
+    checks_total = _require_int(
+        aggregate.get("checks_total"),
+        field=f"{name}.aggregate.checks_total",
+        minimum=1,
+    )
+    aggregate_score = _require_score(
+        aggregate.get("score"), field=f"{name}.aggregate.score"
+    )
+    if aggregate_cases != len(cases):
+        raise ValueError(f"{name}.aggregate.cases does not match case count")
+    if checks_passed != sum(item["passed"] for item in cases):
+        raise ValueError(f"{name}.aggregate.checks_passed does not match cases")
+    if checks_total != sum(item["total"] for item in cases):
+        raise ValueError(f"{name}.aggregate.checks_total does not match cases")
+    if abs(aggregate_score - checks_passed / checks_total) > 1e-12:
+        raise ValueError(f"{name}.aggregate.score does not match check counts")
+    return {
+        "aggregate": {
+            "cases": aggregate_cases,
+            "checks_passed": checks_passed,
+            "checks_total": checks_total,
+            "score": aggregate_score,
+        },
+        "cases": cases,
+    }
+
+
+def _claim_scorer_aggregate_label(report: Mapping[str, Any]) -> Optional[str]:
+    aggregate = report.get("aggregate")
+    if not isinstance(aggregate, Mapping):
+        return None
+    try:
+        scored = _require_int(
+            aggregate.get("scored_claims"), field="scorer.scored_claims"
+        )
+        hits = _require_int(aggregate.get("hit_count"), field="scorer.hit_count")
+        partials = _require_int(
+            aggregate.get("partial_count"), field="scorer.partial_count"
+        )
+        misses = _require_int(
+            aggregate.get("miss_count"), field="scorer.miss_count"
+        )
+        unavailable = _require_int(
+            aggregate.get("data_unavailable_count"),
+            field="scorer.data_unavailable_count",
+        )
+    except ValueError:
+        return None
+    if hits + partials + misses != scored:
+        return None
+    if scored <= 0:
+        return "data_unavailable" if unavailable > 0 else None
+    if hits == scored and partials == 0 and misses == 0:
+        return "hit"
+    if misses == scored and partials == 0 and hits == 0:
+        return "miss"
+    if unavailable > 0 and hits == 0 and partials == 0 and misses == 0:
+        return "data_unavailable"
+    return "partial"
+
+
 def _optional_claim_scorer(
     claims: Sequence[Any],
     actuals: Mapping[str, Any],
-) -> Optional[Dict[str, Any]]:
+) -> Dict[str, Any]:
     try:
         from src.services.claim_scorer import ClaimScorer  # type: ignore
-    except Exception:  # broad-exception: optional_metadata - ClaimScorer lands via A5; offline eval stays pure
-        return None
+    except ModuleNotFoundError as exc:
+        if exc.name == "src.services.claim_scorer":
+            return {"status": "unavailable"}
+        return {
+            "status": "error",
+            "error": f"ClaimScorer import failed ({type(exc).__name__})",
+        }
+    except Exception as exc:  # broad-exception: fallback_recorded - a broken installed scorer fails the gate
+        log_safe_exception(
+            logger,
+            "prediction_eval_claim_scorer_import_failed",
+            exc,
+            error_code="prediction_eval_claim_scorer_import_failed",
+        )
+        return {
+            "status": "error",
+            "error": f"ClaimScorer import failed ({type(exc).__name__})",
+        }
     try:
         report = ClaimScorer().score(claims, actuals)
-    except Exception:  # broad-exception: cleanup - optional scorer must not fail offline prediction gate
-        return None
+    except Exception as exc:  # broad-exception: fallback_recorded - installed scorer failures are regressions
+        log_safe_exception(
+            logger,
+            "prediction_eval_claim_scorer_failed",
+            exc,
+            error_code="prediction_eval_claim_scorer_failed",
+        )
+        return {
+            "status": "error",
+            "error": f"ClaimScorer failed ({type(exc).__name__})",
+        }
     if hasattr(report, "to_dict"):
-        return report.to_dict()
-    if isinstance(report, Mapping):
-        return dict(report)
-    return None
+        report = report.to_dict()
+    if not isinstance(report, Mapping):
+        return {"status": "error", "error": "ClaimScorer returned an invalid report"}
+    return {"status": "ok", "report": dict(report)}
 
 
 __all__ = [

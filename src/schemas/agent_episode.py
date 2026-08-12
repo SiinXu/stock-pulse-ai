@@ -127,12 +127,17 @@ class AgentEpisodeCreate(_StrictEpisodeModel):
     @field_validator("started_at", "completed_at", mode="before")
     @classmethod
     def _coerce_dt(cls, value: Any) -> Any:
-        if value is None or isinstance(value, datetime):
+        if value is None:
             return value
+        parsed = value
         if isinstance(value, str) and value.strip():
             text = value.strip().replace("Z", "+00:00")
-            return datetime.fromisoformat(text)
-        raise ValueError("timestamp must be datetime or ISO-8601 string")
+            parsed = datetime.fromisoformat(text)
+        if not isinstance(parsed, datetime):
+            raise ValueError("timestamp must be datetime or ISO-8601 string")
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return parsed.astimezone(timezone.utc)
 
     @model_validator(mode="after")
     def _time_order(self) -> "AgentEpisodeCreate":

@@ -205,3 +205,5 @@ Integrated into the same runner as `prediction_verification_evaluation`:
 | `tests/agent/benchmark/baselines/prediction_v0.json` | Committed baseline (threshold 0.0) |
 
 Provider failure fixtures must resolve to `data_unavailable` and never a fabricated hit.
+
+The committed prediction baseline freezes the exact case IDs and per-case check counts in addition to finite scores. Missing/extra cases, removed checks, malformed totals, NaN/Infinity, schema/engine drift, or any threshold other than `0.0` fail closed. When A5 `ClaimScorer` is installed, the same typed A1 fixtures are scored through it; an installed-but-broken scorer fails the gate instead of being silently skipped.

@@ -4,8 +4,9 @@
   "claims": [
     {
       "claim_id": "c1",
-      "claim_type": "direction",
-      "direction": "up"
+      "type": "direction",
+      "confidence": 0.8,
+      "payload": {"direction": "up"}
     }
   ],
   "actuals": {
@@ -17,7 +18,8 @@
     "reason": "direction_match"
   },
   "expected": {
-    "outcome": "hit"
+    "outcome": "hit",
+    "scorer_outcome": "hit"
   },
   "episode": {
     "run_id": "run-pred-hit-1",

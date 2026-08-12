@@ -4,8 +4,9 @@
   "claims": [
     {
       "claim_id": "c1",
-      "claim_type": "direction",
-      "direction": "down"
+      "type": "direction",
+      "confidence": 0.7,
+      "payload": {"direction": "down"}
     }
   ],
   "actuals": {
@@ -17,7 +18,8 @@
     "reason": "missing_prices"
   },
   "expected": {
-    "outcome": "data_unavailable"
+    "outcome": "data_unavailable",
+    "scorer_outcome": "data_unavailable"
   },
   "episode": {
     "run_id": "run-pred-missing-1",

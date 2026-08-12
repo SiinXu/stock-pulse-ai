@@ -31,17 +31,19 @@ def test_output_quality_regression_detected_on_candidate_corruption() -> None:
     baseline = service.evaluate_suite(cases)
     broken = copy.deepcopy(cases)
     # Flip a pass fixture claim so rule score drops.
+    mutated = False
     for case in broken:
         if case.get("id") == "fact-grounded-pass":
-            claims = case.get("output", {}).get("claims") or case.get("claims") or []
             # Mutate output numeric claim value if present.
-            output = case.get("output")
+            output = case.get("agent_output")
             if isinstance(output, dict):
                 for claim in output.get("claims") or []:
                     if isinstance(claim, dict) and "value" in claim:
                         claim["value"] = float(claim["value"]) + 9999.0
+                        mutated = True
                         break
             break
+    assert mutated is True
     candidate = service.evaluate_suite(broken)
     comparison = service.compare_reports(
         baseline,
@@ -52,7 +54,6 @@ def test_output_quality_regression_detected_on_candidate_corruption() -> None:
         candidate_config_version="cfg-c",
         regression_threshold=0.0,
     )
-    # Either regressed or suites differ; never silently equal if mutation landed.
-    if baseline.suite_hash != candidate.suite_hash:
-        assert comparison["regressed"] is True or comparison["rule_delta"] < 0
+    assert baseline.suite_hash != candidate.suite_hash
+    assert comparison["regressed"] is True or comparison["rule_delta"] < 0
     assert REGRESSION_THRESHOLD == 0.0

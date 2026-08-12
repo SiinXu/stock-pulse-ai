@@ -1462,30 +1462,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
     title: 'Agent 进化 episode 日志',
-    summary: '写入紧凑的 Agent 进化 episode（轨迹摘要、教训、可选结果标签）。',
-    usage: '默认关闭。开启后，单次 AgentExecutor 运行结束会 fail-soft 写入 episode；写入失败不中断分析。不存储密钥或完整 Soul 章程文本。',
-    valueNotes: [
-      '依赖工厂注入的 executor.config。',
-      '保留天数与容量分别由 AGENT_EPISODE_RETENTION_DAYS / AGENT_EPISODE_MAX_ROWS 控制。',
-    ],
-    impact: ['为 #1107 预测验证闭环提供离线评估与复盘输入。'],
-    notes: ['规划议题 #449 的跟踪框架归属 Epic #1107；禁止平行再实现一套跟踪器。'],
+    summary: '保存精简 Agent 轨迹、教训和可选结果。',
   },
   'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
     title: 'Agent episode 保留天数',
-    summary: 'agent evolution episode 行在按时间清理前的最大保留天数。',
-    usage: '在 episode 日志开启且成功写入后尽力执行。',
-    valueNotes: ['有效范围 1–3650 天；默认 90。'],
-    impact: ['限制 agent_episodes 磁盘增长。'],
-    notes: ['AGENT_EPISODE_LOG_ENABLED 为 false 时不生效。'],
+    summary: 'episode 清理前的最大保留天数。',
   },
   'settings.agent.AGENT_EPISODE_MAX_ROWS': {
     title: 'Agent episode 最大行数',
-    summary: 'agent evolution episode 行容量上限；超出时优先删除最旧行。',
-    usage: '在 episode 日志开启且成功写入后尽力执行。',
-    valueNotes: ['有效范围 100–1000000；默认 50000。'],
-    impact: ['在时间保留之外限制表大小。'],
-    notes: ['AGENT_EPISODE_LOG_ENABLED 为 false 时不生效。'],
+    summary: 'episode 行数上限；优先删除最旧行。',
   },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent 规划循环',

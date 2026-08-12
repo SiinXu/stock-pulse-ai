@@ -35,6 +35,8 @@
 
 CI job `agent-eval-gate` 以 `--strict-baseline` 运行离线评测，并包含预测核验套件（阈值固定 0.0，不得为绿放宽）。详见英文版。
 
+预测基线同时冻结 case ID、每个 case 的 check 数和有限分数；删 case/check、NaN/Infinity、schema/engine 漂移或放宽阈值都会 fail-closed。A5 `ClaimScorer` 可用时，门禁会直接消费同一组 A1 typed fixtures；已安装但损坏的 scorer 不得静默跳过。
+
 ## 如何运行
 
 ```bash

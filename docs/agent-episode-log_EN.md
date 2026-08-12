@@ -33,15 +33,17 @@ Persist compact, queryable **episodes** after agent runs so offline eval, post-m
 | `AGENT_EPISODE_RETENTION_DAYS` | `90` | Age-based purge |
 | `AGENT_EPISODE_MAX_ROWS` | `50000` | Capacity bound (oldest first) |
 
-When disabled or when persistence fails, analysis continues. Episode writes never raise into the user-facing path.
+When disabled, the executor does not import the episode writer or initialize its repository. When enabled, module loading, database initialization, validation, append, and retention failures are isolated from both successful Agent results and original Agent exceptions. Episode writes never raise into the user-facing path.
 
 ## Runtime hook
 
-`AgentExecutor.run` records an episode in a `finally` block via `try_record_agent_episode_from_result` when the flag is on.
+`AgentExecutor.run` records an episode in a guarded `finally` block via `try_record_agent_episode_from_result` only when the flag is on. An injected `context.run_id` (or `task_id`) is preferred over a generated identifier so episodes remain correlated with their originating run.
 
 ## Retention
 
 Documented hooks: `apply_retention(cutoff)` and `apply_capacity(max_rows)`. Invoked best-effort after successful appends.
+
+Queries and replay lists are bounded to 200 rows/IDs. Persisted JSON corruption is surfaced as `agent_episode_corrupt_json`; it is never converted into an apparently valid empty trajectory or lesson list.
 
 ## Rollback
 

@@ -14,6 +14,7 @@ from src.repositories.agent_episode_repo import AgentEpisodeRepository
 from src.schemas.agent_episode import (
     AGENT_EPISODE_DEFAULT_MAX_ROWS,
     AGENT_EPISODE_DEFAULT_RETENTION_DAYS,
+    AGENT_EPISODE_MAX_PAGE_SIZE,
     AGENT_EPISODE_MAX_TRAJECTORY_STEPS,
     AgentEpisode,
     AgentEpisodeCreate,
@@ -51,8 +52,16 @@ class AgentEpisodeService:
         *,
         config: Any = None,
     ) -> None:
-        self._repository = repository or AgentEpisodeRepository()
+        # Keep the default-off path free of database initialization and migration
+        # side effects. The production repository is created only for an enabled
+        # write or an explicit query call.
+        self._repository = repository
         self._config = config
+
+    def _get_repository(self) -> AgentEpisodeRepository:
+        if self._repository is None:
+            self._repository = AgentEpisodeRepository()
+        return self._repository
 
     def record_episode(
         self,
@@ -70,7 +79,7 @@ class AgentEpisodeService:
                 else AgentEpisodeCreate.model_validate(episode)
             )
             create = self._sanitize_create(create)
-            stored = self._repository.append(create)
+            stored = self._get_repository().append(create)
             self._maybe_apply_retention(cfg)
             return stored
         except Exception as exc:  # broad-exception: fallback_recorded - episode append must never fail analysis
@@ -142,17 +151,22 @@ class AgentEpisodeService:
             )
             return None
 
-    def get_by_run_id(self, run_id: str) -> List[AgentEpisode]:
-        return self._repository.get_by_run_id(run_id)
+    def get_by_run_id(
+        self,
+        run_id: str,
+        *,
+        limit: int = AGENT_EPISODE_MAX_PAGE_SIZE,
+    ) -> List[AgentEpisode]:
+        return self._get_repository().get_by_run_id(run_id, limit=limit)
 
     def get_by_episode_id(self, episode_id: str) -> Optional[AgentEpisode]:
-        return self._repository.get_by_episode_id(episode_id)
+        return self._get_repository().get_by_episode_id(episode_id)
 
     def query(self, **filters: Any) -> AgentEpisodePage:
-        return self._repository.query(**filters)
+        return self._get_repository().query(**filters)
 
     def list_for_replay(self, episode_ids: Sequence[str]) -> List[AgentEpisode]:
-        return self._repository.list_for_replay(episode_ids)
+        return self._get_repository().list_for_replay(episode_ids)
 
     def _sanitize_create(self, episode: AgentEpisodeCreate) -> AgentEpisodeCreate:
         lessons: List[EpisodeLesson] = []
@@ -177,8 +191,9 @@ class AgentEpisodeService:
         )
         try:
             cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
-            self._repository.apply_retention(cutoff=cutoff)
-            self._repository.apply_capacity(max_rows=max_rows)
+            repository = self._get_repository()
+            repository.apply_retention(cutoff=cutoff)
+            repository.apply_capacity(max_rows=max_rows)
         except Exception as exc:  # broad-exception: fallback_recorded - retention is best-effort after append
             log_safe_exception(
                 logger, "agent_episode_retention_failed", exc,
@@ -207,7 +222,14 @@ def compact_trajectory_summary(tool_calls: Sequence[Mapping[str, Any] | Any]) ->
             except (TypeError, ValueError):
                 fingerprint = None
         duration_ms = duration_to_ms(entry.get("duration"))
-        step_no = entry.get("step") if isinstance(entry.get("step"), int) else index + 1
+        raw_step = entry.get("step")
+        step_no = (
+            raw_step
+            if isinstance(raw_step, int)
+            and not isinstance(raw_step, bool)
+            and 0 <= raw_step <= 10_000
+            else index + 1
+        )
         summary: Dict[str, Any] = {"step": step_no, "tool": tool.strip()[:128], "success": success}
         if isinstance(entry.get("cached"), bool):
             summary["cached"] = entry["cached"]
@@ -232,15 +254,33 @@ def try_record_agent_episode_from_result(
     context: Optional[Mapping[str, Any]] = None,
     started_at: Optional[datetime] = None,
 ) -> Optional[AgentEpisode]:
-    ctx = context or {}
-    symbol = ctx.get("stock_code") or ctx.get("symbol")
-    market = ctx.get("market")
-    symbol = symbol.strip() if isinstance(symbol, str) and symbol.strip() else None
-    market = market.strip().lower() if isinstance(market, str) and market.strip() else None
-    return AgentEpisodeService(config=config).record_from_agent_result(
-        result=result, run_id=run_id, mode=mode, symbol=symbol, market=market,
-        config=config, started_at=started_at,
-    )
+    if not is_agent_episode_log_enabled(config):
+        return None
+    try:
+        ctx = context if isinstance(context, Mapping) else {}
+        symbol = ctx.get("stock_code") or ctx.get("symbol")
+        market = ctx.get("market")
+        correlated_run_id = run_id or ctx.get("run_id") or ctx.get("task_id")
+        symbol = symbol.strip() if isinstance(symbol, str) and symbol.strip() else None
+        market = market.strip().lower() if isinstance(market, str) and market.strip() else None
+        return AgentEpisodeService(config=config).record_from_agent_result(
+            result=result,
+            run_id=str(correlated_run_id).strip() if correlated_run_id else None,
+            mode=mode,
+            symbol=symbol,
+            market=market,
+            config=config,
+            started_at=started_at,
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - helper must never alter agent control flow
+        log_safe_exception(
+            logger,
+            "agent_episode_helper_failed",
+            exc,
+            error_code="agent_episode_helper_failed",
+            context={"mode": mode},
+        )
+        return None
 
 
 __all__ = [

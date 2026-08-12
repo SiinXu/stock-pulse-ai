@@ -8,11 +8,11 @@
     "end_price": 20.0
   },
   "resolution": {
-    "outcome": "miss",
+    "outcome": "data_unavailable",
     "reason": "no_verifiable_claim"
   },
   "expected": {
-    "outcome": "miss",
+    "outcome": "data_unavailable",
     "reject_unstructured_prose": true
   },
   "episode": {

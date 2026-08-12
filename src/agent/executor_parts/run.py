@@ -44,11 +44,8 @@ class _RunMethods:
         """
         from datetime import datetime, timezone
 
-        from src.services.agent_episode_service import (
-            try_record_agent_episode_from_result,
-        )
-
         started_at = datetime.now(timezone.utc)
+        episode_config = getattr(self, "config", None)
         result: Optional[AgentResult] = None
         try:
             # Opt-in plan→act→observe product path (#199). Default-off via Config.
@@ -93,34 +90,57 @@ class _RunMethods:
             )
             result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
             return result
-        except Exception as exc:  # broad-exception: fallback_recorded - capture compact failure episode then re-raise
-            # Compact failure episode for evolution store (#1090); never swallow.
-            import logging
+        except Exception as exc:
+            # broad-exception: optional_metadata - failure episode only
+            if getattr(episode_config, "agent_episode_log_enabled", None) is True:
+                # Compact failure episode for evolution store (#1090); never swallow.
+                import logging
 
-            from src.agent.executor import AgentResult as _AgentResult
-            from src.utils.sanitize import log_safe_exception
+                from src.agent.executor import AgentResult as _AgentResult
+                from src.utils.sanitize import log_safe_exception
 
-            log_safe_exception(
-                logging.getLogger(__name__),
-                "agent_run_failed_for_episode",
-                exc,
-                error_code="agent_run_failed_for_episode",
-            )
-            if result is None:
-                err = str(exc).strip() or type(exc).__name__
-                result = _AgentResult(success=False, error=err[:500])
+                log_safe_exception(
+                    logging.getLogger(__name__),
+                    "agent_run_failed_for_episode",
+                    exc,
+                    error_code="agent_run_failed_for_episode",
+                )
+                if result is None:
+                    result = _AgentResult(
+                        success=False,
+                        error=type(exc).__name__,
+                    )
             raise
         finally:
             # Evolution episode log (#1090): fail-soft; never abort the user path.
             # Use factory-injected executor.config only (no bare get_config).
-            if result is not None:
-                try_record_agent_episode_from_result(
-                    result=result,
-                    config=getattr(self, "config", None),
-                    mode="single",
-                    context=context,
-                    started_at=started_at,
-                )
+            if (
+                result is not None
+                and getattr(episode_config, "agent_episode_log_enabled", None) is True
+            ):
+                try:
+                    from src.services.agent_episode_service import (
+                        try_record_agent_episode_from_result,
+                    )
+
+                    try_record_agent_episode_from_result(
+                        result=result,
+                        config=episode_config,
+                        mode="single",
+                        context=context,
+                        started_at=started_at,
+                    )
+                except Exception as exc:  # broad-exception: fallback_recorded - episode logging cannot mask run result
+                    import logging
+
+                    from src.utils.sanitize import log_safe_exception
+
+                    log_safe_exception(
+                        logging.getLogger(__name__),
+                        "agent_episode_finalizer_failed",
+                        exc,
+                        error_code="agent_episode_finalizer_failed",
+                    )
 
     def build_run_messages(
         self, task: str, context: Optional[Dict[str, Any]] = None

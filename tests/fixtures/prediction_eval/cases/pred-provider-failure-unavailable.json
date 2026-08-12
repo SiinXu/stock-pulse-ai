@@ -4,8 +4,9 @@
   "claims": [
     {
       "claim_id": "c1",
-      "claim_type": "direction",
-      "direction": "up"
+      "type": "direction",
+      "confidence": 0.7,
+      "payload": {"direction": "up"}
     }
   ],
   "actuals": {
@@ -18,7 +19,8 @@
     "reason": "provider_timeout"
   },
   "expected": {
-    "outcome": "data_unavailable"
+    "outcome": "data_unavailable",
+    "scorer_outcome": "data_unavailable"
   },
   "episode": {
     "run_id": "run-pred-unavail-1",

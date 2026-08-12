@@ -4,8 +4,9 @@
   "claims": [
     {
       "claim_id": "c1",
-      "claim_type": "direction",
-      "direction": "flat"
+      "type": "direction",
+      "confidence": 0.6,
+      "payload": {"direction": "sideways"}
     }
   ],
   "actuals": {
@@ -14,6 +15,7 @@
   },
   "resolution": {
     "outcome": "hit",
+    "scorer_outcome": "hit",
     "reason": "direction_match"
   },
   "expected": {
