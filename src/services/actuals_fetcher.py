@@ -1111,14 +1111,14 @@ class ActualsFetcher:
         if hasattr(value, "to_pydatetime"):
             try:
                 return value.to_pydatetime().date()
-            except Exception:
+            except (TypeError, ValueError, AttributeError, OverflowError):
                 pass
         if hasattr(value, "date") and callable(value.date):
             try:
                 coerced = value.date()
                 if isinstance(coerced, date):
                     return coerced
-            except Exception:
+            except (TypeError, ValueError, AttributeError, OverflowError):
                 pass
         text = str(value).strip()
         if not text or text.lower() in {"nat", "nan", "none"}:
