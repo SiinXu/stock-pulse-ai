@@ -5,6 +5,7 @@
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 // @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import { writeFileSync, mkdirSync } from 'node:fs';
 // @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
@@ -126,8 +127,8 @@ describe('runtime performance contracts (#883)', () => {
       }
       const onChange = vi.fn();
       const bodyRenderSpies = Object.fromEntries(
-        fieldKeys.map((key) => [key, vi.fn()]),
-      ) as Record<string, ReturnType<typeof vi.fn>>;
+        fieldKeys.map((key) => [key, vi.fn<() => void>()]),
+      ) as Record<string, Mock<() => void>>;
 
       // Count renders of a memo boundary that uses the same equality as SettingsField.
       // React.Profiler is not used: it can fire when the Profiler host re-renders even
