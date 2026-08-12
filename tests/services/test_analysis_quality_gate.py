@@ -160,6 +160,8 @@ def test_ungrounded_verified_fact_annotated_by_default() -> None:
     assert "9999" in inference_text
     assert result.quality_gate_result["verdict"] == "annotate"
     assert result.quality_gate_result["eval_hook"]["rule_score"] is not None
+    assert "factuality" in result.quality_gate_result["detail"]
+    assert "ungrounded_claim" in result.quality_gate_result["failure_reason_codes"]
 
 
 def test_ungrounded_intercept_fails_result() -> None:
@@ -253,3 +255,88 @@ def test_project_claims_binds_matching_verified_fact() -> None:
     assert not ungrounded
     assert all(c["source_fact_id"] != "__missing__" for c in claims)
     assert statements
+
+
+def test_soft_limitations_do_not_fail_gate_without_invented_facts() -> None:
+    """Review counterexample: routine limitations + buy/high must not annotate.
+
+    Soft data_quality.limitations must not mark data_missing for the failure
+    path. boundary_honesty may still appear as advisory checks in the hook.
+    """
+    overview = {
+        "data_quality": {
+            "level": "good",
+            "limitations": ["news window partial"],
+        },
+        "quote": {
+            "status": "available",
+            "items": {"price": {"value": 10.0, "source": "quote"}},
+        },
+    }
+    result = AnalysisResult(
+        code="AAPL",
+        name="Apple",
+        sentiment_score=70,
+        trend_prediction="up",
+        operation_advice="Buy",
+        decision_type="buy",
+        confidence_level="high",
+        report_language="en",
+        dashboard={},
+        analysis_summary="buy",
+        success=True,
+        current_price=10.0,
+        change_pct=1.0,
+    )
+    gate = apply_analysis_quality_gate(
+        result,
+        analysis_context_pack_overview=overview,
+        config=SimpleNamespace(
+            analysis_quality_gate_enabled=True,
+            analysis_quality_gate_on_failure="annotate",
+        ),
+    )
+    assert gate.verdict is QualityGateVerdict.PASS
+    assert gate.passed is True
+    assert result.success is True
+    assert gate.failure_reason_codes == ()
+    assert "boundary_honesty" in gate.dimensions
+    assert result.quality_gate_result["eval_hook"]["failure_dimensions"] == [
+        "factuality"
+    ]
+    assert "boundary_honesty" in result.quality_gate_result["eval_hook"][
+        "advisory_dimensions"
+    ]
+
+
+def test_boundary_honesty_advisory_does_not_intercept() -> None:
+    """Even under intercept policy, honesty-only signals must not hard-fail."""
+    overview = {
+        "data_quality": {"level": "good", "limitations": ["stale news"]},
+        "quote": {"status": "available", "items": {"price": {"value": 10.0}}},
+    }
+    result = AnalysisResult(
+        code="AAPL",
+        name="Apple",
+        sentiment_score=70,
+        trend_prediction="up",
+        operation_advice="Buy",
+        decision_type="buy",
+        confidence_level="high",
+        report_language="en",
+        dashboard={},
+        analysis_summary="buy",
+        success=True,
+        current_price=10.0,
+    )
+    gate = apply_analysis_quality_gate(
+        result,
+        analysis_context_pack_overview=overview,
+        config=SimpleNamespace(
+            analysis_quality_gate_enabled=True,
+            analysis_quality_gate_on_failure="intercept",
+        ),
+    )
+    assert gate.verdict is QualityGateVerdict.PASS
+    assert result.success is True
+    assert result.error_code != "quality_gate_intercept"

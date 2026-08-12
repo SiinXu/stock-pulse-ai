@@ -2,12 +2,21 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Pipeline analysis quality gate — no invented facts (Issue #887).
 
-Reuses the offline agent-eval **rule dimensions** (especially ``factuality``
-and ``boundary_honesty``) as the sole scoring standard. This module does not
-define a parallel rubric; it projects pipeline evidence + conclusion claims
-into the same ``FinancialFact`` / ``FinancialClaim`` shapes scored by
-:mod:`src.services.agent_eval_service`, records the verdict in trace, and
-applies a configurable failure policy:
+Reuses the offline agent-eval **rule dimensions** as the sole scoring
+standard (no parallel rubric). Pipeline evidence and conclusion claims are
+projected into the same ``FinancialFact`` / ``FinancialClaim`` shapes scored
+by :mod:`src.services.agent_eval_service`.
+
+Failure path vs advisory path
+-----------------------------
+* **Failure path** (``factuality`` only): ungrounded claims drive
+  annotate/intercept.
+* **Advisory path** (``boundary_honesty``): still scored with the offline
+  scorer for ``eval_hook`` / trace transparency, but never flips the gate
+  verdict or demotes strata. Soft ``data_quality.limitations`` do not mark
+  data missing; directional forbids are never enabled by default.
+
+Configurable failure policy:
 
 * ``annotate`` (default): demote ungrounded fact statements to model opinion
 * ``intercept``: fail the analysis result so it is not treated as success
@@ -47,8 +56,14 @@ logger = logging.getLogger(__name__)
 QUALITY_GATE_SCHEMA_VERSION = "analysis-quality-gate/v1"
 QUALITY_GATE_VERSION = "analysis-quality-gate-v1"
 
-# Default pipeline dimensions: factual grounding + honesty under missing data.
-DEFAULT_GATE_DIMENSIONS: Tuple[str, ...] = ("factuality", "boundary_honesty")
+# Failure path: only factuality drives annotate/intercept (no invented facts).
+DEFAULT_GATE_FAILURE_DIMENSIONS: Tuple[str, ...] = ("factuality",)
+# Advisory path: same offline scorer catalog, recorded in trace only.
+DEFAULT_GATE_ADVISORY_DIMENSIONS: Tuple[str, ...] = ("boundary_honesty",)
+# Full default eval-hook catalog (failure + advisory).
+DEFAULT_GATE_DIMENSIONS: Tuple[str, ...] = (
+    DEFAULT_GATE_FAILURE_DIMENSIONS + DEFAULT_GATE_ADVISORY_DIMENSIONS
+)
 
 _MAX_TRACE_CHECKS = 32
 _MAX_TRACE_DETAIL = 300
@@ -105,6 +120,11 @@ class AnalysisQualityGateResult:
     fail_closed: bool = False
     action_taken: str = "none"
     detail: str = ""
+    failure_dimensions: Tuple[str, ...] = DEFAULT_GATE_FAILURE_DIMENSIONS
+    advisory_dimensions: Tuple[str, ...] = DEFAULT_GATE_ADVISORY_DIMENSIONS
+    failure_rule_score: Optional[float] = None
+    advisory_rule_score: Optional[float] = None
+    failure_reason_codes: Tuple[str, ...] = ()
     evaluator_version: str = EVALUATOR_VERSION
     gate_version: str = QUALITY_GATE_VERSION
 
@@ -119,7 +139,12 @@ class AnalysisQualityGateResult:
             "enabled": self.enabled,
             "passed": self.passed,
             "rule_score": self.rule_score,
+            "failure_rule_score": self.failure_rule_score,
+            "advisory_rule_score": self.advisory_rule_score,
             "dimensions": list(self.dimensions),
+            "failure_dimensions": list(self.failure_dimensions),
+            "advisory_dimensions": list(self.advisory_dimensions),
+            "failure_reason_codes": list(self.failure_reason_codes),
             "checks": list(self.checks),
             "ungrounded_claim_ids": list(self.ungrounded_claim_ids),
             "ungrounded_statements": list(self.ungrounded_statements),
@@ -132,7 +157,12 @@ class AnalysisQualityGateResult:
             "detail": self.detail[:_MAX_TRACE_DETAIL],
             "eval_hook": {
                 "dimensions": list(self.dimensions),
+                "failure_dimensions": list(self.failure_dimensions),
+                "advisory_dimensions": list(self.advisory_dimensions),
                 "rule_score": self.rule_score,
+                "failure_rule_score": self.failure_rule_score,
+                "advisory_rule_score": self.advisory_rule_score,
+                "failure_reason_codes": list(self.failure_reason_codes),
                 "rule_dimensions_catalog": list(RULE_DIMENSIONS),
                 "all_dimensions_catalog": list(ALL_DIMENSIONS),
                 "check_count": len(self.checks),
@@ -540,34 +570,49 @@ def project_claims_from_result(
     return claims, ungrounded, statements
 
 
-def _data_missing_from_overview(
+def _has_price_evidence(facts: Sequence[Mapping[str, Any]]) -> bool:
+    """True when projected evidence includes at least one price-like fact."""
+    for fact in facts:
+        if not isinstance(fact, Mapping):
+            continue
+        field_path = str(fact.get("field_path") or "").lower()
+        unit = str(fact.get("unit") or "").lower()
+        fact_id = str(fact.get("fact_id") or "").lower()
+        if unit in {"price", "cny", "usd", "hkd"}:
+            return True
+        if any(token in field_path for token in ("price", "close", "last", "quote.")):
+            return True
+        if "price" in fact_id:
+            return True
+    return False
+
+
+def _core_quote_missing(
     analysis_context_pack_overview: Optional[Mapping[str, Any]],
     facts: Sequence[Mapping[str, Any]],
 ) -> bool:
+    """Strict missing signal for advisory honesty only (not soft limitations).
+
+    Soft partial limitations (news window, etc.) must not mark data missing.
+    Only hard core-quote unavailability or total absence of price evidence.
+    """
     if not facts:
+        return True
+    if not _has_price_evidence(facts):
         return True
     if not isinstance(analysis_context_pack_overview, Mapping):
         return False
+    quote = analysis_context_pack_overview.get("quote")
+    if isinstance(quote, Mapping):
+        status = str(quote.get("status") or "").strip().lower()
+        if status in {"missing", "fetch_failed", "not_supported"}:
+            return True
     quality = analysis_context_pack_overview.get("data_quality")
     if isinstance(quality, Mapping):
         level = str(quality.get("level") or "").strip().lower()
-        if level in {"poor", "limited", "missing"}:
-            return True
-        limitations = quality.get("limitations") or []
-        if isinstance(limitations, list) and limitations:
-            return True
-    for block_name in ("quote", "daily_bars", "technical"):
-        block = analysis_context_pack_overview.get(block_name)
-        if isinstance(block, Mapping):
-            status = str(block.get("status") or "").strip().lower()
-            if status in {
-                "missing",
-                "fetch_failed",
-                "not_supported",
-                "stale",
-                "partial",
-            }:
-                return True
+        if level in {"poor", "missing"}:
+            # Only when quote price evidence is also absent.
+            return not _has_price_evidence(facts)
     return False
 
 
@@ -578,13 +623,26 @@ def evaluate_analysis_quality(
     result: Any = None,
     analysis_context_pack_overview: Optional[Mapping[str, Any]] = None,
     dimensions: Sequence[str] = DEFAULT_GATE_DIMENSIONS,
-) -> Tuple[List[EvalCheckResult], Optional[float]]:
-    """Run offline eval scorers on projected pipeline artifacts."""
+    failure_dimensions: Sequence[str] = DEFAULT_GATE_FAILURE_DIMENSIONS,
+    advisory_dimensions: Sequence[str] = DEFAULT_GATE_ADVISORY_DIMENSIONS,
+) -> Tuple[
+    List[EvalCheckResult],
+    Optional[float],
+    Optional[float],
+    Optional[float],
+]:
+    """Run offline eval scorers on projected pipeline artifacts.
+
+    Returns
+    ``(checks, overall_rule_score, failure_rule_score, advisory_rule_score)``.
+    Only checks under ``failure_dimensions`` should drive annotate/intercept.
+    """
+    failure_dim_set = set(failure_dimensions)
+    advisory_dim_set = set(advisory_dimensions)
     context: Dict[str, Any] = {
         "facts": list(facts),
-        "data_missing": _data_missing_from_overview(
-            analysis_context_pack_overview, facts
-        ),
+        # Strict core-missing only; soft limitations are not data_missing.
+        "data_missing": _core_quote_missing(analysis_context_pack_overview, facts),
     }
     output: Dict[str, Any] = {
         "claims": list(claims),
@@ -613,6 +671,8 @@ def evaluate_analysis_quality(
             else:
                 checks.extend(score_factuality(context, output, {}))
         elif dimension == "boundary_honesty":
+            # Advisory only: never forbid directional by default (offline cases
+            # opt into that forbid via explicit rubric; runtime must not).
             checks.extend(
                 score_boundary_honesty(
                     context,
@@ -620,11 +680,19 @@ def evaluate_analysis_quality(
                     {
                         "data_missing": context["data_missing"],
                         "require_limitation_mention": False,
-                        "forbid_directional_when_missing": True,
+                        "forbid_directional_when_missing": False,
                     },
                 )
             )
-    return checks, _rule_score(checks)
+    overall = _rule_score(checks)
+    failure_checks = [c for c in checks if c.dimension in failure_dim_set]
+    advisory_checks = [c for c in checks if c.dimension in advisory_dim_set]
+    return (
+        checks,
+        overall,
+        _rule_score(failure_checks),
+        _rule_score(advisory_checks),
+    )
 
 
 def _collect_failed_claim_ids(checks: Sequence[EvalCheckResult]) -> List[str]:
@@ -716,6 +784,11 @@ def _build_result(
     detail: str,
     fail_closed: bool = False,
     evaluation_id: Optional[str] = None,
+    failure_dimensions: Sequence[str] = DEFAULT_GATE_FAILURE_DIMENSIONS,
+    advisory_dimensions: Sequence[str] = DEFAULT_GATE_ADVISORY_DIMENSIONS,
+    failure_rule_score: Optional[float] = None,
+    advisory_rule_score: Optional[float] = None,
+    failure_reason_codes: Sequence[str] = (),
 ) -> AnalysisQualityGateResult:
     bounded_checks = tuple(
         _check_to_trace(c) for c in list(checks)[:_MAX_TRACE_CHECKS]
@@ -740,6 +813,13 @@ def _build_result(
         fail_closed=fail_closed,
         action_taken=action_taken,
         detail=detail[:_MAX_TRACE_DETAIL],
+        failure_dimensions=tuple(failure_dimensions),
+        advisory_dimensions=tuple(advisory_dimensions),
+        failure_rule_score=failure_rule_score,
+        advisory_rule_score=advisory_rule_score,
+        failure_reason_codes=tuple(
+            str(code)[:64] for code in list(failure_reason_codes)[:_MAX_UNGROUNDED]
+        ),
     )
 
 
@@ -821,7 +901,12 @@ def apply_analysis_quality_gate(
         claims, projected_ungrounded, claim_statements = project_claims_from_result(
             result, facts=facts
         )
-        checks, rule_score = evaluate_analysis_quality(
+        (
+            checks,
+            rule_score,
+            failure_rule_score,
+            advisory_rule_score,
+        ) = evaluate_analysis_quality(
             facts=facts,
             claims=claims,
             result=result,
@@ -829,16 +914,51 @@ def apply_analysis_quality_gate(
             if isinstance(overview, Mapping)
             else None,
             dimensions=dimensions,
+            failure_dimensions=DEFAULT_GATE_FAILURE_DIMENSIONS,
+            advisory_dimensions=DEFAULT_GATE_ADVISORY_DIMENSIONS,
         )
-        failed_ids = list(
-            dict.fromkeys(projected_ungrounded + _collect_failed_claim_ids(checks))
-        )
-        hard_failures = [
+        failure_dim_set = set(DEFAULT_GATE_FAILURE_DIMENSIONS)
+        # Only factuality (failure-path) checks drive annotate/intercept.
+        factuality_failures = [
             c
             for c in checks
-            if (not c.skipped) and (not c.passed or c.status == "invalid")
+            if c.dimension in failure_dim_set
+            and (not c.skipped)
+            and (not c.passed or c.status == "invalid")
         ]
-        passed = not hard_failures and not failed_ids
+        failed_ids = list(
+            dict.fromkeys(
+                projected_ungrounded
+                + _collect_failed_claim_ids(factuality_failures)
+            )
+        )
+        reason_codes: List[str] = []
+        if failed_ids or any(
+            c.check_id.startswith("structured_") or c.status == "invalid"
+            for c in factuality_failures
+        ):
+            if failed_ids:
+                reason_codes.append("ungrounded_claim")
+            if any(c.status == "invalid" for c in factuality_failures):
+                reason_codes.append("factuality_invalid")
+            if any(
+                c.check_id == "claim_bound_to_source_fact" and not c.passed
+                for c in factuality_failures
+            ):
+                if "ungrounded_claim" not in reason_codes:
+                    reason_codes.append("ungrounded_claim")
+        # Advisory honesty is never a gate failure reason.
+        advisory_failures = [
+            c
+            for c in checks
+            if c.dimension in set(DEFAULT_GATE_ADVISORY_DIMENSIONS)
+            and (not c.skipped)
+            and not c.passed
+        ]
+        for check in advisory_failures:
+            reason_codes.append(f"advisory:{check.check_id}")
+
+        passed = not factuality_failures and not failed_ids
 
         ungrounded_statements = [
             claim_statements[cid]
@@ -861,12 +981,14 @@ def apply_analysis_quality_gate(
         detail = "all presented fact claims bound to input evidence"
 
         if not passed:
+            ungrounded_count = len(failed_ids) or len(factuality_failures)
             if failure_policy is QualityGateFailurePolicy.INTERCEPT:
                 verdict = QualityGateVerdict.INTERCEPT
                 action_taken = "intercept_analysis"
                 detail = (
-                    f"quality gate intercept: {len(failed_ids) or len(hard_failures)} "
-                    "ungrounded or invalid fact check(s)"
+                    f"quality gate intercept: {ungrounded_count} "
+                    f"factuality failure(s) "
+                    f"[{', '.join(reason_codes) or 'ungrounded_claim'}]"
                 )
                 result.success = False
                 result.error_code = "quality_gate_intercept"
@@ -881,8 +1003,9 @@ def apply_analysis_quality_gate(
                 if action_taken == "none":
                     action_taken = "annotate_trace_only"
                 detail = (
-                    f"quality gate annotate: {len(failed_ids) or len(hard_failures)} "
-                    "ungrounded or invalid fact check(s)"
+                    f"quality gate annotate: {ungrounded_count} "
+                    f"factuality failure(s) "
+                    f"[{', '.join(reason_codes) or 'ungrounded_claim'}]"
                 )
                 if action_taken == "demote_verified_facts_to_inference":
                     dashboard = getattr(result, "dashboard", None)
@@ -899,6 +1022,14 @@ def apply_analysis_quality_gate(
                         )
                         dashboard["quality_annotations"] = notes[:10]
 
+        # Keep advisory reason codes out of the failure_reason_codes field when
+        # the gate passed; still expose them only under eval_hook via checks.
+        failure_reason_codes = tuple(
+            code
+            for code in reason_codes
+            if not str(code).startswith("advisory:")
+        )
+
         gate = _build_result(
             verdict=verdict,
             failure_policy=failure_policy,
@@ -914,6 +1045,11 @@ def apply_analysis_quality_gate(
             action_taken=action_taken,
             detail=detail,
             fail_closed=False,
+            failure_dimensions=DEFAULT_GATE_FAILURE_DIMENSIONS,
+            advisory_dimensions=DEFAULT_GATE_ADVISORY_DIMENSIONS,
+            failure_rule_score=failure_rule_score,
+            advisory_rule_score=advisory_rule_score,
+            failure_reason_codes=failure_reason_codes,
         )
         _attach_gate_to_result(result, gate)
         return gate
@@ -968,7 +1104,9 @@ def apply_analysis_quality_gate(
 
 
 __all__ = [
+    "DEFAULT_GATE_ADVISORY_DIMENSIONS",
     "DEFAULT_GATE_DIMENSIONS",
+    "DEFAULT_GATE_FAILURE_DIMENSIONS",
     "QUALITY_GATE_SCHEMA_VERSION",
     "QUALITY_GATE_VERSION",
     "AnalysisQualityGateResult",

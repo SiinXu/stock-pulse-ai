@@ -65,7 +65,7 @@ Offline suite invocation remains the opt-in boundary for the full fixture catalo
 
 ### Runtime pipeline hook (#887)
 
-The analysis pipeline reuses the **same rule dimensions** (especially `factuality` and `boundary_honesty`) via `src/services/analysis_quality_gate.py`. That gate projects live evidence and conclusion claims into the `FinancialFact` / `FinancialClaim` shapes above, records scores under `quality_gate_result.eval_hook`, and applies `annotate` (default) or `intercept` on failure. Gate-internal errors fail closed to annotate. See [analysis-quality-gate_EN.md](analysis-quality-gate_EN.md).
+The analysis pipeline reuses the **same rule dimensions** via `src/services/analysis_quality_gate.py`. Live evidence and conclusion claims are projected into the `FinancialFact` / `FinancialClaim` shapes above. **Only `factuality` drives annotate/intercept**; `boundary_honesty` is advisory in the runtime hook (trace / `eval_hook` only) so soft limitations cannot fail the gate. Scores live under `quality_gate_result.eval_hook`. Gate-internal errors fail closed to annotate. See [analysis-quality-gate_EN.md](analysis-quality-gate_EN.md).
 
 ## Explicit non-goals
 

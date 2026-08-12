@@ -4,7 +4,7 @@
 
 **English**：[analysis-quality-gate_EN.md](analysis-quality-gate_EN.md)
 
-**复用**：离线 agent-eval 维度 [agent-eval-dimensions.md](agent-eval-dimensions.md) / `src/services/agent_eval_service.py`（尤其 `factuality` 与 `boundary_honesty`）。本质量门**不另立**评分标准。
+**复用**：离线 agent-eval 维度 [agent-eval-dimensions.md](agent-eval-dimensions.md) / `src/services/agent_eval_service.py`。本质量门**不另立**评分标准。
 
 ## 目的
 
@@ -15,6 +15,15 @@
 3. 使用与离线 agent-eval 相同的规则评分器打分
 4. 把判定写入 `quality_gate_result` / `dashboard.quality_gate`（trace 与 raw_result）
 5. 按可配置策略处理失败
+
+## 失败路径 vs 顾问路径
+
+| 路径 | 维度 | 对发布的影响 |
+| --- | --- | --- |
+| **失败路径** | 仅 `factuality` | 驱动 `annotate` / `intercept` |
+| **顾问路径** | `boundary_honesty` | 只写入 `checks` / `eval_hook`；不改变 verdict、不 demote strata |
+
+软性 `data_quality.limitations`（例如新闻窗口 partial）**不会**被当成 data missing。运行时默认不启用 directional forbid（离线 case 仍可在自有 rubric 中显式开启）。
 
 ## 失败策略
 
@@ -37,9 +46,10 @@
 `AnalysisResult.quality_gate_result`（schema `analysis-quality-gate/v1`）包含：
 
 - `verdict`：`pass` | `annotate` | `intercept` | `gate_error` | `skipped`
-- `failure_policy`、`passed`、`rule_score`、`dimensions`、有界 `checks`
+- `failure_policy`、`passed`、`rule_score`、`failure_rule_score`、`advisory_rule_score`
+- `failure_dimensions` / `advisory_dimensions`、`failure_reason_codes`、有界 `checks`
 - `ungrounded_claim_ids` / `ungrounded_statements`
-- `eval_hook`：维度目录 + 规则分（管线内评测钩子）
+- `eval_hook`：维度目录 + 失败/顾问分（管线内评测钩子）
 - `evaluation_id`、`evaluated_at`、`fail_closed`、`action_taken`
 
 ## 明确非目标

@@ -4,7 +4,7 @@
 
 **Chinese**: [analysis-quality-gate.md](analysis-quality-gate.md)
 
-**Reuses**: offline agent-eval dimensions in [agent-eval-dimensions_EN.md](agent-eval-dimensions_EN.md) / `src/services/agent_eval_service.py` (especially `factuality` and `boundary_honesty`). This gate does **not** invent a second rubric.
+**Reuses**: offline agent-eval dimensions in [agent-eval-dimensions_EN.md](agent-eval-dimensions_EN.md) / `src/services/agent_eval_service.py`. This gate does **not** invent a second rubric.
 
 ## Purpose
 
@@ -15,6 +15,15 @@ After analysis produces a conclusion, the pipeline runs a deterministic quality 
 3. Scores them with the same rule scorers used by the offline agent-eval suite
 4. Records the verdict under `quality_gate_result` / `dashboard.quality_gate` (trace + raw_result)
 5. Applies a configurable failure policy
+
+## Failure path vs advisory path
+
+| Path | Dimensions | Effect on publish |
+| --- | --- | --- |
+| **Failure** | `factuality` only | Drives `annotate` / `intercept` |
+| **Advisory** | `boundary_honesty` | Recorded in `checks` / `eval_hook` only; never flips verdict or demotes strata |
+
+Soft `data_quality.limitations` (for example a partial news window) do **not** mark data missing. Directional forbids are never enabled by default at runtime (offline cases may still opt in via their own rubric).
 
 ## Failure policy
 
@@ -37,9 +46,10 @@ Gate-internal exceptions **never pass silently**: they fail closed to `annotate`
 `AnalysisResult.quality_gate_result` (schema `analysis-quality-gate/v1`) includes:
 
 - `verdict`: `pass` | `annotate` | `intercept` | `gate_error` | `skipped`
-- `failure_policy`, `passed`, `rule_score`, `dimensions`, bounded `checks`
+- `failure_policy`, `passed`, `rule_score`, `failure_rule_score`, `advisory_rule_score`
+- `failure_dimensions` / `advisory_dimensions`, `failure_reason_codes`, bounded `checks`
 - `ungrounded_claim_ids` / `ungrounded_statements`
-- `eval_hook`: dimension catalog + rule score (pipeline eval hook)
+- `eval_hook`: dimension catalog + failure/advisory scores (pipeline eval hook)
 - `evaluation_id`, `evaluated_at`, `fail_closed`, `action_taken`
 
 ## Explicit non-goals
