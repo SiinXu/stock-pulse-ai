@@ -51,8 +51,23 @@ Policy via `LayeredMemoryPolicy.from_config(config)` (constructor injection).
 ## Injection protection
 
 - Structured fields reject free-form instruction text.
-- Prompt-facing render must use `isolate_layered_memory_for_prompt()`.
+- Prompt-facing render must use `isolate_layered_memory_for_prompt()` (or the shared
+  `isolate_untrusted_memory_body()` helper for non-bundle text).
 - Adversarial tests in `tests/agent/test_agent_memory_isolation.py`.
+
+### Decision Memory reflection (#118)
+
+Same-stock Historical Decision Reflection is a **separate production path** over
+`DecisionSignal` + outcome stores (not `PrincipalMemoryLifecycle`). It still
+must:
+
+1. **Admit** only size-capped structured completed outcomes with `signal_id`
+   provenance (`admit_decision_memory`); free-form signal reason text is excluded.
+2. **Isolate** the prompt block via `isolate_untrusted_memory_body` so history is
+   non-authoritative data.
+3. Remain **toggleable** (`DECISION_MEMORY_ENABLED` / per-request `use_memory`).
+
+See `docs/decision-signals.md` §历史决策记忆注入.
 
 ## Remaining scope
 

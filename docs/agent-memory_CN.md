@@ -33,7 +33,20 @@
 
 ## 注入防护
 
-任何面向 prompt 的渲染必须使用 `isolate_layered_memory_for_prompt()`。
+任何面向 prompt 的渲染必须使用 `isolate_layered_memory_for_prompt()`，或共享的
+`isolate_untrusted_memory_body()`（非 bundle 文本）。
+
+### 历史决策记忆复盘（#118）
+
+同标的 Historical Decision Reflection 走 **独立生产路径**（`DecisionSignal` +
+outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
+
+1. **准入**：仅 size-capped 的结构化已结算 outcome，且带 `signal_id` 来源
+   （`admit_decision_memory`）；不注入自由文本 `reason`。
+2. **隔离**：Prompt 块经 `isolate_untrusted_memory_body` 标注为不可信数据。
+3. **可关闭**：`DECISION_MEMORY_ENABLED` / 请求级 `use_memory`。
+
+详见 `docs/decision-signals.md`「历史决策记忆注入」。
 
 ## 剩余范围
 

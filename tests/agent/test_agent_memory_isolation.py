@@ -9,6 +9,7 @@ import pytest
 from src.agent.memory_isolation import (
     assert_untrusted_isolation,
     isolate_layered_memory_for_prompt,
+    isolate_untrusted_memory_body,
     iter_adversarial_memory_payloads,
     sanitize_untrusted_memory_text,
 )
@@ -73,3 +74,18 @@ def test_assert_untrusted_isolation_rejects_bare_json() -> None:
         assert_untrusted_isolation('{"principal_id":"alice"}')
     with pytest.raises(ValueError):
         assert_untrusted_isolation("")
+
+
+def test_isolate_untrusted_memory_body_wraps_plain_text() -> None:
+    rendered = isolate_untrusted_memory_body(
+        "- Same-stock track record: 1/1 hit [signal_id=7]"
+    )
+    assert_untrusted_isolation(rendered)
+    assert "signal_id=7" in rendered
+
+
+def test_assert_untrusted_isolation_accepts_section_with_title_wrapper() -> None:
+    body = isolate_untrusted_memory_body("source_signal_ids=[1]")
+    section = f"\n\n## Historical Decision Reflection\n\n{body}\n\n> guardrail\n"
+    assert_untrusted_isolation(section)
+

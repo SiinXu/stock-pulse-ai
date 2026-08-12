@@ -78,6 +78,30 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - `GET /api/v1/decision-signals/{signal_id}`：查询单条。
 - `PATCH /api/v1/decision-signals/{signal_id}/status`：更新状态和可选 metadata。object/null 替换只替换调用方 metadata；已持久化的 `report_language` 作为 canonical presentation provenance 保留，没有正式 provenance 时也不会从替换 object 提升该键，避免单纯状态更新改变同一信号的本地化标签。
 - `GET/PATCH /api/v1/decision-signals/{signal_id}/memory-flag`：读取或局部更新独立的 `memorable` / `ignored` 标记；请求省略的字段保持原值。`ignored` 会排除历史决策记忆检索，`memorable` 会提高优先级，两者同时为 `true` 时以 `ignored` 为准。
+
+## 历史决策记忆注入（Decision Memory / #118）
+
+个股分析在生成最终报告前，可把**同标的、已结算 outcome** 的结构化复盘注入 Prompt 与报告「历史决策复盘」小节。实现入口：
+
+- 检索与准入：`src/services/decision_memory_service.py`（`DecisionMemoryService.build_reflection` → `admit_decision_memory`）
+- 管线挂载：`src/core/stages/analysis_stock.py`（`decision_memory_enabled` 关闭时零开销）
+- Prompt 拼接：`src/analyzer_parts/analysis.py`（读取 `decision_memory_reflection_prompt`）
+- 报告渲染：`src/notification_parts/rendering.py`
+
+**准入（对齐 #1119 情节记忆 size-cap，不得绕过）**
+
+- 仅 `eval_status=completed` 且 `outcome∈{hit,miss,neutral}` 的权威后验可进入注入。
+- 每条复盘行必须带 `signal_id` 来源；`source_signal_ids` 可追溯。
+- **不**注入信号 `reason` 等自由文本，避免用户笔记/对抗文本作为事实进入 Prompt。
+- `DECISION_MEMORY_LOOKBACK` 限制准入条数；扫描窗口可略大于 lookback，以免「最近未结算信号」饿死已结算记忆。
+- `ignored` 标记的信号整条排除；`memorable` 优先排序。
+
+**不可信隔离与关闭**
+
+- Prompt 块经 `isolate_untrusted_memory_body` 包裹（`BEGIN_UNTRUSTED_MEMORY_DATA` / data-only 指令），与分层记忆隔离契约一致（#1017）。
+- 复盘仅校准置信度与风险提示，**不得**翻转方向（文案与数据结构均无方向建议字段）。
+- 全局 `DECISION_MEMORY_ENABLED`（默认 `true`）或请求 `use_memory=false` 可关闭。
+
 - `GET /api/v1/decision-signals/latest/{stock_code}`：查询股票最新 active 信号。
 - `POST /api/v1/decision-signals/outcomes/run`：显式触发后验评估。
 - `GET /api/v1/decision-signals/outcomes`、`GET /api/v1/decision-signals/outcomes/stats`、`GET /api/v1/decision-signals/{signal_id}/outcomes`：查询后验结果与统计。全局 outcome 列表实际支持 `signal_id`、`horizon`、`engine_version`、`eval_status`、`outcome`、`page` 和 `page_size`。
