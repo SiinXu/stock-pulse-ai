@@ -43,6 +43,10 @@ deterministic_checks() {
   python scripts/check_legacy_facade_imports.py
   python scripts/check_import_layers.py --self-test
   python scripts/check_import_layers.py
+  python scripts/check_layer_direction.py --self-test
+  python scripts/check_layer_direction.py
+  python scripts/check_hot_path_module_size.py --self-test
+  python scripts/check_hot_path_module_size.py
   python scripts/check_config_access.py --self-test
   python scripts/check_config_access.py
   python scripts/check_coverage_floor.py --self-test

@@ -4,6 +4,7 @@
 - Last verified: 2026-08-05
 - Related: [ADR-010](adr/ADR-010-import-cycle-ratchet.md),
   [architecture overview](architecture-overview.md),
+  [layer-direction ratchet](layer-direction-ratchet.md),
   [legacy facade import policy](legacy-facade-import-policy.md),
   `scripts/check_import_layers.py`,
   `scripts/import_layer_baseline.json`
