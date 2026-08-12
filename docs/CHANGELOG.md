@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Split notification/report chunks on true H1 headings and flush max-words buffers after oversize sections (Ported-from upstream 5698068fe; Refs #1219).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
