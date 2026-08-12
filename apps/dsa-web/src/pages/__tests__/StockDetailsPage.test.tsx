@@ -3,6 +3,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import StockDetailsPage from '../StockDetailsPage';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { stocksApi } from '../../api/stocks';
@@ -85,6 +89,11 @@ function makeHistory(): StockHistoryResponse {
   };
 }
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 function wrapWithQueryClient(ui: ReactElement): ReactElement {
   const client = new QueryClient({
     defaultOptions: {
@@ -98,7 +107,8 @@ function wrapWithQueryClient(ui: ReactElement): ReactElement {
 function renderPage(code = '600519', includeNavigationProbe = false) {
   return render(
     wrapWithQueryClient(
-      <UiLanguageProvider initialLanguage="en">
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <UiLanguageProvider initialLanguage="en">
         <MemoryRouter initialEntries={[`/stocks/${code}`]}>
           {includeNavigationProbe && <StockRouteNavigationProbe />}
           <Routes>
@@ -111,10 +121,12 @@ function renderPage(code = '600519', includeNavigationProbe = false) {
             />
           </Routes>
         </MemoryRouter>
-      </UiLanguageProvider>,
+      </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>,
     ),
   );
 }
+
 
 describe('StockDetailsPage', () => {
   beforeEach(() => {

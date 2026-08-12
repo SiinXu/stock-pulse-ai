@@ -27,6 +27,7 @@ import {
   useMarketReviewRunner,
   useMarketReviewState,
 } from '../hooks';
+import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   APP_ROUTE_PATHS,
@@ -45,6 +46,12 @@ const MarketReviewPage: React.FC = () => {
   const { t } = useUiLanguage();
   const location = useLocation();
   const navigate = useNavigate();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.researchMarket,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const feedbackRef = useRef<HTMLDivElement | null>(null);
   const handledActionRef = useRef<string | null>(null);
   const [marketReviewRegionOverride, setMarketReviewRegionOverride] = useState<
@@ -233,6 +240,7 @@ const MarketReviewPage: React.FC = () => {
   return (
     <AppPage>
       <PageHeader
+        ref={pageHeadingRef}
         eyebrow={t('layout.nav.research')}
         title={t('home.marketReview')}
         description={t('home.marketReviewHistoryEmptyDescription')}

@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
 import { CheckCircle2, Clock3, RefreshCw, ShieldAlert, XCircle } from 'lucide-react';
 import { approvalsApi } from '../api/approvals';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
@@ -67,6 +68,12 @@ function resolveApprovalPrecondition(error: ParsedApiError | null): ApprovalPrec
 const ApprovalsPage: React.FC = () => {
   const { language } = useUiLanguage();
   const navigate = useNavigate();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.approvals,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const text = APPROVALS_TEXT[language];
   const [rule, setRule] = useState<ApprovalRule | null>(null);
   const [proposals, setProposals] = useState<ApprovalProposal[]>([]);
