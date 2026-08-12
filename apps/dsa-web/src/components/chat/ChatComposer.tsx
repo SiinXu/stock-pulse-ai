@@ -14,7 +14,10 @@ import { cn } from '../../utils/cn';
 import { getStrategyDisplay } from '../../utils/strategyDisplay';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { WhatIfScenarioPanel } from './WhatIfScenarioPanel';
-import type { WhatIfDraftState } from './whatIfScenario';
+import {
+  buildWhatIfPromoteAnalysisHref,
+  type WhatIfDraftState,
+} from './whatIfScenario';
 
 type Translate = (key: UiTextKey, params?: Record<string, string | number>) => string;
 
@@ -188,6 +191,7 @@ export function ChatComposer({
                 draft={whatIfDraft}
                 onChange={onWhatIfChange}
                 disabled={loading || sessionLoading || isSkillsLoading}
+                promoteHref={buildWhatIfPromoteAnalysisHref(activeStockCode)}
               />
             </div>
           </div>

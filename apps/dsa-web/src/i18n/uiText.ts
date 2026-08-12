@@ -483,6 +483,9 @@ const zh = {
   'chat.whatIf.magnitudeInvalid': '请输入大于 0 的有效幅度',
   'chat.whatIf.extraTurnHint': '发送后将作为额外推演轮次，消耗一次 what-if 额度。',
   'chat.whatIf.resultBadge': '假设情景 · 不构成正式建议',
+  'chat.whatIf.promote': '在分析工作台打开该股票',
+  'chat.whatIf.promoteHint': '仅预填股票并打开分析工作台，不会自动开跑，也不会写入情景假设或 DecisionSignal。',
+  'chat.whatIf.promoteNeedStock': '请先绑定股票上下文，再打开分析工作台。',
 
   'decisionSignals.action': '动作',
   'decisionSignals.active': '有效',
@@ -2463,6 +2466,9 @@ const en: Record<UiTextKey, string> = {
   'chat.whatIf.magnitudeInvalid': 'Enter a magnitude greater than 0',
   'chat.whatIf.extraTurnHint': 'Sending will run an extra scenario turn and consume one what-if credit.',
   'chat.whatIf.resultBadge': 'Hypothetical · not a formal recommendation',
+  'chat.whatIf.promote': 'Open this stock in the analysis workbench',
+  'chat.whatIf.promoteHint': 'Opens the analysis workbench with the stock prefilled. Does not auto-start a run or write scenario assumptions or DecisionSignal.',
+  'chat.whatIf.promoteNeedStock': 'Bind a stock context first to open the analysis workbench.',
 
   'decisionSignals.action': 'Action',
   'decisionSignals.active': 'Active',
