@@ -57,9 +57,18 @@ function isShellStaticPath(pathname) {
   return false;
 }
 
+function isSameOrigin(requestUrl) {
+  try {
+    return new URL(requestUrl).origin === self.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 function decideStrategy(request) {
   const method = (request.method || 'GET').toUpperCase();
   if (method !== 'GET' && method !== 'HEAD') return 'network-only';
+  if (!isSameOrigin(request.url)) return 'network-only';
   let pathname = '/';
   try {
     pathname = new URL(request.url).pathname;
@@ -74,9 +83,23 @@ function decideStrategy(request) {
   return 'network-only';
 }
 
+async function precacheShell(cache) {
+  // Prefer per-URL add so one missing optional asset does not fail the whole install.
+  await Promise.all(
+    PRECACHE_URLS.map(async (url) => {
+      try {
+        await cache.add(url);
+      } catch (error) {
+        // Entry shell assets should succeed; optional misses must not block SW install.
+        console.warn('[pwa] precache skipped', url, error);
+      }
+    })
+  );
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => precacheShell(cache)).then(() => self.skipWaiting())
   );
 });
 
@@ -97,6 +120,8 @@ self.addEventListener('fetch', (event) => {
   const strategy = decideStrategy(request);
 
   if (strategy === 'network-only') {
+    // Do not call respondWith for pass-through when we only need default fetch;
+    // still intercept so never-cache paths cannot be served from other SW caches.
     event.respondWith(fetch(request));
     return;
   }
@@ -107,7 +132,8 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match(request);
         if (cached) return cached;
         const response = await fetch(request);
-        if (response && response.ok) {
+        // basic responses only — never store opaque or error bodies
+        if (response && response.ok && response.type === 'basic') {
           cache.put(request, response.clone());
         }
         return response;
@@ -120,7 +146,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then(async (response) => {
-        if (response && response.ok) {
+        if (response && response.ok && response.type === 'basic') {
           const cache = await caches.open(CACHE_NAME);
           cache.put('/index.html', response.clone());
         }
