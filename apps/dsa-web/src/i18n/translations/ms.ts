@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",
@@ -1365,7 +1367,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.enableAuth": "Dayakan pengesahan",
   "i18n.uiText.UI_TEXT.settings.enabledAlphaSiftSuccess": "Saringan AlphaSift didayakan.",
   "i18n.uiText.UI_TEXT.settings.enablingAlphaSift": "Mendayakan...",
-  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Dalam Docker penempatan,--env-file dan Mengarang env_file menyuntik pembolehubah persekitaran hanya semasa permulaan. Kawasan eksport/import ini menggunakan bahagian belakang aktif .env fail. Untuk mengekalkan WebUI-nilai yang disimpan merentas pembinaan semula kontena, titik ENV_FILE kepada fail volum data boleh tulis seperti /app/data/runtime.env dan elakkan mengekalkan nilai lama dengan nama yang sama dalam persekitaran permulaan.",
+  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Di Docker, --env-file dan Compose env_file hanya berkuat kuasa ketika mula. Eksport/import memakai .env backend aktif. Agar tetapan WebUI kekal, arahkan ENV_FILE ke volum boleh tulis seperti /app/data/runtime.env; buang nilai bernama sama daripada persekitaran mula.",
   "i18n.uiText.UI_TEXT.settings.envExported": "Disimpan .env sandaran dieksport.",
   "i18n.uiText.UI_TEXT.settings.envExportNote": "Eksport hanya termasuk konfigurasi yang disimpan pada masa ini, bukan draf tempatan yang tidak disimpan pada halaman.",
   "i18n.uiText.UI_TEXT.settings.envImported": ".env sandaran diimport dan konfigurasi dimuat semula.",
@@ -4631,7 +4633,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testingChannel": "Sedang menguji…",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testPartialHint": "Hanya sebahagian destinasi boleh dicapai. Baiki semua kegagalan dan lulus ujian penuh sebelum mengikat peristiwa.",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testSuccessBindHint": "Saluran boleh dicapai. Ikat peristiwa yang belum diterima melalui pilihan di bawah.",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "＋ Tambah sumber model",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "+ Tambah sumber model",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.advancedDescription": "Tetapan dalaman seperti rahsia tandatangan penggunaan. Kebanyakan pengguna tidak perlu mengubahnya.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveConflicted": "Selamatkan konflik",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveFailed": "Autosimpan gagal",
@@ -4666,7 +4668,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.loadingModels": "Memuatkan model yang tersedia...",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.localValue": "Draf tempatan anda",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccess": "Sumber model",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Urus API awan, pelayan model setempat dan CLI setempat di satu tempat: tambah sumber → uji → aktifkan model → tugaskan kepada tugas.",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Urus API awan, pelayan model setempat dan CLI setempat, kemudian tetapkan model yang boleh digunakan kepada tugasan.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogFailed": "Gagal memuatkan model yang tersedia",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogOverviewError": "Status tugas tidak boleh disahkan sehingga katalog model yang tersedia dimuat semula.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogRoutingError": "Tidak dapat memuatkan katalog model yang tersedia. Ini berbeza daripada tidak mempunyai model.",
@@ -6050,25 +6052,4 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "Had rekod memori berlapis",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "Hari pengekalan memori berlapis",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "Carian vektor memori berlapis",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubActiveHeader": "Aktif sekarang",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAgentModel": "Ejen: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledDismiss": "Faham",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledMessage": "Sumber ini gagal ujian sambungan dan dinyahaktifkan supaya tidak ditunjukkan sebagai tersedia: {sources}. Baiki, uji semula, kemudian aktifkan.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledTitle": "Sumber gagal dinyahaktifkan",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubCliManage": "Urus backend penjanaan →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubLocalManage": "Urus model setempat →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubNoPrimary": "Belum ada model analisis utama",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubPrimaryModel": "Analisis utama: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCli": "Runtime CLI setempat",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCliDescription": "Codex / Claude Code / OpenCode dan seumpamanya",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloud": "Awan / API",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloudDescription": "Gemini, OpenAI, gerbang serasi dan lagi",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocal": "Pelayan model setempat",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocalDescription": "Ollama dan pelayan setempat serasi OpenAI",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerDescription": "API awan, pelayan model setempat dan CLI setempat berkongsi kategori Model.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerTitle": "Tambah sumber model",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubVisionModel": "Visi: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.closeSetup": "Kembali ke sumber model",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.enableRequiresTest": "Lulus ujian sambungan sebelum mengaktifkan. Sumber yang gagal tidak pernah dipaparkan sebagai tersedia.",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.setupLifecycleHint": "Aliran: tambah sumber → uji sambungan → aktifkan model → tugaskan kepada tugas.",
 } as const;

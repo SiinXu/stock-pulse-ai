@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -4631,7 +4633,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testingChannel": "テスト中…",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testPartialHint": "一部の宛先だけが到達可能です。失敗をすべて修正し、全テストに合格してから関連付けてください。",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testSuccessBindHint": "チャンネルに到達できました。まだ受信していないイベントを下で関連付けられます。",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "＋ モデルソースを追加",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "+ モデルソースを追加",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.advancedDescription": "使用署名の秘密のような内部設定。ほとんどのユーザーはこれらの変更をする必要がありません。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveConflicted": "紛争を救う",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveFailed": "自動セーブに失敗しました",
@@ -4666,7 +4668,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.loadingModels": "利用可能なモデルを読み込み中...",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.localValue": "あなたの地元のドラフト",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccess": "モデルソース",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "クラウド API、ローカルモデルサーバー、ローカル CLI を一箇所で管理します：ソース追加 → テスト → モデル有効化 → タスクに割り当て。",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "クラウド API、ローカルモデルサーバー、ローカル CLI を管理し、利用可能なモデルをタスクに割り当てます。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogFailed": "利用可能なモデルの読み込みに失敗",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogOverviewError": "利用可能なモデルカタログが再読み込みされるまでタスクの状態は確認できません。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogRoutingError": "利用可能なモデルカタログを読み込めませんでした。これはモデルが全くないのとは違います。",
@@ -6050,25 +6052,4 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "階層メモリの記録上限",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "階層メモリの保持日数",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "階層メモリのベクトル検索",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubActiveHeader": "現在有効",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAgentModel": "エージェント：{model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledDismiss": "了解",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledMessage": "接続テストに失敗したため、利用可能として表示されないよう無効化しました：{sources}。修正後に再テストして有効化してください。",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledTitle": "失敗したソースを無効化しました",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubCliManage": "生成バックエンドを管理 →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubLocalManage": "ローカルモデルを管理 →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubNoPrimary": "メイン分析モデルが未割り当てです",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubPrimaryModel": "メイン分析：{model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCli": "ローカル CLI ランタイム",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCliDescription": "Codex / Claude Code / OpenCode など",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloud": "クラウド / API",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloudDescription": "Gemini、OpenAI、互換ゲートウェイなど",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocal": "ローカルモデルサーバー",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocalDescription": "Ollama とローカル OpenAI 互換サーバー",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerDescription": "クラウド API・ローカルモデルサーバー・ローカル CLI は同じモデル分類です。",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerTitle": "モデルソースを追加",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubVisionModel": "ビジョン：{model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.closeSetup": "モデルソースに戻る",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.enableRequiresTest": "有効化する前に接続テストを通してください。失敗したソースは利用可能として表示されません。",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.setupLifecycleHint": "流れ：ソース追加 → 接続テスト → モデル有効化 → タスクに割り当て。",
 } as const;

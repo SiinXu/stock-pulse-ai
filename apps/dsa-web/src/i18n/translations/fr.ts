@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -4631,7 +4633,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testingChannel": "Test en cours…",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testPartialHint": "Seules certaines cibles sont accessibles. Corrigez chaque échec et réussissez un test complet avant la liaison.",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testSuccessBindHint": "Le canal est accessible. Vous pouvez lier ci-dessous les événements qu’il ne reçoit pas encore.",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "＋ Ajouter une source de modèle",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "+ Ajouter une source de modèles",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.advancedDescription": "Paramètres internes comme les secrets de signature d’usage. La plupart des utilisateurs n’ont jamais besoin de les changer.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveConflicted": "Sauver le conflit",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveFailed": "Échec de la sauvegarde automatique",
@@ -4657,7 +4659,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.fallbackDescription": "Lorsque l’appel principal du modèle échoue, ces modèles de sauvegarde sont essayés dans l’ordre.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.fallbackOrderLabel": "Ordre de repli :",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.fallbackTitle": "Ordre de secours des modèles",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.goModelAccess": "Aller aux sources de modèles",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.goModelAccess": "Accéder aux sources de modèles",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.hiddenLocalValue": "Valeur sensible locale modifiée (cachée)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.hiddenServerValue": "Valeur sensible modifiée (cachée)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.inheritReportModel": "Modèle de rapport héritier",
@@ -4666,7 +4668,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.loadingModels": "Chargement des modèles disponibles...",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.localValue": "Votre conscription locale",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccess": "Sources de modèles",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Gérez les API cloud, les serveurs de modèles locaux et les CLI locales au même endroit : ajouter une source → tester → activer les modèles → assigner aux tâches.",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Gérez les API cloud, les serveurs de modèles locaux et les CLI locales, puis affectez les modèles utilisables aux tâches.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogFailed": "Échec de charger les modèles disponibles",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogOverviewError": "Le statut de la tâche ne peut être vérifié que tant que le catalogue de modèles disponible ne se recharge pas.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogRoutingError": "Impossible de charger le catalogue de modèles disponibles. Cela ne signifie pas qu’aucun modèle n’est configuré.",
@@ -6050,25 +6052,4 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "Limite d’enregistrements de mémoire en couches",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "Jours de conservation de la mémoire en couches",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "Recherche vectorielle de mémoire en couches",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubActiveHeader": "Actuellement actif",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAgentModel": "Agent : {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledDismiss": "Compris",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledMessage": "Ces sources ont échoué au test de connexion et ont été désactivées pour ne pas apparaître comme disponibles : {sources}. Corrigez, retestez, puis activez.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledTitle": "Sources en échec désactivées",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubCliManage": "Gérer le backend de génération →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubLocalManage": "Gérer les modèles locaux →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubNoPrimary": "Aucun modèle d'analyse principal assigné",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubPrimaryModel": "Analyse principale : {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCli": "Runtime CLI local",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCliDescription": "Codex / Claude Code / OpenCode et similaires",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloud": "Source cloud / API",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloudDescription": "Gemini, OpenAI, passerelles compatibles, etc.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocal": "Serveur de modèles local",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocalDescription": "Ollama et serveurs locaux compatibles OpenAI",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerDescription": "API cloud, serveurs locaux et CLI locales partagent la catégorie Modèle.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerTitle": "Ajouter une source de modèle",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubVisionModel": "Vision : {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.closeSetup": "Retour aux sources de modèles",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.enableRequiresTest": "Réussissez un test de connexion avant d’activer. Les sources en échec n’apparaissent jamais comme disponibles.",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.setupLifecycleHint": "Flux : ajouter une source → tester la connexion → activer les modèles → assigner aux tâches.",
 } as const;

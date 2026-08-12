@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.de,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktiviere den Agentenmodus und versuche es erneut.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agentenmodus ist nicht aktiviert",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Anfrage nicht erfüllt; bitte überprüfen Sie die Details und versuchen Sie es erneut.",
@@ -4631,7 +4633,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testingChannel": "Test läuft…",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testPartialHint": "Nur einige Ziele sind erreichbar. Beheben Sie alle Fehler und bestehen Sie einen vollständigen Test, bevor Sie Ereignisse binden.",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testSuccessBindHint": "Der Kanal ist erreichbar. Unten können Sie noch nicht empfangene Ereignisse binden.",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "＋ Modellquelle hinzufügen",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "+ Modellquelle hinzufügen",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.advancedDescription": "Interne Einstellungen wie Usage-Signing-Geheimnisse. Die meisten Nutzer müssen diese nie ändern.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveConflicted": "Konflikt speichern",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveFailed": "Autosave fehlgeschlagen",
@@ -4657,7 +4659,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.fallbackDescription": "Wenn der primäre Modellaufruf fehlschlägt, werden diese Backup-Modelle der Reihe nach ausprobiert.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.fallbackOrderLabel": "Rückfallreihenfolge:",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.fallbackTitle": "Modell-Fallback-Reihenfolge",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.goModelAccess": "Zu den Modellquellen",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.goModelAccess": "Zu Modellquellen",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.hiddenLocalValue": "Lokal sensibler Wert geändert (versteckt)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.hiddenServerValue": "Sensibler Wert geändert (versteckt)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.inheritReportModel": "Inherit-Report-Modell",
@@ -4666,7 +4668,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.loadingModels": "Verfügbare Modelle werden geladen...",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.localValue": "Deine lokale Wehrpflicht",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccess": "Modellquellen",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Cloud-API, lokale Modellserver und lokale CLI an einem Ort verwalten: Quelle hinzufügen → testen → Modelle aktivieren → Aufgaben zuweisen.",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Cloud-APIs, lokale Modellserver und lokale CLI-Laufzeiten verwalten und nutzbare Modelle Aufgaben zuweisen.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogFailed": "Verfügbare Modelle wurden nicht geladen",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogOverviewError": "Der Aufgabenstatus kann erst überprüft werden, wenn der verfügbare Modellkatalog neu geladen wird.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogRoutingError": "Ich konnte den verfügbaren Modellkatalog nicht laden. Das ist etwas anderes als keine Modelle zu haben.",
@@ -6050,25 +6052,4 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "Datensatzlimit des Schichtgedächtnisses",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "Aufbewahrungstage des Schichtgedächtnisses",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "Vektorsuche im Schichtgedächtnis",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubActiveHeader": "Aktuell aktiv",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAgentModel": "Agent-Modell: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledDismiss": "Verstanden",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledMessage": "Diese Quellen sind bei Verbindungstests fehlgeschlagen und wurden deaktiviert, damit sie nicht als verfügbar gelten: {sources}. Beheben, erneut testen und dann aktivieren.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledTitle": "Fehlgeschlagene Quellen wurden deaktiviert",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubCliManage": "Generierungs-Backend verwalten →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubLocalManage": "Lokale Modelle verwalten →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubNoPrimary": "Noch kein Hauptanalysemodell zugewiesen",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubPrimaryModel": "Hauptanalyse: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCli": "Lokale CLI-Laufzeit",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCliDescription": "Codex / Claude Code / OpenCode und ähnliche",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloud": "Cloud-/API-Quelle",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloudDescription": "Gemini, OpenAI, kompatible Gateways und mehr",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocal": "Lokaler Modellserver",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocalDescription": "Ollama und lokale OpenAI-kompatible Server",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerDescription": "Cloud-API, lokale Modellserver und lokale CLI gehören zur gleichen Modellkategorie.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerTitle": "Modellquelle hinzufügen",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubVisionModel": "Vision-Modell: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.closeSetup": "Zurück zu Modellquellen",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.enableRequiresTest": "Bestehen Sie einen Verbindungstest, bevor Sie aktivieren. Fehlgeschlagene Quellen werden nie als verfügbar angezeigt.",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.setupLifecycleHint": "Ablauf: Quelle hinzufügen → Verbindung testen → Modelle aktivieren → Aufgaben zuweisen.",
 } as const;

@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M['zh-TW'],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -4666,7 +4668,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.loadingModels": "正在載入可用模型…",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.localValue": "你的本地草稿",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccess": "模型來源",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "統一管理雲端 API、本地模型服務與本地 CLI：新增來源 → 測試 → 啟用模型 → 分配到任務。",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "統一管理雲端 API、本地模型服務與本地 CLI，並將可用模型分配到任務。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogFailed": "可用模型載入失敗",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogOverviewError": "重新載入可用模型目錄前，無法確認各任務模型是否真正可用。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogRoutingError": "無法載入可用模型目錄。這與“暫無模型”不同，可能是介面暫時不可用。",
@@ -6050,25 +6052,4 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "分層記憶記錄上限",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "分層記憶保留天數",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "分層記憶向量搜尋",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubActiveHeader": "目前生效",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAgentModel": "Agent：{model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledDismiss": "知道了",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledMessage": "以下來源測試失敗，已自動停用且不會顯示為可用：{sources}。修復後請重新測試並啟用。",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledTitle": "測試失敗的來源已停用",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubCliManage": "管理生成後端 →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubLocalManage": "管理本地模型 →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubNoPrimary": "尚未分配主分析模型",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubPrimaryModel": "主分析：{model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCli": "本地 CLI 執行階段",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCliDescription": "Codex / Claude Code / OpenCode 等",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloud": "雲端 / API",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloudDescription": "Gemini、OpenAI、相容閘道等",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocal": "本地模型服務",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocalDescription": "Ollama 與本地 OpenAI 相容服務",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerDescription": "雲端 API、本地模型服務與本地 CLI 同屬模型分類。",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerTitle": "新增模型來源",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubVisionModel": "視覺：{model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.closeSetup": "返回模型來源",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.enableRequiresTest": "啟用前需先通過連線測試。測試失敗的來源不會顯示為可用。",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.setupLifecycleHint": "流程：選擇來源 → 測試連通 → 啟用模型 → 分配到任務。",
 } as const;

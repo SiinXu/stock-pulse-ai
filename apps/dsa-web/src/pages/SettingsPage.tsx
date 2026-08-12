@@ -1,5 +1,5 @@
 import type React from 'react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
@@ -22,6 +22,7 @@ import {
   GenerationBackendStatusPanel,
   IntelligentImport,
   LocalModelsWithKronos,
+  LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationTestPanel,
   NOTIFICATION_FIELD_GROUP_ORDER,
@@ -114,11 +115,6 @@ import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS } from '../locales/s
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 import TokenUsagePage from '../components/usage/TokenUsagePage';
-
-const LLMChannelEditor = lazy(async () => {
-  const module = await import('../components/settings/LLMChannelEditor');
-  return { default: module.LLMChannelEditor };
-});
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
 const CHANNEL_ROUTING_FIELD_KEYS = new Set([
@@ -1762,33 +1758,31 @@ const SettingsPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                <Suspense fallback={<SettingsLoading />}>
-                  <LLMChannelEditor
-                    key={`llm-connections-${configVersion}`}
-                    items={rawActiveItems}
-                    providers={providerCatalog}
-                    connectionFields={providerConnectionFields}
-                    catalogLoading={isProviderCatalogLoading}
-                    emptyApiKeyHosts={providerEmptyApiKeyHosts}
-                    availableModels={availableModels}
-                    availableModelRoutes={availableModels.map((model) => model.route)}
-                    maskToken={maskToken}
-                    persistedDraftItems={llmChannelDraftItems}
-                    onDraftItemsChange={handleLlmChannelDraftItemsChange}
-                    onValidityChange={handleLlmChannelValidityChange}
-                    resetSignal={llmChannelResetSignal}
-                    addSignal={llmChannelAddSignal}
-                    focusFieldRequest={llmFocusFieldRequest}
-                    disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || (providerConnectionSchemaUnavailable && !providerConnectionSchemaAllowsInspection) || hasUnsafeModelAccessSchema}
-                    catalogUnavailable={Boolean(providerCatalogError)}
-                    onReloadCatalog={() => reloadProviderCatalog()}
-                    overriddenByMode={channelsOverriddenByMode}
-                    onViewDiagnostics={() => selectSectionView('advanced', 'raw_config')}
-                    taskModelRefs={taskModelRefs}
-                    onManageModels={() => selectSectionView('ai_models', 'task_routing')}
-                    onReplaceModelReferences={replaceModelReferences}
-                  />
-                </Suspense>
+                <LLMChannelEditor
+                  key={`llm-connections-${configVersion}`}
+                  items={rawActiveItems}
+                  providers={providerCatalog}
+                  connectionFields={providerConnectionFields}
+                  catalogLoading={isProviderCatalogLoading}
+                  emptyApiKeyHosts={providerEmptyApiKeyHosts}
+                  availableModels={availableModels}
+                  availableModelRoutes={availableModels.map((model) => model.route)}
+                  maskToken={maskToken}
+                  persistedDraftItems={llmChannelDraftItems}
+                  onDraftItemsChange={handleLlmChannelDraftItemsChange}
+                  onValidityChange={handleLlmChannelValidityChange}
+                  resetSignal={llmChannelResetSignal}
+                  addSignal={llmChannelAddSignal}
+                  focusFieldRequest={llmFocusFieldRequest}
+                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || (providerConnectionSchemaUnavailable && !providerConnectionSchemaAllowsInspection) || hasUnsafeModelAccessSchema}
+                  catalogUnavailable={Boolean(providerCatalogError)}
+                  onReloadCatalog={() => reloadProviderCatalog()}
+                  overriddenByMode={channelsOverriddenByMode}
+                  onViewDiagnostics={() => selectSectionView('advanced', 'raw_config')}
+                  taskModelRefs={taskModelRefs}
+                  onManageModels={() => selectSectionView('ai_models', 'task_routing')}
+                  onReplaceModelReferences={replaceModelReferences}
+                />
               </section>
             ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (

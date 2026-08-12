@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -1365,7 +1367,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.enableAuth": "Mengaktifkan autentikasi",
   "i18n.uiText.UI_TEXT.settings.enabledAlphaSiftSuccess": "Penyaringan AlphaSift diaktifkan.",
   "i18n.uiText.UI_TEXT.settings.enablingAlphaSift": "Mengaktifkan...",
-  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Dalam Docker penyebaran,--env-file dan Compose env_file Menyuntikkan variabel lingkungan hanya saat startup. Area ekspor/impor ini menggunakan backend aktif .env berkas. Untuk mempertahankan WebUI-saved di seluruh kontainer rekontai, titik ENV_FILE ke file volume data yang dapat ditulis seperti /app/data/runtime.env dan hindari menyimpan nilai lama dengan nama yang sama di lingkungan startup.",
+  "i18n.uiText.UI_TEXT.settings.envDockerNote": "Di Docker, --env-file dan Compose env_file hanya berlaku saat startup. Ekspor/impor memakai .env backend aktif. Agar setelan WebUI bertahan, arahkan ENV_FILE ke volume tulis seperti /app/data/runtime.env; hapus nilai bernama sama dari lingkungan startup.",
   "i18n.uiText.UI_TEXT.settings.envExported": "Tersimpan .env cadangan diekspor.",
   "i18n.uiText.UI_TEXT.settings.envExportNote": "Ekspor hanya menyertakan konfigurasi yang saat ini disimpan, bukan draf lokal yang belum disimpan di halaman.",
   "i18n.uiText.UI_TEXT.settings.envImported": ".env cadangan diimpor dan konfigurasi dimuat ulang.",
@@ -4631,7 +4633,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testingChannel": "Sedang menguji…",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testPartialHint": "Hanya sebagian tujuan dapat dijangkau. Perbaiki semua kegagalan dan lulus pengujian penuh sebelum mengikat peristiwa.",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testSuccessBindHint": "Kanal dapat dijangkau. Ikat peristiwa yang belum diterima melalui pilihan di bawah.",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "＋ Tambah sumber model",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "+ Tambah sumber model",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.advancedDescription": "Pengaturan internal seperti rahasia penandatanganan penggunaan. Sebagian besar pengguna tidak perlu mengubahnya.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveConflicted": "Menyelamatkan konflik",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveFailed": "Penyimpanan otomatis gagal",
@@ -4666,7 +4668,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.loadingModels": "Memuat model yang tersedia...",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.localValue": "Draf lokal Anda",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccess": "Sumber model",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Kelola API cloud, server model lokal, dan CLI lokal di satu tempat: tambah sumber → uji → aktifkan model → tetapkan ke tugas.",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "Kelola API cloud, server model lokal, dan CLI lokal, lalu tetapkan model yang dapat digunakan ke tugas.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogFailed": "Gagal memuat model yang tersedia",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogOverviewError": "Status tugas tidak dapat diverifikasi hingga katalog model yang tersedia dimuat ulang.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogRoutingError": "Tidak dapat memuat katalog model yang tersedia. Ini berbeda dengan tidak memiliki model.",
@@ -6050,25 +6052,4 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "Batas catatan memori berlapis",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "Hari retensi memori berlapis",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "Pencarian vektor memori berlapis",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubActiveHeader": "Saat ini aktif",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAgentModel": "Agen: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledDismiss": "Mengerti",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledMessage": "Sumber berikut gagal uji koneksi dan dinonaktifkan agar tidak ditampilkan tersedia: {sources}. Perbaiki, uji ulang, lalu aktifkan.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledTitle": "Sumber gagal dinonaktifkan",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubCliManage": "Kelola backend generasi →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubLocalManage": "Kelola model lokal →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubNoPrimary": "Belum ada model analisis utama",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubPrimaryModel": "Analisis utama: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCli": "Runtime CLI lokal",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCliDescription": "Codex / Claude Code / OpenCode dan sejenisnya",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloud": "Sumber cloud / API",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloudDescription": "Gemini, OpenAI, gateway kompatibel, dan lainnya",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocal": "Server model lokal",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocalDescription": "Ollama dan server lokal kompatibel OpenAI",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerDescription": "API cloud, server model lokal, dan CLI lokal dalam satu kategori Model.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerTitle": "Tambah sumber model",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubVisionModel": "Visi: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.closeSetup": "Kembali ke sumber model",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.enableRequiresTest": "Lulus uji koneksi sebelum mengaktifkan. Sumber yang gagal tidak pernah ditampilkan sebagai tersedia.",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.setupLifecycleHint": "Alur: tambah sumber → uji koneksi → aktifkan model → tetapkan ke tugas.",
 } as const;

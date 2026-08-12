@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -4631,7 +4633,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testingChannel": "테스트 중…",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testPartialHint": "일부 대상만 연결됩니다. 모든 실패를 수정하고 전체 테스트를 통과한 뒤 이벤트를 연결하세요.",
   "locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT.testSuccessBindHint": "채널에 연결되었습니다. 아직 받지 않는 이벤트를 아래에서 연결할 수 있습니다.",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "＋ 모델 소스 추가",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.addModelService": "+ 모델 소스 추가",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.advancedDescription": "사용 서명 비밀과 같은 내부 설정들. 대부분의 사용자는 이런 것들을 변경할 필요가 없습니다.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveConflicted": "충돌 저장",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.autosaveFailed": "자동 저장 실패",
@@ -4666,7 +4668,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.loadingModels": "사용 가능한 모델을 불러오고 있습니다...",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.localValue": "지역 드래프트",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccess": "모델 소스",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "클라우드 API, 로컬 모델 서버, 로컬 CLI를 한곳에서 관리합니다: 소스 추가 → 테스트 → 모델 활성화 → 작업에 할당.",
+  "locales.settingsPage.SETTINGS_PAGE_TEXT.modelAccessDescription": "클라우드 API, 로컬 모델 서버 및 로컬 CLI를 관리하고 사용 가능한 모델을 작업에 할당합니다.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogFailed": "사용 가능한 모델 로드에 실패함",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogOverviewError": "작업 상태는 사용 가능한 모델 카탈로그가 재로드될 때까지 확인할 수 없습니다.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.modelCatalogRoutingError": "사용 가능한 모델 카탈로그를 불러올 수 없었어요. 이것은 모델이 없는 것과는 다릅니다.",
@@ -6050,25 +6052,4 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL": "계층형 메모리 기록 한도",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_RETENTION_DAYS": "계층형 메모리 보존 일수",
   "utils.systemConfigI18n.fieldTitleMaps.LAYERED_MEMORY_VECTOR_ENABLED": "계층형 메모리 벡터 검색",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubActiveHeader": "현재 활성",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAgentModel": "에이전트: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledDismiss": "확인",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledMessage": "연결 테스트에 실패한 소스는 사용 가능으로 표시되지 않도록 비활성화되었습니다: {sources}. 수정 후 다시 테스트하고 활성화하세요.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubAutoDisabledTitle": "실패한 소스가 비활성화됨",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubCliManage": "생성 백엔드 관리 →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubLocalManage": "로컬 모델 관리 →",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubNoPrimary": "메인 분석 모델이 아직 할당되지 않았습니다",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubPrimaryModel": "메인 분석: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCli": "로컬 CLI 런타임",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCliDescription": "Codex / Claude Code / OpenCode 등",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloud": "클라우드 / API",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeCloudDescription": "Gemini, OpenAI, 호환 게이트웨이 등",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocal": "로컬 모델 서버",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypeLocalDescription": "Ollama 및 로컬 OpenAI 호환 서버",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerDescription": "클라우드 API, 로컬 모델 서버, 로컬 CLI는 하나의 모델 분류입니다.",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubTypePickerTitle": "모델 소스 추가",
-  "locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT.hubVisionModel": "비전: {model}",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.closeSetup": "모델 소스로 돌아가기",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.enableRequiresTest": "활성화하기 전에 연결 테스트를 통과하세요. 실패한 소스는 사용 가능으로 표시되지 않습니다.",
-  "locales.settingsModelAccess.MODEL_ACCESS_TEXT.setupLifecycleHint": "흐름: 소스 추가 → 연결 테스트 → 모델 활성화 → 작업에 할당.",
 } as const;
