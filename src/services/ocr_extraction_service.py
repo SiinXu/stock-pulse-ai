@@ -658,27 +658,73 @@ def _guess_image_mime(image_bytes: bytes, suggested_name: str = "") -> str:
     raise ValueError("unsupported_embedded_image")
 
 
-def _extract_pdf_page_image(
+def _estimate_pdf_page_count(pdf_bytes: bytes) -> int:
+    """Best-effort page count without optional PDF libraries."""
+    matches = re.findall(rb"/Type\s*/Page(?![sA-Za-z])", pdf_bytes)
+    return max(1, len(matches)) if matches else 1
+
+
+def _extract_embedded_images_builtin(pdf_bytes: bytes) -> list[tuple[bytes, str]]:
+    """Scan PDF bytes for embedded JPEG/PNG payloads without pypdf.
+
+    Used when optional pypdf is not installed (CI baseline). Does not rasterize
+    vector or text-only pages; returns only complete image payloads found
+    inline. Prefer pypdf when available for multi-page object graph accuracy.
+    """
+    found: list[tuple[bytes, str]] = []
+    seen: set[bytes] = set()
+
+    # JPEG: SOI ... EOI markers.
+    cursor = 0
+    while True:
+        start = pdf_bytes.find(b"\xff\xd8\xff", cursor)
+        if start < 0:
+            break
+        end = pdf_bytes.find(b"\xff\xd9", start + 3)
+        if end < 0:
+            break
+        end += 2
+        blob = pdf_bytes[start:end]
+        cursor = end
+        if len(blob) < 64 or len(blob) > MAX_OCR_IMAGE_BYTES:
+            continue
+        digest = hashlib.sha256(blob).digest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        found.append((blob, "image/jpeg"))
+
+    # PNG: signature ... IEND chunk + CRC.
+    cursor = 0
+    while True:
+        start = pdf_bytes.find(b"\x89PNG\r\n\x1a\n", cursor)
+        if start < 0:
+            break
+        iend = pdf_bytes.find(b"IEND", start + 8)
+        if iend < 0:
+            break
+        end = iend + 8  # "IEND" + 4-byte CRC
+        if end > len(pdf_bytes):
+            break
+        blob = pdf_bytes[start:end]
+        cursor = end
+        if len(blob) < 64 or len(blob) > MAX_OCR_IMAGE_BYTES:
+            continue
+        digest = hashlib.sha256(blob).digest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        found.append((blob, "image/png"))
+
+    return found
+
+
+def _extract_pdf_page_image_pypdf(
     pdf_bytes: bytes,
     *,
-    page_index: int = 0,
+    page_index: int,
 ) -> tuple[bytes, str, dict[str, Any]]:
-    """Extract one embedded raster from a PDF page for offline OCR.
-
-    This intentionally does not rasterize vector/text-only pages. Text-layer
-    PDFs remain owned by ``parse_financial_pdf``. Missing or unreadable
-    embedded images degrade with an explicit reason code rather than inventing
-    pixels.
-    """
-    try:
-        from pypdf import PdfReader  # type: ignore[import-not-found]
-    except Exception as exc:  # broad-exception: fallback_recorded - optional path
-        logger.debug(
-            "OCR PDF reader import failed error_code=pdf_reader_unavailable "
-            "exception_type=%s",
-            type(exc).__name__,
-        )
-        raise ValueError("pdf_reader_unavailable") from exc
+    from pypdf import PdfReader  # type: ignore[import-not-found]
 
     try:
         reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
@@ -731,8 +777,94 @@ def _extract_pdf_page_image(
         "pdf_page_count": int(page_count),
         "pdf_embedded_image_count": len(images),
         "embedded_image_name_present": bool(suggested),
+        "pdf_extractor": "pypdf",
     }
     return image_bytes, mime_type, meta
+
+
+def _extract_pdf_page_image_builtin(
+    pdf_bytes: bytes,
+    *,
+    page_index: int,
+) -> tuple[bytes, str, dict[str, Any]]:
+    if page_index < 0:
+        raise ValueError("pdf_page_out_of_range")
+
+    page_count = _estimate_pdf_page_count(pdf_bytes)
+    images = _extract_embedded_images_builtin(pdf_bytes)
+    if not images:
+        raise ValueError("pdf_no_embedded_image")
+
+    # Builtin scan cannot map XObjects to page trees reliably. Bound the index
+    # by the larger of detected page objects and embedded image count.
+    bound = max(page_count, len(images))
+    if page_index >= bound:
+        raise ValueError("pdf_page_out_of_range")
+
+    pick = images[min(page_index, len(images) - 1)]
+    image_bytes, mime_type = pick
+    meta = {
+        "pdf_page_index": int(page_index),
+        "pdf_page_count": int(page_count),
+        "pdf_embedded_image_count": len(images),
+        "embedded_image_name_present": False,
+        "pdf_extractor": "builtin_scan",
+    }
+    return image_bytes, mime_type, meta
+
+
+def _extract_pdf_page_image(
+    pdf_bytes: bytes,
+    *,
+    page_index: int = 0,
+) -> tuple[bytes, str, dict[str, Any]]:
+    """Extract one embedded raster from a PDF page for offline OCR.
+
+    This intentionally does not rasterize vector/text-only pages. Text-layer
+    PDFs remain owned by ``parse_financial_pdf``. Missing or unreadable
+    embedded images degrade with an explicit reason code rather than inventing
+    pixels.
+
+    Prefers optional pypdf when installed; falls back to a pure-Python scan of
+    embedded JPEG/PNG payloads so CI baseline hosts without pypdf still cover
+    raster PDF fixtures.
+    """
+    pypdf_error: Optional[BaseException] = None
+    try:
+        import pypdf  # type: ignore[import-not-found]  # noqa: F401
+
+        return _extract_pdf_page_image_pypdf(pdf_bytes, page_index=page_index)
+    except ImportError as exc:
+        pypdf_error = exc
+        logger.debug(
+            "OCR PDF reader unavailable; using builtin embedded-image scan "
+            "error_code=pdf_reader_unavailable exception_type=%s",
+            type(exc).__name__,
+        )
+    except ValueError:
+        # Domain errors from pypdf path (no image, bad page, malformed) stay.
+        raise
+    except Exception as exc:  # broad-exception: fallback_recorded - optional path
+        pypdf_error = exc
+        logger.debug(
+            "OCR PDF pypdf path failed; trying builtin scan "
+            "error_code=pdf_image_extract_failed exception_type=%s",
+            type(exc).__name__,
+        )
+
+    try:
+        return _extract_pdf_page_image_builtin(pdf_bytes, page_index=page_index)
+    except ValueError:
+        raise
+    except Exception as exc:  # broad-exception: fallback_recorded - builtin path
+        logger.debug(
+            "OCR PDF builtin image scan failed error_code=pdf_image_extract_failed "
+            "exception_type=%s",
+            type(exc).__name__,
+        )
+        if pypdf_error is not None:
+            raise ValueError("pdf_image_extract_failed") from exc
+        raise ValueError("pdf_image_extract_failed") from exc
 
 
 _OCR_POLICY_DENY_REASONS = frozenset(

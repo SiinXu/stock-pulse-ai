@@ -397,7 +397,14 @@ def test_text_layer_pdf_without_embedded_image_degrades_explicitly(tmp_path: Pat
         document_kind="pdf_page",
     )
     assert payload["status"] == "unavailable"
-    assert payload["reason_code"] == "pdf_no_embedded_image"
+    # Fail closed without inventing pixels for text-layer PDFs. Builtin scan
+    # and optional pypdf both report no embedded raster; import absence is also
+    # an explicit unavailable reason when neither path can proceed.
+    assert payload["reason_code"] in {
+        "pdf_no_embedded_image",
+        "pdf_image_extract_failed",
+        "pdf_reader_unavailable",
+    }
     assert called is False
     assert payload["trust"]["authoritative_for_decisions"] is False
 
@@ -416,5 +423,35 @@ def test_malformed_pdf_is_unavailable(tmp_path: Path) -> None:
         "pdf_empty",
         "pdf_image_extract_failed",
         "pdf_no_embedded_image",
+        "pdf_reader_unavailable",
     }
+
+
+def test_pdf_page_fixture_works_without_pypdf(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI baseline may omit optional pypdf; builtin JPEG scan must still work."""
+    import builtins
+    import sys
+
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "sample_pdf_page.pdf").write_bytes((FIXTURES / "sample_pdf_page.pdf").read_bytes())
+
+    real_import = builtins.__import__
+
+    def _block_pypdf(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "pypdf" or name.startswith("pypdf."):
+            raise ImportError("blocked for OCR offline test")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _block_pypdf)
+    sys.modules.pop("pypdf", None)
+
+    payload = OcrExtractionService(
+        file_root=str(root),
+        engine=lambda *_a, **_k: "Risk Factors EXMP",
+    ).extract_path("sample_pdf_page.pdf", document_kind="pdf_page")
+    assert payload["status"] == "available"
+    assert payload["document_kind"] == "pdf_page"
+    assert payload["source"].get("pdf_extractor") == "builtin_scan"
+    assert payload["trust"]["authoritative_for_decisions"] is False
 

@@ -306,8 +306,11 @@ def test_document_kinds_via_real_session(tmp_path: Path, monkeypatch) -> None:
         assert payload["document_kind"] == kind
         assert payload["trust"]["classification"] == "untrusted_user_document"
         assert payload["trust"]["may_authorize_decisions"] is False
-        assert payload["structure"]["verified"] is False
-        assert payload["structure"]["decision_authority"] is False
+        assert payload["trust"]["authoritative_for_decisions"] is False
+        assert payload["status"] == "available", (kind, payload.get("reason_code"))
+        structure = payload.get("structure") or {}
+        assert structure.get("verified") is False
+        assert structure.get("decision_authority") is False
 
 
 def test_run_agent_loop_reaches_ocr_only_via_bound_tool_surface(
