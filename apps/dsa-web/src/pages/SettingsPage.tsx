@@ -7,6 +7,7 @@ import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
+  AGENT_SETTINGS_ESSENTIALS_SOURCE,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
@@ -1381,6 +1382,10 @@ const SettingsPage: React.FC = () => {
     || (isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0)
     || (activeCategory === 'data_source' && activeSubCategory !== 'providers')
   );
+  const agentEssentialsFocus = (
+    searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.source) === AGENT_SETTINGS_ESSENTIALS_SOURCE
+  );
+
   const activeConfigPanel = (
     <SettingsActiveConfigPanel
       panelKey={`${activeSection}:${activeView}`}
@@ -1413,6 +1418,7 @@ const SettingsPage: React.FC = () => {
       resetDraftKeys={resetDraftKeys}
       activeSaveStatus={groupSaveStates[activeCategory]?.status ?? 'idle'}
       agentModelSummary={agentModelSummary}
+      agentEssentialsFocus={agentEssentialsFocus}
       readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
       activeCategory={activeCategory}
       maskToken={maskToken}

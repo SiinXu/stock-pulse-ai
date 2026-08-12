@@ -9,7 +9,6 @@ import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatSessionSidebar } from '../components/chat/ChatSessionSidebar';
 import { ChatComposer } from '../components/chat/ChatComposer';
 import { ChatSendFeedbackAlert } from '../components/chat/ChatSendFeedback';
-import { WhatIfScenarioPanel } from '../components/chat/WhatIfScenarioPanel';
 import {
   resolveActiveStockContextFromMessage,
   restoreActiveStockContextFromMessages,
@@ -41,6 +40,7 @@ import { getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
 import { REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
+import { cn } from '../utils/cn';
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
   { labelKey: 'chat.quick.chan', skill: 'chan_theory' },
@@ -132,6 +132,7 @@ const ChatPage: React.FC = () => {
   const [contextCompressionConfigVersion, setContextCompressionConfigVersion] = useState('');
   const [contextCompressionMaskToken, setContextCompressionMaskToken] = useState('******');
   const [contextCompressionError, setContextCompressionError] = useState<string | null>(null);
+  const [desktopHistoryCollapsed, setDesktopHistoryCollapsed] = useState(false);
   const agentUnavailable = useAgentSetupAvailability();
   const [copiedMessages, setCopiedMessages] = useState<Set<string>>(new Set());
   const { copyText } = useClipboard();
@@ -830,7 +831,8 @@ const ChatPage: React.FC = () => {
       <div
         ref={desktopSessionRailRef}
         tabIndex={-1}
-        className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden xl:flex"
+        className={cn('hidden h-full flex-shrink-0 flex-col overflow-hidden transition-[width] xl:flex',
+          desktopHistoryCollapsed ? 'w-14' : 'w-64')}
         data-testid="chat-session-rail"
       >
         <ChatSessionSidebar
@@ -851,6 +853,7 @@ const ChatPage: React.FC = () => {
             setDeleteConfirmId(id);
             setDeleteError(null);
           }}
+          collapsed={desktopHistoryCollapsed} onCollapsedChange={setDesktopHistoryCollapsed}
         />
       </div>
 
@@ -1056,10 +1059,6 @@ const ChatPage: React.FC = () => {
               </button>
             </div>
           )}
-
-          <WhatIfScenarioPanel t={t} draft={whatIfDraft} onChange={setWhatIfDraft}
-            disabled={loading || sessionLoading || isSkillsLoading} />
-
           <ChatComposer
             language={language}
             t={t}
@@ -1074,6 +1073,7 @@ const ChatPage: React.FC = () => {
             contextCompressionSaving={contextCompressionSaving}
             contextCompressionError={contextCompressionError}
             onContextCompressionChange={(next) => void updateContextCompressionEnabled(next)}
+            whatIfDraft={whatIfDraft} onWhatIfChange={setWhatIfDraft}
             skills={skills}
             selectedSkillIds={selectedSkillIds}
             selectedSkillIdSet={selectedSkillIdSet}

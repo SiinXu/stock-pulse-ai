@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createUiLanguageRecord } from '../../i18n/createUiLanguageRecord';
 import { UI_TEXT, type UiLanguage, type UiTextKey } from '../../i18n/uiText';
-import { APP_ROUTE_PATHS, buildSettingsHref } from '../../routing/routes';
+import { APP_ROUTE_PATHS, buildAgentExecutionSettingsHref, buildSettingsHref } from '../../routing/routes';
 import type {
   ApiErrorCategory,
   ErrorRemediation,
@@ -331,7 +331,7 @@ type RemediationDefinition = {
 };
 
 const SETTINGS_AI_CONNECTIONS = buildSettingsHref({ section: 'ai_models', view: 'connections' });
-const SETTINGS_AGENT_EXECUTION = buildSettingsHref({ section: 'agent_behavior', view: 'execution' });
+const SETTINGS_AGENT_EXECUTION = buildAgentExecutionSettingsHref({ essentialsFocus: true });
 const SETTINGS_AUTH_SECURITY = buildSettingsHref({ section: 'system_security', view: 'security' });
 const SETTINGS_NOTIFICATIONS = buildSettingsHref({ section: 'notifications', view: 'channels' });
 const SETTINGS_DATA_SOURCES = buildSettingsHref({ section: 'data_sources', view: 'sources' });
