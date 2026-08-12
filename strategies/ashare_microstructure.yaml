@@ -24,6 +24,7 @@ default_active: false
 default_router: false
 default_priority: 252
 market_regimes: [volatile, ranging, trending_up, trending_down]
+market_scopes: [cn/equity]
 
 instructions: |
   **A-share Microstructure Rules Specialist (research only)**

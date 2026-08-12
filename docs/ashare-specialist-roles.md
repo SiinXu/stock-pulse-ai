@@ -33,9 +33,11 @@ Migration hooks if a later Persona host arrives:
 Each Skill declares:
 
 - `default_active: false` / `default_router: false` (empty `AGENT_SKILLS` → no change)
+- `market_scopes: [cn/equity]`, enforced by `SkillRouter` before specialist
+  construction, tool access, model work, or specialist-cap consumption
 - `required_tools` limited to **existing** Agent tools
 - Explicit **data dependency** tables and **fail-soft** degradation copy
-- A-share-only scope; non A-share → `out of scope`
+- Prompt-level `out of scope` defense in depth after the runtime scope gate
 - Evidence vs interpretation separation in the output contract
 
 ## Enablement
@@ -52,7 +54,9 @@ AGENT_ORCHESTRATOR_MODE=specialist
 
 Request fields that already accept `skills` can pass the same stable ids.
 Activation puts Skills into the resolved active catalog; routing still applies
-the existing max-three specialist cap.
+the existing max-three specialist cap after market/instrument scope filtering.
+HK, US, JP/KR/TW, crypto, ETF, index, unsupported, and missing-symbol contexts
+cannot construct these specialists even when their ids are explicitly selected.
 
 ## Report path
 

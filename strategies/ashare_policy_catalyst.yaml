@@ -25,6 +25,7 @@ default_active: false
 default_router: false
 default_priority: 250
 market_regimes: [sector_hot, volatile]
+market_scopes: [cn/equity]
 
 instructions: |
   **A-share Policy & Catalyst Specialist (research only)**

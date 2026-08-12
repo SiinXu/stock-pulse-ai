@@ -113,7 +113,7 @@ AGENT_SKILL_ROUTING=manual
 AGENT_SKILLS=ashare_policy_catalyst,ashare_capital_flow,ashare_microstructure
 ```
 
-非 A 股标的由 Skill 指令返回 `out of scope`；资金流/筹码等 specialty feed 不可用时写明 `unavailable`，不得编造北向、龙虎榜或席位数据。稳定 id 预留后续 Persona 宿主迁移位（见 [A-share specialist roles](../docs/ashare-specialist-roles.md)）。
+三个 Skill 都声明 `market_scopes: [cn/equity]`：运行时在 specialist 构造、工具访问、模型调用和数量上限计算之前排除港/美/日/韩/台股、crypto、ETF、指数、无效或缺失标的；Skill 内的 `out of scope` 指令只作为纵深防御。资金流/筹码等 specialty feed 不可用时写明 `unavailable`，不得编造北向、龙虎榜或席位数据。稳定 id 预留后续 Persona 宿主迁移位（见 [A-share specialist roles](../docs/ashare-specialist-roles.md)）。
 
 ## 投资委员会 Persona Skills（默认关闭）
 

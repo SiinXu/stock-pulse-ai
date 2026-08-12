@@ -24,6 +24,7 @@ default_active: false
 default_router: false
 default_priority: 251
 market_regimes: [trending_up, trending_down, volatile, sector_hot]
+market_scopes: [cn/equity]
 
 instructions: |
   **A-share Capital Flow Specialist (research only)**
