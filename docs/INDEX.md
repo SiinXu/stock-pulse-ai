@@ -106,6 +106,7 @@
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
+| [预测 vs 实际跟踪归属](prediction-vs-actual-tracking.md) | #449→#1107：框架由 Agent Evolution Epic 承接；展示/适配器残留见子 issue |
 | [插件开发指南](plugin-development-guide_zh.md) | 六个扩展点的统一入口：是什么/为什么、信任模型、10 分钟 quickstart、官方示例与专题链接（[English](plugin-development-guide.md)） |
 | [离线金融 Agent 评测基准](agent-eval-benchmark.md) | Agent 运行度量（任务正确性、工具纪律、不确定性诚实）、基线与刷新流程（#252 V0；[EN](agent-eval-benchmark_EN.md)） |
 | [Data Provider 插件作者指南（英文）](data-provider-plugin-authoring.md) | 可加载示例、manifest、`PLUGINS_DIR`、生命周期诊断、版本兼容、信任模型与路由边界 |

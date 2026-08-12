@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Classify fail-soft broad handlers in agent episode log and optional ClaimScorer offline eval so backend-gate broad-exception ratchet passes (Refs #1090, #1092, #1107, #449).
+- [Docs] Document #449 Prediction vs Actual framework as superseded by Epic #1107 delivery; residual display/adapters stay on child issues (Refs #449, #1107).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Added] Agent evolution episode log (feature-flagged append-only trajectories, lessons, outcome labels) with fail-soft executor hook and retention policy (Refs #1090, #1107).
 - [Added] Offline prediction-verification eval suite integrated into agent benchmark runner plus blocking CI `agent-eval-gate` with fixed 0.0 regression threshold and injected-degradation anti-tests (Refs #1092, #1107).

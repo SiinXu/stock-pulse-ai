@@ -527,11 +527,11 @@ def _optional_claim_scorer(
 ) -> Optional[Dict[str, Any]]:
     try:
         from src.services.claim_scorer import ClaimScorer  # type: ignore
-    except Exception:
+    except Exception:  # broad-exception: optional_metadata - ClaimScorer lands via A5; offline eval stays pure
         return None
     try:
         report = ClaimScorer().score(claims, actuals)
-    except Exception:
+    except Exception:  # broad-exception: cleanup - optional scorer must not fail offline prediction gate
         return None
     if hasattr(report, "to_dict"):
         return report.to_dict()

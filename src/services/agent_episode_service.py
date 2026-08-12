@@ -73,7 +73,7 @@ class AgentEpisodeService:
             stored = self._repository.append(create)
             self._maybe_apply_retention(cfg)
             return stored
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # broad-exception: fallback_recorded - episode append must never fail analysis
             log_safe_exception(
                 logger,
                 "agent_episode_record_failed",
@@ -132,7 +132,7 @@ class AgentEpisodeService:
                 "outcome_labels": outcome_labels,
             }
             return self.record_episode(payload, config=cfg)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # broad-exception: fallback_recorded - result projection must never fail analysis
             log_safe_exception(
                 logger,
                 "agent_episode_record_from_result_failed",
@@ -179,7 +179,7 @@ class AgentEpisodeService:
             cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
             self._repository.apply_retention(cutoff=cutoff)
             self._repository.apply_capacity(max_rows=max_rows)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # broad-exception: fallback_recorded - retention is best-effort after append
             log_safe_exception(
                 logger, "agent_episode_retention_failed", exc,
                 error_code="agent_episode_retention_failed",
