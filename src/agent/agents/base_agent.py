@@ -237,8 +237,15 @@ class BaseAgent(ABC):
                 system_prompt,
                 ctx_meta=ctx.meta if isinstance(ctx.meta, dict) else None,
             )
-        except Exception:
-            pass
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional persona failures are logged and leave the canonical prompt unchanged.
+            log_safe_exception(
+                logger,
+                "Agent stage research persona assembly failed",
+                exc,
+                error_code="agent_stage_research_persona_failed",
+                level=logging.WARNING,
+                context={"agent": self.agent_name},
+            )
         system_prompt = compose_agent_soul_prompt(system_prompt)
         record_agent_soul_composition(ctx, system_prompt)
         messages: List[Dict[str, Any]] = [

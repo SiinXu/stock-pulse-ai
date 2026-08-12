@@ -324,7 +324,12 @@ class GeminiAnalyzer:
                 _emit_progress(parse_progress, f"{name}：LLM 返回完成，正在解析 JSON")
 
                 # Parse response
-                result = self._parse_response(response_text, code, name)
+                result = self._parse_response(
+                    response_text,
+                    code,
+                    name,
+                    analysis_context=context,
+                )
                 result.raw_response = response_text
                 result.search_performed = bool(news_context)
                 result.market_snapshot = self._build_market_snapshot(context)

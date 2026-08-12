@@ -1,6 +1,6 @@
 """Response assembly method sources for the analyzer facade."""
 
-from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Mapping, Optional, Tuple
 
 from src.llm.generation_backend import GenerationError, GenerationErrorCode
 
@@ -172,7 +172,9 @@ class GeminiAnalyzer:
         self,
         response_text: str,
         code: str,
-        name: str
+        name: str,
+        *,
+        analysis_context: Optional[Mapping[str, Any]] = None,
     ) -> AnalysisResult:
         """
         解析 Gemini 响应（决策仪表盘版）
@@ -248,6 +250,7 @@ class GeminiAnalyzer:
                     dashboard = enrich_dashboard_research_persona(
                         dashboard,
                         config=self._get_runtime_config(),
+                        analysis_context=analysis_context,
                         report_language=report_language,
                     )
                 except Exception as persona_exc:  # broad-exception: fallback_recorded - persona label is optional

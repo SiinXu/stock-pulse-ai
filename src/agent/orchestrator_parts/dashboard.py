@@ -158,7 +158,6 @@ class _DashboardMethods:
             apply_research_persona_to_agent_context(
                 ctx,
                 config=getattr(self, "config", None),
-                request_context=context,
             )
         except Exception as exc:  # broad-exception: fallback_recorded - Research persona is optional.
             log_safe_exception(

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from src.agent.runtime_facts import (
@@ -12,6 +13,9 @@ from src.agent.stock_scope import resolve_stock_scope
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.market_context import get_market_guidelines, get_market_role
 from src.report_language import normalize_report_language
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger("src.agent.executor")
 
 if TYPE_CHECKING:
     from src.agent.executor import (
@@ -128,15 +132,20 @@ class _RunMethods:
             inject_research_persona_into_analysis_context(
                 persona_context,
                 config=getattr(self, "config", None),
-                request_context=context,
                 report_language=report_language,
             )
             system_prompt = append_research_persona_to_system_prompt(
                 system_prompt,
                 context=persona_context,
             )
-        except Exception:
-            pass
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional persona failures are logged and leave the canonical prompt unchanged.
+            log_safe_exception(
+                logger,
+                "Agent run research persona assembly failed",
+                exc,
+                error_code="agent_run_research_persona_failed",
+                level=logging.WARNING,
+            )
         system_prompt = _compose_agent_soul_prompt(system_prompt)
 
         # Build tool declarations in OpenAI format (litellm handles all providers)

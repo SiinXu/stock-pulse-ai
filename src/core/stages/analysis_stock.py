@@ -653,7 +653,6 @@ class _StockAnalysisStageMixin:
                 inject_research_persona_into_analysis_context(
                     enhanced_context,
                     config=self.config,
-                    request_context=enhanced_context,
                     report_language=report_language,
                 )
             except Exception as exc:  # broad-exception: fallback_recorded - Research persona is optional.

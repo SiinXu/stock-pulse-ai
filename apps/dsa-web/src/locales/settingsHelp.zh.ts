@@ -2184,19 +2184,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.AGENT_RESEARCH_PERSONA': {
     title: '研究立场预设',
-    summary: '可选研究立场预设，影响语气、风险表述与结论风格。',
-    usage: '默认留空。需要固定研究立场时选择 rational_analyst / risk_guardian / long_term_compounder。风格标签不构成收益背书。',
-    valueNotes: ['留空保持默认 Agent 语气。', '请求上下文与个人投资框架 research_stance 可覆盖此配置。'],
-    impact: ['启用时向分析/Agent 提示词注入数据化立场，并在报告中标注 active_research_persona。'],
-    notes: ['详见 docs/investor-personas.md。投资视角 Skill 仍需通过 Skills/委员会显式启用。'],
   },
   'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
     title: '自定义研究立场',
-    summary: '在无框架 research_stance 时使用的可选自由文本研究立场。',
-    usage: '默认留空。持久自定义文本优先写入个人投资框架的 research_stance 字段。',
-    valueNotes: ['长度受后端校验约束。', '留空表示配置层不提供自定义立场文本。'],
-    impact: ['仅在研究立场路径激活时附加自定义说明。'],
-    notes: ['不暗示关联或收益背书。'],
   },
 
 

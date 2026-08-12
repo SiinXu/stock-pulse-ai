@@ -714,7 +714,7 @@ const fieldTitleMapEn = {
   ANTHROPIC_MAX_TOKENS: 'Anthropic Max Tokens',
   AGENT_INVESTMENT_COMMITTEE_MODE: 'Investment Committee Mode',
   AGENT_RESEARCH_PERSONA: 'Research Persona Preset',
-  AGENT_RESEARCH_PERSONA_CUSTOM: 'Custom Research Persona Text',
+  AGENT_RESEARCH_PERSONA_CUSTOM: 'Custom Research Stance',
   FEISHU_CHAT_ID: 'Feishu Chat ID',
   FEISHU_RECEIVE_ID_TYPE: 'Feishu Receive ID Type',
   FEISHU_DOMAIN: 'Feishu Domain',

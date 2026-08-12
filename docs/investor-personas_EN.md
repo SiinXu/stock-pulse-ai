@@ -7,7 +7,7 @@ Issues [#119](https://github.com/SiinXu/stock-pulse-ai/issues/119) and [#467](ht
 Personas are **structured data**, built on:
 
 1. **Investment lenses** — Skill YAML under `strategies/personas/`
-2. **Research stances** — optional tone presets via config / request / personal investment framework `research_stance`
+2. **Research stances** — optional tone presets via config or the personal investment framework `research_stance`
 
 Default **off**. Famous names are **style-reference labels only**.
 
@@ -27,9 +27,10 @@ Enable via `AGENT_SKILLS`, Investment Committee mode, or request `personas`.
 
 Presets: `rational_analyst`, `risk_guardian`, `long_term_compounder`.
 
-Priority: request > active framework `research_stance` > `AGENT_RESEARCH_PERSONA` / `AGENT_RESEARCH_PERSONA_CUSTOM`.
+Priority: active framework `research_stance` > `AGENT_RESEARCH_PERSONA` / `AGENT_RESEARCH_PERSONA_CUSTOM`.
 
 When active: analysis/Agent prompts receive a data-rendered section; reports may label `dashboard.active_research_persona`.
+Custom text is rendered as untrusted preference data before the canonical Agent Soul. It cannot change ToolSurface, permissions, evidence requirements, or output contracts.
 
 ## Compliance
 

@@ -110,15 +110,20 @@ class _ChatMethods:
                 persona_context,
                 config=getattr(self, "config", None)
                 or getattr(getattr(self, "llm_adapter", None), "_config", None),
-                request_context=context,
                 report_language=report_language,
             )
             system_prompt = append_research_persona_to_system_prompt(
                 system_prompt,
                 context=persona_context,
             )
-        except Exception:
-            pass
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional persona failures are logged and leave the canonical prompt unchanged.
+            log_safe_exception(
+                logger,
+                "Agent chat research persona assembly failed",
+                exc,
+                error_code="agent_chat_research_persona_failed",
+                level=logging.WARNING,
+            )
         system_prompt = _compose_agent_soul_prompt(system_prompt)
         soul_runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
 

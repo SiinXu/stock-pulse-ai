@@ -12447,7 +12447,7 @@ export interface components {
             /** Custom Text */
             custom_text?: string | null;
             /** Preferred Lens Skill Ids */
-            preferred_lens_skill_ids?: string[];
+            preferred_lens_skill_ids?: ("persona_value_moat" | "persona_mental_models" | "persona_contrarian_deep_value" | "persona_disruptive_growth" | "persona_tail_risk")[];
             /** Preset Id */
             preset_id?: ("rational_analyst" | "risk_guardian" | "long_term_compounder") | null;
         };

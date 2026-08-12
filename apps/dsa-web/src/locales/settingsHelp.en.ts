@@ -1345,19 +1345,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.agent.AGENT_RESEARCH_PERSONA': {
     title: 'Research Persona Preset',
-    summary: 'Optional research-stance preset that shapes tone, risk framing, and conclusion style.',
-    usage: 'Leave empty (default). Choose rational_analyst, risk_guardian, or long_term_compounder when you want a fixed research stance. Style labels are not performance claims.',
-    valueNotes: ['Empty keeps default Agent tone.', 'Request context and the personal framework research_stance field can override this.'],
-    impact: ['Injects a data-defined stance into analysis/Agent prompts and labels active_research_persona on reports when set.'],
-    notes: ['See docs/investor-personas_EN.md. Investment-lens Skills remain separate opt-in Skills/committee personas.'],
   },
   'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
-    title: 'Custom Research Persona Text',
-    summary: 'Optional free-form research stance when no framework research_stance is active.',
-    usage: 'Leave empty by default. Prefer the versioned personal investment framework research_stance field for durable custom text.',
-    valueNotes: ['Max length is bounded by backend validation.', 'Empty means no custom stance text from config.'],
-    impact: ['Adds custom stance instructions only when the research persona path is active.'],
-    notes: ['Does not imply affiliation or return endorsement.'],
+    title: 'Custom Research Stance',
   },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',

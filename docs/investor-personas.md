@@ -7,16 +7,17 @@
 Persona 为**结构化数据**，建立在：
 
 1. **投资视角** — `strategies/personas/` Skill YAML
-2. **研究立场** — 配置 / 请求 / 个人投资框架 `research_stance`
+2. **研究立场** — 配置 / 个人投资框架 `research_stance`
 
 默认**关闭**。人物名仅作风格参考。
 
 ## 启用
 
 - 视角：`AGENT_SKILLS` / 投资委员会 / 请求 `personas`
-- 立场：`AGENT_RESEARCH_PERSONA` / 框架 `research_stance` / 请求 `research_persona`
+- 立场：个人投资框架 `research_stance`（优先）/ `AGENT_RESEARCH_PERSONA` / `AGENT_RESEARCH_PERSONA_CUSTOM`
 
 启用后在分析/Agent 提示词注入，并在 `dashboard.active_research_persona` 标注。
+自定义文本会作为不受信任的偏好数据置于规范 Agent Soul 之前，不能改变 ToolSurface、权限、证据要求或输出契约。
 
 ## 合规
 

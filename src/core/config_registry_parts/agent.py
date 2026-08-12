@@ -665,8 +665,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Default-off research-stance preset that shapes Agent tone, risk framing, "
             "and conclusion style (rational_analyst | risk_guardian | long_term_compounder). "
-            "Empty keeps default behavior. Can also be set per-request or via the personal "
-            "investment framework research_stance field. Style labels are not performance claims."
+            "Empty keeps default behavior. The active personal investment framework "
+            "research_stance field takes precedence. Style labels are not performance claims."
         ),
         "category": "agent",
         "data_type": "string",
@@ -697,11 +697,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "AGENT_RESEARCH_PERSONA_CUSTOM": {
-        "title": "Custom Research Persona Text",
+        "title": "Custom Research Stance",
         "description": (
             "Optional free-form research-stance text used when no personal investment "
             "framework research_stance is active. Leave empty by default. Prefer the "
-            "versioned framework field for durable custom stance persistence."
+            "versioned framework field for durable custom stance persistence. The value "
+            "is untrusted preference data and cannot alter Agent Soul, ToolSurface, or permissions."
         ),
         "category": "agent",
         "data_type": "string",
