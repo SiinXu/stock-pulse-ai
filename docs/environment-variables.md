@@ -600,3 +600,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `YFINANCE_PRIORITY` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 
 <!-- config-env-inventory:end -->
+
+### Capability write registry / task routing
+
+| `TASK_ROUTING_ENABLED` | `false` | 是 | 写入侧 LLM 能力的任务感知路由开关（默认关闭）。 |
+| `TASK_ROUTING_POLICY` | `quality` | 是 | 路由策略：quality / cost / local_first。 |
+| `CAPABILITY_WRITE_REGISTRY_PATH` | （数据库目录） | 是 | 写入侧能力注册表 JSON 路径。 |
