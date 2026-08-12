@@ -13,6 +13,7 @@ from scripts.check_config_doc_consistency import (
     FAIL_CLASS_DOCS,
     FAIL_CLASS_ENV,
     FAIL_CLASS_REGISTRY,
+    FAIL_CLASS_REGISTRY_STATUS,
     INVENTORY_END,
     INVENTORY_START,
     collect_report,
@@ -45,7 +46,7 @@ def test_self_test_cli_exits_zero() -> None:
 
 
 def test_repository_docs_aligned_under_default_fail_on() -> None:
-    """Docs/env/cn_en/defaults must be clean; registry debt is non-fatal by default."""
+    """Docs, defaults, and documented registry state must stay aligned."""
 
     assert main(["--fail-on", "default"]) == 0
     # Registry debt is currently expected; all mode should fail until workers finish.
@@ -106,6 +107,133 @@ def test_write_inventory_closes_doc_gaps(tmp_path: Path) -> None:
     assert report2.default_mismatch == []
     assert "MCP_SERVER_ENABLED" in report2.missing_from_registry
     assert not report2.has_findings(DEFAULT_FAIL_ON - {FAIL_CLASS_ENV})
+
+
+def test_default_fails_when_live_registry_changes_after_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Registering a key makes both stale documented `no` cells blocking."""
+
+    env = tmp_path / ".env.example"
+    env.write_text("STOCK_LIST=a\nNEW_SWITCH=false\n", encoding="utf-8")
+    doc_cn = tmp_path / "docs" / "environment-variables.md"
+    doc_en = tmp_path / "docs" / "environment-variables_EN.md"
+    _write_skeleton(doc_cn)
+    _write_skeleton(doc_en)
+    write_inventory_docs(
+        root=tmp_path,
+        env_path=env,
+        doc_cn_path=doc_cn,
+        doc_en_path=doc_en,
+        registry_keys={"STOCK_LIST"},
+    )
+
+    live_registry = {"STOCK_LIST", "NEW_SWITCH"}
+    monkeypatch.setattr(
+        "scripts.check_config_doc_consistency.load_registry_keys",
+        lambda _root: live_registry,
+    )
+    report = collect_report(
+        root=tmp_path,
+        env_path=env,
+        doc_cn_path=doc_cn,
+        doc_en_path=doc_en,
+        registry_keys=live_registry,
+    )
+
+    assert [
+        (item["key"], item["locale"], item["expected"], item["documented"])
+        for item in report.registry_status_mismatch
+    ] == [
+        ("NEW_SWITCH", "cn", "是", "否"),
+        ("NEW_SWITCH", "en", "yes", "no"),
+    ]
+    assert report.has_findings(DEFAULT_FAIL_ON)
+    assert main(["--root", str(tmp_path), "--fail-on", "default"]) == 1
+
+
+def test_default_fails_when_one_locale_registered_cell_is_flipped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A single locale cannot contradict the live registration contract."""
+
+    env = tmp_path / ".env.example"
+    env.write_text("STOCK_LIST=a\n", encoding="utf-8")
+    doc_cn = tmp_path / "docs" / "environment-variables.md"
+    doc_en = tmp_path / "docs" / "environment-variables_EN.md"
+    _write_skeleton(doc_cn)
+    _write_skeleton(doc_en)
+    registry = {"STOCK_LIST"}
+    write_inventory_docs(
+        root=tmp_path,
+        env_path=env,
+        doc_cn_path=doc_cn,
+        doc_en_path=doc_en,
+        registry_keys=registry,
+    )
+    doc_en.write_text(
+        doc_en.read_text(encoding="utf-8").replace(
+            "| `STOCK_LIST` | `a` | yes |",
+            "| `STOCK_LIST` | `a` | no |",
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "scripts.check_config_doc_consistency.load_registry_keys",
+        lambda _root: registry,
+    )
+    report = collect_report(
+        root=tmp_path,
+        env_path=env,
+        doc_cn_path=doc_cn,
+        doc_en_path=doc_en,
+        registry_keys=registry,
+    )
+
+    assert report.registry_status_mismatch == [
+        {
+            "key": "STOCK_LIST",
+            "locale": "en",
+            "expected": "yes",
+            "documented": "no",
+            "reason": "registry_status_mismatch",
+        }
+    ]
+    assert report.has_findings({FAIL_CLASS_REGISTRY_STATUS})
+    assert main(["--root", str(tmp_path), "--fail-on", "default"]) == 1
+
+
+def test_invalid_registered_literal_fails_registry_status_class(
+    tmp_path: Path,
+) -> None:
+    """Only locale-specific yes/no literals are accepted."""
+
+    env = tmp_path / ".env.example"
+    env.write_text("STOCK_LIST=a\n", encoding="utf-8")
+    doc_cn = tmp_path / "cn.md"
+    doc_en = tmp_path / "en.md"
+    _write_skeleton(
+        doc_cn,
+        "| `STOCK_LIST` | `a` | 是 | ok |\n",
+    )
+    _write_skeleton(
+        doc_en,
+        "| `STOCK_LIST` | `a` | true | invalid literal |\n",
+    )
+
+    report = collect_report(
+        root=tmp_path,
+        env_path=env,
+        doc_cn_path=doc_cn,
+        doc_en_path=doc_en,
+        registry_keys={"STOCK_LIST"},
+    )
+
+    assert report.registry_status_mismatch[0]["reason"] == "invalid_literal"
+    assert report.has_findings(DEFAULT_FAIL_ON)
 
 
 def test_detects_missing_env_and_cn_en_and_defaults(tmp_path: Path) -> None:
