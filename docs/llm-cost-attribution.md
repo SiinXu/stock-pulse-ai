@@ -12,3 +12,4 @@ Refs #166, #248。与每模式 Agent 预算（#1213）对齐计量口径。
 共享实现：`src/llm/cost.py`。
 
 配置：`LLM_USAGE_ATTRIBUTION_ENABLED`（默认 true）、`LLM_COST_PRICING_PATH`。
+
