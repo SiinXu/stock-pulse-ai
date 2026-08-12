@@ -1298,6 +1298,16 @@ System defaults to AkShare (free), also supports other data sources:
 - If credentials are absent, the optional Longbridge fetcher is not instantiated
 - When runtime errors such as `client is closed`, `context closed`, or `connection closed` occur, Longbridge enters a short cooldown window and US/HK daily or realtime requests automatically fall back to YFinance / AkShare instead of reconnecting on every request
 
+### Alternative data plugins (default off)
+
+Corporate events, holdings, supply-chain tags, and quantified sentiment are **not** built-in primary market sources. They use the ToolSurface capability `alt_data:read` and stay **non-authoritative supporting evidence** only.
+
+- **Default off:** keep `PLUGINS_DIR` unset. The corporate-events factory is not in the default Agent tool catalog.
+- **Reference package:** `examples/plugins/example-alternative-data` (deterministic fixture; declare `alt_data:read` in the manifest).
+- **Enable:** point `PLUGINS_DIR` at a reviewed parent directory (for example `examples/plugins`), restart the process, and grant sessions `alt_data:read` only when intended.
+- **Governance:** invalid / missing payloads become gaps with `confidence=null`; attaching alt-data does not change core `AnalysisContextPack` quality scores or project into `verified_fact` / `decision` strata.
+- **Contract:** [alternative-data-plugin-contract.md](alternative-data-plugin-contract.md)
+
 ---
 
 ## Advanced Features

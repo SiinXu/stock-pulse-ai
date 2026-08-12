@@ -1416,6 +1416,16 @@ PUSHOVER_API_TOKEN=your_api_token
 - 仅在 YFinance（美股）或 AkShare（港股）返回数据不完整时自动触发，不影响 A 股链路
 - 未配置凭据时不会实例化该可选数据源；若运行时出现连接关闭类异常，会在冷却期内临时跳过 Longbridge，避免请求级频繁重连
 
+### 另类数据插件（默认关闭）
+
+公司事件、持仓变动、供应链标签、量化情绪等**不是**内置主行情源。它们使用 ToolSurface 能力 `alt_data:read`，且只能作为**非权威支持性证据**。
+
+- **默认关闭：** 保持 `PLUGINS_DIR` 未设置；公司事件工具不在默认 Agent 工具目录中。
+- **参考包：** `examples/plugins/example-alternative-data`（确定性夹具；manifest 声明 `alt_data:read`）。
+- **启用：** 将 `PLUGINS_DIR` 指向已审查的父目录（例如 `examples/plugins`），重启进程，并仅在需要时为会话授予 `alt_data:read`。
+- **治理：** 无效/缺失载荷转为缺口且 `confidence=null`；附加另类数据不改变核心 `AnalysisContextPack` 质量分，也不投影到 `verified_fact` / `decision` 层。
+- **契约：** [alternative-data-plugin-contract_zh.md](alternative-data-plugin-contract_zh.md)
+
 ### 东财接口频繁失败时的处理
 
 若日志出现 `RemoteDisconnected`、`push2his.eastmoney.com` 连接被关闭等，多为东财限流。建议：
