@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Contract tests for hard per-mode budgets (Refs #1121, #125)."""
+"""Contract tests for hard per-mode Agent budgets (Refs #1121, #125)."""
 
 from __future__ import annotations
 
