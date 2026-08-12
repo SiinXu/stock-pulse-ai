@@ -184,9 +184,9 @@ def execute_plan_loop(
                     started=started,
                     cancelled=True,
                     phase_status="cancelled",
-                tracer=tracer,
-                max_total_tool_calls=resolved.max_total_tool_calls,
-                max_observation_replans=resolved.max_observation_replans,
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
             if time.monotonic() >= deadline:
                 return _finish(
@@ -204,9 +204,9 @@ def execute_plan_loop(
                     started=started,
                     timed_out=True,
                     phase_status="timed_out",
-                tracer=tracer,
-                max_total_tool_calls=resolved.max_total_tool_calls,
-                max_observation_replans=resolved.max_observation_replans,
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
             step = current_plan.steps[step_index]
@@ -274,9 +274,9 @@ def execute_plan_loop(
                     started=started,
                     cancelled=True,
                     phase_status="cancelled",
-                tracer=tracer,
-                max_total_tool_calls=resolved.max_total_tool_calls,
-                max_observation_replans=resolved.max_observation_replans,
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
             if budget_hit == "timed_out":
                 return _finish(
@@ -294,9 +294,9 @@ def execute_plan_loop(
                     started=started,
                     timed_out=True,
                     phase_status="timed_out",
-                tracer=tracer,
-                max_total_tool_calls=resolved.max_total_tool_calls,
-                max_observation_replans=resolved.max_observation_replans,
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
             if budget_hit == "max_tool_calls_exceeded":
                 return _finish(
@@ -313,9 +313,9 @@ def execute_plan_loop(
                     plans_trace=plans_trace,
                     started=started,
                     phase_status="failed",
-                tracer=tracer,
-                max_total_tool_calls=resolved.max_total_tool_calls,
-                max_observation_replans=resolved.max_observation_replans,
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
             if step_obs.status == "succeeded":
@@ -352,9 +352,9 @@ def execute_plan_loop(
                     plans_trace=plans_trace,
                     started=started,
                     phase_status="failed",
-                tracer=tracer,
-                max_total_tool_calls=resolved.max_total_tool_calls,
-                max_observation_replans=resolved.max_observation_replans,
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
             replan_reason = step_obs.failure_reason or "step_failed"
@@ -409,9 +409,9 @@ def execute_plan_loop(
                     plans_trace=plans_trace,
                     started=started,
                     phase_status="failed",
-                tracer=tracer,
-                max_total_tool_calls=resolved.max_total_tool_calls,
-                max_observation_replans=resolved.max_observation_replans,
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
             new_plan: AgentPlan = replan_outcome.plan
@@ -468,9 +468,9 @@ def execute_plan_loop(
             plans_trace=plans_trace,
             started=started,
             phase_status="success",
-        tracer=tracer,
-        max_total_tool_calls=resolved.max_total_tool_calls,
-        max_observation_replans=resolved.max_observation_replans,
+            tracer=tracer,
+            max_total_tool_calls=resolved.max_total_tool_calls,
+            max_observation_replans=resolved.max_observation_replans,
         )
     except Exception as exc:  # broad-exception: fallback_recorded - loop must never raise into callers as fake success
         log_safe_exception(
@@ -494,9 +494,9 @@ def execute_plan_loop(
             plans_trace=plans_trace,
             started=started,
             phase_status="failed",
-        tracer=tracer,
-        max_total_tool_calls=resolved.max_total_tool_calls,
-        max_observation_replans=resolved.max_observation_replans,
+            tracer=tracer,
+            max_total_tool_calls=resolved.max_total_tool_calls,
+            max_observation_replans=resolved.max_observation_replans,
         )
 
 
