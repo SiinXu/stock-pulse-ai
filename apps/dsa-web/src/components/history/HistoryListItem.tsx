@@ -1,4 +1,3 @@
-import type React from 'react';
 import { memo } from 'react';
 import { Badge, Checkbox } from '../common';
 import { Pressable } from '../common/Pressable';
