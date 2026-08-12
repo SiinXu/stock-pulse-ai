@@ -595,7 +595,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "true",
         "options": [],
         "validation": {},
-        "display_order": 65,
+        "display_order": 630,
         "help_key": "settings.agent.ANALYSIS_QUALITY_GATE_ENABLED",
         "examples": [
             "ANALYSIS_QUALITY_GATE_ENABLED=true",
@@ -638,7 +638,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {
             "enum": ["annotate", "intercept"],
         },
-        "display_order": 66,
+        "display_order": 631,
         "help_key": "settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE",
         "examples": [
             "ANALYSIS_QUALITY_GATE_ON_FAILURE=annotate",
