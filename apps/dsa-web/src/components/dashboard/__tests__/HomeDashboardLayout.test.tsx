@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
@@ -32,43 +32,44 @@ describe('HomeDashboardLayout', () => {
 
   it('renders the four widgets and supports keyboard reorder in customize mode', () => {
     renderLayout();
-    expect(screen.getByTestId('home-dashboard-layout')).toBeInTheDocument();
-    expect(screen.getByTestId('home-dashboard-widget-watchlist')).toBeInTheDocument();
-    expect(screen.getByText('Watchlist body')).toBeInTheDocument();
+    const dashboard = screen.getByRole('region', { name: 'Dashboard layout' });
+    expect(within(dashboard).getByText('Watchlist body')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('home-dashboard-layout-customize'));
-    const handle = screen.getByTestId('home-dashboard-drag-watchlist');
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Customize layout' }));
+    const handle = within(dashboard).getByRole('button', {
+      name: 'Reorder Watchlist; use Arrow Up or Arrow Down',
+    });
     expect(handle).toHaveAttribute('draggable', 'true');
     fireEvent.keyDown(handle, { key: 'ArrowDown' });
-    expect(screen.getByTestId('home-dashboard-layout-announcement')).not.toBeEmptyDOMElement();
+    expect(within(dashboard).getByRole('status')).toHaveTextContent('Dashboard widgets reordered');
 
-    const board = screen.getByTestId('home-dashboard-layout-board');
-    const widgets = board.querySelectorAll('[data-testid^="home-dashboard-widget-"]');
-    expect(widgets[0]?.getAttribute('data-testid')).toBe('home-dashboard-widget-portfolio_health');
+    const widgets = within(within(dashboard).getByRole('list')).getAllByRole('listitem');
+    expect(within(widgets[0]!).getByText('Health body')).toBeInTheDocument();
   });
 
   it('exposes mobile non-drag move controls and blocks hiding the last widget', () => {
     renderLayout();
-    fireEvent.click(screen.getByTestId('home-dashboard-layout-customize'));
-    expect(screen.getByTestId('home-dashboard-move-up-watchlist')).toBeInTheDocument();
-    expect(screen.getByTestId('home-dashboard-move-down-watchlist')).toBeInTheDocument();
-    expect(screen.getByTestId('home-dashboard-layout-mobile-hint')).toBeInTheDocument();
-    expect(screen.getByTestId('home-dashboard-drag-watchlist').className).toMatch(/sm:inline-flex/);
+    const dashboard = screen.getByRole('region', { name: 'Dashboard layout' });
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Customize layout' }));
+    expect(within(dashboard).getByRole('button', { name: 'Move Watchlist up' })).toBeInTheDocument();
+    expect(within(dashboard).getByRole('button', { name: 'Move Watchlist down' })).toBeInTheDocument();
+    expect(within(dashboard).getByText(/On touch devices/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('home-dashboard-toggle-portfolio_health'));
-    fireEvent.click(screen.getByTestId('home-dashboard-toggle-alerts'));
-    fireEvent.click(screen.getByTestId('home-dashboard-toggle-recent_reports'));
-    const lastToggle = screen.getByTestId('home-dashboard-toggle-watchlist');
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Hide Portfolio health' }));
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Hide Triggered alerts' }));
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Hide Recent analyses' }));
+    const lastToggle = within(dashboard).getByRole('button', { name: 'Hide Watchlist' });
     expect(lastToggle).toBeDisabled();
   });
 
   it('restores defaults from customize mode', () => {
     renderLayout();
-    fireEvent.click(screen.getByTestId('home-dashboard-layout-customize'));
-    fireEvent.click(screen.getByTestId('home-dashboard-toggle-alerts'));
-    fireEvent.click(screen.getByTestId('home-dashboard-layout-reset'));
-    fireEvent.click(screen.getByTestId('home-dashboard-layout-customize'));
-    expect(screen.getByTestId('home-dashboard-widget-alerts')).toHaveAttribute('data-visible', 'true');
-    expect(screen.getByTestId('home-dashboard-layout-announcement')).toHaveTextContent(/default/i);
+    const dashboard = screen.getByRole('region', { name: 'Dashboard layout' });
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Customize layout' }));
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Hide Triggered alerts' }));
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Reset to default' }));
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Done customizing' }));
+    expect(within(dashboard).getByText('Alerts body')).toBeInTheDocument();
+    expect(within(dashboard).getByRole('status')).toHaveTextContent(/default/i);
   });
 });

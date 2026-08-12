@@ -1052,7 +1052,7 @@ P5 在个股分析报告的 `dashboard.phase_decision` 中追加阶段化决策�
 
 #### 报告三模式与 Decision Card（Issue #861）
 
-在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
+在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。分层阅读顺序：每股块内 **Decision Card 开篇 → 按模式密度的证据分层（none / compact / full）→ 长文分析段落**。`ReportType.BRIEF` 通知生成会强制 `report_mode=brief`，即使全局 `REPORT_MODE` 为 standard/research 也不突破推送长度预算。导出链路（`export_report`）消费已渲染 Markdown，不再二次套用模式。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
 
 #### 信号归因分析（Issue #1742）
 
@@ -1070,9 +1070,9 @@ Phase 1 只做呈现层重排：在 Jinja 报告模板的每只股票详情中�
 
 | 模板 | 行为 |
 | --- | --- |
-| `templates/report_markdown.j2` | 每只股票 `##` 标题下先渲染完整 Decision Card；原有「重要信息 / 核心结论 / 盘中护栏 / 作战计划」等段落整体后移，不删除。 |
-| `templates/report_wechat.j2` | 股票块内以紧凑 Decision Card（约 4–5 行）作为首屏内容；后续原有精简段落保留。 |
-| `templates/report_brief.j2` | 使用 brief 专用长度预算形态（`decision_card(..., compact='brief')`）：每股 **1 行主行 + 至多 1 行补充行**。主行保留与 `origin/main` 单行 brief 同等字段（信号 emoji/文案、评分、一句话结论），并标记 🃏；补充行最多打包 1 条风险 + 1 条观察条件（硬截断）。不输出 wechat 风格 5 行卡，也不在 brief 中重复止损/目标位（留给 wechat/markdown）。 |
+| `templates/report_markdown.j2` | 每只股票 `##` 标题下先渲染完整 Decision Card；随后是按模式的证据分层（compact/full）；再是原有「重要信息 / 核心结论 / 盘中护栏 / 作战计划」等段落。 |
+| `templates/report_wechat.j2` | 股票块内以紧凑 Decision Card（约 4–5 行）作为首屏内容；卡后接 compact/full 证据分层；其后原有精简段落保留。 |
+| `templates/report_brief.j2` | 使用 brief 专用长度预算形态（`decision_card(..., compact='brief')`）：每股 **1 行主行 + 至多 1 行补充行**。主行保留与 `origin/main` 单行 brief 同等字段（信号 emoji/文案、评分、一句话结论），并标记 🃏；补充行最多打包 1 条风险 + 1 条观察条件（硬截断）。不输出 wechat 风格 5 行卡，也不在 brief 中重复止损/目标位（留给 wechat/markdown）。通知 `ReportType.BRIEF` 强制 `report_mode=brief`，避免 standard/research 的分层证据进入推送正文。 |
 | 共享宏 | `templates/_macros.j2` 的 `decision_card`；`compact=false` 完整卡、`compact=true` 推送紧凑卡、`compact='brief'` 推送预算形态；字段缺失时省略对应行，不输出空卡字段。 |
 
 **brief 长度预算与体积影响**（相对未预算的 5 行紧凑卡）：
@@ -1900,6 +1900,10 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 `StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
 
 成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
+### 按模式硬预算（#1121 / #125）
+
+每种运行模式（`quick` / `standard` / `full` / `specialist` / chat）对 LLM 轮次、工具调用与估算 USD 成本设有硬上限（可选 token 上限见 `AGENT_MODE_BUDGET_MAX_TOKENS`）。消耗记录在共享的 `mode_budget` 账户中，并可在诊断中查看（`ctx.meta["mode_budget"]` / `result.budget_snapshot`）。超限时以 `success=false` 明确终止并给出原因码（`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`）。既有的剩余墙钟预算跳过仍使用 `budget_skip` / `timeout`，并写入同一快照——预算概念统一，不另造并行体系。配置项为 `AGENT_MODE_BUDGET_*`（见 `.env.example`）。
+
 
 ## Agent 运行时护栏
 

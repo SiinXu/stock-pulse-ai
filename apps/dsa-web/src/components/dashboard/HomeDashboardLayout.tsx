@@ -6,10 +6,9 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
-  EyeOff,
   GripVertical,
-  LayoutGrid,
   RotateCcw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Button, EmptyState, IconButton } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -152,6 +151,7 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
       <p
         className="sr-only"
         aria-live="polite"
+        role="status"
         data-testid="home-dashboard-layout-announcement"
       >
         {announcement}
@@ -191,7 +191,7 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
             onClick={() => setCustomizing((value) => !value)}
             data-testid="home-dashboard-layout-customize"
           >
-            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
             {customizing
               ? t('home.dashboardLayout.doneCustomize')
               : t('home.dashboardLayout.customize')}
@@ -222,7 +222,7 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
           )}
         />
       ) : (
-        <div className="space-y-4" data-testid="home-dashboard-layout-board">
+        <div className="space-y-4" data-testid="home-dashboard-layout-board" role="list">
           {boardItems.map((widget, index) => {
             const content = widgets[widget.id];
             const title = titleFor(widget.id);
@@ -247,6 +247,7 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
                 }}
                 data-testid={`home-dashboard-widget-${widget.id}`}
                 data-visible={widget.visible ? 'true' : 'false'}
+                role="listitem"
               >
                 {customizing ? (
                   <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
@@ -315,9 +316,10 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
                       onClick={() => handleToggleVisible(widget.id, !widget.visible)}
                       data-testid={`home-dashboard-toggle-${widget.id}`}
                     >
-                      {widget.visible
-                        ? <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                        : <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <Eye
+                        className={`h-3.5 w-3.5 ${widget.visible ? '' : 'opacity-50'}`}
+                        aria-hidden="true"
+                      />
                     </IconButton>
                   </div>
                 ) : null}
