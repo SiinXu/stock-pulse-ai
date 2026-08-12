@@ -7,6 +7,19 @@ field-description, hit-target, boundary, empty-state, or alert behavior.
 
 ## Layer Boundary
 
+## Theme Contract v1
+
+Authorable theme surface for Web (Issues #162 / #880):
+
+| Layer | Owner | Notes |
+| --- | --- | --- |
+| 0 — Market paint | `index.css` + `data-price-direction` | `--price-red/green` (hue), `--price-up/down` (direction). Packs must not override. Default CN red-up. |
+| 1 — Core semantic | Theme pack / `:root` / `.dark` | Bare HSL channels for Tailwind. Packs may recolor brand/surfaces only. |
+| Legacy aliases | `index.css` | `--home-price-up/down` → Layer 0 hues during migration. |
+
+Built-in packs: `classic` (default), `slate` (validation variant). Runtime attrs: `data-theme-pack`, `data-price-direction`. Guard: `themeContractGuard.test.ts` (baseline-only-decrease). Preference bridge: `MARKET_REVIEW_COLOR_SCHEME` ↔ `data-price-direction`.
+
+
 - Foundation owns semantic tokens and shared control geometry.
 - Primitives own native semantics, refs, disabled/loading states, focus, and
   coarse-pointer targets.

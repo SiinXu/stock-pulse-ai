@@ -182,11 +182,11 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
     }
 
     if (changePct > 0) {
-      return { color: 'var(--home-price-up)' };
+      return { color: 'var(--price-up)' };
     }
 
     if (changePct < 0) {
-      return { color: 'var(--home-price-down)' };
+      return { color: 'var(--price-down)' };
     }
 
     return undefined;
