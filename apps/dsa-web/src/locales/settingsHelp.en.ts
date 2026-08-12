@@ -207,6 +207,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Prevents accidental comparison across different HMAC keys or deployments.'],
     notes: ['This is only a version label, not a secret.'],
   },
+  'settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED': {
+    title: 'Usage Cost Attribution',
+    summary: 'Attaches run/stage/mode cost estimates and model-routing quality fields to llm_usage rows.',
+    usage: 'Enabled by default. When disabled, cost estimation and attribution columns are skipped while token totals still persist.',
+    valueNotes: ['Shares metering with per-mode budgets (#1213) via src/llm/cost.py. Unpriced models stay cost_status=unpriced without inventing $0.'],
+    impact: ['Affects Usage page cost and routing rates, and fields consumable by the budget gate.'],
+    notes: ['Collection overhead is small; disable temporarily when debugging cost anomalies.'],
+  },
+  'settings.ai_model.LLM_COST_PRICING_PATH': {
+    title: 'LLM Cost Pricing Table Path',
+    summary: 'Optional JSON pricing table path used for estimated_cost_usd.',
+    usage: 'Leave empty to use LiteLLM model_cost, or point to a maintained per-model rate table.',
+    valueNotes: ['Accepts input_cost_per_token / output_cost_per_token or per-1M token fields.'],
+    impact: ['Changes cost-estimate sources only; does not change model calls.'],
+    notes: ['See docs/llm-cost-attribution_EN.md.'],
+  },
   'settings.ai_model.provider_keys': {
     title: 'Provider API Key',
     summary: 'Configures credentials for model providers or gateways.',

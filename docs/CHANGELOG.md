@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Changed] Migrate Agent Web Search tools (`search_stock_news`, `search_comprehensive_intel`) to the always-on `builtin.web_search` agent_tool plugin following the OCR registration paradigm; ToolSurface call path and default availability unchanged, with deferred agent_tool attach so `start_plugins` does not force process ToolRegistry construction (Refs #432).
+- [Added] Fine-grained LLM cost attribution and model-routing quality telemetry on `llm_usage` (run/stage/model/mode, estimated USD, success/fallback rates), shared metering for Usage page and mode budgets, disable via `LLM_USAGE_ATTRIBUTION_ENABLED` (Refs #166, #248).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after PERF_* Settings help i18n strings (Refs #227).
 - [Tests] CI report-export-stack job installs optional report-export dependencies and host fonts, and fails when HTML/PDF fixture, Chinese glyph-coverage, or bound export tests skip (Refs #163).

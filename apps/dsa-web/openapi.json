@@ -1,6 +1,50 @@
 {
   "components": {
     "schemas": {
+      "AgentModeBreakdown": {
+        "properties": {
+          "agent_mode": {
+            "title": "Agent Mode",
+            "type": "string"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_mode",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "AgentModeBreakdown",
+        "type": "object"
+      },
       "AgentModelDeployment": {
         "properties": {
           "api_base": {
@@ -5265,6 +5309,17 @@
             "default": 0,
             "title": "Completion Tokens",
             "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
           },
           "prompt_tokens": {
             "default": 0,
@@ -14247,6 +14302,17 @@
             "default": 0,
             "title": "Completion Tokens",
             "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
           },
           "max_total_tokens": {
             "default": 0,
@@ -26351,6 +26417,60 @@
         "title": "SkillsResponse",
         "type": "object"
       },
+      "StageBreakdown": {
+        "properties": {
+          "avg_latency_ms": {
+            "default": 0,
+            "title": "Avg Latency Ms",
+            "type": "integer"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "success_calls": {
+            "default": 0,
+            "title": "Success Calls",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "StageBreakdown",
+        "type": "object"
+      },
       "StockAnalysisScheduledPayload": {
         "additionalProperties": false,
         "description": "Version-one stock-analysis execution payload.",
@@ -30810,6 +30930,28 @@
       },
       "UsageCallRecord": {
         "properties": {
+          "agent_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Mode"
+          },
+          "call_success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Success"
+          },
           "call_type": {
             "title": "Call Type",
             "type": "string"
@@ -30823,17 +30965,105 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "cost_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Status"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
           },
           "model": {
             "title": "Model",
             "type": "string"
           },
+          "primary_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Model"
+          },
           "prompt_tokens": {
             "title": "Prompt Tokens",
             "type": "integer"
+          },
+          "route_attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Attempt"
+          },
+          "route_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Outcome"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
           },
           "stock_code": {
             "anyOf": [
@@ -30865,6 +31095,13 @@
       },
       "UsageDashboardResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30879,8 +31116,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30889,6 +31132,11 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
           "recent_calls": {
             "items": {
               "$ref": "#/components/schemas/UsageCallRecord"
@@ -30896,8 +31144,44 @@
             "title": "Recent Calls",
             "type": "array"
           },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30910,6 +31194,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30917,6 +31212,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },
@@ -30935,6 +31235,13 @@
       },
       "UsageSummaryResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30949,8 +31256,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30959,8 +31272,49 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30973,6 +31327,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30980,6 +31345,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },

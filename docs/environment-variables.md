@@ -381,6 +381,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_SILICONFLOW_PROVIDER` | `siliconflow` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_TEMPERATURE` | `0.7` | 是 | 模板中注释; Sampling temperature (0.0-2.0, default 0.7; 0 is most deterministic and 2 is most random) |
 | `LLM_TIMEOUT_SEC` | `60` | 是 | 模板中注释; The timeout seconds for a single LLM request; AlphaSift stock selection reuses DSA configuration, downgrades to non-L... |
+| `LLM_COST_PRICING_PATH` | `空` | 是 | 模板中注释; Optional JSON path of per-model token rates for estimated_cost_usd |
+| `LLM_USAGE_ATTRIBUTION_ENABLED` | `true` | 是 | 模板中注释; Fine-grained cost attribution and routing quality on llm_usage |
 | `LLM_USAGE_HMAC_KEY_VERSION` | `local-v1` | 是 | 模板中注释 |
 | `LLM_USAGE_HMAC_SECRET` | `空` | 是 | 模板中注释; LLM usage telemetry message HMAC configuration (optional) |
 | `LLM_VOLCENGINE_API_KEY` | `xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
