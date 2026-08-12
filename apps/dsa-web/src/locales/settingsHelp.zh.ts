@@ -225,6 +225,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['帮助区分不同密钥生成的 HMAC，避免错误比较不同部署或不同版本的指纹。'],
     notes: ['该字段只是版本标签，不是密钥。'],
   },
+  'settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED': {
+    title: '用量成本归因',
+    summary: '在 llm_usage 行上附加 run/stage/mode 成本估算与模型路由质量字段。',
+    usage: '默认开启。关闭后跳过成本估算与归因列写入，但 token 计数仍会落库。',
+    valueNotes: ['与每模式预算（#1213）共用 src/llm/cost.py 计量；未计价模型保持 cost_status=unpriced，不伪造 $0。'],
+    impact: ['影响 Usage 页成本与路由成功率展示，以及预算门可消费的计量字段。'],
+    notes: ['采集开销小；排查成本异常时可临时关闭。'],
+  },
+  'settings.ai_model.LLM_COST_PRICING_PATH': {
+    title: 'LLM 成本定价表路径',
+    summary: '可选 JSON 定价表路径，用于 estimated_cost_usd。',
+    usage: '留空则使用 LiteLLM model_cost；也可指向自维护的 per-model 输入/输出单价表。',
+    valueNotes: ['支持 input_cost_per_token / output_cost_per_token，或 per-1M tokens 字段。'],
+    impact: ['改变成本估算来源，不改变模型调用本身。'],
+    notes: ['详见 docs/llm-cost-attribution.md。'],
+  },
   'settings.ai_model.provider_keys': {
     title: '模型服务 API Key',
     summary: '配置模型服务商或聚合网关的访问密钥。',
