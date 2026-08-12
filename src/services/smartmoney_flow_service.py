@@ -204,8 +204,9 @@ def build_money_flow_view(
 
     if not is_smartmoney_enabled(config):
         base["message"] = (
-            "SmartMoney money-flow is disabled (SMARTMONEY_ENABLED=false). "
-            "Enable it to fetch main-force order-size bucket evidence."
+            "SmartMoney money-flow is disabled (SMARTMONEY_ENABLED is false). "
+            "Enable it in system settings or environment to fetch main-force "
+            "order-size bucket evidence."
         )
         return base
 

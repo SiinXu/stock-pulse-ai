@@ -96,4 +96,33 @@ describe('MoneyFlowPanel', () => {
     });
     expect(fetchView).toHaveBeenCalledTimes(2);
   });
+
+  it('ignores stale slower responses after a newer refresh', async () => {
+    let resolveSlow: ((value: MoneyFlowView) => void) | undefined;
+    const slowDisabled = new Promise<MoneyFlowView>((resolve) => {
+      resolveSlow = resolve;
+    });
+    let callCount = 0;
+    const fetchView = vi.fn(async () => {
+      callCount += 1;
+      // First in-flight call is deliberately slow; every later call is partial.
+      if (callCount === 1) return slowDisabled;
+      return partialView;
+    });
+
+    renderPanel(<MoneyFlowPanel stockCode="600519" fetchView={fetchView} />);
+    await waitFor(() => expect(fetchView).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('money-flow-refresh'));
+    await waitFor(() => {
+      expect(screen.getByTestId('money-flow-snapshot')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('money-flow-main-ratio')).toHaveTextContent('+1.50%');
+
+    // Late disabled payload must not overwrite the newer partial snapshot.
+    resolveSlow?.(disabledView);
+    await Promise.resolve();
+    expect(screen.getByTestId('money-flow-snapshot')).toBeInTheDocument();
+    expect(screen.queryByTestId('money-flow-disabled')).not.toBeInTheDocument();
+    expect(screen.getByTestId('money-flow-status')).toHaveTextContent('partial');
+  });
 });

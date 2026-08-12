@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   getStockMoneyFlow,
   type MoneyFlowView,
@@ -97,32 +97,42 @@ export const MoneyFlowPanel: React.FC<MoneyFlowPanelProps> = ({
   const [view, setView] = useState<MoneyFlowView | null>(initialView);
   const [loading, setLoading] = useState(!initialView && Boolean(stockCode.trim()));
   const [error, setError] = useState<string | null>(null);
+  /** Monotonic request id so slower/stale fetches never overwrite newer UI state. */
+  const requestSeqRef = useRef(0);
 
   const load = useCallback(async () => {
     const code = stockCode.trim();
     if (!code) {
+      requestSeqRef.current += 1;
       setView(null);
       setLoading(false);
       setError(null);
       return;
     }
+    const requestId = requestSeqRef.current + 1;
+    requestSeqRef.current = requestId;
     setLoading(true);
     setError(null);
     try {
       const fetcher = fetchView ?? ((c, d) => getStockMoneyFlow({ stockCode: c, days: d }));
       const payload = await fetcher(code, days);
+      if (requestSeqRef.current !== requestId) return;
       setView(payload);
     } catch (err) {
+      if (requestSeqRef.current !== requestId) return;
       const parsed = getParsedApiError(err);
       setError(parsed.message || text.loadFailed);
       setView(null);
     } finally {
-      setLoading(false);
+      if (requestSeqRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, [days, fetchView, stockCode, text.loadFailed]);
 
   useEffect(() => {
     if (initialView) {
+      requestSeqRef.current += 1;
       setView(initialView);
       setLoading(false);
       setError(null);
@@ -153,7 +163,7 @@ export const MoneyFlowPanel: React.FC<MoneyFlowPanelProps> = ({
           variant="secondary"
           size="compact"
           onClick={() => void load()}
-          disabled={loading || !stockCode.trim()}
+          disabled={!stockCode.trim()}
           data-testid="money-flow-refresh"
         >
           {loading ? text.refreshing : text.refresh}
