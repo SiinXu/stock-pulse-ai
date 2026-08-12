@@ -102,6 +102,12 @@ def run_agent_loop(
     """
     labels = thinking_labels or _THINKING_TOOL_LABELS
     recorder = usage_recorder if usage_recorder is not None else get_default_usage_recorder()
+    run_id = uuid.uuid4().hex[:16]
+    try:
+        from src.config import get_config as _get_config
+        agent_mode = str(getattr(_get_config(), "agent_orchestrator_mode", "") or "").strip() or None
+    except Exception:  # broad-exception: optional_metadata
+        agent_mode = None
     guard_policy = runtime_guard_policy or RuntimeGuardPolicy.from_sources()
     if tool_call_timeout_seconds is None:
         tool_call_timeout_seconds = guard_policy.tool_timeout_seconds
@@ -284,12 +290,31 @@ def run_agent_loop(
         if m and m != "error":
             models_used.append(m)
         model_for_usage = m or response.provider
-        if model_for_usage and model_for_usage != "error":
-            recorder.record(response.usage, model_for_usage, call_type="agent")
+        step_latency_ms = max(0, int((time.perf_counter() - model_started) * 1000))
+        call_ok = getattr(response, "provider", None) != "error"
+        usage_payload = dict(response.usage or {})
+        if usage_payload.get("latency_ms") is None:
+            usage_payload["latency_ms"] = step_latency_ms
+        if usage_payload.get("call_success") is None:
+            usage_payload["call_success"] = call_ok
+        if model_for_usage:
+            recorder.record(
+                usage_payload,
+                model_for_usage if model_for_usage != "error" else (m or "unknown"),
+                call_type="agent",
+                run_id=run_id,
+                stage="agent_step",
+                agent_mode=agent_mode,
+                latency_ms=usage_payload.get("latency_ms"),
+                call_success=bool(usage_payload.get("call_success")),
+                route_outcome=usage_payload.get("route_outcome"),
+                route_attempt=usage_payload.get("route_attempt"),
+                primary_model=usage_payload.get("primary_model"),
+            )
         emit_model_end(
             str(m or model_label or "model"),
-            success=getattr(response, "provider", None) != "error",
-            duration_ms=max(0, int((time.perf_counter() - model_started) * 1000)),
+            success=call_ok,
+            duration_ms=step_latency_ms,
             step=step + 1,
             attrs={
                 "provider": provider_used,

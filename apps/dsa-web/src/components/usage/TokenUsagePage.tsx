@@ -68,6 +68,14 @@ const CALL_TYPE_LABEL_KEYS: Record<string, UiTextKey> = {
 function formatNumber(value: number | null | undefined, language: UiLanguage): string {
   return new Intl.NumberFormat(getUiLocale(language)).format(value ?? 0);
 }
+function formatUsd(value: number | null | undefined, language: UiLanguage): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat(getUiLocale(language), { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value);
+}
+function formatPercent(value: number | null | undefined, language: UiLanguage): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat(getUiLocale(language), { style: 'percent', maximumFractionDigits: 1 }).format(value);
+}
 
 function formatDateTime(value: string, language: UiLanguage): string {
   if (!value) {
@@ -272,6 +280,19 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
       nowrap: true,
       cell: (item) => <span className="font-medium text-foreground">{formatNumber(item.totalTokens, language)}</span>,
     },
+    {
+      id: 'cost',
+      header: t('usage.table.cost'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => formatUsd(item.estimatedCostUsd, language),
+    },
+    {
+      id: 'route',
+      header: t('usage.table.route'),
+      nowrap: true,
+      cell: (item) => item.routeOutcome || '—',
+    },
   ], [language, t]);
 
   const actions = (
@@ -355,6 +376,12 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
               <StatCard label={t('usage.totalCalls')} value={formatNumber(dashboard.totalCalls, language)} hint={t('usage.totalCallsHint')} icon={<Activity className="h-5 w-5" />} />
               <StatCard label={t('usage.promptTokens')} value={formatNumber(dashboard.totalPromptTokens, language)} hint={t('usage.promptTokensHint')} icon={<Cpu className="h-5 w-5" />} />
               <StatCard label={t('usage.completionTokens')} value={formatNumber(dashboard.totalCompletionTokens, language)} hint={t('usage.completionTokensHint')} icon={<Gauge className="h-5 w-5" />} />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard label={t('usage.estimatedCost')} value={formatUsd(dashboard.totalEstimatedCostUsd, language)} hint={t('usage.estimatedCostHint', { priced: formatNumber(dashboard.pricedCalls, language), unpriced: formatNumber(dashboard.unpricedCalls, language) })} icon={<Database className="h-5 w-5" />} />
+              <StatCard label={t('usage.routingSuccessRate')} value={formatPercent(dashboard.routingSuccessRate, language)} hint={t('usage.routingSuccessHint', { primary: formatNumber(dashboard.routingPrimarySuccess, language), fallback: formatNumber(dashboard.routingFallbackSuccess, language), failed: formatNumber(dashboard.routingFailed, language) })} icon={<Activity className="h-5 w-5" />} />
+              <StatCard label={t('usage.routingFallbackRate')} value={formatPercent(dashboard.routingFallbackRate, language)} hint={t('usage.routingFallbackHint')} icon={<Gauge className="h-5 w-5" />} />
+              <StatCard label={t('usage.stageCount')} value={formatNumber(dashboard.byStage?.length ?? 0, language)} hint={t('usage.stageCountHint')} icon={<Cpu className="h-5 w-5" />} />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">

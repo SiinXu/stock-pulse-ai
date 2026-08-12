@@ -47,6 +47,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | 模型服务商与连接、三层配置、Web 设置页和常见模型配置 |
+| [LLM 成本归因与路由遥测](llm-cost-attribution.md) | 按 run/stage/model/mode 归因 token 与成本，路由成功率 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | 市场感知的 provider 顺序、健康评分、自适应排序、熔断、stale 降级与推荐配置 |
 | [LLM 服务商配置指南](llm-providers.md) | Provider 预设、Actions 映射、错误分类和诊断建议 |
 | [LiteLLM YAML 示例](examples/litellm_config.example.yaml) | LiteLLM 多渠道配置示例 |

@@ -754,6 +754,10 @@ class _ConfigLoadingMethods:
             llm_prompt_cache_diagnostics_level=parse_prompt_cache_diagnostics_level(
                 os.getenv("LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL")
             ),
+            llm_usage_attribution_enabled=parse_env_bool(
+                os.getenv("LLM_USAGE_ATTRIBUTION_ENABLED"),
+                default=True,
+            ),
             gemini_api_keys=gemini_api_keys,
             anthropic_api_keys=anthropic_api_keys,
             openai_api_keys=openai_api_keys,
