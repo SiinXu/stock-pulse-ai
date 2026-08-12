@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
+- [Chore] Rebaseline Web locale gzip budgets after capability write-registry and task-routing Settings help inventory (Refs #221, #204).
 - [Added] Data Sources Hub runtime projection: live primary/fallback daily routing, process-local provider health, cache quality, and enhancer configured state under Settings → Data sources (Refs #867).
 - [Chore] Rebaseline Web locale gzip budgets after HTML report-export download chrome strings (Refs #163).
 - [Added] Report Markdown panel one-click HTML export uses history export capabilities so office-friendly HTML is user-reachable alongside Markdown and PDF (Refs #163).
