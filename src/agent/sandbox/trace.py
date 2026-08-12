@@ -92,7 +92,13 @@ class SandboxTrace:
         }
 
     def trajectory_compatible_runs(self) -> List[Dict[str, Any]]:
-        """Project to agent-trajectory-input-v1-compatible run dicts."""
+        """Project to strict ``agent-trajectory-input-v1`` run dicts.
+
+        Simulation metadata is intentionally **not** embedded in the run
+        payload: ``TrajectoryRunInput`` uses ``extra="forbid"``. Callers that
+        need sandbox labels should use :meth:`trajectory_projection` or the
+        enclosing :class:`SandboxTrace` fields.
+        """
         return [
             {
                 "schema_version": "agent-trajectory-input-v1",
@@ -115,14 +121,23 @@ class SandboxTrace:
                     }
                     for call in self.tool_calls
                 ],
-                "sandbox": {
-                    "simulation": True,
-                    "label": self.label,
-                    "mode": self.mode,
-                    "config_digest": self.config_digest,
-                },
             }
         ]
+
+    def trajectory_projection(self) -> Dict[str, Any]:
+        """Strict trajectory run(s) plus side-car simulation metadata."""
+        runs = self.trajectory_compatible_runs()
+        return {
+            "runs": runs,
+            "sandbox": {
+                "simulation": True,
+                "label": self.label,
+                "mode": self.mode,
+                "config_digest": self.config_digest,
+                "sandbox_run_id": self.sandbox_run_id,
+                "data_mode": self.data_mode,
+            },
+        }
 
 
 def build_sandbox_trace(

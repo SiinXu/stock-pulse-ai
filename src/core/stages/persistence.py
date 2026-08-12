@@ -166,14 +166,6 @@ class _PersistenceStageMixin:
             saved_history_id: Any = None
             persistence_error: Optional[BaseException] = None
             try:
-                # Sandbox fence: never write production analysis history during simulation.
-                from src.agent.sandbox.context import (
-                    require_sandbox_inactive_for_production_write,
-                )
-                from src.agent.sandbox.effects import EFFECT_ANALYSIS_HISTORY
-
-                require_sandbox_inactive_for_production_write(EFFECT_ANALYSIS_HISTORY)
-
                 context_snapshot = context_snapshot_factory()
                 result.diagnostic_context_snapshot = context_snapshot
                 saved_history_id = self.db.save_analysis_history(
@@ -219,6 +211,8 @@ class _PersistenceStageMixin:
                             context={"analysis_history_id": saved_history_id},
                         )
             except Exception as exc:  # broad-exception: fallback_recorded - History failure remains isolated after the side-effect fence records whether a write committed.
+                from src.agent.sandbox.effects import SandboxExternalEffectBlocked
+
                 persistence_error = exc
                 valid_saved_history_id = False
                 record_history_run(
@@ -226,14 +220,30 @@ class _PersistenceStageMixin:
                     metadata_saved=False,
                     error_message=exc,
                 )
-                log_safe_exception(
-                    logger,
-                    failure_message,
-                    exc,
-                    error_code=failure_error_code,
-                    level=logging.WARNING,
-                    context={"stock_code": getattr(result, "code", None)},
-                )
+                # Preserve sandbox semantics: do not mislabel a refused simulation
+                # write as a generic history storage failure.
+                if isinstance(exc, SandboxExternalEffectBlocked):
+                    log_safe_exception(
+                        logger,
+                        "Sandbox refused production analysis-history write",
+                        exc,
+                        error_code="sandbox_analysis_history_write_blocked",
+                        level=logging.WARNING,
+                        context={
+                            "stock_code": getattr(result, "code", None),
+                            "effect": getattr(exc, "effect", None),
+                            "sandbox_run_id": getattr(exc, "sandbox_run_id", None),
+                        },
+                    )
+                else:
+                    log_safe_exception(
+                        logger,
+                        failure_message,
+                        exc,
+                        error_code=failure_error_code,
+                        level=logging.WARNING,
+                        context={"stock_code": getattr(result, "code", None)},
+                    )
 
             persistence_succeeded = bool(saved_history_id)
             value = PipelinePersistValue(

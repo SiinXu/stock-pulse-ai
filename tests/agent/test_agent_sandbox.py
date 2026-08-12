@@ -29,6 +29,7 @@ from src.agent.sandbox import (
 )
 from src.agent.sandbox.clock import FakeClock
 from src.agent.sandbox.effects import (
+    EFFECT_ANALYSIS_HISTORY,
     EFFECT_DECISION_SIGNAL,
     EFFECT_NOTIFICATION,
 )
@@ -51,6 +52,9 @@ def test_isolation_policy_fail_closed():
     assert policy["send_real_notifications"] is False
     assert policy["place_real_orders"] is False
     assert policy["auto_promote_to_production"] is False
+    assert "persist_decision_signal" in policy["enforced_in_batch1"]
+    assert "persist_analysis_history" in policy["enforced_in_batch1"]
+    assert "place_real_orders" in policy["declared_not_yet_enforced"]
 
 
 def test_fake_clock_is_deterministic_and_advances():
@@ -143,7 +147,15 @@ def test_runner_labels_output_and_emits_isomorphic_trace():
     runs = result.trace.trajectory_compatible_runs()
     assert runs[0]["schema_version"] == "agent-trajectory-input-v1"
     assert runs[0]["run_id"] == result.context.sandbox_run_id
-    assert runs[0]["sandbox"]["simulation"] is True
+    assert "sandbox" not in runs[0]
+    # Strict trajectory schema rejects extra keys; projection must validate.
+    from src.schemas.agent_trajectory import TrajectoryRunInput
+
+    TrajectoryRunInput.model_validate(runs[0])
+    projection = result.trace.trajectory_projection()
+    assert projection["sandbox"]["simulation"] is True
+    assert projection["sandbox"]["config_digest"] == result.context.config_digest
+    TrajectoryRunInput.model_validate(projection["runs"][0])
 
 
 def test_compare_two_agent_variants():
@@ -265,6 +277,33 @@ def test_counterexample_notification_send_blocked_under_sandbox():
         with pytest.raises(SandboxExternalEffectBlocked) as raised:
             _DispatchMethods.send_with_results(probe, "hello")
     assert raised.value.effect == EFFECT_NOTIFICATION
+
+
+def test_counterexample_analysis_history_write_blocked_under_sandbox():
+    """Authoritative save_analysis_history fence covers all history callers."""
+    from src.storage_parts.history import _HistoryMethods
+
+    class _Probe(_HistoryMethods):
+        def _extract_sniper_points(self, result):
+            raise AssertionError("write path must not run under sandbox")
+
+        def _build_raw_result(self, result):
+            raise AssertionError("write path must not run under sandbox")
+
+        def _run_write_transaction(self, *args, **kwargs):
+            raise AssertionError("write path must not run under sandbox")
+
+    probe = _Probe()
+    ctx = SandboxContext.create(fixed_now=FIXED_NOW)
+    with active_sandbox_context(ctx):
+        with pytest.raises(SandboxExternalEffectBlocked) as raised:
+            probe.save_analysis_history(
+                result=SimpleNamespace(code="AAPL", name="Apple"),
+                query_id="q-sandbox",
+                report_type="standard",
+                news_content=None,
+            )
+    assert raised.value.effect == EFFECT_ANALYSIS_HISTORY
 
 
 def test_production_path_unblocked_when_sandbox_inactive():

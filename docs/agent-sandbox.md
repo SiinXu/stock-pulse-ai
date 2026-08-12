@@ -22,11 +22,18 @@ Passing a sandbox or backtest run **never** becomes automatic execution authorit
    - Isolation policy fail-closed (`persist_decision_signal=false`, `send_real_notifications=false`, …)
 2. **Agent variants**
    - `SandboxRunner` / `run_agent_variant_in_sandbox` / `compare_variants`
-   - Production-isomorphic traces (`sandbox-trace-v1`) projectable to `agent-trajectory-input-v1`
+   - Production-comparable traces (`sandbox-trace-v1`) project to strict `agent-trajectory-input-v1` via `trajectory_compatible_runs()` (no extra keys; simulation metadata stays on the `SandboxTrace` / `trajectory_projection()` side-car)
 3. **Hard no-write fence**
-   - Active sandbox refuses production DecisionSignal writes, analysis-history persistence, and real notification dispatch
+   - Active sandbox refuses production DecisionSignal writes, analysis-history persistence (authoritative `save_analysis_history` boundary), and real notification dispatch
    - Blocked effects are recorded for promotion receipts
    - Counterexample tests in `tests/agent/test_agent_sandbox.py`
+
+### Batch-1 non-goals (declared, not silently enforced)
+
+- **Process-wide wall clock**: `FakeClock` is used only when the sandbox runner / variant code reads `SandboxContext.clock`. It does not monkey-patch `datetime.now` or `utc_naive_now` globally.
+- **Real order / portfolio writes**: policy constants document intent; trade paths are not yet fenced in batch-1 (paper portfolio remains a separate surface).
+- **Agent memory vector writes**: policy documents intent; memory `add` paths are not yet fenced in batch-1.
+- Live `AgentExecutor` / ToolSurface integration and Web multi-scenario UI are later batches.
 
 ## Usage (library)
 
@@ -87,17 +94,10 @@ Schema: `sandbox-promotion-receipt-v1`. Required fields include:
 | Path | Fence |
 | --- | --- |
 | `DecisionSignalService.create_signal*` | `EFFECT_DECISION_SIGNAL` |
-| Analysis history persist stage | `EFFECT_ANALYSIS_HISTORY` |
+| `DatabaseManager.save_analysis_history` (all callers) | `EFFECT_ANALYSIS_HISTORY` |
 | `NotificationService.send_with_results` | `EFFECT_NOTIFICATION` |
 
-Fences raise `SandboxExternalEffectBlocked` only while a `SandboxContext` is active via `active_sandbox_context`. Outside sandbox, production paths are unchanged.
-
-## Out of scope for batch-1
-
-- Web UI sandbox banner / multi-scenario stress pack UI (later batch)
-- Automatic promotion workflow UI
-- Synthetic market shock generators (can feed snapshot data into this runner later)
-- Coupling sandbox results into production decision memory
+Fences raise `SandboxExternalEffectBlocked` only while a `SandboxContext` is active via `active_sandbox_context`. Outside sandbox, production paths are unchanged. Pipeline history stage logs `sandbox_analysis_history_write_blocked` when the authoritative fence refuses a write (does not mislabel it as generic storage failure).
 
 ## Related
 
