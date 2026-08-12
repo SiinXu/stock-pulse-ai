@@ -368,3 +368,29 @@ def test_product_planning_context_binds_config_for_step_critique():
     assert off.status == "disabled"
     assert "step_critique_result" in ctx_off.meta
     assert ctx_off.meta["step_critique_result"]["status"] == "disabled"
+
+
+def test_try_append_lessons_to_episode_service_fail_soft_without_service():
+    """When #1210 service is absent, soft adapter returns None and does not raise."""
+    from src.agent.evolution.episode_lessons import try_append_lessons_to_episode_service
+
+    out = try_append_lessons_to_episode_service(
+        run_id="run-soft-1",
+        lessons=[{"kind": "tool_failure", "severity": "high", "remedy": "retry"}],
+        config=SimpleNamespace(agent_episode_log_enabled=True),
+    )
+    assert out is None
+
+
+def test_product_path_wires_trajectory_and_episode_hooks():
+    """Source contract: planning product harvests critique and runs end reflection."""
+    from pathlib import Path
+
+    product_src = (
+        Path(__file__).resolve().parents[2] / "src" / "agent" / "planning" / "product.py"
+    ).read_text(encoding="utf-8")
+    assert "_merge_reflection_context" in product_src
+    assert "_maybe_attach_end_of_run_reflection" in product_src
+    assert "run_trajectory_layer" in product_src
+    assert "try_append_lessons_to_episode_service" in product_src
+    assert "agent_reflection_enabled" in product_src

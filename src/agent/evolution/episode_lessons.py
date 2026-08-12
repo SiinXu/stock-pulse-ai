@@ -175,6 +175,63 @@ def record_reflection_lessons(
     return lessons
 
 
+def try_append_lessons_to_episode_service(
+    *,
+    run_id: str,
+    lessons: Sequence[Dict[str, Any]],
+    config: Any = None,
+    mode: str = "single",
+    symbol: Optional[str] = None,
+    layer: str = "trajectory",
+    success: Optional[bool] = None,
+    trajectory_summary: Optional[Sequence[Dict[str, Any]]] = None,
+) -> Optional[str]:
+    """Best-effort append into AgentEpisodeService when #1090/#1210 is present.
+
+    Returns the stored episode_id, or ``None`` when the service is unavailable,
+    disabled, or the append fails (fail-soft; never raises into analysis).
+    """
+    if not lessons and not trajectory_summary:
+        return None
+    try:
+        from src.services.agent_episode_service import (  # type: ignore
+            AgentEpisodeService,
+            is_agent_episode_log_enabled,
+        )
+    except Exception:
+        return None
+    if not is_agent_episode_log_enabled(config):
+        return None
+    try:
+        import uuid
+        from datetime import datetime, timezone
+
+        episode_id = f"ep-{uuid.uuid4().hex}"
+        payload: Dict[str, Any] = {
+            "episode_id": episode_id,
+            "run_id": str(run_id or episode_id),
+            "mode": str(mode or "single")[:32],
+            "lessons": list(lessons or [])[:8],
+            "trajectory_summary": list(trajectory_summary or [])[:64],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if symbol:
+            payload["symbol"] = str(symbol)[:32]
+        if success is not None:
+            payload["success"] = bool(success)
+        # Keep layer as an outcome label extra when supported.
+        payload["outcome_labels"] = {
+            "extra": {"reflection_layer": str(layer)[:64]},
+        }
+        service = AgentEpisodeService(config=config)
+        stored = service.record_episode(payload, config=config)
+        if stored is None:
+            return None
+        return getattr(stored, "episode_id", None) or episode_id
+    except Exception:
+        return None
+
+
 __all__ = [
     "EpisodeLessonSink",
     "InMemoryEpisodeLessonSink",
@@ -182,4 +239,5 @@ __all__ = [
     "merge_episode_lessons",
     "record_reflection_lessons",
     "reflection_result_to_episode_lessons",
+    "try_append_lessons_to_episode_service",
 ]

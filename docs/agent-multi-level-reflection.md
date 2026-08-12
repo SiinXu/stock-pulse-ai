@@ -18,7 +18,7 @@
 | **运行级**（轨迹反思） | 配置开启的运行结束反思 | `AGENT_REFLECTION_LLM_BUDGET`（默认 **1**） | 完整 `ReflectionResult` |
 | **跨运行**（离线 meta） | 离线任务且样本量 ≥ 阈值 | `AGENT_META_REVIEW_LLM_BUDGET`（默认 **0**） | Markdown/JSON 演进报告与建议动作 |
 
-教训写入既有 episode 投影形状（`kind` / `severity` / `claim_ref` / `remedy` / `source_step`），见 `episode_lessons.py`。
+教训写入既有 episode 投影形状（`kind` / `severity` / `claim_ref` / `remedy` / `source_step`），见 `episode_lessons.py`。生产路径在 `AGENT_REFLECTION_ENABLED` 时于 plan 结束挂轨迹反思；`try_append_lessons_to_episode_service` 在 #1210 合入且 episode log 开启时 soft-append，缺失服务则 no-op。
 
 跨运行默认样本阈值 `AGENT_META_REVIEW_MIN_EPISODES=30`；不足时返回 `threshold_not_met`，不编造建议。
 

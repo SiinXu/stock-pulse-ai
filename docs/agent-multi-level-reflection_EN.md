@@ -29,9 +29,15 @@ Shared taxonomy (`LESSON_KINDS`):
 
 Typed lessons project into the episode lesson shape used by the evolution
 episode log (`kind` / `severity` / `claim_ref` / `remedy` / `source_step`).
-See `src/agent/evolution/episode_lessons.py`. When the episode service
-(#1090 / #1210) is present, the same dicts are appendable; otherwise an
-in-memory sink supports offline tests and meta-review.
+See `src/agent/evolution/episode_lessons.py`.
+
+- In-memory sink: offline tests / meta-review fixtures.
+- Soft adapter: `try_append_lessons_to_episode_service` best-effort imports
+  `AgentEpisodeService` when Issue #1090/#1210 is merged and
+  `AGENT_EPISODE_LOG_ENABLED` is on. Missing service → no-op (never fails analysis).
+- Production planning path (`run_with_planning`) harvests step-critique artifacts
+  into `planning_metadata` and, when `AGENT_REFLECTION_ENABLED`, runs trajectory
+  reflection at end-of-run (success or plan failure).
 
 ## Planning replan alignment
 

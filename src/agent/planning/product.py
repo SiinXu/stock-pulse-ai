@@ -267,10 +267,19 @@ def run_with_planning(
         "phase": "execution",
         "proposal_applied": True,
     }
+    # Harvest multi-level reflection artifacts written onto context during replan.
+    _merge_reflection_context(planning_metadata, effective_context)
     plan_tool_log = _tool_calls_log_from_execution(exec_result)
 
     if not exec_result.success:
         reason = exec_result.reason or exec_result.status or "plan_execution_failed"
+        _maybe_attach_end_of_run_reflection(
+            planning_metadata,
+            config=cfg,
+            context=effective_context,
+            success=False,
+            tool_calls_log=plan_tool_log,
+        )
         return AgentResult(
             success=False,
             error=f"Plan execution terminated: {reason}",
@@ -322,7 +331,152 @@ def run_with_planning(
         "synthesis_success": bool(result.success),
         "product_duration_ms": max(0, int((time.perf_counter() - started) * 1000)),
     }
+    _maybe_attach_end_of_run_reflection(
+        result.planning_metadata,
+        config=cfg,
+        context=effective_context,
+        success=bool(result.success),
+        tool_calls_log=result.tool_calls_log,
+    )
     return result
+
+
+def _merge_reflection_context(
+    planning_metadata: Dict[str, Any],
+    context: Optional[Dict[str, Any]],
+) -> None:
+    """Copy step-critique / replan taxonomy fields from loop context into metadata."""
+    if not isinstance(context, dict):
+        return
+    kinds = context.get("replan_reason_kinds")
+    if isinstance(kinds, list) and kinds:
+        planning_metadata["replan_reason_kinds"] = [
+            str(item) for item in kinds if str(item).strip()
+        ][:8]
+    step_payload = context.get("step_critique_result")
+    if isinstance(step_payload, dict):
+        planning_metadata["step_critique_result"] = step_payload
+
+
+def _maybe_attach_end_of_run_reflection(
+    planning_metadata: Dict[str, Any],
+    *,
+    config: Any,
+    context: Optional[Dict[str, Any]],
+    success: bool,
+    tool_calls_log: Optional[Sequence[Dict[str, Any]]] = None,
+) -> None:
+    """Trajectory reflection + soft episode lesson append (Issue #1094).
+
+    Default-off via ``agent_reflection_enabled``. Fail-soft: never raises into
+    the product planning path. Soft-imports episode service when #1090/#1210 is
+    present; otherwise keeps lessons on planning_metadata only.
+    """
+    if getattr(config, "agent_reflection_enabled", False) is not True:
+        return
+    try:
+        from src.agent.evolution.episode_lessons import (
+            merge_episode_lessons,
+            reflection_result_to_episode_lessons,
+            try_append_lessons_to_episode_service,
+        )
+        from src.agent.evolution.multilevel import run_trajectory_layer
+        from src.agent.evolution.reflection import REFLECTION_META_KEY
+        from src.agent.evolution.step_critique import STEP_CRITIQUE_META_KEY
+    except Exception as exc:  # broad-exception: fallback_recorded - reflection is optional
+        log_safe_exception(
+            logger,
+            "End-of-run reflection imports failed",
+            exc,
+            error_code="agent_reflection_import_failed",
+            level=logging.INFO,
+        )
+        return
+
+    class _Ctx:
+        meta: Dict[str, Any]
+        opinions: List[Any]
+        risk_flags: List[Any]
+        stock_code: Optional[str]
+
+    ctx = _Ctx()
+    ctx.opinions = []
+    ctx.risk_flags = []
+    ctx.stock_code = None
+    run_id = None
+    episode_id = None
+    if isinstance(context, dict):
+        run_id = context.get("run_id") or context.get("analysis_history_id")
+        episode_id = context.get("episode_id")
+        ctx.stock_code = context.get("stock_code")
+        # Seed immediate-layer payload if the plan loop already wrote it.
+        step_payload = context.get(STEP_CRITIQUE_META_KEY) or planning_metadata.get(
+            STEP_CRITIQUE_META_KEY
+        )
+        ctx.meta = {
+            "run_id": run_id,
+            "episode_id": episode_id,
+            "degraded_stages": list(context.get("degraded_stages") or []),
+        }
+        if isinstance(step_payload, dict):
+            ctx.meta[STEP_CRITIQUE_META_KEY] = step_payload
+            if step_payload.get("replan_reasons"):
+                ctx.meta["replan_reason_kinds"] = list(step_payload["replan_reasons"])
+    else:
+        ctx.meta = {"run_id": run_id, "episode_id": episode_id}
+
+    try:
+        multi = run_trajectory_layer(ctx, config=config, seed_from_immediate=True)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional end reflection
+        log_safe_exception(
+            logger,
+            "End-of-run trajectory reflection failed",
+            exc,
+            error_code="agent_reflection_trajectory_failed",
+            level=logging.INFO,
+        )
+        return
+
+    if multi.trajectory is not None:
+        planning_metadata[REFLECTION_META_KEY] = multi.trajectory
+    if multi.episode_lessons:
+        planning_metadata["episode_lessons"] = list(multi.episode_lessons)
+    if multi.replan_reason_kinds:
+        planning_metadata.setdefault(
+            "replan_reason_kinds", list(multi.replan_reason_kinds)
+        )
+
+    # Soft episode append when the #1210 service is importable and enabled.
+    lessons = list(multi.episode_lessons or [])
+    if not lessons and isinstance(planning_metadata.get(STEP_CRITIQUE_META_KEY), dict):
+        lessons = merge_episode_lessons(
+            planning_metadata[STEP_CRITIQUE_META_KEY].get("lessons") or []
+        )
+    trajectory_summary: List[Dict[str, Any]] = []
+    for row in list(tool_calls_log or [])[:64]:
+        if not isinstance(row, dict):
+            continue
+        tool = row.get("tool") or row.get("tool_name")
+        if not tool:
+            continue
+        trajectory_summary.append(
+            {
+                "tool": str(tool)[:128],
+                "success": bool(row.get("ok", row.get("success", False))),
+            }
+        )
+    stored_id = try_append_lessons_to_episode_service(
+        run_id=str(run_id or "unknown-run"),
+        lessons=lessons,
+        config=config,
+        mode="planning",
+        symbol=str(ctx.stock_code) if ctx.stock_code else None,
+        layer="trajectory",
+        success=success,
+        trajectory_summary=trajectory_summary,
+    )
+    if stored_id:
+        planning_metadata["episode_id"] = stored_id
 
 
 def _open_plan_tool_session(
