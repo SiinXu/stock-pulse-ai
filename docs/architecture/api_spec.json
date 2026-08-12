@@ -2494,14 +2494,14 @@
             "description": "Bad Request"
           },
           "422": {
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
-            },
-            "description": "Validation Error"
+            }
           },
           "500": {
             "content": {
@@ -2512,16 +2512,6 @@
               }
             },
             "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
         },
         "summary": "List alert trigger history",
@@ -6068,7 +6058,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis"
+                "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, multi-strategy synthesis, and committee deliberation"
               }
             }
           }
@@ -6079,14 +6069,18 @@
         ]
       },
       "ReportStructuredInsights": {
+        "description": "Versioned structured-insight projection returned by report APIs.",
         "properties": {
-          "schema_version": {
-            "type": "string",
-            "const": "report-structured-insights-v1",
-            "title": "Schema Version"
+          "committee_deliberation": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeDeliberation"
           },
           "phase_decision": {
             "$ref": "#/components/schemas/ReportStructuredPhaseDecision"
+          },
+          "schema_version": {
+            "const": "report-structured-insights-v1",
+            "title": "Schema Version",
+            "type": "string"
           },
           "signal_attribution": {
             "$ref": "#/components/schemas/ReportStructuredSignalAttribution"
@@ -6095,65 +6089,42 @@
             "$ref": "#/components/schemas/ReportStructuredStrategySynthesis"
           }
         },
-        "type": "object",
         "required": [
           "schema_version"
         ],
         "title": "ReportStructuredInsights",
-        "description": "Versioned structured-insight projection returned by report APIs."
+        "type": "object"
       },
       "ReportStructuredPhaseContext": {
+        "description": "Bounded market-phase context exposed by the report API.",
         "properties": {
-          "phase": {
-            "type": "string",
-            "title": "Phase"
-          },
-          "market": {
-            "type": "string",
-            "title": "Market"
-          },
-          "market_local_time": {
-            "type": "string",
-            "title": "Market Local Time"
-          },
-          "session_date": {
-            "type": "string",
-            "title": "Session Date"
+          "analysis_intent": {
+            "title": "Analysis Intent",
+            "type": "string"
           },
           "effective_daily_bar_date": {
-            "type": "string",
-            "title": "Effective Daily Bar Date"
-          },
-          "trigger_source": {
-            "type": "string",
-            "title": "Trigger Source"
-          },
-          "analysis_intent": {
-            "type": "string",
-            "title": "Analysis Intent"
-          },
-          "is_trading_day": {
-            "type": "boolean",
-            "title": "Is Trading Day"
+            "title": "Effective Daily Bar Date",
+            "type": "string"
           },
           "is_market_open_now": {
-            "type": "boolean",
-            "title": "Is Market Open Now"
+            "title": "Is Market Open Now",
+            "type": "boolean"
           },
           "is_partial_bar": {
-            "type": "boolean",
-            "title": "Is Partial Bar"
+            "title": "Is Partial Bar",
+            "type": "boolean"
           },
-          "minutes_to_open": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              }
-            ],
-            "title": "Minutes To Open"
+          "is_trading_day": {
+            "title": "Is Trading Day",
+            "type": "boolean"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "market_local_time": {
+            "title": "Market Local Time",
+            "type": "string"
           },
           "minutes_to_close": {
             "anyOf": [
@@ -6166,132 +6137,150 @@
             ],
             "title": "Minutes To Close"
           },
+          "minutes_to_open": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Minutes To Open"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "session_date": {
+            "title": "Session Date",
+            "type": "string"
+          },
+          "trigger_source": {
+            "title": "Trigger Source",
+            "type": "string"
+          },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "type": "array",
-            "title": "Warnings"
+            "title": "Warnings",
+            "type": "array"
           }
         },
-        "type": "object",
         "title": "ReportStructuredPhaseContext",
-        "description": "Bounded market-phase context exposed by the report API."
+        "type": "object"
       },
       "ReportStructuredPhaseDecision": {
+        "description": "Bounded phase-decision fields exposed by the report API.",
         "properties": {
-          "phase_context": {
-            "$ref": "#/components/schemas/ReportStructuredPhaseContext"
-          },
           "action_window": {
-            "type": "string",
-            "title": "Action Window"
-          },
-          "immediate_action": {
-            "type": "string",
-            "title": "Immediate Action"
-          },
-          "next_check_time": {
-            "type": "string",
-            "title": "Next Check Time"
+            "title": "Action Window",
+            "type": "string"
           },
           "confidence_reason": {
-            "type": "string",
-            "title": "Confidence Reason"
-          },
-          "watch_conditions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Watch Conditions"
+            "title": "Confidence Reason",
+            "type": "string"
           },
           "data_limitations": {
             "items": {
               "type": "string"
             },
-            "type": "array",
-            "title": "Data Limitations"
+            "title": "Data Limitations",
+            "type": "array"
+          },
+          "immediate_action": {
+            "title": "Immediate Action",
+            "type": "string"
+          },
+          "next_check_time": {
+            "title": "Next Check Time",
+            "type": "string"
+          },
+          "phase_context": {
+            "$ref": "#/components/schemas/ReportStructuredPhaseContext"
+          },
+          "watch_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Watch Conditions",
+            "type": "array"
           }
         },
-        "type": "object",
         "title": "ReportStructuredPhaseDecision",
-        "description": "Bounded phase-decision fields exposed by the report API."
+        "type": "object"
       },
       "ReportStructuredSignalAttribution": {
+        "description": "Normalized signal-attribution weights and strongest-signal labels.",
         "properties": {
-          "technical_indicators": {
-            "type": "integer",
-            "title": "Technical Indicators"
-          },
-          "news_sentiment": {
-            "type": "integer",
-            "title": "News Sentiment"
-          },
           "fundamentals": {
-            "type": "integer",
-            "title": "Fundamentals"
+            "title": "Fundamentals",
+            "type": "integer"
           },
           "market_conditions": {
-            "type": "integer",
-            "title": "Market Conditions"
+            "title": "Market Conditions",
+            "type": "integer"
           },
-          "strongest_bullish_signal": {
-            "type": "string",
-            "title": "Strongest Bullish Signal"
+          "news_sentiment": {
+            "title": "News Sentiment",
+            "type": "integer"
           },
           "strongest_bearish_signal": {
-            "type": "string",
-            "title": "Strongest Bearish Signal"
+            "title": "Strongest Bearish Signal",
+            "type": "string"
+          },
+          "strongest_bullish_signal": {
+            "title": "Strongest Bullish Signal",
+            "type": "string"
+          },
+          "technical_indicators": {
+            "title": "Technical Indicators",
+            "type": "integer"
           }
         },
-        "type": "object",
         "title": "ReportStructuredSignalAttribution",
-        "description": "Normalized signal-attribution weights and strongest-signal labels."
+        "type": "object"
       },
       "ReportStructuredStrategyConflict": {
+        "description": "One bounded conflict between strategy opinions.",
         "properties": {
           "conflict_type": {
-            "type": "string",
-            "title": "Conflict Type"
-          },
-          "severity": {
-            "type": "string",
-            "title": "Severity"
+            "title": "Conflict Type",
+            "type": "string"
           },
           "description_key": {
-            "type": "string",
-            "title": "Description Key"
+            "title": "Description Key",
+            "type": "string"
           },
           "participants": {
             "items": {
               "type": "string"
             },
-            "type": "array",
-            "title": "Participants"
+            "title": "Participants",
+            "type": "array"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
           }
         },
-        "type": "object",
         "title": "ReportStructuredStrategyConflict",
-        "description": "One bounded conflict between strategy opinions."
+        "type": "object"
       },
       "ReportStructuredStrategySkill": {
+        "description": "One bounded supporting or opposing strategy opinion.",
         "properties": {
-          "skill_id": {
-            "type": "string",
-            "title": "Skill Id"
-          },
           "agent_name": {
-            "type": "string",
-            "title": "Agent Name"
+            "title": "Agent Name",
+            "type": "string"
           },
-          "signal": {
-            "type": "string",
-            "title": "Signal"
-          },
-          "reasoning": {
-            "type": "string",
-            "title": "Reasoning"
+          "conditions_met": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conditions Met",
+            "type": "array"
           },
           "confidence": {
             "anyOf": [
@@ -6304,6 +6293,14 @@
             ],
             "title": "Confidence"
           },
+          "invalid_signal": {
+            "title": "Invalid Signal",
+            "type": "boolean"
+          },
+          "reasoning": {
+            "title": "Reasoning",
+            "type": "string"
+          },
           "score_adjustment": {
             "anyOf": [
               {
@@ -6315,35 +6312,54 @@
             ],
             "title": "Score Adjustment"
           },
-          "conditions_met": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Conditions Met"
+          "signal": {
+            "title": "Signal",
+            "type": "string"
           },
-          "invalid_signal": {
-            "type": "boolean",
-            "title": "Invalid Signal"
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
           }
         },
-        "type": "object",
         "title": "ReportStructuredStrategySkill",
-        "description": "One bounded supporting or opposing strategy opinion."
+        "type": "object"
       },
       "ReportStructuredStrategySummary": {
+        "description": "Bounded summary parameters for a strategy synthesis.",
         "properties": {
-          "final_signal": {
-            "type": "string",
-            "title": "Final Signal"
-          },
-          "consensus_level": {
-            "type": "string",
-            "title": "Consensus Level"
+          "conflict_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Conflict Count"
           },
           "conflict_severity": {
-            "type": "string",
-            "title": "Conflict Severity"
+            "title": "Conflict Severity",
+            "type": "string"
+          },
+          "consensus_level": {
+            "title": "Consensus Level",
+            "type": "string"
+          },
+          "final_signal": {
+            "title": "Final Signal",
+            "type": "string"
+          },
+          "invalid_opinion_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Invalid Opinion Count"
           },
           "opinion_count": {
             "anyOf": [
@@ -6366,8 +6382,15 @@
               }
             ],
             "title": "Total Opinion Count"
-          },
-          "invalid_opinion_count": {
+          }
+        },
+        "title": "ReportStructuredStrategySummary",
+        "type": "object"
+      },
+      "ReportStructuredStrategySynthesis": {
+        "description": "Bounded multi-strategy synthesis exposed by the report API.",
+        "properties": {
+          "confidence": {
             "anyOf": [
               {
                 "type": "number"
@@ -6376,7 +6399,7 @@
                 "type": "integer"
               }
             ],
-            "title": "Invalid Opinion Count"
+            "title": "Confidence"
           },
           "conflict_count": {
             "anyOf": [
@@ -6388,51 +6411,32 @@
               }
             ],
             "title": "Conflict Count"
-          }
-        },
-        "type": "object",
-        "title": "ReportStructuredStrategySummary",
-        "description": "Bounded summary parameters for a strategy synthesis."
-      },
-      "ReportStructuredStrategySynthesis": {
-        "properties": {
-          "final_signal": {
-            "type": "string",
-            "title": "Final Signal"
           },
           "conflict_severity": {
-            "type": "string",
-            "title": "Conflict Severity"
+            "title": "Conflict Severity",
+            "type": "string"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredStrategyConflict"
+            },
+            "title": "Conflicts",
+            "type": "array"
           },
           "consensus_level": {
-            "type": "string",
-            "title": "Consensus Level"
+            "title": "Consensus Level",
+            "type": "string"
           },
-          "summary_key": {
-            "type": "string",
-            "title": "Summary Key"
+          "final_signal": {
+            "title": "Final Signal",
+            "type": "string"
           },
-          "weighted_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              }
-            ],
-            "title": "Weighted Score"
-          },
-          "confidence": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              }
-            ],
-            "title": "Confidence"
+          "opposing_skills": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredStrategySkill"
+            },
+            "title": "Opposing Skills",
+            "type": "array"
           },
           "original_confidence": {
             "anyOf": [
@@ -6445,7 +6449,21 @@
             ],
             "title": "Original Confidence"
           },
-          "conflict_count": {
+          "summary_key": {
+            "title": "Summary Key",
+            "type": "string"
+          },
+          "summary_params": {
+            "$ref": "#/components/schemas/ReportStructuredStrategySummary"
+          },
+          "supporting_skills": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredStrategySkill"
+            },
+            "title": "Supporting Skills",
+            "type": "array"
+          },
+          "weighted_score": {
             "anyOf": [
               {
                 "type": "number"
@@ -6454,36 +6472,11 @@
                 "type": "integer"
               }
             ],
-            "title": "Conflict Count"
-          },
-          "supporting_skills": {
-            "items": {
-              "$ref": "#/components/schemas/ReportStructuredStrategySkill"
-            },
-            "type": "array",
-            "title": "Supporting Skills"
-          },
-          "opposing_skills": {
-            "items": {
-              "$ref": "#/components/schemas/ReportStructuredStrategySkill"
-            },
-            "type": "array",
-            "title": "Opposing Skills"
-          },
-          "conflicts": {
-            "items": {
-              "$ref": "#/components/schemas/ReportStructuredStrategyConflict"
-            },
-            "type": "array",
-            "title": "Conflicts"
-          },
-          "summary_params": {
-            "$ref": "#/components/schemas/ReportStructuredStrategySummary"
+            "title": "Weighted Score"
           }
         },
-        "type": "object",
         "title": "ReportStructuredStrategySynthesis",
-        "description": "Bounded multi-strategy synthesis exposed by the report API."
+        "type": "object"
       },
       "StockQuote": {
         "type": "object",
@@ -13727,6 +13720,248 @@
           "provenance"
         ],
         "title": "AlertImpactResult",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeConclusion": {
+        "description": "Authoritative committee conclusion projected from strategy_synthesis.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "conflict_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Conflict Count"
+          },
+          "conflict_severity": {
+            "title": "Conflict Severity",
+            "type": "string"
+          },
+          "consensus_level": {
+            "title": "Consensus Level",
+            "type": "string"
+          },
+          "final_signal": {
+            "title": "Final Signal",
+            "type": "string"
+          },
+          "weighted_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Weighted Score"
+          }
+        },
+        "title": "ReportStructuredCommitteeConclusion",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDeliberation": {
+        "description": "Bounded Investment Committee deliberation for report consumers.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeConclusion"
+          },
+          "dissenting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Dissenting Opinions",
+            "type": "array"
+          },
+          "divergence_points": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeDivergence"
+            },
+            "title": "Divergence Points",
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeMember"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "personas_invalid": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Invalid",
+            "type": "array"
+          },
+          "personas_truncated": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Truncated",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "supporting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Supporting Opinions",
+            "type": "array"
+          }
+        },
+        "title": "ReportStructuredCommitteeDeliberation",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDivergence": {
+        "description": "Divergence point aligned with multi-strategy conflict / #1205 records.",
+        "properties": {
+          "conflict_type": {
+            "title": "Conflict Type",
+            "type": "string"
+          },
+          "description_key": {
+            "title": "Description Key",
+            "type": "string"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeDivergence",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeMember": {
+        "description": "One committee persona stance projected for report / Signal / History UI.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "invalid": {
+            "title": "Invalid",
+            "type": "boolean"
+          },
+          "invalid_reason": {
+            "title": "Invalid Reason",
+            "type": "string"
+          },
+          "lens_verdict": {
+            "title": "Lens Verdict",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeMember",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeOpinion": {
+        "description": "Supporting or dissenting persona opinion from real synthesis rows.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeOpinion",
         "type": "object"
       }
     },
