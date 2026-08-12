@@ -12,10 +12,8 @@ import path from 'node:path';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { HistoryList } from '../../components/history/HistoryList';
-import {
-  SettingsField,
-  areSettingsFieldPropsEqual,
-} from '../../components/settings/SettingsField';
+import { SettingsField } from '../../components/settings/SettingsField';
+import { areSettingsFieldPropsEqual } from '../../components/settings/settingsFieldMemo';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import type { HistoryItem } from '../../types/analysis';
 import type { SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
@@ -127,7 +125,9 @@ describe('runtime performance contracts (#883)', () => {
         };
       }
       const onChange = vi.fn();
-      const bodyRenderCounts = Object.fromEntries(fieldKeys.map((key) => [key, 0])) as Record<string, number>;
+      const bodyRenderSpies = Object.fromEntries(
+        fieldKeys.map((key) => [key, vi.fn()]),
+      ) as Record<string, ReturnType<typeof vi.fn>>;
 
       // Count renders of a memo boundary that uses the same equality as SettingsField.
       // React.Profiler is not used: it can fire when the Profiler host re-renders even
@@ -138,7 +138,7 @@ describe('runtime performance contracts (#883)', () => {
         onChange: (key: string, value: string) => void;
       };
       const CountedSettingsField = memo(function CountedSettingsField(props: CountedProps) {
-        bodyRenderCounts[props.item.key] += 1;
+        bodyRenderSpies[props.item.key]();
         return (
           <SettingsField
             item={props.item}
@@ -181,9 +181,11 @@ describe('runtime performance contracts (#883)', () => {
 
       render(<Host />);
       for (const key of fieldKeys) {
-        expect(bodyRenderCounts[key]).toBe(1);
+        expect(bodyRenderSpies[key]).toHaveBeenCalledTimes(1);
       }
-      const baseline = { ...bodyRenderCounts };
+      const baseline = Object.fromEntries(
+        fieldKeys.map((key) => [key, bodyRenderSpies[key].mock.calls.length]),
+      );
 
       fireEvent.click(screen.getByRole('button', { name: 'edit-field-0' }));
 
@@ -195,8 +197,8 @@ describe('runtime performance contracts (#883)', () => {
 
       const siblingRerenders = fieldKeys
         .filter((key) => key !== 'FIELD_0')
-        .reduce((sum, key) => sum + (bodyRenderCounts[key] - baseline[key]), 0);
-      const editedRerenders = bodyRenderCounts.FIELD_0 - baseline.FIELD_0;
+        .reduce((sum, key) => sum + (bodyRenderSpies[key].mock.calls.length - baseline[key]), 0);
+      const editedRerenders = bodyRenderSpies.FIELD_0.mock.calls.length - baseline.FIELD_0;
 
       record('settings-field-isolation', siblingRerenders, 'renders');
       expect(editedRerenders).toBeGreaterThan(0);
