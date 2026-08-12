@@ -79,7 +79,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         aria-describedby={messageId}
         tabIndex={-1}
         data-overlay-dialog="true"
-        className="w-full max-w-sm rounded-xl border border-border/70 bg-elevated p-6 shadow-2xl animate-in fade-in zoom-in duration-200 focus:outline-none motion-reduce:animate-none"
+        className="w-full max-w-sm rounded-xl border border-border/70 bg-elevated density-surface-pad-lg shadow-elevation-overlay animate-in fade-in zoom-in duration-200 focus:outline-none motion-reduce:animate-none"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id={titleId} className="mb-2 text-lg font-medium text-foreground">{title}</h3>
@@ -91,7 +91,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             {error}
           </p>
         ) : null}
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end density-gap-stack">
           <Button
             onClick={onCancel}
             disabled={cancelDisabled}

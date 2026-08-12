@@ -85,7 +85,7 @@ export const Modal: React.FC<ModalProps> = ({
         data-overlay-dialog="true"
         data-modal-size={size}
         className={cn(
-          'flex max-h-[85dvh] min-h-0 w-full flex-col overflow-hidden rounded-xl bg-elevated shadow-2xl focus:outline-none',
+          'flex max-h-[85dvh] min-h-0 w-full flex-col overflow-hidden rounded-xl bg-elevated shadow-elevation-overlay focus:outline-none',
           'max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none',
           showBorder && 'border border-border max-sm:border-x-0 max-sm:border-b-0',
           MODAL_SIZE_STYLES[size],
@@ -95,7 +95,7 @@ export const Modal: React.FC<ModalProps> = ({
         <header
           data-overlay-slot="header"
           className={cn(
-            'flex shrink-0 items-start justify-between gap-4 px-5 py-4',
+            'flex shrink-0 items-start justify-between density-gap-header density-overlay-pad-x density-overlay-pad-y',
             showHeaderDivider && 'border-b border-border',
           )}
         >
@@ -116,14 +116,14 @@ export const Modal: React.FC<ModalProps> = ({
             <X aria-hidden="true" />
           </IconButton>
         </header>
-        <div data-overlay-slot="body" className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div data-overlay-slot="body" className="min-h-0 flex-1 overflow-y-auto density-surface-pad-md">
           {children}
         </div>
         {footer ? (
           <footer
             data-overlay-slot="footer"
             className={cn(
-              'flex shrink-0 flex-wrap items-center justify-end gap-2 bg-elevated px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]',
+              'flex shrink-0 flex-wrap items-center justify-end density-gap-tools bg-elevated density-overlay-pad-x py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]',
               showFooterDivider && 'border-t border-border',
             )}
           >
