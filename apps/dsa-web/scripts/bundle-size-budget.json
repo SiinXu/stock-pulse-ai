@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 234690,
-      "measuredGzipBytes": 234490,
-      "note": "Remeasured after Data Sources Hub runtime projection merge with main (Refs #867); measured 234490 B + 200 B headroom."
+      "maxGzipBytes": 236558,
+      "measuredGzipBytes": 236358,
+      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys on post-main rebase (PR #1177 / #221 / #204); measured 236358 B + 200 B headroom."
     },
     {
       "id": "js-entry",
