@@ -1986,6 +1986,28 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '留空（自动）表示仅在配置了 NOTIFICATION_SYSTEM_ERROR_CHANNELS 时发送；true 强制开启；false 强制关闭。',
     impact: ['影响失败的每日/Actions 运行是否尝试推送失败通知。'],
   },
+  'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
+    title: '高分歧告警',
+    summary: '当多智能体结构化分歧超过阈值时，通过既有告警通知路由发送专用告警。',
+    usage:
+      '默认开启。仅消费多智能体分歧处理产出的 disagreement_handling 记录，不重新计算分歧分数；走 NOTIFICATION_ALERT_CHANNELS。',
+    valueNotes: [
+      '关闭：从不发送高分歧告警。',
+      '开启：当 disagreement_score ≥ HIGH_DISAGREEMENT_THRESHOLD 或 high_disagreement=true 时发送。',
+    ],
+    impact: [
+      '额外发送含分歧要点与历史入口链接的告警路由通知。',
+      '单渠道失败不会中断分析。',
+    ],
+    notes: ['无 disagreement_handling 记录的单程分析不受影响。'],
+  },
+  'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
+    title: '高分歧告警阈值',
+    summary: '高分歧告警的分数阈值（0-1）。',
+    usage:
+      '默认 0.6。与 disagreement_handling.disagreement_score 比较；high_disagreement=true 的记录也会告警。',
+    impact: ['控制高分歧告警的敏感度。'],
+  },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: '纸面组合初始资金',
     summary: '新建纸面组合时的起始现金。',

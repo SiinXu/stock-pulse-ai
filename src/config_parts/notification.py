@@ -86,6 +86,11 @@ class NotificationConfig:
     notification_daily_digest_enabled: bool = False
     notification_delta_first: bool = False
 
+    # High-disagreement alerts for multi-agent runs (#134): consume structured
+    # disagreement_handling records (#1205) and route via NOTIFICATION_ALERT_CHANNELS.
+    high_disagreement_alerts_enabled: bool = True
+    high_disagreement_threshold: float = 0.6
+
     # Single stock push mode: Pushes immediately after analyzing each stock, instead of pushing after aggregation
     single_stock_notify: bool = False
 

@@ -210,6 +210,29 @@ class _PersistenceStageMixin:
                             level=logging.WARNING,
                             context={"analysis_history_id": saved_history_id},
                         )
+                    # High-disagreement alerts (#134): consume structured
+                    # disagreement_handling from #1205; never recompute score.
+                    # Failures must not interrupt history persistence.
+                    try:
+                        from src.services.high_disagreement_alert import (
+                            maybe_send_high_disagreement_alert,
+                        )
+
+                        maybe_send_high_disagreement_alert(
+                            result,
+                            history_id=int(saved_history_id),
+                            config=getattr(self, "config", None),
+                            notifier=getattr(self, "notifier", None),
+                        )
+                    except Exception as alert_exc:  # broad-exception: fallback_recorded - High-disagreement alerts must never fail history persistence.
+                        log_safe_exception(
+                            logger,
+                            "High-disagreement alert after history save failed",
+                            alert_exc,
+                            error_code="high_disagreement_alert_after_history_failed",
+                            level=logging.WARNING,
+                            context={"analysis_history_id": saved_history_id},
+                        )
             except Exception as exc:  # broad-exception: fallback_recorded - History failure remains isolated after the side-effect fence records whether a write committed.
                 persistence_error = exc
                 valid_saved_history_id = False

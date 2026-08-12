@@ -1957,6 +1957,31 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Leave empty (auto) to notify only when NOTIFICATION_SYSTEM_ERROR_CHANNELS is configured. Set true to force on, false to force off.',
     impact: ['Affects whether failed daily/Actions runs attempt failure push notifications.'],
   },
+  'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
+    title: 'High Disagreement Alerts',
+    summary:
+      'Emit a dedicated alert when multi-agent structured disagreement exceeds the threshold.',
+    usage:
+      'Default on. Requires a structured disagreement_handling record from multi-agent disagreement handling. Routes through NOTIFICATION_ALERT_CHANNELS. Does not recompute disagreement scores.',
+    valueNotes: [
+      'Off: never emit high-disagreement alerts.',
+      'On: emit when disagreement_score >= HIGH_DISAGREEMENT_THRESHOLD or high_disagreement=true.',
+    ],
+    impact: [
+      'Adds an alert-route notification with disagreement points and a history entry link.',
+      'Single channel failure never interrupts analysis.',
+    ],
+    notes: [
+      'Consumes disagreement_handling records only; single-pass analyses without that record are unaffected.',
+    ],
+  },
+  'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
+    title: 'High Disagreement Alert Threshold',
+    summary: 'Score threshold (0-1) for high-disagreement alerts.',
+    usage:
+      'Default 0.6. Compared against disagreement_handling.disagreement_score. Records with high_disagreement=true also alert.',
+    impact: ['Controls how sensitive high-disagreement alert emission is.'],
+  },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: 'Paper Portfolio Initial Cash',
     summary: 'Starting cash for a newly created paper portfolio.',
