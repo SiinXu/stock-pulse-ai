@@ -10987,7 +10987,7 @@ export interface components {
             var_pct?: number | null;
             /**
              * Var Value
-             * @description Historical VaR in portfolio currency units
+             * @description Historical VaR in portfolio response-base currency units
              */
             var_value?: number | null;
         };
@@ -11148,6 +11148,8 @@ export interface components {
             data_source: string;
             /** Distribution Assumption */
             distribution_assumption: string;
+            /** Fx Policy */
+            fx_policy: string;
             /** Horizon Days */
             horizon_days: number;
             /** Horizon Scaling */
@@ -11201,6 +11203,11 @@ export interface components {
             cost_method: string;
             /** Currency */
             currency: string;
+            /**
+             * Fx Stale
+             * @default false
+             */
+            fx_stale: boolean;
             history?: components["schemas"]["PortfolioRiskHistoryMeta"] | null;
             /**
              * Portfolio Value
@@ -11214,7 +11221,7 @@ export interface components {
             positions_used: number;
             /**
              * Status
-             * @description 'ok', 'empty_portfolio', 'insufficient_history', or 'partial'
+             * @description 'ok', 'empty_portfolio', 'insufficient_history', 'partial'
              */
             status: string;
             /** Status Message */

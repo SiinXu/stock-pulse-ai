@@ -17197,10 +17197,13 @@
         "type": "object"
       },
       "PortfolioConcentrationBlock": {
+        "additionalProperties": false,
         "properties": {
           "diversification_score": {
             "anyOf": [
               {
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17213,6 +17216,7 @@
           "effective_n": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17225,6 +17229,8 @@
           "hhi": {
             "anyOf": [
               {
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17247,6 +17253,8 @@
           "top_weight_pct": {
             "anyOf": [
               {
+                "maximum": 100.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17503,6 +17511,7 @@
         "type": "object"
       },
       "PortfolioCorrelationBlock": {
+        "additionalProperties": false,
         "properties": {
           "matrix": {
             "description": "Pairwise Pearson correlation matrix aligned with symbols",
@@ -17510,6 +17519,8 @@
               "items": {
                 "anyOf": [
                   {
+                    "maximum": 1.0,
+                    "minimum": -1.0,
                     "type": "number"
                   },
                   {
@@ -18562,6 +18573,7 @@
         "type": "object"
       },
       "PortfolioHistoricalVaRBlock": {
+        "additionalProperties": false,
         "properties": {
           "confidence": {
             "anyOf": [
@@ -18593,6 +18605,7 @@
           "one_day_var_pct": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -18604,6 +18617,8 @@
           "percentile_used": {
             "anyOf": [
               {
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -18631,6 +18646,7 @@
           "var_pct": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -18643,13 +18659,14 @@
           "var_value": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Historical VaR in portfolio currency units",
+            "description": "Historical VaR in portfolio response-base currency units",
             "title": "Var Value"
           }
         },
@@ -19018,6 +19035,7 @@
         "type": "object"
       },
       "PortfolioRiskAssumptions": {
+        "additionalProperties": false,
         "properties": {
           "cash_excluded": {
             "title": "Cash Excluded",
@@ -19041,6 +19059,10 @@
           },
           "distribution_assumption": {
             "title": "Distribution Assumption",
+            "type": "string"
+          },
+          "fx_policy": {
+            "title": "Fx Policy",
             "type": "string"
           },
           "horizon_days": {
@@ -19095,6 +19117,7 @@
           "portfolio_aggregation",
           "cash_excluded",
           "weight_basis",
+          "fx_policy",
           "horizon_scaling",
           "distribution_assumption",
           "correlation_method",
@@ -19106,6 +19129,7 @@
         "type": "object"
       },
       "PortfolioRiskHistoryMeta": {
+        "additionalProperties": false,
         "properties": {
           "aligned_end": {
             "anyOf": [
@@ -19151,6 +19175,7 @@
         "type": "object"
       },
       "PortfolioRiskMetricsResponse": {
+        "additionalProperties": false,
         "properties": {
           "account_id": {
             "anyOf": [
@@ -19184,6 +19209,11 @@
             "title": "Currency",
             "type": "string"
           },
+          "fx_stale": {
+            "default": false,
+            "title": "Fx Stale",
+            "type": "boolean"
+          },
           "history": {
             "anyOf": [
               {
@@ -19196,6 +19226,7 @@
           },
           "portfolio_value": {
             "default": 0.0,
+            "minimum": 0.0,
             "title": "Portfolio Value",
             "type": "number"
           },
@@ -19205,7 +19236,7 @@
             "type": "integer"
           },
           "status": {
-            "description": "'ok', 'empty_portfolio', 'insufficient_history', or 'partial'",
+            "description": "'ok', 'empty_portfolio', 'insufficient_history', 'partial'",
             "title": "Status",
             "type": "string"
           },
@@ -19300,12 +19331,15 @@
         "type": "object"
       },
       "PortfolioRiskWeightItem": {
+        "additionalProperties": false,
         "properties": {
           "symbol": {
             "title": "Symbol",
             "type": "string"
           },
           "weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Weight Pct",
             "type": "number"
           }
