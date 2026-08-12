@@ -120,7 +120,7 @@ def _lookup_litellm_pricing(wire: str) -> Optional[Dict[str, Any]]:
             bare = wire.split("/", 1)[1]
             if bare in cost_map and isinstance(cost_map[bare], dict):
                 return {**cost_map[bare], "source": "litellm"}
-    except Exception:
+    except Exception:  # broad-exception: optional_metadata - pricing is best-effort and must not abort metering
         return None
     return None
 
@@ -138,7 +138,7 @@ def _load_optional_pricing_table() -> Dict[str, Dict[str, float]]:
             return _pricing_cache
         try:
             raw = json.loads(Path(path).read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: optional_metadata - bad pricing file must degrade to unpriced
             logger.warning("Failed to load LLM_COST_PRICING_PATH=%s: %s", path, exc)
             _pricing_cache, _pricing_cache_path = {}, path
             return _pricing_cache

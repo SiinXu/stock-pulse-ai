@@ -106,7 +106,7 @@ def run_agent_loop(
     try:
         from src.config import get_config as _get_config
         agent_mode = str(getattr(_get_config(), "agent_orchestrator_mode", "") or "").strip() or None
-    except Exception:  # broad-exception: optional_metadata
+    except Exception:  # broad-exception: optional_metadata - attribution must not fail the agent loop
         agent_mode = None
     guard_policy = runtime_guard_policy or RuntimeGuardPolicy.from_sources()
     if tool_call_timeout_seconds is None:
