@@ -38,7 +38,16 @@
 * * * * * cd /app && python -m src.services.prediction_resolver --json >> /var/log/prediction-resolver.log 2>&1
 ```
 
-## 重叠保护
+## 重叠保护与重试
 
 - 进程内非阻塞锁跳过重叠 tick。
 - 存储层租约 + 条件写回防止跨进程双写。
+- **过期的 `resolving` 租约**会在下一次 tick 重新进入 due 扫描（崩溃恢复）。
+- `data_unavailable` 使用有界指数退避（outcome 中的 `next_attempt_at`），并在达到 `PREDICTION_RESOLVE_MAX_ATTEMPTS` 后标记 `retry_exhausted` 停止重试。
+
+## 本 PR 边界
+
+已实现：tick 编排、调度/CLI、租约回收、尝试上限与基础退避、`max_per_tick`。
+
+**不在本 PR**：全局并发池/批量 coalesce（#1104）、预测查询 HTTP API、交易日历 `resolve_after`（#1109）、复盘/适配器（#1103 / #1106）。
+

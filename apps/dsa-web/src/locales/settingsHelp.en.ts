@@ -1496,6 +1496,11 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects background alert detection frequency and notification timing.'],
     notes: ['Must be used with alert rules.'],
   },
+  'settings.agent.prediction_resolve': {
+    title: 'Prediction Horizon Resolver',
+    description:
+      'When enabled, the process scheduler runs PredictionResolver.tick automatically. Provider failures mark data_unavailable and retry with backoff; never fabricates hit/miss. Default off.',
+  },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: 'Event Alert Rules (Legacy JSON)',
     summary: 'Configures basic price and volume alert rules via a JSON array.',

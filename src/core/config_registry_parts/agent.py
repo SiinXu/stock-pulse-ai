@@ -1455,7 +1455,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 705,
+        "display_order": 720,
         "help_key": "settings.agent.prediction_resolve",
         "examples": [
             "PREDICTION_RESOLVE_ENABLED=false",
@@ -1481,7 +1481,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "60",
         "options": [],
         "validation": {"min": 30, "max": 86400},
-        "display_order": 706,
+        "display_order": 721,
         "help_key": "settings.agent.prediction_resolve",
         "examples": ["PREDICTION_RESOLVE_INTERVAL_SECONDS=60"],
         "docs": [
@@ -1504,7 +1504,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "50",
         "options": [],
         "validation": {"min": 0, "max": 10000},
-        "display_order": 707,
+        "display_order": 722,
         "help_key": "settings.agent.prediction_resolve",
         "examples": ["PREDICTION_RESOLVE_MAX_PER_TICK=50"],
         "docs": [
@@ -1527,7 +1527,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "120",
         "options": [],
         "validation": {"min": 5, "max": 86400},
-        "display_order": 708,
+        "display_order": 723,
         "help_key": "settings.agent.prediction_resolve",
         "examples": ["PREDICTION_RESOLVE_LEASE_SECONDS=120"],
         "docs": [
@@ -1550,7 +1550,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "5",
         "options": [],
         "validation": {"min": 1, "max": 100},
-        "display_order": 709,
+        "display_order": 724,
         "help_key": "settings.agent.prediction_resolve",
         "examples": ["PREDICTION_RESOLVE_MAX_ATTEMPTS=5"],
         "docs": [

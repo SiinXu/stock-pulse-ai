@@ -44,10 +44,28 @@ python -m src.services.prediction_resolver --limit 20 --worker-id cron-1 --json
 
 Exit codes: `0` ok (including empty/overlap), `1` deps missing, `2` unexpected failure.
 
-## Overlap protection
+## Overlap protection and retry
 
 - Process-local non-blocking lock skips concurrent ticks.
 - Store leases + conditional resolve prevent cross-process double-scoring.
+- **Expired `resolving` leases are re-scanned** on the next tick (crash recovery).
+- `data_unavailable` uses bounded exponential backoff (`next_attempt_at` in outcome) and stops after `PREDICTION_RESOLVE_MAX_ATTEMPTS` (`retry_exhausted`).
+
+## Scope boundaries (this PR)
+
+Implemented here:
+
+- `PredictionResolver.tick` orchestration, scheduler wiring, CLI entrypoint
+- Process lock, lease reclaim, attempt ceiling, basic backoff
+- `max_per_tick` as the per-tick claim cap
+
+**Not** in this PR (later epic children):
+
+- Parallel batch coalesce / global multi-worker rate-limit pools (#1104)
+- Prediction query / diagnostics HTTP API (outcomes are on the store row + logs)
+- Trading-calendar `resolve_after` policy (#1109)
+- Post-mortem / adapter wiring (#1103 / #1106)
+
 
 ## Related
 

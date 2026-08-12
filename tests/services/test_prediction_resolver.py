@@ -461,3 +461,99 @@ def test_runtime_scheduler_registers_prediction_resolver_task() -> None:
     assert PREDICTION_RESOLVER_BACKGROUND_TASK_NAME in names
     task = next(t for t in service._scheduler.background_tasks if t["name"] == PREDICTION_RESOLVER_BACKGROUND_TASK_NAME)  # type: ignore[union-attr]
     assert task["interval_seconds"] == 75
+
+
+def test_expired_resolving_lease_is_reclaimed_on_next_tick() -> None:
+    """Crash-recovery: expired resolving rows must re-enter list_due."""
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    store.insert(
+        prediction_id="pred-stale",
+        run_id="run-stale",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=2),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+        status=STATUS_RESOLVING,
+        attempts=1,
+        lease_owner="dead-worker",
+        lease_token="old-token",
+        lease_expires_at=now - timedelta(minutes=5),
+    )
+    # Due scan must surface the expired lease without a manual requeue.
+    due = store.list_due(as_of=now, limit=10)
+    assert [r.prediction_id for r in due] == ["pred-stale"]
+
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(105.0))
+        ),
+        claim_scorer=_FakeScorer(),
+        worker_id="worker-recover",
+        clock=_now,
+    )
+    summary = resolver.tick()
+    assert summary.claimed == 1
+    assert summary.resolved == 1
+    row = store.get("pred-stale")
+    assert row is not None
+    assert row.status == STATUS_RESOLVED
+    assert row.outcome is not None
+    assert row.outcome["label"] == "hit"
+    assert row.lease_token is None
+
+
+def test_data_unavailable_respects_backoff_and_max_attempts() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    fetcher = _FakeFetcher(
+        _Snapshot(status="provider_down", reason="provider_failure", retryable=True)
+    )
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=fetcher,
+        claim_scorer=_FakeScorer(),
+        worker_id="worker-retry",
+        max_attempts=2,
+        clock=_now,
+    )
+    first = resolver.tick()
+    assert first.data_unavailable == 1
+    row = store.get("pred-1")
+    assert row is not None
+    assert row.status == STATUS_DATA_UNAVAILABLE
+    assert row.attempts == 1
+    assert row.retry_exhausted is False
+    assert row.next_attempt_at is not None
+    assert row.next_attempt_at > _now()
+    # Backoff not elapsed: second tick must not reclaim.
+    second = resolver.tick()
+    assert second.claimed == 0
+    assert store.get("pred-1").attempts == 1  # type: ignore[union-attr]
+
+    # Advance clock past backoff.
+    later = row.next_attempt_at + timedelta(seconds=1)
+    store._clock = lambda: later
+    resolver._clock = lambda: later
+    third = resolver.tick()
+    assert third.data_unavailable == 1
+    row2 = store.get("pred-1")
+    assert row2 is not None
+    assert row2.attempts == 2
+    assert row2.retry_exhausted is True
+    # Exhausted rows stay out of due scan forever (until external requeue).
+    fourth = resolver.tick()
+    assert fourth.claimed == 0
+
+
+def test_compute_retry_delay_is_bounded() -> None:
+    from src.services.prediction_resolver import compute_retry_delay_seconds
+
+    assert compute_retry_delay_seconds(1, base_seconds=30, max_seconds=3600) == 30
+    assert compute_retry_delay_seconds(2, base_seconds=30, max_seconds=3600) == 60
+    assert compute_retry_delay_seconds(20, base_seconds=30, max_seconds=3600) == 3600

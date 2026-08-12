@@ -19,6 +19,7 @@ from src.services.prediction_resolver.resolver import (
     TickSummary,
     build_prediction_resolver,
     build_prediction_resolver_background_tasks,
+    compute_retry_delay_seconds,
     derive_aggregate_label,
 )
 
@@ -35,5 +36,6 @@ __all__ = [
     "TickSummary",
     "build_prediction_resolver",
     "build_prediction_resolver_background_tasks",
+    "compute_retry_delay_seconds",
     "derive_aggregate_label",
 ]

@@ -9,7 +9,7 @@ import socket
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field, is_dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from src.services.prediction_resolver.memory_store import new_lease_token
@@ -27,6 +27,9 @@ PREDICTION_RESOLVER_BACKGROUND_TASK_NAME = "prediction_resolver"
 PREDICTION_RESOLVER_DEFAULT_INTERVAL_SECONDS = 60
 PREDICTION_RESOLVER_MIN_INTERVAL_SECONDS = 30
 PREDICTION_RESOLVER_ENGINE_VERSION = "prediction-resolver-v1"
+# Bounded exponential backoff for data_unavailable retries (seconds).
+PREDICTION_RESOLVER_RETRY_BASE_SECONDS = 30.0
+PREDICTION_RESOLVER_RETRY_MAX_SECONDS = 3600.0
 
 OUTCOME_HIT = "hit"
 OUTCOME_MISS = "miss"
@@ -108,6 +111,58 @@ def derive_aggregate_label(
     ):
         return OUTCOME_DATA_UNAVAILABLE
     return OUTCOME_PARTIAL
+
+
+def compute_retry_delay_seconds(
+    attempts: int,
+    *,
+    base_seconds: float = PREDICTION_RESOLVER_RETRY_BASE_SECONDS,
+    max_seconds: float = PREDICTION_RESOLVER_RETRY_MAX_SECONDS,
+) -> float:
+    """Bounded exponential backoff from the current attempt count."""
+    safe_attempts = max(1, int(attempts))
+    delay = float(base_seconds) * (2.0 ** max(0, safe_attempts - 1))
+    return min(float(max_seconds), delay)
+
+
+def build_data_unavailable_outcome(
+    *,
+    reason: str,
+    as_of: datetime,
+    attempts: int,
+    max_attempts: int,
+    worker_id: str,
+    extra: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build outcome payload including retry scheduling metadata.
+
+    Stores that only persist ``outcome_json`` can still honor backoff by reading
+    ``next_attempt_at`` / ``retry_exhausted`` from the payload (memory store does).
+    """
+    exhausted = int(attempts) >= int(max_attempts)
+    payload: Dict[str, Any] = {
+        "label": OUTCOME_DATA_UNAVAILABLE,
+        "reason": str(reason or "data_unavailable"),
+        "engine_version": PREDICTION_RESOLVER_ENGINE_VERSION,
+        "worker_id": worker_id,
+        "attempts": int(attempts),
+        "max_attempts": int(max_attempts),
+        "retry_exhausted": exhausted,
+    }
+    if extra:
+        payload.update(dict(extra))
+    # Keep explicit exhausted/reason authority after extra merge.
+    payload["retry_exhausted"] = exhausted
+    payload["reason"] = str(reason or "data_unavailable")
+    if exhausted:
+        payload["next_attempt_at"] = None
+    else:
+        delay = compute_retry_delay_seconds(attempts)
+        payload["next_attempt_at"] = (
+            as_of + timedelta(seconds=delay)
+        ).isoformat()
+        payload["retry_delay_seconds"] = delay
+    return payload
 
 
 def _label_from_score_report(report: Any) -> str:
@@ -314,6 +369,22 @@ class PredictionResolver:
                 reason="lease_lost",
             )
         attempts = int(_attr(claimed, "attempts", 0) or 0)
+        if attempts > self._max_attempts:
+            # Claim already incremented attempts; stop retrying without scoring.
+            applied = self._mark_unavailable(
+                prediction_id=prediction_id,
+                reason="max_attempts_exhausted",
+                lease_token=lease_token,
+                as_of=as_of,
+                attempts=attempts,
+            )
+            return TickItemResult(
+                prediction_id=prediction_id,
+                disposition="data_unavailable",
+                label=OUTCOME_DATA_UNAVAILABLE,
+                reason="max_attempts_exhausted",
+                applied=applied,
+            )
         try:
             return self._score_and_write(
                 claimed,
@@ -330,26 +401,12 @@ class PredictionResolver:
                 context={"prediction_id": prediction_id},
                 level=logging.WARNING,
             )
-            applied, _ = self._store.mark_data_unavailable(
+            applied = self._mark_unavailable(
                 prediction_id=prediction_id,
                 reason="resolver_exception",
-                expected_lease_token=lease_token,
+                lease_token=lease_token,
                 as_of=as_of,
-                outcome={
-                    "label": OUTCOME_DATA_UNAVAILABLE,
-                    "reason": "resolver_exception",
-                    "engine_version": PREDICTION_RESOLVER_ENGINE_VERSION,
-                    "worker_id": self._worker_id,
-                    "attempts": attempts,
-                },
-            )
-            self._emit(
-                "prediction.resolve.data_unavailable",
-                {
-                    "prediction_id": prediction_id,
-                    "reason": "resolver_exception",
-                    "applied": applied,
-                },
+                attempts=attempts,
             )
             return TickItemResult(
                 prediction_id=prediction_id,
@@ -358,6 +415,44 @@ class PredictionResolver:
                 reason="resolver_exception",
                 applied=applied,
             )
+
+    def _mark_unavailable(
+        self,
+        *,
+        prediction_id: str,
+        reason: str,
+        lease_token: str,
+        as_of: datetime,
+        attempts: int,
+        extra: Optional[Mapping[str, Any]] = None,
+    ) -> bool:
+        outcome = build_data_unavailable_outcome(
+            reason=reason,
+            as_of=as_of,
+            attempts=attempts,
+            max_attempts=self._max_attempts,
+            worker_id=self._worker_id,
+            extra=extra,
+        )
+        applied, _ = self._store.mark_data_unavailable(
+            prediction_id=prediction_id,
+            reason=reason,
+            expected_lease_token=lease_token,
+            as_of=as_of,
+            outcome=outcome,
+        )
+        self._emit(
+            "prediction.resolve.data_unavailable",
+            {
+                "prediction_id": prediction_id,
+                "reason": reason,
+                "applied": applied,
+                "attempts": attempts,
+                "retry_exhausted": bool(outcome.get("retry_exhausted")),
+                "next_attempt_at": outcome.get("next_attempt_at"),
+            },
+        )
+        return applied
 
     def _score_and_write(
         self,
@@ -377,18 +472,12 @@ class PredictionResolver:
         end_date = _to_date(resolve_after) or _to_date(as_of)
 
         if not symbol or as_of_date is None or end_date is None:
-            applied, _ = self._store.mark_data_unavailable(
+            applied = self._mark_unavailable(
                 prediction_id=prediction_id,
                 reason="invalid_prediction_fields",
-                expected_lease_token=lease_token,
+                lease_token=lease_token,
                 as_of=as_of,
-                outcome={
-                    "label": OUTCOME_DATA_UNAVAILABLE,
-                    "reason": "invalid_prediction_fields",
-                    "engine_version": PREDICTION_RESOLVER_ENGINE_VERSION,
-                    "worker_id": self._worker_id,
-                    "attempts": attempts,
-                },
+                attempts=attempts,
             )
             return TickItemResult(
                 prediction_id=prediction_id,
@@ -413,29 +502,17 @@ class PredictionResolver:
                 or _attr(snapshot, "status")
                 or "data_unavailable"
             )
-            applied, _ = self._store.mark_data_unavailable(
+            applied = self._mark_unavailable(
                 prediction_id=prediction_id,
                 reason=reason,
-                expected_lease_token=lease_token,
+                lease_token=lease_token,
                 as_of=as_of,
-                outcome={
-                    "label": OUTCOME_DATA_UNAVAILABLE,
-                    "reason": reason,
+                attempts=attempts,
+                extra={
                     "retryable": bool(_attr(snapshot, "retryable", True)),
                     "actuals": _mapping(snapshot),
-                    "engine_version": PREDICTION_RESOLVER_ENGINE_VERSION,
-                    "worker_id": self._worker_id,
-                    "attempts": attempts,
-                },
-            )
-            self._emit(
-                "prediction.resolve.data_unavailable",
-                {
-                    "prediction_id": prediction_id,
-                    "reason": reason,
                     "symbol": symbol,
                     "market": market,
-                    "applied": applied,
                 },
             )
             return TickItemResult(
@@ -449,19 +526,13 @@ class PredictionResolver:
         claim_actuals = _claim_actuals_from_snapshot(snapshot)
         if claim_actuals.get("unavailable_reason"):
             reason = str(claim_actuals["unavailable_reason"])
-            applied, _ = self._store.mark_data_unavailable(
+            applied = self._mark_unavailable(
                 prediction_id=prediction_id,
                 reason=reason,
-                expected_lease_token=lease_token,
+                lease_token=lease_token,
                 as_of=as_of,
-                outcome={
-                    "label": OUTCOME_DATA_UNAVAILABLE,
-                    "reason": reason,
-                    "actuals": _mapping(snapshot),
-                    "engine_version": PREDICTION_RESOLVER_ENGINE_VERSION,
-                    "worker_id": self._worker_id,
-                    "attempts": attempts,
-                },
+                attempts=attempts,
+                extra={"actuals": _mapping(snapshot)},
             )
             return TickItemResult(
                 prediction_id=prediction_id,
@@ -477,19 +548,15 @@ class PredictionResolver:
 
         if label == OUTCOME_DATA_UNAVAILABLE or label not in TERMINAL_SCORE_LABELS:
             reason = "score_data_unavailable"
-            applied, _ = self._store.mark_data_unavailable(
+            applied = self._mark_unavailable(
                 prediction_id=prediction_id,
                 reason=reason,
-                expected_lease_token=lease_token,
+                lease_token=lease_token,
                 as_of=as_of,
-                outcome={
-                    "label": OUTCOME_DATA_UNAVAILABLE,
-                    "reason": reason,
+                attempts=attempts,
+                extra={
                     "score": report_payload,
                     "actuals": _mapping(snapshot),
-                    "engine_version": PREDICTION_RESOLVER_ENGINE_VERSION,
-                    "worker_id": self._worker_id,
-                    "attempts": attempts,
                 },
             )
             return TickItemResult(

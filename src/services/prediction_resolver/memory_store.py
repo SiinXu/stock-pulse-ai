@@ -1,6 +1,14 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""In-memory prediction store with real lease / CAS semantics for tests."""
+"""In-memory prediction store with real lease / CAS semantics for tests.
+
+Due-scan contract (must stay aligned with A3 store predicates when that lands):
+
+- ``pending`` with ``resolve_after <= as_of``
+- ``data_unavailable`` with ``resolve_after <= as_of``, not retry-exhausted, and
+  ``next_attempt_at`` null or ``<= as_of`` (backoff)
+- ``resolving`` with expired or missing lease (crash recovery reclaim)
+"""
 
 from __future__ import annotations
 
@@ -26,6 +34,25 @@ def _utc_naive_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _parse_optional_datetime(value: Any) -> Optional[datetime]:
+    if value is None or value is False:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
 @dataclass
 class MemoryPredictionRecord:
     prediction_id: str
@@ -45,6 +72,8 @@ class MemoryPredictionRecord:
     outcome: Optional[Dict[str, Any]] = None
     model_meta: Optional[Dict[str, Any]] = None
     resolved_at: Optional[datetime] = None
+    next_attempt_at: Optional[datetime] = None
+    retry_exhausted: bool = False
 
     def snapshot(self) -> "MemoryPredictionRecord":
         return replace(
@@ -53,6 +82,24 @@ class MemoryPredictionRecord:
             outcome=copy.deepcopy(self.outcome) if self.outcome is not None else None,
             model_meta=copy.deepcopy(self.model_meta) if self.model_meta is not None else None,
         )
+
+
+def _row_is_due(row: MemoryPredictionRecord, as_of: datetime) -> bool:
+    """Whether a row is eligible for claim in the current tick."""
+    if row.status in TERMINAL or row.retry_exhausted:
+        return False
+    if row.status == STATUS_PENDING:
+        return row.resolve_after <= as_of
+    if row.status == STATUS_DATA_UNAVAILABLE:
+        if row.resolve_after > as_of:
+            return False
+        if row.next_attempt_at is not None and row.next_attempt_at > as_of:
+            return False
+        return True
+    if row.status == STATUS_RESOLVING:
+        # Crash recovery: reclaim only when the lease is missing or expired.
+        return row.lease_expires_at is None or row.lease_expires_at <= as_of
+    return False
 
 
 @dataclass
@@ -74,6 +121,13 @@ class InMemoryPredictionStore:
         created_at: Optional[datetime] = None,
         model_meta: Optional[Mapping[str, Any]] = None,
         status: str = STATUS_PENDING,
+        attempts: int = 0,
+        lease_owner: Optional[str] = None,
+        lease_token: Optional[str] = None,
+        lease_expires_at: Optional[datetime] = None,
+        next_attempt_at: Optional[datetime] = None,
+        retry_exhausted: bool = False,
+        outcome: Optional[Mapping[str, Any]] = None,
     ) -> MemoryPredictionRecord:
         now = created_at or self._clock()
         row = MemoryPredictionRecord(
@@ -87,7 +141,14 @@ class InMemoryPredictionStore:
             claims=list(claims),
             created_at=now,
             updated_at=now,
+            attempts=int(attempts or 0),
+            lease_owner=lease_owner,
+            lease_token=lease_token,
+            lease_expires_at=lease_expires_at,
             model_meta=dict(model_meta) if model_meta is not None else None,
+            next_attempt_at=next_attempt_at,
+            retry_exhausted=bool(retry_exhausted),
+            outcome=dict(outcome) if outcome is not None else None,
         )
         with self._lock:
             if row.prediction_id in self._rows:
@@ -106,7 +167,7 @@ class InMemoryPredictionStore:
             due = [
                 row.snapshot()
                 for row in self._rows.values()
-                if row.status in CLAIMABLE and row.resolve_after <= as_of
+                if _row_is_due(row, as_of)
             ]
         due.sort(key=lambda r: (r.resolve_after, r.prediction_id))
         return due[:bound]
@@ -129,14 +190,16 @@ class InMemoryPredictionStore:
         expires = now + timedelta(seconds=max(1, int(lease_ttl_seconds)))
         with self._lock:
             row = self._rows.get(canonical)
-            if row is None or row.status in TERMINAL:
+            if row is None or row.status in TERMINAL or row.retry_exhausted:
                 return None
-            claimable = row.status in CLAIMABLE
-            expired_lease = (
+            if not _row_is_due(row, now):
+                return None
+            # Active (non-expired) resolving lease held by anyone blocks re-claim.
+            if (
                 row.status == STATUS_RESOLVING
-                and (row.lease_expires_at is None or row.lease_expires_at <= now)
-            )
-            if not claimable and not expired_lease:
+                and row.lease_expires_at is not None
+                and row.lease_expires_at > now
+            ):
                 return None
             row.status = STATUS_RESOLVING
             row.lease_owner = owner
@@ -144,6 +207,8 @@ class InMemoryPredictionStore:
             row.lease_expires_at = expires
             row.attempts = int(row.attempts or 0) + 1
             row.updated_at = now
+            # Clear prior backoff while actively resolving.
+            row.next_attempt_at = None
             return row.snapshot()
 
     def resolve(
@@ -175,6 +240,8 @@ class InMemoryPredictionStore:
             row.lease_owner = None
             row.lease_token = None
             row.lease_expires_at = None
+            row.next_attempt_at = None
+            row.retry_exhausted = False
             return True, row.snapshot()
 
     def mark_data_unavailable(
@@ -210,6 +277,10 @@ class InMemoryPredictionStore:
             row.lease_owner = None
             row.lease_token = None
             row.lease_expires_at = None
+            # Optional retry controls may be carried in outcome for port compatibility
+            # with A3 stores that only persist outcome_json.
+            row.next_attempt_at = _parse_optional_datetime(payload.get("next_attempt_at"))
+            row.retry_exhausted = bool(payload.get("retry_exhausted", False))
             return True, row.snapshot()
 
 
