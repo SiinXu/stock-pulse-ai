@@ -14,7 +14,7 @@ import type { RunFlowEvent, RunFlowSnapshot } from '../../types/runFlow';
 export type TraceEventSource = 'run_flow' | 'unified_trace';
 
 /** Active source. Change only when #1125 provides a stable consumer contract. */
-export const TRACE_EVENT_SOURCE: TraceEventSource = 'run_flow';
+export const TRACE_EVENT_SOURCE: TraceEventSource = 'run_flow'; // CI re-trigger marker
 
 export type ProcessTimelineKind =
   | 'phase'
