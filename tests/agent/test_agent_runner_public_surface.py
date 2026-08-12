@@ -21,10 +21,11 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     Any BoundToolSession Callable DashboardParseResult Dict
     ExecutionFenceRejected FuturesTimeoutError LLMToolAdapter List Optional
     RunLoopResult RuntimeGuardPolicy StageFailureReason StockScope
-    ThreadPoolExecutor ToolCall ToolRegistry UsageRecorder annotations
-    as_completed bind_runner_tool_completion_guard contextvars dataclass
+    ThreadPoolExecutor ToolCall ToolRegistry UsageRecorder ModeBudgetAccount
+    annotations as_completed bind_runner_tool_completion_guard
+    budget_breach_from_max_steps contextvars dataclass
     emit_decision emit_model_end emit_model_start emit_phase_end
-    emit_phase_start emit_tool_end emit_tool_start
+    emit_phase_start emit_tool_end emit_tool_start estimate_usage_cost_usd
     execute_runner_tool_call_via_session field get_default_usage_recorder
     has_reserved_explanation_field json log_runtime_guard_event logger logging
     normalize_report_signal_attribution parse_dashboard_json
@@ -69,15 +70,16 @@ EXPECTED_GROUPS = (
             "_build_timeout_result",
             "_build_cancelled_result",
             "_build_budget_guard_result",
+            "_build_mode_budget_result",
             "_build_tool_loop_result",
         ),
-        "b688d887bdd0e1f40103adb9cb9cbc76038c8735123370be9993e94b25366e18",
+        "c85a03db5691099a5486ba5c1c07d31e401fdd0ea144f37c4f77b09645854f84",
     ),
     (
         "_runner_loop",
         "_LOOP_FUNCTION_NAMES",
         ("run_agent_loop",),
-        "86ccceee4910e6f1c64e14800c044c56d665302f5093f0d11f471a1ef5a0e79f",
+        "ba42576a7d72dc7b2e1c3e9600832c64a6b8b52a8f4a4a96024edc8d1c15a718",
     ),
     (
         "_runner_tools",
@@ -119,7 +121,15 @@ EXPECTED_SIGNATURES = {
         "tool_calls_log: 'List[Dict[str, Any]]', total_tokens: 'int', "
         "provider_used: 'str', models_used: 'List[str]', "
         "messages: 'List[Dict[str, Any]]', remaining_timeout_s: 'float', "
-        "min_step_budget_s: 'float') -> 'RunLoopResult'"
+        "min_step_budget_s: 'float', "
+        "budget_snapshot: 'Optional[Dict[str, Any]]' = None) -> 'RunLoopResult'"
+    ),
+    "_build_mode_budget_result": (
+        "(*, step: 'int', tool_calls_log: 'List[Dict[str, Any]]', "
+        "total_tokens: 'int', provider_used: 'str', models_used: 'List[str]', "
+        "messages: 'List[Dict[str, Any]]', breach_message: 'str', "
+        "failure_reason: 'StageFailureReason', "
+        "budget_snapshot: 'Optional[Dict[str, Any]]' = None) -> 'RunLoopResult'"
     ),
     "_build_tool_loop_result": (
         "(*, step: 'int', tool_name: 'str', repeat_limit: 'int', "
@@ -138,7 +148,8 @@ EXPECTED_SIGNATURES = {
         "emit_stage_events: 'bool' = True, "
         "cancelled_check: 'Optional[Callable[[], bool]]' = None, "
         "usage_recorder: 'Optional[UsageRecorder]' = None, "
-        "runtime_guard_policy: 'Optional[RuntimeGuardPolicy]' = None) "
+        "runtime_guard_policy: 'Optional[RuntimeGuardPolicy]' = None, "
+        "mode_budget_account: 'Optional[ModeBudgetAccount]' = None) "
         "-> 'RunLoopResult'"
     ),
     "_execute_tools": (
@@ -154,7 +165,7 @@ EXPECTED_RETAINED_HELPER_AST_HASH = (
     "7e20269836fe2492cbb25356dff13ec293999574892b02e1d486dbac78143009"
 )
 EXPECTED_RETAINED_CLASS_AST_HASH = (
-    "d3f620819771796d1959e53bc3e4ec01a10a2207f9db1fa1c1e362c2e69fcd0b"
+    "c89f96214ca1cd5423938bb3b16a482474a41012345f96c9817f7836fd0f175e"
 )
 
 
@@ -332,6 +343,7 @@ def test_runner_dataclass_fence_and_reload_ownership_stay_on_facade():
         "messages",
         "cancelled",
         "timed_out",
+        "budget_snapshot",
     )
     for field_name in ("tool_calls_log", "models_used", "messages"):
         assert (
