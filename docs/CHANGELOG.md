@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
+- [Added] PredictionResolver.tick claims due forecasts, fetches server-path actuals, scores deterministically, and writes outcomes or data_unavailable; registers on the existing process scheduler and CLI cron entrypoint (Refs #1102, #1116, #1107).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).

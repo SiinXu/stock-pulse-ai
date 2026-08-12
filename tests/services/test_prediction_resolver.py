@@ -1,0 +1,463 @@
+# -*- coding: utf-8 -*-
+"""End-to-end tests for PredictionResolver.tick (#1102 / #1116)."""
+
+from __future__ import annotations
+
+import threading
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from types import SimpleNamespace
+from typing import Any, Dict, List, Mapping, Optional, Sequence
+from unittest.mock import patch
+
+import pytest
+
+from src.services.prediction_resolver import (
+    PREDICTION_RESOLVER_BACKGROUND_TASK_NAME,
+    InMemoryPredictionStore,
+    PredictionResolver,
+    build_prediction_resolver_background_tasks,
+    derive_aggregate_label,
+)
+from src.services.prediction_resolver.memory_store import (
+    STATUS_DATA_UNAVAILABLE,
+    STATUS_PENDING,
+    STATUS_RESOLVED,
+    STATUS_RESOLVING,
+)
+
+
+@dataclass
+class _Bar:
+    close: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+
+
+@dataclass
+class _Snapshot:
+    status: str = "ok"
+    reason: Optional[str] = None
+    retryable: bool = False
+    as_of_bar: Optional[_Bar] = None
+    end_bar: Optional[_Bar] = None
+    return_pct: Optional[float] = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status == "ok"
+
+    @property
+    def data_unavailable(self) -> bool:
+        return self.status != "ok"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "reason": self.reason,
+            "retryable": self.retryable,
+            "ok": self.ok,
+            "data_unavailable": self.data_unavailable,
+        }
+
+
+class _FakeFetcher:
+    def __init__(self, snapshot: _Snapshot) -> None:
+        self.snapshot = snapshot
+        self.calls: List[Dict[str, Any]] = []
+
+    def fetch(self, **kwargs: Any) -> _Snapshot:
+        self.calls.append(dict(kwargs))
+        return self.snapshot
+
+
+@dataclass
+class _ClaimResult:
+    claim_id: str
+    claim_type: str
+    outcome: str
+    score: Optional[float]
+    reason: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "claim_id": self.claim_id,
+            "claim_type": self.claim_type,
+            "outcome": self.outcome,
+            "score": self.score,
+            "reason": self.reason,
+        }
+
+
+@dataclass
+class _Aggregate:
+    total_claims: int
+    scored_claims: int
+    hit_count: int
+    partial_count: int
+    miss_count: int
+    data_unavailable_count: int
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "total_claims": self.total_claims,
+            "scored_claims": self.scored_claims,
+            "hit_count": self.hit_count,
+            "partial_count": self.partial_count,
+            "miss_count": self.miss_count,
+            "data_unavailable_count": self.data_unavailable_count,
+        }
+
+
+@dataclass
+class _Report:
+    claim_results: List[_ClaimResult]
+    aggregate: _Aggregate
+    scorer_version: str = "test-scorer"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "claim_results": [c.to_dict() for c in self.claim_results],
+            "aggregate": self.aggregate.to_dict(),
+            "scorer_version": self.scorer_version,
+        }
+
+
+class _FakeScorer:
+    def __init__(self) -> None:
+        self.calls: List[Any] = []
+
+    def score(self, claims: Sequence[Any], actuals: Any, config: Any = None) -> _Report:
+        self.calls.append((list(claims), actuals, config))
+        start = float(actuals["start_price"])
+        end = float(actuals["end_price"])
+        realized = "flat" if abs(end - start) / start <= 0.001 else ("up" if end > start else "down")
+        claim = claims[0] if claims else {"direction": "up", "claim_id": "c1"}
+        if isinstance(claim, Mapping):
+            expected = claim.get("direction") or (claim.get("payload") or {}).get("direction")
+            claim_id = str(claim.get("claim_id") or "c1")
+        else:
+            expected = getattr(claim, "direction", "up")
+            claim_id = "c1"
+        outcome = "hit" if expected == realized else "miss"
+        score = 1.0 if outcome == "hit" else 0.0
+        hit = 1 if outcome == "hit" else 0
+        miss = 1 if outcome == "miss" else 0
+        return _Report(
+            claim_results=[_ClaimResult(claim_id, "direction", outcome, score, realized)],
+            aggregate=_Aggregate(1, 1, hit, 0, miss, 0),
+        )
+
+
+def _now() -> datetime:
+    return datetime(2026, 8, 12, 12, 0, 0)
+
+
+def _seed(store: InMemoryPredictionStore, *, prediction_id: str = "pred-1", direction: str = "up") -> None:
+    now = _now()
+    store.insert(
+        prediction_id=prediction_id,
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=1),
+        created_at=now - timedelta(days=1),
+        claims=[{
+            "claim_id": "c1",
+            "claim_type": "direction",
+            "type": "direction",
+            "direction": direction,
+            "confidence": 0.7,
+        }],
+    )
+
+
+def test_derive_aggregate_label_matrix() -> None:
+    assert derive_aggregate_label(
+        scored_claims=0, hit_count=0, partial_count=0, miss_count=0, data_unavailable_count=1
+    ) == "data_unavailable"
+    assert derive_aggregate_label(
+        scored_claims=2, hit_count=2, partial_count=0, miss_count=0, data_unavailable_count=0
+    ) == "hit"
+    assert derive_aggregate_label(
+        scored_claims=2, hit_count=0, partial_count=0, miss_count=2, data_unavailable_count=0
+    ) == "miss"
+    assert derive_aggregate_label(
+        scored_claims=2, hit_count=1, partial_count=0, miss_count=1, data_unavailable_count=0
+    ) == "partial"
+
+
+def test_tick_resolves_due_prediction_end_to_end() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store, direction="up")
+    fetcher = _FakeFetcher(
+        _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(105.0, 106.0, 99.0), return_pct=5.0)
+    )
+    scorer = _FakeScorer()
+    events: List[str] = []
+
+    class _Sink:
+        def emit(self, event_type: str, payload: Mapping[str, Any]) -> None:
+            events.append(event_type)
+
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=fetcher,
+        claim_scorer=scorer,
+        worker_id="worker-a",
+        event_sink=_Sink(),
+        clock=_now,
+    )
+    summary = resolver.tick()
+    assert summary.claimed == 1
+    assert summary.resolved == 1
+    assert summary.data_unavailable == 0
+    assert summary.items[0].label == "hit"
+    row = store.get("pred-1")
+    assert row is not None
+    assert row.status == STATUS_RESOLVED
+    assert row.outcome is not None
+    assert row.outcome["label"] == "hit"
+    assert row.lease_token is None
+    assert fetcher.calls
+    assert scorer.calls
+    assert "prediction.resolve.completed" in events
+
+
+def test_tick_provider_failure_never_fabricates_hit() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    fetcher = _FakeFetcher(_Snapshot(status="provider_down", reason="provider_failure", retryable=True))
+    scorer = _FakeScorer()
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=fetcher,
+        claim_scorer=scorer,
+        worker_id="worker-b",
+        clock=_now,
+    )
+    summary = resolver.tick()
+    assert summary.resolved == 0
+    assert summary.data_unavailable == 1
+    assert scorer.calls == []
+    row = store.get("pred-1")
+    assert row is not None
+    assert row.status == STATUS_DATA_UNAVAILABLE
+    assert row.outcome is not None
+    assert row.outcome["label"] == "data_unavailable"
+    assert row.outcome.get("reason") == "provider_failure"
+
+
+def test_tick_overlap_skips_second_call() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    started = threading.Event()
+    release = threading.Event()
+
+    class _SlowFetcher:
+        def fetch(self, **kwargs: Any) -> _Snapshot:
+            started.set()
+            release.wait(timeout=2.0)
+            return _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(101.0))
+
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_SlowFetcher(),
+        claim_scorer=_FakeScorer(),
+        worker_id="worker-c",
+        clock=_now,
+    )
+    results: List[Any] = []
+
+    def _run() -> None:
+        results.append(resolver.tick())
+
+    t = threading.Thread(target=_run)
+    t.start()
+    assert started.wait(timeout=2.0)
+    overlap = resolver.tick()
+    assert overlap.skipped_overlap is True
+    assert overlap.claimed == 0
+    release.set()
+    t.join(timeout=2.0)
+    assert results and results[0].resolved == 1
+
+
+def test_second_worker_cannot_double_resolve() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    claimed_a = store.claim_for_resolve(
+        prediction_id="pred-1", lease_owner="a", lease_token="token-a", as_of=_now()
+    )
+    assert claimed_a is not None and claimed_a.status == STATUS_RESOLVING
+    assert store.claim_for_resolve(
+        prediction_id="pred-1", lease_owner="b", lease_token="token-b", as_of=_now()
+    ) is None
+    applied_a, row = store.resolve(
+        prediction_id="pred-1", outcome={"label": "hit"}, expected_lease_token="token-a", as_of=_now()
+    )
+    assert applied_a is True and row is not None and row.status == STATUS_RESOLVED
+    applied_b, row2 = store.resolve(
+        prediction_id="pred-1", outcome={"label": "miss"}, expected_lease_token="token-b", as_of=_now()
+    )
+    assert applied_b is False
+    assert row2 is not None and row2.outcome is not None and row2.outcome["label"] == "hit"
+
+
+def test_future_resolve_after_not_claimed() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    store.insert(
+        prediction_id="pred-future",
+        run_id="run-x",
+        symbol="AAPL",
+        market="us",
+        horizon="5d",
+        resolve_after=_now() + timedelta(days=1),
+        created_at=_now(),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+    )
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(_Snapshot(status="ok", as_of_bar=_Bar(1.0), end_bar=_Bar(2.0))),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+    summary = resolver.tick()
+    assert summary.claimed == 0
+    assert store.get("pred-future").status == STATUS_PENDING  # type: ignore[union-attr]
+
+
+def test_build_background_tasks_gated() -> None:
+    assert build_prediction_resolver_background_tasks(
+        SimpleNamespace(prediction_resolve_enabled=False)
+    ) == []
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store, direction="up")
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(90.0))
+        ),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+    on = build_prediction_resolver_background_tasks(
+        SimpleNamespace(
+            prediction_resolve_enabled=True,
+            prediction_resolve_interval_seconds=90,
+            prediction_resolve_lease_seconds=120,
+            prediction_resolve_max_per_tick=50,
+            prediction_resolve_max_attempts=5,
+        ),
+        resolver=resolver,
+    )
+    assert len(on) == 1
+    assert on[0]["name"] == PREDICTION_RESOLVER_BACKGROUND_TASK_NAME
+    assert on[0]["interval_seconds"] == 90
+    on[0]["task"]()
+    row = store.get("pred-1")
+    assert row is not None and row.status == STATUS_RESOLVED
+    assert row.outcome is not None and row.outcome["label"] == "miss"
+
+
+def test_cli_main_json_success(capsys: pytest.CaptureFixture[str]) -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(105.0))
+        ),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+    with patch(
+        "src.services.prediction_resolver.__main__.build_prediction_resolver",
+        return_value=resolver,
+    ):
+        from src.services.prediction_resolver.__main__ import main
+
+        code = main(["--json"])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "resolved" in out
+
+
+def test_runtime_scheduler_registers_prediction_resolver_task() -> None:
+    from src.services.runtime_scheduler import RuntimeSchedulerService
+
+    class _FakeScheduler:
+        def __init__(self, **kwargs):
+            self.background_tasks = []
+
+        def set_daily_task(self, task, run_immediately: bool) -> None:
+            return None
+
+        def add_background_task(self, task, interval_seconds: int, run_immediately: bool = False, name=None) -> None:
+            self.background_tasks.append({
+                "task": task,
+                "interval_seconds": interval_seconds,
+                "run_immediately": run_immediately,
+                "name": name,
+            })
+
+        def run(self) -> None:
+            return None
+
+        def stop(self) -> None:
+            return None
+
+        @property
+        def schedule(self):
+            class _N:
+                @staticmethod
+                def get_jobs():
+                    return []
+            return _N
+
+    class _NoopThread:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self) -> None:
+            return None
+
+    store = InMemoryPredictionStore()
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(_Snapshot(status="ok", as_of_bar=_Bar(1.0), end_bar=_Bar(1.0))),
+        claim_scorer=_FakeScorer(),
+    )
+    config = SimpleNamespace(
+        schedule_enabled=True,
+        schedule_time="18:00",
+        schedule_times=["18:00"],
+        prediction_resolve_enabled=True,
+        prediction_resolve_interval_seconds=75,
+        prediction_resolve_lease_seconds=120,
+        prediction_resolve_max_per_tick=10,
+        prediction_resolve_max_attempts=5,
+        agent_event_monitor_enabled=False,
+        daily_brief_enabled=False,
+    )
+    service = RuntimeSchedulerService(config_provider=lambda: config)
+    service._reload_config = lambda: config
+    with patch("src.services.runtime_scheduler.Scheduler", _FakeScheduler), patch(
+        "src.services.runtime_scheduler.threading.Thread", _NoopThread
+    ), patch(
+        "src.services.prediction_resolver.resolver.build_prediction_resolver",
+        return_value=resolver,
+    ):
+        service.start()
+    names = [t["name"] for t in service._scheduler.background_tasks]  # type: ignore[union-attr]
+    assert PREDICTION_RESOLVER_BACKGROUND_TASK_NAME in names
+    task = next(t for t in service._scheduler.background_tasks if t["name"] == PREDICTION_RESOLVER_BACKGROUND_TASK_NAME)  # type: ignore[union-attr]
+    assert task["interval_seconds"] == 75

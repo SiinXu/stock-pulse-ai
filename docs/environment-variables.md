@@ -490,6 +490,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT` | `10.0` | 是 | 模板中注释 |
 | `PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO` | `0.8` | 是 | 模板中注释 |
 | `PORTFOLIO_STRESS_SCENARIOS_PATH` | `空` | 是 | 模板中注释; Optional YAML path (maximum 1,024 characters) that adds/overrides bounded portfolio stress scenarios by id |
+| `PREDICTION_RESOLVE_ENABLED` | `false` | 是 | 模板中注释; 预测到期解析总开关（Issues #1102 / #1116；默认关闭） |
+| `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | 是 | 模板中注释; PredictionResolver.tick 轮询间隔（秒） |
+| `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | 是 | 模板中注释; resolving 租约 TTL（秒） |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 是 | 模板中注释; 重试诊断用尝试计数 |
+| `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | 是 | 模板中注释; 每次 tick 最多认领条数 |
 | `PREFETCH_REALTIME_QUOTES` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |

@@ -316,6 +316,13 @@ class Config:
     # Attach holdings/watchlist impact context to triggered alert notifications (managed data only).
     agent_event_impact_context_enabled: bool = True
 
+    # === Prediction horizon resolver (Issues #1102 / #1116, Epic #1107; default off) ===
+    prediction_resolve_enabled: bool = False
+    prediction_resolve_interval_seconds: int = 60
+    prediction_resolve_max_per_tick: int = 50
+    prediction_resolve_lease_seconds: int = 120
+    prediction_resolve_max_attempts: int = 5
+
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)
     share_image: ShareImageConfig = field(default_factory=ShareImageConfig)
