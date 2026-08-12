@@ -524,9 +524,9 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
     expect(await screen.findByTestId('portfolio-import-wizard')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    expect(screen.getByLabelText('选择 CSV')).toHaveAttribute('data-control', 'file-input');
-    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveAttribute('data-control', 'button');
-    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    expect(screen.getByLabelText('选择 CSV / Excel')).toHaveAttribute('data-control', 'file-input');
+    expect(screen.getByRole('button', { name: '选择 CSV / Excel' })).toHaveAttribute('data-control', 'button');
+    fireEvent.change(screen.getByLabelText('选择 CSV / Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     await screen.findByText('CSV 解析结果');
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
@@ -880,7 +880,7 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
     await screen.findByTestId('portfolio-import-wizard');
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    const source = screen.getByLabelText('或粘贴 CSV 文本');
+    const source = screen.getByLabelText('或粘贴表格文本');
     fireEvent.change(source, { target: { value: 'symbol,quantity\nAAPL,bad' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
@@ -890,7 +890,7 @@ describe('PortfolioPage FX refresh', () => {
     expect(await screen.findByText('row=2: invalid quantity')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '返回修正' }));
 
-    const editableSource = screen.getByLabelText('或粘贴 CSV 文本');
+    const editableSource = screen.getByLabelText('或粘贴表格文本');
     expect(editableSource).toHaveValue('symbol,quantity\nAAPL,bad');
     fireEvent.change(editableSource, { target: { value: 'symbol,quantity\nAAPL,2' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
@@ -912,7 +912,7 @@ describe('PortfolioPage FX refresh', () => {
     await screen.findByTestId('portfolio-import-wizard');
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     const file = new File(['bad'], 'bad.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('选择 CSV / Excel'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
     expect(await screen.findByText('解析失败')).toBeInTheDocument();
