@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { expect, it } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { loadUiLanguageTranslations } from '../../i18n/translations';
@@ -92,12 +93,19 @@ export function registerSettingsPageIntegrationTests(): void {
     }));
     routerSearchParamsMock.params = new URLSearchParams({ section: 'agent_behavior', view: 'execution' });
 
-    render(<SettingsPage />);
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByTestId('agent-behavior-panel')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-AGENT_MAX_STEPS')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-AGENT_CONTEXT_ENABLED')).not.toBeInTheDocument();
-    expect(screen.getByTestId('agent-advanced-fields')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('agent-behavior-fields')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('agent-governance-fields')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('agent-ask-path')).toBeInTheDocument();
+    expect(screen.getByTestId('agent-ask-cta')).toHaveAttribute('href', '/chat');
 
     const trigger = screen.getByTestId('agent-preset-apply-simple_qa');
     fireEvent.click(trigger);

@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-11",
-  "baselineNote": "Integration rebuild on current main. Changed chunks use the GitHub Actions Linux gzip measurement from PR #1050 plus 200 B headroom; untouched budgets remain unchanged.",
+  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after Agent Behavior Essentials/Behavior/Governance disclosure copy (Refs #868 / PR #1166); failed locales use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,9 +26,9 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 152369,
-      "measuredGzipBytes": 152169,
-      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 152169 B + 200 B headroom."
+      "maxGzipBytes": 152652,
+      "measuredGzipBytes": 152452,
+      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 152452 B + 200 B headroom."
     },
     {
       "id": "locale-de",
@@ -40,44 +40,44 @@
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 145723,
-      "measuredGzipBytes": 145523,
-      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 145523 B + 200 B headroom."
+      "maxGzipBytes": 146029,
+      "measuredGzipBytes": 145829,
+      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 145829 B + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 145994,
-      "measuredGzipBytes": 145794,
-      "note": "Remeasured after the integration rebuild translation additions; measured 145794 B + 200 B headroom."
+      "maxGzipBytes": 146309,
+      "measuredGzipBytes": 146109,
+      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 146109 B + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 141744,
-      "measuredGzipBytes": 141544,
-      "note": "Remeasured after the integration rebuild translation additions; measured 141544 B + 200 B headroom."
+      "maxGzipBytes": 142089,
+      "measuredGzipBytes": 141889,
+      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 141889 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 138341,
-      "measuredGzipBytes": 138141,
-      "note": "GitHub Actions Linux measurement after the integration rebuild translation additions; measured 138141 B + 200 B headroom."
+      "maxGzipBytes": 138632,
+      "measuredGzipBytes": 138432,
+      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 138432 B + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 131717,
-      "measuredGzipBytes": 131517,
-      "note": "Remeasured after the integration rebuild translation additions; measured 131517 B + 200 B headroom."
+      "maxGzipBytes": 132053,
+      "measuredGzipBytes": 131853,
+      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 131853 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 131772,
-      "measuredGzipBytes": 131572,
-      "note": "Remeasured after the integration rebuild translation additions; measured 131572 B + 200 B headroom."
+      "maxGzipBytes": 132128,
+      "measuredGzipBytes": 131928,
+      "note": "GitHub Actions Linux measurement after Agent three-layer progressive-disclosure copy keys (PR #1166 / #868); measured 131928 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",
