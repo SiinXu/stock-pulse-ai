@@ -35,14 +35,16 @@ from src.core.prediction_resolve_after import compute_resolve_after, AsOfPolicy
 result = compute_resolve_after(
     market="cn",                          # 权威市场键：cn | hk | us | …
     created_at=created_at_utc,            # aware 优先；naive 视为 UTC
-    horizon="5d",                         # Nd 交易 session，或正整数
+    horizon="5d",                         # 1..2520 个交易 session
     as_of_policy=AsOfPolicy.TRADING_DAY_CLOSE,
     stock_code="600519",                  # 可选：校验与 market 一致
     allow_cross_market=False,
 )
 # result.resolve_after  -> timezone-aware UTC datetime
-# result.to_dict()      -> 可写入 model_meta / 诊断
+# result.to_dict()      -> JSON-safe 持久化元数据 / 诊断
 ```
+
+`PredictionRecord.model_meta` 是严格的模型来源契约，不接受日历字段。相邻 extractor 会把 `resolve_after` 写入 record，并仅将有界的日历来源信息投影到其支持的诊断路径；调用方不得把完整 `to_dict()` 载荷直接传给 `model_meta`。
 
 ### `as_of_policy`
 
@@ -60,6 +62,8 @@ result = compute_resolve_after(
 因此 `1d` **不是**「自然日 +1」，而是「下一根可交易日线收盘后才允许验证」。
 
 在 `trading_day_close` 下不支持：`swing` / `long` / 散文 horizon；crypto。crypto 或自由市场键请使用 `as_of_policy=explicit_timestamp`（不走 session 数学；`calendar_approx` 仍为 false）。
+
+Session horizon 使用不带前导零的 ASCII `Nd` token 或整数，范围为 `1..2520`。超长输入会在整数转换、诊断回显和日历访问前被拒绝，因此非法输入不会被误报为可重试的日历故障。
 
 ---
 

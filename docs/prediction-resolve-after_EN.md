@@ -35,14 +35,16 @@ from src.core.prediction_resolve_after import compute_resolve_after, AsOfPolicy
 result = compute_resolve_after(
     market="cn",                          # authoritative region: cn | hk | us | …
     created_at=created_at_utc,            # prefer aware; naive is treated as UTC
-    horizon="5d",                         # Nd trading sessions, or a positive int
+    horizon="5d",                         # 1..2520 trading sessions
     as_of_policy=AsOfPolicy.TRADING_DAY_CLOSE,
     stock_code="600519",                  # optional consistency check vs market
     allow_cross_market=False,
 )
 # result.resolve_after  -> timezone-aware UTC datetime
-# result.to_dict()      -> safe for model_meta / diagnostics
+# result.to_dict()      -> JSON-safe persistence metadata / diagnostics
 ```
+
+`PredictionRecord.model_meta` is a strict model-provenance contract and does not accept calendar fields. The adjacent extractor stores `resolve_after` on the record and projects only bounded calendar provenance into its supported diagnostics path; callers must not pass the full `to_dict()` payload into `model_meta`.
 
 ### `as_of_policy`
 
@@ -60,6 +62,8 @@ result = compute_resolve_after(
 So `1d` is **not** “calendar day + 1”; it is “after the next trading session close.”
 
 Unsupported under `trading_day_close`: `swing` / `long` / free-form prose; crypto. For crypto or free-form market keys, use `as_of_policy=explicit_timestamp` (session math is skipped; `calendar_approx` remains false).
+
+Session horizons use canonical ASCII `Nd` tokens without leading zeroes, or an integer, and are bounded to `1..2520`. Oversized inputs are rejected before integer conversion, diagnostic echo, or calendar access, so invalid input is never misclassified as a retryable calendar failure.
 
 ---
 

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import unittest
 from datetime import date, datetime, time, timezone
 from types import SimpleNamespace
@@ -303,6 +304,38 @@ class ComputeResolveAfterUnitTestCase(unittest.TestCase):
         self.assertEqual(ctx.exception.error_code, "calendar_unavailable")
         self.assertFalse(ctx.exception.meta.get("calendar_approx", True))
 
+    def test_calendar_load_failure_is_typed_and_never_approximated(self):
+        created = datetime(2026, 3, 27, 16, 0, tzinfo=timezone.utc)
+        with patch.object(resolve_mod, "_XCALS_AVAILABLE", True), patch(
+            "exchange_calendars.get_calendar",
+            side_effect=RuntimeError("calendar registry unavailable"),
+        ):
+            with self.assertRaises(CalendarUnavailableError) as ctx:
+                compute_resolve_after("cn", created, "5d")
+        self.assertEqual(ctx.exception.error_code, "calendar_load_failed")
+        self.assertFalse(ctx.exception.meta.get("calendar_approx", True))
+
+    def test_session_advance_failure_is_typed_and_never_approximated(self):
+        sessions = [date(2026, 3, 26), date(2026, 3, 27)]
+        fake = _FakeCalendar(
+            sessions,
+            tz_name="Asia/Shanghai",
+            close_time=time(15, 0),
+        )
+        created = datetime(2026, 3, 27, 16, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        with patch.object(trading_calendar, "_XCALS_AVAILABLE", True), patch.object(
+            trading_calendar,
+            "xcals",
+            SimpleNamespace(get_calendar=lambda _ex: fake),
+            create=True,
+        ), patch.object(resolve_mod, "_XCALS_AVAILABLE", True), patch(
+            "exchange_calendars.get_calendar", lambda _ex: fake
+        ):
+            with self.assertRaises(CalendarUnavailableError) as ctx:
+                compute_resolve_after("cn", created, "1d")
+        self.assertEqual(ctx.exception.error_code, "session_advance_failed")
+        self.assertFalse(ctx.exception.meta.get("calendar_approx", True))
+
     def test_explicit_timestamp_policy(self):
         created = datetime(2026, 3, 27, 12, 0, tzinfo=timezone.utc)
         explicit = datetime(2026, 4, 1, 20, 0, tzinfo=timezone.utc)
@@ -315,6 +348,19 @@ class ComputeResolveAfterUnitTestCase(unittest.TestCase):
         self.assertEqual(result.resolve_after, explicit)
         self.assertEqual(result.as_of_policy, AsOfPolicy.EXPLICIT_TIMESTAMP.value)
         self.assertFalse(result.calendar_approx)
+
+    def test_oversized_explicit_timestamp_is_bounded_invalid_input(self):
+        created = datetime(2026, 3, 27, 12, 0, tzinfo=timezone.utc)
+        with self.assertRaises(InvalidHorizonError) as ctx:
+            compute_resolve_after(
+                "us",
+                created,
+                "2026-04-01T20:00:00+00:00" + "0" * 5000,
+                as_of_policy=AsOfPolicy.EXPLICIT_TIMESTAMP,
+            )
+        self.assertEqual(ctx.exception.error_code, "invalid_horizon")
+        self.assertLess(len(str(ctx.exception)), 128)
+        self.assertNotIn("horizon", ctx.exception.meta)
 
     def test_cross_market_mismatch_rejected(self):
         created = datetime(2026, 3, 27, 12, 0, tzinfo=timezone.utc)
@@ -370,6 +416,16 @@ class ComputeResolveAfterUnitTestCase(unittest.TestCase):
         with self.assertRaises(InvalidHorizonError):
             compute_resolve_after("cn", created, "0d")
         with self.assertRaises(InvalidHorizonError):
+            compute_resolve_after("cn", created, "01d")
+        with self.assertRaises(InvalidHorizonError):
+            compute_resolve_after("cn", created, 2521)
+        with self.assertRaises(InvalidHorizonError):
+            compute_resolve_after("cn", created, "9" * 5000 + "d")
+        with self.assertRaises(InvalidHorizonError) as ctx:
+            compute_resolve_after("cn", created, "not-a-horizon" * 1000)
+        self.assertLess(len(str(ctx.exception)), 128)
+        self.assertNotIn("horizon", ctx.exception.meta)
+        with self.assertRaises(InvalidHorizonError):
             compute_resolve_after(
                 "cn",
                 created,
@@ -390,6 +446,7 @@ class ComputeResolveAfterUnitTestCase(unittest.TestCase):
         self.assertIn("resolve_after", payload)
         self.assertEqual(payload["calendar_approx"], False)
         self.assertIsInstance(payload["meta"], dict)
+        json.dumps(payload)
 
 
 @unittest.skipUnless(

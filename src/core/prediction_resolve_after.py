@@ -38,7 +38,12 @@ logger = logging.getLogger(__name__)
 # Prediction verification horizons expressed as N exchange sessions after the
 # completed as-of bar. Aligns with DecisionSignal outcome bar counting (N forward
 # trading bars after the anchor session).
-_HORIZON_SESSION_RE = re.compile(r"^(\d+)d$", re.IGNORECASE)
+_HORIZON_SESSION_RE = re.compile(r"^([1-9][0-9]*)d$", re.IGNORECASE)
+# Bound parsing and calendar traversal before converting attacker-controlled
+# digit strings to int. A1 currently emits at most 20d; this broader ceiling
+# leaves room for future typed horizons without permitting unbounded work.
+MAX_TRADING_SESSIONS_FORWARD = 2520
+MAX_HORIZON_INPUT_CHARS = 128
 
 # Primary markets for the forecast verification track (Issue #1109).
 # Other exchange-calendar markets remain callable when registered in
@@ -99,7 +104,7 @@ class ResolveAfterResult:
     meta: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        """JSON-safe projection for PredictionRecord.model_meta / diagnostics."""
+        """Return a JSON-safe projection for persistence metadata or diagnostics."""
         return {
             "resolve_after": self.resolve_after.isoformat(),
             "market": self.market,
@@ -286,11 +291,15 @@ def _parse_session_horizon(horizon: HorizonInput) -> int:
             error_code="invalid_horizon",
         )
     if isinstance(horizon, int):
-        if horizon <= 0:
+        if horizon <= 0 or horizon > MAX_TRADING_SESSIONS_FORWARD:
             raise InvalidHorizonError(
-                "horizon session count must be a positive integer",
+                "horizon session count must be between 1 and "
+                f"{MAX_TRADING_SESSIONS_FORWARD}",
                 error_code="invalid_horizon",
-                meta={"horizon": horizon},
+                meta={
+                    "horizon": horizon,
+                    "max_sessions": MAX_TRADING_SESSIONS_FORWARD,
+                },
             )
         return horizon
 
@@ -299,6 +308,12 @@ def _parse_session_horizon(horizon: HorizonInput) -> int:
         raise InvalidHorizonError(
             "horizon is required",
             error_code="invalid_horizon",
+        )
+    if len(text) > MAX_HORIZON_INPUT_CHARS:
+        raise InvalidHorizonError(
+            "horizon input is too long",
+            error_code="invalid_horizon",
+            meta={"max_chars": MAX_HORIZON_INPUT_CHARS},
         )
 
     # Reject ISO timestamps under trading_day_close (caller must switch policy).
@@ -317,12 +332,25 @@ def _parse_session_horizon(horizon: HorizonInput) -> int:
             error_code="invalid_horizon",
             meta={"horizon": text},
         )
-    count = int(match.group(1))
-    if count <= 0:
+    digits = match.group(1)
+    max_digits = len(str(MAX_TRADING_SESSIONS_FORWARD))
+    if len(digits) > max_digits:
         raise InvalidHorizonError(
-            "horizon session count must be a positive integer",
+            "horizon session count must be between 1 and "
+            f"{MAX_TRADING_SESSIONS_FORWARD}",
             error_code="invalid_horizon",
-            meta={"horizon": text},
+            meta={"max_sessions": MAX_TRADING_SESSIONS_FORWARD},
+        )
+    count = int(digits)
+    if count > MAX_TRADING_SESSIONS_FORWARD:
+        raise InvalidHorizonError(
+            "horizon session count must be between 1 and "
+            f"{MAX_TRADING_SESSIONS_FORWARD}",
+            error_code="invalid_horizon",
+            meta={
+                "horizon": text,
+                "max_sessions": MAX_TRADING_SESSIONS_FORWARD,
+            },
         )
     return count
 
@@ -389,6 +417,12 @@ def _coerce_explicit_timestamp(horizon: HorizonInput) -> datetime:
         raise InvalidHorizonError(
             "explicit horizon timestamp is required",
             error_code="invalid_horizon",
+        )
+    if len(text) > MAX_HORIZON_INPUT_CHARS:
+        raise InvalidHorizonError(
+            "explicit horizon timestamp is too long",
+            error_code="invalid_horizon",
+            meta={"max_chars": MAX_HORIZON_INPUT_CHARS},
         )
     try:
         if text.endswith("Z"):
