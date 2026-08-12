@@ -64,6 +64,7 @@ MULTIMODAL_AGENT_TOOLS_ENABLED=false
 - Overall `confidence`; fields are **observations**, not verified market facts
 - Untrusted-document envelope: `trust`, `content`, `model_directive`, `privacy`, redaction counts
 - Explicit `status=rejected` for garbage / non-chart inputs (`garbage_image`, `not_a_chart`, …)
+- Untrusted follow-on fence arms only for content-bearing statuses (`available` / `degraded`); pure validation rejects do not freeze the turn
 - `vision_model` when a route was selected; `timeout_seconds` from `CHART_READ_TIMEOUT_SECONDS`
 
 The chart prompt lives in `CHART_READ_PROMPT` and is documented in

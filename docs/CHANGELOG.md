@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
+- [Fixed] Untrusted-document follow-on fence arms only for content-bearing multimodal tool statuses (`available`/`degraded`), not pure validation rejects (chart/OCR/transcript; issue #253 review).
 - [Added] Chart reading `chart-reading-v2`: structured trend/pattern/key-level observations with confidence inside an untrusted-document envelope (redaction, timeout, garbage/non-chart explicit reject); `read_price_chart` joins the session follow-on fence; `CHART_READ_TIMEOUT_SECONDS` (issue #253 remaining chart gap).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).

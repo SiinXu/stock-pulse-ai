@@ -42,7 +42,7 @@ MULTIMODAL_AGENT_TOOLS_ENABLED=false
 | 模块 | 职责 |
 | --- | --- |
 | `src/services/pdf_parsing_service.py` | 本地 PDF 解析 → `schema_version=pdf-parse-v1` |
-| `src/services/chart_reading_service.py` | Vision 图表阅读 → `schema_version=chart-reading-v2`（含不可信文档信封 / 脱敏 / 超时 / 垃圾图拒绝） |
+| `src/services/chart_reading_service.py` | Vision 图表阅读 → `schema_version=chart-reading-v2`（含不可信文档信封 / 脱敏 / 超时 / 垃圾图拒绝）；会话 follow-on 围栏仅在 status 为 available/degraded 时启用 |
 | `src/services/earnings_transcript_service.py` | 转录解析 → `schema_version=earnings-transcript-v2` |
 | `src/agent/tools/multimodal_tools.py` | 默认关闭的 `ToolDefinition` 工厂 |
 | `src/agent/tools/earnings_transcript_tools.py` | 独立的默认关闭转录工具 |
