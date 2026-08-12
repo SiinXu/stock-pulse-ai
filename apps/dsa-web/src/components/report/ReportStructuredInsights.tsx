@@ -173,23 +173,10 @@ const AttributionCard: React.FC<{
                   <span className="inline-flex flex-wrap items-center gap-1 font-medium text-foreground">
                     <span>{label}</span>
                     {isTechnical ? (
-                      <span
-                        className="inline-flex items-center gap-0.5"
+                      <HelpKeyButton
+                        helpKey={EDUCATION_HELP_KEYS.indicatorCommon}
                         data-testid="report-attribution-indicator-help"
-                      >
-                        <HelpKeyButton
-                          helpKey={EDUCATION_HELP_KEYS.indicatorMa}
-                          data-testid="report-attribution-ma-help"
-                        />
-                        <HelpKeyButton
-                          helpKey={EDUCATION_HELP_KEYS.indicatorMacd}
-                          data-testid="report-attribution-macd-help"
-                        />
-                        <HelpKeyButton
-                          helpKey={EDUCATION_HELP_KEYS.indicatorRsi}
-                          data-testid="report-attribution-rsi-help"
-                        />
-                      </span>
+                      />
                     ) : null}
                   </span>
                   <span className="tabular-nums text-muted-text">{Math.round(value)}%</span>

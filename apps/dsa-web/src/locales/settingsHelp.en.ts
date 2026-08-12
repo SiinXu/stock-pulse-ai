@@ -2444,6 +2444,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Low diversification is a reason to check correlation and size before adding similar risk.',
     ],
   },
+  'education.indicator.common': {
+    title: 'Technical indicators (MA / MACD / RSI)',
+    summary: 'Common trend and momentum tools: moving averages (MA), MACD, and RSI.',
+    usage: 'Reports may weight technical signals alongside news and fundamentals; open each indicator’s help where shown for field-level detail.',
+    impact: [
+      'Use indicators as context for structure and timing, not as standalone trade orders or performance guarantees.',
+    ],
+    notes: [
+      'MA, MACD, and RSI can disagree; risk limits and invalidation still come first.',
+    ],
+  },
   'education.indicator.ma': {
     title: 'Moving average (MA)',
     summary: 'The average close over N trading days, plotted as a smooth trend line (for example MA5, MA20).',

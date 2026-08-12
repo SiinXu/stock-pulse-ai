@@ -2486,6 +2486,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '分散偏低时，加同类风险前应先看相关性和仓位。',
     ],
   },
+  'education.indicator.common': {
+    title: '技术指标（MA / MACD / RSI）',
+    summary: '常用趋势与动量工具：均线（MA）、MACD 与 RSI。',
+    usage: '报告可能把技术信号与新闻、基本面一起加权；各展示点旁可打开对应指标的说明。',
+    impact: [
+      '把指标当作结构与节奏的上下文，而不是单独的买卖指令或收益保证。',
+    ],
+    notes: [
+      'MA、MACD 与 RSI 可能互相矛盾；仍应以风险限额与失效条件为先。',
+    ],
+  },
   'education.indicator.ma': {
     title: '均线（MA）',
     summary: '过去 N 个交易日收盘价的平均，画成平滑趋势线（如 MA5、MA20）。',

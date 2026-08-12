@@ -232,6 +232,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-error-summary', 'SettingsErrorSummary', 'components/settings/SettingsErrorSummary.tsx', ['default', 'empty']),
   entry('settings', 'settings-field', 'SettingsField', 'components/settings/SettingsField.tsx', ['default', 'states']),
   entry('settings', 'settings-help-button', 'SettingsHelpButton', 'components/settings/SettingsHelpButton.tsx', ['interactive']),
+  entry('foundation', 'help-key-button', 'HelpKeyButton', 'components/help/HelpKeyButton.tsx', ['default']),
   entry('settings', 'settings-loading', 'SettingsLoading', 'components/settings/SettingsLoading.tsx', ['loading']),
   entry('settings', 'settings-section-nav', 'SettingsSectionNav', 'components/settings/SettingsNavigation.tsx', ['interactive', 'states']),
   entry('settings', 'settings-view-tabs', 'SettingsViewTabs', 'components/settings/SettingsNavigation.tsx', ['interactive']),

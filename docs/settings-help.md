@@ -115,5 +115,9 @@ python scripts/check_config_doc_consistency.py
 
 ## 非设置页教育说明（Issue #201）
 
-风险等级、风险门裁决、组合结构健康与常用技术指标（MA / MACD / RSI）的平实解释复用同一套 `settingsHelp` 库存与 `getSettingsHelpContent` 解析路径，key 以 `education.*` 为前缀。Web 通过通用 `HelpKeyButton` 在真实展示点提供就地入口；不要在组件内散落硬编码正文。英文镜像见 `docs/settings-help_EN.md` 若存在对应段落，否则本段为中文维护说明。
+风险等级、风险门裁决、组合结构健康与常用技术指标（MA / MACD / RSI）的平实解释复用同一套 `settingsHelp` 库存与 `getSettingsHelpContent` 解析路径，key 以 `education.*` 为前缀。Web 通过通用 `HelpKeyButton` 在真实展示点提供就地入口；不要在组件内散落硬编码正文。
+
+- 源语言维护：`apps/dsa-web/src/locales/settingsHelp.zh.ts` 与 `settingsHelp.en.ts`。
+- 英文维护说明见 `docs/settings-help_EN.md` 同名章节。
+- 非 zh/en UI 语言的教育正文以 inventory 翻译为准；新增 key 后须更新全部 locale bundle，且不得与英文逐字节相同（identical-to-English ratchet）。母语润色前可标注 `PENDING_NATIVE_REVIEW`。
 

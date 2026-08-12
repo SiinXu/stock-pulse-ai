@@ -24,6 +24,7 @@ export const EDUCATION_HELP_KEYS = {
   portfolioVar: 'education.portfolio.var',
   portfolioConcentration: 'education.portfolio.concentration',
   portfolioDiversification: 'education.portfolio.diversification',
+  indicatorCommon: 'education.indicator.common',
   indicatorMa: 'education.indicator.ma',
   indicatorMacd: 'education.indicator.macd',
   indicatorRsi: 'education.indicator.rsi',
