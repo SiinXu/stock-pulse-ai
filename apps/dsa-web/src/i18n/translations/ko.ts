@@ -2987,6 +2987,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Markdown 소스 복사",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "일반 텍스트 복사",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "내보내기 실패",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "HTML 다운로드",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML 내보내기를 사용할 수 없음",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Markdown 다운로드",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "PDF 다운로드",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF 내보내기를 사용할 수 없음",

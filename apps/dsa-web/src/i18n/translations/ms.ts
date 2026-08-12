@@ -2987,6 +2987,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Salin sumber Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Salin Teks Biasa",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Eksport gagal",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Muat turun HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "Eksport HTML tidak tersedia",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Muat turun Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Muat turun PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "Eksport PDF tidak tersedia",
