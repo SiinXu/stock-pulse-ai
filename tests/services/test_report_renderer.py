@@ -1178,3 +1178,223 @@ class TestDecisionCardRendering(unittest.TestCase):
         self.assertIn("Confidence", out)
         self.assertIn("Risk Alerts", out)
         self.assertIn("Watch Conditions", out)
+
+
+class TestDecisionFirstLayeredReading(unittest.TestCase):
+    """Issues #861/#874: Decision Card first, then mode-density strata, then detail."""
+
+    def _layered_dashboard(self) -> dict:
+        return {
+            "core_conclusion": {
+                "one_sentence": "等待放量确认后再加仓",
+                "time_sensitivity": "本周内",
+                "position_advice": {"no_position": "观望等待", "has_position": "继续持有"},
+            },
+            "intelligence": {
+                "sentiment_summary": "中性偏多",
+                "risk_alerts": ["业绩波动", "板块轮动", "流动性收紧"],
+                "positive_catalysts": ["催化A", "催化B"],
+            },
+            "phase_decision": {
+                "immediate_action": "等待确认",
+                "watch_conditions": ["放量突破前高", "跌破支撑离场"],
+                "confidence_reason": "数据质量可用",
+            },
+            "battle_plan": {
+                "sniper_points": {"stop_loss": "1580", "take_profit": "1780"},
+                "action_checklist": ["✅ 检查支撑", "⚠️ 观察量能"],
+            },
+            "report_strata": {
+                "verified_facts": [
+                    {
+                        "statement": "Close was 1680 on the last daily bar.",
+                        "source_id": "ohlcv:daily",
+                        "as_of": "2026-08-01",
+                    }
+                ],
+                "missing_or_conflicts": [],
+                "model_inference": ["Momentum may improve if volume confirms."],
+                "risks_counter_evidence": ["Break below support invalidates the case."],
+                "framework_alignment": {
+                    "status": "partial",
+                    "summary": "partial align",
+                },
+            },
+        }
+
+    def _layered_result(self, *, report_language: str = "zh"):
+        r = _make_result(
+            sentiment_score=72,
+            operation_advice="买入",
+            decision_type="buy",
+            dashboard=self._layered_dashboard(),
+            report_language=report_language,
+        )
+        r.confidence_level = "高"
+        return r
+
+    def test_markdown_brief_is_card_only_layer(self) -> None:
+        r = self._layered_result()
+        out = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={"report_mode": "brief"},
+        )
+        self.assertIsNotNone(out)
+        assert out is not None
+        card_idx = out.find("### 🃏")
+        self.assertGreaterEqual(card_idx, 0, out)
+        self.assertIn("评分 72", out)
+        self.assertNotIn("证据分层", out)
+        self.assertNotIn("### 📰", out)
+        self.assertNotIn("作战计划", out)
+        self.assertIn("已省略", out)
+
+    def test_markdown_standard_layers_card_then_compact_strata_then_detail(self) -> None:
+        r = self._layered_result()
+        out = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={"report_mode": "standard"},
+        )
+        self.assertIsNotNone(out)
+        assert out is not None
+        card_idx = out.find("### 🃏")
+        strata_idx = out.find("证据分层")
+        intel_idx = out.find("### 📰")
+        battle_idx = out.find("作战计划")
+        self.assertGreaterEqual(card_idx, 0, out)
+        self.assertGreater(strata_idx, card_idx, out)
+        self.assertGreater(intel_idx, strata_idx, out)
+        self.assertGreater(battle_idx, strata_idx, out)
+        self.assertNotIn("#### 1. 已核实事实", out)
+        self.assertEqual(out.count("证据分层"), 1, out)
+
+    def test_markdown_research_layers_card_then_full_strata_then_detail(self) -> None:
+        r = self._layered_result(report_language="en")
+        out = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={"report_mode": "research"},
+        )
+        self.assertIsNotNone(out)
+        assert out is not None
+        card_idx = out.find("### 🃏")
+        strata_idx = out.find("Evidence Strata")
+        facts_idx = out.find("Verified Facts")
+        intel_idx = out.find("### 📰")
+        self.assertGreaterEqual(card_idx, 0, out)
+        self.assertGreater(strata_idx, card_idx, out)
+        self.assertGreater(facts_idx, strata_idx, out)
+        self.assertGreater(intel_idx, facts_idx, out)
+        self.assertIn("Close was 1680", out)
+        self.assertIn("Momentum may improve", out)
+
+    def test_wechat_and_brief_platforms_layer_by_mode(self) -> None:
+        r = self._layered_result(report_language="en")
+        brief_only = render("brief", [r], extra_context={"report_mode": "brief"})
+        brief_research = render("brief", [r], extra_context={"report_mode": "research"})
+        wechat_standard = render("wechat", [r], extra_context={"report_mode": "standard"})
+        wechat_brief = render("wechat", [r], extra_context={"report_mode": "brief"})
+
+        for out, name in (
+            (brief_only, "brief/brief"),
+            (brief_research, "brief/research"),
+            (wechat_standard, "wechat/standard"),
+            (wechat_brief, "wechat/brief"),
+        ):
+            self.assertIsNotNone(out, name)
+            assert out is not None
+            card_idx = out.find("🃏")
+            self.assertGreaterEqual(card_idx, 0, name)
+
+        assert brief_only is not None
+        self.assertNotIn("Evidence Strata", brief_only)
+        assert brief_research is not None
+        self.assertIn("Evidence Strata", brief_research)
+        strata_idx = brief_research.find("Evidence Strata")
+        self.assertGreater(strata_idx, brief_research.find("🃏"))
+
+        assert wechat_standard is not None
+        card_idx = wechat_standard.find("🃏")
+        strata_idx = wechat_standard.find("Evidence Strata")
+        trail_idx = wechat_standard.find("📌")
+        self.assertGreater(strata_idx, card_idx)
+        if trail_idx >= 0:
+            self.assertGreater(trail_idx, strata_idx)
+        assert wechat_brief is not None
+        self.assertNotIn("Evidence Strata", wechat_brief)
+
+    def test_notification_brief_report_forces_brief_mode_despite_config(self) -> None:
+        """ReportType.BRIEF path must keep push density when REPORT_MODE is research."""
+        from src.formatters import markdown_to_plain_text
+        from src.notification import NotificationService
+
+        results = []
+        for i in range(10):
+            r = self._layered_result()
+            r.code = str(600519 + i)
+            r.name = "贵州茅台"
+            results.append(r)
+
+        cfg = _make_renderer_config(True)
+        cfg.report_renderer_enabled = True
+        cfg.report_mode = "research"
+        cfg.report_type = "brief"
+        cfg.report_language = "zh"
+
+        service = NotificationService.__new__(NotificationService)
+        service._report_summary_only = False
+        service._get_report_language = lambda _results: "zh"
+        service._prepend_report_delta_section = (
+            lambda content, _results, _report_type: content
+        )
+        service._should_show_llm_model = lambda: False
+        service._count_display_decisions = lambda _results, _lang: (1, 0, 9)
+        service._append_market_status_line = lambda *_args, **_kwargs: None
+        service._get_signal_level = lambda _r: ("买入", "🟢", "buy")
+        service._get_display_name = lambda r, _lang: r.name
+
+        with patch("src.services.report_renderer.get_config", return_value=cfg), patch(
+            "src.notification_parts.rendering.get_config", return_value=cfg
+        ), patch(
+            "src.services.report_renderer.render_plugin_template", return_value=None
+        ):
+            out = service.generate_brief_report(results)
+
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("🃏", out)
+        self.assertNotIn("证据分层", out)
+        plain = markdown_to_plain_text(out)
+        self.assertLessEqual(
+            len(plain),
+            1024,
+            f"brief notification plain text exceeds Pushover budget "
+            f"(len={len(plain)}):\n{plain}",
+        )
+
+    def test_export_passthrough_preserves_decision_card_markdown(self) -> None:
+        """Export consumes rendered Markdown; Decision Card text must survive md export."""
+        from src.services.report_export_service import export_report
+
+        r = self._layered_result()
+        rendered = render(
+            "markdown",
+            [r],
+            summary_only=False,
+            extra_context={"report_mode": "standard"},
+        )
+        self.assertIsNotNone(rendered)
+        assert rendered is not None
+        artifact = export_report(rendered, "md", filename_stem="layered-decision")
+        exported = artifact.content.decode("utf-8")
+        self.assertEqual(exported, rendered)
+        self.assertIn("### 🃏", exported)
+        self.assertIn("证据分层", exported)
+        card_idx = exported.find("### 🃏")
+        strata_idx = exported.find("证据分层")
+        self.assertGreater(strata_idx, card_idx)
