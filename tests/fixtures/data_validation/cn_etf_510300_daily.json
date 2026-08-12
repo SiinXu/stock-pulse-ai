@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "symbol": "510300",
+    "market": "cn",
+    "instrument_type": "etf",
+    "note": "CSI 300 ETF style daily bars without PE/PB. Values frozen for offline calibration."
+  },
+  "rows": [
+    {
+      "date": "2026-05-06",
+      "open": 3.812,
+      "high": 3.845,
+      "low": 3.798,
+      "close": 3.831,
+      "volume": 458120300,
+      "amount": 1752340112.5,
+      "pct_chg": 0.55,
+      "pre_close": 3.81
+    },
+    {
+      "date": "2026-05-07",
+      "open": 3.83,
+      "high": 3.862,
+      "low": 3.821,
+      "close": 3.85,
+      "volume": 401552100,
+      "amount": 1543221008.0,
+      "pct_chg": 0.496,
+      "pre_close": 3.831
+    },
+    {
+      "date": "2026-05-08",
+      "open": 3.848,
+      "high": 3.871,
+      "low": 3.835,
+      "close": 3.86,
+      "volume": 372901400,
+      "amount": 1437100220.0,
+      "pct_chg": 0.26,
+      "pre_close": 3.85
+    }
+  ],
+  "valuation": {
+    "pe_ratio": null,
+    "pb_ratio": null
+  }
+}

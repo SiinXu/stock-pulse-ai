@@ -374,6 +374,12 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DATA_VALIDATION_STRICT_SCOPES` | Comma-separated `market/instrument` strict-mode selectors such as `cn/equity,hk/etf,us/index`; `*` is a wildcard. | `*/*` | Optional |
 | `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | Authoritative comma-separated `SYMBOL=instrument` identities for offshore symbols whose ETF/index type cannot be inferred safely from code alone. | - | Optional |
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | Final aggregated-fundamental policy: `warn` preserves data with evidence; `reject` raises explicitly and is not provider failover. | `warn` | Optional |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | Soft absolute PE bound; values at or above this magnitude are marked suspect (warn) and kept. | `200` | Optional |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | Soft absolute PB bound; values at or above this magnitude are marked suspect (warn) and kept. | `50` | Optional |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | Relative multi-provider divergence threshold; above-threshold differences warn with attribution and keep values. | `0.05` | Optional |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | Soft absolute PE bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `200` | Optional |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | Soft absolute PB bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `50` | Optional |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | Relative multi-provider field divergence threshold; excess difference records a warn with attribution while keeping values. | `0.05` | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `8.0` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call; market-structure industry/concept rankings share this budget | `8.0` | Optional |
@@ -930,10 +936,12 @@ When `REPORT_RENDERER_ENABLED=true`, Jinja stock reports support three presentat
 | Mode | Content | Typical use |
 |------|---------|-------------|
 | `brief` | Decision Card + key risk + disclaimer; detail sections omitted with explicit truncation notice | Push / mobile |
-| `standard` (default) | Decision Card pinned first, then main analysis sections; compact strata; hard list/char limits | Daily default |
-| `research` | Full sections with expanded list and character limits | Deep review |
+| `standard` (default) | Decision Card first → compact evidence strata → main analysis sections; hard list/char limits | Daily default |
+| `research` | Decision Card first → full evidence strata → full analysis sections with expanded list/character limits | Deep review |
 
-The existing Decision Card template continues to use dashboard/result fields, and missing fields omit their rows. Hard limits never drop the Decision Card block; omitted lower-priority items are annotated. Unconfigured `REPORT_MODE` keeps `standard` on every report platform. The hard-coded notification fallback path (`REPORT_RENDERER_ENABLED=false`) is unchanged.
+Layer order (Jinja, `REPORT_RENDERER_ENABLED=true`): within each stock block the Decision Card is always first, then mode-density evidence strata (`none` / compact / full), then long-form detail sections. `ReportType.BRIEF` notification generation always passes `report_mode=brief` so push length budgets hold even when global `REPORT_MODE` is `standard` or `research`. Export (`export_report`) consumes already-rendered Markdown and does not re-apply modes.
+
+The existing Decision Card template continues to use dashboard/result fields, and missing fields omit their rows. Hard limits never drop the Decision Card block; omitted lower-priority items are annotated. Unconfigured `REPORT_MODE` keeps `standard` on every report platform (except the brief report-type path above). The hard-coded notification fallback path (`REPORT_RENDERER_ENABLED=false`) is unchanged.
 
 ### Signal Attribution Analysis (Issue #1742)
 
@@ -951,9 +959,9 @@ Phase 1 is presentation-only: each per-stock Jinja report section starts with a 
 
 | Template | Behavior |
 | --- | --- |
-| `templates/report_markdown.j2` | Full Decision Card immediately under each stock `##` heading; existing sections (Key Updates / Core Conclusion / Phase Guardrail / Battle Plan, etc.) move down but are not removed. |
-| `templates/report_wechat.j2` | Compact Decision Card (~4–5 lines) is the first content inside each stock block; original compact follow-up lines remain. |
-| `templates/report_brief.j2` | Uses the brief-specific length budget form (`decision_card(..., compact='brief')`): **1 primary line + at most 1 supplementary line per stock**. The primary line keeps parity with the origin/main one-liner (signal emoji/text, score, one-sentence conclusion) and marks 🃏; the supplementary line packs at most one risk and one watch condition (hard truncation). It does not emit the 5-line wechat compact card, and does not repeat stop/take levels on brief (those stay on wechat/markdown). |
+| `templates/report_markdown.j2` | Full Decision Card immediately under each stock `##` heading; evidence strata (compact/full) next; then existing sections (Key Updates / Core Conclusion / Phase Guardrail / Battle Plan, etc.). |
+| `templates/report_wechat.j2` | Compact Decision Card (~4–5 lines) is the first content inside each stock block; compact/full strata follow the card; original compact follow-up lines remain after that. |
+| `templates/report_brief.j2` | Uses the brief-specific length budget form (`decision_card(..., compact='brief')`): **1 primary line + at most 1 supplementary line per stock**. The primary line keeps parity with the origin/main one-liner (signal emoji/text, score, one-sentence conclusion) and marks 🃏; the supplementary line packs at most one risk and one watch condition (hard truncation). It does not emit the 5-line wechat compact card, and does not repeat stop/take levels on brief (those stay on wechat/markdown). Notification `ReportType.BRIEF` forces `report_mode=brief` so optional standard/research strata never enter the push payload. |
 | Shared macro | `decision_card` in `templates/_macros.j2`; `compact=false` full card, `compact=true` push compact card, `compact='brief'` budgeted push form; missing fields are omitted (no empty card rows). |
 
 **Brief length budget and size impact** (vs the unbudgeted 5-line compact card):

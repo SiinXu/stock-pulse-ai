@@ -385,15 +385,40 @@ class _StockAnalysisStageMixin:
                     # Issue #234: Augment with realtime for intraday MA calculation
                     if self.config.enable_realtime_quote and realtime_quote:
                         df = self._augment_historical_with_realtime(df, realtime_quote, code)
-                    trend_result = self.trend_analyzer.analyze(df, code)
-                    logger.info(
-                        "%s(%s) trend analysis: status=%s buy_signal=%s score=%s",
-                        stock_name,
-                        code,
-                        trend_result.trend_status.value,
-                        trend_result.buy_signal.value,
-                        trend_result.signal_score,
+                    # Issue #185: reject non-finite OHLCV before indicator synthesis.
+                    from data_provider.data_validation import prepare_indicator_inputs
+
+                    df, input_validation = prepare_indicator_inputs(
+                        df,
+                        market=_mkt,
+                        stock_code=code,
+                        provider="trend_analysis",
                     )
+                    # Degrade only when the cleaned frame is empty or every row was
+                    # rejected. Validation-disabled path leaves clean_rows unset.
+                    clean_rows = input_validation.context.get("clean_rows")
+                    inputs_unusable = (
+                        df is None
+                        or (hasattr(df, "empty") and bool(df.empty))
+                        or (clean_rows is not None and int(clean_rows) == 0)
+                    )
+                    if inputs_unusable:
+                        logger.warning(
+                            "%s(%s) trend analysis skipped: indicator inputs failed validation",
+                            stock_name,
+                            code,
+                        )
+                        trend_result = None
+                    else:
+                        trend_result = self.trend_analyzer.analyze(df, code)
+                        logger.info(
+                            "%s(%s) trend analysis: status=%s buy_signal=%s score=%s",
+                            stock_name,
+                            code,
+                            trend_result.trend_status.value,
+                            trend_result.buy_signal.value,
+                            trend_result.signal_score,
+                        )
             except Exception as e:  # broad-exception: fallback_recorded - Trend failure is safely logged before analysis continues without trend input.
                 log_safe_exception(
                     logger,

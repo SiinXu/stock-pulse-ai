@@ -2084,6 +2084,43 @@ class DataFetcherManager:
                         if supplement_attempts > 1:
                             logger.debug(f"[实时行情] {stock_code} 补充尝试已达上限，停止继续")
                             break
+                        # Issue #185: observe cross-source divergence on shared fields.
+                        try:
+                            from data_provider.data_validation import (
+                                compare_cross_source_quotes,
+                                is_validation_enabled,
+                            )
+
+                            if is_validation_enabled():
+                                primary_source = getattr(primary_quote, "source", None)
+                                primary_provider = getattr(
+                                    primary_source, "value", primary_source
+                                ) or "primary"
+                                compare_cross_source_quotes(
+                                    primary_quote,
+                                    quote,
+                                    primary_provider=str(primary_provider),
+                                    secondary_provider=str(provider_name),
+                                    market=_market_tag(
+                                        normalize_stock_code(stock_code)
+                                    ),
+                                    stock_code=stock_code,
+                                    asset_type=getattr(
+                                        primary_quote, "instrument_type", None
+                                    ),
+                                )
+                        except Exception as cross_exc:  # broad-exception: fallback_recorded - observational only
+                            log_safe_exception(
+                                logger,
+                                "Cross-source quote comparison failed",
+                                cross_exc,
+                                error_code="data_validation_cross_source_failed",
+                                level=logging.DEBUG,
+                                context={
+                                    "symbol": stock_code,
+                                    "provider": provider_name,
+                                },
+                            )
                         merged = self._merge_quote_fields(primary_quote, quote)
                         if merged:
                             logger.info(f"[实时行情] {stock_code} 从 {source} 补充了缺失字段: {merged}")
@@ -2311,6 +2348,42 @@ class DataFetcherManager:
             try:
                 secondary = self._try_fetcher_quote(stock_code, fetcher_name, **kw)
                 if secondary is not None:
+                    # Issue #185: cross-source consistency when both providers
+                    # supply the same field. Fail-open: never drop the primary.
+                    try:
+                        from data_provider.data_validation import (
+                            compare_cross_source_quotes,
+                            is_validation_enabled,
+                        )
+
+                        if is_validation_enabled():
+                            primary_source = getattr(primary_quote, "source", None)
+                            primary_provider = getattr(
+                                primary_source, "value", primary_source
+                            ) or "primary"
+                            compare_cross_source_quotes(
+                                primary_quote,
+                                secondary,
+                                primary_provider=str(primary_provider),
+                                secondary_provider=str(fetcher_name),
+                                market=_market_tag(normalize_stock_code(stock_code)),
+                                stock_code=stock_code,
+                                asset_type=getattr(
+                                    primary_quote, "instrument_type", None
+                                ),
+                            )
+                    except Exception as cross_exc:  # broad-exception: fallback_recorded - comparison is observational
+                        log_safe_exception(
+                            logger,
+                            "Cross-source quote comparison failed",
+                            cross_exc,
+                            error_code="data_validation_cross_source_failed",
+                            level=logging.DEBUG,
+                            context={
+                                "symbol": stock_code,
+                                "provider": fetcher_name,
+                            },
+                        )
                     filled = self._merge_quote_fields(primary_quote, secondary)
                     if filled:
                         logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 补充了: {filled}")
