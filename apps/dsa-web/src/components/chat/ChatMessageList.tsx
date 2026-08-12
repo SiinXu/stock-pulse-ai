@@ -1,7 +1,7 @@
 import React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Check, Copy, Download } from 'lucide-react';
+import { Check, ChevronRight, Copy, Download } from 'lucide-react';
 import { Badge, IconButton, ScrollArea } from '../common';
 import { ChatEmptyMessages } from './ChatEmptyMessages';
 import {
@@ -106,9 +106,10 @@ export function ChatMessageList({
               </div>
               <div
                 className={cn(
-                  'group/message relative min-w-0 w-fit max-w-[min(100%,48rem)] px-5 py-3.5 transition-colors',
-                  msg.role === 'user' ? 'overflow-hidden chat-bubble-user' : 'mb-8 overflow-visible chat-bubble-ai',
-                  isHypothetical && 'ring-1 ring-warning/40',
+                  'chat-message group/message relative min-w-0 w-fit max-w-[min(100%,48rem)] transition-colors',
+                  msg.role === 'user'
+                    ? 'overflow-hidden px-4 py-2.5 text-sm chat-bubble-user'
+                    : 'mb-8 overflow-visible px-5 py-3.5 chat-bubble-ai',
                 )}
                 data-what-if={isHypothetical ? 'true' : undefined}
               >
@@ -209,17 +210,24 @@ export function ChatMessageList({
           <div className="w-8 h-8 rounded-full bg-elevated text-foreground flex items-center justify-center flex-shrink-0 text-xs font-bold">
             AI
           </div>
-          <div className="min-w-50 max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-subtle bg-card/72 px-5 py-4">
-            <div className="flex items-center gap-2.5 text-sm text-secondary-text">
+          <details className="group live-progress min-w-50 max-w-[min(100%,48rem)] overflow-visible px-5 py-3">
+            <summary className="flex cursor-pointer list-none items-center gap-2.5 text-sm text-secondary-text">
               <div className="relative w-4 h-4 flex-shrink-0">
                 <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
                 <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
               </div>
-              <span className="text-secondary-text">
+              <span className="min-w-0 flex-1 text-secondary-text">
                 {getCurrentStageLabel(progressSteps, t)}
               </span>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90"
+                aria-hidden="true"
+              />
+            </summary>
+            <div className="mt-2">
+              <ChatThinkingDetails steps={progressSteps} t={t} />
             </div>
-          </div>
+          </details>
         </div>
       )}
 

@@ -334,12 +334,39 @@ describe('ChatPage', () => {
     );
     expect(screen.getByTestId('chat-session-trigger')).toHaveClass('xl:hidden');
     expect(screen.getByTestId('chat-session-trigger')).not.toHaveClass('md:hidden');
-    // Session rail header is owned by ChatSessionSidebar (bordered history strip).
     const historyHeader = screen.getByRole('heading', { name: '历史对话' }).parentElement;
-    expect(historyHeader).toHaveClass('border-b', 'border-subtle');
-    expect(historyHeader).not.toHaveClass('rounded-3xl', 'shadow-soft-card');
+    expect(historyHeader).not.toHaveClass('border-b', 'border-subtle', 'bg-subtle-soft');
+    expect(screen.getByRole('button', { name: '开启新对话' })).toHaveClass('h-8', 'w-8', 'bg-transparent');
     expect(mockLoadInitialSession).toHaveBeenCalled();
     expect(mockClearCompletionBadge).toHaveBeenCalled();
+  });
+
+  it('collapses and expands the desktop conversation history rail', async () => {
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const rail = await screen.findByTestId('chat-session-rail');
+    expect(rail).toHaveClass('w-64');
+    expect(screen.getByTestId('chat-session-list-scroll')).toBeInTheDocument();
+
+    const collapseButton = screen.getByRole('button', { name: '折叠侧边栏' });
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(collapseButton);
+
+    expect(rail).toHaveClass('w-14');
+    expect(screen.queryByTestId('chat-session-list-scroll')).not.toBeInTheDocument();
+    const expandButton = screen.getByRole('button', { name: '展开侧边栏' });
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+    expect(expandButton.querySelector('.lucide-history')).toHaveClass('group-hover/history-toggle:hidden');
+    expect(expandButton.querySelector('.lucide-panel-left-open')).toHaveClass('hidden');
+    expect(screen.queryByRole('button', { name: '开启新对话' })).not.toBeInTheDocument();
+
+    fireEvent.click(expandButton);
+    expect(rail).toHaveClass('w-64');
+    expect(screen.getByTestId('chat-session-list-scroll')).toBeInTheDocument();
   });
 
   it('closes the compact session drawer when the wide rail becomes available', async () => {
@@ -479,17 +506,14 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
-    const compressionToggle = await screen.findByRole('switch', { name: /上下文压缩/ });
+    const compressionToggle = await screen.findByRole('button', { name: '上下文压缩' });
 
     await waitFor(() => {
       expect(compressionToggle).not.toBeDisabled();
     });
 
-    expect(compressionToggle).toHaveClass('h-11', 'w-11');
-    expect(screen.getByTestId('context-compression-switch-visual')).toHaveClass('h-6', 'w-10');
-    expect(screen.getByTestId('context-compression-settings')).toHaveClass('py-1');
-    expect(screen.getByTestId('context-compression-settings')).not.toHaveClass('py-2');
-    expect(compressionToggle).not.toBeChecked();
+    expect(screen.getByTestId('chat-composer-input')).toContainElement(compressionToggle);
+    expect(compressionToggle).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(compressionToggle);
 
@@ -507,8 +531,18 @@ describe('ChatPage', () => {
       });
     });
 
-    expect(compressionToggle).toBeChecked();
-    expect(compressionToggle).toHaveAttribute('aria-checked', 'true');
+    expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
+
+    const whatIfButton = screen.getByRole('button', { name: 'What-if 情景分析' });
+    expect(whatIfButton).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(whatIfButton);
+    expect(whatIfButton).toHaveAttribute('aria-pressed', 'true');
+    const whatIfConfiguration = await screen.findByRole('region', { name: 'What-if 情景分析' });
+    expect(within(whatIfConfiguration).getByTestId('chat-what-if-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-composer-input').parentElement).toContainElement(whatIfConfiguration);
+    expect(whatIfConfiguration).not.toHaveClass('absolute', 'fixed');
+    expect(within(whatIfConfiguration).getByTestId('chat-what-if-fields')).toHaveClass('grid-cols-2');
+    expect(within(whatIfConfiguration).getAllByRole('combobox')).toHaveLength(2);
   });
 
   it('rolls back the context compression switch when saving fails', async () => {
@@ -538,10 +572,10 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
-    const compressionToggle = await screen.findByRole('switch', { name: /上下文压缩/ });
+    const compressionToggle = await screen.findByRole('button', { name: '上下文压缩' });
 
     await waitFor(() => {
-      expect(compressionToggle).toBeChecked();
+      expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
       expect(compressionToggle).not.toBeDisabled();
     });
 
@@ -556,7 +590,7 @@ describe('ChatPage', () => {
           },
         ],
       }));
-      expect(compressionToggle).toBeChecked();
+      expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
     });
     expect(screen.getByText('配置服务不可用')).toBeInTheDocument();
   });
@@ -669,6 +703,65 @@ describe('ChatPage', () => {
     expect(skillBadge).toHaveTextContent('趋势分析、均线金叉');
   });
 
+  it('renders compact borderless chat bubbles and plain progress rows', async () => {
+    mockStoreState.messages = [
+      { id: 'user-1', role: 'user', content: '分析腾讯 hk00700' },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '腾讯控股结论',
+        thinkingSteps: [
+          {
+            type: 'tool_done',
+            tool: 'get_daily_history',
+            duration: 8.71,
+            success: true,
+            meta: { result_preview: 'ok' },
+          },
+        ],
+      },
+    ];
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const userBubble = await screen.findByText('分析腾讯 hk00700');
+    expect(userBubble.parentElement).toHaveClass('chat-bubble-user', 'px-4', 'py-2.5', 'text-sm');
+
+    const assistantBubble = screen.getByText('腾讯控股结论').closest('.chat-message');
+    expect(assistantBubble).toHaveClass('chat-bubble-ai');
+    expect(assistantBubble).not.toHaveClass('border');
+    expect(screen.getByTestId('chat-composer-input').closest('.relative.z-20')).not.toHaveClass('border-t');
+
+    const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
+    fireEvent.click(thinkingToggle);
+    const progressItem = screen.getByRole('button', { name: /get_daily_history/u });
+    expect(progressItem).toHaveClass('chat-progress-item', 'chat-progress-item-success');
+    expect(progressItem.querySelector('.lucide-chevron-right')).toHaveClass('text-muted-text/70');
+  });
+
+  it('renders hypothetical messages without warning rings', async () => {
+    mockStoreState.messages = [
+      { id: 'user-1', role: 'user', content: '[HYPOTHETICAL ASSUMPTION]\n分析腾讯' },
+      { id: 'assistant-1', role: 'assistant', content: '[HYPOTHETICAL SCENARIO]\n情景结论' },
+    ];
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const hypotheticalMessages = container.querySelectorAll('[data-what-if="true"]');
+    expect(hypotheticalMessages).toHaveLength(2);
+    hypotheticalMessages.forEach((message) => {
+      expect(message).not.toHaveClass('ring-1', 'ring-warning/40');
+    });
+  });
+
   it('renders failed stage_done progress as a non-success state', async () => {
     mockStoreState.loading = true;
     mockStoreState.progressSteps = [
@@ -691,7 +784,13 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findAllByText('risk failed')).toHaveLength(1);
+    expect(await screen.findAllByText('risk failed')).toHaveLength(2);
+    const liveProgress = screen.getAllByText('risk failed')
+      .find((node) => node.closest('details.live-progress'))?.closest('details');
+    expect(liveProgress).not.toBeNull();
+    expect(liveProgress).not.toHaveAttribute('open');
+    fireEvent.click((liveProgress as HTMLElement).querySelector('summary') as HTMLElement);
+    expect(liveProgress).toHaveAttribute('open');
 
     const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
     fireEvent.click(thinkingToggle);
@@ -726,7 +825,7 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findAllByText('decision skipped: insufficient budget')).toHaveLength(1);
+    expect(await screen.findAllByText('decision skipped: insufficient budget')).toHaveLength(2);
     expect(screen.queryByText('decision timed out')).not.toBeInTheDocument();
 
     const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
@@ -996,8 +1095,12 @@ describe('ChatPage', () => {
 
     const mobileToggle = await screen.findByRole('button', { name: '展开策略选择' });
     const skillPanel = screen.getByTestId('chat-skill-picker-panel');
-    expect(mobileToggle).toHaveClass('h-9', '!shadow-none');
+    const sendButton = screen.getByRole('button', { name: '发送' });
+    expect(mobileToggle).toHaveClass('h-8', 'max-w-56');
+    expect(sendButton).toHaveClass('h-8', 'w-8', 'ml-auto');
+    expect(sendButton.querySelector('.lucide-send')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11', 'text-foreground');
+    expect(screen.getByTestId('chat-composer-input')).toContainElement(mobileToggle);
     expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
     expect(skillPanel).toHaveClass('hidden');
 
@@ -1008,6 +1111,11 @@ describe('ChatPage', () => {
     expect(skillPanel).toHaveClass('flex');
     expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-8');
     expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-8');
+
+    fireEvent.mouseEnter(screen.getByRole('checkbox', { name: '均线金叉' }).closest('.group') as HTMLElement);
+    const skillTooltip = await screen.findByRole('tooltip');
+    expect(skillTooltip).toHaveTextContent('均线交叉');
+    expect(skillPanel).not.toContainElement(skillTooltip);
 
     fireEvent.click(screen.getByRole('checkbox', { name: '均线金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
