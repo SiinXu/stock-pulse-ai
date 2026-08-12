@@ -38,7 +38,7 @@ PortfolioBusyError = RepoPortfolioBusyError
 
 try:
     import yfinance as yf
-except Exception:  # pragma: no cover - optional dependency path
+except Exception:  # pragma: no cover - broad-exception: optional_metadata - yfinance is optional for FX refresh
     yf = None
 
 EPS = 1e-8

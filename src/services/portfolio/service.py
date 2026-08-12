@@ -5,6 +5,22 @@ from __future__ import annotations
 
 from src.services.portfolio.models import DEFAULT_ACCOUNT_TYPE
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.portfolio_service import (
+        Any,
+        Dict,
+        List,
+        Optional,
+        Tuple,
+        VALID_ACCOUNT_TYPES,
+        VALID_COST_METHODS,
+        VALID_MARKETS,
+        get_config,
+    )
+
+
 class _PortfolioServiceCoreMethods:
     """Method group bound onto the public facade class."""
 

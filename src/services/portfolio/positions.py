@@ -3,6 +3,37 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.portfolio_service import (
+        Any,
+        Dict,
+        EPS,
+        Iterable,
+        List,
+        Optional,
+        PORTFOLIO_REALTIME_QUOTE_MAX_WORKERS,
+        PortfolioAccount,
+        PortfolioOversellError,
+        Set,
+        ThreadPoolExecutor,
+        Tuple,
+        _AvgState,
+        _ResolvedPositionPrice,
+        _merge_portfolio_limitations,
+        _portfolio_limitations_for_market,
+        as_completed,
+        canonical_stock_code,
+        date,
+        defaultdict,
+        json,
+        log_safe_exception,
+        logger,
+        logging,
+        normalize_stock_code,
+    )
+
 class _PortfolioPositionMethods:
     """Method group bound onto the public facade class."""
 
@@ -688,7 +719,7 @@ class _PortfolioPositionMethods:
                 from data_provider.base import DataFetcherManager
 
                 DataFetcherManager().prefetch_realtime_quotes(unique_symbols)
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - quote prefetch is best-effort for snapshots
                 log_safe_exception(
                     logger,
                     "Portfolio realtime quote batch prefetch failed",
@@ -713,7 +744,7 @@ class _PortfolioPositionMethods:
                 symbol = futures[future]
                 try:
                     results[symbol] = future.result()
-                except Exception as exc:  # pragma: no cover - defensive guard for patched fetchers
+                except Exception as exc:  # pragma: no cover - broad-exception: fallback_recorded - worker failure is recorded and skipped
                     log_safe_exception(
                         logger,
                         "Portfolio realtime price worker failed",
@@ -733,7 +764,7 @@ class _PortfolioPositionMethods:
 
             fetcher_manager = DataFetcherManager()
             quote = fetcher_manager.get_realtime_quote(symbol, log_final_failure=False)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - single-symbol quote failure degrades to unavailable price
             log_safe_exception(
                 logger,
                 "Portfolio realtime price lookup failed",

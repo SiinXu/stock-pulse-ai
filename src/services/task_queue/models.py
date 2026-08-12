@@ -26,7 +26,21 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, List, Any, Tuple, Literal, Callable, Mapping, Protocol
+from typing import (
+    TYPE_CHECKING,
+    Optional,
+    Dict,
+    List,
+    Any,
+    Tuple,
+    Literal,
+    Callable,
+    Mapping,
+    Protocol,
+)
+
+if TYPE_CHECKING:
+    from src.services.task_queue import AnalysisTaskQueue
 
 from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.enums import ReportType

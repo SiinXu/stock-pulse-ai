@@ -3,6 +3,28 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.portfolio_service import (
+        Any,
+        Dict,
+        EPS,
+        List,
+        Optional,
+        PORTFOLIO_FX_REFRESH_DISABLED_REASON,
+        PortfolioAccount,
+        Set,
+        Tuple,
+        date,
+        get_config,
+        log_safe_exception,
+        logger,
+        logging,
+        timedelta,
+        yf,
+    )
+
 class _PortfolioRiskMethods:
     """Method group bound onto the public facade class."""
 
@@ -242,7 +264,7 @@ class _PortfolioRiskMethods:
                     )
                     summary["updated_count"] += 1
                     continue
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - FX online lookup is best-effort
                 log_safe_exception(
                     logger,
                     "Portfolio FX online lookup failed",

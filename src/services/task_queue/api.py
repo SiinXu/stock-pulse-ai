@@ -3,6 +3,49 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.task_queue import (
+        AnalysisRequestContext,
+        AnalysisTaskCoalescingContract,
+        Any,
+        Callable,
+        Dict,
+        DuplicateTaskError,
+        Future,
+        List,
+        Literal,
+        Optional,
+        SELECTION_SOURCES,
+        TaskCommand,
+        TaskIdempotencyConflictError,
+        TaskInfo,
+        TaskNotFoundError,
+        TaskQueueShutdownError,
+        TaskRetryInProgressError,
+        TaskRetryNotAllowedError,
+        TaskRetryUnsupportedError,
+        TaskRunContext,
+        TaskSnapshot,
+        TaskStatus,
+        ThreadPoolExecutor,
+        Tuple,
+        _QueueTaskEventStream,
+        _RetryReservation,
+        _dedupe_stock_code_key,
+        _task_message_metadata,
+        copy,
+        datetime,
+        deep_thaw,
+        log_safe_exception,
+        logger,
+        logging,
+        replace,
+        resolve_index_stock_code_for_analysis,
+        uuid,
+    )
+
 class _TaskQueueApiMethods:
     """Method group bound onto the public facade class."""
 

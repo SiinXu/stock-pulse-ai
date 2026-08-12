@@ -3,6 +3,36 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.task_queue import (
+        AnalysisRequestContext,
+        Any,
+        Callable,
+        Dict,
+        KnownTaskFailure,
+        Optional,
+        TaskCommand,
+        TaskInfo,
+        TaskRunContext,
+        TaskStatus,
+        TaskStatusEnum,
+        Tuple,
+        activate_run_diagnostic_context,
+        copy,
+        datetime,
+        deep_freeze,
+        deep_thaw,
+        exception_chain_redaction_values,
+        get_current_diagnostic_context,
+        log_safe_exception,
+        logger,
+        logging,
+        reset_run_diagnostic_context,
+        sanitize_exception_chain,
+    )
+
 class _TaskQueueWorkerMethods:
     """Method group bound onto the public facade class."""
 

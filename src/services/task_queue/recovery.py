@@ -3,6 +3,32 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.task_queue import (
+        Any,
+        Dict,
+        Optional,
+        TaskCommand,
+        TaskInfo,
+        TaskQueueInflightCheckpoint,
+        TaskQueueInflightStore,
+        TaskStatus,
+        _MESSAGE_CODE_INTERRUPTED_PROCESS_RESTART,
+        _MESSAGE_CODE_RECOVERED_REQUEUED,
+        _RECOVERY_CLASS_INTERRUPT,
+        _RECOVERY_CLASS_REQUEUE,
+        _REQUEUEABLE_TASK_KINDS,
+        copy,
+        datetime,
+        deep_thaw,
+        log_safe_exception,
+        logger,
+        logging,
+        replace,
+    )
+
 class _TaskQueueRecoveryMethods:
     """Method group bound onto the public facade class."""
 

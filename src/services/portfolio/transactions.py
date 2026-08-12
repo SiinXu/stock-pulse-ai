@@ -3,6 +3,37 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.portfolio_service import (
+        Any,
+        Callable,
+        Dict,
+        DuplicateTradeDedupHashError,
+        DuplicateTradeUidError,
+        EPS,
+        List,
+        Optional,
+        PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+        PortfolioConflictError,
+        PortfolioIdempotencyConflictError,
+        PortfolioOversellError,
+        PortfolioService,
+        Tuple,
+        VALID_CASH_DIRECTIONS,
+        VALID_CORPORATE_ACTIONS,
+        VALID_SIDES,
+        build_portfolio_idempotency_scope_key,
+        build_portfolio_idempotency_storage_id,
+        date,
+        datetime,
+        get_config,
+        hashlib,
+        json,
+        timedelta,
+    )
+
 class _PortfolioTransactionMethods:
     """Method group bound onto the public facade class."""
 

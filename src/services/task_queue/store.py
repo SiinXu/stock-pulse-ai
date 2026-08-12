@@ -3,6 +3,26 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.services.task_queue import (
+        Any,
+        Dict,
+        List,
+        TaskEvent,
+        TaskEventType,
+        TaskInfo,
+        TaskNotFoundError,
+        TaskQueueShutdownError,
+        TaskSnapshot,
+        TaskStatus,
+        ThreadPoolExecutor,
+        log_safe_exception,
+        logger,
+        logging,
+    )
+
 class _TaskQueueStoreMethods:
     """Method group bound onto the public facade class."""
 
