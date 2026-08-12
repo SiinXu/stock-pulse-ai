@@ -1298,10 +1298,10 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "DAILY_BRIEF_ENABLED": {
         "title": "Daily Brief Enabled",
         "description": (
-            "Opt-in daily brief that reviews historical prediction accuracy "
-            "(decision-signal outcomes, backtest summary, skill-opinion performance) "
-            "before summarizing yesterday's analyses and today's watchlist. "
-            "Default off. Does not invent hit rates when history is insufficient."
+            "Opt-in personal morning brief: portfolio holdings, overnight "
+            "highlights, earnings event foresight, yesterday's analyses, "
+            "watchlist, and historical accuracy review. Default off. "
+            "Does not invent hit rates when history is insufficient."
         ),
         "category": "system",
         "data_type": "boolean",
@@ -1526,7 +1526,85 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "DAILY_BRIEF_QUIET_WHEN_EMPTY": {
+        "title": "Daily Brief Quiet When Empty",
+        "description": "Skip notification when no material overnight/event/yesterday content; generation may still run.",
+        "category": "system", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "false", "options": [], "validation": {}, "display_order": 171,
+        "help_key": "settings.system.daily_brief",
+        "examples": ["DAILY_BRIEF_QUIET_WHEN_EMPTY=false", "DAILY_BRIEF_QUIET_WHEN_EMPTY=true"],
+        "docs": [{"label": "Daily brief", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/daily-brief.md"}],
+        "warning_codes": [],
+    },
+    "EVENT_RESEARCH_BRIEF_ENABLED": {
+        "title": "Event Research Brief Enabled",
+        "description": "Opt-in standalone earnings event research briefs from managed corporate-event triggers. Default off.",
+        "category": "system", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "false", "options": [], "validation": {}, "display_order": 172,
+        "help_key": "settings.system.event_research_brief",
+        "examples": ["EVENT_RESEARCH_BRIEF_ENABLED=false", "EVENT_RESEARCH_BRIEF_ENABLED=true"],
+        "docs": [{"label": "Event research brief", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/event-research-brief.md"}],
+        "warning_codes": [],
+    },
+    "EVENT_RESEARCH_BRIEF_NOTIFY": {
+        "title": "Event Research Brief Notify",
+        "description": "Push standalone event research briefs through notification channels.",
+        "category": "system", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "true", "options": [], "validation": {}, "display_order": 173,
+        "help_key": "settings.system.event_research_brief",
+        "examples": ["EVENT_RESEARCH_BRIEF_NOTIFY=true", "EVENT_RESEARCH_BRIEF_NOTIFY=false"],
+        "docs": [{"label": "Event research brief", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/event-research-brief.md"}],
+        "warning_codes": [],
+    },
+    "EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": {
+        "title": "Event Research Brief Persist History",
+        "description": "Persist standalone event research briefs as analysis history.",
+        "category": "system", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "true", "options": [], "validation": {}, "display_order": 174,
+        "help_key": "settings.system.event_research_brief",
+        "examples": ["EVENT_RESEARCH_BRIEF_PERSIST_HISTORY=true"],
+        "docs": [{"label": "Event research brief", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/event-research-brief.md"}],
+        "warning_codes": [],
+    },
+    "EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": {
+        "title": "Event Research Brief Save Report File",
+        "description": "Write standalone event research brief markdown files.",
+        "category": "system", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "true", "options": [], "validation": {}, "display_order": 175,
+        "help_key": "settings.system.event_research_brief",
+        "examples": ["EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE=true"],
+        "docs": [{"label": "Event research brief", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/event-research-brief.md"}],
+        "warning_codes": [],
+    },
+    "EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS": {
+        "title": "Event Research Brief Lookback Hours",
+        "description": "Trigger lookback window in hours (1-168).",
+        "category": "system", "data_type": "integer", "ui_control": "number",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "48", "options": [], "validation": {"min": 1, "max": 168}, "display_order": 176,
+        "help_key": "settings.system.event_research_brief",
+        "examples": ["EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS=48"],
+        "docs": [{"label": "Event research brief", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/event-research-brief.md"}],
+        "warning_codes": [],
+    },
+    "EVENT_RESEARCH_BRIEF_CATEGORIES": {
+        "title": "Event Research Brief Categories",
+        "description": "Comma-separated categories (day one: earnings).",
+        "category": "system", "data_type": "string", "ui_control": "text",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "earnings", "options": [], "validation": {"max_length": 128}, "display_order": 177,
+        "help_key": "settings.system.event_research_brief",
+        "examples": ["EVENT_RESEARCH_BRIEF_CATEGORIES=earnings"],
+        "docs": [{"label": "Event research brief", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/event-research-brief.md"}],
+        "warning_codes": [],
+    },
     "ADMIN_SESSION_MAX_AGE_HOURS": {
+
         "title": "Admin Session Max Age (Hours)",
         "description": (
             "Maximum lifetime of an authenticated admin web session in hours. "

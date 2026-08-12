@@ -503,10 +503,12 @@ stock-pulse-ai/
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | 计分卡中低于该“已判定”样本数（命中+偏离）的分桶返回 `insufficient_data` 而非比率 | `10` |
 | `RESEARCH_API_ENABLED` | 可选鉴权只读研究 API（`GET /api/v1/research/conclusions*`），按 brief/standard/research 暴露分层结论及 as-of、置信度、证据计数；默认关闭。仅挂主 API 端口（会话鉴权、安全审计、滑动窗口限流）。详见 [research-api.md](research-api.md) | `false` |
 | `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | 研究 API 启用时的每主体滑动窗口限流（与 MCP 同一治理模式） | `60` |
-| `DAILY_BRIEF_ENABLED` | 可选每日简报（历史准确率复盘：决策信号 outcome / 回测汇总 / 技能观点表现）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
+| `DAILY_BRIEF_ENABLED` | 可选个人晨报（持仓 / 隔夜要点 / 近期财报事件上下文 / 昨日分析 / 自选 / 历史准确率复盘）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | 本地 `HH:MM`，开启后在该时刻之后可触发（每个本地自然日最多一次） | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | 日程与「昨天」映射使用的 IANA 时区 | `Asia/Shanghai` |
 | `DAILY_BRIEF_MIN_SAMPLES` | 发布准确率百分比前的最小完成样本；不足时简报明确写出样本不足 | `10` |
+| `DAILY_BRIEF_QUIET_WHEN_EMPTY` | 无隔夜/事件/昨日等实质内容时跳过推送（仍可生成与落库） | `false` |
+| `EVENT_RESEARCH_BRIEF_ENABLED` | 可选独立财报类事件研究简报调度。默认关闭。详见 [event-research-brief.md](event-research-brief.md) | `false` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | 新建模拟组合（paper portfolio）时播种的初始现金（作为一笔现金流入记账）；模拟成交按交易时点最新可得收盘价成交，MVP 忽略费用与滑点，买入按可用现金校验 | `1000000` |
 | `MARKET_REVIEW_REGION` | 大盘复盘市场区域：cn(A股)、hk(港股)、us(美股)、jp(日股)、kr(韩股)、both(五市场)，us/jp/kr 适合仅关注单区域用户 | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | 大盘复盘指数涨跌颜色：`green_up`=绿涨红跌（默认），`red_up`=红涨绿跌 | `green_up` |

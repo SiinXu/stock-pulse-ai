@@ -435,10 +435,12 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | Scorecard buckets below this decided sample (hit+miss) render as `insufficient_data` instead of a rate | `10` |
 | `RESEARCH_API_ENABLED` | Opt-in authenticated read-only research API (`GET /api/v1/research/conclusions*`) for stratified conclusions (brief/standard/research) with as-of, confidence, and evidence counts. Default off. Mounted on the main API port only (session auth, security audit, sliding-window rate limits). See [research-api_EN.md](research-api_EN.md) | `false` |
 | `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | Per-principal sliding-window rate limit for research API reads when enabled (same governance pattern as MCP) | `60` |
-| `DAILY_BRIEF_ENABLED` | Opt-in daily brief with historical accuracy review (decision-signal outcomes, backtest summary, skill-opinion performance). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
+| `DAILY_BRIEF_ENABLED` | Opt-in personal morning brief (holdings, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, accuracy review). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | Local `HH:MM` after which the enabled brief may fire (at most once per local day) | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | IANA timezone for schedule and “yesterday” mapping | `Asia/Shanghai` |
 | `DAILY_BRIEF_MIN_SAMPLES` | Minimum completed samples before publishing an accuracy percentage; below this the brief states insufficient history | `10` |
+| `DAILY_BRIEF_QUIET_WHEN_EMPTY` | Skip notification when there is no material overnight/event/yesterday content (generation/persistence still run) | `false` |
+| `EVENT_RESEARCH_BRIEF_ENABLED` | Opt-in standalone earnings event research briefs. Default off. See [event-research-brief_EN.md](event-research-brief_EN.md) | `false` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | Initial cash seeded (as a cash-in ledger entry) when a paper portfolio is created; simulated fills use the latest available close at the trade date, fees/slippage are ignored in the MVP, and buys are validated against available cash | `1000000` |
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), hk (HK stocks), us (US stocks), jp (JP stocks), kr (KR stocks), both (all five markets) | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | Index change color style in market reviews: `green_up` = green gains/red losses (default), `red_up` = red gains/green losses | `green_up` |
