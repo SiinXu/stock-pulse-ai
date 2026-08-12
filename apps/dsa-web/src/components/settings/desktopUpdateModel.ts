@@ -10,6 +10,9 @@ export type DesktopWindow = Window & {
     checkForUpdates?: () => Promise<RawDesktopUpdateState>;
     installDownloadedUpdate?: () => Promise<boolean>;
     openReleasePage?: (releaseUrl?: string) => Promise<boolean>;
+    getEnvDiagnostics?: (payload?: { locale?: string }) => Promise<unknown>;
+    openOperatorTerminal?: (payload?: { locale?: string }) => Promise<unknown>;
+    openCliInstallGuide?: (payload?: { command?: string; locale?: string }) => Promise<unknown>;
     onUpdateStateChange?: (listener: (state: RawDesktopUpdateState) => void) => (() => void) | void;
   };
 };

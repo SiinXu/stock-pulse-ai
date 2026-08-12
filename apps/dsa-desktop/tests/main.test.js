@@ -2333,6 +2333,139 @@ test('desktop update backup and restore preserve generation backend env keys', (
   assert.equal(fs.existsSync(backupRoot), false);
 });
 
+
+test('update migration verification covers the realistic critical local data tree', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-critical-tree-'));
+  const appDir = path.join(tempRoot, 'Stock Pulse App');
+  const userDataDir = path.join(tempRoot, 'user Data 中文');
+  const backupRoot = path.join(userDataDir, '.dsa-desktop-update-backup');
+  let currentVersion = '3.12.0';
+
+  const criticalFiles = [
+    ['.env', 'OPENAI_API_KEY=keep-me\nGENERATION_BACKEND=codex_cli\n'],
+    [path.join('data', 'stock_analysis.db'), 'db-bytes'],
+    [path.join('data', 'stock_analysis.db-wal'), 'wal-bytes'],
+    [path.join('data', 'stock_analysis.db-shm'), 'shm-bytes'],
+    [path.join('data', 'provider_cache', 'daily', 'AAPL.json'), '{"close":1}\n'],
+    [path.join('data', 'ollama', 'models', 'blobs', 'sha256-abc'), 'weights'],
+    [path.join('data', 'alphasift', 'hotspots.json'), '[]\n'],
+    [path.join('data', 'alphasift', 'hotspot.history.jsonl'), '{"topic":"AI算力"}\n'],
+    [path.join('data', 'alphasift', 'hotspot_details', 'AI算力', 'detail.json'), '{"ok":true}\n'],
+    [path.join('data', 'alphasift', 'snapshot.last_good.json'), '{"ok":true}\n'],
+    [path.join('logs', 'desktop.log'), 'boot\n'],
+  ];
+
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.writeFileSync(path.join(appDir, 'Uninstall StockPulse.exe'), '');
+  for (const [relativePath, contents] of criticalFiles) {
+    const absolute = path.join(appDir, relativePath);
+    fs.mkdirSync(path.dirname(absolute), { recursive: true });
+    fs.writeFileSync(absolute, contents, 'utf-8');
+  }
+  // Existing target directory must not block recursive restore of nested files.
+  fs.mkdirSync(path.join(appDir, 'data', 'alphasift', 'hotspot_details', 'AI算力'), { recursive: true });
+
+  const mainModule = loadMainModule(t, {
+    platform: 'win32',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(appDir, 'StockPulse.exe');
+        }
+        return userDataDir;
+      },
+      getVersion: () => currentVersion,
+    },
+  });
+
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  mainModule.backupPackagedRuntimeState();
+  const manifest = JSON.parse(fs.readFileSync(path.join(backupRoot, 'runtime-state.json'), 'utf-8'));
+  for (const relativePath of mainModule.DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES) {
+    assert.ok(manifest.files.includes(relativePath), relativePath);
+  }
+  assert.equal(
+    fs.readFileSync(path.join(backupRoot, 'data', 'alphasift', 'hotspot_details', 'AI算力', 'detail.json'), 'utf-8'),
+    '{"ok":true}\n'
+  );
+  assert.equal(
+    fs.readFileSync(path.join(backupRoot, 'data', 'ollama', 'models', 'blobs', 'sha256-abc'), 'utf-8'),
+    'weights'
+  );
+
+  for (const [relativePath] of criticalFiles) {
+    fs.rmSync(path.join(appDir, relativePath), { recursive: true, force: true });
+  }
+  currentVersion = '3.13.0';
+  const restoreResult = mainModule.restorePackagedRuntimeStateFromBackup();
+  assert.deepEqual(restoreResult.failed, []);
+  for (const [relativePath, contents] of criticalFiles) {
+    assert.equal(fs.readFileSync(path.join(appDir, relativePath), 'utf-8'), contents, relativePath);
+  }
+  assert.equal(fs.existsSync(backupRoot), false);
+});
+
+test('desktop env diagnostics IPC returns path-safe guidance and open-terminal has no path argv', async (t) => {
+  const spawnCalls = [];
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    childProcess: {
+      spawn: (command, args, options) => {
+        spawnCalls.push({ command, args, options });
+        return { unref() {}, on() {}, stdout: null, stderr: null };
+      },
+    },
+  });
+  const mainWebContents = { send: () => undefined };
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    webContents: mainWebContents,
+  });
+
+  const diagnostics = await mainModule.__getIpcMainHandler(mainModule.DESKTOP_GET_ENV_DIAGNOSTICS_CHANNEL)(
+    { sender: mainWebContents },
+    { locale: 'en' }
+  );
+  const serialized = JSON.stringify(diagnostics);
+  assert.equal(serialized.includes('/opt/homebrew'), false);
+  assert.equal(serialized.includes('/Users/'), false);
+  assert.equal(typeof diagnostics.copy.openTerminal, 'string');
+  assert.ok(Array.isArray(diagnostics.commands));
+
+  const terminalResult = await mainModule.__getIpcMainHandler(mainModule.DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL)(
+    { sender: mainWebContents },
+    { locale: 'en' }
+  );
+  assert.equal(terminalResult.ok, true);
+  assert.ok(spawnCalls.some((call) => call.command === 'open' && call.args[0] === '-a' && call.args[1] === 'Terminal'));
+  assert.equal(JSON.stringify(spawnCalls).includes('/Users'), false);
+});
+
+test('rejected deep links notify without echoing the raw URL', async (t) => {
+  const boxes = [];
+  const mainModule = loadMainModule(t, {
+    dialog: {
+      showMessageBox: async (options) => {
+        boxes.push(options);
+        return { response: 0 };
+      },
+    },
+  });
+  const rejected = 'stockpulse://evil.example/settings?token=/Users/secret';
+  assert.equal(mainModule.queueDesktopDeepLink(rejected, { notifyRejection: true }), false);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(boxes.length, 1);
+  const serialized = JSON.stringify(boxes[0]);
+  assert.equal(serialized.includes(rejected), false);
+  assert.equal(serialized.includes('/Users/secret'), false);
+  assert.match(boxes[0].title, /Unsupported|不支持/);
+});
+
 test('desktop update backup and restore preserve AlphaSift detail directories recursively', (t) => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-dir-backup-'));
   const appDir = path.join(tempRoot, 'app');

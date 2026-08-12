@@ -33,6 +33,7 @@ import {
   type HubAvailability,
   type HubProbeState,
 } from './modelSourcesHubStatus';
+import { DesktopCliVisibilityPanel } from './DesktopCliVisibilityPanel';
 import {
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,
@@ -1403,6 +1404,8 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           ) : null}
         </section>
       ) : null}
+
+      <DesktopCliVisibilityPanel language={language} />
 
       {!draftValid ? (
         <InlineAlert

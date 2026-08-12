@@ -89,6 +89,8 @@
 | [云端 WebUI 部署](deploy-webui-cloud.md) | 云服务器访问 WebUI 的部署说明 |
 | [Zeabur 部署](docker/zeabur-deployment.md) | Zeabur 平台部署说明 |
 | [桌面端打包说明](desktop-package.md)（[EN](desktop-package_EN.md)） | Electron 桌面端首次启动、本地模型与打包说明 |
+| [桌面端 vs Web 能力矩阵](desktop-capability-matrix.md)（[EN](desktop-capability-matrix_EN.md)） | Desktop / Web 能力对照、CLI 诊断与更新留存 |
+| [桌面深链策略](desktop-deep-link-policy.md)（[EN](desktop-deep-link-policy_EN.md)） | `stockpulse://` 白名单、拒绝语义与 UX |
 
 ## 参考与开发
 

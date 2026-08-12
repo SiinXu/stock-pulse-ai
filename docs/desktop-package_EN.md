@@ -15,6 +15,15 @@ English twin of [desktop-package.md](desktop-package.md). Packaging build matric
 
 Share-image generation remains **Web-only** when `window.dsaDesktop` is present (no desktop IPC share path yet).
 
+## Capability matrix and deep-link policy
+
+Published product contracts for #884:
+
+- [Desktop vs Web capability matrix](desktop-capability-matrix_EN.md)
+- [Desktop deep-link policy](desktop-deep-link-policy_EN.md)
+
+Desktop Model Sources exposes path-safe CLI visibility (`available` / `missing` / `unknown`) with Open terminal / Open install guide actions. Raw PATH and absolute executable paths are never sent to the renderer.
+
 ## First-run and one-click local install
 
 On a **fresh install** (runtime directory had no `.env` before bootstrap), after `/api/health` succeeds the shell opens the existing Web first-run route:

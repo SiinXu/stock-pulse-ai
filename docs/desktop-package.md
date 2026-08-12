@@ -138,13 +138,13 @@ npm run typecheck
 | 问题 | 实测结论 | 处置 |
 | --- | --- | --- |
 | Dock/Finder 启动时找不到 Homebrew CLI | 仍成立：GUI `process.env.PATH` 常缺 `/opt/homebrew/bin` 等 | **已有** `extendMacDesktopBackendPath` 注入后端与 Ollama 子进程 PATH；本任务补充有界异步启动摘要日志 |
-| PATH/CLI 对操作者不可见 | 部分成立：此前无统一诊断摘要 | **本任务** 在 `logs/desktop.log` 写入安全摘要，不向 renderer 暴露原始 PATH 或 CLI 绝对路径；#884 Phase 1 的可见设置 UI 仍待后续 Web 任务完成 |
-| 深链 / 二实例 URL 转发 | **已随既有实现解决** | 协议解析、冷启动排队、`open-url` / second-instance 与测试/文档已在仓库 |
-| 更新“像清空数据” | **已有备份/恢复路径** | Windows NSIS 更新备份 `.env`、DB、provider cache、AlphaSift、内嵌模型目录；macOS 使用 userData，不随 `.app` 替换丢失 |
+| PATH/CLI 对操作者不可见 | 已关闭 | Model Sources 渲染有界诊断；打开终端 / 安装说明；不向 renderer 暴露原始 PATH |
+| 深链 / 二实例 URL 转发 | **已收口** | 见 [桌面深链策略](desktop-deep-link-policy.md) |
+| 更新“像清空数据” | **已有备份/恢复路径 + 验证测试** | Windows NSIS 更新备份关键目录；见能力矩阵 |
 | 环境变量 denylist 与 shell 不一致 | 部分成立 | 本地 CLI 生成后端仅继承安全 env 白名单（防密钥泄漏）；**不**为“与 shell 完全一致”放宽 denylist（#884 non-goal） |
-| Desktop vs Web 矩阵文档 | 此前分散 | **本任务** 收敛为本节 |
+| Desktop vs Web 矩阵文档 | **已发布** | [desktop-capability-matrix.md](desktop-capability-matrix.md) / [EN](desktop-capability-matrix_EN.md) |
 
-Web 侧 Model Sources / Settings 面板直接渲染 CLI 表格属于 Web 域，不在 `apps/dsa-desktop/**` 边界内。本任务不新增 preload/IPC 契约；可见设置 UI、用户触发刷新及可操作引导仍属于 #884 后续阶段。
+Web 侧 Model Sources 通过 `window.dsaDesktop.getEnvDiagnostics` 消费路径安全摘要与可操作指引；诊断结果仍不包含原始 PATH、PATH 条目或 CLI 绝对路径。
 
 ### PATH / CLI 诊断
 
@@ -155,19 +155,23 @@ Web 侧 Model Sources / Settings 面板直接渲染 CLI 表格属于 Web 域，�
 - `claude`
 - `opencode`
 
-诊断有 250 ms 总时限、最多 64 个 PATH 条目和 4 个并发探测，并以单次请求合并和 5 分钟缓存限制重复 I/O。窗口创建和后端启动不等待诊断完成；慢文件系统、权限错误或缺失 PATH 会得到 `unknown`，不会误报为 `missing`。
+诊断有 250 ms 总时限、最多 64 个 PATH 条目和 4 个并发探测，并以单次请求合并和 5 分钟缓存限制重复 I/O。窗口创建和后端启动不等待诊断完成；慢文件系统、权限错误或缺失 PATH 会得到 `unknown`，不会误报为 `missing`，更不会 fail-open 成 `available`。
 
 **日志：** 一行摘要形如
 `[env-diagnostics] platform=darwin pathPolicy=macos-gui-homebrew-extend pathEntries=N pathAugmented=yes ollama=available codex=missing claude=unknown ...`
-日志只记录 `available` / `missing` / `unknown` 状态与条目数量，不记录原始 PATH、PATH 条目、CLI 绝对路径、应用目录或 `.env` 路径。诊断结果不通过 IPC/preload 暴露给 renderer。
+日志只记录 `available` / `missing` / `unknown` 状态与条目数量，不记录原始 PATH、PATH 条目、CLI 绝对路径、应用目录或 `.env` 路径。
+
+**UI：** Settings → Model Sources 的 Desktop CLI 可见性面板提供重新检测、打开系统终端、打开 HTTPS allowlist 安装说明；文案由主进程按语言返回，避免扩大 Web locale baseline。
 
 操作建议：
 
-1. 若 `codex`/`claude`/`opencode` 为 `missing`：在终端确认 `which <cli>`，并安装到 `/opt/homebrew/bin` 或 `/usr/local/bin`（macOS），或保证安装目录已在用户登录 PATH 且重启桌面端；`unknown` 表示探测超时、PATH 不可用或探测错误，不能据此断定 CLI 缺失。
+1. 若 `codex`/`claude`/`opencode` 为 `missing`：使用面板打开终端，确认 `which <cli>`，安装到登录 PATH 后重新检测或重启桌面端；`unknown` 表示探测超时、PATH 不可用或探测错误，不能据此断定 CLI 缺失。
 2. 若 `ollama=missing` 但 Local Models 仍可用：可能使用了**内嵌** runtime（不依赖 PATH 上的 `ollama`）；以 Local Models 面板状态为准。
 3. 生成失败时不要只看空白 “backend error”：对照上述 CLI 可见性与 Settings 中的 generation backend 配置。
 
 ## 桌面深链协议
+
+策略正文已发布为 [桌面深链策略](desktop-deep-link-policy.md)。下列摘要保持与实现对齐。
 
 桌面安装包注册 `stockpulse` 自定义协议。规范形式是
 `stockpulse://app/<应用内路径>?<查询参数>`，例如：
