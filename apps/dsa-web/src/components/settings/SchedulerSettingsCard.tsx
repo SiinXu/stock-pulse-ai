@@ -28,7 +28,7 @@ import { SettingsSwitch } from './SettingsSwitch';
 import { getConfigItem } from './settingsConfigItems';
 
 /** Deep link to Settings → Notifications → Channels (report delivery targets). */
-export const SCHEDULER_NOTIFICATIONS_CHANNELS_HREF = buildSettingsHref({
+const SCHEDULER_NOTIFICATIONS_CHANNELS_HREF = buildSettingsHref({
   section: 'notifications',
   view: 'channels',
 });

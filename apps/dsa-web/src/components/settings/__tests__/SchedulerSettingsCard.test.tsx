@@ -7,10 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { systemConfigApi } from '../../../api/systemConfig';
 import { UI_TEXT } from '../../../i18n/uiText';
+import { buildSettingsHref } from '../../../routing/routes';
 import type { SchedulerStatusResponse, SystemConfigItem } from '../../../types/systemConfig';
-import SchedulerSettingsCard, {
-  SCHEDULER_NOTIFICATIONS_CHANNELS_HREF,
-} from '../SchedulerSettingsCard';
+import SchedulerSettingsCard from '../SchedulerSettingsCard';
+
+const schedulerNotificationsChannelsHref = buildSettingsHref({
+  section: 'notifications',
+  view: 'channels',
+});
 
 function renderCard(ui: ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -256,9 +260,9 @@ describe('SchedulerSettingsCard observability', () => {
     );
 
     const link = await screen.findByTestId('scheduler-notifications-channels-link');
-    expect(link).toHaveAttribute('href', SCHEDULER_NOTIFICATIONS_CHANNELS_HREF);
-    expect(SCHEDULER_NOTIFICATIONS_CHANNELS_HREF).toContain('section=notifications');
-    expect(SCHEDULER_NOTIFICATIONS_CHANNELS_HREF).toContain('view=channels');
+    expect(link).toHaveAttribute('href', schedulerNotificationsChannelsHref);
+    expect(schedulerNotificationsChannelsHref).toContain('section=notifications');
+    expect(schedulerNotificationsChannelsHref).toContain('view=channels');
     expect(link).toHaveTextContent(UI_TEXT.en['settings.schedulerNotificationsLink']);
   });
 
