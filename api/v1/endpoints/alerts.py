@@ -15,11 +15,14 @@ from api.v1.schemas.alerts import (
     AlertRuleCreateRequest,
     AlertRuleItem,
     AlertRuleListResponse,
+    AlertRuleNlCompileRequest,
+    AlertRuleNlCompileResponse,
     AlertRuleTestResponse,
     AlertRuleUpdateRequest,
     AlertTriggerListResponse,
     CorporateAlertTypeFilter,
 )
+from src.services.alert_rule_nl_compiler import compile_alert_rule_nl
 from api.v1.schemas.common import ErrorResponse
 from src.services.alert_service import (
     AlertNotFoundError,
@@ -77,6 +80,30 @@ def create_rule(request: AlertRuleCreateRequest) -> AlertRuleItem:
         raise _bad_request(exc, error=exc.error_code)
     except Exception as exc:
         raise _internal_error("Create alert rule failed", exc)
+
+
+@router.post(
+    "/rules/compile-nl",
+    response_model=AlertRuleNlCompileResponse,
+    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    summary="Compile natural-language text into a whitelist-bounded alert rule payload",
+)
+def compile_rule_nl(request: AlertRuleNlCompileRequest) -> AlertRuleNlCompileResponse:
+    """C5 / issue #1133: compile NL monitor phrases without executing user code.
+
+    Returns success | need_clarification | rejected. Does not persist rules.
+    Callers may POST the returned rule payload to /rules when outcome=success.
+    """
+    try:
+        result = compile_alert_rule_nl(
+            request.text,
+            default_severity=request.default_severity,
+            default_enabled=request.default_enabled,
+            auto_analysis=request.auto_analysis,
+        )
+        return AlertRuleNlCompileResponse(**result.to_dict())
+    except Exception as exc:
+        raise _internal_error("Compile natural-language alert rule failed", exc)
 
 
 @router.get(

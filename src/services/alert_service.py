@@ -1317,10 +1317,14 @@ class AlertService:
             alert_type = "corporate_event"
         severity = getattr(row, "_public_severity", None)
         is_corporate_event = alert_type == "corporate_event"
-        contexts = extract_event_display_contexts(row.diagnostics) if is_corporate_event else {
-            "impact_context": None,
-            "event_context": None,
-        }
+        contexts = extract_event_display_contexts(row.diagnostics)
+        if not is_corporate_event:
+            contexts = {
+                "impact_context": None,
+                "event_context": None,
+                "suggested_action": contexts.get("suggested_action"),
+                "auto_analysis": contexts.get("auto_analysis"),
+            }
         impact_result = None
         if is_corporate_event and severity in SUPPORTED_SEVERITIES:
             impact_result = {
@@ -1354,8 +1358,10 @@ class AlertService:
             "analysis_context_pack_overview": visibility.get("analysis_context_pack_overview"),
             "analysis_visibility_source": visibility.get("analysis_visibility_source"),
             "decision_signal_summary": visibility.get("decision_signal_summary"),
-            "impact_context": contexts["impact_context"],
-            "event_context": contexts["event_context"],
+            "impact_context": contexts.get("impact_context"),
+            "event_context": contexts.get("event_context"),
+            "suggested_action": contexts.get("suggested_action"),
+            "auto_analysis": contexts.get("auto_analysis"),
             "impact_result": impact_result,
         }
 

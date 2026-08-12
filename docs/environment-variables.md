@@ -603,3 +603,14 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `YFINANCE_PRIORITY` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 
 <!-- config-env-inventory:end -->
+
+### Event-triggered analysis (issues #129 / #152)
+
+- `EVENT_TRIGGERED_ANALYSIS_ENABLED` (default `false`)
+- `EVENT_TRIGGER_COOLDOWN_MINUTES` (default `180`)
+- `EVENT_TRIGGER_DEFAULT_PIPELINE` (default `standard`)
+- `EVENT_TRIGGER_MAX_PER_HOUR` (default `5`)
+- `EVENT_TRIGGER_MAX_PER_DAY` (default `20`)
+
+See [alerts](alerts.md) / [alerts_EN](alerts_EN.md).
+

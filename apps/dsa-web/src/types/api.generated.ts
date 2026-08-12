@@ -247,6 +247,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alerts/rules/compile-nl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compile natural-language text into a whitelist-bounded alert rule payload
+         * @description C5 / issue #1133: compile NL monitor phrases without executing user code.
+         *
+         *     Returns success | need_clarification | rejected. Does not persist rules.
+         *     Callers may POST the returned rule payload to /rules when outcome=success.
+         */
+        post: operations["compile_rule_nl_api_v1_alerts_rules_compile_nl_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/alerts/rules/{rule_id}": {
         parameters: {
             query?: never;
@@ -3865,6 +3888,22 @@ export interface components {
             /** Soul Version */
             soul_version: string;
         };
+        /** AlertAutoAnalysisStatus */
+        AlertAutoAnalysisStatus: {
+            /** Pipeline */
+            pipeline?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Status */
+            status: string;
+            /** Stock Code */
+            stock_code?: string | null;
+            /**
+             * Submitted
+             * @default false
+             */
+            submitted: boolean;
+        };
         /** AlertDeleteResponse */
         AlertDeleteResponse: {
             /** Deleted */
@@ -3928,6 +3967,7 @@ export interface components {
             source_name?: string | null;
             /** Source Url */
             source_url?: string | null;
+            suggested_action?: components["schemas"]["AlertSuggestedAction"] | null;
             /** What Happened */
             what_happened?: string | null;
             /** Why It Matters */
@@ -4072,6 +4112,52 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** AlertRuleNlCompileRequest */
+        AlertRuleNlCompileRequest: {
+            /**
+             * Auto Analysis
+             * @description When true, attach notification_policy.auto_analysis=true to a successful compile.
+             */
+            auto_analysis?: boolean | null;
+            /**
+             * Default Enabled
+             * @default true
+             */
+            default_enabled: boolean;
+            /**
+             * Default Severity
+             * @default warning
+             * @enum {string}
+             */
+            default_severity: "info" | "warning" | "critical";
+            /** Text */
+            text: string;
+        };
+        /** AlertRuleNlCompileResponse */
+        AlertRuleNlCompileResponse: {
+            /** Clarifications */
+            clarifications?: string[];
+            /** Matched Metric */
+            matched_metric?: string | null;
+            /** Matched Symbols */
+            matched_symbols?: string[];
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "success" | "need_clarification" | "rejected";
+            /** Rejected Reason */
+            rejected_reason?: string | null;
+            /** Rule */
+            rule?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** AlertRuleTargetResult */
         AlertRuleTargetResult: {
             /** Display Target */
@@ -4161,6 +4247,22 @@ export interface components {
             /** Target Scope */
             target_scope?: ("single_symbol" | "watchlist" | "portfolio_holdings" | "portfolio_account" | "market") | null;
         };
+        /** AlertSuggestedAction */
+        AlertSuggestedAction: {
+            /** Action Code */
+            action_code: string;
+            auto_analysis?: components["schemas"]["AlertAutoAnalysisStatus"] | null;
+            /** Deep Links */
+            deep_links?: {
+                [key: string]: string;
+            } | null;
+            /** Label */
+            label?: string | null;
+            /** Rationale */
+            rationale?: string | null;
+            /** Relevance */
+            relevance?: string[];
+        };
         /** AlertTriggerItem */
         AlertTriggerItem: {
             /** Alert Type */
@@ -4171,6 +4273,7 @@ export interface components {
              * @description 公开摘要来源：alert_trigger_market_context / analysis_history_snapshot / evaluator_snapshot / legacy_text / null
              */
             analysis_visibility_source?: string | null;
+            auto_analysis?: components["schemas"]["AlertAutoAnalysisStatus"] | null;
             /** Data Source */
             data_source?: string | null;
             /** Data Timestamp */
@@ -4197,6 +4300,7 @@ export interface components {
             severity?: ("info" | "warning" | "critical") | null;
             /** Status */
             status: string;
+            suggested_action?: components["schemas"]["AlertSuggestedAction"] | null;
             /** Target */
             target: string;
             /** Threshold */
@@ -16536,6 +16640,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertRuleItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compile_rule_nl_api_v1_alerts_rules_compile_nl_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleNlCompileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleNlCompileResponse"];
                 };
             };
             /** @description Bad Request */

@@ -42,6 +42,11 @@ from src.services.event_alerts import (
     build_impact_context,
     format_impact_context_excerpt,
 )
+from src.services.event_triggered_analysis import (
+    EventTriggeredAnalysisService,
+    build_suggested_action,
+    format_suggested_action_excerpt,
+)
 from src.services.history_service import HistoryService
 from src.services.market_light_service import normalize_market_alert_region
 from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
@@ -66,6 +71,7 @@ class RuntimeAlertRule:
     source: str
     severity: Optional[str] = None
     cooldown_policy: Optional[Dict[str, Any]] = None
+    notification_policy: Optional[Dict[str, Any]] = None
     effective_target: Optional[str] = None
     display_target: Optional[str] = None
 
@@ -93,6 +99,7 @@ class AlertWorker:
         service: Optional[AlertService] = None,
         decision_signal_service: Optional[DecisionSignalService] = None,
         notifier: Optional[Any] = None,
+        event_triggered_analysis: Optional[EventTriggeredAnalysisService] = None,
         now_provider: Optional[Callable[[], float]] = None,
         fingerprint_ttl_seconds: int = ALERT_WORKER_FINGERPRINT_TTL_SECONDS,
     ) -> None:
@@ -100,6 +107,7 @@ class AlertWorker:
         self.service = service or AlertService()
         self.decision_signal_service = decision_signal_service or DecisionSignalService()
         self.notifier = notifier
+        self.event_triggered_analysis = event_triggered_analysis or EventTriggeredAnalysisService()
         self.now_provider = now_provider or time.time
         self.fingerprint_ttl_seconds = max(1, int(fingerprint_ttl_seconds))
         self._trigger_fingerprints: Dict[str, float] = {}
@@ -129,6 +137,8 @@ class AlertWorker:
             "failed": 0,
             "notification_attempts": 0,
             "cooldown_suppressed": 0,
+            "auto_analysis_submitted": 0,
+            "auto_analysis_skipped": 0,
         }
 
         try:
@@ -190,6 +200,14 @@ class AlertWorker:
                         config=config,
                         report_language=report_language,
                     )
+                auto_stats = self._attach_suggested_action_and_auto_analysis_safely(
+                    runtime_rule,
+                    result,
+                    config=config,
+                    report_language=report_language,
+                )
+                stats["auto_analysis_submitted"] += int(auto_stats.get("submitted") or 0)
+                stats["auto_analysis_skipped"] += int(auto_stats.get("skipped") or 0)
             if record_status in WRITABLE_TRIGGER_STATUSES:
                 trigger_write = self._record_trigger_safely(runtime_rule, result, record_status)
                 trigger_id = trigger_write.trigger_id
@@ -242,6 +260,7 @@ class AlertWorker:
         for row in self.service.repo.list_enabled_rules(limit=ALERT_WORKER_RULE_LIMIT):
             try:
                 cooldown_policy = self.service._load_json(row.cooldown_policy, default=None)
+                notification_policy = self.service._load_json(row.notification_policy, default=None)
                 for payload in self.service.build_runtime_payloads(row, config=config, include_overflow_payload=False):
                     if len(runtime_rules) >= ALERT_WORKER_RULE_LIMIT:
                         logger.warning(
@@ -256,6 +275,7 @@ class AlertWorker:
                             source="db",
                             severity=row.severity,
                             cooldown_policy=cooldown_policy,
+                            notification_policy=notification_policy if isinstance(notification_policy, dict) else None,
                             effective_target=payload.effective_target,
                             display_target=payload.display_target,
                         )
@@ -418,7 +438,13 @@ class AlertWorker:
             # Keep compact evaluator + impact keys first so API sanitization
             # truncation does not drop them behind large visibility packs.
             ordered: Dict[str, Any] = {}
-            for key in ("impact_context", "event_context", "decision_signal_summary"):
+            for key in (
+                "impact_context",
+                "event_context",
+                "suggested_action",
+                "auto_analysis",
+                "decision_signal_summary",
+            ):
                 if key in payload:
                     ordered[key] = payload.pop(key)
             visibility = payload.pop("analysis_visibility", None)
@@ -503,6 +529,72 @@ class AlertWorker:
                 level=logging.DEBUG,
                 context={"target": self._display_target(runtime_rule)},
             )
+
+
+    def _attach_suggested_action_and_auto_analysis_safely(
+        self,
+        runtime_rule: RuntimeAlertRule,
+        result: Dict[str, Any],
+        *,
+        config: Any,
+        report_language: str = "zh",
+    ) -> Dict[str, int]:
+        """Attach suggested action / deep links and optionally enqueue deep analysis.
+
+        Auto-analysis is off by default: both the master config switch and
+        notification_policy.auto_analysis must be explicitly enabled.
+        """
+        stats = {"submitted": 0, "skipped": 0}
+        try:
+            payload = self._diagnostics_payload(result.get("diagnostics"))
+            alert_type = self._public_alert_type(
+                getattr(getattr(runtime_rule, "rule", runtime_rule), "alert_type", None)
+                or result.get("alert_type")
+            )
+            stock_code = self._effective_target(runtime_rule)
+            rule_id = self.service._runtime_rule_id(getattr(runtime_rule, "rule", runtime_rule))
+            auto_decision = self.event_triggered_analysis.maybe_submit(
+                config=config,
+                stock_code=stock_code,
+                alert_type=alert_type,
+                rule_id=rule_id or None,
+                notification_policy=runtime_rule.notification_policy,
+                trigger_reason=result.get("reason") or result.get("message"),
+            )
+            auto_public = auto_decision.to_public_dict()
+            payload["auto_analysis"] = auto_public
+            if auto_decision.submitted:
+                stats["submitted"] = 1
+            else:
+                stats["skipped"] = 1
+
+            impact_context = payload.get("impact_context") if isinstance(payload.get("impact_context"), dict) else None
+            event_context = payload.get("event_context") if isinstance(payload.get("event_context"), dict) else None
+            suggested = build_suggested_action(
+                stock_code=stock_code,
+                alert_type=alert_type,
+                event_context=event_context,
+                impact_context=impact_context,
+                auto_analysis=auto_public,
+                report_language=report_language,
+            )
+            payload["suggested_action"] = suggested
+            if isinstance(impact_context, dict):
+                impact_context = dict(impact_context)
+                impact_context["suggested_action"] = suggested
+                payload["impact_context"] = impact_context
+            result["diagnostics"] = payload
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(
+                logger,
+                "Alert suggested action / auto-analysis unavailable",
+                exc,
+                error_code="alert_suggested_action_unavailable",
+                level=logging.DEBUG,
+                context={"target": self._display_target(runtime_rule)},
+            )
+            stats["skipped"] = 1
+        return stats
 
     def _resolve_impact_context(
         self,
@@ -862,6 +954,12 @@ class AlertWorker:
         )
         if impact_excerpt:
             content = f"{content}\n\n{impact_excerpt}"
+        suggested_excerpt = format_suggested_action_excerpt(
+            diagnostics.get("suggested_action"),
+            report_language=report_language,
+        )
+        if suggested_excerpt:
+            content = f"{content}\n\n{suggested_excerpt}"
         alert_text = NotificationBuilder.build_simple_alert(title=title, content=content, alert_type="warning")
 
         return notification_service.send_with_results(alert_text, route_type="alert")
