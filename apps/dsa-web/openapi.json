@@ -15525,6 +15525,435 @@
         "title": "OutboundActivityPage",
         "type": "object"
       },
+      "PaperDecisionQualityAggregate": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityAggregateDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "max_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Process Score"
+          },
+          "min_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Process Score"
+          },
+          "process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Score"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "empty"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sample_size"
+        ],
+        "title": "PaperDecisionQualityAggregate",
+        "type": "object"
+      },
+      "PaperDecisionQualityAggregateDimension": {
+        "properties": {
+          "sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Size"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityAggregateDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDimension": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Inputs",
+            "type": "object"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDivisionOfLabor": {
+        "properties": {
+          "does_not_own": {
+            "title": "Does Not Own",
+            "type": "string"
+          },
+          "outcome_owner_issue": {
+            "default": 987,
+            "title": "Outcome Owner Issue",
+            "type": "integer"
+          },
+          "owns": {
+            "title": "Owns",
+            "type": "string"
+          },
+          "this_issue": {
+            "default": 1134,
+            "title": "This Issue",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "owns",
+          "does_not_own"
+        ],
+        "title": "PaperDecisionQualityDivisionOfLabor",
+        "type": "object"
+      },
+      "PaperDecisionQualityItem": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "effective_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Effective Weights",
+            "type": "object"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "linked_signal_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Signal Id"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "process_score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Process Score",
+            "type": "number"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "trade_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Date"
+          },
+          "trade_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Id"
+          }
+        },
+        "required": [
+          "process_score",
+          "dimensions",
+          "formula_version"
+        ],
+        "title": "PaperDecisionQualityItem",
+        "type": "object"
+      },
+      "PaperDecisionQualityReason": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimension"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "PaperDecisionQualityReason",
+        "type": "object"
+      },
+      "PaperDecisionQualityResponse": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "account_type": {
+            "const": "paper",
+            "default": "paper",
+            "title": "Account Type",
+            "type": "string"
+          },
+          "aggregate": {
+            "$ref": "#/components/schemas/PaperDecisionQualityAggregate"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "division_of_labor": {
+            "$ref": "#/components/schemas/PaperDecisionQualityDivisionOfLabor"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "formula_version",
+          "disclaimer",
+          "account_id",
+          "as_of",
+          "sample_size",
+          "aggregate",
+          "division_of_labor"
+        ],
+        "title": "PaperDecisionQualityResponse",
+        "type": "object"
+      },
       "PaperTradeCreateRequest": {
         "properties": {
           "note": {
@@ -41192,6 +41621,121 @@
           }
         },
         "summary": "Update portfolio account",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/accounts/{account_id}/paper-decision-quality": {
+      "get": {
+        "description": "Returns explainable process scores for simulated trades on a paper account: analysis support, risk-gate compliance, and position discipline. This is not a return or win-rate evaluation. Outcome metrics remain owned by DecisionSignal post-hoc calibration (issue #987).",
+        "operationId": "getPaperDecisionQuality",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional trade date from",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date from",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Optional trade date to",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date to",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Max trades to score",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Max trades to score",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperDecisionQualityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Score paper-trading decisions on process quality (not PnL)",
         "tags": [
           "Portfolio"
         ]
