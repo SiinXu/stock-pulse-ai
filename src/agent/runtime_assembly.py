@@ -245,13 +245,25 @@ def get_tool_registry():
     from src.agent.tools.registry import ToolRegistry
     from src.agent.tools.data_tools import ALL_DATA_TOOLS
     from src.agent.tools.analysis_tools import ALL_ANALYSIS_TOOLS
-    from src.agent.tools.search_tools import ALL_SEARCH_TOOLS
     from src.agent.tools.market_tools import ALL_MARKET_TOOLS
     from src.agent.tools.backtest_tools import ALL_BACKTEST_TOOLS
 
     registry = ToolRegistry()
-    for tool_fn in ALL_DATA_TOOLS + ALL_ANALYSIS_TOOLS + ALL_SEARCH_TOOLS + ALL_MARKET_TOOLS + ALL_BACKTEST_TOOLS:
+    # Core non-plugin tools. Agent Web Search tools register via the
+    # builtin.web_search agent_tool plugin (issue #432); optional tools below
+    # remain configuration-gated.
+    for tool_fn in (
+        ALL_DATA_TOOLS
+        + ALL_ANALYSIS_TOOLS
+        + ALL_MARKET_TOOLS
+        + ALL_BACKTEST_TOOLS
+    ):
         registry.register(tool_fn)
+
+    # Publish early so re-entrant agent_tool plugin registration (triggered when
+    # optional factories call get_application_services → start_plugins) attaches
+    # to this process registry instead of building a second incomplete cache.
+    _TOOL_REGISTRY = registry
 
     # Optional multimodal PDF/chart tools (issue #253): default-off.
     try:
