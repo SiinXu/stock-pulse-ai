@@ -3,8 +3,8 @@ import type React from 'react';
 import { CheckCircle2, CircleAlert, CircleDashed, Play, RefreshCw, WandSparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { ParsedApiError } from '../../api/error';
-import { isTaskBusyError } from '../../utils/asyncTaskUx';
 import ActionableApiErrorInline from '../analysis/ActionableApiErrorInline';
+import type { SetupSmokeOutcome } from '../../utils/setupSmokeTask';
 import type {
   SetupStatusCheck,
   SetupStatusResponse,
@@ -26,10 +26,7 @@ type FirstRunSetupCardProps = {
   firstStockCode: string;
   isSaving: boolean;
   isRunningSmoke: boolean;
-  smokeError: ParsedApiError | null;
-  smokeSuccess: string;
-  /** Recoverable Analysis Workbench tasks href when a smoke task was accepted. */
-  smokeTasksHref?: string | null;
+  smokeOutcome: SetupSmokeOutcome | null;
   onRefresh: () => void | Promise<void>;
   onSelectCategory: (category: SystemConfigCategory) => void;
   onRunSmoke: () => void | Promise<void>;
@@ -58,9 +55,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
   firstStockCode,
   isSaving,
   isRunningSmoke,
-  smokeError,
-  smokeSuccess,
-  smokeTasksHref = null,
+  smokeOutcome,
   onRefresh,
   onSelectCategory,
   onRunSmoke,
@@ -222,28 +217,28 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             {firstStockCode ? t('settings.setupGuideSmokeNotReady') : t('settings.setupGuideSmokeNeedsStock')}
           </p>
         ) : null}
-        {smokeError ? (
-          isTaskBusyError(smokeError) ? (
+        {smokeOutcome?.status !== 'accepted' ? (
+          smokeOutcome?.status === 'failed' && smokeOutcome.tasksHref ? (
             <ActionableApiErrorInline
-              error={smokeError}
-              actions={smokeTasksHref
-                ? [{
-                    label: t('analysisWorkbench.tasks'),
-                    onClick: () => navigate(smokeTasksHref),
-                  }]
-                : undefined}
+              error={smokeOutcome.error}
+              actions={[{
+                label: t('analysisWorkbench.tasks'),
+                onClick: () => navigate(smokeOutcome.tasksHref!),
+              }]}
             />
+          ) : smokeOutcome ? (
+            <ApiErrorAlert error={smokeOutcome.error} />
           ) : (
-            <ApiErrorAlert error={smokeError} />
+            null
           )
         ) : null}
-        {!smokeError && smokeSuccess ? (
+        {smokeOutcome?.status === 'accepted' ? (
           <SettingsAlert
             title={t('settings.actionSuccess')}
-            message={smokeSuccess}
+            message={smokeOutcome.successMessage}
             variant="success"
-            actionLabel={smokeTasksHref ? t('analysisWorkbench.tasks') : undefined}
-            onAction={smokeTasksHref ? () => navigate(smokeTasksHref) : undefined}
+            actionLabel={t('analysisWorkbench.tasks')}
+            onAction={() => navigate(smokeOutcome.tasksHref)}
           />
         ) : null}
       </div>

@@ -15,7 +15,7 @@ import {
   SETTINGS_VIEW_IDS,
 } from '../routing/routes';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
-import { runSetupSmokeAnalysis } from '../utils/setupSmokeTask';
+import type { SetupSmokeOutcome } from '../utils/setupSmokeTask';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
@@ -175,9 +175,7 @@ const SettingsPage: React.FC = () => {
   const [isRefreshingSetupStatus, setIsRefreshingSetupStatus] = useState(false);
   const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [isRunningSetupSmoke, setIsRunningSetupSmoke] = useState(false);
-  const [setupSmokeError, setSetupSmokeError] = useState<ParsedApiError | null>(null);
-  const [setupSmokeSuccess, setSetupSmokeSuccess] = useState('');
-  const [setupSmokeTasksHref, setSetupSmokeTasksHref] = useState<string | null>(null);
+  const [setupSmokeOutcome, setSetupSmokeOutcome] = useState<SetupSmokeOutcome | null>(null);
   const [llmChannelDraftItems, setLlmChannelDraftItems] = useState<SystemConfigUpdateItem[]>([]);
   const [dismissedErrorSummaryFingerprint, setDismissedErrorSummaryFingerprint] = useState('');
   const [groupSaveStates, setGroupSaveStates] = useState<Record<string, SettingsGroupSaveState>>({});
@@ -1275,24 +1273,26 @@ const SettingsPage: React.FC = () => {
   );
 
   const handleRunSetupSmoke = async () => {
-    setSetupSmokeError(null);
-    setSetupSmokeSuccess('');
-    setSetupSmokeTasksHref(null);
+    setSetupSmokeOutcome(null);
     setIsRunningSetupSmoke(true);
     try {
+      const { runSetupSmokeAnalysis } = await import('../utils/setupSmokeTask');
       const outcome = await runSetupSmokeAnalysis({
         readyForSmoke: Boolean(setupStatus?.readyForSmoke),
         stockCode: firstSetupStockCode,
         t,
       });
-      if (outcome.status === 'blocked' || outcome.status === 'failed') {
-        setSetupSmokeError(outcome.error);
-        if (outcome.status === 'failed') setSetupSmokeTasksHref(outcome.tasksHref);
+      setSetupSmokeOutcome(outcome);
+      if (outcome.status !== 'accepted') {
         return;
       }
-      setSetupSmokeSuccess(outcome.successMessage);
-      setSetupSmokeTasksHref(outcome.tasksHref);
       void refreshSetupStatus();
+    } catch (error: unknown) {
+      setSetupSmokeOutcome({
+        status: 'failed',
+        error: getParsedApiError(error),
+        tasksHref: null,
+      });
     } finally {
       setIsRunningSetupSmoke(false);
     }
@@ -1540,9 +1540,7 @@ const SettingsPage: React.FC = () => {
               isSaving={isSaving}
               isLoading={isLoading}
               isRunningSetupSmoke={isRunningSetupSmoke}
-              setupSmokeError={setupSmokeError}
-              setupSmokeSuccess={setupSmokeSuccess}
-              setupSmokeTasksHref={setupSmokeTasksHref}
+              setupSmokeOutcome={setupSmokeOutcome}
               refreshSetupStatus={refreshSetupStatus}
               selectSectionView={selectSectionView}
               handleRunSetupSmoke={handleRunSetupSmoke}
