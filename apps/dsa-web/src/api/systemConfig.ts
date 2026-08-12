@@ -200,7 +200,14 @@ const availableModelsResponseSchema = z.object({ models: z.array(availableModelE
 const schedulerStatusResponseSchema = z.object({
   enabled: z.boolean(), running: z.boolean(), scheduleTimes: z.array(z.string()),
   track: z.literal('legacy_day_batch').optional(), attached: z.boolean().optional(),
-  processMode: z.enum(['serve', 'desktop', 'not_attached']).optional(),
+  // Design four-state vocabulary (#869). Legacy "serve" accepted for rolling upgrades.
+  processMode: z.enum([
+    'serve+schedule',
+    'desktop',
+    'cli-schedule',
+    'not_attached',
+    'serve',
+  ]).optional(),
   scheduleTimezone: z.string().optional(), runNowAvailable: z.boolean().optional(),
   runNowBlockReason: z.string().nullable().optional(),
   nextRunAt: z.string().nullable().optional(), lastRunAt: z.string().nullable().optional(),

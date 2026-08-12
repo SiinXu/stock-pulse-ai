@@ -13,7 +13,14 @@ from api.v1.schemas.common import ErrorDetailsCompatibilityModel
 LLMCapabilityCheck = Literal["json", "tools", "vision", "stream"]
 GenerationBackendSmokeMode = Literal["text", "json"]
 GenerationBackendHealthStatus = Literal["not_tested", "passed", "failed", "skipped"]
-SchedulerProcessMode = Literal["serve", "desktop", "not_attached"]
+# Design vocabulary (#869): serve+schedule / desktop / cli-schedule / not_attached.
+# Values come from runtime ownership + attachment, never static labels.
+SchedulerProcessMode = Literal[
+    "serve+schedule",
+    "desktop",
+    "cli-schedule",
+    "not_attached",
+]
 SchedulerRunOutcome = Literal["succeeded", "failed"]
 NotificationTestChannel = Literal[
     "wechat",

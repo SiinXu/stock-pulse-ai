@@ -281,11 +281,58 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         status = service.status()
         self.assertEqual(status["track"], "legacy_day_batch")
         self.assertTrue(status["attached"])
-        self.assertEqual(status["process_mode"], "serve")
+        self.assertEqual(status["process_mode"], "serve+schedule")
         self.assertEqual(status["schedule_timezone"], "America/New_York")
         self.assertTrue(status["run_now_available"])
         self.assertIsNone(status["run_now_block_reason"])
         self.assertTrue(status["next_run_at"].endswith("-05:00"))
+
+    def test_process_mode_four_state_vocabulary_from_runtime_signals(self) -> None:
+        from src.services.runtime_scheduler import (
+            DESKTOP_MODE_ENV,
+            CLI_SCHEDULER_OWNER_ENV,
+            resolve_scheduler_process_mode,
+        )
+
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=True, attached=True, desktop_mode=False),
+            "serve+schedule",
+        )
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=True, attached=True, desktop_mode=True),
+            "desktop",
+        )
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=False, attached=False, desktop_mode=False),
+            "cli-schedule",
+        )
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=True, attached=False, desktop_mode=False),
+            "not_attached",
+        )
+
+        config = SimpleNamespace(
+            schedule_enabled=True,
+            schedule_time="18:00",
+            schedule_times=["18:00"],
+        )
+
+        with patch.dict(os.environ, {DESKTOP_MODE_ENV: "true", CLI_SCHEDULER_OWNER_ENV: ""}, clear=False):
+            desktop = RuntimeSchedulerService(config_provider=lambda: config)
+            self.assertEqual(desktop.status()["process_mode"], "desktop")
+            self.assertTrue(desktop.status()["attached"])
+
+        with patch.dict(os.environ, {CLI_SCHEDULER_OWNER_ENV: "true", DESKTOP_MODE_ENV: ""}, clear=False):
+            cli_owned = RuntimeSchedulerService(config_provider=lambda: config)
+            self.assertEqual(cli_owned.status()["process_mode"], "cli-schedule")
+            self.assertFalse(cli_owned.status()["attached"])
+
+        serve_only = RuntimeSchedulerService(
+            config_provider=lambda: config,
+            legacy_schedule_enabled=False,
+        )
+        self.assertEqual(serve_only.status()["process_mode"], "not_attached")
+        self.assertFalse(serve_only.status()["attached"])
 
     def test_run_now_uses_shared_lock_across_service_instances(self) -> None:
         config = SimpleNamespace(

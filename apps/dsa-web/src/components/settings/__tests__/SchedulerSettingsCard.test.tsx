@@ -1,12 +1,20 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { systemConfigApi } from '../../../api/systemConfig';
 import { UI_TEXT } from '../../../i18n/uiText';
 import type { SchedulerStatusResponse, SystemConfigItem } from '../../../types/systemConfig';
-import SchedulerSettingsCard from '../SchedulerSettingsCard';
+import SchedulerSettingsCard, {
+  SCHEDULER_NOTIFICATIONS_CHANNELS_HREF,
+} from '../SchedulerSettingsCard';
+
+function renderCard(ui: ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 vi.mock('../../../api/scheduledTasks', () => ({
   scheduledTasksApi: {
@@ -68,7 +76,7 @@ const idleStatus: SchedulerStatusResponse = {
   enabled: true,
   running: false,
   attached: true,
-  processMode: 'serve',
+  processMode: 'serve+schedule',
   scheduleTimezone: 'Asia/Shanghai',
   runNowAvailable: true,
   runNowBlockReason: null,
@@ -96,7 +104,7 @@ describe('SchedulerSettingsCard observability', () => {
   });
 
   it('shows next run with timezone label, process mode, and run-now tracking surface', async () => {
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -122,7 +130,7 @@ describe('SchedulerSettingsCard observability', () => {
     const processMode = screen.getByTestId('scheduler-process-mode');
     expect(processMode).toHaveTextContent(UI_TEXT.en['settings.schedulerProcessMode']);
     expect(screen.getByTestId('scheduler-process-mode-value')).toHaveTextContent(
-      UI_TEXT.en['settings.schedulerProcessModeServe'],
+      UI_TEXT.en['settings.schedulerProcessModeServeSchedule'],
     );
     expect(screen.getByTestId('scheduler-process-mode-value')).toHaveTextContent(
       UI_TEXT.en['settings.schedulerAttached'],
@@ -135,6 +143,125 @@ describe('SchedulerSettingsCard observability', () => {
     expect(notice).toHaveTextContent(/Migrate to versioned scheduled tasks/);
   });
 
+  it('renders design four-state process-mode labels from runtime status', async () => {
+    const cases: Array<{
+      processMode: NonNullable<SchedulerStatusResponse['processMode']>;
+      attached: boolean;
+      labelKey: keyof typeof UI_TEXT.en;
+    }> = [
+      {
+        processMode: 'serve+schedule',
+        attached: true,
+        labelKey: 'settings.schedulerProcessModeServeSchedule',
+      },
+      {
+        processMode: 'desktop',
+        attached: true,
+        labelKey: 'settings.schedulerProcessModeDesktop',
+      },
+      {
+        processMode: 'cli-schedule',
+        attached: false,
+        labelKey: 'settings.schedulerProcessModeCliSchedule',
+      },
+      {
+        processMode: 'not_attached',
+        attached: false,
+        labelKey: 'settings.schedulerProcessModeNotAttached',
+      },
+    ];
+
+    for (const item of cases) {
+      vi.mocked(systemConfigApi.getSchedulerStatus).mockResolvedValue({
+        ...idleStatus,
+        processMode: item.processMode,
+        attached: item.attached,
+        runNowAvailable: item.attached,
+        runNowBlockReason: item.attached ? null : 'scheduler_not_attached',
+      });
+      const { unmount } = renderCard(
+        <SchedulerSettingsCard
+          items={defaultItems}
+          disabled={false}
+          issueByKey={{}}
+          statusRefreshToken={0}
+          onChange={vi.fn()}
+          t={t}
+          language="en"
+        />,
+      );
+      expect(await screen.findByTestId('scheduler-process-mode-value')).toHaveTextContent(
+        UI_TEXT.en[item.labelKey],
+      );
+      unmount();
+    }
+  });
+
+  it('shows hot-reload badges only when this process is attached', async () => {
+    const attached = renderCard(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+    expect(await screen.findByTestId('scheduler-enable-apply-badge')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerFieldHotReload'],
+    );
+    expect(screen.getByTestId('scheduler-times-apply-badge')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerFieldHotReload'],
+    );
+    attached.unmount();
+
+    vi.mocked(systemConfigApi.getSchedulerStatus).mockResolvedValue({
+      ...idleStatus,
+      attached: false,
+      processMode: 'not_attached',
+      runNowAvailable: false,
+      runNowBlockReason: 'scheduler_not_attached',
+    });
+    renderCard(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={1}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+    expect(await screen.findByTestId('scheduler-process-mode-value')).toHaveTextContent(
+      UI_TEXT.en['settings.schedulerProcessModeNotAttached'],
+    );
+    expect(screen.queryByTestId('scheduler-enable-apply-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('scheduler-times-apply-badge')).not.toBeInTheDocument();
+  });
+
+  it('deep-links from scheduler status to notification channels', async () => {
+    renderCard(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    const link = await screen.findByTestId('scheduler-notifications-channels-link');
+    expect(link).toHaveAttribute('href', SCHEDULER_NOTIFICATIONS_CHANNELS_HREF);
+    expect(SCHEDULER_NOTIFICATIONS_CHANNELS_HREF).toContain('section=notifications');
+    expect(SCHEDULER_NOTIFICATIONS_CHANNELS_HREF).toContain('view=channels');
+    expect(link).toHaveTextContent(UI_TEXT.en['settings.schedulerNotificationsLink']);
+  });
+
   it('disables run-now while analysis is running and shows busy reason', async () => {
     vi.mocked(systemConfigApi.getSchedulerStatus).mockResolvedValue({
       ...idleStatus,
@@ -144,7 +271,7 @@ describe('SchedulerSettingsCard observability', () => {
       nextRunAt: null,
     });
 
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -190,7 +317,7 @@ describe('SchedulerSettingsCard observability', () => {
         lastRunAt: '2026-06-21T09:00:00+08:00',
       });
 
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -229,7 +356,7 @@ describe('SchedulerSettingsCard observability', () => {
       lastError: null,
     });
 
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -255,7 +382,7 @@ describe('SchedulerSettingsCard observability', () => {
   });
 
   it('keeps versioned-task probing out of status-only refreshes', async () => {
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -280,7 +407,7 @@ describe('SchedulerSettingsCard observability', () => {
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
 
-    const { rerender } = render(
+    const { rerender } = renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -294,15 +421,17 @@ describe('SchedulerSettingsCard observability', () => {
     await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(1));
 
     rerender(
-      <SchedulerSettingsCard
-        items={defaultItems}
-        disabled={false}
-        issueByKey={{}}
-        statusRefreshToken={1}
-        onChange={vi.fn()}
-        t={t}
-        language="en"
-      />,
+      <MemoryRouter>
+        <SchedulerSettingsCard
+          items={defaultItems}
+          disabled={false}
+          issueByKey={{}}
+          statusRefreshToken={1}
+          onChange={vi.fn()}
+          t={t}
+          language="en"
+        />
+      </MemoryRouter>,
     );
     await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(2));
 
@@ -330,7 +459,7 @@ describe('SchedulerSettingsCard observability', () => {
       lastSkipReason: 'analysis_already_running',
     });
 
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -364,7 +493,7 @@ describe('SchedulerSettingsCard observability', () => {
       }],
     });
 
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -385,7 +514,7 @@ describe('SchedulerSettingsCard observability', () => {
   it('still shows the directional migration notice when the versioned list probe fails', async () => {
     vi.mocked(scheduledTasksApi.list).mockRejectedValue(new Error('network'));
 
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -416,7 +545,7 @@ describe('SchedulerSettingsCard observability', () => {
       lastError: null,
     });
 
-    render(
+    renderCard(
       <SchedulerSettingsCard
         items={[
           scheduleItem('SCHEDULE_ENABLED', 'false'),

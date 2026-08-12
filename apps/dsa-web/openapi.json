@@ -23675,8 +23675,9 @@
           },
           "process_mode": {
             "enum": [
-              "serve",
+              "serve+schedule",
               "desktop",
+              "cli-schedule",
               "not_attached"
             ],
             "title": "Process Mode",

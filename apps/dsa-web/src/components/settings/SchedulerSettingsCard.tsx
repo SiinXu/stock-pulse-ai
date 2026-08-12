@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
-import { Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Bell, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { scheduledTasksApi } from '../../api/scheduledTasks';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -10,9 +11,11 @@ import type {
   SystemConfigItem,
 } from '../../types/systemConfig';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
+import { buildSettingsHref } from '../../routing/routes';
 import { getUiLocale } from '../../utils/uiLocale';
 import {
   ApiErrorAlert,
+  Badge,
   Button,
   IconButton,
   InlineAlert,
@@ -23,6 +26,12 @@ import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import { SettingsSwitch } from './SettingsSwitch';
 import { getConfigItem } from './settingsConfigItems';
+
+/** Deep link to Settings → Notifications → Channels (report delivery targets). */
+export const SCHEDULER_NOTIFICATIONS_CHANNELS_HREF = buildSettingsHref({
+  section: 'notifications',
+  view: 'channels',
+});
 
 const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 /** Poll interval while this process reports analysis running (run-now / schedule). */
@@ -127,8 +136,11 @@ function formatProcessMode(
   t: (key: UiTextKey, params?: Record<string, string | number>) => string,
 ) {
   const modeKeys: Record<string, UiTextKey> = {
-    serve: 'settings.schedulerProcessModeServe',
+    'serve+schedule': 'settings.schedulerProcessModeServeSchedule',
+    // Legacy API value from pre-#869 servers; same user-facing meaning.
+    serve: 'settings.schedulerProcessModeServeSchedule',
     desktop: 'settings.schedulerProcessModeDesktop',
+    'cli-schedule': 'settings.schedulerProcessModeCliSchedule',
     not_attached: 'settings.schedulerProcessModeNotAttached',
   };
   return processMode && modeKeys[processMode]
@@ -325,6 +337,9 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     : status?.attached === false
       ? t('settings.schedulerNotAttached')
       : t('settings.schedulerAttachmentUnknown');
+  // Only label apply semantics when this process is known attached (hot reconcile path).
+  // Uncertain / not-attached modes are left unlabeled rather than guessed.
+  const showHotReloadBadges = status?.attached === true;
   const lastSkippedDisplay = status?.lastSkippedAt
     ? [
         formatSchedulerTimestamp(status.lastSkippedAt, language, status.scheduleTimezone, t),
@@ -387,7 +402,18 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
           <Surface level="interactive" className="space-y-4 px-4 py-4">
             <div className="flex min-h-11 items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</p>
+                  {showHotReloadBadges ? (
+                    <Badge
+                      variant="default"
+                      size="sm"
+                      data-testid="scheduler-enable-apply-badge"
+                    >
+                      {t('settings.schedulerFieldHotReload')}
+                    </Badge>
+                  ) : null}
+                </div>
                 <p className="text-xs leading-6 text-muted-text">{t('settings.schedulerEnableDescription')}</p>
               </div>
               <SettingsSwitch
@@ -403,9 +429,18 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
             </div>
 
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
                 <Clock className="h-4 w-4" aria-hidden="true" />
                 {t('settings.schedulerTimes')}
+                {showHotReloadBadges ? (
+                  <Badge
+                    variant="default"
+                    size="sm"
+                    data-testid="scheduler-times-apply-badge"
+                  >
+                    {t('settings.schedulerFieldHotReload')}
+                  </Badge>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {scheduleTimes.map((time, index) => (
@@ -595,6 +630,22 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {runNowBlockReasonText}
               </p>
             ) : null}
+            <Surface
+              as="div"
+              level="interactive"
+              className="space-y-1 px-3 py-2"
+              data-testid="scheduler-notifications-link"
+            >
+              <p className="text-xs text-muted-text">{t('settings.schedulerNotificationsLinkHint')}</p>
+              <Link
+                to={SCHEDULER_NOTIFICATIONS_CHANNELS_HREF}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-accent underline-offset-2 hover:underline"
+                data-testid="scheduler-notifications-channels-link"
+              >
+                <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('settings.schedulerNotificationsLink')}
+              </Link>
+            </Surface>
           </Surface>
         </div>
 

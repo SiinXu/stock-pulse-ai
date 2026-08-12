@@ -44,6 +44,39 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _env_flag_enabled(name: str) -> bool:
+    """Return True when the named process env flag is an explicit truthy value."""
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def resolve_scheduler_process_mode(
+    *,
+    owns_schedule: bool,
+    attached: bool,
+    desktop_mode: bool | None = None,
+) -> str:
+    """Return the authoritative four-state process mode for this process.
+
+    Vocabulary (design #869):
+    - ``serve+schedule``: long-lived Web/API process with the legacy day-batch attached
+    - ``desktop``: Desktop process with the legacy day-batch attached
+    - ``cli-schedule``: this process does not own the schedule (CLI ownership handoff)
+    - ``not_attached``: this process could own the schedule but the legacy day-batch is not attached
+      (for example ``--serve-only`` suppress-start)
+
+    Values are derived only from ownership, attachment, and Desktop env — never guessed.
+    """
+    if desktop_mode is None:
+        desktop_mode = _env_flag_enabled(DESKTOP_MODE_ENV)
+    if not owns_schedule:
+        return "cli-schedule"
+    if attached and desktop_mode:
+        return "desktop"
+    if attached:
+        return "serve+schedule"
+    return "not_attached"
+
+
 def _resolve_schedule_timezone(
     configured_name: Optional[str] = None,
 ) -> tuple[tzinfo, str]:
@@ -210,16 +243,11 @@ class RuntimeSchedulerService:
         self._personalized_schedule_enabled = personalized_schedule_enabled
         self._legacy_schedule_enabled = legacy_schedule_enabled
         self._attached = bool(owns_schedule and legacy_schedule_enabled)
-        desktop_mode = os.getenv(DESKTOP_MODE_ENV, "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-        self._process_mode = (
-            "desktop" if desktop_mode and self._attached
-            else "serve" if self._attached
-            else "not_attached"
+        desktop_mode = _env_flag_enabled(DESKTOP_MODE_ENV)
+        self._process_mode = resolve_scheduler_process_mode(
+            owns_schedule=self._owns_schedule,
+            attached=self._attached,
+            desktop_mode=desktop_mode,
         )
         self._schedule_tzinfo, self._schedule_timezone = _resolve_schedule_timezone(
             schedule_timezone,
