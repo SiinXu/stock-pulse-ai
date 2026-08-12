@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Tests] Refresh config registry contract snapshot after BACKTEST cost-model fields (Refs #211, #242, #133).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Added] Professional backtest methodology batch: explicit commission/slippage cost model, look-ahead/survivorship/sample-split disclosures, NaN/±Inf rejection, skill YAML isomorphic metrics via skill-opinion outcomes, and non-promise methodology statements on run/performance reports (Refs #211, #242, #133).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
