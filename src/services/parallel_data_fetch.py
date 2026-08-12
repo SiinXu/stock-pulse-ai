@@ -40,6 +40,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
+
+from src.utils.sanitize import log_safe_exception
 from collections import OrderedDict
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
@@ -256,11 +258,13 @@ def _execute_task(
             if error_code == "parallel_fetch_timeout"
             else FetchBranchStatus.ERROR
         )
-        logger.warning(
-            "Parallel fetch branch '%s' failed (%s): %s",
-            task.key,
-            status.value,
-            message,
+        log_safe_exception(
+            logger,
+            "Parallel fetch branch failed",
+            exc,
+            error_code=error_code,
+            level=logging.WARNING,
+            context={"branch_key": task.key, "status": status.value},
         )
         return FetchBranchResult(
             key=task.key,
