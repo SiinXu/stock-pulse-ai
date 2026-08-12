@@ -140,3 +140,7 @@ python -m pytest \
 
 Revert the Issue #179 PR. There is no database migration and no new required
 configuration key. Historical records without `sentiment_snapshot` remain valid.
+## CI note
+
+Pipeline facade binding requires `SentimentPipelineService` imports on both `src.core.stages.analysis` and `src.core.pipeline` because stage methods are rebound onto those module globals.
+

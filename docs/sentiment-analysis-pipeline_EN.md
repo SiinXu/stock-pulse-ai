@@ -38,3 +38,5 @@ notes (`news_lexicon_v1`), verification commands, and rollback. Source anchors:
 - `src/services/sentiment_pipeline_service.py`
 - `src/services/analysis_context_builder.py` (`sentiment` block)
 - `src/core/stages/analysis_stock.py` / `analysis_agent.py` / `persistence.py`
+
+Facade note: `SentimentPipelineService` is imported on both `src.core.stages.analysis` and `src.core.pipeline` because rebound stage methods use those module globals.
