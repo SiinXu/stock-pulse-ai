@@ -74,6 +74,9 @@ class PipelineAnalysisArtifacts:
     metadata: Dict[str, Any]
     portfolio_context: Optional[Dict[str, Any]] = None
     money_flow_data: Optional[Any] = None
+    # Optional non-authoritative alt-data payload (Issues #139 / #1144).
+    # Default-off: omit or pass None so the pack shape stays unchanged.
+    alternative_data: Optional[Dict[str, Any]] = None
 
 
 class AnalysisContextBuilder:
@@ -110,13 +113,14 @@ class AnalysisContextBuilder:
         data_quality_warnings.extend(
             code for code in evidence_codes if code not in data_quality_warnings
         )
+        # Core quality is computed before optional alt-data so supporting
+        # non-authoritative blocks never change overall_score / block_scores.
         data_quality = _build_data_quality(
             blocks,
             warnings=data_quality_warnings,
             validation_evidence=evidence,
         )
-
-        return AnalysisContextPack(
+        pack = AnalysisContextPack(
             subject=AnalysisSubject(
                 code=artifacts.code,
                 stock_name=artifacts.stock_name or None,
@@ -127,6 +131,13 @@ class AnalysisContextBuilder:
             data_quality=data_quality,
             metadata=metadata,
         )
+        if artifacts.alternative_data is not None:
+            from src.services.alternative_data_governance import (
+                attach_alternative_data_block,
+            )
+
+            pack = attach_alternative_data_block(pack, artifacts.alternative_data)
+        return pack
 
     @staticmethod
     def build_batch(items: Sequence[PipelineAnalysisArtifacts]) -> List[AnalysisContextPack]:
