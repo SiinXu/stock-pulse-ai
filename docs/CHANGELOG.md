@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
+- [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).

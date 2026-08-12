@@ -32,6 +32,27 @@ _LOOKBACK_CALENDAR_FACTOR = 1.7
 _EPS = 1e-12
 
 
+def _finite_number(
+    value: Any,
+    field: str,
+    *,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+) -> float:
+    """Coerce to float and reject NaN / ±Infinity (and optional bounds)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be a finite number") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be a finite number")
+    if minimum is not None and number < minimum:
+        raise ValueError(f"{field} must be >= {minimum}")
+    if maximum is not None and number > maximum:
+        raise ValueError(f"{field} must be <= {maximum}")
+    return number
+
+
 class PortfolioRiskMetricsService:
     """Compute portfolio-level risk metrics from stored data only."""
 
@@ -69,8 +90,12 @@ class PortfolioRiskMetricsService:
                 cost_method=cost_method,
                 include_realtime=False,
             )
-        currency = str(snapshot_payload.get("currency") or "CNY")
-        weights, total_mv, _symbols = self._position_weights(snapshot_payload)
+        currency = str(snapshot_payload.get("currency") or "CNY").upper()
+        weights, total_mv, _symbols, fx_stale = self._position_weights(
+            snapshot_payload,
+            response_currency=currency,
+            as_of_date=as_of_date,
+        )
 
         assumptions = self._build_assumptions(
             confidence=confidence_norm,
@@ -86,6 +111,7 @@ class PortfolioRiskMetricsService:
             "portfolio_value": round(total_mv, 6) if total_mv > _EPS else 0.0,
             "positions_used": len(weights),
             "assumptions": assumptions,
+            "fx_stale": bool(fx_stale or snapshot_payload.get("fx_stale")),
         }
 
         if not weights or total_mv <= _EPS:
@@ -140,6 +166,12 @@ class PortfolioRiskMetricsService:
             observation_count=observation_count,
             min_observations=MIN_RETURN_OBSERVATIONS,
         )
+        if base["fx_stale"] and overall_status == "ok":
+            overall_status = "partial"
+            status_message = (
+                "Risk metrics computed with stale FX conversion into the response "
+                "base currency; treat weights and VaR currency units as partial."
+            )
 
         return {
             **base,
@@ -159,10 +191,7 @@ class PortfolioRiskMetricsService:
 
     @staticmethod
     def _validate_confidence(confidence: float) -> float:
-        try:
-            value = float(confidence)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("confidence must be a number") from exc
+        value = _finite_number(confidence, "confidence", minimum=0.0, maximum=1.0)
         if not (0.5 < value < 1.0):
             raise ValueError("confidence must be strictly between 0.5 and 1.0 (exclusive)")
         return value
@@ -205,9 +234,14 @@ class PortfolioRiskMetricsService:
             "min_return_observations": MIN_RETURN_OBSERVATIONS,
             "min_correlation_observations": MIN_CORRELATION_OBSERVATIONS,
             "return_definition": "simple_close_to_close",
-            "portfolio_aggregation": "static_current_market_value_weights",
+            "portfolio_aggregation": "static_current_response_base_weights",
             "cash_excluded": True,
-            "weight_basis": "market_value_base",
+            "weight_basis": "response_base_market_value",
+            "fx_policy": (
+                "each position market_value_base is converted from account base "
+                "currency into snapshot response currency before weight and VaR "
+                "aggregation; never sum mixed currency units"
+            ),
             "horizon_scaling": (
                 "sqrt_time_iid_assumption" if horizon_days > 1 else "none"
             ),
@@ -224,23 +258,64 @@ class PortfolioRiskMetricsService:
     def _position_weights(
         self,
         snapshot: Mapping[str, Any],
-    ) -> Tuple[Dict[str, float], float, List[str]]:
+        *,
+        response_currency: str,
+        as_of_date: date,
+    ) -> Tuple[Dict[str, float], float, List[str], bool]:
+        """Aggregate position weights in the snapshot response base currency.
+
+        Position ``market_value_base`` is denominated in each account's base
+        currency. Multi-account / multi-currency portfolios must convert into
+        ``response_currency`` before summing — the same contract as stress test.
+        """
         exposure: Dict[str, float] = {}
+        fx_stale = bool(snapshot.get("fx_stale"))
+        response = str(response_currency or "CNY").upper()
+
         for account in snapshot.get("accounts", []) or []:
+            account_currency = str(
+                account.get("base_currency") or response
+            ).upper()
             for pos in account.get("positions", []) or []:
                 symbol = str(pos.get("symbol") or "").strip().upper()
                 if not symbol:
                     continue
-                mv = float(pos.get("market_value_base") or 0.0)
+                source_mv = _finite_number(
+                    pos.get("market_value_base") or 0.0,
+                    f"{symbol}.market_value_base",
+                    minimum=0.0,
+                )
+                if source_mv <= _EPS:
+                    continue
+                conversion = self.portfolio_service.convert_amount_with_provenance(
+                    amount=source_mv,
+                    from_currency=account_currency,
+                    to_currency=response,
+                    as_of_date=as_of_date,
+                )
+                mv = _finite_number(
+                    conversion.get("converted_amount"),
+                    f"{symbol}.market_value_response_base",
+                    minimum=0.0,
+                )
                 if mv <= _EPS:
                     continue
+                fx_stale = fx_stale or bool(conversion.get("is_stale"))
                 exposure[symbol] = exposure.get(symbol, 0.0) + mv
 
         total = sum(exposure.values())
         if total <= _EPS:
-            return {}, 0.0, []
-        weights = {symbol: value / total for symbol, value in sorted(exposure.items())}
-        return weights, total, list(weights.keys())
+            return {}, 0.0, [], fx_stale
+        weights = {
+            symbol: _finite_number(value / total, f"{symbol}.weight", minimum=0.0)
+            for symbol, value in sorted(exposure.items())
+        }
+        return (
+            weights,
+            _finite_number(total, "portfolio_value", minimum=0.0),
+            list(weights.keys()),
+            fx_stale,
+        )
 
     def _load_close_series(
         self,
@@ -267,7 +342,7 @@ class PortfolioRiskMetricsService:
                     close_f = float(close)
                 except (TypeError, ValueError):
                     continue
-                if close_f <= 0:
+                if not math.isfinite(close_f) or close_f <= 0:
                     continue
                 closes[row_date] = close_f
             if closes:
@@ -424,10 +499,16 @@ def historical_var_pct(returns: Sequence[float], confidence: float) -> float:
     """
     if not returns:
         raise ValueError("returns must not be empty")
-    if not (0.5 < confidence < 1.0):
+    confidence_norm = _finite_number(confidence, "confidence", minimum=0.0, maximum=1.0)
+    if not (0.5 < confidence_norm < 1.0):
         raise ValueError("confidence out of range")
-    alpha = (1.0 - confidence) * 100.0
-    quantile = float(np.percentile(np.asarray(returns, dtype=float), alpha, method="linear"))
+    cleaned: List[float] = []
+    for idx, raw in enumerate(returns):
+        cleaned.append(_finite_number(raw, f"returns[{idx}]"))
+    alpha = (1.0 - confidence_norm) * 100.0
+    quantile = float(np.percentile(np.asarray(cleaned, dtype=float), alpha, method="linear"))
+    if not math.isfinite(quantile):
+        raise ValueError("historical VaR quantile must be finite")
     # VaR is the loss magnitude; if the left-tail quantile is already positive
     # (unusual), clamp loss to zero rather than inventing a negative VaR.
     return max(0.0, -quantile)
@@ -458,25 +539,30 @@ def compute_historical_var_block(
             "percentile_used": 1.0 - confidence,
         }
 
+    value = _finite_number(portfolio_value, "portfolio_value", minimum=0.0)
     one_day_var = historical_var_pct(portfolio_returns, confidence)
     if horizon_days > 1:
         # Documented i.i.d. sqrt-time scaling for multi-day horizon (V0).
         scaled = one_day_var * math.sqrt(float(horizon_days))
     else:
         scaled = one_day_var
+    if not math.isfinite(scaled):
+        raise ValueError("scaled VaR must be a finite number")
 
     var_pct_points = scaled * 100.0
-    var_value = scaled * float(portfolio_value)
+    var_value = scaled * value
     return {
         "status": "ok",
         "status_message": "Historical VaR computed from empirical portfolio returns.",
         "confidence": confidence,
         "horizon_days": horizon_days,
-        "var_pct": round(var_pct_points, 6),
-        "var_value": round(var_value, 6),
+        "var_pct": round(_finite_number(var_pct_points, "var_pct", minimum=0.0), 6),
+        "var_value": round(_finite_number(var_value, "var_value", minimum=0.0), 6),
         "observation_count": usable,
         "percentile_used": round(1.0 - confidence, 8),
-        "one_day_var_pct": round(one_day_var * 100.0, 6),
+        "one_day_var_pct": round(
+            _finite_number(one_day_var * 100.0, "one_day_var_pct", minimum=0.0), 6
+        ),
     }
 
 
@@ -503,7 +589,7 @@ def pearson_correlation_matrix(
                 corr = None
             else:
                 corr = float(np.corrcoef(a, b)[0, 1])
-                if math.isnan(corr):
+                if not math.isfinite(corr):
                     corr = None
                 else:
                     corr = round(corr, 8)
