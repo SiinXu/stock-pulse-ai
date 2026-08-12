@@ -2194,7 +2194,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "examples": [
             "MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash",
         ],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "MULTI_MODEL_CONSENSUS_PRESET": {
@@ -2222,7 +2227,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "MULTI_MODEL_CONSENSUS_PRESET=fast",
             "MULTI_MODEL_CONSENSUS_PRESET=quality",
         ],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "MULTI_MODEL_CONSENSUS_MAX_MODELS": {
@@ -2243,7 +2253,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "MULTI_MODEL_CONSENSUS_MAX_MODELS=3",
             "MULTI_MODEL_CONSENSUS_MAX_MODELS=2",
         ],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "MULTI_MODEL_CONSENSUS_MAX_COST_USD": {
@@ -2269,7 +2284,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "examples": [
             "MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05",
         ],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
 
