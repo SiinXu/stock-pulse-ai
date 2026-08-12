@@ -1396,12 +1396,11 @@ def localize_disagreement_resolution(value: Any, language: Optional[str]) -> str
 
 def normalize_disagreement_handling_payload(value: Any) -> Dict[str, Any]:
     """Return a renderer-safe disagreement handling payload, or empty dict."""
-    try:
-        from src.agent.disagreement_handling import public_disagreement_handling_payload
-    except Exception:
-        return {}
+    from src.agent.disagreement_handling import public_disagreement_handling_payload
+
     payload = public_disagreement_handling_payload(value)
     return dict(payload) if isinstance(payload, dict) else {}
+
 
 def normalize_strategy_synthesis_payload(value: Any) -> Dict[str, Any]:
     """Return a renderer-safe copy of a strategy synthesis payload.

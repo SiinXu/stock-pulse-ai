@@ -231,6 +231,12 @@ def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, 
                 f"- {localize_conflict_severity(conflict.get('severity', 'medium'), report_language)}: "
                 f"{localize_strategy_conflict_description(conflict.get('conflict_type'), report_language)}{suffix}"
             )
+    _append_disagreement_handling_block(
+        lines,
+        strategy_synthesis,
+        labels,
+        report_language,
+    )
     lines.append("")
 
 
@@ -666,9 +672,6 @@ class NotificationBuilder:
 def get_notification_service() -> NotificationService:
     """获取通知服务实例"""
     return NotificationService()
-    _append_disagreement_handling_block(lines, strategy_synthesis, labels, report_language)
-
-
 
 def _append_disagreement_handling_block(
     lines: List[str],

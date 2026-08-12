@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from src.agent.disagreement_handling import (
     ESCALATION_SPLIT,
@@ -12,7 +13,8 @@ from src.agent.disagreement_handling import (
     build_disagreement_handling_record,
     public_disagreement_handling_payload,
 )
-from src.agent.protocols import AgentOpinion, StrategyConflict
+from src.agent.orchestrator import AgentOrchestrator
+from src.agent.protocols import AgentContext, AgentOpinion
 from src.agent.skills.engine import StrategyEngine
 from src.agent.skills.defaults import build_skill_agent_name
 from src.report_language import get_report_labels, normalize_disagreement_handling_payload
@@ -137,6 +139,52 @@ def test_cross_validation_dual_layer_elevates_to_split():
     assert updated["final_signal"] == "hold"
 
 
+def test_cross_validation_confidence_penalty_is_idempotent():
+    synthesis = {
+        "final_signal": "buy",
+        "confidence": 0.8,
+        "conflict_severity": "medium",
+        "conflicts": [
+            {
+                "conflict_type": "wide_score_dispersion",
+                "severity": "medium",
+                "participants": ["momentum", "value"],
+            }
+        ],
+        "consensus_level": "medium",
+    }
+    first = apply_disagreement_handling_to_synthesis(synthesis)
+    second = apply_disagreement_handling_to_synthesis(first)
+    assert first["confidence"] == 0.72
+    assert second["confidence"] == first["confidence"]
+    assert second["original_confidence"] == 0.8
+
+
+def test_custom_high_threshold_controls_role_confidence_escalation():
+    role_summary = {
+        "conflict_type": "mixed_directional_signals",
+        "bullish_agents": [{"agent_name": "technical", "confidence": 0.8}],
+        "bearish_agents": [{"agent_name": "intel", "confidence": 0.78}],
+    }
+    record = build_disagreement_handling_record(
+        role_summary=role_summary,
+        high_confidence_threshold=0.9,
+        medium_confidence_threshold=0.55,
+    )
+    assert record["high_disagreement"] is False
+    assert record["escalation"] != ESCALATION_SPLIT
+
+
+def test_non_finite_thresholds_fall_back_deterministically():
+    record = build_disagreement_handling_record(
+        strategy_synthesis={"final_signal": "hold", "conflicts": []},
+        high_confidence_threshold=float("nan"),
+        medium_confidence_threshold=float("inf"),
+    )
+    assert record["policy"]["high_confidence_threshold"] == 0.7
+    assert record["policy"]["medium_confidence_threshold"] == 0.55
+
+
 def test_strategy_engine_applies_handling_when_enabled():
     engine = StrategyEngine(disagreement_handling_enabled=True)
     opinions = [
@@ -167,6 +215,56 @@ def test_strategy_engine_default_off_leaves_synthesis_without_handling_block():
     assert "disagreement_handling" not in synthesis
 
 
+def test_final_dashboard_cannot_restore_direction_after_split_verdict():
+    config = SimpleNamespace(
+        agent_orchestrator_timeout_s=0,
+        agent_risk_override=False,
+        agent_disagreement_handling=True,
+        agent_multi_strategy_deliberation=False,
+    )
+    orchestrator = AgentOrchestrator(MagicMock(), MagicMock(), config=config)
+    synthesis = apply_disagreement_handling_to_synthesis(
+        {
+            "final_signal": "buy",
+            "confidence": 0.8,
+            "conflict_severity": "high",
+            "conflicts": [
+                {
+                    "conflict_type": "directional_opposition",
+                    "severity": "high",
+                    "participants": ["momentum", "value"],
+                    "metadata": {"bullish": ["momentum"], "bearish": ["value"]},
+                }
+            ],
+            "consensus_level": "low",
+        }
+    )
+    ctx = AgentContext(stock_code="600519")
+    ctx.add_opinion(
+        AgentOpinion(
+            agent_name="skill_consensus",
+            signal="hold",
+            confidence=synthesis["confidence"],
+            raw_data={"strategy_synthesis": synthesis},
+        )
+    )
+    ctx.set_data("skill_consensus", {"strategy_synthesis": synthesis})
+
+    dashboard = orchestrator._finalize_dashboard_payload(
+        {
+            "decision_type": "buy",
+            "operation_advice": "buy now",
+            "sentiment_score": 90,
+        },
+        ctx,
+    )
+
+    assert dashboard is not None
+    assert dashboard["decision_type"] == "hold"
+    assert "观望" in str(dashboard["operation_advice"])
+    assert dashboard["sentiment_score"] <= 60
+
+
 def test_public_payload_strips_and_forbids_majority_vote_claim():
     raw = build_disagreement_handling_record(
         strategy_synthesis={
@@ -185,9 +283,11 @@ def test_public_payload_strips_and_forbids_majority_vote_claim():
         }
     )
     raw["policy"]["majority_vote_used"] = True  # adversarial input
+    raw["policy"]["confidence_cap"] = float("nan")
     public = public_disagreement_handling_payload(raw)
     assert public is not None
     assert public["policy"]["majority_vote_used"] is False
+    assert public["policy"]["confidence_cap"] is None
     assert public["high_disagreement"] is True
 
 
@@ -278,7 +378,9 @@ def test_high_disagreement_is_annotated_in_markdown_product():
 
 
 def test_high_disagreement_is_annotated_in_notification_block():
-    from src.notification import _append_disagreement_handling_block
+    from src.analyzer import AnalysisResult
+    from src.config import Config
+    from src.notification import NotificationService
 
     synthesis = apply_disagreement_handling_to_synthesis(
         {
@@ -300,10 +402,24 @@ def test_high_disagreement_is_annotated_in_notification_block():
             "summary_params": {},
         }
     )
-    lines: list[str] = []
     labels = get_report_labels("en")
-    _append_disagreement_handling_block(lines, synthesis, labels, "en")
-    joined = "\n".join(lines)
+    result = AnalysisResult(
+        code="600519",
+        name="Test Stock",
+        sentiment_score=50,
+        trend_prediction="neutral",
+        operation_advice="hold",
+        report_language="en",
+        dashboard={
+            "core_conclusion": {"one_sentence": "Conflicting evidence"},
+            "strategy_synthesis": synthesis,
+        },
+    )
+    with patch(
+        "src.notification.get_config",
+        return_value=Config(stock_list=[], report_renderer_enabled=False),
+    ):
+        joined = NotificationService().generate_dashboard_report([result])
     assert labels["disagreement_high_banner"] in joined
     assert labels["disagreement_no_majority_note"] in joined
     assert normalize_disagreement_handling_payload(synthesis["disagreement_handling"])[

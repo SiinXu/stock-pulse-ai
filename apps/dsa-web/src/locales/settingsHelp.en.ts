@@ -1335,6 +1335,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects agent pipeline specialist scheduling and disagreement explanation fields.'],
     notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
   },
+  'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
+    title: 'Disagreement Handling',
+    summary: 'Record conflicts; split means hold.',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
+    title: 'High Disagreement Threshold',
+    summary: 'Opposing confidence: split',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
+    title: 'Cross-Validation Threshold',
+    summary: 'Level for role/strategy cross-check.',
+  },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: 'Investment Committee Mode',
     summary: 'Run multi-role investment committee style analysis with structured dissent.',

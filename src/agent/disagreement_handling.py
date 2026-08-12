@@ -10,7 +10,8 @@ Product honesty rules:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+import math
+from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Optional
 
 from src.agent.protocols import strategy_signal_score
@@ -63,6 +64,7 @@ def build_disagreement_handling_record(
         role_summary=role_summary,
         strategy_synthesis=strategy_synthesis,
         strategy_conflicts=strategy_conflicts,
+        high_threshold=high_threshold,
     )
     role_conflict = _role_layer_conflict(role_summary)
     strategy_conflict = _strategy_layer_conflict(
@@ -206,10 +208,18 @@ def apply_disagreement_handling_to_synthesis(
         payload["disagreement_handling"] = record
         payload = _regroup_for_hold(payload)
     elif escalation == ESCALATION_CROSS_VALIDATE:
+        original = payload.get("original_confidence")
+        if not isinstance(original, (int, float)) or isinstance(original, bool):
+            original = payload.get("confidence")
         try:
-            confidence = float(payload.get("confidence") or 0.0)
+            confidence = float(original if original is not None else 0.0)
         except (TypeError, ValueError):
             confidence = 0.0
+        if not math.isfinite(confidence):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        if "original_confidence" not in payload:
+            payload["original_confidence"] = round(confidence, 4)
         payload["confidence"] = round(
             max(0.0, min(1.0, confidence * _CROSS_VALIDATE_CONFIDENCE_FACTOR)),
             4,
@@ -331,13 +341,15 @@ def public_disagreement_handling_payload(value: Any) -> Optional[Dict[str, Any]]
             "majority_vote_used": False,
             "pre_escalation_final_signal": policy.get("pre_escalation_final_signal"),
             "applied_final_signal": policy.get("applied_final_signal"),
-            "confidence_cap": policy.get("confidence_cap"),
+            "confidence_cap": _optional_unit_float(policy.get("confidence_cap")),
         },
         "explanation_key": str(value.get("explanation_key") or ""),
     }
 
 
-def _collect_points(*, role_summary, strategy_synthesis, strategy_conflicts):
+def _collect_points(
+    *, role_summary, strategy_synthesis, strategy_conflicts, high_threshold
+):
     points: List[Dict[str, Any]] = []
     if isinstance(role_summary, Mapping):
         conflict_type = str(role_summary.get("conflict_type") or "").strip()
@@ -348,11 +360,11 @@ def _collect_points(*, role_summary, strategy_synthesis, strategy_conflicts):
             bullish = _agent_names(role_summary.get("bullish_agents"))
             bearish = _agent_names(role_summary.get("bearish_agents"))
             neutral = _agent_names(role_summary.get("neutral_agents"))
-            severity = "high" if conflict_type in _ROLE_MIXED_TYPES else "medium"
+            severity = "medium"
             if conflict_type in _ROLE_MIXED_TYPES:
                 max_bull = _max_confidence(role_summary.get("bullish_agents"))
                 max_bear = _max_confidence(role_summary.get("bearish_agents"))
-                if max_bull >= _DEFAULT_HIGH_CONFIDENCE and max_bear >= _DEFAULT_HIGH_CONFIDENCE:
+                if max_bull >= high_threshold and max_bear >= high_threshold:
                     severity = "high"
             points.append({
                 "source": "role",
@@ -633,6 +645,8 @@ def _clamp_unit(value, default):
         number = float(value)
     except (TypeError, ValueError):
         return default
+    if not math.isfinite(number):
+        return default
     return max(0.0, min(1.0, number))
 
 
@@ -640,9 +654,24 @@ def _safe_float(value, default=0.0):
     try:
         if value is None or isinstance(value, bool):
             return default
-        return round(max(0.0, min(1.0, float(value))), 4)
+        number = float(value)
     except (TypeError, ValueError):
         return default
+    if not math.isfinite(number):
+        return default
+    return round(max(0.0, min(1.0, number)), 4)
+
+
+def _optional_unit_float(value):
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return round(max(0.0, min(1.0, number)), 4)
 
 
 __all__ = [

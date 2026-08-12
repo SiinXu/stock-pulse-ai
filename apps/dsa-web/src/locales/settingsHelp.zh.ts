@@ -1376,6 +1376,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 流水线的专家调度与分歧说明字段。'],
     notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
   },
+  'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
+    title: '结构化分歧处理',
+    summary: '记录角色与策略冲突，并把未收敛的分裂裁决强制降为保守观望。',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
+    title: '高分歧置信度阈值',
+    summary: '对立角色观点触发分裂裁决所需的置信度。',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
+    title: '交叉校验置信度阈值',
+    summary: '请求角色层与策略层确定性交叉校验的分歧阈值。',
+  },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',
     summary: '在聚合时根据样本充足的后验桶应用保守贝叶斯权重。',
