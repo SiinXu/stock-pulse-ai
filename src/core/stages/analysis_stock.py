@@ -1002,7 +1002,7 @@ class _StockAnalysisStageMixin:
                 quote = self.fetcher_manager.get_realtime_quote(
                     code, log_final_failure=False
                 )
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - Realtime failure is safely logged before historical-price fallback.
                 log_safe_exception(
                     logger,
                     "Realtime quote retrieval failed; using historical close data",
@@ -1038,7 +1038,7 @@ class _StockAnalysisStageMixin:
         def _pull_chip():
             try:
                 chip = self.fetcher_manager.get_chip_distribution(code)
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - Chip-data failure is safely logged before optional-input degradation.
                 log_safe_exception(
                     logger,
                     "Chip distribution retrieval failed",
@@ -1069,7 +1069,7 @@ class _StockAnalysisStageMixin:
                 return None
             try:
                 money_flow = self.fetcher_manager.get_money_flow(code)
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - money-flow is optional and must not block analysis.
                 log_safe_exception(
                     logger,
                     "SmartMoney money flow retrieval failed",
@@ -1114,7 +1114,7 @@ class _StockAnalysisStageMixin:
                     code,
                     rejection,
                 )
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - Fundamental failure is safely logged before a failed-context fallback is built.
                 log_safe_exception(
                     logger,
                     "Fundamental data aggregation failed",
