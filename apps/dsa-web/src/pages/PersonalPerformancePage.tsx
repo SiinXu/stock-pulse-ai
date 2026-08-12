@@ -100,17 +100,23 @@ const PersonalPerformancePage: React.FC = () => {
   }, []);
 
   const onAccountChange = async (nextId: number) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setAccountId(nextId);
     setRefreshing(true);
     setError(null);
     try {
       const quality = await portfolioApi.getPaperDecisionQuality(nextId, { limit: 50 });
+      if (requestIdRef.current !== requestId) return;
       setReport(quality);
     } catch (cause) {
+      if (requestIdRef.current !== requestId) return;
       setReport(null);
       setError(getParsedApiError(cause));
     } finally {
-      setRefreshing(false);
+      if (requestIdRef.current === requestId) {
+        setRefreshing(false);
+      }
     }
   };
 
@@ -183,7 +189,7 @@ const PersonalPerformancePage: React.FC = () => {
             </label>
             <select
               id="paper-account-select"
-              className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+              className="min-h-11 rounded-md border border-border bg-background px-2 py-1 text-sm"
               value={accountId ?? ''}
               onChange={(event) => {
                 const next = Number(event.target.value);
@@ -213,7 +219,10 @@ const PersonalPerformancePage: React.FC = () => {
                   {aggregateScore == null ? '—' : aggregateScore.toFixed(1)}
                 </div>
                 <div className="text-sm text-secondary-text">
-                  {formatUiText(text.sampleSize, { count: report.sampleSize })}
+                  {formatUiText(text.sampleSize, {
+                    count: report.sampleSize,
+                    total: report.totalTradeCount,
+                  })}
                 </div>
                 <div className="grid gap-2 sm:grid-cols-3">
                   {([

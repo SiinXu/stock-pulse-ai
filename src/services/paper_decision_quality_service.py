@@ -99,9 +99,16 @@ class PaperDecisionQualityService:
         signal_repo: Optional[DecisionSignalRepository] = None,
         config: Optional[Config] = None,
     ) -> None:
-        self.portfolio = portfolio_service or PortfolioService()
+        self._portfolio = portfolio_service
         self._signal_repo = signal_repo
         self._config = config
+
+    @property
+    def portfolio(self) -> PortfolioService:
+        """Create the persistence-backed portfolio dependency only when needed."""
+        if self._portfolio is None:
+            self._portfolio = PortfolioService()
+        return self._portfolio
 
     @property
     def signal_repo(self) -> DecisionSignalRepository:
@@ -126,15 +133,21 @@ class PaperDecisionQualityService:
         ignored = sorted(key for key in context.keys() if key in IGNORED_RETURN_FIELDS)
         side = _normalize_side(context.get("side"))
         linked = _as_mapping(context.get("linked_signal"))
-        position_weight_pct = _optional_finite(context.get("position_weight_pct"))
-        notional_pct = _optional_finite(context.get("notional_pct_of_equity"))
-        concentration_alert_pct = _optional_finite(
-            context.get("concentration_alert_pct")
+        position_weight_pct = _optional_nonnegative_finite(
+            context.get("position_weight_pct")
         )
-        if concentration_alert_pct is None:
-            concentration_alert_pct = float(
-                getattr(self.config, "portfolio_risk_concentration_alert_pct", 35.0)
-            )
+        notional_pct = _optional_nonnegative_finite(
+            context.get("notional_pct_of_equity")
+        )
+        configured_threshold = getattr(
+            self.config,
+            "portfolio_risk_concentration_alert_pct",
+            35.0,
+        )
+        concentration_alert_pct = _positive_percent(
+            context.get("concentration_alert_pct", configured_threshold),
+            default=_positive_percent(configured_threshold, default=35.0),
+        )
 
         analysis = _score_analysis_support(linked_signal=linked, side=side)
         risk_gate = _score_risk_gate_compliance(linked_signal=linked, side=side)
@@ -190,6 +203,8 @@ class PaperDecisionQualityService:
         if date_from is not None and date_to is not None and date_from > date_to:
             raise ValueError("date_from must be <= date_to")
 
+        if isinstance(account_id, bool) or int(account_id) <= 0:
+            raise ValueError("account_id must be a positive integer")
         self._require_active_paper_account(int(account_id))
 
         safe_limit = max(1, min(int(limit), 200))
@@ -201,14 +216,23 @@ class PaperDecisionQualityService:
             page_size=safe_limit,
         )
         trades = list(trade_page.get("items") or [])
+        total_trade_count = max(
+            len(trades),
+            int(trade_page.get("total") or 0),
+        )
 
         as_of = date_to or date.today()
-        concentration_alert_pct = float(
-            getattr(self.config, "portfolio_risk_concentration_alert_pct", 35.0)
+        concentration_alert_pct = _positive_percent(
+            getattr(
+                self.config,
+                "portfolio_risk_concentration_alert_pct",
+                35.0,
+            ),
+            default=35.0,
         )
         # Equity is resolved per trade date so historical size discipline is
         # path-reproducible (not skewed by later deposits/trades).
-        equity_by_date: Dict[date, float] = {}
+        snapshot_by_date: Dict[date, Optional[Mapping[str, Any]]] = {}
 
         items: List[Dict[str, Any]] = []
         for trade in trades:
@@ -216,7 +240,7 @@ class PaperDecisionQualityService:
                 self._score_trade_row(
                     account_id=int(account_id),
                     trade=trade,
-                    equity_by_date=equity_by_date,
+                    snapshot_by_date=snapshot_by_date,
                     concentration_alert_pct=concentration_alert_pct,
                 )
             )
@@ -231,6 +255,8 @@ class PaperDecisionQualityService:
             "date_from": date_from.isoformat() if date_from else None,
             "date_to": date_to.isoformat() if date_to else None,
             "sample_size": len(items),
+            "total_trade_count": total_trade_count,
+            "truncated": total_trade_count > len(items),
             "aggregate": _aggregate_items(items),
             "items": items,
             "division_of_labor": {
@@ -257,20 +283,26 @@ class PaperDecisionQualityService:
                 f"Account {account_id} is not a paper trading account"
             )
 
-    def _equity_as_of(self, *, account_id: int, as_of: date) -> float:
-        snapshot = self.portfolio.get_portfolio_snapshot(
+    def _account_snapshot_as_of(
+        self,
+        *,
+        account_id: int,
+        as_of: date,
+    ) -> Optional[Mapping[str, Any]]:
+        """Replay without materializing derived rows and return the exact account."""
+        snapshot = self.portfolio.preview_portfolio_snapshot(
             account_id=int(account_id),
             as_of=as_of,
             include_realtime=False,
         )
-        return _equity_for_account(snapshot, account_id=int(account_id))
+        return _account_snapshot(snapshot, account_id=int(account_id))
 
     def _score_trade_row(
         self,
         *,
         account_id: int,
         trade: Mapping[str, Any],
-        equity_by_date: Dict[date, float],
+        snapshot_by_date: Dict[date, Optional[Mapping[str, Any]]],
         concentration_alert_pct: float,
     ) -> Dict[str, Any]:
         symbol = str(trade.get("symbol") or "")
@@ -283,20 +315,32 @@ class PaperDecisionQualityService:
         notional_pct: Optional[float] = None
         equity_as_of: Optional[float] = None
         equity_basis = "unavailable"
+        position_weight_pct: Optional[float] = None
+        position_basis = "unavailable"
         if trade_date is not None:
-            if trade_date not in equity_by_date:
-                equity_by_date[trade_date] = self._equity_as_of(
+            if trade_date not in snapshot_by_date:
+                snapshot_by_date[trade_date] = self._account_snapshot_as_of(
                     account_id=account_id, as_of=trade_date
                 )
-            equity_as_of = equity_by_date[trade_date]
+            account_snapshot = snapshot_by_date[trade_date]
+            equity_as_of = _equity_from_account_snapshot(account_snapshot)
             if equity_as_of is not None and equity_as_of > 0:
                 notional_pct = notional / equity_as_of * 100.0
                 equity_basis = "trade_date_snapshot"
+                position_weight_pct = _position_weight_for_symbol(
+                    account_snapshot,
+                    symbol=symbol,
+                    market=_optional_str(trade.get("market")),
+                    equity=equity_as_of,
+                )
+                if position_weight_pct is not None:
+                    position_basis = "trade_date_position"
 
         linkage = self._find_supporting_signal(
             symbol=symbol,
             market=_optional_str(trade.get("market")),
             trade_date=trade_date,
+            trade_created_at=_parse_datetime(trade.get("created_at")),
             side=side,
         )
         linked_record = linkage.get("signal")
@@ -307,8 +351,10 @@ class PaperDecisionQualityService:
             "symbol": symbol,
             "trade_date": trade_date.isoformat() if trade_date else None,
             "linked_signal": linked,
-            "notional_pct_of_equity": notional_pct,
-            "position_weight_pct": notional_pct,
+            # Never substitute one trade's notional for missing resulting-position
+            # evidence. The real notional percentage is retained below as evidence.
+            "notional_pct_of_equity": None,
+            "position_weight_pct": position_weight_pct,
             "concentration_alert_pct": concentration_alert_pct,
         }
         scored = self.score_decision(context)
@@ -317,11 +363,14 @@ class PaperDecisionQualityService:
             {
                 "equity_as_of": equity_as_of,
                 "equity_basis": equity_basis,
+                "position_basis": position_basis,
+                "notional_pct_of_equity": notional_pct,
                 "signal_candidate_count": int(linkage.get("candidate_count") or 0),
                 "signal_linkage_ambiguous": bool(
                     linkage.get("linkage_ambiguous")
                 ),
                 "signal_pool": linkage.get("pool") or "none",
+                "signal_linkage_status": linkage.get("status") or "none",
             }
         )
         return {
@@ -348,6 +397,7 @@ class PaperDecisionQualityService:
         symbol: str,
         market: Optional[str],
         trade_date: Optional[date],
+        trade_created_at: Optional[datetime],
         side: str,
     ) -> Dict[str, Any]:
         empty = {
@@ -355,11 +405,14 @@ class PaperDecisionQualityService:
             "candidate_count": 0,
             "linkage_ambiguous": False,
             "pool": "none",
+            "status": "none",
         }
         if not symbol or trade_date is None:
             return empty
         codes = _signal_lookup_codes(symbol, market=market)
         created_to = datetime.combine(trade_date, time(23, 59, 59))
+        if trade_created_at is not None and trade_created_at.date() == trade_date:
+            created_to = min(created_to, trade_created_at)
         created_from = datetime.combine(
             trade_date - timedelta(days=SIGNAL_LOOKBACK_DAYS),
             time.min,
@@ -398,11 +451,16 @@ class PaperDecisionQualityService:
             )
 
         pool.sort(key=sort_key, reverse=True)
+        ambiguous = len(pool) > 1
         return {
-            "signal": pool[0],
+            # A heuristic cannot honestly identify one supporting decision when
+            # multiple equally eligible records remain. Preserve the ambiguity
+            # as evidence and score signal-dependent dimensions as unsupported.
+            "signal": None if ambiguous else pool[0],
             "candidate_count": len(pool),
-            "linkage_ambiguous": len(pool) > 1,
+            "linkage_ambiguous": ambiguous,
             "pool": pool_name,
+            "status": "ambiguous" if ambiguous else "unique_inferred",
         }
 
 
@@ -763,11 +821,13 @@ def _score_position_discipline(
         )
 
     if side == "sell":
-        score = max(score, 70.0)
         reasons.append(
             {
-                "code": "sell_reduces_exposure",
-                "message": "Sell actions are treated as exposure-reducing for size discipline.",
+                "code": "sell_resulting_exposure_evaluated",
+                "message": (
+                    "Sell position discipline is based on the resulting exposure; "
+                    "a sell is not automatically treated as disciplined."
+                ),
             }
         )
 
@@ -906,13 +966,13 @@ def _signal_record_to_context(row: DecisionSignalRecord) -> Dict[str, Any]:
         raw_evidence = getattr(row, "evidence_json", None)
         if raw_evidence:
             evidence = json.loads(raw_evidence)
-    except Exception:  # broad-exception: fallback_recorded - optional evidence parse
+    except (TypeError, json.JSONDecodeError):
         evidence = None
     try:
         raw_dq = getattr(row, "data_quality_summary_json", None)
         if raw_dq:
             data_quality_summary = json.loads(raw_dq)
-    except Exception:  # broad-exception: fallback_recorded - optional quality parse
+    except (TypeError, json.JSONDecodeError):
         data_quality_summary = None
 
     return {
@@ -933,14 +993,63 @@ def _signal_record_to_context(row: DecisionSignalRecord) -> Dict[str, Any]:
     }
 
 
-def _equity_for_account(snapshot: Mapping[str, Any], *, account_id: int) -> float:
+def _account_snapshot(
+    snapshot: Mapping[str, Any],
+    *,
+    account_id: int,
+) -> Optional[Mapping[str, Any]]:
     for entry in snapshot.get("accounts") or []:
-        if int(entry.get("account_id", -1)) == int(account_id):
-            equity = _optional_finite(entry.get("total_equity"))
-            if equity is not None and equity > 0:
-                return equity
-    equity = _optional_finite(snapshot.get("total_equity"))
-    return equity if equity is not None and equity > 0 else 0.0
+        if not isinstance(entry, Mapping):
+            continue
+        try:
+            matches = int(entry.get("account_id", -1)) == int(account_id)
+        except (TypeError, ValueError):
+            matches = False
+        if matches:
+            return entry
+    return None
+
+
+def _equity_from_account_snapshot(
+    account_snapshot: Optional[Mapping[str, Any]],
+) -> Optional[float]:
+    if not account_snapshot:
+        return None
+    equity = _optional_finite(account_snapshot.get("total_equity"))
+    return equity if equity is not None and equity > 0 else None
+
+
+def _position_weight_for_symbol(
+    account_snapshot: Optional[Mapping[str, Any]],
+    *,
+    symbol: str,
+    market: Optional[str],
+    equity: float,
+) -> Optional[float]:
+    if not account_snapshot or equity <= 0:
+        return None
+    target = canonical_stock_code(symbol)
+    if not target:
+        return None
+    market_key = (market or "").strip().lower()
+    positions = account_snapshot.get("positions")
+    if not isinstance(positions, list):
+        return None
+    for position in positions:
+        if not isinstance(position, Mapping):
+            continue
+        position_symbol = canonical_stock_code(str(position.get("symbol") or ""))
+        position_market = str(position.get("market") or "").strip().lower()
+        if position_symbol != target or (market_key and position_market != market_key):
+            continue
+        if position.get("price_available") is False:
+            return None
+        market_value = _optional_finite(position.get("market_value_base"))
+        if market_value is None or market_value < 0:
+            return None
+        return market_value / equity * 100.0
+    # A fully exited position is a real zero exposure, not missing evidence.
+    return 0.0
 
 
 def _normalize_side(value: Any) -> str:
@@ -958,13 +1067,20 @@ def _optional_str(value: Any) -> Optional[str]:
 
 
 def _optional_finite(value: Any) -> Optional[float]:
-    if value is None or value == "":
+    if value is None or isinstance(value, bool) or value == "":
         return None
     try:
         number = float(value)
     except (TypeError, ValueError):
         return None
     if not math.isfinite(number):
+        return None
+    return number
+
+
+def _optional_nonnegative_finite(value: Any) -> Optional[float]:
+    number = _optional_finite(value)
+    if number is None or number < 0.0:
         return None
     return number
 
@@ -980,9 +1096,31 @@ def _parse_date(value: Any) -> Optional[date]:
     if not text:
         return None
     try:
-        return date.fromisoformat(text[:10])
+        return date.fromisoformat(text)
     except ValueError:
         return None
+
+
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    # Repository timestamps are naive local datetimes. Normalize an aware API
+    # timestamp only for a safe ordering comparison against those rows.
+    return parsed.replace(tzinfo=None)
+
+
+def _positive_percent(value: Any, *, default: float) -> float:
+    number = _optional_finite(value)
+    if number is None or number <= 0.0 or number > 100.0:
+        return float(default)
+    return number
 
 
 def _as_mapping(value: Any) -> Optional[Dict[str, Any]]:
@@ -992,6 +1130,8 @@ def _as_mapping(value: Any) -> Optional[Dict[str, Any]]:
 
 
 def _clamp(score: float) -> float:
+    if not math.isfinite(score):
+        return 0.0
     if score < 0.0:
         return 0.0
     if score > 100.0:

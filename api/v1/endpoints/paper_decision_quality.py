@@ -7,7 +7,7 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 
 from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
@@ -42,7 +42,7 @@ router = APIRouter()
     operation_id="getPaperDecisionQuality",
 )
 def get_paper_decision_quality(
-    account_id: int,
+    account_id: int = Path(..., ge=1, description="Paper account ID"),
     date_from: Optional[date] = Query(None, description="Optional trade date from"),
     date_to: Optional[date] = Query(None, description="Optional trade date to"),
     limit: int = Query(50, ge=1, le=200, description="Max trades to score"),

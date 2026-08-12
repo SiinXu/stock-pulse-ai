@@ -31,7 +31,7 @@ Both may appear under a personal performance view. This API never redefines outc
 - Score range: 0–100
 - Every dimension emits machine `code` + human-readable `message` reasons
 - Evidence block records linked signal id/action, size inputs, equity basis, signal candidate count / ambiguity, and any ignored return field names present on the input
-- **Position size uses equity as of the trade date** (portfolio snapshot replay through that date), not the account’s latest equity. Evidence fields: `equity_basis=trade_date_snapshot`, `equity_as_of`
+- **Position discipline uses the resulting same-symbol position weight from a read-only trade-date snapshot**, not just the current trade notional and not the account’s latest equity. Evidence fields include `equity_basis=trade_date_snapshot`, `position_basis=trade_date_position`, and `equity_as_of`.
 
 ## API
 
@@ -44,9 +44,11 @@ Query:
 - `date_from` / `date_to` (optional trade date filters)
 - `limit` (1–200, default 50)
 
+The response distinguishes the scored page (`sample_size`) from all matching trades (`total_trade_count`) and sets `truncated=true` when `limit` omits trades. Account aggregation therefore describes only the disclosed scored sample.
+
 Requires a **paper** account (`account_type=paper` via the #370 sidecar). Real accounts return `400 paper_account_required`.
 
-Signal linkage: DecisionSignals for the same stock code with `created_at` within 7 calendar days before the trade date (inclusive). Prefer action-aligned, analysis-sourced, higher `plan_quality`, then newest. When more than one candidate remains, the top-ranked signal is used and evidence sets `signal_linkage_ambiguous=true` with `signal_candidate_count`.
+Signal linkage: DecisionSignals for the same stock code with `created_at` within 7 calendar days before the trade date (inclusive). For a trade recorded on that same day, the trade creation time is the strict upper bound, so a later signal cannot justify an earlier trade. Action-aligned candidates are preferred. When more than one eligible candidate remains, no signal is fabricated: signal-dependent dimensions are unsupported and evidence sets `signal_linkage_status=ambiguous`, `signal_linkage_ambiguous=true`, and `signal_candidate_count`.
 
 ## Service entry points
 

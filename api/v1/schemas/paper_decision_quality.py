@@ -73,6 +73,8 @@ class PaperDecisionQualityResponse(BaseModel):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     sample_size: int
+    total_trade_count: int
+    truncated: bool
     aggregate: PaperDecisionQualityAggregate
     items: List[PaperDecisionQualityItem] = Field(default_factory=list)
     division_of_labor: PaperDecisionQualityDivisionOfLabor

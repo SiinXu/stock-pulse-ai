@@ -94,6 +94,8 @@ const paperDecisionQualityResponseSchema = z.object({
   accountType: z.literal('paper'),
   asOf: z.string(),
   sampleSize: z.number(),
+  totalTradeCount: z.number(),
+  truncated: z.boolean(),
   aggregate: z.object({
     sampleSize: z.number(),
     processScore: z.number().nullable().optional(),

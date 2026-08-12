@@ -16006,6 +16006,14 @@
             "default": "process",
             "title": "Score Kind",
             "type": "string"
+          },
+          "total_trade_count": {
+            "title": "Total Trade Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
           }
         },
         "required": [
@@ -16014,6 +16022,8 @@
           "account_id",
           "as_of",
           "sample_size",
+          "total_trade_count",
+          "truncated",
           "aggregate",
           "division_of_labor"
         ],
@@ -42525,10 +42535,13 @@
         "operationId": "getPaperDecisionQuality",
         "parameters": [
           {
+            "description": "Paper account ID",
             "in": "path",
             "name": "account_id",
             "required": true,
             "schema": {
+              "description": "Paper account ID",
+              "minimum": 1,
               "title": "Account Id",
               "type": "integer"
             }

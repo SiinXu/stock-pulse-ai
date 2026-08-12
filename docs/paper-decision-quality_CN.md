@@ -27,10 +27,11 @@ English: [paper-decision-quality.md](paper-decision-quality.md)
 
 - `formula_version`: `paper-decision-quality-v2`
 - 权重：分析 0.40、风险门 0.35、仓位 0.25
-- **仓位占比按成交日权益**（回放到该日的组合快照），不用当前权益
-- 信号关联：同代码 7 日内优先动作对齐；多候选时 `signal_linkage_ambiguous=true`
+- **仓位纪律使用只读成交日快照中的同标的最终仓位占比**，而不是只看本笔成交名义金额，也不用当前权益；证据包含 `equity_basis=trade_date_snapshot` 与 `position_basis=trade_date_position`
+- 信号关联：同代码 7 日内优先动作对齐；同日记录的成交以成交创建时间为严格上限，禁止用事后信号解释成交；多候选时不伪选信号，信号相关维度不计分，并标记 `signal_linkage_status=ambiguous`
 - 端点：`GET /api/v1/portfolio/accounts/{account_id}/paper-decision-quality`
 - 仅 `paper` 账户；真实账户返回 `400 paper_account_required`；账户不存在返回 `404 account_not_found`
+- 返回值用 `sample_size` 表示本次已评分数量、`total_trade_count` 表示全部匹配成交；当 `limit` 截断结果时 `truncated=true`，账户聚合分仅代表已明确披露的样本
 
 ## 非目标
 

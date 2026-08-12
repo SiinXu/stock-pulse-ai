@@ -13,6 +13,8 @@ from __future__ import annotations
 import os
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -144,6 +146,29 @@ def test_poor_data_quality_large_size_penalizes_position_discipline() -> None:
     assert position["score"] < 70.0
     assert any(
         reason["code"] == "size_not_reduced_for_gaps" for reason in position["reasons"]
+    )
+
+
+def test_negative_size_is_unavailable_and_sell_is_not_automatically_disciplined() -> None:
+    invalid = _disciplined_buy()
+    invalid["position_weight_pct"] = -1
+    invalid["notional_pct_of_equity"] = -2
+    invalid_position = score_paper_decision_context(invalid)["dimensions"][
+        "position_discipline"
+    ]
+    assert invalid_position["status"] == "unavailable"
+    assert invalid_position["score"] is None
+
+    concentrated_sell = _disciplined_buy()
+    concentrated_sell["side"] = "sell"
+    concentrated_sell["position_weight_pct"] = 80.0
+    sell_position = score_paper_decision_context(concentrated_sell)["dimensions"][
+        "position_discipline"
+    ]
+    assert sell_position["score"] < 20.0
+    assert any(
+        reason["code"] == "sell_resulting_exposure_evaluated"
+        for reason in sell_position["reasons"]
     )
 
 
@@ -308,6 +333,8 @@ def test_score_paper_account_links_signal_and_uses_trade_date_equity(
     assert item["evidence"]["equity_basis"] == "trade_date_snapshot"
     assert item["evidence"]["equity_as_of"] is not None
     assert item["evidence"]["equity_as_of"] > 0
+    assert item["evidence"]["position_weight_pct"] == pytest.approx(10.0)
+    assert item["evidence"]["position_basis"] == "trade_date_position"
     assert item["evidence"]["signal_candidate_count"] >= 1
     assert item["evidence"]["ignored_return_fields"] == []
 
@@ -340,7 +367,192 @@ def test_score_paper_account_marks_ambiguous_signal_linkage(isolated_db) -> None
     evidence = report["items"][0]["evidence"]
     assert evidence["signal_candidate_count"] >= 2
     assert evidence["signal_linkage_ambiguous"] is True
-    assert evidence["linked_signal_id"] is not None
+    assert evidence["signal_linkage_status"] == "ambiguous"
+    assert evidence["linked_signal_id"] is None
+    item = report["items"][0]
+    assert item["linked_signal_id"] is None
+    assert item["dimensions"]["analysis_support"]["score"] == 0.0
+
+
+def test_position_discipline_uses_resulting_position_not_small_trade_notional(
+    isolated_db,
+) -> None:
+    service = _portfolio_service()
+    paper = PaperPortfolioService(service)
+    account = _create_account(service, account_type="paper")
+    _add_close(isolated_db, close=100.0)
+    paper.record_paper_trade(
+        account_id=account["id"],
+        symbol="600519",
+        trade_date=_AS_OF,
+        side="buy",
+        quantity=800,
+        price=100.0,
+    )
+    small_add = paper.record_paper_trade(
+        account_id=account["id"],
+        symbol="600519",
+        trade_date=_AS_OF,
+        side="buy",
+        quantity=10,
+        price=100.0,
+    )
+
+    report = PaperDecisionQualityService(portfolio_service=service).score_paper_account(
+        account_id=account["id"]
+    )
+    item = next(row for row in report["items"] if row["trade_id"] == small_add["id"])
+    assert item["evidence"]["notional_pct_of_equity"] == pytest.approx(1.0)
+    assert item["evidence"]["position_weight_pct"] == pytest.approx(81.0)
+    assert item["dimensions"]["position_discipline"]["score"] <= 20.0
+
+
+def test_account_scoring_is_read_only_and_discloses_truncation() -> None:
+    portfolio = MagicMock()
+    portfolio.repo.get_account.return_value = {"id": 7}
+    portfolio.kind_repo.get.return_value = SimpleNamespace(account_type="paper")
+    portfolio.list_trade_events.return_value = {
+        "total": 3,
+        "items": [
+            {
+                "id": 1,
+                "symbol": "600519",
+                "market": "cn",
+                "side": "buy",
+                "trade_date": _AS_OF.isoformat(),
+                "quantity": 1,
+                "price": 100.0,
+            }
+        ],
+    }
+    portfolio.preview_portfolio_snapshot.return_value = {
+        "total_equity": 999999.0,
+        "accounts": [
+            {
+                "account_id": 7,
+                "total_equity": 100_000.0,
+                "positions": [
+                    {
+                        "symbol": "600519",
+                        "market": "cn",
+                        "market_value_base": 100.0,
+                        "price_available": True,
+                    }
+                ],
+            }
+        ],
+    }
+    signal_repo = MagicMock()
+    signal_repo.list.return_value = ([], 0)
+
+    report = PaperDecisionQualityService(
+        portfolio_service=portfolio,
+        signal_repo=signal_repo,
+        config=SimpleNamespace(portfolio_risk_concentration_alert_pct=35.0),
+    ).score_paper_account(account_id=7, limit=1)
+
+    assert report["sample_size"] == 1
+    assert report["total_trade_count"] == 3
+    assert report["truncated"] is True
+    assert report["items"][0]["evidence"]["equity_as_of"] == 100_000.0
+    portfolio.preview_portfolio_snapshot.assert_called_once()
+    portfolio.get_portfolio_snapshot.assert_not_called()
+
+
+def test_missing_position_valuation_does_not_fabricate_discipline_from_notional() -> None:
+    portfolio = MagicMock()
+    portfolio.repo.get_account.return_value = {"id": 7}
+    portfolio.kind_repo.get.return_value = SimpleNamespace(account_type="paper")
+    portfolio.list_trade_events.return_value = {
+        "total": 1,
+        "items": [
+            {
+                "id": 1,
+                "symbol": "600519",
+                "market": "cn",
+                "side": "buy",
+                "trade_date": _AS_OF.isoformat(),
+                "quantity": 1,
+                "price": 100.0,
+            }
+        ],
+    }
+    portfolio.preview_portfolio_snapshot.return_value = {
+        "accounts": [
+            {
+                "account_id": 7,
+                "total_equity": 100_000.0,
+                "positions": [
+                    {
+                        "symbol": "600519",
+                        "market": "cn",
+                        "market_value_base": 0.0,
+                        "price_available": False,
+                    }
+                ],
+            }
+        ]
+    }
+    signal_repo = MagicMock()
+    signal_repo.list.return_value = ([], 0)
+
+    item = PaperDecisionQualityService(
+        portfolio_service=portfolio,
+        signal_repo=signal_repo,
+        config=SimpleNamespace(portfolio_risk_concentration_alert_pct=35.0),
+    ).score_paper_account(account_id=7)["items"][0]
+
+    assert item["evidence"]["notional_pct_of_equity"] == pytest.approx(0.1)
+    assert item["evidence"]["position_weight_pct"] is None
+    assert item["dimensions"]["position_discipline"]["status"] == "unavailable"
+    assert item["dimensions"]["position_discipline"]["score"] is None
+
+
+def test_same_day_signal_created_after_trade_is_not_linked() -> None:
+    trade_created_at = datetime(2024, 6, 3, 14, 0, 0)
+    later_signal = SimpleNamespace(
+        id=123,
+        stock_code="600519",
+        market="cn",
+        source_type="analysis",
+        action="buy",
+        plan_quality="complete",
+        created_at=datetime(2024, 6, 3, 15, 0, 0),
+    )
+
+    class FilteringSignalRepo:
+        def list(self, **kwargs):
+            rows = [
+                row
+                for row in [later_signal]
+                if kwargs["created_from"] <= row.created_at <= kwargs["created_to"]
+            ]
+            return rows, len(rows)
+
+    linkage = PaperDecisionQualityService(
+        signal_repo=FilteringSignalRepo(),
+    )._find_supporting_signal(
+        symbol="600519",
+        market="cn",
+        trade_date=_AS_OF,
+        trade_created_at=trade_created_at,
+        side="buy",
+    )
+
+    assert linkage["signal"] is None
+    assert linkage["candidate_count"] == 0
+
+
+@pytest.mark.parametrize("threshold", [float("nan"), float("inf"), -1, 0, 101, True])
+def test_invalid_concentration_threshold_falls_back_deterministically(threshold) -> None:
+    context = _disciplined_buy()
+    context["concentration_alert_pct"] = threshold
+    scored = PaperDecisionQualityService(
+        config=SimpleNamespace(portfolio_risk_concentration_alert_pct=threshold)
+    ).score_decision(context)
+
+    assert scored["evidence"]["concentration_alert_pct"] == 35.0
+    assert 0.0 <= scored["process_score"] <= 100.0
 
 
 def test_http_endpoint_paper_gate_and_score_smoke(tmp_path) -> None:
@@ -420,8 +632,17 @@ def test_http_endpoint_paper_gate_and_score_smoke(tmp_path) -> None:
         assert body["score_kind"] == "process"
         assert body["formula_version"] == FORMULA_VERSION
         assert body["sample_size"] == 1
+        assert body["total_trade_count"] == 1
+        assert body["truncated"] is False
         assert body["items"][0]["evidence"]["equity_basis"] == "trade_date_snapshot"
-        assert body["items"][0]["linked_signal_id"] is not None
+        linkage = body["items"][0]["evidence"]
+        if linkage["signal_candidate_count"] == 0:
+            assert linkage["signal_linkage_status"] == "none"
+            assert body["items"][0]["linked_signal_id"] is None
+        elif linkage["signal_linkage_ambiguous"]:
+            assert body["items"][0]["linked_signal_id"] is None
+        else:
+            assert body["items"][0]["linked_signal_id"] is not None
     finally:
         DatabaseManager.reset_instance()
         Config.reset_instance()
@@ -443,3 +664,6 @@ def test_date_range_validation(isolated_db) -> None:
             date_from=_AS_OF,
             date_to=_AS_OF - timedelta(days=1),
         )
+
+    with pytest.raises(ValueError, match="positive integer"):
+        scorer.score_paper_account(account_id=True)

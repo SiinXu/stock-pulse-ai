@@ -10094,6 +10094,10 @@ export interface components {
              * @constant
              */
             score_kind: "process";
+            /** Total Trade Count */
+            total_trade_count: number;
+            /** Truncated */
+            truncated: boolean;
         };
         /** PaperTradeCreateRequest */
         PaperTradeCreateRequest: {
@@ -23150,6 +23154,7 @@ export interface operations {
             };
             header?: never;
             path: {
+                /** @description Paper account ID */
                 account_id: number;
             };
             cookie?: never;

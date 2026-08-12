@@ -274,6 +274,8 @@ export interface PaperDecisionQualityResponse {
   dateFrom?: string | null;
   dateTo?: string | null;
   sampleSize: number;
+  totalTradeCount: number;
+  truncated: boolean;
   aggregate: PaperDecisionQualityAggregate;
   items: PaperDecisionQualityItem[];
   divisionOfLabor: {

@@ -931,8 +931,7 @@ const PortfolioWorkspace: React.FC = () => {
               {isPaperAccountSelected ? (
                 <Link
                   to={APP_ROUTE_PATHS.portfolioPerformance}
-                  className="text-xs font-medium text-primary hover:underline"
-                  title={text.processQualityLinkHint}
+                  className="inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline"
                 >
                   {text.processQualityLink}
                 </Link>
