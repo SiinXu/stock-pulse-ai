@@ -31592,6 +31592,261 @@
         ],
         "title": "WatchlistScoreSourceRows",
         "type": "object"
+      },
+      "PeerValuationCanvasRequest": {
+        "properties": {
+          "stock_code": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Stock Code",
+            "description": "Target stock code"
+          },
+          "peer_source": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "industry"
+            ],
+            "title": "Peer Source",
+            "description": "Explainable peer-set source: custom codes or industry-constrained set",
+            "default": "custom"
+          },
+          "peer_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Codes",
+            "description": "Peer stock codes (required for comparison; never invented server-side)"
+          },
+          "industry_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Label",
+            "description": "Optional industry label override when peer_source=industry"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency",
+            "description": "Base currency for cross-market estimate normalization (default: target listing currency)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stock_code"
+        ],
+        "title": "PeerValuationCanvasRequest",
+        "description": "Request body for the constrained peer relative-value canvas (issue #1139)."
+      },
+      "PeerValuationCanvasResponse": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "fx_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Stale"
+          },
+          "peer_set": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Set"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "multiple_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiple Metrics"
+          },
+          "currency_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Metrics"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "medians": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medians"
+          },
+          "relative_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Summary"
+          },
+          "heatmap_cells": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heatmap Cells"
+          },
+          "valuation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Status"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schema_version",
+          "status"
+        ],
+        "title": "PeerValuationCanvasResponse",
+        "additionalProperties": true
       }
     },
     "securitySchemes": {
@@ -48189,6 +48444,68 @@
         "tags": [
           "Health"
         ]
+      }
+    },
+    "/api/v1/valuation/peer-canvas": {
+      "post": {
+        "tags": [
+          "Valuation"
+        ],
+        "summary": "Build peer relative-value comparison canvas",
+        "description": "Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.",
+        "operationId": "buildPeerValuationCanvas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeerValuationCanvasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerValuationCanvasResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Valuation estimate failed"
+          }
+        }
       }
     }
   }

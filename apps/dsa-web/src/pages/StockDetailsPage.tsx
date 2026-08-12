@@ -22,7 +22,7 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
-import { DcfSensitivityPanel } from '../components/valuation';
+import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
 import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -576,6 +576,10 @@ const StockDetailsPage: React.FC = () => {
 
         <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
           <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
+        </section>
+
+        <section aria-label={valuationText.peerTitle} data-testid="stock-details-peer-canvas-section">
+          <PeerValuationCanvas key={`peer-${canonicalCode}`} stockCode={canonicalCode} />
         </section>
       </div>
     </AppPage>

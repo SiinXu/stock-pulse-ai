@@ -107,6 +107,24 @@ python -m pytest tests -k "valuation or dcf" -m "not network and not benchmark"
 - Web 交互式敏感性 UI
 - 超出通用 DCF / PE-PB 的市场专用模型包
 
+
+
+## 同业相对估值画布（issue #1139）
+
+选定标的 + 同业集合的约束对比网格：
+
+- **复用** `ValuationService.estimate` 的倍数、同业明细与中位数（不重算 DCF）。
+- **同业集合来源可解释**：`custom`（调用方代码）或 `industry`（解析行业标签 + 该标签下由调用方提供的同业；从不编造成分股）。
+- **缺失数据显式标注**：同业行保留在网格中（`status=missing`、`missing_metrics`），不静默剔除。
+- **跨市场 estimates 币种归一**：绝对额字段归一到 `base_currency`（复用组合 FX 转换与过期溯源）；无量纲倍数不换汇。
+- API：`POST /api/v1/valuation/peer-canvas`
+- Web：`PeerValuationCanvas` 挂载在股票详情（复用 `DataTable` + `RiskHeatmap`）。
+- 相对话术策略：`evaluate_relative_claims` 在无可用画布或未引用画布字段时降级相对估值表述。
+
+```bash
+python -m pytest tests/services/test_peer_valuation_canvas.py -m "not network"
+```
+
 ## 回滚
 
 1. 设置 `VALUATION_AGENT_TOOL_ENABLED=false`（或删除该变量）

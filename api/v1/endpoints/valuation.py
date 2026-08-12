@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Valuation estimate endpoint for DCF / relative models (issue #238)."""
+"""Valuation estimate and peer canvas endpoints (issues #238, #1139)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,13 @@ from fastapi import APIRouter, HTTPException, Query
 
 from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
-from api.v1.schemas.valuation import ValuationEstimateRequest, ValuationEstimateResponse
+from api.v1.schemas.valuation import (
+    PeerValuationCanvasRequest,
+    PeerValuationCanvasResponse,
+    ValuationEstimateRequest,
+    ValuationEstimateResponse,
+)
+from src.services.peer_valuation_canvas import PeerValuationCanvasService
 from src.services.valuation_service import (
     MAX_DISCOUNT_RATE,
     MAX_GROWTH_RATE,
@@ -96,7 +102,7 @@ def estimate_stock_valuation(
         )
     except ValueError as exc:
         raise _bad_request(str(exc)) from exc
-    except Exception as exc:  # broad-exception: fallback_recorded - map valuation failures to a sanitized API error
+    except Exception as exc:  # broad-exception: fallback_recorded
         log_safe_exception(
             logger,
             "Valuation estimate failed",
@@ -127,3 +133,46 @@ def estimate_stock_valuation_post(body: ValuationEstimateRequest) -> ValuationEs
         projection_years=body.projection_years,
         peer_codes=body.peer_codes,
     )
+
+
+@router.post(
+    "/peer-canvas",
+    response_model=PeerValuationCanvasResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid request body"},
+        500: {"model": ErrorResponse, "description": "Peer canvas build failed"},
+    },
+    summary="Build peer relative-value comparison canvas",
+    description=(
+        "Constrained target + peer valuation metrics grid. Reuses the valuation "
+        "estimate service for multiples/medians (no recompute). Peer set source "
+        "is explainable (custom or industry). Peers with missing data stay in "
+        "the grid and are annotated. Absolute estimates are normalized into a "
+        "base currency when FX conversion is available. Research support only."
+    ),
+    operation_id="buildPeerValuationCanvas",
+)
+def build_peer_valuation_canvas(body: PeerValuationCanvasRequest) -> PeerValuationCanvasResponse:
+    code = str(body.stock_code or "").strip()
+    if not code:
+        raise _bad_request("stock_code is required")
+    try:
+        service = PeerValuationCanvasService()
+        payload = service.build(
+            code,
+            peer_source=body.peer_source,
+            peer_codes=_parse_peer_codes(body.peer_codes),
+            industry_label=body.industry_label,
+            base_currency=body.base_currency,
+        )
+    except ValueError as exc:
+        raise _bad_request(str(exc)) from exc
+    except Exception as exc:  # broad-exception: fallback_recorded
+        log_safe_exception(
+            logger,
+            "Peer valuation canvas failed",
+            exc,
+            error_code="peer_valuation_canvas_failed",
+        )
+        raise api_error(500, "internal_error", "Peer valuation canvas failed") from exc
+    return PeerValuationCanvasResponse.model_validate(payload)

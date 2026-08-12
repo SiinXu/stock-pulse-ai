@@ -67,3 +67,71 @@ export async function estimateStockValuation(params: ValuationEstimateParams): P
     throw createApiError(getParsedApiError(error), { cause: error });
   }
 }
+
+
+const peerMetricCellSchema = z.object({
+  value: z.number().nullable().optional(),
+  status: z.string().optional(),
+  missingReason: z.string().optional().nullable(),
+  currency: z.string().nullable().optional(),
+  nativeValue: z.number().nullable().optional(),
+  nativeCurrency: z.string().nullable().optional(),
+  fx: z.record(z.string(), z.unknown()).optional(),
+}).passthrough();
+
+const peerCanvasRowSchema = z.object({
+  stockCode: z.string(),
+  role: z.string().optional(),
+  currency: z.string().optional().nullable(),
+  nativeCurrency: z.string().optional().nullable(),
+  metrics: z.record(z.string(), peerMetricCellSchema).optional(),
+  dataStatus: z.string().optional(),
+  missingMetrics: z.array(z.string()).optional(),
+}).passthrough();
+
+const peerValuationCanvasSchema = z.object({
+  schemaVersion: z.string().optional(),
+  status: z.string(),
+  stockCode: z.string().optional().nullable(),
+  baseCurrency: z.string().optional().nullable(),
+  fxStale: z.boolean().optional().nullable(),
+  peerSet: z.record(z.string(), z.unknown()).optional().nullable(),
+  metrics: z.array(z.string()).optional(),
+  multipleMetrics: z.array(z.string()).optional().nullable(),
+  currencyMetrics: z.array(z.string()).optional().nullable(),
+  rows: z.array(peerCanvasRowSchema).optional(),
+  medians: z.record(z.string(), z.unknown()).optional().nullable(),
+  relativeSummary: z.record(z.string(), z.unknown()).optional().nullable(),
+  heatmapCells: z.array(z.record(z.string(), z.unknown())).optional().nullable(),
+  valuationStatus: z.string().optional().nullable(),
+  disclaimer: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(),
+  message: z.string().optional().nullable(),
+}).passthrough();
+
+export type PeerValuationCanvas = z.infer<typeof peerValuationCanvasSchema>;
+
+export type PeerValuationCanvasParams = {
+  stockCode: string;
+  peerSource?: 'custom' | 'industry';
+  peerCodes?: string[];
+  industryLabel?: string | null;
+  baseCurrency?: string | null;
+};
+
+export async function buildPeerValuationCanvas(
+  params: PeerValuationCanvasParams,
+): Promise<PeerValuationCanvas> {
+  try {
+    const response = await apiClient.post('/api/v1/valuation/peer-canvas', {
+      stock_code: params.stockCode,
+      peer_source: params.peerSource ?? 'custom',
+      peer_codes: params.peerCodes,
+      industry_label: params.industryLabel ?? undefined,
+      base_currency: params.baseCurrency ?? undefined,
+    });
+    return peerValuationCanvasSchema.parse(toCamelCase(response.data) as unknown);
+  } catch (error) {
+    throw createApiError(getParsedApiError(error), { cause: error });
+  }
+}
