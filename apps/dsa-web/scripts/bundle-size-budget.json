@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Merged locale/IntelligenceSourcesPanel budgets after main sync; measured gzip + headroom.",
+  "baselineNote": "Settings, locale, and IntelligenceSourcesPanel budgets use a combined production build after landing Daily Brief/Event Research, research API, and cost-attribution inventory changes (Refs #149 / #1131 / #1143 / #166 / #248); each rule retains its fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -14,8 +14,8 @@
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
       "maxGzipBytes": 244107,
-      "measuredGzipBytes": 241690,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "measuredGzipBytes": 241714,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution inventory changes, with 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -29,56 +29,56 @@
       "match": "assets/ja-*.js",
       "maxGzipBytes": 158826,
       "measuredGzipBytes": 157253,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
       "maxGzipBytes": 151925,
-      "measuredGzipBytes": 150420,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "measuredGzipBytes": 150528,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
       "maxGzipBytes": 151964,
       "measuredGzipBytes": 150459,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
       "maxGzipBytes": 151808,
-      "measuredGzipBytes": 150304,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "measuredGzipBytes": 150355,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 600 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
       "maxGzipBytes": 147678,
       "measuredGzipBytes": 146215,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
       "maxGzipBytes": 144083,
-      "measuredGzipBytes": 142656,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "measuredGzipBytes": 142893,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
       "maxGzipBytes": 137577,
       "measuredGzipBytes": 136214,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
       "maxGzipBytes": 137662,
       "measuredGzipBytes": 136299,
-      "note": "GitHub Actions Linux remeasure after multi-model consensus sync (PR #1238); measured gzip + ~1% headroom."
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -127,28 +127,28 @@
       "match": "assets/vendor-*.js",
       "maxGzipBytes": 86562,
       "measuredGzipBytes": 78692,
-      "note": "Merged budgets after main sync; maxGzipBytes=86562."
+      "note": "First-match residual for vendor-* after the more-specific vendor-* rules above (measured from vendor-CRoa6YUW)."
     },
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
       "maxGzipBytes": 73318,
       "measuredGzipBytes": 73118,
-      "note": "Merged budgets after main sync; maxGzipBytes=73318."
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
       "maxGzipBytes": 57276,
       "measuredGzipBytes": 57076,
-      "note": "Merged budgets after main sync; maxGzipBytes=57276."
+      "note": "Rebaselined after adding the reasoning-trace export controls Playground story (PR #1040); measured 57076 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45391,
-      "measuredGzipBytes": 41264,
-      "note": "Merged budgets after main sync; maxGzipBytes=45391."
+      "maxGzipBytes": 45803,
+      "measuredGzipBytes": 45603,
+      "note": "GitHub Actions Linux remeasure after cost attribution and routing telemetry Settings controls (Refs #166 / #248); measured gzip + 200 B headroom."
     },
     {
       "id": "AlertsWorkspace",
@@ -162,14 +162,14 @@
       "match": "assets/PortfolioRiskMetricsPanel-*.js",
       "maxGzipBytes": 10654,
       "measuredGzipBytes": 9685,
-      "note": "Merged budgets after main sync; maxGzipBytes=10654."
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
     },
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 26363,
       "measuredGzipBytes": 26163,
-      "note": "Merged budgets after main sync; maxGzipBytes=26363."
+      "note": "GitHub Actions Linux measurement after the integrated portfolio flow; measured 26163 B + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",

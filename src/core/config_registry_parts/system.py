@@ -1136,6 +1136,68 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "RESEARCH_API_ENABLED": {
+        "title": "Read-only Research API",
+        "description": (
+            "Opt-in gate for the authenticated read-only research API at "
+            "GET /api/v1/research/conclusions*. Off by default. When enabled, exposes "
+            "mode-filtered stratified conclusions (brief/standard/research) with as-of, "
+            "confidence, and evidence counts. No write methods. Reuses session auth, "
+            "security audit, and sliding-window rate limits on the main API port."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 171,
+        "help_key": "settings.system.research_api",
+        "examples": [
+            "RESEARCH_API_ENABLED=false",
+            "RESEARCH_API_ENABLED=true",
+            "RESEARCH_API_RATE_LIMIT_PER_MINUTE=60",
+        ],
+        "docs": [
+            {
+                "label": "Read-only research API",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/research-api_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "RESEARCH_API_RATE_LIMIT_PER_MINUTE": {
+        "title": "Research API Rate Limit",
+        "description": (
+            "Per-principal sliding-window budget for research API reads (same governance "
+            "pattern as MCP_RATE_LIMIT_PER_MINUTE). Applies only when RESEARCH_API_ENABLED=true."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "60",
+        "options": [],
+        "validation": {"min": 1, "max": 10000},
+        "display_order": 172,
+        "help_key": "settings.system.research_api",
+        "examples": [
+            "RESEARCH_API_RATE_LIMIT_PER_MINUTE=60",
+            "RESEARCH_API_RATE_LIMIT_PER_MINUTE=30",
+        ],
+        "docs": [
+            {
+                "label": "Read-only research API",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/research-api_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "LOCAL_RUNTIME_AUTO_DETECT": {
         "title": "Local Runtime Auto-Detect",
         "description": (
@@ -1199,6 +1261,39 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+
+    "READINESS_CHECK_TIMEOUT_SECONDS": {
+        "title": "Readiness Check Timeout",
+        "description": (
+            "Per-check timeout in seconds for the structured readiness/self-check module "
+            "(data providers, LLM, task queue, setup dependencies). "
+            "Clamped to 0.1–5.0. On-demand only — never runs automatically at process startup. "
+            "Timed-out or failed probes are reported as failed/degraded and never as ready."
+        ),
+        "category": "system",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1.0",
+        "options": [],
+        "validation": {"min": 0.1, "max": 5.0},
+        "display_order": 60,
+        "help_key": "settings.system.READINESS_CHECK_TIMEOUT_SECONDS",
+        "examples": [
+            "READINESS_CHECK_TIMEOUT_SECONDS=1.0",
+            "READINESS_CHECK_TIMEOUT_SECONDS=2.0",
+        ],
+        "docs": [
+            {
+                "label": "Structured readiness self-check",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/readiness-self-check_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+
 
     "DAILY_BRIEF_ENABLED": {
         "title": "Daily Brief Enabled",

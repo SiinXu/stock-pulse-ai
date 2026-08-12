@@ -17,6 +17,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT as _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
     logger,
     normalize_tickflow_kline_adjust,
     parse_prompt_cache_diagnostics_level,
@@ -754,6 +755,10 @@ class _ConfigLoadingMethods:
             llm_prompt_cache_diagnostics_level=parse_prompt_cache_diagnostics_level(
                 os.getenv("LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL")
             ),
+            llm_usage_attribution_enabled=parse_env_bool(
+                os.getenv("LLM_USAGE_ATTRIBUTION_ENABLED"),
+                default=True,
+            ),
             gemini_api_keys=gemini_api_keys,
             anthropic_api_keys=anthropic_api_keys,
             openai_api_keys=openai_api_keys,
@@ -1308,6 +1313,12 @@ class _ConfigLoadingMethods:
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),
+            readiness_check_timeout_seconds=parse_env_float(
+                os.getenv('READINESS_CHECK_TIMEOUT_SECONDS'),
+                _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
+                field_name='READINESS_CHECK_TIMEOUT_SECONDS',
+                minimum=0.1,
+            ),
             analysis_parallel_fetch_enabled=parse_env_bool(
                 os.getenv('ANALYSIS_PARALLEL_FETCH_ENABLED'),
                 default=True,
@@ -1590,6 +1601,16 @@ class _ConfigLoadingMethods:
             ),
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
+            ),
+            research_api_enabled=parse_env_bool(
+                os.getenv('RESEARCH_API_ENABLED'), default=False
+            ),
+            research_api_rate_limit_per_minute=parse_env_int(
+                os.getenv('RESEARCH_API_RATE_LIMIT_PER_MINUTE'),
+                60,
+                field_name='RESEARCH_API_RATE_LIMIT_PER_MINUTE',
+                minimum=1,
+                maximum=10_000,
             ),
             reasoning_trace_export_enabled=parse_env_bool(
                 os.getenv('REASONING_TRACE_EXPORT_ENABLED'), default=False

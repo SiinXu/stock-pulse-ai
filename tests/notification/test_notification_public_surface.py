@@ -187,7 +187,7 @@ EXPECTED_GROUPS = (
             "_append_institutional_flow",
             "_append_related_boards",
         ),
-        "31fecf657604ae144ba00ee1b46b1a26f8afa37132beffa610d6342a5b76c296",  # brief report_mode force
+        "55a08bf7eaef743ea4092e9b0aed41daf65d0d7906ef7f7315852e889a4e10c4",  # brief report_mode force
     ),
     (
         "_DispatchMethods",
