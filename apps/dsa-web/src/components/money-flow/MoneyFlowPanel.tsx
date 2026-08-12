@@ -18,7 +18,6 @@ export type MoneyFlowPanelProps = {
   days?: number;
   fetchView?: (stockCode: string, days: number) => Promise<MoneyFlowView>;
   initialView?: MoneyFlowView | null;
-  className?: string;
 };
 
 const asFiniteNumber = (value: unknown): number | undefined => {
@@ -88,8 +87,7 @@ export const MoneyFlowPanel: React.FC<MoneyFlowPanelProps> = ({
   stockCode,
   days = 5,
   fetchView,
-  initialView = null,
-  className,
+  initialView = null
 }) => {
   const { language } = useUiLanguage();
   const text = MONEY_FLOW_TEXT[language] ?? MONEY_FLOW_TEXT.en;
@@ -147,7 +145,6 @@ export const MoneyFlowPanel: React.FC<MoneyFlowPanelProps> = ({
 
   return (
     <Card
-      className={className}
       data-testid="money-flow-panel"
       aria-labelledby={titleId}
     >

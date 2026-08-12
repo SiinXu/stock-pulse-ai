@@ -43,12 +43,12 @@ from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
+from src.application_services import get_application_services
 from src.services.smartmoney_flow_service import build_money_flow_view
 from data_provider.daily_cache import LocalDataMissingError
 from data_provider.money_flow_types import MAX_HISTORY_DAYS, validate_history_days
 from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
-from src.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -473,14 +473,14 @@ def get_stock_money_flow(
     try:
         code = _validate_and_normalize_stock_code(stock_code)
         days = validate_history_days(days)
-        config = get_config()
+        config = get_application_services().config
         payload = build_money_flow_view(code, days=days, config=config)
         return MoneyFlowViewResponse.model_validate(payload)
     except ValueError as exc:
         raise api_error(400, "validation_error", str(exc)) from exc
     except HTTPException:
         raise
-    except Exception as exc:  # broad-exception: fallback_recorded - map money-flow view failures
+    except Exception as exc:  # broad-exception: fallback_recorded - map unexpected money-flow view failures to a sanitized API error
         log_safe_exception(
             logger,
             "Stock money-flow view failed",
