@@ -369,6 +369,25 @@ def _normalize_lesson_input(
     )
 
 
+def _episode_credit_key(episode_id: str) -> Optional[str]:
+    """Return a stable credit key for stats, or None when the id cannot be deduped."""
+    cleaned = (episode_id or "").strip()
+    if not cleaned or cleaned == "unknown":
+        return None
+    return cleaned[:128]
+
+
+def _max_severity(lessons: Sequence[ReflectionLesson]) -> str:
+    best = "low"
+    best_rank = 0
+    for lesson in lessons:
+        rank = _SEVERITY_RANK.get(str(lesson.severity), 0)
+        if rank > best_rank:
+            best_rank = rank
+            best = str(lesson.severity)
+    return best
+
+
 def cluster_lessons_into_cards(
     lessons_input: Sequence[Any],
     *,
@@ -379,6 +398,11 @@ def cluster_lessons_into_cards(
 
     Human-locked fields on ``existing`` cards are preserved across reclustering.
     Episode refs accumulate (bounded) so each pattern links back to episodes.
+
+    Stats are **episode-idempotent** for known episode ids: re-ingesting lessons
+    from an episode already present in ``stats.episode_refs`` does not inflate
+    ``occurrence_count`` or severity counters. Bare lessons without an episode
+    id still credit once per call (no durable key to dedupe).
     """
     stamp = now or _utc_now_iso()
     by_kind: Dict[str, List[Tuple[str, ReflectionLesson]]] = defaultdict(list)
@@ -405,40 +429,83 @@ def cluster_lessons_into_cards(
         locked = set(base.human_locked_fields)
 
         group = by_kind.get(kind, [])
-        occurrence = len(group)
-        high = sum(1 for _, lesson in group if lesson.severity == "high")
-        medium = sum(1 for _, lesson in group if lesson.severity == "medium")
-        low = sum(1 for _, lesson in group if lesson.severity == "low")
+        # Collapse this batch by episode so one episode with multiple same-kind
+        # lessons credits at most once.
+        batch_by_episode: Dict[str, List[ReflectionLesson]] = defaultdict(list)
+        anonymous_lessons: List[ReflectionLesson] = []
+        for episode_id, lesson in group:
+            credit_key = _episode_credit_key(str(episode_id))
+            if credit_key is None:
+                anonymous_lessons.append(lesson)
+            else:
+                batch_by_episode[credit_key].append(lesson)
 
         episode_refs: List[str] = list(base.stats.episode_refs)
-        for episode_id, _lesson in group:
-            if episode_id and episode_id not in episode_refs:
-                episode_refs.append(episode_id)
-            if len(episode_refs) >= MAX_EPISODE_REFS_PER_CARD:
-                break
+        credited_set = set(episode_refs)
+        new_episode_ids: List[str] = []
+        high = medium = low = 0
 
-        # Aggregate remedy/trigger candidates from new lessons when not locked.
+        for ep_id, lessons in batch_by_episode.items():
+            if ep_id in credited_set:
+                continue
+            if len(episode_refs) + len(new_episode_ids) >= MAX_EPISODE_REFS_PER_CARD:
+                break
+            new_episode_ids.append(ep_id)
+            credited_set.add(ep_id)
+            sev = _max_severity(lessons)
+            if sev == "high":
+                high += 1
+            elif sev == "medium":
+                medium += 1
+            else:
+                low += 1
+
+        # Anonymous lessons (no durable episode id): credit once per lesson in
+        # this batch only — cannot be made cross-call idempotent.
+        for lesson in anonymous_lessons:
+            high += 1 if lesson.severity == "high" else 0
+            medium += 1 if lesson.severity == "medium" else 0
+            low += 1 if lesson.severity == "low" else 0
+
+        occurrence_delta = len(new_episode_ids) + len(anonymous_lessons)
+        episode_refs = (episode_refs + new_episode_ids)[:MAX_EPISODE_REFS_PER_CARD]
+
+        # Aggregate remedy from new lessons when not locked. Do not copy remedies
+        # into triggers (trigger = when it fires; remedy = what to do next).
         new_remedies = [
             lesson.remedy
             for _, lesson in group
             if isinstance(lesson.remedy, str) and lesson.remedy.strip()
         ]
+        fields_changed = False
         if "remedy" not in locked and new_remedies:
-            # Prefer the most recent non-empty remedy.
-            base = base.model_copy(update={"remedy": new_remedies[-1][:MAX_REMEDY_CHARS]})
-        if "triggers" not in locked and new_remedies:
-            triggers = list(base.triggers)
-            for remedy in new_remedies:
-                # Use claim_ref-less remedies as weak trigger phrases only when short.
-                if remedy and remedy not in triggers and len(remedy) <= MAX_TRIGGER_CHARS:
-                    triggers.append(remedy[:MAX_TRIGGER_CHARS])
-                if len(triggers) >= MAX_TRIGGERS_PER_CARD:
-                    break
-            base = base.model_copy(update={"triggers": triggers[:MAX_TRIGGERS_PER_CARD]})
+            candidate = new_remedies[-1][:MAX_REMEDY_CHARS]
+            if candidate != base.remedy:
+                base = base.model_copy(update={"remedy": candidate})
+                fields_changed = True
+        if "triggers" not in locked:
+            claim_triggers = [
+                lesson.claim_ref
+                for _, lesson in group
+                if isinstance(lesson.claim_ref, str) and lesson.claim_ref.strip()
+            ]
+            if claim_triggers:
+                triggers = list(base.triggers)
+                for claim in claim_triggers:
+                    text = claim.strip()[:MAX_TRIGGER_CHARS]
+                    if text and text not in triggers:
+                        triggers.append(text)
+                    if len(triggers) >= MAX_TRIGGERS_PER_CARD:
+                        break
+                if triggers != list(base.triggers):
+                    base = base.model_copy(
+                        update={"triggers": triggers[:MAX_TRIGGERS_PER_CARD]}
+                    )
+                    fields_changed = True
 
         prev_count = int(base.stats.occurrence_count) if prev is not None else 0
         stats = PatternStats(
-            occurrence_count=prev_count + occurrence if prev is not None else occurrence,
+            occurrence_count=prev_count + occurrence_delta if prev is not None else occurrence_delta,
             high_severity_count=(
                 (int(base.stats.high_severity_count) if prev is not None else 0) + high
             ),
@@ -448,19 +515,20 @@ def cluster_lessons_into_cards(
             low_severity_count=(
                 (int(base.stats.low_severity_count) if prev is not None else 0) + low
             ),
-            last_seen_at=stamp if occurrence else base.stats.last_seen_at,
-            episode_refs=episode_refs[:MAX_EPISODE_REFS_PER_CARD],
+            last_seen_at=stamp if occurrence_delta else base.stats.last_seen_at,
+            episode_refs=episode_refs,
         )
 
         revision = int(base.revision)
-        if prev is not None and occurrence:
+        material_change = occurrence_delta > 0 or fields_changed
+        if prev is not None and material_change:
             revision = revision + 1
 
         card = base.model_copy(
             update={
                 "stats": stats,
                 "revision": revision,
-                "updated_at": stamp if occurrence or prev is None else base.updated_at,
+                "updated_at": stamp if material_change or prev is None else base.updated_at,
                 "source": base.source if prev is not None and "source" in locked else (
                     "human" if prev is not None and prev.source == "human" else "clustered"
                 ),
@@ -585,7 +653,11 @@ class ErrorPatternEncyclopedia:
         note: Optional[str] = None,
         expected_revision: Optional[int] = None,
     ) -> ErrorPatternCard:
-        """Apply a human re-judgment. Always appends an audit event."""
+        """Apply a human re-judgment.
+
+        Always appends a ``PatternEditEvent`` (including no-op touches) so
+        human review sessions leave an audit trail.
+        """
         card = self._cards.get(pattern_id)
         if card is None:
             raise KeyError(f"unknown pattern_id: {pattern_id}")
@@ -639,18 +711,16 @@ class ErrorPatternEncyclopedia:
                 locked.add("enabled")
 
         if not changed:
-            # Still leave a no-op audit mark when a human explicitly opens an edit
-            # session with a note (re-judgment confirmation).
-            if note:
-                self._record_edit(
-                    pattern_id=pattern_id,
-                    revision_before=card.revision,
-                    revision_after=card.revision,
-                    actor=actor_clean,
-                    action="human_note",
-                    changed_fields={},
-                    note=note,
-                )
+            # Every human_edit call leaves an audit mark (touch or note-only).
+            self._record_edit(
+                pattern_id=pattern_id,
+                revision_before=card.revision,
+                revision_after=card.revision,
+                actor=actor_clean,
+                action="human_note" if note else "human_touch",
+                changed_fields={},
+                note=note,
+            )
             return card
 
         stamp = _utc_now_iso()
@@ -840,13 +910,13 @@ def retrieve_error_patterns(
     kinds: Optional[Sequence[str]] = None,
     top_k: int = DEFAULT_INJECT_TOP_K,
     char_budget: int = DEFAULT_INJECT_CHAR_BUDGET,
-    include_disabled: bool = False,
 ) -> PatternRetrievalResult:
-    """Retrieve top-K enabled pattern cards under hard char budget.
+    """Retrieve top-K **enabled** pattern cards under hard char budget.
 
-    Disabled cards are never injected when ``include_disabled`` is false (the
-    analysis path default). Soul identity is snapshotted and re-asserted so
-    checklist rendering cannot rewrite charter bytes.
+    Disabled cards are never injected (use ``list_cards`` for admin views).
+    ``top_k=0`` or ``char_budget=0`` yields an empty injection (fail-closed).
+    Soul identity is snapshotted and re-asserted so checklist rendering cannot
+    rewrite charter bytes.
     """
     soul_before = snapshot_soul_identity()
     charter_before = str(soul_before.charter)
@@ -868,15 +938,27 @@ def retrieve_error_patterns(
     for card in all_cards:
         if kind_filter is not None and card.kind not in kind_filter:
             continue
-        if not card.enabled and not include_disabled:
-            disabled_excluded += 1
-            continue
-        if not card.enabled and include_disabled:
-            # Still skip for injection payloads; include_disabled is for admin list only.
-            # Analysis path must never inject disabled cards.
+        if not card.enabled:
             disabled_excluded += 1
             continue
         candidates.append(card)
+
+    # Fail-closed empty quotas: 0 means inject nothing (not unlimited).
+    if top_k == 0 or char_budget == 0:
+        result = PatternRetrievalResult(
+            cards=[],
+            requested_top_k=top_k,
+            injected_count=0,
+            char_budget=char_budget,
+            char_used=0,
+            truncated=bool(candidates),
+            disabled_excluded=disabled_excluded,
+            rendered_checklist="",
+        )
+        assert_soul_unchanged(soul_before)
+        if str(snapshot_soul_identity().charter) != charter_before:
+            raise RuntimeError("Agent Soul charter bytes changed during pattern retrieval")
+        return result
 
     candidates.sort(key=_card_rank_key)
 
@@ -889,7 +971,7 @@ def retrieve_error_patterns(
             break
         trial = selected + [card]
         trial_text = format_error_pattern_checklist(trial)
-        if char_budget and len(trial_text) > char_budget:
+        if len(trial_text) > char_budget:
             if selected:
                 truncated = True
                 break
@@ -976,7 +1058,6 @@ def inject_error_pattern_checklist(
         kinds=kinds,
         top_k=resolved_top_k,
         char_budget=resolved_budget,
-        include_disabled=False,
     )
     assert_soul_unchanged(soul_before)
     return result

@@ -79,6 +79,7 @@ class TestClusterLessons:
                     "kind": "tool_failure",
                     "severity": "high",
                     "remedy": "do not invent tool output",
+                    "claim_ref": "missing volume confirmation",
                 }
             ]
         )
@@ -86,6 +87,35 @@ class TestClusterLessons:
         assert cards[0].kind == "tool_failure"
         assert "ep-map" in cards[0].stats.episode_refs
         assert "invent" in cards[0].remedy
+        # Remedies must not be copied into triggers; claim_ref may seed triggers.
+        assert all("invent" not in trigger for trigger in cards[0].triggers)
+        assert any("volume" in trigger for trigger in cards[0].triggers)
+
+    def test_episode_idempotent_occurrence_on_reingest(self) -> None:
+        store = ErrorPatternEncyclopedia()
+        store.ingest_lessons([_bundle("ep-1", ["evidence_gap"], severity="high")])
+        first = store.get_card("pattern:evidence_gap")
+        assert first is not None
+        assert first.stats.occurrence_count == 1
+        assert first.stats.high_severity_count == 1
+        assert first.stats.episode_refs == ["ep-1"]
+        rev1 = first.revision
+
+        store.ingest_lessons([_bundle("ep-1", ["evidence_gap"], severity="high")])
+        second = store.get_card("pattern:evidence_gap")
+        assert second is not None
+        assert second.stats.occurrence_count == 1
+        assert second.stats.high_severity_count == 1
+        assert second.stats.episode_refs == ["ep-1"]
+        assert second.revision == rev1
+
+        store.ingest_lessons([_bundle("ep-2", ["evidence_gap"], severity="medium")])
+        third = store.get_card("pattern:evidence_gap")
+        assert third is not None
+        assert third.stats.occurrence_count == 2
+        assert third.stats.high_severity_count == 1
+        assert third.stats.medium_severity_count == 1
+        assert third.stats.episode_refs == ["ep-1", "ep-2"]
 
 
 class TestHumanEditAudit:
@@ -147,6 +177,17 @@ class TestHumanEditAudit:
         assert store.get_card("pattern:risk_omission").enabled is True
         assert store.list_edit_events(pattern_id="pattern:risk_omission")[-1].action == "enable"
 
+    def test_noop_human_edit_still_audited(self) -> None:
+        store = ErrorPatternEncyclopedia()
+        store.ingest_lessons([_bundle("ep-1", ["overclaim"])])
+        before = len(store.list_edit_events(pattern_id="pattern:overclaim"))
+        card = store.human_edit("pattern:overclaim", actor="reviewer:a")
+        assert card is not None
+        events = store.list_edit_events(pattern_id="pattern:overclaim")
+        assert len(events) == before + 1
+        assert events[-1].action == "human_touch"
+        assert events[-1].revision_before == events[-1].revision_after
+
 
 class TestRetrievalAndInjection:
     def _populated_store(self) -> ErrorPatternEncyclopedia:
@@ -185,6 +226,18 @@ class TestRetrievalAndInjection:
         assert result.char_used <= 350
         assert result.injected_count >= 1
         assert result.truncated is True
+
+    def test_zero_quotas_inject_nothing(self) -> None:
+        store = self._populated_store()
+        by_chars = retrieve_error_patterns(store, top_k=5, char_budget=0)
+        assert by_chars.injected_count == 0
+        assert by_chars.rendered_checklist == ""
+        assert by_chars.char_used == 0
+        assert by_chars.truncated is True
+
+        by_k = retrieve_error_patterns(store, top_k=0, char_budget=4000)
+        assert by_k.injected_count == 0
+        assert by_k.rendered_checklist == ""
 
     def test_checklist_is_non_authoritative_block(self) -> None:
         store = self._populated_store()

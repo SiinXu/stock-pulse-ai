@@ -843,7 +843,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "title": "Error Pattern Inject Top-K",
         "description": (
             "Maximum number of enabled error-pattern cards injected into analysis "
-            "context (hard cap 3)."
+            "context (hard cap 3). 0 injects nothing."
         ),
         "category": "agent",
         "data_type": "integer",
@@ -867,7 +867,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "title": "Error Pattern Inject Char Budget",
         "description": (
             "Maximum characters for the error-pattern checklist block injected into "
-            "analysis context (hard cap 8000)."
+            "analysis context (hard cap 8000). 0 injects nothing (not unlimited)."
         ),
         "category": "agent",
         "data_type": "integer",

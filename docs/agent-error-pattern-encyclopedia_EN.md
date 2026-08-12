@@ -16,6 +16,8 @@ Lessons are **input**. The encyclopedia is the **aggregation layer**. Cards refe
 
 ## Product rules
 
+Stats note: `occurrence_count` and severity counters are **episode-idempotent** for known episode ids — re-ingesting the same episode does not inflate ranking. `top_k=0` or `char_budget=0` means **inject nothing** on the analysis path.
+
 1. Cluster recurring lessons by typed kind into searchable cards.
 2. Humans may edit title / description / triggers / remedy, or disable a card.
 3. Every human edit (including disable/enable/re-judge) **leaves an append-only audit trail**.
@@ -87,8 +89,8 @@ Optional snapshot: `export_snapshot()` / `import_snapshot()` (V1 has no DB migra
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `AGENT_ERROR_PATTERN_ENABLED` | `false` | Master switch for analysis injection |
-| `AGENT_ERROR_PATTERN_INJECT_TOP_K` | `3` | Max cards injected (hard cap 3) |
-| `AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET` | `2000` | Max checklist characters (hard cap 8000) |
+| `AGENT_ERROR_PATTERN_INJECT_TOP_K` | `3` | Max cards injected (hard cap 3); **`0` injects nothing** |
+| `AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET` | `2000` | Max checklist characters (hard cap 8000); **`0` means inject nothing** (not unlimited) |
 
 ## Acceptance mapping
 

@@ -16,6 +16,8 @@
 
 ## 产品规则
 
+补充：`occurrence_count` / 严重度计数对**已知 episode_id** 幂等；重复 ingest 同一 episode 不会抬高排名。`top_k=0` 或 `char_budget=0` 表示分析路径**不注入**。
+
 1. 将复发教训按 typed kind 聚类为可检索卡片。
 2. 人类可编辑 title / description / triggers / remedy，或禁用卡片。
 3. 每次人工编辑（含禁用 / 启用 / 改判）**必须追加审计事件**。
@@ -64,8 +66,8 @@
 | 变量 | 默认 | 含义 |
 | --- | --- | --- |
 | `AGENT_ERROR_PATTERN_ENABLED` | `false` | 分析注入总开关 |
-| `AGENT_ERROR_PATTERN_INJECT_TOP_K` | `3` | 最多注入卡片数（硬顶 3） |
-| `AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET` | `2000` | 清单字符上限（硬顶 8000） |
+| `AGENT_ERROR_PATTERN_INJECT_TOP_K` | `3` | 最多注入卡片数（硬顶 3）；**`0` 表示不注入** |
+| `AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET` | `2000` | 清单字符上限（硬顶 8000）；**`0` 表示不注入**（非无限） |
 
 ## 验收映射
 
