@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale chunks rebaselined after HTML report-export chrome strings (Refs #163 PR #1159); measured local gzip level 9 + 200 B headroom for every locale rule that gained keys.",
+  "baselineNote": "Locale budgets merge PR #1166 Linux rebaseline with HTML report-export chrome (Refs #163 / PR #1159); caps keep stack headroom for both key sets.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 152538,
-      "measuredGzipBytes": 152338,
-      "note": "Rebaselined after HTML report-export download chrome (Refs #163); measured 152338 B + 200 B headroom."
+      "maxGzipBytes": 152852,
+      "measuredGzipBytes": 152452,
+      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 152452 B, cap 152852 B."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 146022,
+      "maxGzipBytes": 146108,
       "measuredGzipBytes": 145708,
-      "note": "HTML report-export chrome remeasure kept prior cap (145708 B measured; previous 146022 B budget already has headroom)."
+      "note": "Merged #1166 + #1159 locale growth; measured baseline 145708 B, cap 146108 B."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 145890,
-      "measuredGzipBytes": 145690,
-      "note": "Rebaselined after HTML report-export download chrome (Refs #163); measured 145690 B + 200 B headroom."
+      "maxGzipBytes": 146229,
+      "measuredGzipBytes": 145829,
+      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 145829 B, cap 146229 B."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 146184,
-      "measuredGzipBytes": 145984,
-      "note": "Rebaselined after HTML report-export download chrome (Refs #163); measured 145984 B + 200 B headroom."
+      "maxGzipBytes": 146509,
+      "measuredGzipBytes": 146109,
+      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 146109 B, cap 146509 B."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 141962,
-      "measuredGzipBytes": 141762,
-      "note": "Rebaselined after HTML report-export download chrome (Refs #163); measured 141762 B + 200 B headroom."
+      "maxGzipBytes": 142289,
+      "measuredGzipBytes": 141889,
+      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 141889 B, cap 142289 B."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 138510,
-      "measuredGzipBytes": 138310,
-      "note": "Rebaselined after HTML report-export download chrome (Refs #163); measured 138310 B + 200 B headroom."
+      "maxGzipBytes": 138832,
+      "measuredGzipBytes": 138432,
+      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 138432 B, cap 138832 B."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 131937,
-      "measuredGzipBytes": 131737,
-      "note": "Rebaselined after HTML report-export download chrome (Refs #163); measured 131737 B + 200 B headroom."
+      "maxGzipBytes": 132253,
+      "measuredGzipBytes": 131853,
+      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 131853 B, cap 132253 B."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 131987,
-      "measuredGzipBytes": 131787,
-      "note": "Rebaselined after HTML report-export download chrome (Refs #163); measured 131787 B + 200 B headroom."
+      "maxGzipBytes": 132328,
+      "measuredGzipBytes": 131928,
+      "note": "Merged #1166 Linux base + #1159 HTML export chrome stack; measured baseline 131928 B, cap 132328 B."
     },
     {
       "id": "vendor-charts",
