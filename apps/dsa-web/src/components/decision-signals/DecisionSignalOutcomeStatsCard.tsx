@@ -10,9 +10,11 @@ import {
   Badge,
   Card,
   EmptyState,
+  InlineAlert,
   Loading,
   StatCard,
 } from '../common';
+import { DecisionSignalCalibrationBreakdown } from './DecisionSignalCalibrationBreakdown';
 import { DecisionSignalOutcomeRunPanel } from './DecisionSignalOutcomeRunPanel';
 import { DecisionSignalProfileCalibration } from './DecisionSignalProfileCalibration';
 
@@ -38,6 +40,8 @@ export const DecisionSignalOutcomeStatsCard: React.FC<Props> = ({
   onRunCompleted,
 }) => {
   const { t } = useUiLanguage();
+  const minSamples = outcomeStats?.minimumCompletedSampleSize ?? 30;
+  const sampleSufficient = outcomeStats?.sampleSufficient === true;
 
   return (
     <Card
@@ -46,6 +50,14 @@ export const DecisionSignalOutcomeStatsCard: React.FC<Props> = ({
       padding="md"
       headerRight={<Badge variant="default" size="sm">{t('decisionSignals.scopeGlobal')}</Badge>}
     >
+      {/* Research-tool positioning: process quality, not return promises. */}
+      <InlineAlert
+        variant="info"
+        className="mb-3"
+        title={t('decisionSignals.researchPositionTitle')}
+        message={t('decisionSignals.researchPositionBody')}
+        data-testid="decision-signal-research-position"
+      />
       <p className="mb-3 text-sm text-secondary-text">{t('decisionSignals.statsGlobalScope')}</p>
       {statsError ? (
         <ApiErrorAlert
@@ -57,12 +69,27 @@ export const DecisionSignalOutcomeStatsCard: React.FC<Props> = ({
         <Loading />
       ) : outcomeStats && outcomeStats.total > 0 ? (
         <div>
+          {!sampleSufficient ? (
+            <p
+              className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning"
+              role="status"
+              data-testid="decision-signal-sample-insufficient"
+            >
+              {t('decisionSignals.statsInsufficientNotice', { count: minSamples })}
+            </p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <StatCard label={t('decisionSignals.statsTotal')} value={outcomeStats.total} />
             <StatCard
               tone="success"
               label={t('decisionSignals.statsHitRate')}
-              value={<span className="text-success">{formatStatPercent(outcomeStats.hitRatePct)}</span>}
+              value={(
+                <span className="text-success">
+                  {sampleSufficient
+                    ? formatStatPercent(outcomeStats.hitRatePct)
+                    : t('decisionSignals.statsRateHidden')}
+                </span>
+              )}
             />
             <StatCard
               tone="success"
@@ -80,6 +107,7 @@ export const DecisionSignalOutcomeStatsCard: React.FC<Props> = ({
               value={<span className="text-warning">{outcomeStats.unable}</span>}
             />
           </div>
+          <DecisionSignalCalibrationBreakdown stats={outcomeStats} />
           {outcomeStats.profileCalibration ? (
             <DecisionSignalProfileCalibration calibration={outcomeStats.profileCalibration} />
           ) : null}

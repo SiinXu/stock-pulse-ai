@@ -130,9 +130,25 @@ def test_run_outcomes_evaluates_supported_horizons_and_stats(isolated_db) -> Non
     stats = service.get_stats(horizons=["1d", "3d", "5d", "10d"])
     assert stats["total"] == 4
     assert stats["hit"] == 4
+    assert stats["minimum_completed_sample_size"] == 30
+    assert stats["sample_sufficient"] is False
+    # Process-quality publication: rates stay hidden until the sample floor.
+    assert stats["hit_rate_pct"] is None
+    assert stats["avg_stock_return_pct"] is None
     assert stats["breakdowns"]["action"][0]["value"] == "buy"
+    assert stats["breakdowns"]["action"][0]["sample_sufficient"] is False
+    assert stats["breakdowns"]["action"][0]["hit_rate_pct"] is None
+    assert stats["breakdowns"]["market"][0]["value"] == "cn"
     assert stats["breakdowns"]["holding_state"][0]["value"] == "holding"
+    assert "period" in stats["breakdowns"]
+    assert stats["breakdowns"]["period"][0]["dimension"] == "period"
+    assert stats["breakdowns"]["period"][0]["sample_sufficient"] is False
     assert "profile_calibration" not in stats
+    # Internal aggregate keeps raw rates for callers that apply their own floor.
+    raw = DecisionSignalOutcomeService.aggregate_outcome_rows(
+        service.repo.list_outcomes(signal_id=signal_id, page=1, page_size=20)[0]
+    )
+    assert raw["hit_rate_pct"] == 100.0
 
 
 def test_profile_calibration_gate_parity(isolated_db, monkeypatch) -> None:
@@ -156,6 +172,96 @@ def test_profile_calibration_gate_parity(isolated_db, monkeypatch) -> None:
 
     monkeypatch.delenv("DECISION_PROFILE_CALIBRATION_ENABLED", raising=False)
     Config.reset_instance()
+
+
+def _seed_anchor_and_forward(
+    db: DatabaseManager,
+    *,
+    code: str,
+    anchor: date,
+    start_close: float = 100.0,
+    end_close: float = 103.0,
+) -> None:
+    """Seed anchor bar + next calendar day bar (1d horizon)."""
+    from datetime import timedelta
+
+    forward = anchor + timedelta(days=1)
+    with db.session_scope() as session:
+        session.add(
+            StockDaily(
+                code=code,
+                date=anchor,
+                open=start_close,
+                high=start_close,
+                low=start_close,
+                close=start_close,
+            )
+        )
+        session.add(
+            StockDaily(
+                code=code,
+                date=forward,
+                open=end_close,
+                high=end_close + 1,
+                low=end_close - 1,
+                close=end_close,
+            )
+        )
+
+
+def test_stats_period_and_market_groupings_and_sample_floor(isolated_db) -> None:
+    """Post-hoc stats group by period/market/action and gate rates at 30 completed."""
+    service = DecisionSignalOutcomeService(db_manager=isolated_db)
+    # 30 completed buy/cn outcomes in 2024-01 → sufficient global + action/market buckets
+    for idx in range(30):
+        code = f"60{idx:04d}"
+        signal_id = _add_signal(
+            isolated_db,
+            code=code,
+            market="cn",
+            action="buy",
+            horizon="1d",
+            session_date="2024-01-03",
+        )
+        _seed_anchor_and_forward(isolated_db, code=code, anchor=date(2024, 1, 3))
+        service.run_outcomes(signal_id=signal_id, horizons=["1d"])
+    # One extra insufficient period/market slice
+    late_id = _add_signal(
+        isolated_db,
+        code="AAPL",
+        market="us",
+        action="sell",
+        horizon="1d",
+        session_date="2024-02-05",
+    )
+    _seed_anchor_and_forward(isolated_db, code="AAPL", anchor=date(2024, 2, 5))
+    service.run_outcomes(signal_id=late_id, horizons=["1d"])
+
+    stats = service.get_stats(horizons=["1d"])
+    assert stats["total"] == 31
+    assert stats["completed"] == 31
+    assert stats["sample_sufficient"] is True
+    assert stats["hit_rate_pct"] is not None
+    assert stats["minimum_completed_sample_size"] == 30
+
+    by_action = {bucket["value"]: bucket for bucket in stats["breakdowns"]["action"]}
+    assert by_action["buy"]["sample_sufficient"] is True
+    assert by_action["buy"]["hit_rate_pct"] is not None
+    assert by_action["sell"]["sample_sufficient"] is False
+    assert by_action["sell"]["hit_rate_pct"] is None
+
+    by_market = {bucket["value"]: bucket for bucket in stats["breakdowns"]["market"]}
+    assert by_market["cn"]["sample_sufficient"] is True
+    assert by_market["us"]["sample_sufficient"] is False
+    assert by_market["us"]["hit_rate_pct"] is None
+
+    by_period = {bucket["value"]: bucket for bucket in stats["breakdowns"]["period"]}
+    assert by_period["2024-01"]["sample_sufficient"] is True
+    assert by_period["2024-01"]["hit_rate_pct"] is not None
+    assert by_period["2024-02"]["sample_sufficient"] is False
+    assert by_period["2024-02"]["hit_rate_pct"] is None
+    # Newest period first
+    assert stats["breakdowns"]["period"][0]["value"] == "2024-02"
 
 
 def test_stats_default_statuses_exclude_archived(isolated_db) -> None:

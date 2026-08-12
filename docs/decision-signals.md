@@ -86,13 +86,40 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 
 这些接口继承现有 `/api/v1/*` 管理员鉴权；`ADMIN_AUTH_ENABLED=true` 时需要有效管理员会话 Cookie。
 
+## 事后命中统计与过程质量校准（#987）
+
+`GET /api/v1/decision-signals/outcomes/stats` 消费已落库的
+`decision_signal_outcomes` 行（`engine_version=decision-signal-v1`），不重新拉行情、
+不自建核验引擎。响应在原有聚合与单维 breakdown 之上：
+
+- 顶层增加 `sample_sufficient` 与 `minimum_completed_sample_size`（固定 `30`，与
+  profile calibration 门槛一致）。
+- 每个 breakdown bucket 同样带 `sample_sufficient`。
+- 当 `sample_sufficient=false` 时，`hit_rate_pct` / `avg_stock_return_pct` 为
+  `null`（计数仍返回）；`completed >= 30` 后才公布比率。
+- `breakdowns.period` 按 `anchor_date` 的 `YYYY-MM` 分月（缺 anchor 时回退 outcome
+  `created_at` 月份），与既有 `action`（信号类型）、`market` 一起构成 Web 校准视图的
+  三组维度。
+
+`aggregate_outcome_rows()` 仍返回未门控的原始比率，供 decision memory / scorecard /
+daily brief 等内部调用方自行应用阈值；仅 `get_stats` 的 `publish=True` 路径做公布门控。
+
+Web 在信号中心 `/signals?tab=review` 的过程质量卡片中：
+
+- 展示研究工具定位声明：命中率描述过程一致性，不是收益承诺或投资建议。
+- 样本不足时显式标注，并隐藏比率。
+- 提供按时间 / 市场 / 信号类型切换的校准分桶视图。
+- 可选 `profile_calibration`（需 `DECISION_PROFILE_CALIBRATION_ENABLED=true`）仍挂在
+  同一卡片下方。
+
 ## 决策风格历史表现（profile calibration）
 
 [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) 在现有
 `GET /api/v1/decision-signals/outcomes/stats` 响应中追加可选字段
 `profile_calibration`。实现为独立服务模块
 `src/services/decision_profile_calibration_service.py`，不新增 endpoint、数据库表
-或行情请求。全局统计字段和八类单维 breakdown 保持原口径。
+或行情请求。全局统计字段在原八类单维 breakdown 之外增加 `period` 分月桶；过程质量
+公布门控见上一节。
 
 默认关闭配置项 `DECISION_PROFILE_CALIBRATION_ENABLED`（registry + `.env.example`）。
 关闭时 stats 响应不填充 `profile_calibration`，与开启前兼容；开启时才返回校准分组。

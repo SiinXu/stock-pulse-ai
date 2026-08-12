@@ -736,8 +736,12 @@ describe('decisionSignalsApi', () => {
     );
     expect(stats.engineVersion).toBe('decision-signal-v1');
     expect(stats.hitRatePct).toBe(50);
+    // Older payloads without sample_sufficient infer sufficiency from published rates.
+    expect(stats.sampleSufficient).toBe(true);
+    expect(stats.minimumCompletedSampleSize).toBe(30);
     expect(stats.unableReasons).toEqual({ missing_anchor_price: 1 });
     expect(stats.breakdowns.action[0].unableReasons).toEqual({ missing_anchor_price: 1 });
+    expect(stats.breakdowns.action[0].sampleSufficient).toBe(true);
   });
 
   it('gets per-signal outcomes and upserts feedback', async () => {

@@ -42,10 +42,61 @@ const sampleStats: DecisionSignalOutcomeStatsResponse = {
   hit: 2,
   miss: 1,
   neutral: 0,
-  hitRatePct: 66.67,
-  avgStockReturnPct: 1.5,
+  sampleSufficient: false,
+  minimumCompletedSampleSize: 30,
+  hitRatePct: null,
+  avgStockReturnPct: null,
   unableReasons: {},
-  breakdowns: {},
+  breakdowns: {
+    period: [
+      {
+        dimension: 'period',
+        value: '2024-01',
+        total: 4,
+        completed: 3,
+        unable: 1,
+        hit: 2,
+        miss: 1,
+        neutral: 0,
+        sampleSufficient: false,
+        hitRatePct: null,
+        avgStockReturnPct: null,
+        unableReasons: {},
+      },
+    ],
+    market: [
+      {
+        dimension: 'market',
+        value: 'cn',
+        total: 4,
+        completed: 3,
+        unable: 1,
+        hit: 2,
+        miss: 1,
+        neutral: 0,
+        sampleSufficient: false,
+        hitRatePct: null,
+        avgStockReturnPct: null,
+        unableReasons: {},
+      },
+    ],
+    action: [
+      {
+        dimension: 'action',
+        value: 'buy',
+        total: 4,
+        completed: 3,
+        unable: 1,
+        hit: 2,
+        miss: 1,
+        neutral: 0,
+        sampleSufficient: false,
+        hitRatePct: null,
+        avgStockReturnPct: null,
+        unableReasons: {},
+      },
+    ],
+  },
 };
 
 function renderSection(
@@ -81,11 +132,18 @@ describe('DecisionSignalReviewSection production mount', () => {
     renderSection();
 
     // Production-discoverable chrome for outcome stats (Signal Center → Review).
-    expect(screen.getByText('Signal performance')).toBeInTheDocument();
+    expect(screen.getByText('Process quality stats')).toBeInTheDocument();
     expect(screen.getByText('Global')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByTestId('decision-signal-research-position')).toBeInTheDocument();
+    expect(screen.getByText('Research tool positioning')).toBeInTheDocument();
+    expect(screen.getByTestId('decision-signal-sample-insufficient')).toBeInTheDocument();
+    expect(screen.getByTestId('decision-signal-calibration-breakdown')).toBeInTheDocument();
+    expect(screen.getByText('Post-hoc hit calibration')).toBeInTheDocument();
     expect(screen.getByTestId('outcome-run-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('outcome-explorer')).not.toBeInTheDocument();
+    // Rates stay unpublished under the sample floor.
+    expect(screen.queryByText('66.67%')).not.toBeInTheDocument();
   });
 
   it('shows honest empty state when there are no reviewed outcomes', () => {
@@ -98,6 +156,8 @@ describe('DecisionSignalReviewSection production mount', () => {
         miss: 0,
         unable: 0,
         hitRatePct: null,
+        sampleSufficient: false,
+        breakdowns: {},
       },
       showExplorer: true,
       outcomeExplorerRefreshKey: 1,
@@ -107,6 +167,7 @@ describe('DecisionSignalReviewSection production mount', () => {
     expect(screen.getByTestId('outcome-explorer')).toHaveAttribute('data-refresh-key', '1');
     // Empty-state must not pretend a healthy scoreboard exists.
     expect(screen.queryByText('66.67%')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('decision-signal-calibration-breakdown')).not.toBeInTheDocument();
   });
 
   it('retries stats load from the mounted card error action', () => {
