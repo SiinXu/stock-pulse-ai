@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Default-off authenticated read-only research API (`GET /api/v1/research/conclusions*`) exposing brief/standard/research stratified conclusions with as-of, confidence, and evidence counts; reuses session auth, security audit, and sliding-window rate limits on the main API port (Refs #1143, #1127).
+- [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Changed] Jinja stock reports use Decision Card-first layered reading (card → mode-density evidence strata → detail sections) for brief/standard/research, and `ReportType.BRIEF` notifications force `report_mode=brief` so push length budgets hold (Refs #861, #874).
