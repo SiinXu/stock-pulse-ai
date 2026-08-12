@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Tests] CI report-export-stack job installs optional report-export dependencies and host fonts, and fails when HTML/PDF fixture, Chinese glyph-coverage, or bound export tests skip (Refs #163).
 - [Fixed] Split notification/report chunks on true H1 headings and flush max-words buffers after oversize sections (Ported-from upstream 5698068fe; Refs #1219).
 - [Docs] Add bilingual engineering-efficiency playbook for parallel merge trains (batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, worktree safety) and link it from CONTRIBUTING and the docs index (Refs #891).
+- [Chore] Pin the desktop Electron runtime to 43.4.0 (supported 43-x-y) while keeping electron-builder 26.15.7, electron-updater 6.8.9, tar 7.5.22, and js-yaml 4.3.1 overrides for the #1060 / #615 security stack.
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Changed] Jinja stock reports use Decision Card-first layered reading (card → mode-density evidence strata → detail sections) for brief/standard/research, and `ReportType.BRIEF` notifications force `report_mode=brief` so push length budgets hold (Refs #861, #874).
