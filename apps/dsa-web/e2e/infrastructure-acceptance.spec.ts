@@ -266,23 +266,32 @@ async function installMockAuth(page: Page, options: {
 
 async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLanguage: 'zh' | 'en') {
   const detailReady = deferred();
+  let detailRequests = 0;
+  let upstreamDetailFetches = 0;
+  let seededDetailPromise: Promise<{ body: JsonObject; status: number }> | null = null;
   await page.route('**/api/v1/history/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (!/\/api\/v1\/history\/\d+$/.test(pathname)) {
       await route.continue();
       return;
     }
-    const response = await route.fetch();
-    const body = await response.json() as JsonObject;
-    const meta = body.meta as JsonObject;
-    body.meta = { ...meta, report_language: reportLanguage };
-    const details = (body.details as JsonObject | undefined) ?? {};
-    body.details = {
-      ...details,
-      raw_result: { fixture: 'raw-diagnostic-value' },
-      context_snapshot: { fixture: 'context-snapshot-value' },
-    };
-    await route.fulfill({ response, json: body });
+    detailRequests += 1;
+    seededDetailPromise ??= (async () => {
+      upstreamDetailFetches += 1;
+      const response = await route.fetch();
+      const body = await response.json() as JsonObject;
+      const meta = body.meta as JsonObject;
+      body.meta = { ...meta, report_language: reportLanguage };
+      const details = (body.details as JsonObject | undefined) ?? {};
+      body.details = {
+        ...details,
+        raw_result: { fixture: 'raw-diagnostic-value' },
+        context_snapshot: { fixture: 'context-snapshot-value' },
+      };
+      return { body, status: response.status() };
+    })();
+    const seededDetail = await seededDetailPromise;
+    await fulfillJson(route, seededDetail.body, seededDetail.status);
     detailReady.resolve();
   });
   await page.route('**/api/v1/history/*/diagnostics', async (route) => {
@@ -312,6 +321,10 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
   await historyItem.click();
   await detailReady.promise;
   await expect(page.getByText('E2E Fixture', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+  return {
+    detailRequests: () => detailRequests,
+    upstreamDetailFetches: () => upstreamDetailFetches,
+  };
 }
 
 async function currentConfig(page: Page) {
@@ -1174,7 +1187,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   });
 
   test('10 report copy, diagnostics, and traceability chrome always follows UI language', async ({ page }) => {
-    await openSeededReport(page, 'en', 'zh');
+    const seededReport = await openSeededReport(page, 'en', 'zh');
     await expect(page.getByText('Run Status', { exact: true })).toBeVisible();
     await expect(page.getByText('Data Traceability', { exact: true })).toBeVisible();
     await expect(page.getByText('运行状态', { exact: true })).toHaveCount(0);
@@ -1182,6 +1195,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const drawer = page.getByRole('dialog', { name: /Full Analysis Report/ });
     await expect(drawer.getByRole('button', { name: 'Copy Markdown Source' })).toBeVisible();
     await expect(drawer.getByRole('button', { name: 'Copy Plain Text' })).toBeVisible();
+
+    const requestsBeforeReload = seededReport.detailRequests();
+    await page.reload();
+    await expect.poll(seededReport.detailRequests).toBeGreaterThan(requestsBeforeReload);
+    await expect(page.getByText('Run Status', { exact: true })).toBeVisible();
+    expect(seededReport.upstreamDetailFetches()).toBe(1);
   });
 
   test('11 Chat handles labeled input, IME composition, stream failure, and retry without duplicating the user message', async ({ page }) => {
