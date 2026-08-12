@@ -40,7 +40,7 @@
 - 步骤失败且允许 replan 时，带 `prior_observations` 调用 planner，把 replan 记入审计轨迹，并从新计划第一步重启；历史 observation 保留在 metadata。
 - template replan 在构造下一提案时排除硬失败工具（非瞬时错误码）；授权集合仍只来自调用方 available-tools。
 - 停止闭环的预算/围栏原因：`max_tool_calls_exceeded`、`execution_timeout`、`max_observation_replans_exceeded`、`cancelled`、`replan_failed`。
-- 轨迹通道：通过既有 agent observability 发出 `plan_execution` / `plan_step` 阶段事件、工具起止事件与终态 decision 事件（诊断上下文激活时可持久化）。结构化 metadata 始终可通过 `PlanExecutionResult.to_metadata()` 供诊断与评测消费。
+- 轨迹通道：规划闭环发出结构化 `plan` / `action` / `observation` / `replan` / `terminate` 事件（`agent.plan` … `agent.terminate`；Issue #1078，事件 taxonomy 与 #1125 统一运行追踪草案对齐）。事件携带 `run_id`、可选 `step`、适用时的 `reason` / `error_type`，以及预算快照（工具调用、observation replan、token）。`terminate` 始终带非空 `reason`。同一有序列表挂在 `PlanExecutionResult.trace_events`，可不翻日志还原一次规划。既有 phase/tool/decision 事件继续发出。记录受 `AGENT_OBSERVABILITY_ENABLED` 门控（默认开；设为 false 可关闭）。完整结构化 metadata 仍可通过 `PlanExecutionResult.to_metadata()` 消费。
 - 仅当（含 replan 后的）活动计划全部步骤成功完成时 `success=True`。replan 前的失败 observation 仍保留在列表中，不会单独把终态改写为成功——终态反映闭环是否完成，而不是“每一行 observation 都绿”。
 
 ### 执行示例

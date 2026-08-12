@@ -210,6 +210,9 @@ class PlanExecutionResult:
     timed_out: bool = False
     duration_ms: Optional[int] = None
     plans: List[Dict[str, Any]] = field(default_factory=list)
+    #: Ordered plan/action/observation/replan/terminate events for one run (#1078).
+    trace_events: List[Dict[str, Any]] = field(default_factory=list)
+    planning_run_id: Optional[str] = None
 
     def to_metadata(self) -> Dict[str, Any]:
         """Trace-safe metadata for diagnostics / audit consumers."""
@@ -232,6 +235,8 @@ class PlanExecutionResult:
             payload["initial_plan_id"] = self.initial_plan_id
         if self.final_plan_id:
             payload["final_plan_id"] = self.final_plan_id
+        if self.planning_run_id:
+            payload["planning_run_id"] = self.planning_run_id
         if self.reason:
             payload["reason"] = _safe_code(self.reason, default="failed")
         if self.error_code:
@@ -247,6 +252,10 @@ class PlanExecutionResult:
             payload["observations_truncated"] = True
         if self.plans:
             payload["plans"] = list(self.plans)[:MAX_TRACE_STEPS]
+        if self.trace_events:
+            payload["trace_events"] = list(self.trace_events)[:MAX_TRACE_STEPS]
+            if len(self.trace_events) > MAX_TRACE_STEPS:
+                payload["trace_events_truncated"] = True
         return payload
 
 
