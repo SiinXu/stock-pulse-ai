@@ -15,6 +15,8 @@ from src.report_language import normalize_report_language
 
 if TYPE_CHECKING:
     from src.agent.executor import (
+        AGENT_SYSTEM_PROMPT,
+        LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT,
         AgentResult,
         _build_language_section,
     )
@@ -104,12 +106,10 @@ class _RunMethods:
         stock_code = (context or {}).get("stock_code", "")
         market_role = get_market_role(stock_code, report_language)
         market_guidelines = get_market_guidelines(stock_code, report_language)
-        from src.agent.prompt_versioning import resolve_key_prompt_text
-
-        prompt_template = resolve_key_prompt_text(
-            "agent.system.legacy"
+        prompt_template = (
+            LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT
             if self.use_legacy_default_prompt
-            else "agent.system"
+            else AGENT_SYSTEM_PROMPT
         )
         system_prompt = prompt_template.format(
             market_role=market_role,

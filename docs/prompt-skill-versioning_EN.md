@@ -1,6 +1,6 @@
 # Prompt and Skill versioning
 
-**Issue:** #249  
+**Issue:** #249
 **Related:** promotion pipeline #1093 (out of scope here), evaluation harness #215
 
 Chinese version: `docs/prompt-skill-versioning.md`
@@ -8,8 +8,8 @@ Chinese version: `docs/prompt-skill-versioning.md`
 ## Purpose
 
 Provide a **version identity + change history + rollback pin** base for Skills
-and key prompts so runs are reproducible and bad content can be pinned back
-without rewriting source modules.
+and key prompts so runs are traceable and bad key-prompt content can be pinned
+back without rewriting source modules or the runtime ToolSurface.
 
 This issue intentionally does **not**:
 
@@ -44,31 +44,39 @@ dedicated PR.
 - `ensure_*` appends a revision when the content hash changes
 - `list_history` returns newest-first revisions
 - `rollback(..., to_version=N)` moves only the **active pin**
-- `apply_active_skill_pin` overlays the active pin onto a live Skill when the
-  pin body differs from the disk/plugin load (in memory only)
+- A Skill rollback moves the history active pin only; runtime Skills continue
+  to use their source/plugin definition until governed activation in #1093
 - Does **not** rewrite `strategies/*.yaml` or Python prompt constants
 
 Storage root: `PROMPT_ARTIFACT_STORE_DIR` (default
 `<database parent>/prompt_artifacts`).
 
-**Runtime loop (Skills):** `load_skill_from_yaml` / `load_skill_from_markdown`,
-`SkillManager.register`, and plugin `AnalysisStrategyDefinition.to_skill()` all
-call `apply_active_skill_pin`. The pin body is applied only when
-`active_version < latest_version` (rolled back); while the tip is active, disk /
-plugin content remains the working set. On-disk YAML is never rewritten.
+**Runtime loop (Skills):** `resolve_skill_prompt_state` records history and trace
+for the actually active Skills. History never rewrites runtime `instructions`,
+`required_tools`, `allowed_tools`, default activation, or routing metadata, so a
+version pin cannot bypass the ToolSurface or plugin catalog. Governed Skill-pin
+activation belongs to #1093.
 
 **Runtime loop (key prompts):** `resolve_key_prompt_text(prompt_id)` is used by
-Agent run/chat, analyzer system/text, and image extract. Same
+Agent run/chat, chat-summary compression, analyzer system/text, and image extract. Same
 `active_version < latest_version` rule. `agent.soul` **never** accepts a pin
-overlay (Soul identity proofs require the live charter).
+overlay (Soul identity proofs require the live charter). Each real resolution
+atomically records the live body and traces the selected `source_version`.
+Corrupt indexes and reused labels with different content fail closed.
+
+The JSON store protects complete read-modify-write transactions with a process
+file lock, writes through a temporary file plus `fsync`, and atomically replaces
+the index. Corrupt, unknown-schema, or invariant-breaking indexes are never
+silently treated as empty history.
 
 ## Runtime trace
 
-`resolve_skill_prompt_state` builds `SkillPromptState.version_trace` and, when a
-diagnostic context is active, attaches it via
-`attach_prompt_artifact_versions`. Snapshots expose
+`resolve_skill_prompt_state` records actual Skill identities. Agent run/chat,
+analyzer system/text, and image extraction merge the precise prompt revision at
+the point its body is resolved. Diagnostic snapshots expose
 `prompt_artifact_versions`, plus compatibility fields `prompt_version` and
-`skill_versions`.
+`skill_versions`. Soul keeps its existing independent, immutable runtime-facts
+proof.
 
 `SkillAgent.post_process` sets `raw_data.skill_version` /
 `skill_content_hash` for skill-opinion samples.
@@ -78,7 +86,7 @@ diagnostic context is active, attaches it via
 | Concern | #249 | #1093 |
 | --- | --- | --- |
 | Version id + content hash | Yes | Consumes |
-| History + rollback pin | Yes | Checklist item |
+| History + key-prompt rollback pin; Skill management pin | Yes | Consumes and governs Skill-pin activation |
 | Lifecycle label field | Store only | Transitions / policy |
 | Experimental activation | No | Yes |
 | Eval + promotion CLI | No | Yes |

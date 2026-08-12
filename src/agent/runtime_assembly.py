@@ -610,9 +610,11 @@ def resolve_skill_prompt_state(
     try:
         version_trace = skill_manager.get_version_trace(
             active_only=True,
-            include_prompts=True,
+            # Actual prompt identity is recorded at the point each prompt body
+            # is resolved; avoid claiming agent.system for analyzer/chat runs.
+            include_prompts=False,
             use_legacy_default_prompt=use_legacy_default_prompt,
-            record_history=False,
+            record_history=True,
         )
         from src.services.run_diagnostics import attach_prompt_artifact_versions
 

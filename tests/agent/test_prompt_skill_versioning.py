@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,7 +20,11 @@ from src.agent.prompt_versioning import (
     reset_prompt_artifact_service_for_tests,
     skill_content_hash,
 )
-from src.agent.prompt_versioning.store import PromptArtifactStore
+from src.agent.prompt_versioning.registry import KeyPromptSpec
+from src.agent.prompt_versioning.store import (
+    PromptArtifactStore,
+    PromptArtifactStoreError,
+)
 from src.agent.skills.base import Skill, SkillManager, load_skill_from_yaml
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
@@ -134,15 +140,28 @@ def test_history_and_rollback(isolated_service: PromptArtifactService):
     assert "body v1" in body
 
     isolated_service.ensure_skill(skill_v1)
+    skill_v3 = _make_skill(instructions="body v3", version="3.0.0")
+    after_new_tip = isolated_service.ensure_skill(skill_v3)
+    assert after_new_tip.content_hash == skill_v3.content_hash
+    pinned_snapshot = isolated_service.get_snapshot(
+        kind=ArtifactKind.SKILL,
+        artifact_id="demo_skill",
+    )
+    assert pinned_snapshot is not None
+    assert pinned_snapshot.active_version == 1
+    assert pinned_snapshot.latest_version == 3
     history_after = isolated_service.list_history(
         kind=ArtifactKind.SKILL,
         artifact_id="demo_skill",
     )
-    assert len(history_after) == 2
+    assert len(history_after) == 3
 
 
-def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactService, tmp_path):
-    """After rollback, loaders must serve pinned body without rewriting YAML."""
+def test_skill_rollback_pin_never_mutates_runtime_skill_or_tool_surface(
+    isolated_service: PromptArtifactService,
+    tmp_path,
+):
+    """A management pin must not rewrite the runtime Skill or ToolSurface metadata."""
     path = tmp_path / "pinned.yaml"
     path.write_text(
         "\n".join(
@@ -151,6 +170,8 @@ def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactServ
                 "display_name: Pin Skill",
                 "description: pin test",
                 "version: 1.0.0",
+                "required_tools: [get_daily_history]",
+                "allowed_tools: [get_daily_history]",
                 "instructions: |",
                 "  body v1",
                 "",
@@ -170,6 +191,8 @@ def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactServ
                 "display_name: Pin Skill",
                 "description: pin test",
                 "version: 2.0.0",
+                "required_tools: [search_stock_news]",
+                "allowed_tools: [search_stock_news]",
                 "instructions: |",
                 "  body v2",
                 "",
@@ -188,16 +211,18 @@ def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactServ
         to_version=1,
     )
 
-    # Disk still has v2; active pin is v1 → load must overlay pin body.
+    # Runtime definitions remain source-controlled. Applying a history pin to
+    # instructions or tool metadata is deferred to governed promotion (#1093).
     loaded = load_skill_from_yaml(path)
-    assert loaded.instructions.strip() == "body v1"
-    assert loaded.version == "1.0.0"
-    assert loaded.content_hash == skill_v1.content_hash
+    assert loaded.instructions.strip() == "body v2"
+    assert loaded.version == "2.0.0"
+    assert loaded.required_tools == ["search_stock_news"]
+    assert loaded.allowed_tools == ["search_stock_news"]
 
-    # SkillManager.register also applies the pin.
+    # SkillManager.register must not apply history state either.
     manager = SkillManager()
     disk_skill = load_skill_from_yaml(path)
-    # load_skill_from_yaml already applied pin; re-build without pin path:
+    # Registration must retain the current source-defined ToolSurface.
     from src.agent.prompt_versioning import attach_skill_identity
 
     raw = Skill(
@@ -212,7 +237,7 @@ def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactServ
     manager.register(raw)
     registered = manager.get("pin_skill")
     assert registered is not None
-    assert registered.instructions.strip() == "body v1"
+    assert registered.instructions.strip() == "body v2"
 
     # Disk file must remain at tip (no rewrite).
     disk_text = path.read_text(encoding="utf-8")
@@ -220,61 +245,156 @@ def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactServ
     assert "version: 2.0.0" in disk_text
 
 
-def test_key_prompt_pin_resolved_after_rollback(isolated_service: PromptArtifactService):
+def test_key_prompt_pin_resolved_after_rollback(
+    isolated_service: PromptArtifactService,
+    monkeypatch,
+):
     """Rolled-back key prompts serve pin body; tip stays live when not rolled back."""
     from src.agent.prompt_versioning import resolve_key_prompt_text
 
     prompt_id = "agent.system"
-    live = resolve_key_prompt_text(prompt_id)
-    assert live  # live loader body
+    from src.agent.prompt_versioning import registry
 
-    isolated_service.ensure_content(
-        kind=ArtifactKind.PROMPT,
-        artifact_id=prompt_id,
-        content="PINNED_V1_TEMPLATE {market_role}",
-        label="1.0.0",
-        change_summary="v1",
+    live_v1 = resolve_key_prompt_text(prompt_id)
+    assert live_v1
+    monkeypatch.setitem(
+        registry._SPECS_BY_ID,
+        prompt_id,
+        KeyPromptSpec(
+            artifact_id=prompt_id,
+            version="2.0.0",
+            loader=lambda: "PINNED_V2_TEMPLATE {market_role}",
+        ),
     )
-    isolated_service.ensure_content(
-        kind=ArtifactKind.PROMPT,
-        artifact_id=prompt_id,
-        content="PINNED_V2_TEMPLATE {market_role}",
-        label="2.0.0",
-        change_summary="v2",
-    )
-    # Tip active → still live module body (not auto-switched to store tip text
-    # unless pin is behind tip). Store tip is v2; live module may differ — when
-    # active==latest we intentionally keep live loader text.
-    assert resolve_key_prompt_text(prompt_id) == live
+    assert resolve_key_prompt_text(prompt_id) == "PINNED_V2_TEMPLATE {market_role}"
 
     isolated_service.rollback(
         kind=ArtifactKind.PROMPT,
         artifact_id=prompt_id,
         to_version=1,
     )
-    assert resolve_key_prompt_text(prompt_id) == "PINNED_V1_TEMPLATE {market_role}"
+    assert resolve_key_prompt_text(prompt_id) == live_v1
+    from src.agent.executor import AGENT_SYSTEM_PROMPT
+
+    rendered = AGENT_SYSTEM_PROMPT.format(
+        market_role="test market",
+        market_guidelines="test guidelines",
+        default_skill_policy_section="",
+        skills_section="",
+        language_section="",
+    )
+    assert rendered == live_v1.format(
+        market_role="test market",
+        market_guidelines="test guidelines",
+        default_skill_policy_section="",
+        skills_section="",
+        language_section="",
+    )
 
     # Soul must never be overlaid by a history pin.
     soul_live = resolve_key_prompt_text("agent.soul")
-    isolated_service.ensure_content(
-        kind=ArtifactKind.PROMPT,
-        artifact_id="agent.soul",
-        content="FAKE_SOUL_V1",
-        label="1.0.0",
-    )
-    isolated_service.ensure_content(
+    soul_fake_v2 = isolated_service.ensure_content(
         kind=ArtifactKind.PROMPT,
         artifact_id="agent.soul",
         content="FAKE_SOUL_V2",
         label="2.0.0",
     )
+    isolated_service.ensure_content(
+        kind=ArtifactKind.PROMPT,
+        artifact_id="agent.soul",
+        content="FAKE_SOUL_V3",
+        label="3.0.0",
+    )
     isolated_service.rollback(
         kind=ArtifactKind.PROMPT,
         artifact_id="agent.soul",
-        to_version=1,
+        to_version=soul_fake_v2.latest_version,
     )
     assert resolve_key_prompt_text("agent.soul") == soul_live
     assert "FAKE_SOUL" not in resolve_key_prompt_text("agent.soul")
+
+
+def test_corrupt_store_fails_closed_without_overwriting_history(tmp_path) -> None:
+    root = tmp_path / "corrupt"
+    root.mkdir()
+    index = root / "index.json"
+    index.write_text("{broken", encoding="utf-8")
+    service = PromptArtifactService(PromptArtifactStore(root))
+
+    with pytest.raises(PromptArtifactStoreError):
+        service.ensure_content(
+            kind=ArtifactKind.PROMPT,
+            artifact_id="agent.system",
+            content="new body",
+            label="1.0.0",
+        )
+
+    assert index.read_text(encoding="utf-8") == "{broken"
+
+
+def test_independent_store_instances_do_not_lose_concurrent_updates(tmp_path) -> None:
+    root = tmp_path / "concurrent"
+
+    def _record(index: int) -> None:
+        service = PromptArtifactService(PromptArtifactStore(root))
+        service.ensure_content(
+            kind=ArtifactKind.PROMPT,
+            artifact_id=f"prompt.{index}",
+            content=f"body {index}",
+            label="1.0.0",
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(_record, range(32)))
+
+    assert len(PromptArtifactStore(root).keys()) == 32
+
+
+def test_identity_metadata_rejects_invalid_governance_values() -> None:
+    with pytest.raises(ValueError):
+        _make_skill(version="bad version")
+    skill = Skill(
+        name="bad_lifecycle",
+        display_name="Bad",
+        description="bad lifecycle",
+        instructions="body",
+        lifecycle="activ",
+    )
+    with pytest.raises(ValueError):
+        attach_skill_identity(skill)
+
+
+def test_content_hash_mismatch_and_duplicate_label_fail_closed(
+    isolated_service: PromptArtifactService,
+) -> None:
+    with pytest.raises(ValueError, match="does not match"):
+        isolated_service.ensure_content(
+            kind=ArtifactKind.PROMPT,
+            artifact_id="agent.system",
+            content="body",
+            label="1.0.0",
+            content_hash=content_hash_for_text("different"),
+        )
+    with pytest.raises(ValueError, match="reserved"):
+        isolated_service.ensure_content(
+            kind=ArtifactKind.PROMPT,
+            artifact_id="agent.system",
+            content="body",
+            label="ca-deadbeef0000",
+        )
+    isolated_service.ensure_content(
+        kind=ArtifactKind.PROMPT,
+        artifact_id="agent.system",
+        content="body v1",
+        label="1.0.0",
+    )
+    with pytest.raises(ValueError, match="already identifies different content"):
+        isolated_service.ensure_content(
+            kind=ArtifactKind.PROMPT,
+            artifact_id="agent.system",
+            content="body v2",
+            label="1.0.0",
+        )
 
 
 def test_history_persists_across_store_reopen(tmp_path, monkeypatch):
@@ -365,6 +485,88 @@ def test_skill_manager_version_trace(isolated_service: PromptArtifactService, tm
         artifact_id="mgr_skill",
     )
     assert len(history) == 1
+
+
+def test_production_prompt_state_records_history_and_exact_prompt_use(
+    isolated_service: PromptArtifactService,
+    monkeypatch,
+) -> None:
+    from src.agent import runtime_assembly
+    from src.agent.prompt_versioning import resolve_key_prompt_text
+
+    manager = SkillManager()
+    manager.register(_make_skill(name="runtime_skill", version="4.0.0"))
+    monkeypatch.setattr(runtime_assembly, "get_skill_manager", lambda _config: manager)
+
+    token = activate_run_diagnostic_context(trace_id="trace-runtime-versioning")
+    try:
+        runtime_assembly.resolve_skill_prompt_state(
+            SimpleNamespace(agent_skills=[]),
+            skills=["runtime_skill"],
+        )
+        prompt_text = resolve_key_prompt_text("agent.system")
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert prompt_text
+    assert snapshot is not None
+    versions = snapshot["prompt_artifact_versions"]
+    assert versions["skill_versions"]["runtime_skill"] == "4.0.0"
+    assert [item["artifact_id"] for item in versions["prompts"]] == ["agent.system"]
+    assert versions["prompts"][0]["source_version"] == 1
+    assert len(
+        isolated_service.list_history(
+            kind=ArtifactKind.SKILL,
+            artifact_id="runtime_skill",
+        )
+    ) == 1
+    assert len(
+        isolated_service.list_history(
+            kind=ArtifactKind.PROMPT,
+            artifact_id="agent.system",
+        )
+    ) == 1
+
+
+def test_chat_summary_builder_consumes_rolled_back_prompt(
+    isolated_service: PromptArtifactService,
+    monkeypatch,
+) -> None:
+    from src.agent.chat_context import VisibleMessage, build_summary_messages
+    from src.agent.prompt_versioning import registry
+
+    prompt_id = "agent.chat.summary"
+    monkeypatch.setitem(
+        registry._SPECS_BY_ID,
+        prompt_id,
+        KeyPromptSpec(prompt_id, "1.0.0", lambda: "summary v1"),
+    )
+    assert build_summary_messages("", [VisibleMessage(1, "user", "hello")])[0][
+        "content"
+    ] == "summary v1"
+    monkeypatch.setitem(
+        registry._SPECS_BY_ID,
+        prompt_id,
+        KeyPromptSpec(prompt_id, "2.0.0", lambda: "summary v2"),
+    )
+    assert build_summary_messages("", [VisibleMessage(1, "user", "hello")])[0][
+        "content"
+    ] == "summary v2"
+    isolated_service.rollback(
+        kind=ArtifactKind.PROMPT,
+        artifact_id=prompt_id,
+        to_version=1,
+    )
+    assert build_summary_messages("", [VisibleMessage(1, "user", "hello")])[0][
+        "content"
+    ] == "summary v1"
+    assert len(
+        isolated_service.list_history(
+            kind=ArtifactKind.PROMPT,
+            artifact_id=prompt_id,
+        )
+    ) == 2
 
 
 def test_builtin_bull_trend_has_identity():

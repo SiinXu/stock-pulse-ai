@@ -22,7 +22,6 @@ from src.agent.prompt_versioning.registry import (
 )
 from src.agent.prompt_versioning.service import (
     PromptArtifactService,
-    apply_active_skill_pin,
     get_prompt_artifact_service,
     reset_prompt_artifact_service_for_tests,
     resolve_key_prompt_text,
@@ -44,7 +43,6 @@ __all__ = [
     "LifecycleState",
     "PromptArtifactService",
     "VersionedIdentity",
-    "apply_active_skill_pin",
     "attach_skill_identity",
     "build_run_version_trace",
     "content_hash_for_text",

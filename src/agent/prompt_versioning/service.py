@@ -3,19 +3,20 @@
 
 from __future__ import annotations
 
-import json
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from src.agent.prompt_versioning.identity import (
     attach_skill_identity,
     build_run_version_trace,
+    content_addressed_version,
     content_hash_for_text,
+    normalize_version_label,
     skill_content_body,
-    skill_content_hash,
     skill_identity,
 )
 from src.agent.prompt_versioning.registry import (
@@ -35,6 +36,9 @@ from src.agent.prompt_versioning.types import (
 
 _SERVICE_LOCK = threading.RLock()
 _SERVICE: Optional["PromptArtifactService"] = None
+_ARTIFACT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_MAX_ARTIFACT_CONTENT_BYTES = 2 * 1024 * 1024
+_MAX_CHANGE_SUMMARY_LENGTH = 500
 
 
 def _utc_now_iso() -> str:
@@ -128,20 +132,41 @@ class PromptArtifactService:
         """
         kind_enum = kind if isinstance(kind, ArtifactKind) else ArtifactKind(str(kind))
         artifact_key = str(artifact_id or "").strip()
-        if not artifact_key:
-            raise ValueError("artifact_id is required")
+        if not _ARTIFACT_ID_RE.fullmatch(artifact_key):
+            raise ValueError("artifact_id must be a bounded portable identifier")
         body = content if content is not None else ""
-        digest = content_hash or content_hash_for_text(body)
+        if not body:
+            raise ValueError("artifact content is required")
+        if len(body.encode("utf-8")) > _MAX_ARTIFACT_CONTENT_BYTES:
+            raise ValueError("artifact content exceeds the 2 MiB history limit")
+        computed_digest = content_hash_for_text(body)
+        if content_hash is not None and str(content_hash) != computed_digest:
+            raise ValueError("content_hash does not match artifact content")
+        digest = computed_digest
         life = normalize_lifecycle(lifecycle)
-        version_label = str(label or "").strip() or digest
+        label_text = str(label or "").strip()
+        if label_text:
+            version_label = normalize_version_label(label_text)
+            if version_label is None:
+                raise ValueError(f"Invalid artifact version label: {label!r}")
+            if version_label.startswith("ca-"):
+                raise ValueError("Authored version labels must not use the reserved 'ca-' prefix")
+        else:
+            version_label = content_addressed_version(digest)
+        summary = None
+        if change_summary is not None:
+            summary = str(change_summary).strip()[:_MAX_CHANGE_SUMMARY_LENGTH] or None
 
-        with self._lock:
-            existing = self._store.get(kind_enum, artifact_key)
+        def _update(existing: Optional[ArtifactSnapshot]) -> ArtifactSnapshot:
             if existing is not None:
                 for revision in existing.revisions:
                     if revision.content_hash == digest:
                         # Content already known — leave active pin and history alone.
                         return existing
+                    if revision.label == version_label:
+                        raise ValueError(
+                            f"Version label {version_label!r} already identifies different content"
+                        )
 
                 next_version = int(existing.latest_version) + 1
                 revision = ArtifactRevision(
@@ -150,7 +175,7 @@ class PromptArtifactService:
                     content_hash=digest,
                     content=body,
                     lifecycle=life,
-                    change_summary=change_summary,
+                    change_summary=summary,
                     created_at=_utc_now_iso(),
                 )
                 revisions = tuple(existing.revisions) + (revision,)
@@ -158,11 +183,20 @@ class PromptArtifactService:
                     kind=kind_enum,
                     artifact_id=artifact_key,
                     latest_version=next_version,
-                    active_version=next_version,
-                    lifecycle=life,
+                    active_version=(
+                        existing.active_version
+                        if existing.active_version < existing.latest_version
+                        else next_version
+                    ),
+                    lifecycle=(
+                        existing.active_revision().lifecycle
+                        if existing.active_version < existing.latest_version
+                        and existing.active_revision() is not None
+                        else life
+                    ),
                     revisions=revisions,
                 )
-                return self._store.put(snapshot)
+                return snapshot
 
             revision = ArtifactRevision(
                 version=1,
@@ -170,7 +204,7 @@ class PromptArtifactService:
                 content_hash=digest,
                 content=body,
                 lifecycle=life,
-                change_summary=change_summary,
+                change_summary=summary,
                 created_at=_utc_now_iso(),
             )
             snapshot = ArtifactSnapshot(
@@ -181,7 +215,10 @@ class PromptArtifactService:
                 lifecycle=life,
                 revisions=(revision,),
             )
-            return self._store.put(snapshot)
+            return snapshot
+
+        with self._lock:
+            return self._store.update(kind_enum, artifact_key, _update)
 
     def list_history(
         self,
@@ -210,7 +247,10 @@ class PromptArtifactService:
         artifact_id: str,
     ) -> Optional[ArtifactSnapshot]:
         kind_enum = kind if isinstance(kind, ArtifactKind) else ArtifactKind(str(kind))
-        return self._store.get(kind_enum, str(artifact_id or "").strip())
+        artifact_key = str(artifact_id or "").strip()
+        if not _ARTIFACT_ID_RE.fullmatch(artifact_key):
+            raise ValueError("artifact_id must be a bounded portable identifier")
+        return self._store.get(kind_enum, artifact_key)
 
     def get_active_revision(
         self,
@@ -233,9 +273,13 @@ class PromptArtifactService:
         """Move only the active pin to an existing revision; history is immutable."""
         kind_enum = kind if isinstance(kind, ArtifactKind) else ArtifactKind(str(kind))
         artifact_key = str(artifact_id or "").strip()
-        target = int(to_version)
-        with self._lock:
-            snapshot = self._store.get(kind_enum, artifact_key)
+        if not _ARTIFACT_ID_RE.fullmatch(artifact_key):
+            raise ValueError("artifact_id must be a bounded portable identifier")
+        if isinstance(to_version, bool) or not isinstance(to_version, int) or to_version < 1:
+            raise ValueError("to_version must be a positive integer")
+        target = to_version
+
+        def _update(snapshot: Optional[ArtifactSnapshot]) -> ArtifactSnapshot:
             if snapshot is None:
                 raise KeyError(
                     f"No artifact history for {kind_enum.value}:{artifact_key}"
@@ -245,7 +289,7 @@ class PromptArtifactService:
                 raise KeyError(
                     f"Version {target} not found for {kind_enum.value}:{artifact_key}"
                 )
-            updated = ArtifactSnapshot(
+            return ArtifactSnapshot(
                 kind=snapshot.kind,
                 artifact_id=snapshot.artifact_id,
                 latest_version=snapshot.latest_version,
@@ -253,7 +297,9 @@ class PromptArtifactService:
                 lifecycle=revision.lifecycle or snapshot.lifecycle,
                 revisions=snapshot.revisions,
             )
-            return self._store.put(updated)
+
+        with self._lock:
+            return self._store.update(kind_enum, artifact_key, _update)
 
     def resolve_active_content(
         self,
@@ -266,136 +312,6 @@ class PromptArtifactService:
         if revision is None:
             return None
         return revision.content
-
-    def apply_active_skill_pin(self, skill: Any) -> Any:
-        """Overlay a rolled-back active pin onto a live Skill (memory only).
-
-        Disk / plugin loaders remain the authoring source. When
-        ``active_version == latest_version`` the tip is the working set and the
-        loaded body is kept so authors can advance content and history. After a
-        rollback (``active_version < latest_version``) this method applies the
-        pinned revision's definition-bearing fields in memory only (YAML is not
-        rewritten). Fail-open: missing history, bad JSON, or store errors leave
-        the Skill unchanged.
-        """
-        artifact_id = str(getattr(skill, "name", "") or "").strip()
-        if not artifact_id:
-            return skill
-        try:
-            snapshot = self.get_snapshot(
-                kind=ArtifactKind.SKILL,
-                artifact_id=artifact_id,
-            )
-        except Exception:
-            return skill
-        if snapshot is None:
-            return skill
-        # Tip is not rolled back: keep disk/plugin body as the working set.
-        if int(snapshot.active_version) >= int(snapshot.latest_version):
-            return skill
-        active = snapshot.active_revision()
-        if active is None or not str(active.content or "").strip():
-            return skill
-
-        try:
-            disk_hash = str(getattr(skill, "content_hash", "") or "").strip()
-            if not disk_hash:
-                disk_hash = skill_content_hash(skill)
-        except Exception:
-            disk_hash = ""
-
-        if disk_hash and disk_hash == str(active.content_hash or "").strip():
-            # Pin matches loaded body; align identity fields with the pin label.
-            try:
-                if active.label:
-                    skill.version = str(active.label)
-                if active.content_hash:
-                    skill.content_hash = str(active.content_hash)
-                if active.lifecycle:
-                    skill.lifecycle = str(active.lifecycle)
-            except Exception:
-                pass
-            return skill
-
-        try:
-            payload = json.loads(active.content)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return skill
-        if not isinstance(payload, dict):
-            return skill
-
-        def _string_list(value: Any) -> list:
-            if value is None:
-                return []
-            if isinstance(value, str):
-                return [value.strip()] if value.strip() else []
-            if isinstance(value, (list, tuple)):
-                return [str(item).strip() for item in value if str(item).strip()]
-            text = str(value).strip()
-            return [text] if text else []
-
-        def _int_list(value: Any) -> list:
-            result = []
-            if not isinstance(value, (list, tuple)):
-                return result
-            for item in value:
-                try:
-                    result.append(int(item))
-                except (TypeError, ValueError):
-                    continue
-            return result
-
-        try:
-            if "display_name" in payload:
-                skill.display_name = str(payload.get("display_name") or "").strip()
-            if "description" in payload:
-                skill.description = str(payload.get("description") or "").strip()
-            if "instructions" in payload:
-                skill.instructions = str(payload.get("instructions") or "")
-            if "category" in payload:
-                skill.category = str(payload.get("category") or "").strip() or "trend"
-            if "core_rules" in payload:
-                skill.core_rules = _int_list(payload.get("core_rules"))
-            if "required_tools" in payload:
-                skill.required_tools = _string_list(payload.get("required_tools"))
-            if "allowed_tools" in payload:
-                skill.allowed_tools = _string_list(payload.get("allowed_tools"))
-            if "aliases" in payload:
-                skill.aliases = _string_list(payload.get("aliases"))
-            if "market_regimes" in payload:
-                skill.market_regimes = _string_list(payload.get("market_regimes"))
-            if "default_active" in payload:
-                skill.default_active = bool(payload.get("default_active"))
-            if "default_router" in payload:
-                skill.default_router = bool(payload.get("default_router"))
-            if "default_priority" in payload:
-                try:
-                    skill.default_priority = int(payload.get("default_priority") or 100)
-                except (TypeError, ValueError):
-                    skill.default_priority = 100
-            if "disable_model_invocation" in payload:
-                skill.disable_model_invocation = bool(
-                    payload.get("disable_model_invocation")
-                )
-            if "user_invocable" in payload:
-                skill.user_invocable = bool(payload.get("user_invocable"))
-            if "execution_context" in payload:
-                skill.execution_context = (
-                    str(payload.get("execution_context") or "").strip() or "inline"
-                )
-            if "subagent_type" in payload:
-                skill.subagent_type = str(payload.get("subagent_type") or "").strip()
-            if "preferred_model" in payload:
-                skill.preferred_model = str(payload.get("preferred_model") or "").strip()
-            # Identity comes from the pin itself (label may be author version).
-            skill.version = str(active.label or "").strip() or str(
-                getattr(skill, "version", "") or ""
-            )
-            skill.content_hash = str(active.content_hash or "").strip()
-            skill.lifecycle = str(active.lifecycle or "active").strip() or "active"
-        except Exception:
-            return skill
-        return skill
 
     def build_skill_run_trace(
         self,
@@ -416,7 +332,7 @@ class PromptArtifactService:
             for prompt_id in resolve_analysis_prompt_ids(
                 use_legacy_default_prompt=use_legacy_default_prompt,
             ):
-                identity = self.ensure_key_prompt(
+                _, identity = self.resolve_key_prompt(
                     prompt_id,
                     record_history=record_history,
                 )
@@ -426,6 +342,64 @@ class PromptArtifactService:
             skills=skill_list,
             prompts=prompts,
             active_skill_ids=active_skill_ids,
+        )
+
+    def resolve_key_prompt(
+        self,
+        artifact_id: str,
+        *,
+        record_history: bool = True,
+    ) -> Tuple[str, VersionedIdentity]:
+        """Select the precise live or pinned prompt revision and its identity."""
+        spec = get_key_prompt_spec(artifact_id)
+        live = spec.loader()
+        live_digest = content_hash_for_text(live)
+        snapshot = (
+            self.ensure_content(
+                kind=ArtifactKind.PROMPT,
+                artifact_id=artifact_id,
+                content=live,
+                label=spec.version,
+                lifecycle=LifecycleState.ACTIVE.value,
+            )
+            if record_history
+            else self.get_snapshot(kind=ArtifactKind.PROMPT, artifact_id=artifact_id)
+        )
+        selected: Optional[ArtifactRevision] = None
+        if snapshot is not None:
+            selected = next(
+                (
+                    revision
+                    for revision in snapshot.revisions
+                    if revision.content_hash == live_digest
+                ),
+                None,
+            )
+            if (
+                artifact_id not in _PIN_FORBIDDEN_PROMPT_IDS
+                and snapshot.active_version < snapshot.latest_version
+            ):
+                selected = snapshot.active_revision()
+                if selected is None:
+                    raise RuntimeError(
+                        f"Active prompt revision is missing for {artifact_id!r}"
+                    )
+
+        if selected is None:
+            return live, VersionedIdentity(
+                kind=ArtifactKind.PROMPT,
+                artifact_id=artifact_id,
+                version=spec.version,
+                content_hash=live_digest,
+                lifecycle=LifecycleState.ACTIVE.value,
+            )
+        return selected.content, VersionedIdentity(
+            kind=ArtifactKind.PROMPT,
+            artifact_id=artifact_id,
+            version=selected.label,
+            content_hash=selected.content_hash,
+            lifecycle=selected.lifecycle,
+            source_version=selected.version,
         )
 
 
@@ -448,14 +422,6 @@ def reset_prompt_artifact_service_for_tests(
         _SERVICE = service
 
 
-def apply_active_skill_pin(skill: Any) -> Any:
-    """Process-wide helper: apply the active Skill pin when history exists."""
-    try:
-        return get_prompt_artifact_service().apply_active_skill_pin(skill)
-    except Exception:
-        return skill
-
-
 # Soul charter is identity-proofed elsewhere; never overlay a history pin onto it.
 _PIN_FORBIDDEN_PROMPT_IDS = frozenset({"agent.soul"})
 
@@ -464,37 +430,22 @@ def resolve_key_prompt_text(prompt_id: str) -> str:
     """Return live key-prompt text, or a rolled-back pin body when active < latest.
 
     Does not rewrite module-level prompt constants. ``agent.soul`` always uses
-    the live charter (runtime Soul identity proofs forbid pin overlays).
-    Fail-open to the live loader body when history is missing or unreadable.
+    the live charter (runtime Soul identity proofs forbid pin overlays). Store
+    corruption raises instead of silently executing content outside the pin.
     """
-    from src.agent.prompt_versioning.registry import get_key_prompt_spec
+    from src.services.run_diagnostics import attach_prompt_artifact_versions
 
     artifact_id = str(prompt_id or "").strip()
-    spec = get_key_prompt_spec(artifact_id)
-    live = spec.loader()
-    if artifact_id in _PIN_FORBIDDEN_PROMPT_IDS:
-        return live
-    try:
-        service = get_prompt_artifact_service()
-        snapshot = service.get_snapshot(
-            kind=ArtifactKind.PROMPT,
-            artifact_id=artifact_id,
-        )
-    except Exception:
-        return live
-    if snapshot is None:
-        return live
-    if int(snapshot.active_version) >= int(snapshot.latest_version):
-        return live
-    active = snapshot.active_revision()
-    if active is None or not str(active.content or "").strip():
-        return live
-    return str(active.content)
+    service = get_prompt_artifact_service()
+    selected_content, identity = service.resolve_key_prompt(artifact_id)
+    attach_prompt_artifact_versions(
+        build_run_version_trace(prompts=[identity])
+    )
+    return selected_content
 
 
 __all__ = [
     "PromptArtifactService",
-    "apply_active_skill_pin",
     "default_prompt_artifact_store_root",
     "get_prompt_artifact_service",
     "reset_prompt_artifact_service_for_tests",

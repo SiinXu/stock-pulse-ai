@@ -241,6 +241,31 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PROMPT_ARTIFACT_STORE_DIR": {
+        "title": "Prompt Artifact Store Directory",
+        "description": "Boot-time directory for durable prompt and Skill version history. This operator path is not editable from Web settings.",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": False,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 41,
+        "help_key": None,
+        "examples": [
+            "PROMPT_ARTIFACT_STORE_DIR=./data/prompt_artifacts",
+        ],
+        "docs": [
+            {
+                "label": "Prompt and Skill versioning",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/prompt-skill-versioning_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
     "AGENT_NL_ROUTING": {
         "title": "Agent NL Routing",
         "description": "Enable natural-language routing in bot dispatcher. When on, high-confidence stock queries in private chat (or @mentions) are routed to the agent even without an explicit command.",

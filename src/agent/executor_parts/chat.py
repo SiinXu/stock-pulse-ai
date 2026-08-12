@@ -37,6 +37,8 @@ from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
     from src.agent.executor import (
+        CHAT_SYSTEM_PROMPT,
+        LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT,
         AgentResult,
         _CHAT_TOOL_REGISTRY,
         _build_language_section,
@@ -82,12 +84,10 @@ class _ChatMethods:
             scope_resolution.stock_scope,
             report_language,
         )
-        from src.agent.prompt_versioning import resolve_key_prompt_text
-
-        prompt_template = resolve_key_prompt_text(
-            "agent.chat.legacy"
+        prompt_template = (
+            LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT
             if self.use_legacy_default_prompt
-            else "agent.chat"
+            else CHAT_SYSTEM_PROMPT
         )
         system_prompt = prompt_template.format(
             market_role=market_context.market_role,

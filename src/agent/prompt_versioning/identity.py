@@ -70,6 +70,14 @@ def skill_canonical_payload(skill: Any) -> Dict[str, Any]:
                 continue
         return result
 
+    def _integer(value: Any, default: int) -> int:
+        if value is None:
+            return default
+        try:
+            return int(value)
+        except (TypeError, ValueError, OverflowError):
+            return default
+
     return {
         "name": str(getattr(skill, "name", "") or "").strip(),
         "display_name": str(getattr(skill, "display_name", "") or "").strip(),
@@ -83,7 +91,7 @@ def skill_canonical_payload(skill: Any) -> Dict[str, Any]:
         "market_regimes": _string_list(getattr(skill, "market_regimes", None)),
         "default_active": bool(getattr(skill, "default_active", False)),
         "default_router": bool(getattr(skill, "default_router", False)),
-        "default_priority": int(getattr(skill, "default_priority", 100) or 100),
+        "default_priority": _integer(getattr(skill, "default_priority", 100), 100),
         "disable_model_invocation": bool(getattr(skill, "disable_model_invocation", False)),
         "user_invocable": bool(getattr(skill, "user_invocable", True)),
         "execution_context": str(getattr(skill, "execution_context", "") or "").strip(),
@@ -109,10 +117,15 @@ def skill_content_hash(skill: Any) -> str:
 
 def resolve_version_label(authored_version: Any, *, content_hash: str) -> str:
     """Prefer an author-supplied label; otherwise use content-addressed identity."""
+    authored_text = str(authored_version or "").strip()
+    if not authored_text:
+        return content_addressed_version(content_hash)
     explicit = normalize_version_label(authored_version)
-    if explicit is not None and not explicit.startswith(_CONTENT_ADDRESSED_PREFIX):
-        return explicit
-    return content_addressed_version(content_hash)
+    if explicit is None:
+        raise ValueError(f"Invalid artifact version label: {authored_version!r}")
+    if explicit.startswith(_CONTENT_ADDRESSED_PREFIX):
+        raise ValueError("Author version labels must not use the reserved 'ca-' prefix")
+    return explicit
 
 
 def attach_skill_identity(
@@ -129,12 +142,9 @@ def attach_skill_identity(
     life = normalize_lifecycle(
         lifecycle if lifecycle is not None else getattr(skill, "lifecycle", None)
     )
-    try:
-        skill.version = version
-        skill.content_hash = digest
-        skill.lifecycle = life
-    except Exception:
-        pass
+    skill.version = version
+    skill.content_hash = digest
+    skill.lifecycle = life
     return skill
 
 
@@ -170,10 +180,7 @@ def build_run_version_trace(
     """Build a low-sensitivity run trace of Skill and prompt versions."""
     skill_entries: List[Dict[str, Any]] = []
     for skill in skills or ():
-        try:
-            identity = skill_identity(skill)
-        except Exception:
-            continue
+        identity = skill_identity(skill)
         if not identity.artifact_id:
             continue
         skill_entries.append(identity.to_trace_entry())

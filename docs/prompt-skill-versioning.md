@@ -1,6 +1,6 @@
 # Prompt / Skill 版本化（#249）
 
-**Issue:** #249  
+**Issue:** #249
 **相关：** 晋升流水线 #1093（本议题不实现）、评估架 #215
 
 英文版：`docs/prompt-skill-versioning_EN.md`
@@ -8,7 +8,8 @@
 ## 目标
 
 为 Skill 与关键 prompt 提供 **版本标识 + 变更历史 + 回滚钉（active pin）** 基座，
-使运行可复现，错误内容可回退，且 **不改写现行 prompt / Skill 指令正文**。
+使运行可追溯，关键 prompt 的错误内容可回退，且 **不改写现行 prompt / Skill
+源文件或运行时 ToolSurface**。
 
 本议题明确不做：
 
@@ -45,28 +46,34 @@
 - `ensure_*`：内容哈希变化时追加修订
 - `list_history`：最新优先
 - `rollback(..., to_version=N)`：只移动 **active pin**，历史行不可变
-- `apply_active_skill_pin`：加载 / 注册 Skill 时若 active pin 与磁盘正文不一致，**仅在内存**叠加 pin 正文
+- Skill rollback 只移动历史 active pin，运行时 Skill 仍以源文件 / plugin 定义为准；
+  受治理的 Skill 激活留给 #1093
 - 不重写 `strategies/*.yaml` 或 Python prompt 常量
 
 存储：`PROMPT_ARTIFACT_STORE_DIR`；未设置时默认
 `<database parent>/prompt_artifacts`。
 
-**运行时闭环（Skill）：** `load_skill_from_yaml` / `load_skill_from_markdown`、
-`SkillManager.register`、以及插件 `AnalysisStrategyDefinition.to_skill()` 都会调用
-`apply_active_skill_pin`。仅当 `active_version < latest_version`（已 rollback）时
-叠加 pin 正文；tip 未回滚时仍使用磁盘/插件正文，便于作者继续演进。磁盘 YAML 永不被改写。
+**运行时闭环（Skill）：** `resolve_skill_prompt_state` 对实际激活的 Skill 写入历史和
+trace，但不会从历史反向改写 `instructions`、`required_tools`、`allowed_tools`、默认
+激活或路由字段。这样版本记录不能在进程运行时绕过 ToolSurface 或 plugin catalog；
+受治理的 rollback 激活留给 #1093。
 
 **运行时闭环（关键 prompt）：** `resolve_key_prompt_text(prompt_id)` 在
-Agent run/chat、analyzer system/text、image extract 路径使用。同样仅在
+Agent run/chat、chat summary 压缩、analyzer system/text、image extract 路径使用。同样仅在
 `active_version < latest_version` 时返回 pin 正文。`agent.soul` **禁止** pin
-叠加（Soul 身份证明要求 live charter）。
+叠加（Soul 身份证明要求 live charter）。每次实际解析先原子写入当前正文，再记录所选
+修订的 `source_version`；索引损坏或版本标签复用不同正文时失败关闭，不静默使用未钉选正文。
+
+JSON 存储通过进程级文件锁保护完整 read-modify-write，并以临时文件、`fsync` 和原子
+替换落盘。损坏、未知 schema 或不满足修订不变量的索引会报错且不会被空历史覆盖。
 
 ## 运行 trace
 
 `resolve_skill_prompt_state` → `SkillManager.get_version_trace()` →
-`SkillPromptState.version_trace`，并在有诊断上下文时写入
+`SkillPromptState.version_trace` 写入实际 Skill 身份；Agent run/chat、analyzer system/text、
+image extract 在解析实际 prompt 时把对应修订合并到
 `RunDiagnosticContext.prompt_artifact_versions`（同时兼容 `prompt_version` /
-`skill_versions` 字段）。
+`skill_versions` 字段）。Soul 沿用已有独立、不可覆盖的 runtime facts 身份证明。
 
 `SkillAgent.post_process` 向 `raw_data` 写入 `skill_version` /
 `skill_content_hash`，供 skill opinion 样本落库。
@@ -76,7 +83,7 @@ Agent run/chat、analyzer system/text、image extract 路径使用。同样仅�
 | 能力 | #249 | #1093 |
 | --- | --- | --- |
 | 版本 id + content hash | 是 | 消费 |
-| 历史 + 回滚 pin | 是 | 检查项 |
+| 历史 + key prompt 回滚 pin；Skill 管理 pin | 是 | 消费 Skill pin 并治理激活 |
 | lifecycle 字段 | 存储 | 策略迁移 |
 | experimental 激活 | 否 | 是 |
 | 晋升 CLI / eval | 否 | 是 |

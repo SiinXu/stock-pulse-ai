@@ -207,9 +207,7 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
         authored_version=data.get("version"),
         lifecycle=data.get("lifecycle"),
     )
-    from src.agent.prompt_versioning import apply_active_skill_pin
-
-    return apply_active_skill_pin(skill)
+    return skill
 
 
 def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
@@ -288,9 +286,7 @@ def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
         authored_version=metadata.get("version"),
         lifecycle=metadata.get("lifecycle"),
     )
-    from src.agent.prompt_versioning import apply_active_skill_pin
-
-    return apply_active_skill_pin(skill)
+    return skill
 
 
 def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
@@ -358,9 +354,6 @@ class SkillManager:
         self._skills: Dict[str, Skill] = {}
 
     def register(self, skill: Skill) -> None:
-        from src.agent.prompt_versioning import apply_active_skill_pin
-
-        skill = apply_active_skill_pin(skill)
         self._skills[skill.name] = skill
         logger.debug(f"Registered skill: {skill.name} ({skill.display_name})")
 
@@ -517,4 +510,3 @@ class SkillManager:
             prompts=(),
             active_skill_ids=active_ids,
         )
-

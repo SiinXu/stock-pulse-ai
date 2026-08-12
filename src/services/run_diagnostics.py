@@ -17,6 +17,7 @@ from collections.abc import Iterable, Mapping
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from itertools import islice
 from typing import Any, Callable, Dict, List, Optional
 
 from src.utils.sanitize import (
@@ -869,8 +870,16 @@ def _public_prompt_artifact_versions(trace: Mapping[str, Any]) -> Dict[str, Any]
             return None
         return text[:maximum]
 
+    def _items(value: Any) -> List[Any]:
+        if isinstance(value, (str, bytes, bytearray, Mapping)):
+            return []
+        try:
+            return list(islice(iter(value or ()), 128))
+        except TypeError:
+            return []
+
     skills: List[Dict[str, Any]] = []
-    for item in trace.get("skills") or []:
+    for item in _items(trace.get("skills")):
         if not isinstance(item, Mapping):
             continue
         entry = {
@@ -880,11 +889,18 @@ def _public_prompt_artifact_versions(trace: Mapping[str, Any]) -> Dict[str, Any]
             "content_hash": _text(item.get("content_hash"), maximum=80),
             "lifecycle": _text(item.get("lifecycle"), maximum=16) or "active",
         }
+        source_version = item.get("source_version")
+        if (
+            isinstance(source_version, int)
+            and not isinstance(source_version, bool)
+            and 0 < source_version <= 2_147_483_647
+        ):
+            entry["source_version"] = source_version
         if entry["artifact_id"]:
             skills.append(entry)
 
     prompts: List[Dict[str, Any]] = []
-    for item in trace.get("prompts") or []:
+    for item in _items(trace.get("prompts")):
         if not isinstance(item, Mapping):
             continue
         entry = {
@@ -894,18 +910,25 @@ def _public_prompt_artifact_versions(trace: Mapping[str, Any]) -> Dict[str, Any]
             "content_hash": _text(item.get("content_hash"), maximum=80),
             "lifecycle": _text(item.get("lifecycle"), maximum=16) or "active",
         }
+        source_version = item.get("source_version")
+        if (
+            isinstance(source_version, int)
+            and not isinstance(source_version, bool)
+            and 0 < source_version <= 2_147_483_647
+        ):
+            entry["source_version"] = source_version
         if entry["artifact_id"]:
             prompts.append(entry)
 
     active_ids = [
         str(item).strip()[:128]
-        for item in (trace.get("active_skill_ids") or [])
+        for item in _items(trace.get("active_skill_ids"))
         if str(item).strip()
     ]
     skill_versions: Dict[str, str] = {}
     raw_versions = trace.get("skill_versions")
     if isinstance(raw_versions, Mapping):
-        for key, value in raw_versions.items():
+        for key, value in islice(raw_versions.items(), 128):
             kid = _text(key)
             ver = _text(value, maximum=64)
             if kid and ver:
@@ -922,14 +945,44 @@ def _public_prompt_artifact_versions(trace: Mapping[str, Any]) -> Dict[str, Any]
 
 
 def attach_prompt_artifact_versions(trace: Optional[Dict[str, Any]]) -> bool:
-    """Attach Skill/prompt version identity to the active diagnostic context."""
+    """Merge Skill/prompt version identity into the active diagnostic context."""
     if not isinstance(trace, dict):
         return False
     context = get_current_diagnostic_context()
     if context is None:
         return False
     try:
-        context.prompt_artifact_versions = _public_prompt_artifact_versions(trace)
+        incoming = _public_prompt_artifact_versions(trace)
+        existing = _public_prompt_artifact_versions(
+            context.prompt_artifact_versions or {}
+        )
+
+        def _merge_entries(key: str) -> List[Dict[str, Any]]:
+            merged: Dict[str, Dict[str, Any]] = {}
+            for item in [*existing.get(key, []), *incoming.get(key, [])]:
+                artifact_id = str(item.get("artifact_id") or "").strip()
+                if artifact_id:
+                    merged[artifact_id] = dict(item)
+            return list(merged.values())[:128]
+
+        active_skill_ids = incoming.get("active_skill_ids") or existing.get(
+            "active_skill_ids", []
+        )
+        context.prompt_artifact_versions = {
+            "schema_version": incoming.get("schema_version") or existing.get(
+                "schema_version", "1"
+            ),
+            "skills": _merge_entries("skills"),
+            "prompts": _merge_entries("prompts"),
+            "active_skill_ids": list(active_skill_ids)[:128],
+            "skill_versions": {
+                **existing.get("skill_versions", {}),
+                **incoming.get("skill_versions", {}),
+            },
+            "prompt_version": incoming.get("prompt_version") or existing.get(
+                "prompt_version"
+            ),
+        }
     except Exception as exc:  # broad-exception: optional_metadata - diagnostics must not raise.
         log_safe_exception(
             logger,
