@@ -97,12 +97,13 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - 每个 breakdown bucket 同样带 `sample_sufficient`。
 - 当 `sample_sufficient=false` 时，`hit_rate_pct` / `avg_stock_return_pct` 为
   `null`（计数仍返回）；`completed >= 30` 后才公布比率。
-- `breakdowns.period` 按 `anchor_date` 的 `YYYY-MM` 分月（缺 anchor 时回退 outcome
-  `created_at` 月份），与既有 `action`（信号类型）、`market` 一起构成 Web 校准视图的
-  三组维度。
+- `breakdowns.period` 仅按已冻结 `anchor_date` 的 `YYYY-MM` 分月；缺少 anchor 的历史行
+  归入 `unknown`，不会用核验写入时间伪造信号月份。该维度与既有 `action`（信号类型）、
+  `market` 一起构成 Web 校准视图的三组维度。
 
-`aggregate_outcome_rows()` 仍返回未门控的原始比率，供 decision memory / scorecard /
-daily brief 等内部调用方自行应用阈值；仅 `get_stats` 的 `publish=True` 路径做公布门控。
+`aggregate_outcome_rows()` 与显式 `get_stats(publish=False)` 返回未门控的原始比率，供
+decision memory 等内部调用方自行应用阈值；API 使用默认 `get_stats(publish=True)`，仅该
+发布路径对比率做样本门控。
 
 Web 在信号中心 `/signals?tab=review` 的过程质量卡片中：
 

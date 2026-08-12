@@ -140,10 +140,32 @@ describe('DecisionSignalReviewSection production mount', () => {
     expect(screen.getByTestId('decision-signal-sample-insufficient')).toBeInTheDocument();
     expect(screen.getByTestId('decision-signal-calibration-breakdown')).toBeInTheDocument();
     expect(screen.getByText('Post-hoc hit calibration')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'By time (month)' })).toHaveClass('min-h-11');
     expect(screen.getByTestId('outcome-run-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('outcome-explorer')).not.toBeInTheDocument();
     // Rates stay unpublished under the sample floor.
     expect(screen.queryByText('66.67%')).not.toBeInTheDocument();
+  });
+
+  it('does not render a non-finite published rate as a percentage', () => {
+    renderSection({
+      stats: {
+        ...sampleStats,
+        sampleSufficient: true,
+        hitRatePct: Number.POSITIVE_INFINITY,
+        breakdowns: {
+          ...sampleStats.breakdowns,
+          period: [{
+            ...sampleStats.breakdowns.period[0],
+            sampleSufficient: true,
+            hitRatePct: Number.POSITIVE_INFINITY,
+          }],
+        },
+      },
+    });
+
+    expect(screen.queryByText('Infinity%')).not.toBeInTheDocument();
+    expect(screen.getByText('Not available')).toBeInTheDocument();
   });
 
   it('shows honest empty state when there are no reviewed outcomes', () => {

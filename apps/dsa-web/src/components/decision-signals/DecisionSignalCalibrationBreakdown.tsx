@@ -23,7 +23,7 @@ const ACTION_VALUES: DecisionAction[] = [
 const MARKET_VALUES: DecisionSignalMarket[] = ['cn', 'hk', 'us', 'jp', 'kr', 'tw'];
 
 function formatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '';
+  if (value === null || value === undefined || !Number.isFinite(value)) return '';
   const formatted = Number(value).toFixed(2).replace(/\.?0+$/, '');
   return `${formatted}%`;
 }
@@ -114,7 +114,7 @@ export const DecisionSignalCalibrationBreakdown: React.FC<Props> = ({ stats }) =
               aria-pressed={selected}
               onClick={() => setGroup(mode)}
               className={cn(
-                'rounded-lg border px-3 py-2 text-sm transition-colors',
+                'min-h-11 rounded-lg border px-3 py-2 text-sm transition-colors',
                 selected
                   ? 'border-primary/70 bg-primary/10 text-foreground'
                   : 'border-border/60 text-secondary-text hover:border-primary/40 hover:text-foreground',

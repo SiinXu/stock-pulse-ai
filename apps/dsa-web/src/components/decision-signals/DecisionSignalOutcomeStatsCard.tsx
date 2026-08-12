@@ -19,7 +19,7 @@ import { DecisionSignalOutcomeRunPanel } from './DecisionSignalOutcomeRunPanel';
 import { DecisionSignalProfileCalibration } from './DecisionSignalProfileCalibration';
 
 function formatStatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '-';
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-';
   const formatted = Number(value).toFixed(2).replace(/\.?0+$/, '');
   return `${formatted}%`;
 }

@@ -310,7 +310,14 @@ class DecisionSignalOutcomeService:
         horizons: Optional[List[str]] = None,
         engine_version: Optional[str] = None,
         statuses: Optional[List[str]] = None,
+        publish: bool = True,
     ) -> Dict[str, Any]:
+        """Return outcome aggregates, with public rate gating enabled by default.
+
+        Internal consumers that apply their own explicit sample threshold may use
+        ``publish=False``. API callers must retain the default so thin buckets do
+        not disclose rates.
+        """
         engine_version_norm = str(engine_version or DECISION_SIGNAL_OUTCOME_ENGINE_VERSION).strip()
         horizons_norm = self._normalize_horizons(horizons)
         statuses_norm = (
@@ -337,12 +344,12 @@ class DecisionSignalOutcomeService:
             "holding_state",
         )
         breakdowns = {
-            dimension: self._breakdown(rows, dimension, publish=True)
+            dimension: self._breakdown(rows, dimension, publish=publish)
             for dimension in dimensions
         }
-        breakdowns["period"] = self._breakdown_period(rows, publish=True)
+        breakdowns["period"] = self._breakdown_period(rows, publish=publish)
         payload: Dict[str, Any] = {
-            **self._aggregate(rows, publish=True),
+            **self._aggregate(rows, publish=publish),
             "engine_version": engine_version_norm,
             "horizons": horizons_norm,
             "statuses": statuses_norm,
@@ -757,27 +764,21 @@ class DecisionSignalOutcomeService:
             }
             for value, bucket_rows in grouped.items()
         ]
-        # Newest period first; keep "unknown" last among ties.
-        return sorted(
-            buckets,
-            key=lambda item: (
-                1 if str(item["value"]) == "unknown" else 0,
-                str(item["value"]),
-            ),
+        # Newest dated period first; an unverifiable period is always last.
+        dated = sorted(
+            (item for item in buckets if str(item["value"]) != "unknown"),
+            key=lambda item: str(item["value"]),
             reverse=True,
         )
+        unknown = [item for item in buckets if str(item["value"]) == "unknown"]
+        return [*dated, *unknown]
 
     @staticmethod
     def _period_bucket_value(row: DecisionSignalOutcomeRecord) -> str:
-        """YYYY-MM from frozen anchor_date; fall back to outcome created_at month."""
+        """Return YYYY-MM only from the frozen market-data anchor date."""
         anchor = getattr(row, "anchor_date", None)
         if isinstance(anchor, date):
             return f"{anchor.year:04d}-{anchor.month:02d}"
-        created_at = getattr(row, "created_at", None)
-        if isinstance(created_at, datetime):
-            return f"{created_at.year:04d}-{created_at.month:02d}"
-        if isinstance(created_at, date):
-            return f"{created_at.year:04d}-{created_at.month:02d}"
         return "unknown"
 
     @staticmethod
@@ -807,11 +808,16 @@ class DecisionSignalOutcomeService:
         miss = sum(1 for row in completed if row.outcome == "miss")
         neutral = sum(1 for row in completed if row.outcome == "neutral")
         denominator = hit + miss
-        returns = [
-            float(row.stock_return_pct)
-            for row in completed
-            if row.stock_return_pct is not None
-        ]
+        returns: List[float] = []
+        for row in completed:
+            if row.stock_return_pct is None:
+                continue
+            try:
+                value = float(row.stock_return_pct)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(value):
+                returns.append(value)
         unable_reasons = Counter(row.unable_reason or "unknown" for row in unable)
         completed_count = len(completed)
         sample_sufficient = completed_count >= MIN_OUTCOME_STATS_SAMPLE_SIZE

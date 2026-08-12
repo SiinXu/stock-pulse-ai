@@ -444,6 +444,8 @@ function toDecisionSignalOutcomeStatsResponse(data: Record<string, unknown>): De
   if (
     typeof response.minimumCompletedSampleSize !== 'number'
     || !Number.isFinite(response.minimumCompletedSampleSize)
+    || !Number.isInteger(response.minimumCompletedSampleSize)
+    || response.minimumCompletedSampleSize < 1
   ) {
     response.minimumCompletedSampleSize = 30;
   }

@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import date, datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -144,11 +146,60 @@ def test_run_outcomes_evaluates_supported_horizons_and_stats(isolated_db) -> Non
     assert stats["breakdowns"]["period"][0]["dimension"] == "period"
     assert stats["breakdowns"]["period"][0]["sample_sufficient"] is False
     assert "profile_calibration" not in stats
+    internal_stats = service.get_stats(
+        horizons=["1d", "3d", "5d", "10d"],
+        publish=False,
+    )
+    assert internal_stats["hit_rate_pct"] == 100.0
+    assert internal_stats["breakdowns"]["action"][0]["hit_rate_pct"] == 100.0
     # Internal aggregate keeps raw rates for callers that apply their own floor.
     raw = DecisionSignalOutcomeService.aggregate_outcome_rows(
         service.repo.list_outcomes(signal_id=signal_id, page=1, page_size=20)[0]
     )
     assert raw["hit_rate_pct"] == 100.0
+
+
+def test_period_bucket_never_uses_evaluation_write_time() -> None:
+    row = SimpleNamespace(anchor_date=None, created_at=datetime(2025, 7, 8, 9, 10))
+
+    assert DecisionSignalOutcomeService._period_bucket_value(row) == "unknown"
+
+
+def test_period_breakdown_sorts_unknown_after_dated_buckets() -> None:
+    rows = [
+        SimpleNamespace(
+            anchor_date=anchor,
+            eval_status="completed",
+            outcome="neutral",
+            stock_return_pct=None,
+            unable_reason=None,
+        )
+        for anchor in (None, date(2024, 1, 2), date(2025, 3, 4))
+    ]
+
+    buckets = DecisionSignalOutcomeService._breakdown_period(  # type: ignore[arg-type]
+        DecisionSignalOutcomeService.__new__(DecisionSignalOutcomeService),
+        rows,
+    )
+
+    assert [bucket["value"] for bucket in buckets] == ["2025-03", "2024-01", "unknown"]
+
+
+def test_aggregate_ignores_non_finite_returns() -> None:
+    rows = [
+        SimpleNamespace(
+            eval_status="completed",
+            outcome="hit",
+            stock_return_pct=value,
+            unable_reason=None,
+        )
+        for value in (2.0, float("nan"), float("inf"), float("-inf"))
+    ]
+
+    aggregate = DecisionSignalOutcomeService.aggregate_outcome_rows(rows)  # type: ignore[arg-type]
+
+    assert math.isfinite(aggregate["avg_stock_return_pct"])
+    assert aggregate["avg_stock_return_pct"] == 2.0
 
 
 def test_profile_calibration_gate_parity(isolated_db, monkeypatch) -> None:
