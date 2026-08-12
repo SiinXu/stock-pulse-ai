@@ -22,7 +22,7 @@ This slice is **schema + repository CAS** only. It does not extract claims, fetc
 | System-driven loop | Rows carry `status` / `resolve_after` / leases for background resolvers |
 | No Soul / ToolSurface mutation | Store `model_meta_json` as provenance only |
 | Research / quality-ops framing | No guaranteed-return product surface |
-| Non-parseable prose ≠ claim | Empty or non-verifiable claims are allowed; do not invent claims at write time |
+| Non-parseable prose ≠ claim | Empty claims are accepted only as `no_verifiable_claim` with an explicit reason; do not invent claims at write time |
 | Provider failure never fabricates hit | Use `data_unavailable` and retry; never write a fake hit/miss |
 
 ## Schema location
@@ -44,13 +44,15 @@ Migration id: `202608120001_agent_prediction_schema`.
 | `prediction_id` | Primary key (`VARCHAR(128)`, aligned with A1 `PredictionRecord`) |
 | `run_id` | Analysis / agent run linkage (`VARCHAR(128)`) |
 | `symbol`, `market` | Instrument identity for history queries; **`market` is normalized to lowercase** on write |
-| `horizon` | Horizon token or policy label |
+| `as_of` | A1 forecast base date used by ActualsFetcher/resolver grouping |
+| `horizon` | A1 horizon token (`1d`, `3d`, `5d`, `10d`, or `20d`) |
 | `resolve_after` | UTC-naive datetime used by due scans |
 | `status` | See state machine below |
 | `lease_owner`, `lease_token`, `lease_expires_at` | Resolver claim lease |
 | `claims_json` | Typed claims array (JSON text) |
 | `outcome_json` | Score / label payload after resolution attempts |
 | `model_meta_json` | Optional provenance (mode, soul_version, skill ids) |
+| `source_decision_id`, `no_verifiable_reason`, `notes` | A1 decision linkage, explicit non-verifiable reason, and bounded research notes |
 | `attempts` | Claim/resolve attempt counter |
 | `created_at`, `updated_at`, `resolved_at` | Timestamps |
 
@@ -75,10 +77,11 @@ Also accepted in the CHECK constraint for forward compatibility with the A1 cont
 
 ## Concurrency
 
-- Insert uses primary-key uniqueness; collisions return the existing row without overwrite. CHECK / NOT NULL failures are **not** treated as collisions.
-- Claim and resolve use conditional `UPDATE ... WHERE` and require `rowcount == 1`.
+- Insert validates the real A1 `PredictionClaim`, horizon, status/claim invariants, model metadata, `as_of`, and provenance before using primary-key uniqueness; collisions return the existing row without overwrite. CHECK / NOT NULL failures are **not** treated as collisions, and malformed JSON is never read as empty claims.
+- Claim and resolve use conditional `UPDATE ... WHERE` and require `rowcount == 1`. Future rows cannot be claimed.
 - Concurrent resolvers of the same id: exactly one applies; losers observe the winner’s terminal outcome.
-- After `claim_for_resolve`, the worker **should always pass** `expected_lease_token` into `resolve` / `mark_data_unavailable` so only the lease holder can finish the transition. Omitting the token still enforces terminal CAS but does not bind the writer to a lease.
+- After `claim_for_resolve`, only the unexpired lease holder can call `resolve` or `mark_data_unavailable`; `mark_data_unavailable` always requires the token. A direct tokenless resolve is accepted only while the row is still `pending`.
+- Provider-failure diagnostics cannot override the canonical `data_unavailable` label or add score/hit/miss fields. `requeue_pending` clears the stale unavailable outcome before a later claim.
 
 ## Rollback
 

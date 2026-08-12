@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 import pytest
@@ -33,6 +33,10 @@ from src.schemas.agent_prediction import (
     STATUS_RESOLVING,
     AgentPredictionInsert,
 )
+from src.schemas.prediction_record import (
+    PredictionRecord,
+    build_no_verifiable_claim_record,
+)
 from src.storage import DatabaseManager
 
 
@@ -54,6 +58,15 @@ def _fixed_now() -> datetime:
     return datetime(2026, 8, 12, 12, 0, 0)
 
 
+def _direction_claim(direction: str = "up") -> dict:
+    return {
+        "claim_id": "direction-0",
+        "type": "direction",
+        "confidence": 0.7,
+        "payload": {"direction": direction},
+    }
+
+
 def _insert(
     repo: AgentPredictionRepository,
     *,
@@ -68,9 +81,10 @@ def _insert(
             run_id="run-1",
             symbol=symbol,
             market=market,
+            as_of=_fixed_now().date(),
             horizon="5d",
             resolve_after=resolve_after or (_fixed_now() - timedelta(hours=1)),
-            claims=[{"type": "direction", "payload": {"side": "up"}, "confidence": 0.7}],
+            claims=[_direction_claim()],
             model_meta={"mode": "analysis"},
             created_at=_fixed_now() - timedelta(days=1),
         )
@@ -113,7 +127,13 @@ def test_fresh_database_manager_applies_prediction_schema(isolated_db) -> None:
     ddl = _table_sql(isolated_db._engine, "agent_predictions")
     assert "ck_agent_prediction_status" in ddl
     assert "ck_agent_prediction_attempts" in ddl
+    assert "ck_agent_prediction_claims_json" in ddl
+    assert "ck_agent_prediction_lease_state" in ddl
+    assert "ck_agent_prediction_outcome_state" in ddl
+    assert "ck_agent_prediction_resolved_at" in ddl
+    assert "ck_agent_prediction_no_verifiable_reason" in ddl
     assert "data_unavailable" in ddl
+    assert "as_of DATE" in ddl
     # A1 PredictionRecord allows prediction_id/run_id up to 128 characters.
     assert "prediction_id VARCHAR(128)" in ddl
     assert "run_id VARCHAR(128)" in ddl
@@ -239,9 +259,10 @@ def test_insert_is_idempotent_and_does_not_overwrite(isolated_db) -> None:
             run_id="run-a",
             symbol="600519",
             market="cn",
+            as_of=_fixed_now().date(),
             horizon="5d",
             resolve_after=_fixed_now(),
-            claims=[{"type": "direction", "payload": {"side": "up"}}],
+            claims=[_direction_claim()],
         )
     )
     second_created, second = repo.insert_pending(
@@ -250,16 +271,103 @@ def test_insert_is_idempotent_and_does_not_overwrite(isolated_db) -> None:
             run_id="run-b",
             symbol="AAPL",
             market="us",
+            as_of=_fixed_now().date(),
             horizon="1d",
             resolve_after=_fixed_now() + timedelta(days=1),
-            claims=[{"type": "direction", "payload": {"side": "down"}}],
+            claims=[_direction_claim("down")],
         )
     )
     assert first_created is True
     assert second_created is False
     assert second.run_id == first.run_id == "run-a"
     assert second.symbol == "600519"
-    assert second.claims[0]["payload"]["side"] == "up"
+    assert second.claims[0]["payload"]["direction"] == "up"
+
+
+def test_real_a1_prediction_round_trips_resolution_metadata(isolated_db) -> None:
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    source = PredictionRecord.model_validate(
+        {
+            "prediction_id": "pred-a1",
+            "run_id": "run-a1",
+            "symbol": "AAPL",
+            "market": "US",
+            "created_at": datetime(2026, 8, 11, 12, tzinfo=timezone.utc),
+            "as_of": "2026-08-11",
+            "horizon": "5d",
+            "resolve_after": datetime(2026, 8, 18, 12, tzinfo=timezone.utc),
+            "claims": [_direction_claim()],
+            "status": "pending",
+            "source_decision_id": "history-41",
+            "model_meta": {
+                "mode": "agent",
+                "soul_version": "soul-v1",
+                "skill_ids": ["trend"],
+                "model_id": "model-a",
+            },
+            "notes": "horizon_source=structured",
+        }
+    )
+
+    created, stored = repo.insert_pending(
+        AgentPredictionInsert.from_prediction_record(source)
+    )
+
+    assert created is True
+    assert stored.as_of == source.as_of
+    assert stored.source_decision_id == "history-41"
+    assert stored.model_meta == source.model_meta.model_dump(mode="json")
+    assert stored.notes == "horizon_source=structured"
+    assert stored.claims == [claim.model_dump(mode="json") for claim in source.claims]
+
+    no_claim = build_no_verifiable_claim_record(
+        prediction_id="pred-a1-no-claim",
+        run_id="run-a1-no-claim",
+        symbol="AAPL",
+        market="us",
+        created_at=datetime(2026, 8, 11, 12, tzinfo=timezone.utc),
+        as_of=source.as_of,
+        resolve_after=datetime(2026, 8, 18, 12, tzinfo=timezone.utc),
+        reason="prose_only",
+    )
+    no_claim_created, stored_no_claim = repo.insert_pending(
+        AgentPredictionInsert.from_prediction_record(no_claim)
+    )
+    assert no_claim_created is True
+    assert stored_no_claim.status == "no_verifiable_claim"
+    assert stored_no_claim.claims == []
+    assert stored_no_claim.no_verifiable_reason == "prose_only"
+
+
+def test_insert_rejects_non_a1_claims_and_invalid_status_claim_pairs(isolated_db) -> None:
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    base = {
+        "prediction_id": "pred-invalid",
+        "run_id": "run-invalid",
+        "symbol": "600519",
+        "market": "cn",
+        "as_of": _fixed_now().date(),
+        "horizon": "5d",
+        "resolve_after": _fixed_now(),
+    }
+
+    with pytest.raises(ValueError, match="A1 PredictionClaim"):
+        repo.insert_pending(
+            AgentPredictionInsert(
+                **base,
+                claims=[{"type": "direction", "payload": {"side": "up"}}],
+            )
+        )
+    with pytest.raises(ValueError, match="pending predictions require"):
+        repo.insert_pending(AgentPredictionInsert(**base, claims=[]))
+    with pytest.raises(ValueError, match="no_verifiable_claim requires"):
+        repo.insert_pending(
+            AgentPredictionInsert(
+                **base,
+                claims=[],
+                status="no_verifiable_claim",
+            )
+        )
 
 
 def test_accepts_a1_max_length_ids_and_normalizes_market(isolated_db) -> None:
@@ -272,9 +380,10 @@ def test_accepts_a1_max_length_ids_and_normalizes_market(isolated_db) -> None:
             run_id=run_id,
             symbol="600519",
             market="CN",
+            as_of=_fixed_now().date(),
             horizon="5d",
             resolve_after=_fixed_now(),
-            claims=[{"type": "direction", "payload": {"side": "up"}}],
+            claims=[_direction_claim()],
         )
     )
     assert created is True
@@ -290,6 +399,7 @@ def test_accepts_a1_max_length_ids_and_normalizes_market(isolated_db) -> None:
                 run_id="run",
                 symbol="600519",
                 market="cn",
+                as_of=_fixed_now().date(),
                 horizon="5d",
                 resolve_after=_fixed_now(),
                 claims=[],
@@ -324,9 +434,10 @@ def test_check_constraint_failure_is_not_treated_as_collision(
                 run_id="run-check",
                 symbol="600519",
                 market="cn",
+                as_of=_fixed_now().date(),
                 horizon="5d",
                 resolve_after=_fixed_now(),
-                claims=[{"type": "direction"}],
+                claims=[_direction_claim()],
                 status="bogus_status",
             )
         )
@@ -387,7 +498,20 @@ def test_claim_resolve_and_data_unavailable_state_machine(isolated_db) -> None:
     )
     assert lost is None
 
-    # Lease holder must bind resolve/unavailable to expected_lease_token.
+    # Lease ownership is enforced, not merely documented.
+    with pytest.raises(ValueError, match="expected_lease_token is required"):
+        repo.mark_data_unavailable(
+            prediction_id="pred-sm",
+            reason="missing_token",
+            as_of=_fixed_now(),
+        )
+    unbound_resolve_ok, _ = repo.resolve(
+        prediction_id="pred-sm",
+        outcome={"label": "hit", "score": 1.0},
+        as_of=_fixed_now(),
+    )
+    assert unbound_resolve_ok is False
+
     wrong_token_ok, _ = repo.mark_data_unavailable(
         prediction_id="pred-sm",
         reason="should_fail",
@@ -402,12 +526,17 @@ def test_claim_resolve_and_data_unavailable_state_machine(isolated_db) -> None:
         reason="provider_timeout",
         expected_lease_token="token-a",
         as_of=_fixed_now(),
+        outcome={"label": "hit", "score": 1.0, "diagnostic": "timeout"},
     )
     assert unavailable_ok is True
     assert unavailable is not None
     assert unavailable.status == STATUS_DATA_UNAVAILABLE
     assert unavailable.outcome is not None
+    assert unavailable.outcome["label"] == STATUS_DATA_UNAVAILABLE
     assert unavailable.outcome["reason"] == "provider_timeout"
+    assert unavailable.outcome["diagnostic"] == "timeout"
+    assert "score" not in unavailable.outcome
+    assert repo.list_due(as_of=_fixed_now()) == []
 
     requeued_ok, requeued = repo.requeue_pending(
         prediction_id="pred-sm",
@@ -416,6 +545,7 @@ def test_claim_resolve_and_data_unavailable_state_machine(isolated_db) -> None:
     assert requeued_ok is True
     assert requeued is not None
     assert requeued.status == STATUS_PENDING
+    assert requeued.outcome is None
 
     claimed2 = repo.claim_for_resolve(
         prediction_id="pred-sm",
@@ -473,6 +603,7 @@ def test_concurrent_resolve_only_one_writer_wins(isolated_db) -> None:
         applied, record = worker_repo.resolve(
             prediction_id="pred-race",
             outcome={"label": f"worker-{worker_id}", "worker_id": worker_id},
+            expected_lease_token="shared",
             as_of=_fixed_now() + timedelta(milliseconds=worker_id),
         )
         label = None
@@ -524,3 +655,56 @@ def test_concurrent_claim_only_one_owner(isolated_db) -> None:
     assert final.status == STATUS_RESOLVING
     assert final.lease_owner == successful[0]
     assert final.attempts == 1
+
+
+def test_claim_rejects_future_rows_and_expired_lease_cannot_complete(isolated_db) -> None:
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    _insert(
+        repo,
+        prediction_id="pred-future",
+        resolve_after=_fixed_now() + timedelta(hours=1),
+    )
+    assert (
+        repo.claim_for_resolve(
+            prediction_id="pred-future",
+            lease_owner="worker-a",
+            lease_token="token-a",
+            as_of=_fixed_now(),
+        )
+        is None
+    )
+
+    _insert(repo, prediction_id="pred-expired-lease")
+    claimed = repo.claim_for_resolve(
+        prediction_id="pred-expired-lease",
+        lease_owner="worker-a",
+        lease_token="token-a",
+        lease_ttl_seconds=10,
+        as_of=_fixed_now(),
+    )
+    assert claimed is not None
+    applied, still_resolving = repo.resolve(
+        prediction_id="pred-expired-lease",
+        outcome={"label": "hit", "score": 1.0},
+        expected_lease_token="token-a",
+        as_of=_fixed_now() + timedelta(seconds=11),
+    )
+    assert applied is False
+    assert still_resolving is not None
+    assert still_resolving.status == STATUS_RESOLVING
+
+
+def test_corrupt_json_is_not_silently_coerced_to_empty_claims(isolated_db) -> None:
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    _insert(repo, prediction_id="pred-corrupt")
+    with isolated_db._engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA ignore_check_constraints = ON")
+        connection.exec_driver_sql(
+            "UPDATE agent_predictions SET claims_json = 'not-json' "
+            "WHERE prediction_id = 'pred-corrupt'"
+        )
+        connection.exec_driver_sql("PRAGMA ignore_check_constraints = OFF")
+
+    with pytest.raises(RepositoryError) as raised:
+        repo.get("pred-corrupt")
+    assert raised.value.error_code == "agent_prediction_corrupt_json"

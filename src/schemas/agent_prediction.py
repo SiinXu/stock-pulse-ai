@@ -10,8 +10,10 @@ module stores claims and outcomes as JSON text and does not invent claims.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Mapping, Optional
+
+from src.schemas.prediction_record import PredictionRecord
 
 
 AGENT_PREDICTION_SCHEMA_VERSION = "agent-prediction-v1"
@@ -44,7 +46,6 @@ TERMINAL_AGENT_PREDICTION_STATUSES = frozenset({STATUS_RESOLVED})
 CLAIMABLE_AGENT_PREDICTION_STATUSES = frozenset(
     {
         STATUS_PENDING,
-        STATUS_DATA_UNAVAILABLE,
     }
 )
 
@@ -65,6 +66,7 @@ class AgentPredictionRecord:
     run_id: str
     symbol: str
     market: str
+    as_of: date
     horizon: str
     resolve_after: datetime
     status: str
@@ -77,6 +79,9 @@ class AgentPredictionRecord:
     lease_expires_at: Optional[datetime] = None
     outcome: Optional[Dict[str, Any]] = None
     model_meta: Optional[Dict[str, Any]] = None
+    source_decision_id: Optional[str] = None
+    no_verifiable_reason: Optional[str] = None
+    notes: Optional[str] = None
     resolved_at: Optional[datetime] = None
 
     def is_terminal(self) -> bool:
@@ -91,9 +96,35 @@ class AgentPredictionInsert:
     run_id: str
     symbol: str
     market: str
+    as_of: date
     horizon: str
     resolve_after: datetime
     claims: List[Any]
     model_meta: Optional[Mapping[str, Any]] = None
     created_at: Optional[datetime] = None
     status: str = STATUS_PENDING
+    source_decision_id: Optional[str] = None
+    no_verifiable_reason: Optional[str] = None
+    notes: Optional[str] = None
+
+    @classmethod
+    def from_prediction_record(
+        cls, record: PredictionRecord
+    ) -> "AgentPredictionInsert":
+        """Project the complete A1 draft fields needed by persistence/resolution."""
+        return cls(
+            prediction_id=record.prediction_id,
+            run_id=record.run_id,
+            symbol=record.symbol,
+            market=record.market or "",
+            as_of=record.as_of,
+            horizon=record.horizon,
+            resolve_after=record.resolve_after,
+            claims=[claim.model_dump(mode="json") for claim in record.claims],
+            model_meta=record.model_meta.model_dump(mode="json"),
+            created_at=record.created_at,
+            status=record.status,
+            source_decision_id=record.source_decision_id,
+            no_verifiable_reason=record.no_verifiable_reason,
+            notes=record.notes,
+        )

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Persist agent forecast verification rows in `agent_predictions` with due-scan indexes and CAS status transitions (`pending` / `resolving` / `resolved` / `data_unavailable`) (Refs #1112, #1107).
+- [Fixed] Align prediction persistence with A1 claim/provenance fields, enforce live lease ownership, and prevent provider failures or corrupt JSON from becoming scoreable outcomes (Refs #1112, #1107).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).

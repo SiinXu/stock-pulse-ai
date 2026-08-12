@@ -11,8 +11,19 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from datetime import date, datetime, timedelta, timezone
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    get_args,
+)
 
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -22,7 +33,6 @@ from src.repositories.base import BaseRepository, RepositoryError
 from src.schemas.agent_prediction import (
     AGENT_PREDICTION_STATUSES,
     CLAIMABLE_AGENT_PREDICTION_STATUSES,
-    RESOLVABLE_AGENT_PREDICTION_STATUSES,
     STATUS_DATA_UNAVAILABLE,
     STATUS_PENDING,
     STATUS_RESOLVED,
@@ -30,10 +40,18 @@ from src.schemas.agent_prediction import (
     AgentPredictionInsert,
     AgentPredictionRecord,
 )
+from src.schemas.prediction_record import (
+    NoVerifiableReason,
+    PREDICTION_HORIZON_TOKENS,
+    PredictionClaim,
+    PredictionModelMeta,
+)
 from src.storage import DatabaseManager
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+_NO_VERIFIABLE_REASONS = frozenset(get_args(NoVerifiableReason))
 
 
 def _utc_naive_now() -> datetime:
@@ -41,16 +59,39 @@ def _utc_naive_now() -> datetime:
 
 
 def _json_dumps(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, allow_nan=False, default=str)
+    return json.dumps(value, ensure_ascii=False, allow_nan=False)
 
 
-def _json_loads(raw: Optional[str], *, default: Any) -> Any:
+def _json_loads(
+    raw: Optional[str],
+    *,
+    field: str,
+    expected_type: Type[Any],
+    allow_none: bool = False,
+) -> Any:
+    """Load persisted JSON without turning corruption into valid empty data."""
     if raw is None or raw == "":
-        return default
+        if allow_none:
+            return None
+        raise RepositoryError(
+            f"Agent prediction {field} JSON is missing",
+            error_code="agent_prediction_corrupt_json",
+            context={"field": field},
+        )
     try:
         parsed = json.loads(raw)
-    except (TypeError, ValueError):
-        return default
+    except (TypeError, ValueError) as exc:
+        raise RepositoryError(
+            f"Agent prediction {field} JSON is invalid",
+            error_code="agent_prediction_corrupt_json",
+            context={"field": field},
+        ) from exc
+    if not isinstance(parsed, expected_type):
+        raise RepositoryError(
+            f"Agent prediction {field} JSON has the wrong shape",
+            error_code="agent_prediction_corrupt_json",
+            context={"field": field},
+        )
     return parsed
 
 
@@ -82,20 +123,29 @@ class AgentPredictionRepository(BaseRepository):
 
     @staticmethod
     def _row_to_record(row: Any) -> AgentPredictionRecord:
-        claims = _json_loads(row.claims_json, default=[])
-        if not isinstance(claims, list):
-            claims = []
-        outcome = _json_loads(row.outcome_json, default=None)
-        if outcome is not None and not isinstance(outcome, dict):
-            outcome = {"value": outcome}
-        model_meta = _json_loads(row.model_meta_json, default=None)
-        if model_meta is not None and not isinstance(model_meta, dict):
-            model_meta = {"value": model_meta}
+        claims = _json_loads(
+            row.claims_json,
+            field="claims",
+            expected_type=list,
+        )
+        outcome = _json_loads(
+            row.outcome_json,
+            field="outcome",
+            expected_type=dict,
+            allow_none=True,
+        )
+        model_meta = _json_loads(
+            row.model_meta_json,
+            field="model_meta",
+            expected_type=dict,
+            allow_none=True,
+        )
         return AgentPredictionRecord(
             prediction_id=str(row.prediction_id),
             run_id=str(row.run_id),
             symbol=str(row.symbol),
             market=str(row.market),
+            as_of=row.as_of,
             horizon=str(row.horizon),
             resolve_after=row.resolve_after,
             status=str(row.status),
@@ -108,6 +158,9 @@ class AgentPredictionRepository(BaseRepository):
             lease_expires_at=row.lease_expires_at,
             outcome=outcome,
             model_meta=model_meta,
+            source_decision_id=row.source_decision_id,
+            no_verifiable_reason=row.no_verifiable_reason,
+            notes=row.notes,
             resolved_at=row.resolved_at,
         )
 
@@ -127,38 +180,108 @@ class AgentPredictionRepository(BaseRepository):
             raise ValueError(
                 "prediction_id, run_id, symbol, market, and horizon are required"
             )
+        if any(
+            char.isspace()
+            for value in (prediction_id, run_id, symbol, market)
+            for char in value
+        ):
+            raise ValueError("prediction identifiers must not contain whitespace")
         if len(prediction_id) > 128 or len(run_id) > 128:
             raise ValueError("prediction_id and run_id must be at most 128 characters")
         if len(symbol) > 32 or len(market) > 16 or len(horizon) > 32:
             raise ValueError("symbol/market/horizon exceed column width")
-        if fields.resolve_after is None:
-            raise ValueError("resolve_after is required")
+        if horizon not in PREDICTION_HORIZON_TOKENS:
+            raise ValueError(f"unsupported horizon: {horizon!r}")
+        if not isinstance(fields.as_of, date) or isinstance(fields.as_of, datetime):
+            raise ValueError("as_of must be a date")
+        if not isinstance(fields.resolve_after, datetime):
+            raise ValueError("resolve_after must be a datetime")
         if not isinstance(fields.claims, list):
             raise ValueError("claims must be a list")
+        if len(fields.claims) > 32:
+            raise ValueError("claims must contain at most 32 entries")
         if status not in AGENT_PREDICTION_STATUSES:
             raise ValueError(f"unsupported status: {status!r}")
-        if status in {STATUS_RESOLVED}:
-            raise ValueError("cannot insert a terminal resolved prediction")
+        if status in {STATUS_RESOLVING, STATUS_RESOLVED, STATUS_DATA_UNAVAILABLE}:
+            raise ValueError(f"cannot insert lifecycle status {status!r} directly")
+
+        try:
+            claims = [
+                PredictionClaim.model_validate(claim).model_dump(mode="json")
+                for claim in fields.claims
+            ]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("claims must conform to the A1 PredictionClaim contract") from exc
+        claim_ids = [claim["claim_id"] for claim in claims]
+        if len(claim_ids) != len(set(claim_ids)):
+            raise ValueError("claim_id values must be unique")
+        if status == STATUS_PENDING and not claims:
+            raise ValueError("pending predictions require at least one typed claim")
+        if status == "no_verifiable_claim":
+            if claims:
+                raise ValueError("no_verifiable_claim predictions must not carry claims")
+            if not str(fields.no_verifiable_reason or "").strip():
+                raise ValueError("no_verifiable_claim requires no_verifiable_reason")
+        elif fields.no_verifiable_reason is not None:
+            raise ValueError(
+                "no_verifiable_reason is only valid for no_verifiable_claim"
+            )
+
+        source_decision_id = str(fields.source_decision_id or "").strip() or None
+        no_verifiable_reason = (
+            str(fields.no_verifiable_reason or "").strip() or None
+        )
+        notes = str(fields.notes) if fields.notes is not None else None
+        if source_decision_id is not None and len(source_decision_id) > 128:
+            raise ValueError("source_decision_id must be at most 128 characters")
+        if source_decision_id is not None and any(
+            char.isspace() for char in source_decision_id
+        ):
+            raise ValueError("source_decision_id must not contain whitespace")
+        if no_verifiable_reason is not None and len(no_verifiable_reason) > 64:
+            raise ValueError("no_verifiable_reason must be at most 64 characters")
+        if (
+            no_verifiable_reason is not None
+            and no_verifiable_reason not in _NO_VERIFIABLE_REASONS
+        ):
+            raise ValueError("unsupported no_verifiable_reason")
+        if notes is not None and len(notes) > 500:
+            raise ValueError("notes must be at most 500 characters")
+
+        model_meta = None
+        if fields.model_meta is not None:
+            try:
+                model_meta = PredictionModelMeta.model_validate(
+                    dict(fields.model_meta)
+                ).model_dump(mode="json")
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "model_meta must conform to the A1 PredictionModelMeta contract"
+                ) from exc
 
         now = fields.created_at or self._clock()
+        if not isinstance(now, datetime):
+            raise ValueError("created_at must be a datetime")
         values = {
             "prediction_id": prediction_id,
             "run_id": run_id,
             "symbol": symbol,
             "market": market,
+            "as_of": fields.as_of,
             "horizon": horizon,
             "resolve_after": fields.resolve_after,
             "status": status,
             "lease_owner": None,
             "lease_token": None,
             "lease_expires_at": None,
-            "claims_json": _json_dumps(fields.claims),
+            "claims_json": _json_dumps(claims),
             "outcome_json": None,
             "model_meta_json": (
-                _json_dumps(dict(fields.model_meta))
-                if fields.model_meta is not None
-                else None
+                _json_dumps(model_meta) if model_meta is not None else None
             ),
+            "source_decision_id": source_decision_id,
+            "no_verifiable_reason": no_verifiable_reason,
+            "notes": notes,
             "attempts": 0,
             "created_at": now,
             "updated_at": now,
@@ -241,7 +364,7 @@ class AgentPredictionRepository(BaseRepository):
         now = as_of or self._clock()
         allowed = tuple(
             status
-            for status in (statuses or (STATUS_PENDING, STATUS_DATA_UNAVAILABLE))
+            for status in (statuses or (STATUS_PENDING,))
             if status in AGENT_PREDICTION_STATUSES
         )
         if not allowed:
@@ -309,6 +432,8 @@ class AgentPredictionRepository(BaseRepository):
         token = str(lease_token or "").strip()
         if not canonical or not owner or not token:
             raise ValueError("prediction_id, lease_owner, and lease_token are required")
+        if len(owner) > 128 or len(token) > 64:
+            raise ValueError("lease_owner/lease_token exceed column width")
         now = as_of or self._clock()
         ttl = max(1, int(lease_ttl_seconds))
         expires = now + timedelta(seconds=ttl)
@@ -318,6 +443,7 @@ class AgentPredictionRepository(BaseRepository):
                     update(agent_predictions_table)
                     .where(
                         agent_predictions_table.c.prediction_id == canonical,
+                        agent_predictions_table.c.resolve_after <= now,
                         or_(
                             agent_predictions_table.c.status.in_(
                                 tuple(CLAIMABLE_AGENT_PREDICTION_STATUSES)
@@ -387,16 +513,22 @@ class AgentPredictionRepository(BaseRepository):
         if not isinstance(outcome, Mapping):
             raise ValueError("outcome must be a mapping")
         now = as_of or self._clock()
+        token = str(expected_lease_token or "").strip() or None
+        if token is not None and len(token) > 64:
+            raise ValueError("expected_lease_token exceeds column width")
+        # Direct pending resolution is allowed for synchronous callers. Once a
+        # row is claimed, only the live lease holder may complete it.
+        transition = agent_predictions_table.c.status == STATUS_PENDING
+        if token is not None:
+            transition = and_(
+                agent_predictions_table.c.status == STATUS_RESOLVING,
+                agent_predictions_table.c.lease_token == token,
+                agent_predictions_table.c.lease_expires_at > now,
+            )
         conditions = [
             agent_predictions_table.c.prediction_id == canonical,
-            agent_predictions_table.c.status.in_(
-                tuple(RESOLVABLE_AGENT_PREDICTION_STATUSES)
-            ),
+            transition,
         ]
-        if expected_lease_token is not None:
-            conditions.append(
-                agent_predictions_table.c.lease_token == str(expected_lease_token)
-            )
         try:
             with self.db.get_session() as session:
                 result = session.execute(
@@ -418,9 +550,6 @@ class AgentPredictionRepository(BaseRepository):
                 else:
                     session.rollback()
         except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            message = str(exc).lower()
-            if "resolved agent_predictions are immutable" in message:
-                return False, self.get(canonical)
             context = {"prediction_id": canonical}
             log_safe_exception(
                 logger,
@@ -449,21 +578,31 @@ class AgentPredictionRepository(BaseRepository):
         canonical = str(prediction_id or "").strip()
         if not canonical:
             raise ValueError("prediction_id is required")
+        token = str(expected_lease_token or "").strip()
+        if not token:
+            raise ValueError("expected_lease_token is required")
+        if len(token) > 64:
+            raise ValueError("expected_lease_token exceeds column width")
         now = as_of or self._clock()
-        payload: Dict[str, Any] = {
-            "label": STATUS_DATA_UNAVAILABLE,
-            "reason": str(reason or "data_unavailable"),
-        }
+        payload: Dict[str, Any] = {}
         if outcome:
             payload.update(dict(outcome))
+        # Provider failures are never scoreable. Callers cannot smuggle a hit,
+        # miss, or numeric score through the diagnostic extension mapping.
+        for reserved in ("label", "score", "hit", "is_hit", "miss"):
+            payload.pop(reserved, None)
+        payload.update(
+            {
+                "label": STATUS_DATA_UNAVAILABLE,
+                "reason": str(reason or "data_unavailable"),
+            }
+        )
         conditions = [
             agent_predictions_table.c.prediction_id == canonical,
             agent_predictions_table.c.status == STATUS_RESOLVING,
+            agent_predictions_table.c.lease_token == token,
+            agent_predictions_table.c.lease_expires_at > now,
         ]
-        if expected_lease_token is not None:
-            conditions.append(
-                agent_predictions_table.c.lease_token == str(expected_lease_token)
-            )
         try:
             with self.db.get_session() as session:
                 result = session.execute(
@@ -484,9 +623,6 @@ class AgentPredictionRepository(BaseRepository):
                 else:
                     session.rollback()
         except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
-            message = str(exc).lower()
-            if "resolved agent_predictions are immutable" in message:
-                return False, self.get(canonical)
             context = {"prediction_id": canonical}
             log_safe_exception(
                 logger,
@@ -523,6 +659,7 @@ class AgentPredictionRepository(BaseRepository):
                     )
                     .values(
                         status=STATUS_PENDING,
+                        outcome_json=None,
                         updated_at=now,
                         lease_owner=None,
                         lease_token=None,

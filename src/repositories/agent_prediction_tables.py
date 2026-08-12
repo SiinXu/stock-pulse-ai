@@ -4,6 +4,7 @@
 
 from sqlalchemy import (
     Column,
+    Date,
     DateTime,
     Integer,
     MetaData,
@@ -23,6 +24,7 @@ agent_predictions_table = Table(
     Column("run_id", String(128), nullable=False),
     Column("symbol", String(32), nullable=False),
     Column("market", String(16), nullable=False),
+    Column("as_of", Date, nullable=False),
     Column("horizon", String(32), nullable=False),
     Column("resolve_after", DateTime, nullable=False),
     Column("status", String(32), nullable=False),
@@ -32,6 +34,9 @@ agent_predictions_table = Table(
     Column("claims_json", Text, nullable=False),
     Column("outcome_json", Text),
     Column("model_meta_json", Text),
+    Column("source_decision_id", String(128)),
+    Column("no_verifiable_reason", String(64)),
+    Column("notes", String(500)),
     Column("attempts", Integer, nullable=False, default=0),
     Column("created_at", DateTime, nullable=False),
     Column("updated_at", DateTime, nullable=False),

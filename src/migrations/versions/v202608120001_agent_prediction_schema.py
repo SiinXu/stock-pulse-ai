@@ -23,6 +23,7 @@ _TABLE_STATEMENTS = (
         run_id VARCHAR(128) NOT NULL,
         symbol VARCHAR(32) NOT NULL,
         market VARCHAR(16) NOT NULL,
+        as_of DATE NOT NULL,
         horizon VARCHAR(32) NOT NULL,
         resolve_after DATETIME NOT NULL,
         status VARCHAR(32) NOT NULL,
@@ -32,6 +33,9 @@ _TABLE_STATEMENTS = (
         claims_json TEXT NOT NULL,
         outcome_json TEXT,
         model_meta_json TEXT,
+        source_decision_id VARCHAR(128),
+        no_verifiable_reason VARCHAR(64),
+        notes VARCHAR(500),
         attempts INTEGER NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
@@ -39,7 +43,39 @@ _TABLE_STATEMENTS = (
         CONSTRAINT ck_agent_prediction_status
             CHECK (status IN ({_STATUS_CHECK})),
         CONSTRAINT ck_agent_prediction_attempts
-            CHECK (attempts >= 0)
+            CHECK (attempts >= 0),
+        CONSTRAINT ck_agent_prediction_claims_json
+            CHECK (json_valid(claims_json) AND json_type(claims_json) = 'array'),
+        CONSTRAINT ck_agent_prediction_lease_state
+            CHECK (
+                (status = 'resolving'
+                    AND lease_owner IS NOT NULL
+                    AND lease_token IS NOT NULL
+                    AND lease_expires_at IS NOT NULL)
+                OR
+                (status != 'resolving'
+                    AND lease_owner IS NULL
+                    AND lease_token IS NULL
+                    AND lease_expires_at IS NULL)
+            ),
+        CONSTRAINT ck_agent_prediction_outcome_state
+            CHECK (
+                (status IN ('resolved', 'data_unavailable') AND outcome_json IS NOT NULL)
+                OR
+                (status NOT IN ('resolved', 'data_unavailable'))
+            ),
+        CONSTRAINT ck_agent_prediction_resolved_at
+            CHECK (
+                (status = 'resolved' AND resolved_at IS NOT NULL)
+                OR
+                (status != 'resolved' AND resolved_at IS NULL)
+            ),
+        CONSTRAINT ck_agent_prediction_no_verifiable_reason
+            CHECK (
+                (status = 'no_verifiable_claim' AND no_verifiable_reason IS NOT NULL)
+                OR
+                (status != 'no_verifiable_claim' AND no_verifiable_reason IS NULL)
+            )
     )
     """,
 )
