@@ -2,6 +2,8 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSystemConfig } from '../useSystemConfig';
 import { createDeferred } from '../../test-utils';
+import { THEME_STORAGE_KEYS } from '../../design/theme';
+import { ThemeAppearanceProvider } from '../../components/theme/ThemeAppearanceProvider';
 
 const { getConfig, validate, update, ConflictError } = vi.hoisted(() => ({
   getConfig: vi.fn(),
@@ -189,6 +191,53 @@ describe('useSystemConfig', () => {
     expect(getConfig).toHaveBeenCalledTimes(1);
     expect(result.current.load).toBe(firstLoad);
     expect(result.current.configuredNotificationChannels).toBeNull();
+  });
+
+  it('previews price direction without persistence and persists it after save', async () => {
+    const colorConfig = {
+      ...sampleConfig,
+      items: [
+        ...sampleConfig.items,
+        {
+          key: 'MARKET_REVIEW_COLOR_SCHEME',
+          value: 'red_up',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'MARKET_REVIEW_COLOR_SCHEME',
+            category: 'base',
+            dataType: 'string',
+            uiControl: 'select',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 2,
+          },
+        },
+      ],
+    };
+    document.documentElement.removeAttribute('data-price-direction');
+    localStorage.removeItem(THEME_STORAGE_KEYS.priceDirection);
+    getConfig.mockResolvedValue(colorConfig);
+    const { result } = renderHook(() => useSystemConfig(), {
+      wrapper: ThemeAppearanceProvider,
+    });
+
+    await act(async () => {
+      await result.current.load();
+    });
+    act(() => result.current.setDraftValue('MARKET_REVIEW_COLOR_SCHEME', 'green_up'));
+
+    expect(document.documentElement).toHaveAttribute('data-price-direction', 'us');
+    expect(localStorage.getItem(THEME_STORAGE_KEYS.priceDirection)).toBe('cn');
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(localStorage.getItem(THEME_STORAGE_KEYS.priceDirection)).toBe('us');
   });
 
   it('keeps server-configured notification channels when their values are masked', async () => {

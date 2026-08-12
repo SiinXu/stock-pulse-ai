@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import { systemConfigApi } from '../../api/systemConfig';
-import { useThemeAppearanceOptional } from './ThemeAppearanceProvider';
+import { useThemeAppearanceOptional } from '../../contexts/ThemeAppearanceContext';
 
 const COLOR_SCHEME_KEY = 'MARKET_REVIEW_COLOR_SCHEME';
 

@@ -21,7 +21,6 @@ import {
   resolveSettingsFieldControl,
   type ResolvedSettingsControl,
 } from './settingsFieldControl';
-import { useThemeAppearanceOptional } from '../theme/ThemeAppearanceProvider';
 
 function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['options'] = [], locale: UiLanguage) {
   return options.map((option) => {
@@ -401,7 +400,6 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   enumEmptyState,
 }) => {
   const { language, t } = useUiLanguage();
-  const themeAppearance = useThemeAppearanceOptional();
   const schema = item.schema;
   // Resolve once per render and share across layout, default backfill, and control.
   const resolvedControl = resolveSettingsFieldControl(schema, { isMasked: item.isMasked });
@@ -483,13 +481,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           title,
           displayValue,
           disabled || dependencyLocked || Boolean(readOnlyDiagnostic),
-          (nextValue) => {
-            onChange(item.key, nextValue);
-            // Live CSS preview only — do not persist until system config save succeeds.
-            if (item.key === 'MARKET_REVIEW_COLOR_SCHEME') {
-              themeAppearance?.syncPriceDirectionFromChangeColorPref(nextValue, { persist: false });
-            }
-          },
+          (nextValue) => onChange(item.key, nextValue),
           isPasswordEditable,
           () => setIsPasswordEditable(true),
           controlId,

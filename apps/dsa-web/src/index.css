@@ -182,8 +182,10 @@
    * --price-up / --price-down are direction tokens; remapped by data-price-direction.
    * Default (no attribute or cn): A-share red-up / green-down.
    */
-  --price-red: hsl(0 88% 62%);
-  --price-green: hsl(149 100% 42%);
+  --price-red-hsl: 0 88% 62%;
+  --price-green-hsl: 149 100% 42%;
+  --price-red: hsl(var(--price-red-hsl));
+  --price-green: hsl(var(--price-green-hsl));
   --price-up: var(--price-red);
   --price-down: var(--price-green);
   /* Legacy aliases — hue identity, not direction (marketFormat maps red/green paint). */
@@ -342,7 +344,6 @@
   --secondary-text: 215 10% 38%;
   --muted-text: 215 8% 50%;
   --color-success: 152 40% 38%;
-  --color-cyan-400: 215 16% 42%;
   --color-emerald-400: 152 40% 38%;
   --success: var(--color-success);
 }
@@ -364,7 +365,6 @@
   --secondary-text: 215 10% 72%;
   --muted-text: 215 8% 55%;
   --color-success: 152 36% 58%;
-  --color-cyan-400: 215 18% 68%;
   --color-emerald-400: 152 36% 58%;
   --success: var(--color-success);
 }
@@ -504,8 +504,10 @@
   --home-accent-text: hsl(var(--primary));
   --home-secondary-accent-text: hsl(var(--secondary-text));
   --home-title-accent: hsl(var(--foreground));
-  --price-red: hsl(0 88% 64%);
-  --price-green: hsl(149 100% 44%);
+  --price-red-hsl: 0 88% 64%;
+  --price-green-hsl: 149 100% 44%;
+  --price-red: hsl(var(--price-red-hsl));
+  --price-green: hsl(var(--price-green-hsl));
   --price-up: var(--price-red);
   --price-down: var(--price-green);
   --home-price-up: var(--price-red);

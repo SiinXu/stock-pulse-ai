@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type React from 'react';
-import { Palette } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { listThemePacks } from '../../design/themePacks';
 import type { ThemePackId } from '../../design/theme';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { Select } from '../common/Select';
-import { useThemeAppearanceOptional } from './ThemeAppearanceProvider';
+import { useThemeAppearanceOptional } from '../../contexts/ThemeAppearanceContext';
 
 type ThemePackSelectProps = {
   wrapperClassName?: string;
@@ -48,7 +48,7 @@ export const ThemePackSelect: React.FC<ThemePackSelectProps> = ({
       )}
       data-testid="theme-pack-select"
     >
-      <Palette className={iconClassName ?? 'h-4 w-4 shrink-0'} aria-hidden="true" />
+      <Layers className={iconClassName ?? 'h-4 w-4 shrink-0'} aria-hidden="true" />
       <Select
         value={pack}
         onChange={(next) => setPack(next as ThemePackId)}
