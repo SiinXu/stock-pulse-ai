@@ -553,5 +553,12 @@ Automated path presence can miss behavioral gaps and fork-native renames. Spot-c
 
 ### Child issues opened from this inventory
 
-_Filled in after `gh issue create` in the delivery comment on #1002 / #1061._
+| Issue | Kind | Upstream SHAs / topic |
+| --- | --- | --- |
+| #1219 | Port now | `5698068fe` H1 heading chunk split bug still present |
+| #1220 | DESIGN-NEEDED | `628c5b6ef` Codex App Server prototype |
+| #1221 | Record trailers | Already-absorbed Attention SHAs + fork-native renames spot-check |
+| #1222 | Docs / product | `3b98aa1d7` AIHubMix → InferEra referral decision |
+
+Also registered: screening/AlphaSift path divergence remains under existing #325 (and prior ports); multi-strategy design remains #805.
 
