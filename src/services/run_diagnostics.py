@@ -511,8 +511,15 @@ class PipelineStageObservation:
                 category="pipeline_stage",
                 attrs={"status": str(status or "success")},
             )
-        except Exception:  # broad-exception: fallback_recorded - Perf mirror must not break diagnostics.
-            pass
+        except Exception as exc:  # broad-exception: fallback_recorded - Perf mirror must not break diagnostics.
+            log_safe_exception(
+                logger,
+                "Pipeline stage perf mirror failed",
+                exc,
+                error_code="pipeline_stage_perf_mirror_failed",
+                level=logging.DEBUG,
+                context={"stage": self.stage},
+            )
 
     def __enter__(self) -> "PipelineStageObservation":
         """Return this observation for explicit status completion."""

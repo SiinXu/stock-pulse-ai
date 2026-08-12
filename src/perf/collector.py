@@ -20,6 +20,8 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Mapping, Optional
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 MAX_SPANS = 500
@@ -140,12 +142,26 @@ def is_perf_collection_enabled() -> bool:
 
         config = get_application_services().config
         enabled = bool(getattr(config, "perf_collection_enabled", False))
-    except Exception:  # broad-exception: fallback_recorded - Config lookup must not block callers.
+    except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block callers.
+        log_safe_exception(
+            logger,
+            "Perf collection enabled flag lookup failed; trying get_config",
+            exc,
+            error_code="perf_collection_enabled_lookup_failed",
+            level=logging.DEBUG,
+        )
         try:
             from src.config import get_config
 
             enabled = bool(getattr(get_config(), "perf_collection_enabled", False))
-        except Exception:  # broad-exception: fallback_recorded - Default off when config unavailable.
+        except Exception as inner_exc:  # broad-exception: fallback_recorded - Default off when config unavailable.
+            log_safe_exception(
+                logger,
+                "Perf collection enabled flag get_config failed; defaulting off",
+                inner_exc,
+                error_code="perf_collection_enabled_get_config_failed",
+                level=logging.DEBUG,
+            )
             enabled = False
     _ENABLED_CACHE = enabled
     return enabled
@@ -158,12 +174,26 @@ def is_perf_profile_enabled() -> bool:
 
         config = get_application_services().config
         return bool(getattr(config, "perf_profile_enabled", False))
-    except Exception:  # broad-exception: fallback_recorded - Config lookup must not block callers.
+    except Exception as exc:  # broad-exception: fallback_recorded - Config lookup must not block callers.
+        log_safe_exception(
+            logger,
+            "Perf profile enabled flag lookup failed; trying get_config",
+            exc,
+            error_code="perf_profile_enabled_lookup_failed",
+            level=logging.DEBUG,
+        )
         try:
             from src.config import get_config
 
             return bool(getattr(get_config(), "perf_profile_enabled", False))
-        except Exception:  # broad-exception: fallback_recorded - Default off when config unavailable.
+        except Exception as inner_exc:  # broad-exception: fallback_recorded - Default off when config unavailable.
+            log_safe_exception(
+                logger,
+                "Perf profile enabled flag get_config failed; defaulting off",
+                inner_exc,
+                error_code="perf_profile_enabled_get_config_failed",
+                level=logging.DEBUG,
+            )
             return False
 
 
@@ -201,8 +231,15 @@ def record_span(
         return
     try:
         collector.record(name, duration_ms, category=category, attrs=attrs)
-    except Exception:  # broad-exception: fallback_recorded - Perf recording must not break callers.
-        logger.debug("perf span record failed for %s", name, exc_info=True)
+    except Exception as exc:  # broad-exception: fallback_recorded - Perf recording must not break callers.
+        log_safe_exception(
+            logger,
+            "Perf span record failed",
+            exc,
+            error_code="perf_span_record_failed",
+            level=logging.DEBUG,
+            context={"name": str(name or "")},
+        )
 
 
 @contextmanager
