@@ -166,6 +166,14 @@ class _PersistenceStageMixin:
             saved_history_id: Any = None
             persistence_error: Optional[BaseException] = None
             try:
+                # Sandbox fence: never write production analysis history during simulation.
+                from src.agent.sandbox.context import (
+                    require_sandbox_inactive_for_production_write,
+                )
+                from src.agent.sandbox.effects import EFFECT_ANALYSIS_HISTORY
+
+                require_sandbox_inactive_for_production_write(EFFECT_ANALYSIS_HISTORY)
+
                 context_snapshot = context_snapshot_factory()
                 result.diagnostic_context_snapshot = context_snapshot
                 saved_history_id = self.db.save_analysis_history(
