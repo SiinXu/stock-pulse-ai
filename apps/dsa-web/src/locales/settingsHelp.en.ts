@@ -2247,16 +2247,83 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Bounds per-call analysis cost.',
     ],
   },
-  'settings.ai_model.TASK_ROUTING_ENABLED': { summary: 'Enable task-aware model routing from the write-side capability registry.', valueNotes: ['Default off. Explicit TASK_ROUTING_PIN_* always wins.'] },
-  'settings.ai_model.TASK_ROUTING_POLICY': { summary: 'Scoring policy: quality, cost, or local_first.', valueNotes: ['Used only when TASK_ROUTING_ENABLED=true.'] },
-  'settings.ai_model.CAPABILITY_WRITE_REGISTRY_PATH': { summary: 'Optional path for capability_write_registry.json.', valueNotes: ['Empty uses the database directory.'] },
-  'settings.ai_model.TASK_ROUTING_PIN_REPORT': { summary: 'Optional report task model pin.', valueNotes: ['Always overrides automatic selection when set.'] },
-  'settings.ai_model.TASK_ROUTING_PIN_AGENT': { summary: 'Optional Agent task model pin.', valueNotes: ['Always overrides automatic selection when set.'] },
-  'settings.ai_model.TASK_ROUTING_PIN_VISION': { summary: 'Optional vision task model pin.', valueNotes: ['Always overrides automatic selection when set.'] },
-  'settings.ai_model.TASK_ROUTING_PIN_MARKET_REVIEW': { summary: 'Optional market-review task model pin.', valueNotes: [] },
-  'settings.ai_model.TASK_ROUTING_PIN_CHEAP_SCAN': { summary: 'Optional cheap-scan task model pin.', valueNotes: [] },
-  'settings.ai_model.TASK_ROUTING_PIN_DEEP_REASONING': { summary: 'Optional deep-reasoning task model pin.', valueNotes: [] },
-  'settings.ai_model.TASK_ROUTING_PIN_CODING': { summary: 'Optional coding task model pin.', valueNotes: [] }
+  'settings.ai_model.TASK_ROUTING_ENABLED': {
+    title: 'Task-Aware Model Routing',
+    summary: 'Enable task-aware model routing from the write-side capability registry.',
+    usage: 'Default off. When enabled, active LLM capabilities are scored by task tags and TASK_ROUTING_POLICY. Explicit TASK_ROUTING_PIN_* always wins.',
+    valueNotes: [
+      'Default off. Explicit TASK_ROUTING_PIN_* always wins.',
+      'See docs/capability-write-registry.md.',
+    ],
+    impact: ['Changes which model is selected for report, agent, vision, and other task classes when registry LLM entries exist.'],
+    notes: ['Does not replace existing LITELLM_MODEL assignments when routing is disabled or no candidate matches.'],
+  },
+  'settings.ai_model.TASK_ROUTING_POLICY': {
+    title: 'Task Routing Policy',
+    summary: 'Scoring policy for automatic model selection: quality, cost, or local_first.',
+    usage: 'Used only when TASK_ROUTING_ENABLED=true.',
+    valueNotes: [
+      'Used only when TASK_ROUTING_ENABLED=true.',
+      'Allowed values: quality, cost, local_first.',
+    ],
+  },
+  'settings.ai_model.CAPABILITY_WRITE_REGISTRY_PATH': {
+    title: 'Capability Write Registry Path',
+    summary: 'Optional path for capability_write_registry.json.',
+    usage: 'Empty uses <database-dir>/capability_write_registry.json.',
+    valueNotes: [
+      'Empty uses the database directory.',
+    ],
+    notes: ['Write-side only; does not change the live-owner inventory endpoint.'],
+  },
+  'settings.ai_model.TASK_ROUTING_PIN_REPORT': {
+    title: 'Task Routing Pin (Report)',
+    summary: 'Optional report task model pin.',
+    usage: 'Always overrides automatic selection when set.',
+    valueNotes: [
+      'Always overrides automatic selection when set.',
+    ],
+  },
+  'settings.ai_model.TASK_ROUTING_PIN_AGENT': {
+    title: 'Task Routing Pin (Agent)',
+    summary: 'Optional Agent task model pin.',
+    usage: 'Always overrides automatic selection when set.',
+    valueNotes: [
+      'Always overrides automatic selection when set.',
+    ],
+  },
+  'settings.ai_model.TASK_ROUTING_PIN_VISION': {
+    title: 'Task Routing Pin (Vision)',
+    summary: 'Optional vision task model pin.',
+    usage: 'Always overrides automatic selection when set.',
+    valueNotes: [
+      'Always overrides automatic selection when set.',
+    ],
+  },
+  'settings.ai_model.TASK_ROUTING_PIN_MARKET_REVIEW': {
+    title: 'Task Routing Pin (Market Review)',
+    summary: 'Optional market-review task model pin.',
+    usage: 'Always overrides automatic selection when set.',
+    valueNotes: [],
+  },
+  'settings.ai_model.TASK_ROUTING_PIN_CHEAP_SCAN': {
+    title: 'Task Routing Pin (Cheap Scan)',
+    summary: 'Optional cheap-scan task model pin.',
+    usage: 'Always overrides automatic selection when set.',
+    valueNotes: [],
+  },
+  'settings.ai_model.TASK_ROUTING_PIN_DEEP_REASONING': {
+    title: 'Task Routing Pin (Deep Reasoning)',
+    summary: 'Optional deep-reasoning task model pin.',
+    usage: 'Always overrides automatic selection when set.',
+    valueNotes: [],
+  },
+  'settings.ai_model.TASK_ROUTING_PIN_CODING': {
+    title: 'Task Routing Pin (Coding)',
+    summary: 'Optional coding task model pin.',
+    usage: 'Always overrides automatic selection when set.',
+    valueNotes: [],
+  },
 };
 
 export default settingsHelpEnUS;
