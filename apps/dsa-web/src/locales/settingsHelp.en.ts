@@ -980,6 +980,29 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.research_api': {
+    title: 'Read-only research API',
+    summary: 'Controls the authenticated read-only research API that exposes stratified conclusions for embed/portal clients.',
+    usage: 'Keep RESEARCH_API_ENABLED off unless you intentionally need GET /api/v1/research/conclusions*. When enabled, clients request brief/standard/research density plus as-of, confidence, and evidence counts. RESEARCH_API_RATE_LIMIT_PER_MINUTE sets the per-principal sliding-window budget (same pattern as MCP).',
+    valueNotes: [
+      'Default is off; routes return 404 while disabled.',
+      'Mounted on the main API port only — no separate listener.',
+      'Reuses session auth (when ADMIN_AUTH_ENABLED), fail-closed security audit, and sliding-window rate limits.',
+      'Responses are compact projections only: no raw_result dump and no write methods.',
+    ],
+    impact: [
+      'Affects whether /api/v1/research/conclusions* is reachable when authenticated.',
+      'Does not change analysis generation, history storage, or MCP tool inventory.',
+    ],
+    notes: [
+      'Capability registry work remains separate (see related tracking issues).',
+    ],
+    examples: [
+      'RESEARCH_API_ENABLED=false',
+      'RESEARCH_API_ENABLED=true',
+      'RESEARCH_API_RATE_LIMIT_PER_MINUTE=60',
+    ],
+  },
   'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
     title: 'Report Export PDF Font Path',
     summary: 'Selects the single-face TTF/OTF used by optional PDF report export.',

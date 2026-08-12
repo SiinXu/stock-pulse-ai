@@ -433,6 +433,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | Scorecard buckets below this decided sample (hit+miss) render as `insufficient_data` instead of a rate | `10` |
+| `RESEARCH_API_ENABLED` | Opt-in authenticated read-only research API (`GET /api/v1/research/conclusions*`) for stratified conclusions (brief/standard/research) with as-of, confidence, and evidence counts. Default off. Mounted on the main API port only (session auth, security audit, sliding-window rate limits). See [research-api_EN.md](research-api_EN.md) | `false` |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | Per-principal sliding-window rate limit for research API reads when enabled (same governance pattern as MCP) | `60` |
 | `DAILY_BRIEF_ENABLED` | Opt-in daily brief with historical accuracy review (decision-signal outcomes, backtest summary, skill-opinion performance). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | Local `HH:MM` after which the enabled brief may fire (at most once per local day) | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | IANA timezone for schedule and “yesterday” mapping | `Asia/Shanghai` |

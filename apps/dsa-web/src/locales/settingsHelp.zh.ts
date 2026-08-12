@@ -1023,6 +1023,29 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.research_api': {
+    title: '只读研究 API',
+    summary: '控制面向嵌入/门户客户端的只读研究 API，用于暴露分层结论。',
+    usage: '除非明确需要 GET /api/v1/research/conclusions*，否则保持 RESEARCH_API_ENABLED 关闭。启用后客户端可按 brief/standard/research 密度读取结论，并获取 as-of、置信度与证据计数。RESEARCH_API_RATE_LIMIT_PER_MINUTE 设置每主体滑动窗口限流（与 MCP 同一治理模式）。',
+    valueNotes: [
+      '默认关闭；关闭时路由返回 404。',
+      '仅挂载在主 API 端口，不另开监听端口。',
+      '复用会话鉴权（ADMIN_AUTH_ENABLED 开启时）、fail-closed 安全审计与滑动窗口限流。',
+      '响应仅为紧凑投影：不返回 raw_result 全量，且无写方法。',
+    ],
+    impact: [
+      '影响认证后是否可访问 /api/v1/research/conclusions*。',
+      '不改变分析生成、历史存储或 MCP 工具清单。',
+    ],
+    notes: [
+      '能力注册表相关工作独立推进，不在本开关内完成。',
+    ],
+    examples: [
+      'RESEARCH_API_ENABLED=false',
+      'RESEARCH_API_ENABLED=true',
+      'RESEARCH_API_RATE_LIMIT_PER_MINUTE=60',
+    ],
+  },
   'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
     title: '报告导出 PDF 字体路径',
     summary: '选择可选 PDF 报告导出使用的单字体 TTF/OTF。',

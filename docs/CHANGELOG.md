@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
 - [Fixed] Restore the Chat context-compression switch semantics and shared 44px touch target after the compact workspace migration.
 - [Added] Web runtime performance budgets for HistoryList virtualization, Settings field isolation, and SSE progress batching, with soft-gate CI measurement entry points (Refs #883).
+- [Added] Default-off authenticated read-only research API (`GET /api/v1/research/conclusions*`) exposing brief/standard/research stratified conclusions with as-of, confidence, and evidence counts; reuses session auth, security audit, and sliding-window rate limits on the main API port (Refs #1143, #1127).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).

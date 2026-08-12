@@ -2717,6 +2717,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/research/conclusions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get latest stratified research conclusion for a stock code
+         * @description Returns the newest analysis history row for stock_code as a mode-filtered stratified conclusion. Same governance as GET by record id. Default-off.
+         */
+        get: operations["getLatestResearchConclusion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/conclusions/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get stratified research conclusion by history record id
+         * @description Authenticated read-only projection of stratified conclusions (brief / standard / research) plus metadata (as-of, confidence, evidence counts and refs). Default-off via RESEARCH_API_ENABLED; no write methods; reuses session auth, security audit, and sliding-window rate limits on the main API port.
+         */
+        get: operations["getResearchConclusionByRecordId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/scheduled-tasks": {
         parameters: {
             query?: never;
@@ -12483,6 +12523,154 @@ export interface components {
             stock_code: string;
             /** Total */
             total: number;
+        };
+        /**
+         * ResearchConclusionBody
+         * @description Mode-density stratified conclusion body (no secrets, no raw_result dump).
+         */
+        ResearchConclusionBody: {
+            /** Action */
+            action?: string | null;
+            /** Action Label */
+            action_label?: string | null;
+            /** Analysis Summary */
+            analysis_summary?: string | null;
+            /** Confidence Reason */
+            confidence_reason?: string | null;
+            /** Gaps */
+            gaps?: components["schemas"]["ResearchGapItem"][];
+            /**
+             * Omitted Count
+             * @default 0
+             */
+            omitted_count: number;
+            /** One Sentence */
+            one_sentence?: string | null;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Position Advice */
+            position_advice?: string | null;
+            /** Positive Catalysts */
+            positive_catalysts?: string[] | null;
+            /**
+             * Report Strata
+             * @description Mode-filtered report strata; null in brief mode
+             */
+            report_strata?: {
+                [key: string]: unknown;
+            } | null;
+            /** Risks */
+            risks?: string[];
+            /** Signal Type */
+            signal_type?: string | null;
+            /** Time Sensitivity */
+            time_sensitivity?: string | null;
+            /** Trend Prediction */
+            trend_prediction?: string | null;
+            /** Truncation Notice */
+            truncation_notice?: string | null;
+        };
+        /**
+         * ResearchConclusionMetadata
+         * @description Record-level metadata for embed/portal clients.
+         */
+        ResearchConclusionMetadata: {
+            /**
+             * As Of
+             * @description Best-effort data as-of timestamp from strata facts or record time
+             */
+            as_of?: string | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            evidence_counts?: components["schemas"]["ResearchEvidenceCounts"];
+            /**
+             * Evidence Refs
+             * @description Bounded unique evidence reference ids (source_id values)
+             */
+            evidence_refs?: string[];
+            /** Query Id */
+            query_id?: string | null;
+            /** Record Id */
+            record_id: number;
+            /** Report Language */
+            report_language?: string | null;
+            /** Report Type */
+            report_type?: string | null;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name?: string | null;
+        };
+        /**
+         * ResearchConclusionResponse
+         * @description Compact stratified conclusion response for embed/portal use.
+         */
+        ResearchConclusionResponse: {
+            conclusion: components["schemas"]["ResearchConclusionBody"];
+            /** Disclaimer */
+            disclaimer?: string | null;
+            metadata: components["schemas"]["ResearchConclusionMetadata"];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "brief" | "standard" | "research";
+            /**
+             * Schema Version
+             * @default research-conclusion-v1
+             * @constant
+             */
+            schema_version: "research-conclusion-v1";
+        };
+        /**
+         * ResearchEvidenceCounts
+         * @description Counts derived from the mode-filtered strata projection.
+         */
+        ResearchEvidenceCounts: {
+            /**
+             * Evidence Refs
+             * @description Unique source_id / source_ids count
+             * @default 0
+             */
+            evidence_refs: number;
+            /**
+             * Missing Or Conflicts
+             * @default 0
+             */
+            missing_or_conflicts: number;
+            /**
+             * Model Inference
+             * @default 0
+             */
+            model_inference: number;
+            /**
+             * Risks Counter Evidence
+             * @default 0
+             */
+            risks_counter_evidence: number;
+            /**
+             * Verified Facts
+             * @default 0
+             */
+            verified_facts: number;
+        };
+        /**
+         * ResearchGapItem
+         * @description One missing-data or conflict gap the client can render without full history.
+         */
+        ResearchGapItem: {
+            /** Description */
+            description: string;
+            /**
+             * Kind
+             * @default missing
+             * @enum {string}
+             */
+            kind: "missing" | "conflict";
+            /** Source Ids */
+            source_ids?: string[];
         };
         /** ResearchRequest */
         ResearchRequest: {
@@ -24321,6 +24509,186 @@ export interface operations {
             };
             /** @description Server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getLatestResearchConclusion: {
+        parameters: {
+            query: {
+                /** @description Stock code */
+                stock_code: string;
+                /** @description Presentation density: brief | standard | research */
+                mode?: "brief" | "standard" | "research";
+                /** @description Optional report language override (zh/en/ko) */
+                language?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchConclusionResponse"];
+                };
+            };
+            /** @description Missing stock_code or invalid mode */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Feature disabled or no history for stock_code */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Per-principal rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit storage unavailable (fail-closed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getResearchConclusionByRecordId: {
+        parameters: {
+            query?: {
+                /** @description Presentation density: brief | standard | research */
+                mode?: "brief" | "standard" | "research";
+                /** @description Optional report language override (zh/en/ko) */
+                language?: string | null;
+            };
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchConclusionResponse"];
+                };
+            };
+            /** @description Invalid mode or record_id */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Feature disabled or analysis record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Per-principal rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit storage unavailable (fail-closed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

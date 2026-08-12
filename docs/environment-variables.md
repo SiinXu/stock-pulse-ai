@@ -568,6 +568,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SHARE_IMAGE_XIAOHONGSHU_QR_PATH` | `src/assets/share_image/xiaohongshu_qr.jpg` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SHARE_IMAGE_XIAOHONGSHU_URL` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | `10` | 是 | 模板中注释; Buckets below this decided sample render as insufficient_data |
+| `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; 分层结论只读研究 API（Issue #1143；默认关闭；仅主 API 端口） |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释; 研究 API 每主体滑动窗口限流 |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | `false` | 是 | 模板中注释; Public signal scorecard (Issue #379; default off so self-hosted stays private) Exposes an aggregated, non-sensitive n... |
 | `SINGLE_STOCK_NOTIFY` | `false` | 是 | 模板中注释; =================================== (Optional) Single stock push configuration =================================== Si... |
 | `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` | `false` | 是 | 模板中注释; Default-off Bayesian outcome weights for skill aggregation (issue #714) |
