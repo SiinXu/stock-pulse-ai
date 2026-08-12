@@ -133,9 +133,9 @@ class SentimentPipelineService:
     ) -> SentimentSnapshot:
         as_of = self._now_iso()
         return SentimentSnapshot(
-            stock_code=(stock_code or "").strip() or "UNKNOWN",
-            stock_name=stock_name,
-            market=market,
+            stock_code=self._safe_text(stock_code, fallback="UNKNOWN", max_len=32),
+            stock_name=self._safe_optional_text(stock_name, max_len=120),
+            market=self._safe_optional_text(market, max_len=32),
             as_of=as_of,
             window_days=self.window_days,
             status="unavailable",
@@ -200,7 +200,9 @@ class SentimentPipelineService:
         local_intel_items: Optional[Sequence[Mapping[str, Any]]],
         news_context: Optional[str],
     ) -> SentimentSnapshot:
-        code = (stock_code or "").strip() or "UNKNOWN"
+        code = self._safe_text(stock_code, fallback="UNKNOWN", max_len=32)
+        stock_name = self._safe_optional_text(stock_name, max_len=120)
+        market = self._safe_optional_text(market, max_len=32)
         now = self._clock()
         if now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
@@ -786,6 +788,26 @@ class SentimentPipelineService:
         if now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
         return self._iso(now)
+
+    @staticmethod
+    def _safe_text(value: Any, *, fallback: str = "", max_len: int = 120) -> str:
+        if not isinstance(value, str):
+            return fallback
+        cleaned = value.strip()
+        if not cleaned:
+            return fallback
+        return cleaned[:max_len]
+
+    @classmethod
+    def _safe_optional_text(cls, value: Any, *, max_len: int = 120) -> Optional[str]:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        return cleaned[:max_len]
 
     @staticmethod
     def _slug(value: str) -> str:

@@ -19,7 +19,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     DailyMarketContextService Dict FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
     List MarketHotspotService MarketStructureService Optional PipelineStageName
     PipelineStageObservation PipelineStageResult ReportType SearchService
-    SimpleNamespace StockAnalysisPipeline TrendAnalysisResult Tuple
+    SentimentPipelineService SimpleNamespace StockAnalysisPipeline
+    TrendAnalysisResult Tuple
     apply_daily_market_context_guardrail apply_phase_decision_guardrails
     build_market_phase_context current_diagnostic_snapshot date datetime
     fill_price_position_if_needed format_daily_market_context_prompt_section
