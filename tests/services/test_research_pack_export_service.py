@@ -147,3 +147,33 @@ def test_progress_callback_sequence():
     ResearchPackExportService(history_service=_FakeHistory(_record()), config=_enabled_config()).export_for_record(
         "42", progress_callback=lambda n, s, d: seen.append(n) if s in ("completed", "skipped", "failed") else None)
     assert "resolve_record" in seen and "assemble_zip" in seen
+
+
+def test_json_mode_skips_zip_assembly():
+    service = ResearchPackExportService(
+        history_service=_FakeHistory(_record()),
+        config=_enabled_config(),
+    )
+    result = service.export_for_record("42", include_zip=False)
+    assert result.zip_included is False
+    assert result.zip_bytes == b""
+    assert result.content_byte_length > 0
+    envelope = result.to_json_envelope()
+    assert envelope["zip_included"] is False
+    assert envelope["byte_length"] == result.content_byte_length
+    assert result.meta.get("zip_included") is False
+    assert "zip_byte_length" not in result.meta or result.meta.get("zip_byte_length") is None
+
+
+def test_zip_meta_byte_length_matches_archive():
+    service = ResearchPackExportService(
+        history_service=_FakeHistory(_record()),
+        config=_enabled_config(),
+    )
+    result = service.export_for_record("42", include_zip=True)
+    assert result.zip_included is True
+    assert len(result.zip_bytes) > 0
+    files = _unzip(result.zip_bytes)
+    meta = json.loads(next(v for k, v in files.items() if k.endswith("/meta.json")))
+    assert meta["zip_byte_length"] == len(result.zip_bytes)
+    assert meta.get("zip_included") is True

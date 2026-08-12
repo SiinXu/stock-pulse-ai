@@ -1531,6 +1531,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/{record_id}/research-pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export research asset package for an analysis history record
+         * @description One-click ZIP (or JSON metadata envelope) containing redacted report, decision card, evidence refs, signals, and reasoning trace. Default off. format=json does not assemble ZIP bytes; format=zip returns the package.
+         */
+        get: operations["exportResearchPack"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history/{record_id}/share-image": {
         parameters: {
             query?: never;
@@ -12398,6 +12418,46 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * ResearchPackJsonEnvelope
+         * @description JSON companion when callers need metadata without assembling ZIP bytes.
+         */
+        ResearchPackJsonEnvelope: {
+            /** Byte Length */
+            byte_length: number;
+            /** Meta */
+            meta: {
+                [key: string]: unknown;
+            };
+            /** Progress */
+            progress?: components["schemas"]["ResearchPackProgressStage"][];
+            /** Root Dirname */
+            root_dirname: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "research-pack-v1";
+            /** Truncated */
+            truncated: boolean;
+            /**
+             * Zip Included
+             * @default false
+             */
+            zip_included: boolean;
+        };
+        /** ResearchPackProgressStage */
+        ResearchPackProgressStage: {
+            /** Detail */
+            detail?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "completed" | "skipped" | "failed";
+        };
         /** ResearchRequest */
         ResearchRequest: {
             /** Question */
@@ -20330,6 +20390,97 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    exportResearchPack: {
+        parameters: {
+            query?: {
+                /** @description zip returns the downloadable package; json returns metadata only (no ZIP assembly) */
+                format?: "zip" | "json";
+                /** @description Language for brief-card and README copy (en or zh) */
+                language?: string;
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Research pack ZIP or JSON envelope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchPackJsonEnvelope"];
+                    "application/zip": string;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

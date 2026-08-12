@@ -79,6 +79,8 @@ class ProgressStage:
 
 @dataclass(frozen=True)
 class ResearchPackExportResult:
+    """Export result. ``zip_bytes`` is empty when ``include_zip=False`` (JSON meta only)."""
+
     zip_bytes: bytes
     meta: Dict[str, Any]
     truncated: bool
@@ -87,15 +89,20 @@ class ResearchPackExportResult:
     lookup_mode: Optional[str] = None
     progress: List[Dict[str, Any]] = field(default_factory=list)
     root_dirname: str = "research-pack"
+    content_byte_length: int = 0
+    zip_included: bool = True
 
     def to_json_envelope(self) -> Dict[str, Any]:
+        # JSON mode reports content size when ZIP was not assembled.
+        byte_length = len(self.zip_bytes) if self.zip_included else self.content_byte_length
         return {
             "schema_version": self.schema_version,
             "meta": self.meta,
             "truncated": self.truncated,
             "progress": self.progress,
-            "byte_length": len(self.zip_bytes),
+            "byte_length": byte_length,
             "root_dirname": self.root_dirname,
+            "zip_included": self.zip_included,
         }
 
 
@@ -552,8 +559,14 @@ class ResearchPackExportService:
             raise ResearchPackExportDisabled()
 
     def export_for_record(
-        self, record_id: str, *, progress_callback: Optional[ProgressCallback] = None, language: Optional[str] = None,
+        self,
+        record_id: str,
+        *,
+        progress_callback: Optional[ProgressCallback] = None,
+        language: Optional[str] = None,
+        include_zip: bool = True,
     ) -> ResearchPackExportResult:
+        """Assemble pack artifacts; set ``include_zip=False`` for metadata-only export."""
         self.ensure_enabled()
         tracker = _ProgressTracker(progress_callback)
         truncated = False
@@ -714,43 +727,95 @@ class ResearchPackExportService:
             raise ResearchPackLimitError(
                 f"Research pack content exceeds max size ({content_bytes} > {max_zip} bytes).",
             )
-        tracker.complete("assemble_zip", f"files={len(artifacts)}")
-        final_progress = tracker.as_list()
-        meta: Dict[str, Any] = {
-            "schema_version": SCHEMA_VERSION,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "record_id": selected_record_id,
-            "query_id": str(selected_query_id) if selected_query_id is not None else None,
-            "lookup_key": str(record_id), "lookup_mode": lookup_mode,
-            "stock_code": _clip_str(stock_code, 32), "stock_name": _clip_str(stock_name, 80),
-            "created_at": created_iso,
-            "model_used": _clip_str(_as_mapping(raw_result).get("model_used") if isinstance(raw_result, Mapping) else None, 80),
-            "report_language": lang, "share_mode": True,
-            "redaction": {
-                "always_on": True, "helper": "redact_export_payload",
-                "classes": ["api_keys", "bearer_tokens", "credential_urls", "local_paths", "opaque_tokens"],
-            },
-            "disclaimer": DISCLAIMER_ZH if str(lang).lower().startswith("zh") else DISCLAIMER_EN,
-            "truncated": truncated, "truncation_notes": truncation_notes,
-            "limits": {"max_zip_bytes": max_zip, "max_report_chars": DEFAULT_MAX_REPORT_CHARS, "max_evidence_items": DEFAULT_MAX_EVIDENCE_ITEMS},
-            "progress": final_progress, "artifacts": artifact_manifest,
-            "evidence_chain_status": "deferred",
-            "evidence_chain_note": "Full evidence-chain-v1 deferred until #986/#127 merge.",
-        }
-        meta = redact_export_payload(meta)
-        if not isinstance(meta, dict):
-            meta = {"schema_version": SCHEMA_VERSION, "truncated": truncated}
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for name, data in sorted(artifacts.items()):
-                zf.writestr(f"{root}/{name}", data)
-            zf.writestr(f"{root}/meta.json", _json_bytes(meta))
-        zip_bytes = buffer.getvalue()
-        if len(zip_bytes) > max_zip:
-            raise ResearchPackLimitError(f"Research pack ZIP exceeds max size ({len(zip_bytes)} > {max_zip} bytes).")
-        meta["zip_byte_length"] = len(zip_bytes)
+
+        def _build_zip(meta_payload: Mapping[str, Any]) -> bytes:
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+                for name, data in sorted(artifacts.items()):
+                    zf.writestr(f"{root}/{name}", data)
+                zf.writestr(f"{root}/meta.json", _json_bytes(meta_payload))
+            return buffer.getvalue()
+
+        def _base_meta(*, zip_included_flag: bool, progress: List[Dict[str, Any]]) -> Dict[str, Any]:
+            payload: Dict[str, Any] = {
+                "schema_version": SCHEMA_VERSION,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "record_id": selected_record_id,
+                "query_id": str(selected_query_id) if selected_query_id is not None else None,
+                "lookup_key": str(record_id),
+                "lookup_mode": lookup_mode,
+                "stock_code": _clip_str(stock_code, 32),
+                "stock_name": _clip_str(stock_name, 80),
+                "created_at": created_iso,
+                "model_used": _clip_str(
+                    _as_mapping(raw_result).get("model_used") if isinstance(raw_result, Mapping) else None,
+                    80,
+                ),
+                "report_language": lang,
+                "share_mode": True,
+                "redaction": {
+                    "always_on": True,
+                    "helper": "redact_export_payload",
+                    "classes": [
+                        "api_keys",
+                        "bearer_tokens",
+                        "credential_urls",
+                        "local_paths",
+                        "opaque_tokens",
+                    ],
+                },
+                "disclaimer": DISCLAIMER_ZH if str(lang).lower().startswith("zh") else DISCLAIMER_EN,
+                "truncated": truncated,
+                "truncation_notes": truncation_notes,
+                "limits": {
+                    "max_zip_bytes": max_zip,
+                    "max_report_chars": DEFAULT_MAX_REPORT_CHARS,
+                    "max_evidence_items": DEFAULT_MAX_EVIDENCE_ITEMS,
+                },
+                "progress": progress,
+                "artifacts": artifact_manifest,
+                "content_byte_length": content_bytes,
+                "zip_included": zip_included_flag,
+                "evidence_chain_status": "deferred",
+                "evidence_chain_note": "Full evidence-chain-v1 deferred until #986/#127 merge.",
+            }
+            redacted = redact_export_payload(payload)
+            return redacted if isinstance(redacted, dict) else payload
+
+        zip_bytes = b""
+        if include_zip:
+            tracker.complete("assemble_zip", f"files={len(artifacts)}")
+            final_progress = tracker.as_list()
+            meta = _base_meta(zip_included_flag=True, progress=final_progress)
+            size_guess = 0
+            for _ in range(4):
+                meta["zip_byte_length"] = size_guess
+                zip_bytes = _build_zip(meta)
+                if len(zip_bytes) == size_guess:
+                    break
+                size_guess = len(zip_bytes)
+            meta["zip_byte_length"] = len(zip_bytes)
+            zip_bytes = _build_zip(meta)
+            if len(zip_bytes) != meta["zip_byte_length"]:
+                meta["zip_byte_length"] = len(zip_bytes)
+                zip_bytes = _build_zip(meta)
+            if len(zip_bytes) > max_zip:
+                raise ResearchPackLimitError(
+                    f"Research pack ZIP exceeds max size ({len(zip_bytes)} > {max_zip} bytes).",
+                )
+        else:
+            tracker.complete("assemble_zip", f"files={len(artifacts)};zip_skipped=1")
+            final_progress = tracker.as_list()
+            meta = _base_meta(zip_included_flag=False, progress=final_progress)
+
         return ResearchPackExportResult(
-            zip_bytes=zip_bytes, meta=meta, truncated=truncated,
-            resolved_record_id=selected_record_id, lookup_mode=lookup_mode,
-            progress=final_progress, root_dirname=root,
+            zip_bytes=zip_bytes,
+            meta=meta,
+            truncated=truncated,
+            resolved_record_id=selected_record_id,
+            lookup_mode=lookup_mode,
+            progress=final_progress,
+            root_dirname=root,
+            content_byte_length=content_bytes,
+            zip_included=include_zip,
         )

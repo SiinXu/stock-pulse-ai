@@ -42,3 +42,7 @@ Share-mode redaction is always on via `redact_export_payload`. Counterexample te
 ## Rollback
 
 Set `RESEARCH_PACK_EXPORT_ENABLED=false` and restart.
+
+## Related surfaces
+
+The history **audit package** export tracked under Issues #986 / #127 (open PR #1214) is a separate evidence-chain audit ZIP. This research pack is the shareable research asset surface for #988 / #1140.
