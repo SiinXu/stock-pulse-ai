@@ -6,7 +6,7 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { EDUCATION_HELP_KEYS } from '../../../locales/educationHelpKeys';
 import { HelpKeyButton } from '../HelpKeyButton';
 
-function renderHelp(helpKey: string) {
+function renderHelp(helpKey: (typeof EDUCATION_HELP_KEYS)[keyof typeof EDUCATION_HELP_KEYS]) {
   render(
     <UiLanguageProvider>
       <HelpKeyButton helpKey={helpKey} data-testid="edu-help" />
@@ -16,7 +16,7 @@ function renderHelp(helpKey: string) {
 }
 
 describe('HelpKeyButton', () => {
-  it('renders three-part plain-language risk level help from settings-help inventory', () => {
+  it('renders three-part plain-language risk level help from the education inventory', () => {
     const trigger = renderHelp(EDUCATION_HELP_KEYS.riskLevelCritical);
     fireEvent.mouseEnter(trigger.parentElement!);
 
@@ -35,12 +35,4 @@ describe('HelpKeyButton', () => {
     expect(tooltip).toHaveTextContent(/MACD|12\/26\/9|动量/);
   });
 
-  it('returns null for unknown help keys', () => {
-    const { container } = render(
-      <UiLanguageProvider>
-        <HelpKeyButton helpKey="education.missing.key" />
-      </UiLanguageProvider>,
-    );
-    expect(container.querySelector('[data-help-key]')).toBeNull();
-  });
 });

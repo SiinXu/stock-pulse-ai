@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Stable help keys for plain-language risk levels and indicator explanations (Issue #201).
- * Content lives in settingsHelp.en.ts / settingsHelp.zh.ts and is resolved via getSettingsHelpContent.
+ * Content lives in the dedicated education-help inventory.
  */
 
 export const EDUCATION_HELP_KEYS = {

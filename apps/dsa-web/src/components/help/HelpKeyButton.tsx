@@ -1,19 +1,19 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Inline plain-language help entry that resolves copy through the shared
- * settings-help inventory (getSettingsHelpContent). Used outside Settings for
- * risk levels, risk-gate verdicts, portfolio health, and indicators (Issue #201).
+ * Inline plain-language help for risk levels, risk-gate verdicts, portfolio
+ * health, and indicators (Issue #201).
  */
 import { Info } from 'lucide-react';
-import type React from 'react';
+import React from 'react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
-import { getSettingsHelpContent } from '../../locales/settingsHelp';
+import { getEducationHelpContent, loadEducationHelpContent } from '../../locales/educationHelp';
+import type { EducationHelpKey } from '../../locales/educationHelpKeys';
 import { IconButton } from '../common';
 
 export interface HelpKeyButtonProps {
-  helpKey: string;
+  helpKey: EducationHelpKey;
   /** Optional override; defaults to localized help title. */
   title?: string;
   className?: string;
@@ -22,7 +22,7 @@ export interface HelpKeyButtonProps {
 
 /**
  * Three-part educational tooltip: what / why / what it means for you.
- * Falls back to summary + notes when usage/impact are absent (settings-style keys).
+ * Falls back to summary + notes when usage/impact are absent.
  */
 export const HelpKeyButton: React.FC<HelpKeyButtonProps> = ({
   helpKey,
@@ -31,10 +31,27 @@ export const HelpKeyButton: React.FC<HelpKeyButtonProps> = ({
   'data-testid': testId = 'help-key-button',
 }) => {
   const { language, t } = useUiLanguage();
-  const help = getSettingsHelpContent(helpKey, undefined, language);
-  if (!help) {
-    return null;
-  }
+  const synchronousHelp = getEducationHelpContent(helpKey, language);
+  const [loadedHelp, setLoadedHelp] = React.useState<{
+    language: string;
+    helpKey: EducationHelpKey;
+    content: NonNullable<typeof synchronousHelp>;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (synchronousHelp) return undefined;
+    let active = true;
+    void loadEducationHelpContent(helpKey, language).then((content) => {
+      if (active) setLoadedHelp({ language, helpKey, content });
+    });
+    return () => {
+      active = false;
+    };
+  }, [helpKey, language, synchronousHelp]);
+
+  const help = synchronousHelp
+    ?? (loadedHelp?.language === language && loadedHelp.helpKey === helpKey ? loadedHelp.content : null);
+  if (!help) return null;
 
   const resolvedTitle = title?.trim() || help.title;
   const what = help.summary?.trim() || '';
@@ -55,7 +72,7 @@ export const HelpKeyButton: React.FC<HelpKeyButtonProps> = ({
       data-testid={testId}
       data-help-key={helpKey}
       tooltip={(
-        <span className="block w-64 space-y-2 py-1 text-left">
+        <span className="block space-y-2 py-1 text-left">
           {what ? (
             <span className="block">
               <span className="block font-medium text-foreground">{t('help.what')}</span>
@@ -76,7 +93,6 @@ export const HelpKeyButton: React.FC<HelpKeyButtonProps> = ({
           ) : null}
         </span>
       )}
-      tooltipContentClassName="max-w-[18rem]"
     >
       <Info aria-hidden="true" />
     </IconButton>
