@@ -269,7 +269,7 @@ class ResearchTimelineService:
                     .limit(limit)
                 )
                 rows = list(session.execute(stmt).scalars().all())
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - A failed source is logged and exposed as an error status while other timeline sources remain available.
             log_safe_exception(
                 logger,
                 "Research timeline analysis query failed",
@@ -364,7 +364,7 @@ class ResearchTimelineService:
                     .limit(limit)
                 )
                 rows = list(session.execute(stmt).scalars().all())
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - A failed source is logged and exposed as an error status while other timeline sources remain available.
             log_safe_exception(
                 logger,
                 "Research timeline chat query failed",
@@ -452,7 +452,7 @@ class ResearchTimelineService:
                     .limit(limit)
                 )
                 rows = list(session.execute(stmt).scalars().all())
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - A failed source is logged and exposed as an error status while other timeline sources remain available.
             log_safe_exception(
                 logger,
                 "Research timeline signal query failed",
@@ -516,7 +516,7 @@ class ResearchTimelineService:
         """Optional #1130 feed. Absent workspace → unavailable (not a fake empty)."""
         try:
             from src.services import hypothesis_service as hypothesis_module  # type: ignore
-        except Exception:
+        except Exception:  # broad-exception: optional_metadata - The optional hypothesis workspace may be absent until its integration ships.
             return [], "unavailable"
 
         list_fn = getattr(hypothesis_module, "list_hypothesis_timeline_nodes", None)
@@ -527,7 +527,7 @@ class ResearchTimelineService:
             try:
                 service = service_cls(self.db)
                 list_fn = getattr(service, "list_timeline_nodes", None)
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Hypothesis initialization failure is logged and surfaced through the source status.
                 log_safe_exception(
                     logger,
                     "Hypothesis timeline service init failed",
@@ -550,7 +550,7 @@ class ResearchTimelineService:
         except TypeError:
             try:
                 raw_nodes = list_fn(display_code, limit=limit)
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Compatibility-call failure is logged and surfaced through the source status.
                 log_safe_exception(
                     logger,
                     "Hypothesis timeline query failed",
@@ -559,7 +559,7 @@ class ResearchTimelineService:
                     context={"stock_code": display_code},
                 )
                 return [], "error"
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Hypothesis query failure is logged and surfaced through the source status.
             log_safe_exception(
                 logger,
                 "Hypothesis timeline query failed",
@@ -683,7 +683,7 @@ class ResearchTimelineService:
                 str(code).strip().upper()
                 for code in HistoryService._history_code_filter_candidates(value)
             }
-        except Exception:
+        except Exception:  # broad-exception: optional_metadata - History code expansion only broadens matching and safely falls back to the normalized code.
             expanded = {value}
         return bool(expanded & allowed)
 

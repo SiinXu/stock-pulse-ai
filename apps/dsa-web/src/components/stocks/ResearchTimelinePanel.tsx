@@ -104,7 +104,8 @@ function AnalysisDiffCard({
   return (
     <div
       className="rounded-lg border border-border bg-surface-secondary/40 p-3 text-sm"
-      data-testid="research-timeline-analysis-diff"
+      role="status"
+      aria-label={t('stocks.workspace.timeline.diffTitle')}
     >
       <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
         <GitCompareArrows className="h-4 w-4" aria-hidden="true" />
@@ -191,7 +192,7 @@ const ResearchTimelinePanel: React.FC<ResearchTimelinePanelProps> = ({ stockCode
   const selectedAnalysis = useMemo(() => {
     const selected = selectedIds
       .map((id) => items.find((item) => item.id === id))
-      .filter((item): item is ResearchTimelineNode => Boolean(item) && item.kind === 'analysis_run');
+      .filter((item): item is ResearchTimelineNode => item?.kind === 'analysis_run');
     if (selected.length !== 2) return null;
     const ordered = [...selected].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
     return { left: ordered[0], right: ordered[1] };
@@ -239,7 +240,6 @@ const ResearchTimelinePanel: React.FC<ResearchTimelinePanelProps> = ({ stockCode
     <Card
       title={t('stocks.workspace.timeline.title')}
       padding="md"
-      data-testid="stock-details-research-timeline"
     >
       <div className="space-y-3">
         <p className="text-sm text-secondary-text">
@@ -289,7 +289,6 @@ const ResearchTimelinePanel: React.FC<ResearchTimelinePanelProps> = ({ stockCode
                   <li
                     key={node.id}
                     className={`rounded-lg border p-3 ${selected ? 'border-primary bg-primary/5' : 'border-border bg-surface'}`}
-                    data-testid={`research-timeline-node-${node.id}`}
                     data-kind={node.kind}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
@@ -336,7 +335,7 @@ const ResearchTimelinePanel: React.FC<ResearchTimelinePanelProps> = ({ stockCode
                             variant="secondary"
                             size="compact"
                             onClick={() => handleOpen(node)}
-                            data-testid={`research-timeline-open-${node.id}`}
+                            aria-label={`${t('stocks.workspace.timeline.open')}: ${node.title}`}
                           >
                             {t('stocks.workspace.timeline.open')}
                           </Button>
@@ -356,7 +355,6 @@ const ResearchTimelinePanel: React.FC<ResearchTimelinePanelProps> = ({ stockCode
                   size="comfortable"
                   disabled={loadingMore || !nextCursor}
                   onClick={() => void loadPage(nextCursor, true)}
-                  data-testid="research-timeline-load-more"
                 >
                   {loadingMore ? (
                     <>

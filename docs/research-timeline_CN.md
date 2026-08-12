@@ -23,6 +23,13 @@ GET /api/v1/stocks/{stock_code}/research-timeline?cursor=&limit=20&kinds=
   - `unavailable`：源未上线（当前为假设工作台）
   - UI 区分上述状态，不伪造“成功的空列表”。
 
+## 分析对比
+
+选择两条 `analysis_run` 节点可对比方向与置信度，范围刻意限制为摘要对比，不替代完整报告差异。
+
+其中信号、方向和置信度属于高风险金融文案。八个非源语言译文均标记为
+`PENDING_NATIVE_REVIEW`，不声称已经过母语金融审校。
+
 ## 相关
 
 - Issue #1137 / Epic #1127

@@ -31,6 +31,10 @@ GET /api/v1/stocks/{stock_code}/research-timeline?cursor=&limit=20&kinds=
 Selecting two `analysis_run` nodes shows a simple direction + confidence compare.
 This is intentionally narrow (not a full report diff).
 
+The localized signal, direction, and confidence copy is financial terminology.
+All eight non-source locale translations are `PENDING_NATIVE_REVIEW`; no native
+financial reviewer approval is claimed.
+
 ## Related
 
 - Issue #1137 (feature), #1127 (innovation epic)

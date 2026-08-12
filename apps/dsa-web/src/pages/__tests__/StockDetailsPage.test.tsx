@@ -454,7 +454,7 @@ describe('StockDetailsPage', () => {
     getQuoteMock.mockResolvedValue(makeQuote());
     getHistoryMock.mockResolvedValue(makeHistory());
     renderPage();
-    expect(await screen.findByTestId('stock-details-research-timeline')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Research timeline' })).toBeInTheDocument();
   });
 
 });

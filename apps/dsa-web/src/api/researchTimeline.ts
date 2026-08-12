@@ -3,8 +3,7 @@
 
 import { z } from 'zod';
 import apiClient from './index';
-import { createApiError, createParsedApiError } from './error';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 
 const researchTimelineLinkSchema = z.object({
   type: z.string(),
@@ -108,17 +107,12 @@ function toStockCodePath(stockCode: string): string {
 }
 
 function parseResponse(data: unknown): ResearchTimelineResponse {
-  const camel = toCamelCase<unknown>(data);
-  const result = researchTimelineResponseSchema.safeParse(camel);
-  if (!result.success) {
-    throw createApiError(createParsedApiError({
-      title: 'Invalid research timeline response',
-      message: `ResearchTimelineResponse validation failed: ${result.error.message}`,
-      code: 'api_response_validation_failed',
-      category: 'unknown',
-    }));
-  }
-  const parsed = camel as ResearchTimelineResponse;
+  const parsed = parseCamelCasePayload<ResearchTimelineResponse>(
+    data,
+    researchTimelineResponseSchema,
+    'ResearchTimelineResponse',
+    'research-timeline',
+  );
   return {
     ...parsed,
     items: Array.isArray(parsed.items) ? parsed.items : [],

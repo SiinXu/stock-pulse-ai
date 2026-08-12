@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResearchTimelinePanel from '../ResearchTimelinePanel';
@@ -19,7 +19,7 @@ const listMock = vi.mocked(researchTimelineApi.list);
 
 function LocationProbe() {
   const location = useLocation();
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+  return <output aria-label="Current route">{`${location.pathname}${location.search}`}</output>;
 }
 
 function makeResponse(overrides: Partial<ResearchTimelineResponse> = {}): ResearchTimelineResponse {
@@ -70,7 +70,7 @@ describe('ResearchTimelinePanel', () => {
   it('shows an honest empty state when all sources are empty/unavailable', async () => {
     listMock.mockResolvedValue(makeResponse());
     renderPanel();
-    expect(await screen.findByTestId('stock-details-research-timeline')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Research timeline|研究时间线/ })).toBeInTheDocument();
     expect(await screen.findByText(/No research activity yet|暂无研究活动/)).toBeInTheDocument();
     expect(screen.getByText(/Hypothesis source unavailable|假设源不可用/)).toBeInTheDocument();
     expect(listMock).toHaveBeenCalledWith('600519', expect.objectContaining({ limit: 20 }));
@@ -125,14 +125,15 @@ describe('ResearchTimelinePanel', () => {
     }));
 
     renderPanel();
-    expect(await screen.findByTestId('research-timeline-node-signal:9')).toBeInTheDocument();
-    expect(screen.getByTestId('research-timeline-node-chat:3')).toBeInTheDocument();
-    expect(screen.getByTestId('research-timeline-node-analysis_run:1')).toBeInTheDocument();
+    const timeline = await screen.findByRole('list', { name: /Research timeline nodes|研究时间线节点/ });
+    expect(within(timeline).getByText('Signal · Buy')).toBeInTheDocument();
+    expect(within(timeline).getByText('Deep research chat')).toBeInTheDocument();
+    expect(within(timeline).getByText('Buy')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('research-timeline-open-analysis_run:1'));
+    fireEvent.click(screen.getByRole('button', { name: /Open: Buy|打开.*Buy/ }));
     await waitFor(() => {
-      expect(screen.getByTestId('location').textContent).toContain('/research/analysis');
-      expect(screen.getByTestId('location').textContent).toContain('recordId=1');
+      expect(screen.getByRole('status', { name: 'Current route' }).textContent).toContain('/research/analysis');
+      expect(screen.getByRole('status', { name: 'Current route' }).textContent).toContain('recordId=1');
     });
   });
 
@@ -182,15 +183,15 @@ describe('ResearchTimelinePanel', () => {
       }));
 
     renderPanel();
-    expect(await screen.findByTestId('research-timeline-node-analysis_run:2')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('research-timeline-load-more'));
+    expect(await screen.findByText('Hold')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Load older activity|加载更早记录/ }));
     await waitFor(() => {
       expect(listMock).toHaveBeenLastCalledWith(
         '600519',
         expect.objectContaining({ cursor: 'cursor-page-1', limit: 20 }),
       );
     });
-    expect(await screen.findByTestId('research-timeline-node-analysis_run:1')).toBeInTheDocument();
+    expect(await screen.findByText('Buy')).toBeInTheDocument();
   });
 
   it('compares direction and confidence for two selected analysis nodes', async () => {
@@ -229,7 +230,7 @@ describe('ResearchTimelinePanel', () => {
     });
     fireEvent.click(selectButtons[0]);
     fireEvent.click(selectButtons[1]);
-    const diff = await screen.findByTestId('research-timeline-analysis-diff');
+    const diff = await screen.findByRole('status', { name: /Analysis compare|分析对比/ });
     expect(diff).toBeInTheDocument();
     expect(diff.textContent).toMatch(/Bullish/);
     expect(diff.textContent).toMatch(/Bearish/);
