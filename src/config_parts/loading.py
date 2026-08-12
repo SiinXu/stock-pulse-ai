@@ -701,6 +701,25 @@ class _ConfigLoadingMethods:
                 == "reject"
                 else "warn"
             ),
+            data_validation_fund_pe_suspect_abs=parse_env_float(
+                os.getenv('DATA_VALIDATION_FUND_PE_SUSPECT_ABS'),
+                200.0,
+                field_name='DATA_VALIDATION_FUND_PE_SUSPECT_ABS',
+                minimum=1.0,
+            ),
+            data_validation_fund_pb_suspect_abs=parse_env_float(
+                os.getenv('DATA_VALIDATION_FUND_PB_SUSPECT_ABS'),
+                50.0,
+                field_name='DATA_VALIDATION_FUND_PB_SUSPECT_ABS',
+                minimum=0.1,
+            ),
+            data_validation_cross_source_rel_threshold=parse_env_float(
+                os.getenv('DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD'),
+                0.05,
+                field_name='DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD',
+                minimum=0.0001,
+                maximum=1.0,
+            ),
             plugin_data_provider_auto_bind_enabled=parse_env_bool(
                 os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
                 default=False,

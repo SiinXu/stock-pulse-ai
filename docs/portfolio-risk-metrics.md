@@ -43,7 +43,10 @@ GET /api/v1/portfolio/risk-metrics
 1. **持仓 / 权重** — `PortfolioService.get_portfolio_snapshot(..., include_realtime=False)`。
 2. **日线收盘** — `StockRepository.get_range` 读取已存储的 `stock_daily`。
 
-现金不参与权重。权重为权益仓位的市值占比（`market_value_base`），归一化后和为 1.0。
+现金不参与权重。权重为权益仓位在**响应本位币**下的市值占比：每个持仓的
+`market_value_base`（账户本位币）先经 `PortfolioService.convert_amount_with_provenance`
+换算到快照 `currency`（默认 CNY），再汇总并归一化到和为 1.0。
+**禁止**跨币种直接相加账户本位币单位。换算陈旧时响应 `fx_stale=true`，整体 status 可为 `partial`。
 
 ## 公式与假设
 

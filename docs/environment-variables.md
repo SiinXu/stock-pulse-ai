@@ -198,7 +198,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DAILY_BRIEF_TIMEZONE` | `Asia/Shanghai` | 是 | 模板中注释 |
 | `DAILY_MARKET_CONTEXT_ENABLED` | `true` | 是 | Should the market summary be injected into individual stock analysis prompts and should conservative barriers be enab... |
 | `DATABASE_PATH` | `./data/stock_analysis.db` | 否 | 注册表缺口（见清单文档 / 跟踪 issue） |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | `0.05` | 是 | 模板中注释; Multi-provider relative divergence threshold (default 0.05 = 5%) |
 | `DATA_VALIDATION_ENABLED` | `true` | 是 | 模板中注释; Financial data validation layer at provider candidate and synthesis boundaries |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | `50` | 是 | 模板中注释 |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | `200` | 是 | 模板中注释; Soft PE/PB plausibility bounds: values beyond these are marked suspect (warn) and kept; hard feed extremes still reject. |
 | `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | `空` | 是 | 模板中注释; Optional authoritative identities for symbols whose instrument type cannot be inferred safely from their market code,... |
 | `DATA_VALIDATION_STRICT` | `false` | 是 | 模板中注释; Reject invalid daily/realtime provider candidates before acceptance/cache so the existing bounded provider loop can c... |
 | `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | 是 | 模板中注释; Comma-separated market/instrument selectors; supported instruments are equity, etf, and index |
