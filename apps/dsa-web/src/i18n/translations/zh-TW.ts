@@ -2115,6 +2115,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.watchlistScore.sortManual": "手動排序",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreDesc": "依 AI 分由高到低",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreAsc": "依 AI 分由低到高",
+  "i18n.uiText.UI_TEXT.watchlistScore.loadFailed": "AI 評分暫時無法使用；重新整理成功前不會顯示評分或依評分排序。",
   "i18n.uiText.UI_TEXT.watchlist.createGroup": "建立分組",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupBadge": "預設",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupName": "預設分組",

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
+- [Changed] Mount watchlist AI scores and opt-in sorting on production Home watchlist groups, refetch on analysis or refresh lifecycle changes, and fail closed on score errors (Refs #147, #1008).
+- [Fixed] Capability inventory tool/skill/pipeline probes observe installed owners only, advance skill generation for every record-visible declarative field, and stop over-claiming healthy from registration (Refs #221).
 
 - [Fixed] Route the Home Today's Focus request through the versioned API so the panel loads without a persistent request-failure toast.
 - [Chore] Run path-selective backend tests on pull requests and duration-balanced full-suite shards with combined coverage on pushes to main.

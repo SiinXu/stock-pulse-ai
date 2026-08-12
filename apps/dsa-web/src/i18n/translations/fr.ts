@@ -2115,6 +2115,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.watchlistScore.sortManual": "Ordre manuel",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreDesc": "Score IA haut → bas",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreAsc": "Score IA bas → haut",
+  "i18n.uiText.UI_TEXT.watchlistScore.loadFailed": "Les scores IA sont indisponibles. Ils restent masqués et le tri par score reste désactivé jusqu’à la réussite de l’actualisation.",
   "i18n.uiText.UI_TEXT.watchlist.createGroup": "Créer un groupe",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupBadge": "Par défaut",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupName": "Groupe par défaut",
