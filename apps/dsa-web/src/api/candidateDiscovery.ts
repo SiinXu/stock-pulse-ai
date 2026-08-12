@@ -1,0 +1,246 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { z } from 'zod';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+import apiClient from './index';
+
+const candidateSchema = z.object({
+  rank: z.number(),
+  code: z.string(),
+  name: z.string().optional(),
+  score: z.number().nullable().optional(),
+  reason: z.string().optional(),
+  reasonCodes: z.array(z.string()).optional(),
+  riskLevel: z.string().optional(),
+  price: z.number().nullable().optional(),
+  changePct: z.number().nullable().optional(),
+  amount: z.number().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  factorScores: z.record(z.string(), z.number()).optional(),
+  llmThesis: z.string().nullable().optional(),
+  market: z.string().nullable().optional(),
+  provider: z.string().nullable().optional(),
+  selectionSource: z.string().nullable().optional(),
+}).passthrough();
+
+const discoveryResponseSchema = z.object({
+  packVersion: z.string(),
+  runId: z.string(),
+  status: z.string(),
+  query: z.string().optional(),
+  universe: z.string(),
+  market: z.string().optional(),
+  page: z.number().optional(),
+  pageSize: z.number().optional(),
+  maxResults: z.number().optional(),
+  candidateCount: z.number(),
+  candidates: z.array(z.record(z.string(), z.unknown())).optional(),
+  criteria: z.record(z.string(), z.unknown()).optional(),
+  emptyReason: z.string().nullable().optional(),
+  emptyMessage: z.string().nullable().optional(),
+  warnings: z.array(z.string()).optional(),
+  researchDisclaimer: z.string().optional(),
+  universeContract: z.record(z.string(), z.unknown()).optional(),
+  costContract: z.record(z.string(), z.unknown()).optional(),
+}).passthrough();
+
+const taskAcceptedSchema = z.object({
+  taskId: z.string(),
+  traceId: z.string(),
+  status: z.string(),
+  message: z.string(),
+  messageCode: z.string().optional(),
+  messageParams: z.record(z.string(), z.unknown()).optional(),
+  universe: z.string(),
+  page: z.number(),
+  pageSize: z.number(),
+  maxResults: z.number(),
+  maxProviderCalls: z.number(),
+}).passthrough();
+
+const taskStatusSchema = z.object({
+  taskId: z.string(),
+  traceId: z.string().nullable().optional(),
+  status: z.string(),
+  progress: z.number().optional(),
+  message: z.string().nullable().optional(),
+  messageCode: z.string().nullable().optional(),
+  messageParams: z.record(z.string(), z.unknown()).optional(),
+  error: z.string().nullable().optional(),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+}).passthrough();
+
+export type DiscoveryUniverse = 'watchlist' | 'portfolio' | 'index' | 'codes';
+
+export type CandidateDiscoveryRequest = {
+  query?: string;
+  universe?: DiscoveryUniverse | string;
+  page?: number;
+  pageSize?: number;
+  maxResults?: number;
+  maxProviderCalls?: number;
+  codes?: string[];
+  markets?: string[];
+  useLlm?: boolean;
+  language?: 'en' | 'zh';
+};
+
+export type DiscoveryCandidate = {
+  rank: number;
+  code: string;
+  name: string;
+  score?: number | null;
+  reason: string;
+  reasonCodes?: string[];
+  riskLevel?: string;
+  price?: number | null;
+  changePct?: number | null;
+  amount?: number | null;
+  industry?: string;
+  factorScores?: Record<string, number>;
+  llmThesis?: string;
+  market?: string;
+  provider?: string;
+  selectionSource?: string;
+  raw: Record<string, unknown>;
+};
+
+export type CandidateDiscoveryResponse = {
+  packVersion: string;
+  runId: string;
+  status: string;
+  query?: string;
+  universe: string;
+  market?: string;
+  page?: number;
+  pageSize?: number;
+  maxResults?: number;
+  candidateCount: number;
+  candidates: DiscoveryCandidate[];
+  criteria?: Record<string, unknown>;
+  emptyReason?: string | null;
+  emptyMessage?: string | null;
+  warnings?: string[];
+  researchDisclaimer?: string;
+  universeContract?: Record<string, unknown>;
+  costContract?: Record<string, unknown>;
+};
+
+export type CandidateDiscoveryTaskAccepted = {
+  taskId: string;
+  traceId: string;
+  status: string;
+  message: string;
+  universe: string;
+  page: number;
+  pageSize: number;
+  maxResults: number;
+  maxProviderCalls: number;
+};
+
+export type CandidateDiscoveryTaskStatus = {
+  taskId: string;
+  traceId?: string | null;
+  status: string;
+  progress?: number;
+  message?: string | null;
+  error?: string | null;
+  result?: CandidateDiscoveryResponse | null;
+};
+
+function mapCandidate(raw: Record<string, unknown>): DiscoveryCandidate {
+  const parsed = candidateSchema.parse(raw);
+  return {
+    rank: parsed.rank,
+    code: parsed.code,
+    name: parsed.name || parsed.code,
+    score: parsed.score ?? null,
+    reason: parsed.reason || '',
+    reasonCodes: parsed.reasonCodes,
+    riskLevel: parsed.riskLevel,
+    price: parsed.price ?? null,
+    changePct: parsed.changePct ?? null,
+    amount: parsed.amount ?? null,
+    industry: parsed.industry || undefined,
+    factorScores: parsed.factorScores,
+    llmThesis: parsed.llmThesis || undefined,
+    market: parsed.market || undefined,
+    provider: parsed.provider || undefined,
+    selectionSource: parsed.selectionSource || undefined,
+    raw,
+  };
+}
+
+function mapResponse(payload: unknown): CandidateDiscoveryResponse {
+  const parsed = discoveryResponseSchema.parse(parseCamelCasePayload(payload));
+  const candidates = (parsed.candidates || []).map((item) => {
+    const camel = parseCamelCasePayload(item) as Record<string, unknown>;
+    return mapCandidate(camel);
+  });
+  return {
+    packVersion: parsed.packVersion,
+    runId: parsed.runId,
+    status: parsed.status,
+    query: parsed.query,
+    universe: parsed.universe,
+    market: parsed.market,
+    page: parsed.page,
+    pageSize: parsed.pageSize,
+    maxResults: parsed.maxResults,
+    candidateCount: parsed.candidateCount,
+    candidates,
+    criteria: parsed.criteria,
+    emptyReason: parsed.emptyReason,
+    emptyMessage: parsed.emptyMessage,
+    warnings: parsed.warnings,
+    researchDisclaimer: parsed.researchDisclaimer,
+    universeContract: parsed.universeContract,
+    costContract: parsed.costContract,
+  };
+}
+
+export const candidateDiscoveryApi = {
+  startTask: async (body: CandidateDiscoveryRequest): Promise<CandidateDiscoveryTaskAccepted> => {
+    const { data } = await apiClient.post('/api/v1/discover/screen/tasks', body);
+    const parsed = taskAcceptedSchema.parse(parseCamelCasePayload(data));
+    return {
+      taskId: parsed.taskId,
+      traceId: parsed.traceId,
+      status: parsed.status,
+      message: parsed.message,
+      universe: parsed.universe,
+      page: parsed.page,
+      pageSize: parsed.pageSize,
+      maxResults: parsed.maxResults,
+      maxProviderCalls: parsed.maxProviderCalls,
+    };
+  },
+
+  getTask: async (taskId: string): Promise<CandidateDiscoveryTaskStatus> => {
+    const { data } = await apiClient.get(`/api/v1/discover/screen/tasks/${encodeURIComponent(taskId)}`);
+    const parsed = taskStatusSchema.parse(parseCamelCasePayload(data));
+    return {
+      taskId: parsed.taskId,
+      traceId: parsed.traceId,
+      status: parsed.status,
+      progress: parsed.progress,
+      message: parsed.message,
+      error: parsed.error,
+      result: parsed.result ? mapResponse(parsed.result) : null,
+    };
+  },
+
+  cancelTask: async (taskId: string): Promise<CandidateDiscoveryTaskStatus> => {
+    const { data } = await apiClient.post(`/api/v1/discover/screen/tasks/${encodeURIComponent(taskId)}/cancel`);
+    const parsed = taskStatusSchema.parse(parseCamelCasePayload(data));
+    return {
+      taskId: parsed.taskId,
+      traceId: parsed.traceId,
+      status: parsed.status,
+      progress: parsed.progress,
+      message: parsed.message,
+      error: parsed.error,
+      result: parsed.result ? mapResponse(parsed.result) : null,
+    };
+  },
+};

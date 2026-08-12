@@ -24,6 +24,7 @@ import { useRouteFocusTarget } from '../components/routing';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
+import ScreeningDiscoveryPanel from '../components/screening/ScreeningDiscoveryPanel';
 import { formatHotspotEmptyMessage } from '../components/screening/hotspotModel';
 import { getScreeningDegradationReasons } from '../components/screening/screeningDegradation';
 import createScreeningResultsEmptyState from '../components/screening/screeningResultsEmptyState';
@@ -37,6 +38,7 @@ import {
   type ScreeningSuccessfulRun,
 } from '../components/screening/screeningPageState';
 import { useScreeningCapability } from '../components/screening/useScreeningCapability';
+import { Button, Surface } from '../components/common';
 import {
   SCREEN_TASK_POLL_INTERVAL_MS,
   clearPersistedScreenTask,
@@ -123,6 +125,7 @@ const StockScreeningPage: React.FC = () => {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(restoredTask?.taskId ?? null);
   const [taskProgress, setTaskProgress] = useState(restoredTask?.taskId ? 10 : 0);
   const [taskMessage, setTaskMessage] = useState(restoredTask?.taskId ? text.restoringTask : '');
+  const [screenMode, setScreenMode] = useState<'strategy' | 'discovery'>('discovery');
 
   const {
     expandedCode,
@@ -563,6 +566,29 @@ const StockScreeningPage: React.FC = () => {
         headingRef={pageHeadingRef}
       />
 
+      <Surface as="section" level="interactive" padding="none" className="flex flex-wrap gap-2 p-3">
+        <Button
+          type="button"
+          size="compact"
+          variant={screenMode === 'discovery' ? 'primary' : 'secondary'}
+          onClick={() => setScreenMode('discovery')}
+        >
+          {text.modeDiscovery}
+        </Button>
+        <Button
+          type="button"
+          size="compact"
+          variant={screenMode === 'strategy' ? 'primary' : 'secondary'}
+          onClick={() => setScreenMode('strategy')}
+        >
+          {text.modeStrategy}
+        </Button>
+      </Surface>
+
+      {screenMode === 'discovery' ? <ScreeningDiscoveryPanel text={text} /> : null}
+
+      {screenMode === 'strategy' ? (
+      <>
       <ScreeningPageAlerts
         text={text}
         capability={capability.state}
@@ -668,6 +694,8 @@ const StockScreeningPage: React.FC = () => {
         })}
         onExpandedCodeChange={handleExpandedCodeChange}
       />
+      </>
+      ) : null}
     </AppPage>
   );
 };
