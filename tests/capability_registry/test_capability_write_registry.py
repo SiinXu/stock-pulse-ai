@@ -24,6 +24,7 @@ from src.capability_registry.write_models import (
     WriteRegistrySnapshot,
 )
 from src.capability_registry.write_service import (
+    CapabilityWriteAuditCompletionUnavailable,
     CapabilityWriteError,
     CapabilityWriteService,
 )
@@ -160,6 +161,28 @@ def test_unauthorized_write_denied_is_audited(tmp_path: Path) -> None:
     assert audit.completions[-1]["outcome"] == "denied"
     assert audit.completions[-1]["reason_code"] == "capability_write_unauthorized"
     assert service.list_entries().entries == ()
+
+
+def test_audit_completion_failure_reports_persisted_mutation(tmp_path: Path) -> None:
+    store = CapabilityWriteStore(tmp_path / "capability_write_registry.json")
+
+    class CompletionFailureRecorder:
+        def record_attempt(self, **fields):
+            return None
+
+        def record_completion(self, **fields):
+            raise RuntimeError("completion unavailable")
+
+    service = CapabilityWriteService(
+        store=store,
+        auditor=CapabilityWriteAuditor(recorder=CompletionFailureRecorder()),
+    )
+
+    with pytest.raises(CapabilityWriteAuditCompletionUnavailable) as exc:
+        service.register(_llm_payload("llm:persisted"))
+
+    assert exc.value.entry.capability_id == "llm:persisted"
+    assert store.get("llm:persisted") is not None
 
 
 def test_dependency_cycle_and_version_incompatibility(tmp_path: Path) -> None:

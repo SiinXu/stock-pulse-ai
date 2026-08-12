@@ -136,3 +136,38 @@ def test_failed_register_does_not_pollute_inventory(tmp_path: Path, monkeypatch)
     inventory = collect_capability_records(domains=["tool"])
     assert all(item.capability_id != "llm:bad" for item in inventory.items)
     assert get_capability_write_service().list_entries().entries == ()
+
+
+def test_completed_write_with_failed_audit_is_reported_truthfully(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class CompletionFailureRecorder:
+        def record_attempt(self, **fields):
+            return None
+
+        def record_completion(self, **fields):
+            raise RuntimeError("completion unavailable")
+
+    store = CapabilityWriteStore(tmp_path / "capability_write_registry.json")
+    service = CapabilityWriteService(
+        store=store,
+        auditor=CapabilityWriteAuditor(recorder=CompletionFailureRecorder()),
+    )
+    import src.capability_registry.write_service as write_service_mod
+
+    write_service_mod._SERVICE = service
+    app = FastAPI()
+    app.include_router(capabilities_endpoint.router, prefix="/api/v1/capabilities")
+    client = TestClient(app)
+    monkeypatch.setenv("ADMIN_AUTH_ENABLED", "false")
+
+    response = client.post(
+        "/api/v1/capabilities/registry",
+        json=_llm_body("llm:persisted"),
+    )
+
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["operation_completed"] is True
+    assert detail["capability_id"] == "llm:persisted"
+    assert store.get("llm:persisted") is not None

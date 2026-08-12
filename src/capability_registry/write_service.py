@@ -8,6 +8,7 @@ Validation failures surface explicit error codes; the store is not updated.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,8 +25,10 @@ from src.capability_registry.write_store import (
     WriteRegistryStoreError,
     default_write_registry_path,
 )
+from src.utils.sanitize import log_safe_exception
 
 Clock = Callable[[], datetime]
+logger = logging.getLogger(__name__)
 
 
 class CapabilityWriteError(Exception):
@@ -35,6 +38,14 @@ class CapabilityWriteError(Exception):
         super().__init__(message or error_code)
         self.error_code = error_code
         self.message = message or error_code
+
+
+class CapabilityWriteAuditCompletionUnavailable(RuntimeError):
+    """Raised when a durable mutation succeeded but audit completion failed."""
+
+    def __init__(self, entry: WriteCapabilityEntry) -> None:
+        super().__init__("security_audit_unavailable")
+        self.entry = entry
 
 
 class CapabilityWriteService:
@@ -61,6 +72,42 @@ class CapabilityWriteService:
 
     def _now_iso(self) -> str:
         return self._clock().astimezone(timezone.utc).isoformat()
+
+    def _complete_success(
+        self,
+        *,
+        capability_id: str,
+        operation: str,
+        correlation_id: str,
+        entry: WriteCapabilityEntry,
+        metadata: Mapping[str, Any] | None = None,
+        actor_type: str,
+        actor_id: str,
+    ) -> None:
+        """Surface a post-mutation audit failure without misreporting the write."""
+
+        try:
+            self._auditor.complete(
+                capability_id=capability_id,
+                operation=operation,
+                success=True,
+                correlation_id=correlation_id,
+                metadata=metadata,
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - preserve mutation state
+            log_safe_exception(
+                logger,
+                "Capability write audit completion unavailable after mutation",
+                exc,
+                error_code="capability_write_audit_completion_unavailable",
+                context={
+                    "capability_id": capability_id,
+                    "operation": operation,
+                },
+            )
+            raise CapabilityWriteAuditCompletionUnavailable(entry) from exc
 
     def list_entries(
         self,
@@ -164,11 +211,11 @@ class CapabilityWriteService:
             )
             raise
 
-        self._auditor.complete(
+        self._complete_success(
             capability_id=entry.capability_id,
             operation="register",
-            success=True,
             correlation_id=correlation_id,
+            entry=entry,
             metadata={"version": entry.version, "domain": entry.domain},
             actor_type=actor_type,
             actor_id=actor_id,
@@ -316,11 +363,11 @@ class CapabilityWriteService:
             )
             raise
 
-        self._auditor.complete(
+        self._complete_success(
             capability_id=entry.capability_id,
             operation="update",
-            success=True,
             correlation_id=correlation_id,
+            entry=entry,
             metadata={"version": entry.version, "generation": entry.generation},
             actor_type=actor_type,
             actor_id=actor_id,
@@ -414,11 +461,11 @@ class CapabilityWriteService:
             )
             raise
 
-        self._auditor.complete(
+        self._complete_success(
             capability_id=entry.capability_id,
             operation="retire",
-            success=True,
             correlation_id=correlation_id,
+            entry=entry,
             actor_type=actor_type,
             actor_id=actor_id,
         )

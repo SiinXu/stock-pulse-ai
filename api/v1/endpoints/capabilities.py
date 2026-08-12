@@ -48,6 +48,9 @@ from src.capability_registry import (
     resolve_task_model_route,
 )
 from src.capability_registry.write_models import WriteCapabilityEntry
+from src.capability_registry.write_service import (
+    CapabilityWriteAuditCompletionUnavailable,
+)
 from src.capability_registry.write_store import WriteRegistryStoreError
 from src.services.security_audit_service import SecurityAuditUnavailable
 from src.utils.sanitize import log_safe_exception
@@ -208,6 +211,24 @@ def _http_from_write_error(exc: CapabilityWriteError) -> HTTPException:
     )
 
 
+def _audit_completion_unavailable(
+    exc: CapabilityWriteAuditCompletionUnavailable,
+) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail={
+            "error": "security_audit_unavailable",
+            "message": (
+                "Capability mutation was persisted, but audit completion "
+                "could not be persisted"
+            ),
+            "operation_completed": True,
+            "capability_id": exc.entry.capability_id,
+            "status": exc.entry.status,
+        },
+    )
+
+
 @router.get(
     "",
     response_model=CapabilityListResponse,
@@ -334,6 +355,8 @@ def register_capability(
         )
     except CapabilityWriteError as exc:
         raise _http_from_write_error(exc) from None
+    except CapabilityWriteAuditCompletionUnavailable as exc:
+        raise _audit_completion_unavailable(exc) from None
     except SecurityAuditUnavailable:
         raise HTTPException(
             status_code=503,
@@ -376,6 +399,8 @@ def update_capability(
         )
     except CapabilityWriteError as exc:
         raise _http_from_write_error(exc) from None
+    except CapabilityWriteAuditCompletionUnavailable as exc:
+        raise _audit_completion_unavailable(exc) from None
     except SecurityAuditUnavailable:
         raise HTTPException(
             status_code=503,
@@ -415,6 +440,8 @@ def retire_capability(
         )
     except CapabilityWriteError as exc:
         raise _http_from_write_error(exc) from None
+    except CapabilityWriteAuditCompletionUnavailable as exc:
+        raise _audit_completion_unavailable(exc) from None
     except SecurityAuditUnavailable:
         raise HTTPException(
             status_code=503,
