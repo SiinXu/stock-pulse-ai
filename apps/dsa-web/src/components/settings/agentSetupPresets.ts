@@ -251,9 +251,7 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       advancedTitle: '行为',
       advancedDescription: '策略、路由、内存与规划。默认折叠。',
       governanceTitle: '治理 / 专家',
-      governanceDescription: '风险、HITL、预算、工具与专家 JSON。默认折叠，仍可访问。',
       askCta: '开始提问',
-      askCtaDescription: '直接进入对话，无需深层设置。',
       configureModelCta: '配置模型',
       emptyValue: '（空）',
       simple_qa: {
@@ -311,9 +309,7 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       advancedTitle: 'Behavior',
       advancedDescription: 'Strategies, routing, memory, planning. Collapsed by default.',
       governanceTitle: 'Governance / Expert',
-      governanceDescription: 'Risk, HITL, budgets, tools, expert JSON. Collapsed; still reachable.',
       askCta: 'Start asking',
-      askCtaDescription: 'Go to chat without deep Settings.',
       configureModelCta: 'Model source',
       emptyValue: '(empty)',
       simple_qa: {

@@ -340,7 +340,6 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
         <section className="space-y-2 rounded-lg border border-success/30 bg-success/5 p-4" data-testid="agent-ask-path" aria-labelledby="agent-ask-path-title">
           <div className="space-y-1">
             <h3 id="agent-ask-path-title" className="text-sm font-semibold text-foreground">{copy.askCta}</h3>
-            <p className="text-xs leading-5 text-muted-text">{copy.askCtaDescription}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {modelNeedsConfig ? (
@@ -378,7 +377,6 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
           <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">{copy.governanceTitle}</p>
-              <p className="text-xs leading-5 text-muted-text">{copy.governanceDescription}</p>
             </div>
             <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-governance:rotate-180" aria-hidden="true" />
           </summary>
