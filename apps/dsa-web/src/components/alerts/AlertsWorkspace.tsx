@@ -13,6 +13,7 @@ import {
   type AlertTypeFilter,
 } from './AlertRuleList';
 import { AlertTriggerHistory } from './AlertTriggerHistory';
+import EventAlertsDiscoveryEntry from './EventAlertsDiscoveryEntry';
 import { useAlertsWorkspaceUrlState } from './useAlertsWorkspaceUrlState';
 import { ApiErrorAlert, AppPage, Button, Card, DataTable, type DataTableColumn, InlineAlert, Loading, Modal, PageHeader, Pagination, Select, TabPanel, Tabs, Toolbar } from '../common';
 import type {
@@ -777,6 +778,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
           {...activePanelProps}
           className="space-y-4"
         >
+          <EventAlertsDiscoveryEntry />
           {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
           <AlertTriggerHistory
             triggers={triggers}
