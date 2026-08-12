@@ -161,6 +161,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ALPHASIFT_SOURCE_CALL_TIMEOUT_SEC` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHAVANTAGE_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ANALYSIS_DELAY` | `0` | 是 | 模板中注释; =================================== Analyze interval configuration (optional) =================================== Del... |
+| `ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS` | `0` | 是 | 模板中注释; Coordinator wall-clock budget in seconds; 0 disables (individual stage timeouts still apply). |
+| `ANALYSIS_PARALLEL_FETCH_ENABLED` | `true` | 是 | 模板中注释; Parallel dependency-free market-input pulls inside one stock analysis (realtime / chip / money-flow / fundamental) |
+| `ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT` | `3` | 是 | 模板中注释 |
+| `ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT` | `1` | 是 | 模板中注释 |
 | `ANSPIRE_API_KEYS` | `空` | 是 | Anspire Open API keys (supports multiple comma-separated values) Get keys from: https://open.anspire.cn/ When no high... |
 | `ANSPIRE_LLM_BASE_URL` | `https://open-gateway.anspire.cn/v6` | 是 | 模板中注释 |
 | `ANSPIRE_LLM_ENABLED` | `true` | 是 | 模板中注释 |
