@@ -562,7 +562,7 @@ const StockDetailsPage: React.FC = () => {
         </Card>
 
         <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
-          <DcfSensitivityPanel stockCode={canonicalCode} />
+          <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
         </section>
       </div>
     </AppPage>
