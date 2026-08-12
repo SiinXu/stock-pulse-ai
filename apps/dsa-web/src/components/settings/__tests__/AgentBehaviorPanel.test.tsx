@@ -253,4 +253,16 @@ describe('AgentBehaviorPanel', () => {
     expect(screen.getByTestId('agent-configure-model-cta')).toBeInTheDocument();
     expect(screen.getByTestId('agent-ask-cta')).toHaveAttribute('href', '/chat');
   });
+
+  it('nests Behavior and Governance under one disclosure when essentialsFocus is set', () => {
+    renderPanel(<AgentBehaviorPanel {...propsFor({ essentialsFocus: true })} />);
+
+    const shell = screen.getByTestId('agent-essentials-focus-advanced');
+    expect(shell).not.toHaveAttribute('open');
+    expect(within(shell).getByTestId('agent-behavior-fields')).toBeInTheDocument();
+    expect(within(shell).getByTestId('agent-governance-fields')).toBeInTheDocument();
+    // Primary surface still shows essentials + ask path outside the nested shell.
+    expect(screen.getByTestId('agent-essentials-fields')).toBeInTheDocument();
+    expect(screen.getByTestId('agent-ask-path')).toBeInTheDocument();
+  });
 });
