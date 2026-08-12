@@ -502,14 +502,15 @@ describe('ChatPage', () => {
   it('loads and saves the global context compression setting from the chat input area', async () => {
     renderChat(<ChatPage />);
 
-    const compressionToggle = await screen.findByRole('button', { name: '上下文压缩' });
+    const compressionToggle = await screen.findByRole('switch', { name: '上下文压缩' });
 
     await waitFor(() => {
       expect(compressionToggle).not.toBeDisabled();
     });
 
     expect(screen.getByTestId('chat-composer-input')).toContainElement(compressionToggle);
-    expect(compressionToggle).toHaveAttribute('aria-pressed', 'false');
+    expect(compressionToggle).toHaveAttribute('aria-checked', 'false');
+    expect(compressionToggle).toHaveAttribute('data-size', 'navigation');
 
     fireEvent.click(compressionToggle);
 
@@ -527,7 +528,7 @@ describe('ChatPage', () => {
       });
     });
 
-    expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
+    expect(compressionToggle).toHaveAttribute('aria-checked', 'true');
 
     const whatIfButton = screen.getByRole('button', { name: 'What-if 情景分析' });
     expect(whatIfButton).toHaveAttribute('aria-pressed', 'false');
@@ -577,10 +578,10 @@ describe('ChatPage', () => {
 
     renderChat(<ChatPage />);
 
-    const compressionToggle = await screen.findByRole('button', { name: '上下文压缩' });
+    const compressionToggle = await screen.findByRole('switch', { name: '上下文压缩' });
 
     await waitFor(() => {
-      expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
+      expect(compressionToggle).toHaveAttribute('aria-checked', 'true');
       expect(compressionToggle).not.toBeDisabled();
     });
 
@@ -595,7 +596,7 @@ describe('ChatPage', () => {
           },
         ],
       }));
-      expect(compressionToggle).toHaveAttribute('aria-pressed', 'true');
+      expect(compressionToggle).toHaveAttribute('aria-checked', 'true');
     });
     expect(screen.getByText('配置服务不可用')).toBeInTheDocument();
   });
