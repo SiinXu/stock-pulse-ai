@@ -128,7 +128,7 @@ def is_prediction_extract_enabled(config: Any = None) -> bool:
             from src.config import Config
 
             config = Config.get_instance()
-        except Exception:  # broad-exception: fallback_recorded - fail closed to disabled
+        except Exception:  # broad-exception: optional_metadata - config unavailable; treat extract gate as off
             return False
     return bool(getattr(config, "prediction_extract_enabled", False))
 
@@ -484,7 +484,7 @@ def _coerce_source_mapping(source: ExtractionSource) -> Dict[str, Any]:
             if isinstance(dumped, Mapping):
                 for key, value in dumped.items():
                     out.setdefault(key, value)
-        except Exception:  # broad-exception: fallback_recorded - duck typing only
+        except Exception:  # broad-exception: optional_metadata - to_dict optional for duck-typed sources
             pass
     return out
 
@@ -501,7 +501,7 @@ def _normalize_symbol_token(raw: Any) -> Optional[str]:
         normalized = normalize_stock_code(text)
         if normalized:
             return str(normalized).strip().upper()
-    except Exception:  # broad-exception: fallback_recorded - keep extraction pure
+    except Exception:  # broad-exception: optional_metadata - symbol normalizer optional
         pass
     return text.upper()
 
@@ -532,7 +532,7 @@ def _extract_market(payload: Mapping[str, Any], symbol: Optional[str]) -> Option
         market = get_market_for_stock(symbol)
         if market and market != "crypto":
             return market
-    except Exception:  # broad-exception: fallback_recorded - market optional for draft
+    except Exception:  # broad-exception: optional_metadata - market calendar optional for draft
         return None
     return None
 
@@ -780,7 +780,7 @@ def _validate_explicit_claim(
             data["claim_id"] = f"{origin.replace('.', '-')}-{index}"
         claim = PredictionClaim.model_validate(data)
         return claim, None
-    except Exception as exc:  # validation errors are expected for bad shapes
+    except Exception as exc:  # broad-exception: optional_metadata - invalid claim objects are skipped with reason
         return None, f"{origin}[{index}]:{exc}"
 
 
@@ -879,7 +879,7 @@ def _claim_from_return_bucket(
             }
         )
         return claim, None
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: optional_metadata - invalid return_bucket skipped with reason
         return None, f"return_bucket:{exc}"
 
 
@@ -902,7 +902,7 @@ def _claim_from_level_break(
             }
         )
         return claim, None
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: optional_metadata - invalid level_break skipped with reason
         return None, f"level_break:{exc}"
 
 
@@ -927,7 +927,7 @@ def _claim_from_vol_regime(
             }
         )
         return claim, None
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: optional_metadata - invalid vol_regime skipped with reason
         return None, f"vol_regime:{exc}"
 
 
@@ -1001,7 +1001,7 @@ def _compute_resolve_after(
             ResolveAfterError,
             compute_resolve_after,
         )
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: optional_metadata - resolve_after helper may be absent until A6 merges
         return None, None, f"resolve_after_module_unavailable:{exc.__class__.__name__}"
 
     try:
@@ -1014,7 +1014,7 @@ def _compute_resolve_after(
         return result.resolve_after, result.to_dict(), None
     except ResolveAfterError as exc:
         return None, getattr(exc, "meta", None), f"{exc.error_code}:{exc}"
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - calendar resolve failures fail closed without fabricating due times
         log_safe_exception(
             logger,
             "Prediction resolve_after computation failed",
