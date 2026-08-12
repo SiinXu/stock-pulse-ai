@@ -9,12 +9,16 @@ import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   AGENT_SETTINGS_ESSENTIALS_SOURCE,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
+  buildAnalysisWorkbenchHref,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
 } from '../routing/routes';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
+import { extractExistingTaskId, isTaskBusyError } from '../utils/asyncTaskUx';
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
@@ -177,6 +181,7 @@ const SettingsPage: React.FC = () => {
   const [isRunningSetupSmoke, setIsRunningSetupSmoke] = useState(false);
   const [setupSmokeError, setSetupSmokeError] = useState<ParsedApiError | null>(null);
   const [setupSmokeSuccess, setSetupSmokeSuccess] = useState('');
+  const [setupSmokeTasksHref, setSetupSmokeTasksHref] = useState<string | null>(null);
   const [llmChannelDraftItems, setLlmChannelDraftItems] = useState<SystemConfigUpdateItem[]>([]);
   const [dismissedErrorSummaryFingerprint, setDismissedErrorSummaryFingerprint] = useState('');
   const [groupSaveStates, setGroupSaveStates] = useState<Record<string, SettingsGroupSaveState>>({});
@@ -1276,6 +1281,7 @@ const SettingsPage: React.FC = () => {
   const handleRunSetupSmoke = async () => {
     setSetupSmokeError(null);
     setSetupSmokeSuccess('');
+    setSetupSmokeTasksHref(null);
 
     if (!setupStatus?.readyForSmoke) {
       setSetupSmokeError(createParsedApiError({
@@ -1308,14 +1314,37 @@ const SettingsPage: React.FC = () => {
         selectionSource: 'manual',
       });
       const taskId = 'taskId' in result ? result.taskId : result.accepted?.[0]?.taskId;
-      setSetupSmokeSuccess(
+      // Primary copy never surfaces a bare task id (#885 / #879 A6).
+      setSetupSmokeSuccess(t('settings.setupGuideSmokeAccepted', { stock: firstSetupStockCode }));
+      setSetupSmokeTasksHref(
         taskId
-          ? t('settings.setupGuideSmokeAcceptedWithTask', { stock: firstSetupStockCode, taskId })
-          : t('settings.setupGuideSmokeAccepted', { stock: firstSetupStockCode }),
+          ? buildAnalysisWorkbenchHref({
+              segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+              runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
+              runFlowTaskId: taskId,
+            })
+          : buildAnalysisWorkbenchHref({
+              segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+            }),
       );
       void refreshSetupStatus();
     } catch (error: unknown) {
-      setSetupSmokeError(getParsedApiError(error));
+      const parsed = getParsedApiError(error);
+      setSetupSmokeError(parsed);
+      const existingTaskId = extractExistingTaskId(parsed);
+      if (isTaskBusyError(parsed)) {
+        setSetupSmokeTasksHref(
+          existingTaskId
+            ? buildAnalysisWorkbenchHref({
+                segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+                runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
+                runFlowTaskId: existingTaskId,
+              })
+            : buildAnalysisWorkbenchHref({
+                segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+              }),
+        );
+      }
     } finally {
       setIsRunningSetupSmoke(false);
     }
@@ -1565,6 +1594,7 @@ const SettingsPage: React.FC = () => {
               isRunningSetupSmoke={isRunningSetupSmoke}
               setupSmokeError={setupSmokeError}
               setupSmokeSuccess={setupSmokeSuccess}
+              setupSmokeTasksHref={setupSmokeTasksHref}
               refreshSetupStatus={refreshSetupStatus}
               selectSectionView={selectSectionView}
               handleRunSetupSmoke={handleRunSetupSmoke}

@@ -608,6 +608,24 @@ independent `overflow-y` regions require a product reason (for example Run Flow
 event rail + graph). Mid-width clipping of core content due to three full
 columns is a contract defect (issue #877 I4).
 
+### Async long-running tasks (409 / busy / queue / terminal)
+
+For analysis, market review, portfolio analysis, screening, scheduler run-now,
+and similar accepted background work, the shared **async task UX contract**
+applies on top of StatePanel / Alert / Progress primitives:
+
+- Document: [`async-task-ux-contract.md`](./async-task-ux-contract.md) (issue #885)
+- Helpers: `apps/dsa-web/src/utils/asyncTaskUx.ts`
+- Progress copy: `formatTaskMessage` (`apps/dsa-web/src/utils/taskMessage.ts`)
+- Never present a bare task id without a TaskPanel, RunFlow, or equivalent
+  recoverable navigation path
+- Busy/409 must disable double-submit **and** offer dismiss, attach/view-tasks,
+  or reload so the launch control cannot deadlock
+
+Error *class* taxonomy (auth, credential, network, …) remains the error-catalog
+track; this foundation only requires the presentation patterns above for
+async lifecycle states.
+
 ### Task state structure (Loading / Empty / Error / Partial)
 
 Component APIs live in State And Alert Semantics. This table adds **structure

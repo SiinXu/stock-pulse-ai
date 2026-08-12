@@ -125,10 +125,17 @@ Raw diagnostic messages are intentionally not rendered in the Toast.
 This is the Web V0 contract. CLI and desktop-native error presentation are not
 covered by the catalog or Toast remediation in this phase.
 
+Long-running work, 409 busy/duplicate, queue/in-progress/terminal presentation,
+and launch-block recovery are documented separately in the
+[async task UX contract](async-task-ux-contract.md) (issue #885). That contract
+consumes this parse/catalog surface; it does not replace it.
+
 ## Related documents
+
 
 - Historical OpenAPI snapshot: [`architecture/api_spec.json`](architecture/api_spec.json)
   (not the CI-gated artifact; prefer `apps/dsa-web/openapi.json` for typegen).
 - Web API modules: `apps/dsa-web/src/api/`
 - Error compatibility facade: `apps/dsa-web/src/api/error.ts`
 - Error implementation modules: `apps/dsa-web/src/api/error/`
+- Async task / busy UX: [`async-task-ux-contract.md`](async-task-ux-contract.md)
