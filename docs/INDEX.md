@@ -22,7 +22,7 @@
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
 | 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [英文版](data-source-stability_EN.md)、[FAQ](FAQ.md) |
 | 查看日志、错误、审计与 trace 的敏感数据边界 | [敏感数据脱敏（英文）](security-sensitive-data-redaction.md) | [持久安全审计](security-audit_zh.md) / [EN](security-audit.md)、[出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
-| 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [业务架构](business-architecture.md)、[技术架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
+| 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [工程效率操作手册](engineering-efficiency-playbook.md)、[业务架构](business-architecture.md)、[技术架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
 
 ## 快速开始
 
@@ -99,11 +99,12 @@
 | [业务架构](business-architecture.md) | 利益相关者、业务能力、结果与从证据获取到通知的价值流 |
 | [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流 |
 | [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md) | 双轨职责、交互边界、贡献归属、上游移植与许可证来源规则 |
-| [上游一致性检查](upstream-parity_CN.md) | 每周漂移报告、有意分叉路径白名单、`Ported-from` trailer 与分诊流程（[English](upstream-parity.md)） |
+| [上游一致性检查](upstream-parity_CN.md) | 每周漂移报告、路径存在性盘点、有意分叉路径白名单、`Ported-from` trailer、分诊流程与治理节奏（#1002 / #1061；[English](upstream-parity.md)） |
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [OpenAPI Web 类型与运行时校验（英文）](openapi-web-types.md) | 从 OpenAPI 生成 Web 类型、CI 漂移门禁与 stocks 运行时校验试点 |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
+| [工程效率操作手册](engineering-efficiency-playbook.md) | 并行修复/合并火车的操作指南：批次合并、冲突图、配置注册守卫、squash 误关防线、自迭代验收、单机资源与工作区保护（[EN](engineering-efficiency-playbook_EN.md)；合同仍以 `AGENTS.md` 为准） |
 | [离线测试门禁（超时、覆盖率下限、marker）](testing-ci-gate.md) | 单测超时、faulthandler、实测覆盖率下限、严格 marker，以及手动 benchmark 说明（英文专题；中英流程一致） |
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
