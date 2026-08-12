@@ -1,5 +1,9 @@
 # 市场支持与边界
 
+## 预测验证 `resolve_after` 与交易日历
+
+Agent 预测验证（Issue #1109 / Epic #1107）按 **交易所 session** 换算 `resolve_after`（A 股 `XSHG` / 港股 `XHKG` / 美股 `XNYS`），复用 `src/core/trading_calendar.py`，处理节假日、周末、半日市与跨时区，且 **禁止自然日近似交易日**。完整契约见 [prediction-resolve-after.md](prediction-resolve-after.md)（英文：[prediction-resolve-after_EN.md](prediction-resolve-after_EN.md)）。
+
 ## 港股 (Hong Kong)
 
 港股是项目 headline 市场之一（与 A 股、美股并列），个股分析、大盘复盘区域 `hk`、以及 Market Light 告警区域均包含港股。完整多源优先级、熔断与降级见 [数据源稳定性](data-source-stability.md)（英文：[data-source-stability_EN.md](data-source-stability_EN.md)）。

@@ -70,6 +70,7 @@
 | [定时任务 API 与执行契约（英文）](scheduled-tasks.md) | 版本化每日分析/研究任务、今日只读视图、交易日策略、运行记录、重试与 local/Docker/API 调度所有权边界 |
 | [每日简报（历史准确率复盘）](daily-brief.md) | 配置门控的晨间简报：昨日分析、关注列表与基于既有 outcome 存储的诚实准确率复盘（[英文](daily-brief_EN.md)） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
+| [预测 resolve_after 交易日历策略](prediction-resolve-after.md) | horizon → UTC `resolve_after`（A/HK/US 交易 session、节假日/半日市/跨市场）；禁止自然日近似（[EN](prediction-resolve-after_EN.md)） |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
