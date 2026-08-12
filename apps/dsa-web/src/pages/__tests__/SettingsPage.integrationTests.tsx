@@ -97,7 +97,9 @@ export function registerSettingsPageIntegrationTests(): void {
     expect(screen.getByTestId('agent-behavior-panel')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-AGENT_MAX_STEPS')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-AGENT_CONTEXT_ENABLED')).not.toBeInTheDocument();
-    expect(screen.getByTestId('agent-advanced-fields')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('agent-behavior-fields')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('agent-governance-fields')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('agent-ask-cta')).toHaveAttribute('href', '/chat');
 
     const trigger = screen.getByTestId('agent-preset-apply-simple_qa');
     fireEvent.click(trigger);

@@ -166,6 +166,22 @@ vi.mock('react-router-dom', async (importOriginal) => ({
   },
   useSearchParams: () => [routerSearchParamsMock.params, routerSearchParamsMock.setParams] as const,
   useNavigate: () => usageNavigate,
+  // Settings host tests do not mount a Router tree; keep Link keyboard/href usable.
+  Link: React.forwardRef(function MockLink(
+    {
+      to,
+      children,
+      ...props
+    }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to?: string | { pathname?: string } },
+    ref: React.ForwardedRef<HTMLAnchorElement>,
+  ) {
+    const href = typeof to === 'string' ? to : (to?.pathname ?? '#');
+    return (
+      <a ref={ref} href={href} {...props}>
+        {children}
+      </a>
+    );
+  }),
 }));
 
 vi.mock('../../api/scheduledTasks', () => ({
