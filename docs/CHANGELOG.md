@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Deterministic prediction ClaimScorer for A1 claim types (direction, return_bucket, level_break, vol_regime, custom) with hit/partial/miss/data_unavailable, configurable sideways/flat epsilon, and confidence calibration aggregates (Refs #1111, #1107).
 - [Added] Strict PredictionRecord schema with typed verifiable claims, no_verifiable_claim path for unparseable prose, and finite-number rejection (Refs #1101, #1107).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
