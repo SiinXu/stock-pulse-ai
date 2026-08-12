@@ -8,7 +8,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from api.v1.endpoints import candidate_discovery as endpoint
-from src.services.candidate_discovery_service import DiscoveryValidationError
+from src.services.candidate_discovery_service import (
+    DiscoveryCancelled,
+    DiscoveryValidationError,
+)
 from src.services.task_queue import TaskStatus as QueueTaskStatus
 
 
@@ -149,6 +152,69 @@ class CandidateDiscoveryApiTests(unittest.TestCase):
             payload = endpoint.cancel_candidate_discovery_task("disc-2")
         fake_queue.cancel.assert_called_once_with("disc-2")
         self.assertEqual(payload.status, "cancel_requested")
+
+    def test_worker_maps_discovery_cancelled_to_cancelled_payload(self) -> None:
+        """Cooperative cancel must not raise a failed RuntimeError."""
+        import threading
+
+        from src.services.task_queue import AnalysisTaskQueue, TaskStatus
+
+        original = AnalysisTaskQueue._instance
+        AnalysisTaskQueue._instance = None
+        queue = AnalysisTaskQueue(max_workers=1)
+        started = threading.Event()
+        release = threading.Event()
+        try:
+            config = SimpleNamespace()
+            request = endpoint.CandidateDiscoveryRequest(
+                query="银行",
+                universe="watchlist",
+                max_results=3,
+                max_provider_calls=2,
+            )
+
+            def slow_discover(**kwargs):
+                cancel_check = kwargs.get("cancel_check")
+                started.set()
+                assert release.wait(timeout=2)
+                if cancel_check and cancel_check():
+                    raise DiscoveryCancelled("Discovery run cancelled")
+                return {
+                    "pack_version": "candidate_discovery/1.0",
+                    "run_id": "x",
+                    "status": "ok",
+                    "universe": "watchlist",
+                    "candidate_count": 0,
+                    "candidates": [],
+                }
+
+            with (
+                patch("api.v1.endpoints.candidate_discovery.get_task_queue", return_value=queue),
+                patch.object(
+                    endpoint.CandidateDiscoveryService,
+                    "discover",
+                    side_effect=slow_discover,
+                ),
+            ):
+                accepted = endpoint.start_candidate_discovery_task(request, config=config)
+                self.assertTrue(started.wait(timeout=2))
+                cancel_snapshot = queue.cancel(accepted.task_id)
+                self.assertIn(
+                    cancel_snapshot.status,
+                    {TaskStatus.CANCEL_REQUESTED, TaskStatus.CANCELLED},
+                )
+                release.set()
+                future = queue._futures.get(accepted.task_id)
+                if future is not None:
+                    future.result(timeout=3)
+                final = queue.get_task(accepted.task_id)
+                self.assertIsNotNone(final)
+                self.assertEqual(final.status, TaskStatus.CANCELLED)
+                self.assertNotEqual(final.status, TaskStatus.FAILED)
+                self.assertIsNone(getattr(final, "error", None) or None)
+        finally:
+            queue.shutdown()
+            AnalysisTaskQueue._instance = original
 
 
 if __name__ == "__main__":

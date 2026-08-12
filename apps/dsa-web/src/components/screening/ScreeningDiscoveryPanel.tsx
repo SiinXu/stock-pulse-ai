@@ -61,11 +61,26 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
   );
 
   const loading = runState === 'submitting' || runState === 'running';
+  const pollTimerRef = useRef<number | null>(null);
+  const pollGenerationRef = useRef(0);
 
-  const pollTask = useCallback(async (id: string) => {
+  const clearPollTimer = useCallback(() => {
+    if (pollTimerRef.current != null) {
+      window.clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    pollGenerationRef.current += 1;
+    clearPollTimer();
+  }, [clearPollTimer]);
+
+  const pollTask = useCallback(async (id: string, generation: number) => {
+    if (!mountedRef.current || generation !== pollGenerationRef.current) return;
     try {
       const task = await candidateDiscoveryApi.getTask(id);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || generation !== pollGenerationRef.current) return;
       setProgress(Number(task.progress ?? 0));
       setMessage(task.message || '');
       if (task.status === 'completed') {
@@ -81,25 +96,27 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
         return;
       }
       if (task.status === 'cancelled' || task.status === 'cancel_requested') {
-        setRunState(task.status === 'cancelled' ? 'cancelled' : 'running');
         setMessage(task.message || text.discoveryCancelRequested);
         if (task.status === 'cancelled') {
+          setRunState('cancelled');
           setTaskId(null);
           return;
         }
+        setRunState('running');
       } else {
         setRunState('running');
       }
-      window.setTimeout(() => {
-        void pollTask(id);
+      clearPollTimer();
+      pollTimerRef.current = window.setTimeout(() => {
+        void pollTask(id, generation);
       }, POLL_MS);
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || generation !== pollGenerationRef.current) return;
       setError(toApiErrorMessage(err, text.discoveryFailed, language));
       setRunState('failed');
       setTaskId(null);
     }
-  }, [language, text.discoveryCancelRequested, text.discoveryFailed]);
+  }, [clearPollTimer, language, text.discoveryCancelRequested, text.discoveryFailed]);
 
   const handleRun = async () => {
     setError('');
@@ -107,6 +124,9 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
     setRunState('submitting');
     setProgress(0);
     setMessage(text.discoverySubmitting);
+    clearPollTimer();
+    pollGenerationRef.current += 1;
+    const generation = pollGenerationRef.current;
     try {
       const accepted = await candidateDiscoveryApi.startTask({
         query: query.trim(),
@@ -117,13 +137,13 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
         maxProviderCalls,
         language: language.startsWith('zh') ? 'zh' : 'en',
       });
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || generation !== pollGenerationRef.current) return;
       setTaskId(accepted.taskId);
       setRunState('running');
       setMessage(accepted.message || text.discoveryRunning);
-      void pollTask(accepted.taskId);
+      void pollTask(accepted.taskId, generation);
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || generation !== pollGenerationRef.current) return;
       setError(toApiErrorMessage(err, text.discoveryFailed, language));
       setRunState('failed');
     }
@@ -133,9 +153,13 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
     if (!taskId) return;
     try {
       await candidateDiscoveryApi.cancelTask(taskId);
-      setMessage(text.discoveryCancelRequested);
+      if (mountedRef.current) {
+        setMessage(text.discoveryCancelRequested);
+      }
     } catch (err) {
-      setError(toApiErrorMessage(err, text.discoveryCancelFailed, language));
+      if (mountedRef.current) {
+        setError(toApiErrorMessage(err, text.discoveryCancelFailed, language));
+      }
     }
   };
 

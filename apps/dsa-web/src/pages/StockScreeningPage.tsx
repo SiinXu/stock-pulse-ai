@@ -342,6 +342,8 @@ const StockScreeningPage: React.FC = () => {
     enableFailedText: text.enableFailed,
     loadStrategies,
     loadHotspots,
+    // AI discovery does not need AlphaSift; probe only when strategy mode is open.
+    active: screenMode === 'strategy',
   });
   const loading = isScreeningAttemptLoading(attemptState);
   const showingLastGood = Boolean(

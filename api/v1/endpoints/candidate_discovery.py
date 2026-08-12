@@ -116,6 +116,66 @@ def run_candidate_discovery(
     summary="Submit bounded AI candidate discovery task",
     operation_id="startCandidateDiscoveryTask",
 )
+def _is_discovery_cancel_requested(task_queue, task_id: str) -> bool:
+    task = task_queue.get_task(task_id)
+    if task is None:
+        return False
+    status = task.status.value if hasattr(task.status, "value") else str(task.status)
+    return status in {
+        QueueTaskStatus.CANCEL_REQUESTED.value,
+        QueueTaskStatus.CANCELLED.value,
+    }
+
+
+def _cancelled_discovery_payload(request: CandidateDiscoveryRequest) -> Dict[str, Any]:
+    """Return a non-null payload so the worker exits without a failed terminalization.
+
+    When the queue has already recorded CANCEL_REQUESTED, completing with any
+    payload is remapped to CANCELLED by TaskQueue._terminalize_locked.
+    """
+    return {
+        "pack_version": "candidate_discovery/1.0",
+        "run_id": uuid.uuid4().hex,
+        "status": "cancelled",
+        "query": request.query or "",
+        "universe": request.universe,
+        "market": "cn",
+        "page": request.page,
+        "page_size": request.page_size,
+        "max_results": request.max_results,
+        "candidate_count": 0,
+        "candidates": [],
+        "criteria": {},
+        "empty_reason": "cancelled",
+        "empty_message": "Discovery run cancelled before candidates were packaged.",
+        "warnings": [],
+        "research_disclaimer": (
+            "Research screening only. Not investment advice or trade instructions."
+        ),
+        "universe_contract": {
+            "source": request.universe,
+            "resolved_count": 0,
+            "evaluated_count": 0,
+            "truncated": False,
+        },
+        "cost_contract": {
+            "provider_calls": 0,
+            "provider_hits": 0,
+            "provider_errors": 0,
+            "max_provider_calls": request.max_provider_calls,
+            "llm_calls": 0,
+            "llm_explained": 0,
+            "max_llm_calls": 0,
+            "elapsed_ms": 0,
+            "analysis_runs_triggered": 0,
+            "database_writes": 0,
+            "bounded": True,
+            "interruptible": True,
+            "cancelled": True,
+        },
+    }
+
+
 def start_candidate_discovery_task(
     request: CandidateDiscoveryRequest,
     config: Config = Depends(get_config_dep),
@@ -125,16 +185,11 @@ def start_candidate_discovery_task(
     service = _service(config)
 
     def cancel_check() -> bool:
-        task = task_queue.get_task(task_id)
-        if task is None:
-            return False
-        status = task.status.value if hasattr(task.status, "value") else str(task.status)
-        return status in {
-            QueueTaskStatus.CANCEL_REQUESTED.value,
-            QueueTaskStatus.CANCELLED.value,
-        }
+        return _is_discovery_cancel_requested(task_queue, task_id)
 
     def run_discovery() -> Dict[str, Any]:
+        if cancel_check():
+            return _cancelled_discovery_payload(request)
         task_queue.update_task_progress(
             task_id,
             15,
@@ -142,8 +197,12 @@ def start_candidate_discovery_task(
         )
         try:
             result = _run_discovery(service, request, cancel_check=cancel_check)
-        except DiscoveryCancelled as exc:
-            raise RuntimeError(str(exc)) from exc
+        except DiscoveryCancelled:
+            # Cooperative cancel: exit cleanly so CANCEL_REQUESTED → CANCELLED,
+            # not a failed task with candidate_discovery_failed.
+            return _cancelled_discovery_payload(request)
+        if cancel_check():
+            return _cancelled_discovery_payload(request)
         task_queue.update_task_progress(
             task_id,
             90,
