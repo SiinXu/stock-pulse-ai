@@ -33,7 +33,6 @@ import {
   type HubAvailability,
   type HubProbeState,
 } from './modelSourcesHubStatus';
-import DesktopCliVisibilityPanel from './DesktopCliVisibilityPanel';
 import {
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,
@@ -81,6 +80,17 @@ import {
 } from './modelSourcesRoute';
 
 const ConnectionModal = lazy(() => import('./LLMConnectionModal'));
+const DesktopCliVisibilityPanel = lazy(() => import('./DesktopCliVisibilityPanel'));
+
+function isDesktopCliGuidanceAvailable() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const desktopWindow = window as Window & {
+    dsaDesktop?: { getEnvDiagnostics?: unknown };
+  };
+  return typeof desktopWindow.dsaDesktop?.getEnvDiagnostics === 'function';
+}
 
 export type {
   ModelReferenceReplacement,
@@ -1405,7 +1415,11 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         </section>
       ) : null}
 
-      <DesktopCliVisibilityPanel language={language} />
+      {isDesktopCliGuidanceAvailable() ? (
+        <Suspense fallback={null}>
+          <DesktopCliVisibilityPanel language={language} />
+        </Suspense>
+      ) : null}
 
       {!draftValid ? (
         <InlineAlert
