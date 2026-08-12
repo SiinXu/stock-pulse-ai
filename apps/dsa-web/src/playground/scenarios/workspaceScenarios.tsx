@@ -3,6 +3,10 @@ import { lazy, Suspense, useState } from 'react';
 import { Button } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
+import { HomeAlertsWidget } from '../../components/dashboard/HomeAlertsWidget';
+import { HomeDashboardLayout } from '../../components/dashboard/HomeDashboardLayout';
+import { HomePortfolioHealthWidget } from '../../components/dashboard/HomePortfolioHealthWidget';
+import { HomeRecentReportsWidget } from '../../components/dashboard/HomeRecentReportsWidget';
 import { HomeReadinessCard } from '../../components/home/HomeReadinessCard';
 import { AgentOnboardingWizard } from '../../components/onboarding/AgentOnboardingWizard';
 import { HomeOnboardingSection } from '../../components/onboarding/HomeOnboardingSection';
@@ -13,7 +17,7 @@ import { WatchlistGroupsPanel } from '../../components/watchlist/WatchlistGroups
 import { createParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
-import type { TaskInfo } from '../../types/analysis';
+import type { HistoryItem, TaskInfo } from '../../types/analysis';
 import {
   DEFAULT_ONBOARDING_PROFILE,
   type OnboardingPlan,
@@ -154,6 +158,64 @@ const WatchlistGroupsPanelStory = () => {
 };
 
 const HomeWatchlistGroupsSectionStory = () => <HomeWatchlistGroupsSection />;
+
+const FIXTURE_RECENT_REPORTS: HistoryItem[] = [
+  {
+    id: 101,
+    queryId: 'query-fixture-101',
+    stockCode: 'AAPL',
+    stockName: 'Apple',
+    reportType: 'detailed',
+    createdAt: '2026-08-09T12:00:00Z',
+  },
+];
+
+const HomeDashboardLayoutStory = () => (
+  <HomeDashboardLayout
+    widgets={{
+      watchlist: <div className="rounded-lg border border-border p-3 text-sm">Watchlist fixture</div>,
+      portfolio_health: <HomePortfolioHealthWidget />,
+      alerts: (
+        <HomeAlertsWidget
+          isLoading={false}
+          available
+          triggeredAlertTotal={2}
+          onRetry={() => undefined}
+        />
+      ),
+      recent_reports: (
+        <HomeRecentReportsWidget
+          isLoading={false}
+          available
+          items={FIXTURE_RECENT_REPORTS}
+          language="en"
+          onRetry={() => undefined}
+        />
+      ),
+    }}
+  />
+);
+
+const HomeAlertsWidgetStory = () => (
+  <HomeAlertsWidget
+    isLoading={false}
+    available
+    triggeredAlertTotal={3}
+    onRetry={() => undefined}
+  />
+);
+
+const HomePortfolioHealthWidgetStory = () => <HomePortfolioHealthWidget />;
+
+const HomeRecentReportsWidgetStory = () => (
+  <HomeRecentReportsWidget
+    isLoading={false}
+    available
+    items={FIXTURE_RECENT_REPORTS}
+    language="en"
+    onRetry={() => undefined}
+  />
+);
 
 const FIXTURE_SETUP_STATUS: SetupStatusResponse = {
   isComplete: false,
@@ -311,6 +373,10 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'task-panel': TaskPanelStory,
   'home-watchlist-groups-section': HomeWatchlistGroupsSectionStory,
   'watchlist-groups-panel': WatchlistGroupsPanelStory,
+  'home-dashboard-layout': HomeDashboardLayoutStory,
+  'home-alerts-widget': HomeAlertsWidgetStory,
+  'home-portfolio-health-widget': HomePortfolioHealthWidgetStory,
+  'home-recent-reports-widget': HomeRecentReportsWidgetStory,
   'home-readiness-card': HomeReadinessCardStory,
   'todays-focus-panel': TodaysFocusPanelStory,
   'home-onboarding-section': HomeOnboardingSectionStory,

@@ -124,6 +124,10 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
 
   entry('dashboard', 'dashboard-panel-header', 'DashboardPanelHeader', 'components/dashboard/DashboardPanelHeader.tsx'),
   entry('dashboard', 'dashboard-state-block', 'DashboardStateBlock', 'components/dashboard/DashboardStateBlock.tsx', ['default', 'loading', 'empty']),
+  entry('dashboard', 'home-dashboard-layout', 'HomeDashboardLayout', 'components/dashboard/HomeDashboardLayout.tsx', ['default', 'interactive']),
+  entry('dashboard', 'home-alerts-widget', 'HomeAlertsWidget', 'components/dashboard/HomeAlertsWidget.tsx', ['default', 'empty', 'loading', 'error']),
+  entry('dashboard', 'home-portfolio-health-widget', 'HomePortfolioHealthWidget', 'components/dashboard/HomePortfolioHealthWidget.tsx', ['default', 'empty', 'loading', 'error']),
+  entry('dashboard', 'home-recent-reports-widget', 'HomeRecentReportsWidget', 'components/dashboard/HomeRecentReportsWidget.tsx', ['default', 'empty', 'loading']),
   entry('dashboard', 'home-readiness-card', 'HomeReadinessCard', 'components/home/HomeReadinessCard.tsx', ['default', 'loading', 'empty', 'error']),
   entry('dashboard', 'todays-focus-panel', 'TodaysFocusPanel', 'components/home/TodaysFocusPanel.tsx', ['default', 'empty', 'loading', 'error']),
   entry('dashboard', 'home-onboarding-section', 'HomeOnboardingSection', 'components/onboarding/HomeOnboardingSection.tsx', ['default', 'empty']),
