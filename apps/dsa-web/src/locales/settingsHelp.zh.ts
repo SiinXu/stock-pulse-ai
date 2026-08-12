@@ -1600,6 +1600,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['为多步骤 Agent 排障提供低开销时间线细节。'],
     notes: ['隐私与开销说明见 docs/agent-observability.md。'],
   },
+  'settings.agent.performance': {
+    title: '性能基线',
+    summary: '为关键分析路径提供可关闭的性能 span 采集与离线剖析入口。',
+    usage: 'PERF_COLLECTION_ENABLED 在 collector 激活时记录轻量 span（默认关闭）。PERF_PROFILE_ENABLED 仅表达离线 cProfile 意图，不会自动包装生产请求。',
+    valueNotes: [
+      '关闭时为 no-op，生产路径开销接近零。',
+      '离线基线与可选 cProfile 请使用 scripts/run_perf_baseline.py。',
+    ],
+    impact: ['在不改变默认运行时行为的前提下，支持本地基线对比与 pipeline 阶段耗时镜像。'],
+    notes: ['workload、CI 影响与刷新方式见 docs/performance-baseline.md。'],
+  },
   'settings.agent.event_monitor': {
     title: '事件监控',
     summary: '在定时模式下启用后台事件监控，定期轮询告警规则。',

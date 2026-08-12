@@ -1571,6 +1571,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds low-overhead agent timeline detail for debugging multi-step runs.'],
     notes: ['See docs/agent-observability_EN.md for privacy and overhead notes.'],
   },
+  'settings.agent.performance': {
+    title: 'Performance Baselines',
+    summary: 'Opt-in performance span collection and offline profiling for key analysis paths.',
+    usage: 'PERF_COLLECTION_ENABLED records lightweight spans when a collector is active (default off). PERF_PROFILE_ENABLED documents offline cProfile intent and does not auto-wrap production requests.',
+    valueNotes: [
+      'Disabled path is a no-op so production overhead stays near zero.',
+      'Use scripts/run_perf_baseline.py for offline baselines and optional cProfile.',
+    ],
+    impact: ['Enables local baseline compare and pipeline stage duration mirrors without changing default runtime behavior.'],
+    notes: ['See docs/performance-baseline_EN.md for workloads, CI impact, and refresh guidance.'],
+  },
   'settings.agent.event_monitor': {
     title: 'Event Monitor',
     summary: 'Enables background event monitoring in schedule mode with periodic rule polling.',

@@ -339,6 +339,9 @@ class Config:
     agent_context_protected_turns: int = 4
     agent_observability_enabled: bool = True  # Lightweight agent run events (default on)
     agent_observability_deep_payload: bool = False  # Capture sanitized tool/model payloads (default off)
+    # Performance baseline collection / optional cProfile (Issue #227). Default off.
+    perf_collection_enabled: bool = False
+    perf_profile_enabled: bool = False
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules

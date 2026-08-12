@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 238986,
+      "maxGzipBytes": 239062,
       "measuredGzipBytes": 238786,
-      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help inventory (Refs #1108); measured gzip + 200 B headroom."
+      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 238662 B + 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -47,9 +47,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 148614,
+      "maxGzipBytes": 148659,
       "measuredGzipBytes": 148414,
-      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help inventory (Refs #1108); measured gzip + 200 B headroom."
+      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 148259 B + 400 B headroom."
     },
     {
       "id": "locale-es",
