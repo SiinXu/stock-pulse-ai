@@ -62,9 +62,9 @@
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 144083,
-      "measuredGzipBytes": 142893,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 145597,
+      "measuredGzipBytes": 144155,
+      "note": "GitHub Actions Linux remeasure after consensus+landing sync (PR #1238); measured gzip + ~1% headroom."
     },
     {
       "id": "locale-ms",
