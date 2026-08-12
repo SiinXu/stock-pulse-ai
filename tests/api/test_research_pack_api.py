@@ -153,6 +153,51 @@ def test_export_json_skips_zip_and_validates_before_success_audit() -> None:
     assert kwargs.get("include_zip") is False
 
 
+def test_export_json_rejects_non_finite_meta_before_success_audit() -> None:
+    audit = SecurityAuditRecorderStub()
+    service = MagicMock()
+    result = _result(include_zip=False)
+    result.meta["metric"] = float("nan")
+    service.export_for_record.return_value = result
+    with _patch_services_config(enabled=True), patch.object(
+        endpoint, "is_auth_enabled", return_value=True
+    ), patch.object(endpoint, "verify_session", return_value=True), patch.object(
+        endpoint, "HistoryService", return_value=MagicMock()
+    ), patch.object(endpoint, "ResearchPackExportService", return_value=service):
+        response = _client(audit).get(
+            "/api/v1/history/42/research-pack",
+            params={"format": "json"},
+            cookies={"dsa_session": "valid"},
+        )
+    assert response.status_code == 500
+    assert response.json()["error"] == "internal_error"
+    assert len(audit.completions) == 1
+    assert audit.completions[0]["outcome"] == "failure"
+    assert audit.completions[0]["reason_code"] == "response_contract_invalid"
+
+
+def test_export_json_rejects_non_json_meta_before_success_audit() -> None:
+    audit = SecurityAuditRecorderStub()
+    service = MagicMock()
+    result = _result(include_zip=False)
+    result.meta["unsupported"] = {"set-value"}
+    service.export_for_record.return_value = result
+    with _patch_services_config(enabled=True), patch.object(
+        endpoint, "is_auth_enabled", return_value=True
+    ), patch.object(endpoint, "verify_session", return_value=True), patch.object(
+        endpoint, "HistoryService", return_value=MagicMock()
+    ), patch.object(endpoint, "ResearchPackExportService", return_value=service):
+        response = _client(audit).get(
+            "/api/v1/history/42/research-pack",
+            params={"format": "json"},
+            cookies={"dsa_session": "valid"},
+        )
+    assert response.status_code == 500
+    assert len(audit.completions) == 1
+    assert audit.completions[0]["outcome"] == "failure"
+    assert audit.completions[0]["reason_code"] == "response_contract_invalid"
+
+
 def test_export_not_found_audits_denied() -> None:
     audit = SecurityAuditRecorderStub()
     service = MagicMock()

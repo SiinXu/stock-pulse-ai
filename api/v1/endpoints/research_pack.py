@@ -256,7 +256,13 @@ def export_research_pack(
         envelope = result.to_json_envelope()
         try:
             ResearchPackJsonEnvelope.model_validate(envelope)
-        except ValueError:
+            json_content = json.dumps(
+                envelope,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+        except (TypeError, ValueError, OverflowError):
             _record_export_audit(
                 security_audit,
                 phase="completion",
@@ -281,7 +287,7 @@ def export_research_pack(
             lookup_mode=result.lookup_mode,
         )
         return Response(
-            content=json.dumps(envelope, ensure_ascii=False, separators=(",", ":")),
+            content=json_content,
             media_type="application/json",
             headers={
                 **headers,

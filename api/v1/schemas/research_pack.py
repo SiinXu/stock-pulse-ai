@@ -4,9 +4,23 @@
 """Typed contracts for research asset package export (Issues #988 / #1140)."""
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _reject_non_finite(value: Any, *, path: str = "meta") -> None:
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{path} contains a non-finite number")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _reject_non_finite(item, path=f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _reject_non_finite(item, path=f"{path}[{index}]")
 
 
 class ResearchPackProgressStage(BaseModel):
@@ -29,3 +43,9 @@ class ResearchPackJsonEnvelope(BaseModel):
     byte_length: int = Field(ge=0)
     root_dirname: str = Field(min_length=1, max_length=120)
     zip_included: bool = False
+
+    @field_validator("meta")
+    @classmethod
+    def validate_finite_meta(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        _reject_non_finite(value)
+        return value

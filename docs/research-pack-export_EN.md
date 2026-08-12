@@ -19,6 +19,11 @@ research-pack-{code}-{date}/
 ```
 
 Full `evidence-chain-v1` (#986/#127) is **deferred**; `meta.evidence_chain_status=deferred`.
+The persisted `brief`, `standard`, or `research` report is preserved in `report.md`
+and recorded as `meta.report_mode`; the compact decision card remains a separate
+bounded artifact. Non-finite metrics are never serialized: unavailable numeric
+values are shown as **Not calculable**, and a missing risk verdict is shown as
+**Not evaluated** rather than passed.
 
 ## Configuration
 

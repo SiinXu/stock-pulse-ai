@@ -71,6 +71,10 @@ def test_flag_defaults_off():
 def test_max_zip_bytes_clamped():
     assert get_research_pack_max_zip_bytes(SimpleNamespace(research_pack_max_zip_bytes=100)) == 1 * 1024 * 1024
 
+def test_max_zip_bytes_rejects_non_finite_config():
+    config = SimpleNamespace(research_pack_max_zip_bytes=float("inf"))
+    assert get_research_pack_max_zip_bytes(config) == DEFAULT_MAX_ZIP_BYTES
+
 def test_export_disabled_raises():
     service = ResearchPackExportService(history_service=_FakeHistory(_record()), config=SimpleNamespace(research_pack_export_enabled=False))
     with pytest.raises(ResearchPackExportDisabled):
@@ -107,6 +111,78 @@ def test_export_zip_structure_and_progress():
     assert evidence["count"] >= 1
     claims = json.loads(next(v for k, v in files.items() if k.endswith("/claims-outcomes.json")))
     assert claims["claims_status"] == "present"
+
+@pytest.mark.parametrize("report_mode", ["brief", "standard", "research"])
+def test_export_preserves_all_report_modes_and_decision_card(report_mode):
+    marker = f"mode-marker:{report_mode}"
+    markdown = f"# Report\n\n{marker}\n\n### 🃏 Decision Card\n- Action: Hold\n"
+    record = _record(report_type=report_mode)
+    result = ResearchPackExportService(
+        history_service=_FakeHistory(record, markdown=markdown),
+        config=_enabled_config(),
+    ).export_for_record("42")
+
+    files = _unzip(result.zip_bytes)
+    report = next(v for k, v in files.items() if k.endswith("/report.md")).decode()
+    brief_card = next(
+        v for k, v in files.items() if k.endswith("/brief-card.md")
+    ).decode()
+    meta = json.loads(next(v for k, v in files.items() if k.endswith("/meta.json")))
+
+    assert marker in report
+    assert "Decision Card" in brief_card
+    assert meta["report_mode"] == report_mode
+
+def test_non_finite_metrics_are_explicitly_not_calculable():
+    record = _record(
+        sentiment_score=float("nan"),
+        raw_result={
+            "model_used": "test-model",
+            "operation_advice": "Hold",
+            "analysis_summary": "Insufficient finite metrics.",
+            "decision_signal": {
+                "score": float("nan"),
+                "strength": float("inf"),
+            },
+            "dashboard": {"core_conclusion": {"operation_advice": "Hold"}},
+        },
+    )
+    result = ResearchPackExportService(
+        history_service=_FakeHistory(record),
+        config=_enabled_config(),
+    ).export_for_record("42")
+    files = _unzip(result.zip_bytes)
+
+    def reject_constant(value):
+        raise AssertionError(f"non-finite JSON constant exported: {value}")
+
+    for name, payload in files.items():
+        if name.endswith(".json"):
+            json.loads(payload, parse_constant=reject_constant)
+    brief_card = next(
+        v for k, v in files.items() if k.endswith("/brief-card.md")
+    ).decode()
+    signals = json.loads(
+        next(v for k, v in files.items() if k.endswith("/signals.json"))
+    )
+    assert "Not calculable" in brief_card
+    assert "Not evaluated" in brief_card
+    assert signals["status"] == "not_calculable"
+    assert signals["signal"]["not_calculable_fields"] == ["score", "strength"]
+
+def test_risk_gate_verdict_is_rendered_when_evaluated():
+    record = _record()
+    record.raw_result["risk_gate_result"] = {"verdict": "downgrade"}
+    result = ResearchPackExportService(
+        history_service=_FakeHistory(record),
+        config=_enabled_config(),
+    ).export_for_record("42")
+    files = _unzip(result.zip_bytes)
+    brief_card = next(
+        v for k, v in files.items() if k.endswith("/brief-card.md")
+    ).decode()
+    assert "Risk conclusion**: downgrade" in brief_card
+    assert "Not evaluated" not in brief_card
 
 REDACT_COUNTEREXAMPLES = {
     "openai_key": "sk-abcdefghijklmnopqrstuvwxyz1234567890ABCD",

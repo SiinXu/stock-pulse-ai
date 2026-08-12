@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
-- [Added] One-click research asset package export (ZIP): report, decision card, evidence refs, claims/outcomes when present, and redacted reasoning trace, with always-on share-mode redaction, size bounds, and assembly progress feedback (Refs #988, #1140).
+- [Added] One-click research asset package export (ZIP): brief/standard/research reports, fail-closed decision cards, evidence refs, claims/outcomes when present, and redacted reasoning trace, with finite-only metrics, always-on share-mode redaction, size bounds, and assembly progress feedback (Refs #988, #1140).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after PERF_* Settings help i18n strings (Refs #227).
 - [Tests] CI report-export-stack job installs optional report-export dependencies and host fonts, and fails when HTML/PDF fixture, Chinese glyph-coverage, or bound export tests skip (Refs #163).

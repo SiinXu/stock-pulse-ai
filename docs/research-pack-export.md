@@ -7,6 +7,9 @@
 包含 `meta.json`、`report.md`、`brief-card.md`、`signals.json`、`evidence-refs.json`、`evidence-summary.md`、`claims-outcomes.json`、`reasoning-trace.json`、`README.md`。
 
 完整证据链 `evidence-chain-v1`（#986/#127）暂缓；`meta.evidence_chain_status=deferred`。
+历史记录中的 `brief`、`standard` 或 `research` 报告会原样保存在 `report.md`，
+并由 `meta.report_mode` 标注；受长度约束的决策卡仍为独立文件。NaN/±Inf
+不会进入导出：不可用数值明确显示为“不可计算”，风险结论缺失时显示“未评估”而非“通过”。
 
 ## 配置
 

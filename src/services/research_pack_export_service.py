@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import logging
+import math
 import re
 import zipfile
 from dataclasses import dataclass, field
@@ -24,6 +25,7 @@ from src.services.reasoning_trace_export_service import (
     build_reasoning_trace_package,
     redact_export_payload,
 )
+from src.services.report_mode import normalize_report_mode
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -134,7 +136,7 @@ def get_research_pack_max_zip_bytes(config: Any = None) -> int:
     raw = getattr(resolved, "research_pack_max_zip_bytes", DEFAULT_MAX_ZIP_BYTES)
     try:
         value = int(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return DEFAULT_MAX_ZIP_BYTES
     return min(MAX_MAX_ZIP_BYTES, max(MIN_MAX_ZIP_BYTES, value))
 
@@ -157,6 +159,8 @@ def _as_list(value: Any) -> List[Any]:
 
 def _clip_str(value: Any, max_chars: int = DEFAULT_MAX_STRING_CHARS) -> Optional[str]:
     if value is None:
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
         return None
     text = str(value)
     if len(text) <= max_chars:
@@ -226,22 +230,41 @@ class _ProgressTracker:
 
 def _slim_mapping(value: Mapping[str, Any], *, max_keys: int = 48) -> Dict[str, Any]:
     slim: Dict[str, Any] = {}
+    not_calculable: List[str] = []
     for key, item in list(value.items())[:max_keys]:
         key_text = str(key)[:64]
+        if isinstance(item, float) and not math.isfinite(item):
+            not_calculable.append(key_text)
+            continue
         if isinstance(item, (str, int, float, bool)) or item is None:
             slim[key_text] = _clip_str(item, 500) if isinstance(item, str) else item
         elif isinstance(item, Mapping):
-            slim[key_text] = {
-                str(k)[:64]: (_clip_str(v, 200) if isinstance(v, str) else v)
-                for k, v in list(item.items())[:16]
-                if isinstance(v, (str, int, float, bool)) or v is None
-            }
+            nested: Dict[str, Any] = {}
+            for nested_key, nested_value in list(item.items())[:16]:
+                nested_key_text = str(nested_key)[:64]
+                if isinstance(nested_value, float) and not math.isfinite(nested_value):
+                    not_calculable.append(f"{key_text}.{nested_key_text}")
+                    continue
+                if isinstance(nested_value, (str, int, float, bool)) or nested_value is None:
+                    nested[nested_key_text] = (
+                        _clip_str(nested_value, 200)
+                        if isinstance(nested_value, str)
+                        else nested_value
+                    )
+            slim[key_text] = nested
         elif isinstance(item, list):
-            slim[key_text] = [
-                _clip_str(entry, 200) if isinstance(entry, str) else entry
-                for entry in item[:16]
-                if isinstance(entry, (str, int, float, bool)) or entry is None
-            ]
+            entries: List[Any] = []
+            for index, entry in enumerate(item[:16]):
+                if isinstance(entry, float) and not math.isfinite(entry):
+                    not_calculable.append(f"{key_text}[{index}]")
+                    continue
+                if isinstance(entry, (str, int, float, bool)) or entry is None:
+                    entries.append(
+                        _clip_str(entry, 200) if isinstance(entry, str) else entry
+                    )
+            slim[key_text] = entries
+    if not_calculable:
+        slim["not_calculable_fields"] = not_calculable
     return slim
 
 
@@ -274,12 +297,41 @@ def _extract_decision_card(*, record: Any, raw_result: Any, report_markdown: Opt
     watch = _as_list(core.get("watch_conditions") or battle.get("watch_conditions") or raw.get("watch_conditions"))
     stop_loss = battle.get("stop_loss") or raw.get("stop_loss") or getattr(record, "stop_loss", None)
     take_profit = battle.get("take_profit") or raw.get("take_profit") or getattr(record, "take_profit", None)
+    risk = _as_mapping(
+        dashboard.get("risk_manager")
+        or raw.get("risk_gate_result")
+        or dashboard.get("risk")
+        or dashboard.get("risk_assessment")
+        or raw.get("risk_assessment")
+    )
+    risk_conclusion = (
+        risk.get("verdict")
+        or risk.get("outcome")
+        or risk.get("conclusion")
+        or risk.get("risk_level")
+        or risk.get("assessment")
+    )
+    clipped_risk_conclusion = _clip_str(risk_conclusion, 200)
+    if not str(clipped_risk_conclusion or "").strip():
+        clipped_risk_conclusion = None
+    sentiment_score = getattr(record, "sentiment_score", None)
+    if isinstance(sentiment_score, bool) or not isinstance(sentiment_score, (int, float)):
+        sentiment_score = None
+    elif isinstance(sentiment_score, float) and not math.isfinite(sentiment_score):
+        sentiment_score = None
     card: Dict[str, Any] = {
         "action": _clip_str(action, 120),
         "one_sentence": _clip_str(one_sentence, 500),
         "confidence_level": _clip_str(confidence, 80),
         "trend_prediction": _clip_str(raw.get("trend_prediction") or getattr(record, "trend_prediction", None), 120),
-        "sentiment_score": getattr(record, "sentiment_score", None),
+        "sentiment_score": sentiment_score,
+        "sentiment_score_status": (
+            "available" if sentiment_score is not None else "not_calculable"
+        ),
+        "risk_conclusion": clipped_risk_conclusion,
+        "risk_assessment_status": (
+            "evaluated" if clipped_risk_conclusion is not None else "not_evaluated"
+        ),
         "key_risks": [_clip_str(i, 200) for i in key_risks[:5] if i is not None],
         "watch_conditions": [_clip_str(i, 200) for i in watch[:5] if i is not None],
         "stop_loss": _clip_str(stop_loss, 80),
@@ -304,15 +356,33 @@ def render_brief_card_markdown(card: Mapping[str, Any], *, language: str = "en")
         "confidence_level": "置信度" if zh else "Confidence",
         "trend_prediction": "趋势" if zh else "Trend",
         "sentiment_score": "情绪分" if zh else "Sentiment score",
+        "risk_conclusion": "风险结论" if zh else "Risk conclusion",
         "key_risks": "关键风险" if zh else "Key risks",
         "watch_conditions": "观察/失效条件" if zh else "Watch / invalidation",
         "stop_loss": "止损" if zh else "Stop loss",
         "take_profit": "止盈" if zh else "Take profit",
     }
     lines = [f"# {title}", ""]
-    for key in ("action", "one_sentence", "confidence_level", "trend_prediction", "sentiment_score", "stop_loss", "take_profit"):
+    for key in (
+        "action",
+        "one_sentence",
+        "confidence_level",
+        "trend_prediction",
+        "sentiment_score",
+        "risk_conclusion",
+        "stop_loss",
+        "take_profit",
+    ):
         value = card.get(key)
         if value is None or value == "":
+            if key == "sentiment_score" and card.get("sentiment_score_status") == "not_calculable":
+                lines.append(
+                    f"- **{labels[key]}**: {'不可计算' if zh else 'Not calculable'}"
+                )
+            elif key == "risk_conclusion" and card.get("risk_assessment_status") == "not_evaluated":
+                lines.append(
+                    f"- **{labels[key]}**: {'未评估' if zh else 'Not evaluated'}"
+                )
             continue
         lines.append(f"- **{labels[key]}**: {value}")
     for list_key in ("key_risks", "watch_conditions"):
@@ -339,7 +409,16 @@ def _extract_signals_snapshot(record: Any, raw_result: Any, context_snapshot: An
         if isinstance(candidate, Mapping) and candidate:
             slim = _slim_mapping(candidate, max_keys=48)
             if slim:
-                return {"status": "present", "signal": slim, "projection": "persisted_decision_signal"}
+                status = (
+                    "not_calculable"
+                    if set(slim) == {"not_calculable_fields"}
+                    else "present"
+                )
+                return {
+                    "status": status,
+                    "signal": slim,
+                    "projection": "persisted_decision_signal",
+                }
     projected: Dict[str, Any] = {}
     for key in ("operation_advice", "action", "action_label", "sentiment_score", "trend_prediction"):
         value = raw.get(key)
@@ -356,7 +435,13 @@ def _extract_signals_snapshot(record: Any, raw_result: Any, context_snapshot: An
         projected.setdefault("final_signal", _clip_str(strategy.get("final_signal"), 80))
     if projected:
         projected["projection"] = "dashboard_fields"
-        return {"status": "present", "signal": projected, "projection": "dashboard_fields"}
+        slim = _slim_mapping(projected, max_keys=48)
+        status = (
+            "not_calculable"
+            if set(slim) == {"not_calculable_fields", "projection"}
+            else "present"
+        )
+        return {"status": status, "signal": slim, "projection": "dashboard_fields"}
     return {"status": "missing", "signal": None, "missing_reason": "decision signal snapshot not present on this history record"}
 
 
@@ -581,6 +666,15 @@ class ResearchPackExportService:
         context_snapshot = _parse_record_json(self.history_service, record, "context_snapshot")
         raw_result = _parse_record_json(self.history_service, record, "raw_result")
         diagnostics = context_snapshot.get("diagnostics") if isinstance(context_snapshot, Mapping) else None
+        raw_meta = _as_mapping(raw_result.get("meta"))
+        report_mode = normalize_report_mode(
+            _clip_str(
+                raw_meta.get("report_mode")
+                or raw_meta.get("report_type")
+                or getattr(record, "report_type", None),
+                32,
+            )
+        )
         primary_id = getattr(record, "id", None)
         selected_record_id = str(primary_id) if primary_id is not None else str(record_id)
         selected_query_id = getattr(record, "query_id", None)
@@ -729,8 +823,9 @@ class ResearchPackExportService:
             )
 
         def _build_zip(meta_payload: Mapping[str, Any]) -> bytes:
-            # Fixed entry timestamps keep DEFLATE output deterministic across rebuilds
-            # so zip_byte_length can converge inside meta.json.
+            # Fixed entry timestamps keep archive output deterministic. Store meta.json
+            # without compression so changing zip_byte_length cannot create a DEFLATE
+            # size cycle; after the integer width stabilizes, the archive size does too.
             fixed_ts = (1980, 1, 1, 0, 0, 0)
             buffer = io.BytesIO()
             with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -739,7 +834,7 @@ class ResearchPackExportService:
                     info.compress_type = zipfile.ZIP_DEFLATED
                     zf.writestr(info, data)
                 meta_info = zipfile.ZipInfo(filename=f"{root}/meta.json", date_time=fixed_ts)
-                meta_info.compress_type = zipfile.ZIP_DEFLATED
+                meta_info.compress_type = zipfile.ZIP_STORED
                 zf.writestr(meta_info, _json_bytes(meta_payload))
             return buffer.getvalue()
 
@@ -759,6 +854,7 @@ class ResearchPackExportService:
                     80,
                 ),
                 "report_language": lang,
+                "report_mode": report_mode,
                 "share_mode": True,
                 "redaction": {
                     "always_on": True,
@@ -795,17 +891,14 @@ class ResearchPackExportService:
             final_progress = tracker.as_list()
             meta = _base_meta(zip_included_flag=True, progress=final_progress)
             size_guess = 0
-            for _ in range(4):
+            for _ in range(16):
                 meta["zip_byte_length"] = size_guess
                 zip_bytes = _build_zip(meta)
                 if len(zip_bytes) == size_guess:
                     break
                 size_guess = len(zip_bytes)
-            meta["zip_byte_length"] = len(zip_bytes)
-            zip_bytes = _build_zip(meta)
-            if len(zip_bytes) != meta["zip_byte_length"]:
-                meta["zip_byte_length"] = len(zip_bytes)
-                zip_bytes = _build_zip(meta)
+            else:
+                raise RuntimeError("research pack ZIP byte length did not converge")
             if len(zip_bytes) > max_zip:
                 raise ResearchPackLimitError(
                     f"Research pack ZIP exceeds max size ({len(zip_bytes)} > {max_zip} bytes).",
