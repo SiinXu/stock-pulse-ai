@@ -351,8 +351,15 @@ class PipelineStageRunner:
                         stage=stage,
                         attempt=attempt,
                     )
-            except Exception:  # broad-exception: fallback_recorded - Contract import/mapping failure must not change stage control flow.
-                pass
+            except Exception as mapping_exc:  # broad-exception: fallback_recorded - Contract import/mapping failure is logged; historical failed result is used.
+                log_safe_exception(
+                    logger,
+                    "Pipeline stage contract mapping unavailable; using historical failed result",
+                    mapping_exc,
+                    error_code="pipeline_stage_contract_mapping_failed",
+                    level=logging.DEBUG,
+                    context={"stage": stage.value, "attempt": attempt},
+                )
             return PipelineStageResult.failed(
                 stage,
                 error=exc,
