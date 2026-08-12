@@ -396,7 +396,7 @@ def _resolve_trading_day_close(
         import exchange_calendars as xcals
 
         calendar = xcals.get_calendar(exchange)
-    except Exception as exc:  # broad-exception: fallback_recorded - fail closed, never approximate.
+    except Exception as exc:  # broad-exception: fallback_recorded - Calendar load failures fail closed without natural-day approx.
         log_safe_exception(
             logger,
             "Prediction resolve_after calendar load failed closed",
@@ -414,7 +414,7 @@ def _resolve_trading_day_close(
     # Last completed session as of created_at (same contract as analysis bars).
     try:
         anchor_session = get_effective_trading_date(market, current_time=created_at)
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Anchor session lookup failures fail closed without natural-day approx.
         log_safe_exception(
             logger,
             "Prediction resolve_after anchor session failed closed",
@@ -438,7 +438,7 @@ def _resolve_trading_day_close(
             anchor_session = (
                 anchor_ts.date() if hasattr(anchor_ts, "date") else pd.Timestamp(anchor_ts).date()
             )
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Non-session anchors fail closed instead of natural-day advancement.
         log_safe_exception(
             logger,
             "Prediction resolve_after anchor session normalize failed closed",
@@ -478,7 +478,7 @@ def _resolve_trading_day_close(
         is_early = _session_is_early_close(calendar, target_ts)
     except ResolveAfterError:
         raise
-    except Exception as exc:  # broad-exception: fallback_recorded - fail closed.
+    except Exception as exc:  # broad-exception: fallback_recorded - Session advance failures fail closed without natural-day approx.
         log_safe_exception(
             logger,
             "Prediction resolve_after session advance failed closed",
@@ -537,7 +537,7 @@ def _session_is_early_close(calendar: Any, session_ts: Any) -> bool:
     try:
         if session_ts in early_closes:
             return True
-    except Exception:
+    except Exception:  # broad-exception: optional_metadata - Early-close membership probe is best-effort metadata only.
         pass
     try:
         session_date = (
@@ -547,6 +547,6 @@ def _session_is_early_close(calendar: Any, session_ts: Any) -> bool:
             item_ts = pd.Timestamp(item)
             if item_ts.date() == session_date:
                 return True
-    except Exception:
+    except Exception:  # broad-exception: optional_metadata - Early-close date scan is best-effort metadata only.
         return False
     return False
