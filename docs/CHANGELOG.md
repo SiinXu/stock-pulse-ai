@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
 - [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
+- [Fixed] Settings AI overview task table stays horizontally scrollable at 320/390 instead of clipping under overflow-hidden (Refs #879 B3).
+- [Changed] Agent Behavior settings use Essentials · Behavior · Governance/Expert progressive disclosure, keep expert JSON (including alert rules) behind the expert layer, and offer a preset-to-ask path into chat without changing config semantics or defaults (Refs #868).
 - [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
 - [Changed] Mount the interactive DCF sensitivity panel on Stock Details and reset its stock-bound estimate and assumptions when the canonical route stock changes (Refs #238, #1008).
 - [Changed] Mount watchlist AI scores and opt-in sorting on production Home watchlist groups, refetch on analysis or refresh lifecycle changes, and fail closed on score errors (Refs #147, #1008).

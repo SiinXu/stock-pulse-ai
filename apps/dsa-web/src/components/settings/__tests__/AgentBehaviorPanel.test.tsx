@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { SystemConfigItem } from '../../../types/systemConfig';
 import { AgentBehaviorPanel, type AgentBehaviorPanelProps } from '../AgentBehaviorPanel';
@@ -8,7 +10,13 @@ import {
   AGENT_ESSENTIAL_KEYS,
   AGENT_PRESET_MANAGED_KEYS,
   AGENT_SETUP_PRESETS,
+  resolveAgentDisclosureLayer,
 } from '../agentSetupPresets';
+import { APP_ROUTE_PATHS } from '../../../routing/routes';
+
+function renderPanel(ui: ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 function buildItem(key: string, value: string, displayOrder = 1): SystemConfigItem {
   return {
@@ -68,8 +76,8 @@ function propsFor(overrides: Partial<AgentBehaviorPanelProps> = {}): AgentBehavi
 }
 
 describe('AgentBehaviorPanel', () => {
-  it('shows a persisted summary and keeps advanced fields collapsed under semantic groups', () => {
-    render(<AgentBehaviorPanel {...propsFor()} />);
+  it('shows a persisted summary and keeps Behavior and Governance layers collapsed', () => {
+    renderPanel(<AgentBehaviorPanel {...propsFor()} />);
 
     expect(screen.getByTestId('agent-active-summary')).toHaveTextContent(/Standard research|标准研究/);
     expect(screen.getByTestId('agent-active-summary')).toHaveTextContent(/GPT · primary/);
@@ -77,16 +85,28 @@ describe('AgentBehaviorPanel', () => {
     for (const key of AGENT_ESSENTIAL_KEYS) {
       expect(within(essentials).getByTestId(`settings-field-${key}`)).toBeInTheDocument();
     }
-    const advanced = screen.getByTestId('agent-advanced-fields');
-    expect(advanced).not.toHaveAttribute('open');
-    expect(within(advanced).getByText(/Runtime & mode|运行模式/)).toBeInTheDocument();
-    expect(within(advanced).getByText(/Skills|技能/)).toBeInTheDocument();
+    const behavior = screen.getByTestId('agent-behavior-fields');
+    const governance = screen.getByTestId('agent-governance-fields');
+    expect(behavior).not.toHaveAttribute('open');
+    expect(governance).not.toHaveAttribute('open');
+    expect(within(behavior).getByText(/Runtime & mode|运行模式/)).toBeInTheDocument();
+    expect(within(behavior).getByText(/Skills|技能/)).toBeInTheDocument();
+    expect(within(governance).getByTestId('settings-field-AGENT_RISK_OVERRIDE')).toBeInTheDocument();
+    expect(within(governance).getByTestId('settings-field-VALUATION_AGENT_TOOL_ENABLED')).toBeInTheDocument();
+  });
+
+  it('offers a default ask path from presets without opening deep layers', () => {
+    renderPanel(<AgentBehaviorPanel {...propsFor()} />);
+    const askCta = within(screen.getByTestId('agent-ask-path')).getByTestId('agent-ask-cta');
+    expect(askCta).toHaveAttribute('href', APP_ROUTE_PATHS.agent);
+    expect(screen.getByTestId('agent-behavior-fields')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('agent-governance-fields')).not.toHaveAttribute('open');
   });
 
   it('previews without mutation, then confirms exactly one atomic batch', () => {
     const onChange = vi.fn();
     const onBatchChange = vi.fn();
-    render(<AgentBehaviorPanel {...propsFor({ onChange, onBatchChange })} />);
+    renderPanel(<AgentBehaviorPanel {...propsFor({ onChange, onBatchChange })} />);
 
     const apply = screen.getByTestId('agent-preset-apply-simple_qa');
     fireEvent.mouseEnter(apply);
@@ -110,7 +130,7 @@ describe('AgentBehaviorPanel', () => {
 
   it('cancels confirmation without changing the draft', () => {
     const onBatchChange = vi.fn();
-    render(<AgentBehaviorPanel {...propsFor({ onBatchChange })} />);
+    renderPanel(<AgentBehaviorPanel {...propsFor({ onBatchChange })} />);
     fireEvent.click(screen.getByTestId('agent-preset-apply-deep_governed'));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Cancel|取消/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -119,7 +139,7 @@ describe('AgentBehaviorPanel', () => {
 
   it('surfaces a failed autosave and offers immediate draft recovery', () => {
     const onResetKeys = vi.fn();
-    render(<AgentBehaviorPanel {...propsFor({ saveStatus: 'failed', onResetKeys })} />);
+    renderPanel(<AgentBehaviorPanel {...propsFor({ saveStatus: 'failed', onResetKeys })} />);
     fireEvent.click(screen.getByTestId('agent-preset-apply-simple_qa'));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Apply preset|确认应用/ }));
 
@@ -132,19 +152,20 @@ describe('AgentBehaviorPanel', () => {
   it('uses persisted values for the active badge instead of an unsaved draft', () => {
     const persisted = standardValues();
     const draft = { ...persisted, AGENT_MAX_STEPS: '12' };
-    render(<AgentBehaviorPanel {...propsFor({ draftValuesByKey: draft, persistedValuesByKey: persisted })} />);
+    renderPanel(<AgentBehaviorPanel {...propsFor({ draftValuesByKey: draft, persistedValuesByKey: persisted })} />);
     expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(/Standard research|标准研究/);
   });
 
   it('fails closed when the backend omits any managed preset key', () => {
     const values = standardValues();
-    render(<AgentBehaviorPanel {...propsFor({ items: buildItems(values, AGENT_ESSENTIAL_KEYS) })} />);
+    renderPanel(<AgentBehaviorPanel {...propsFor({ items: buildItems(values, AGENT_ESSENTIAL_KEYS) })} />);
     expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(/missing preset fields|缺少部分预设字段/);
     expect(screen.getByTestId('agent-preset-apply-simple_qa')).toBeDisabled();
+    expect(screen.queryByTestId('agent-ask-path')).not.toBeInTheDocument();
   });
 
   it('restores focus to the preset trigger after keyboard cancellation', async () => {
-    render(<AgentBehaviorPanel {...propsFor()} />);
+    renderPanel(<AgentBehaviorPanel {...propsFor()} />);
     const trigger = screen.getByTestId('agent-preset-apply-simple_qa');
     trigger.focus();
     fireEvent.click(trigger);
@@ -155,16 +176,29 @@ describe('AgentBehaviorPanel', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it('moves keyboard focus to the ask CTA after a confirmed preset apply', async () => {
+    renderPanel(<AgentBehaviorPanel {...propsFor()} />);
+    fireEvent.click(screen.getByTestId('agent-preset-apply-simple_qa'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Apply preset|确认应用/ }));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByTestId('agent-ask-cta'));
+    });
+  });
+
   it.each(['failed', 'conflicted'] as const)(
     'surfaces a %s preset save and restores only the preset draft keys',
     (saveStatus) => {
       const onResetKeys = vi.fn();
       const initialProps = propsFor({ onResetKeys });
-      const { rerender } = render(<AgentBehaviorPanel {...initialProps} />);
+      const { rerender } = renderPanel(<AgentBehaviorPanel {...initialProps} />);
       fireEvent.click(screen.getByTestId('agent-preset-apply-simple_qa'));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Apply preset|确认应用/ }));
 
-      rerender(<AgentBehaviorPanel {...initialProps} saveStatus={saveStatus} />);
+      rerender(
+        <MemoryRouter>
+          <AgentBehaviorPanel {...initialProps} saveStatus={saveStatus} />
+        </MemoryRouter>,
+      );
       expect(screen.getByTestId('agent-preset-status')).toHaveTextContent(
         saveStatus === 'failed' ? /Autosave failed|自动保存失败/ : /Save conflict|保存冲突/,
       );
@@ -191,7 +225,7 @@ describe('AgentBehaviorPanel', () => {
       },
       modelSummary: { value: 'GPT · primary', source: 'explicit', readiness: 'unknown' },
     });
-    render(<AgentBehaviorPanel {...props} />);
+    renderPanel(<AgentBehaviorPanel {...props} />);
 
     const field = screen.getByTestId('settings-field-AGENT_MAX_STEPS');
     expect(field.querySelector('[aria-invalid="true"]')).not.toBeNull();
@@ -205,13 +239,23 @@ describe('AgentBehaviorPanel', () => {
       AGENT_FEATURES_ACKNOWLEDGED_OFF: 'true',
       AGENT_LITELLM_MODEL: 'primary/gpt',
     };
-    render(<AgentBehaviorPanel {...propsFor({
+    renderPanel(<AgentBehaviorPanel {...propsFor({
       persistedValuesByKey,
+      draftValuesByKey: persistedValuesByKey,
       modelSummary: { value: 'GPT · primary', source: 'explicit', readiness: 'ready' },
     })} />);
 
     const summary = screen.getByTestId('agent-active-summary');
     expect(summary).toHaveTextContent(/Agent use acknowledged off|已确认暂不使用 Agent/);
     expect(summary).not.toHaveTextContent(/· Ready|· 可用/);
+    expect(screen.queryByTestId('agent-ask-path')).not.toBeInTheDocument();
+  });
+
+  it('classifies risk, deep tools, and JSON keys into the governance layer only', () => {
+    expect(resolveAgentDisclosureLayer('AGENT_MAX_STEPS')).toBe('essentials');
+    expect(resolveAgentDisclosureLayer('AGENT_MEMORY_ENABLED')).toBe('behavior');
+    expect(resolveAgentDisclosureLayer('AGENT_RISK_OVERRIDE')).toBe('governance');
+    expect(resolveAgentDisclosureLayer('VALUATION_AGENT_TOOL_ENABLED')).toBe('governance');
+    expect(resolveAgentDisclosureLayer('AGENT_EVENT_ALERT_RULES_JSON')).toBe('governance');
   });
 });

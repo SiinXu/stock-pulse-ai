@@ -44,7 +44,90 @@ export const AGENT_ESSENTIAL_KEYS = [
 
 export type AgentEssentialKey = (typeof AGENT_ESSENTIAL_KEYS)[number];
 
+/**
+ * Behavior layer (collapsed by default): strategies, routing, memory/planning.
+ * Presentation-only — values and registry defaults are unchanged.
+ */
+export const AGENT_BEHAVIOR_KEYS = [
+  'AGENT_FEATURES_ACKNOWLEDGED_OFF',
+  'AGENT_ORCHESTRATOR_TIMEOUT_S',
+  'AGENT_NL_ROUTING',
+  'AGENT_CRITIC_ENABLED',
+  'AGENT_MEMORY_ENABLED',
+  'AGENT_SKILL_ROUTING',
+  'AGENT_SKILL_AUTOWEIGHT',
+  'AGENT_INVESTMENT_COMMITTEE_MODE',
+  'AGENT_MULTI_STRATEGY_DELIBERATION',
+  'AGENT_SKILLS',
+  'AGENT_SKILL_DIR',
+  'SKILL_OPINION_RECORDING_ENABLED',
+  'SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED',
+  'DECISION_PROFILE_CALIBRATION_ENABLED',
+  'AGENT_PLANNING_ENABLED',
+  'AGENT_PLANNING_STRATEGY',
+  'AGENT_PLANNING_MAX_PLAN_STEPS',
+  'AGENT_PLANNING_MAX_REPLANS',
+  'AGENT_PLANNING_MAX_TOKENS',
+  'AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS',
+  'AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS',
+  'AGENT_PLANNING_MAX_OBSERVATION_REPLANS',
+  'AGENT_PLANNING_EXEC_TIMEOUT_SECONDS',
+  'AGENT_PLANNING_ON_STEP_FAILURE',
+  'LAYERED_MEMORY_COLLECTION_ENABLED',
+  'LAYERED_MEMORY_RETENTION_DAYS',
+  'LAYERED_MEMORY_VECTOR_ENABLED',
+  'LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL',
+  'LAYERED_MEMORY_AUDIT_ENABLED',
+  'DECISION_MEMORY_ENABLED',
+  'DECISION_MEMORY_LOOKBACK',
+  'DECISION_MEMORY_MIN_AGE_DAYS',
+  'DECISION_MEMORY_MIN_SAMPLES',
+] as const;
+
+/**
+ * Governance / Expert layer (collapsed by default): risk/HITL, deep research,
+ * tool policy, observability, and expert JSON. Unknown non-essential keys fall through here.
+ */
+export const AGENT_GOVERNANCE_EXPERT_KEYS = [
+  'AGENT_RISK_OVERRIDE',
+  'RISK_GATE_PROFILE',
+  'AGENT_DEEP_RESEARCH_BUDGET',
+  'AGENT_DEEP_RESEARCH_TIMEOUT',
+  'VALUATION_AGENT_TOOL_ENABLED',
+  'MULTIMODAL_AGENT_TOOLS_ENABLED',
+  'MULTIMODAL_FILE_ROOT',
+  'OCR_AGENT_TOOL_ENABLED',
+  'OCR_FILE_ROOT',
+  'OCR_LANGS',
+  'OCR_TIMEOUT_SECONDS',
+  'REASONING_TRACE_EXPORT_ENABLED',
+  'REASONING_TRACE_EXPORT_MAX_CHARS',
+  'AGENT_OBSERVABILITY_ENABLED',
+  'AGENT_OBSERVABILITY_DEEP_PAYLOAD',
+  'AGENT_TOOL_TIMEOUT_S',
+  'AGENT_MAX_IDENTICAL_TOOL_CALLS',
+  'AGENT_MAX_STAGE_ENTRIES',
+  'AGENT_STAGE_FAILURE_POLICY',
+  'AGENT_TECHNICAL_AGENT_TIMEOUT_S',
+  'AGENT_INTEL_AGENT_TIMEOUT_S',
+  'AGENT_RISK_AGENT_TIMEOUT_S',
+  'AGENT_DECISION_AGENT_TIMEOUT_S',
+  'AGENT_PORTFOLIO_AGENT_TIMEOUT_S',
+  'AGENT_SKILL_AGENT_TIMEOUT_S',
+  'AGENT_EVENT_IMPACT_CONTEXT_ENABLED',
+  'AGENT_EVENT_ALERT_RULES_JSON',
+] as const;
+
+export const AGENT_EXPERT_JSON_KEYS = [
+  'AGENT_EVENT_ALERT_RULES_JSON',
+] as const;
+
+export type AgentDisclosureLayer = 'essentials' | 'behavior' | 'governance';
+
 const ESSENTIAL_KEY_SET = new Set<string>(AGENT_ESSENTIAL_KEYS);
+const BEHAVIOR_KEY_SET = new Set<string>(AGENT_BEHAVIOR_KEYS);
+const GOVERNANCE_KEY_SET = new Set<string>(AGENT_GOVERNANCE_EXPERT_KEYS);
+const EXPERT_JSON_KEY_SET = new Set<string>(AGENT_EXPERT_JSON_KEYS);
 const MANAGED_KEY_SET = new Set<string>(AGENT_PRESET_MANAGED_KEYS);
 
 export type AgentPresetValues = Readonly<Record<AgentPresetManagedKey, string>>;
@@ -165,8 +248,13 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       deepToolsDisabled: '估值 Agent 工具已关闭',
       noChanges: '当前值已与该预设一致',
       essentialsTitle: '基础配置',
-      advancedTitle: '高级字段',
-      advancedDescription: '策略目录、研究预算、治理与诊断类开关。默认折叠，展开后可完整编辑。',
+      advancedTitle: '行为',
+      advancedDescription: '策略、路由、内存与规划类开关。默认折叠，展开后可完整编辑。',
+      governanceTitle: '治理 / 专家',
+      governanceDescription: '风险否决、HITL 边界、深度研究预算、工具策略与专家 JSON。默认折叠，仍可完整访问。',
+      askCta: '开始提问',
+      askCtaDescription: '预设就绪后可直接进入对话提问，无需再打开深层设置。',
+      configureModelCta: '配置模型来源',
       emptyValue: '（空）',
       simple_qa: {
         name: '简单问答',
@@ -220,8 +308,13 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
       deepToolsDisabled: 'Valuation Agent tool disabled',
       noChanges: 'Values already match this preset',
       essentialsTitle: 'Essentials',
-      advancedTitle: 'Advanced fields',
-      advancedDescription: 'Strategy paths, research budgets, governance, and diagnostic toggles. Collapsed by default; expand to edit the full set.',
+      advancedTitle: 'Behavior',
+      advancedDescription: 'Strategies, routing, memory, and planning toggles. Collapsed by default; expand to edit the full set.',
+      governanceTitle: 'Governance / Expert',
+      governanceDescription: 'Risk veto, HITL boundaries, deep research budgets, tool policy, and expert JSON. Collapsed by default; still fully reachable.',
+      askCta: 'Start asking',
+      askCtaDescription: 'Once a preset is ready, go straight to chat — no deep Settings dive required.',
+      configureModelCta: 'Configure model source',
       emptyValue: '(empty)',
       simple_qa: {
         name: 'Simple Q&A',
@@ -241,6 +334,28 @@ export const AGENT_SETUP_COPY = createUiLanguageRecord(
 
 export function isAgentEssentialKey(key: string): boolean {
   return ESSENTIAL_KEY_SET.has(key.toUpperCase());
+}
+
+export function isAgentBehaviorKey(key: string): boolean {
+  return BEHAVIOR_KEY_SET.has(key.toUpperCase());
+}
+
+export function isAgentGovernanceExpertKey(key: string): boolean {
+  const upper = key.toUpperCase();
+  return GOVERNANCE_KEY_SET.has(upper) || EXPERT_JSON_KEY_SET.has(upper) || upper.endsWith('_JSON');
+}
+
+export function isAgentExpertJsonKey(key: string): boolean {
+  const upper = key.toUpperCase();
+  return EXPERT_JSON_KEY_SET.has(upper) || upper.endsWith('_JSON');
+}
+
+/** Presentation-only layer resolver; unknown non-essential keys stay reachable under governance. */
+export function resolveAgentDisclosureLayer(key: string): AgentDisclosureLayer {
+  const upper = key.toUpperCase();
+  if (ESSENTIAL_KEY_SET.has(upper)) return 'essentials';
+  if (BEHAVIOR_KEY_SET.has(upper)) return 'behavior';
+  return 'governance';
 }
 
 export function isAgentPresetManagedKey(key: string): boolean {

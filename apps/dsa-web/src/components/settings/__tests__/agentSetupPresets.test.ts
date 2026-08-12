@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_BEHAVIOR_KEYS,
   AGENT_ESSENTIAL_KEYS,
+  AGENT_GOVERNANCE_EXPERT_KEYS,
   AGENT_PRESET_MANAGED_KEYS,
   AGENT_SETUP_PRESETS,
   buildAgentPresetUpdates,
   diffAgentPreset,
   matchesAgentPreset,
+  resolveAgentDisclosureLayer,
   resolveAgentPresetStatus,
 } from '../agentSetupPresets';
 
@@ -30,6 +33,21 @@ describe('agentSetupPresets', () => {
     }
     expect(AGENT_ESSENTIAL_KEYS.length).toBeLessThan(AGENT_PRESET_MANAGED_KEYS.length);
     expect(AGENT_ESSENTIAL_KEYS.length).toBeLessThanOrEqual(5);
+  });
+
+  it('splits non-essential managed keys across Behavior vs Governance without changing values', () => {
+    for (const key of AGENT_ESSENTIAL_KEYS) {
+      expect(resolveAgentDisclosureLayer(key)).toBe('essentials');
+    }
+    for (const key of AGENT_BEHAVIOR_KEYS) {
+      expect(resolveAgentDisclosureLayer(key)).toBe('behavior');
+    }
+    for (const key of AGENT_GOVERNANCE_EXPERT_KEYS) {
+      expect(resolveAgentDisclosureLayer(key)).toBe('governance');
+    }
+    for (const preset of AGENT_SETUP_PRESETS) {
+      expect(Object.keys(preset.values).sort()).toEqual([...AGENT_PRESET_MANAGED_KEYS].sort());
+    }
   });
 
   it('matches a preset only when every available managed key equals the profile', () => {

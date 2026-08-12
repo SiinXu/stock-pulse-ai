@@ -142,7 +142,7 @@ On desktop, the category navigation uses a compact sidebar so the active setting
 
 Selecting a preset opens confirmation without mutating the draft. Review every old/new value plus step/timeout, memory, Critic, and multi-strategy cost effects. Confirmation submits all changes as one Agent Settings batch for autosave. Cancel, Escape, focus, and hover write nothing. After failure or conflict, discard that preset draft before retrying or loading the server version.
 
-Presets enable Agent and clear “Agent acknowledged off,” but do not change credentials, skill lists, global Deep Research budgets, Risk Agent veto, or HITL approval policy. The default surface shows essentials; Advanced preserves the registry-owned runtime, skills, research, memory/context, and other semantic groups.
+Presets enable Agent and clear “Agent acknowledged off,” but do not change credentials, skill lists, global Deep Research budgets, Risk Agent veto, or HITL approval policy. The surface uses three progressive layers — **Essentials** (always open), **Behavior**, and **Governance / Expert** (both collapsed by default). Layering changes only presentation; every registry field remains reachable with the same semantics and defaults. Expert JSON (for example alert rules under **Alerts → Events**) stays behind the expert disclosure and is not shown on the default surface. After a usable preset is ready, **Start asking** jumps straight to chat so you do not need to open Behavior or Governance.
 
 ### Scheduling
 
