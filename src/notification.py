@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 import threading as _threading
 import time
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
@@ -34,6 +33,10 @@ from src.notification_routing import (
     split_notification_route_channels,
 )
 from src.notification_contracts import is_feishu_static_configured
+from src.notification_parts.contracts import (
+    ChannelAttemptResult,
+    NotificationDispatchResult,
+)
 from src.notification_noise import (
     NotificationNoiseDecision,
     evaluate_notification_noise,
@@ -288,79 +291,6 @@ class NotificationChannel(Enum):
     UNKNOWN = "unknown"    # Unknown.
 
 
-@dataclass
-class ChannelAttemptResult:
-    """One notification channel send attempt (built-in or plugin).
-
-    Callers that need a stable, JSON-friendly shape should use
-    :meth:`as_summary` (minimal ``channel`` / ``ok`` / ``error``) or
-    :meth:`as_dict` (includes retry and diagnostic fields).
-    """
-
-    channel: str
-    success: bool
-    error_code: Optional[str] = None
-    retryable: bool = False
-    latency_ms: Optional[int] = None
-    diagnostics: Optional[str] = None
-
-    def as_summary(self) -> Dict[str, Any]:
-        """Return the minimal queryable per-channel shape (Issue #1081)."""
-
-        return {
-            "channel": self.channel,
-            "ok": bool(self.success),
-            "error": self.error_code,
-        }
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Return the full queryable per-channel attempt record."""
-
-        summary = self.as_summary()
-        summary.update(
-            {
-                "retryable": bool(self.retryable),
-                "latency_ms": self.latency_ms,
-                "diagnostics": self.diagnostics,
-            }
-        )
-        return summary
-
-
-@dataclass
-class NotificationDispatchResult:
-    """Structured multi-channel notification dispatch result.
-
-    Separates analysis success from notification delivery outcomes:
-    ``status`` may be ``sent``, ``partial_failed``, ``all_failed``,
-    ``no_channel``, or ``noise_suppressed`` while ``channel_results``
-    retains every attempted channel for query and diagnostics.
-    """
-
-    dispatched: bool
-    success: bool
-    status: str
-    channel_results: List[ChannelAttemptResult] = field(default_factory=list)
-    message: Optional[str] = None
-
-    def channel_summaries(self) -> List[Dict[str, Any]]:
-        """Return ``[{channel, ok, error}, ...]`` for API/bot callers."""
-
-        return [item.as_summary() for item in self.channel_results]
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Return a JSON-friendly dispatch record for query and logging."""
-
-        return {
-            "dispatched": bool(self.dispatched),
-            "success": bool(self.success),
-            "status": self.status,
-            "message": self.message,
-            "channels": self.channel_summaries(),
-            "channel_results": [item.as_dict() for item in self.channel_results],
-        }
-
-
 class ChannelDetector:
     """
     渠道检测器 - 简化版
@@ -454,6 +384,10 @@ class NotificationService(
         self._request_context = request_context
         self._context_channels: List[str] = []
         self._notification_channel_registry = notification_channel_registry
+        # Latest structured multi-channel result for post-send query. Last-writer
+        # wins if the same service instance is shared across concurrent sends;
+        # prefer the return value of send_with_results() under concurrency.
+        self._last_dispatch_result: Optional[NotificationDispatchResult] = None
 
         # Markdown Convert to image(Issue #289)
         self._markdown_to_image_channels = set(

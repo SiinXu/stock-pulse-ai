@@ -22,9 +22,9 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     NotificationNoiseDecision NotificationService NtfySender Optional
     PushoverSender PushplusSender ReportType Serverchan3Sender SlackSender
     TYPE_CHECKING TelegramSender Tuple WECHAT_IMAGE_MAX_BYTES WechatSender
-    annotations dataclass datetime display_action_fields_for_result
+    annotations datetime display_action_fields_for_result
     display_decision_type_for_result display_operation_advice_for_result
-    evaluate_notification_noise field format_public_market_status_line
+    evaluate_notification_noise format_public_market_status_line
     format_public_phase_pack_excerpt format_strategy_skill_items
     get_chip_unavailable_reason get_config get_localized_stock_name
     get_notification_route_config get_notification_service get_report_labels
@@ -204,7 +204,7 @@ EXPECTED_GROUPS = (
             "save_report_to_file",
             "save_and_send_feishu_file",
         ),
-        "ad70c8fbbad00f488dca906dded8f8fd8c14e87e0dcaf295d46148500c129272",
+        "9106021ab3dcb5d7b052be63948cf899677b636b533a976dbd7c27fec49abbf5",
     ),
 )
 

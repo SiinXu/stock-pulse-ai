@@ -1650,7 +1650,12 @@ class _DispatchMethods:
         return execution.result
 
     def get_last_dispatch_result(self) -> Optional[NotificationDispatchResult]:
-        """Return the most recent structured dispatch result, if any."""
+        """Return the most recent structured dispatch result, if any.
+
+        Under concurrent sends on one service instance this is last-writer-wins.
+        Prefer the return value of :meth:`send_with_results` when multiple
+        dispatches may overlap.
+        """
 
         from src.notification import NotificationDispatchResult as ResultType
 

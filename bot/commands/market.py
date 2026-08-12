@@ -161,11 +161,19 @@ class MarketCommand(BotCommand):
                         "partial_failed",
                         "all_failed",
                     }:
+                        summaries_fn = getattr(
+                            dispatch,
+                            "channel_summaries",
+                            None,
+                        )
+                        channel_summaries = (
+                            summaries_fn() if callable(summaries_fn) else []
+                        )
                         logger.warning(
                             "[MarketCommand] Closed-market skip notice dispatch "
                             "status=%s channels=%s",
                             dispatch.status,
-                            getattr(dispatch, "channel_summaries", lambda: [])(),
+                            channel_summaries,
                         )
                 return
 

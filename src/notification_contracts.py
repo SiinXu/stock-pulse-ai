@@ -4,10 +4,12 @@
 from src.notification_parts._facade import load_legacy_module as _load_legacy_module
 from src.notification_parts.contracts import (
     Any,
+    ChannelAttemptResult,
     FEISHU_APP_BOT_ENV_GROUP,
     FEISHU_STATIC_ENV_GROUPS,
     FEISHU_WEBHOOK_ENV_GROUP,
     Mapping,
+    NotificationDispatchResult,
     Tuple,
     annotations,
     is_dingtalk_session_webhook_url,
@@ -22,10 +24,12 @@ from src.notification_parts.contracts import (
 
 __all__ = (
     "Any",
+    "ChannelAttemptResult",
     "FEISHU_APP_BOT_ENV_GROUP",
     "FEISHU_STATIC_ENV_GROUPS",
     "FEISHU_WEBHOOK_ENV_GROUP",
     "Mapping",
+    "NotificationDispatchResult",
     "Tuple",
     "annotations",
     "is_dingtalk_session_webhook_url",

@@ -268,6 +268,20 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         self.assertTrue(public["success"])
         self.assertEqual(public["channels"], result.channel_summaries())
         self.assertIs(service.get_last_dispatch_result(), result)
+        # Result types are defined in contracts and re-exported from the facade.
+        from src.notification_parts.contracts import (
+            ChannelAttemptResult as ContractAttempt,
+            NotificationDispatchResult as ContractDispatch,
+        )
+        from src.notification_contracts import (
+            ChannelAttemptResult as FacadeAttempt,
+            NotificationDispatchResult as FacadeDispatch,
+        )
+
+        self.assertIs(type(result.channel_results[0]), ContractAttempt)
+        self.assertIs(type(result), ContractDispatch)
+        self.assertIs(ContractAttempt, FacadeAttempt)
+        self.assertIs(ContractDispatch, FacadeDispatch)
         # Historical bool API still reports overall success when any channel ok.
         with mock.patch.object(service, "send_to_wechat", side_effect=RuntimeError("boom")), \
              mock.patch.object(service, "send_to_custom", return_value=True):
