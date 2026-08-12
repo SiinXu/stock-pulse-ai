@@ -18,14 +18,20 @@ import {
   setDashboardWidgetVisible,
 } from '../types/dashboardLayout';
 
+export type DashboardLayoutCommitReason =
+  | 'revision_conflict'
+  | 'invalid'
+  | 'lease_busy'
+  | 'storage_failed';
+
 export type DashboardLayoutCommitResult =
   | { ok: true; layout: DashboardLayoutPreference }
-  | { ok: false; reason: 'revision_conflict' | 'invalid' | 'lease_busy' | 'storage_failed'; layout: DashboardLayoutPreference };
+  | { ok: false; reason: DashboardLayoutCommitReason; layout: DashboardLayoutPreference };
 
 type DashboardLayoutState = {
   layout: DashboardLayoutPreference;
   isActioning: boolean;
-  lastError: DashboardLayoutCommitResult['reason'] | null;
+  lastError: DashboardLayoutCommitReason | null;
   hydrate: () => void;
   reorder: (orderedIds: readonly DashboardWidgetId[], expectedRevision: number) => DashboardLayoutCommitResult;
   setVisible: (

@@ -5,7 +5,11 @@ import { ArrowRight, BellRing } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button, EmptyState, Section, StatePanel } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import {
+  SIGNAL_CENTER_HISTORY_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
+  buildSignalCenterHref,
+} from '../../routing/routes';
 
 export type HomeAlertsWidgetProps = {
   isLoading: boolean;
@@ -23,6 +27,10 @@ export const HomeAlertsWidget: React.FC<HomeAlertsWidgetProps> = ({
   const { t } = useUiLanguage();
   const navigate = useNavigate();
   const total = triggeredAlertTotal ?? 0;
+  const alertsHref = buildSignalCenterHref({
+    tab: SIGNAL_CENTER_TAB_VALUES.history,
+    history: SIGNAL_CENTER_HISTORY_VALUES.triggers,
+  });
 
   return (
     <Section
@@ -52,7 +60,7 @@ export const HomeAlertsWidget: React.FC<HomeAlertsWidgetProps> = ({
         <button
           type="button"
           className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-left"
-          onClick={() => navigate(APP_ROUTE_PATHS.alerts)}
+          onClick={() => navigate(alertsHref)}
         >
           <span>
             <span className="block text-sm font-semibold text-foreground">
@@ -73,7 +81,7 @@ export const HomeAlertsWidget: React.FC<HomeAlertsWidgetProps> = ({
             <Button
               variant="secondary"
               size="default"
-              onClick={() => navigate(APP_ROUTE_PATHS.alerts)}
+              onClick={() => navigate(alertsHref)}
             >
               {t('home.dashboardLayout.widget.openAlerts')}
             </Button>

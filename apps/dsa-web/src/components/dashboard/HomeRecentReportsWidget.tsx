@@ -10,13 +10,14 @@ import {
   buildAnalysisWorkbenchHref,
 } from '../../routing/routes';
 import type { HistoryItem } from '../../types/analysis';
+import type { UiLanguage } from '../../i18n/uiText';
 import { formatDateTime } from '../../utils/format';
 
 export type HomeRecentReportsWidgetProps = {
   isLoading: boolean;
   available: boolean;
   items: HistoryItem[];
-  language: string;
+  language: UiLanguage;
   onRetry: () => void;
 };
 
