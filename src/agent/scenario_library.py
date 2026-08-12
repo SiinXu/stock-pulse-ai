@@ -14,6 +14,7 @@ import re
 import threading
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from src.agent.soul import AGENT_SOUL_CHARTER, AGENT_SOUL_HASH, AGENT_SOUL_VERSION
@@ -177,179 +178,108 @@ def _rf(
     )
 
 
-_BUILTIN: Tuple[LibraryScenario, ...] = (
-    LibraryScenario(
-        id="rate_hike_100bp",
-        name="Policy rates +100bp",
-        description="Parallel policy-rate hike of 100 basis points.",
-        category="rate",
-        markets=("all",),
-        assumptions=(WhatIfAssumption(dimension="interest_rate", direction="up", magnitude=100.0),),
-        risk_framing=_rf(
-            uncertainty="elevated",
-            sizing="tighter",
-            emphasis=(
-                "discount_rate_pressure",
-                "duration_and_leverage_sensitivity",
-                "funding_cost_upside",
-            ),
-            tighter=(
-                "Require explicit funding-cost and multiple-compression checks before any bullish sizing.",
-                "Do not soften invalidation levels solely because the baseline thesis remains intact.",
-            ),
-            sections=(
-                ("risks_counter_evidence", "elevated", "Surface rate-driven downside and valuation compression."),
-                ("risk_control", "tightened", "Prefer smaller size and stricter invalidation under higher rates."),
-                ("invalidation", "elevated", "Call out rate-path breaks that invalidate the baseline case."),
-            ),
-        ),
-    ),
-    LibraryScenario(
-        id="rate_cut_50bp",
-        name="Policy rates -50bp",
-        description="Parallel policy-rate cut of 50 basis points.",
-        category="rate",
-        markets=("all",),
-        assumptions=(WhatIfAssumption(dimension="interest_rate", direction="down", magnitude=50.0),),
-        risk_framing=_rf(
-            uncertainty="elevated",
-            sizing="unchanged",
-            emphasis=(
-                "easing_is_not_risk_free",
-                "growth_reacceleration_vs_policy_lag",
-                "still_separate_hypothesis_from_observation",
-            ),
-            tighter=(
-                "Do not present rate cuts as guaranteed upside; keep downside and lag risks explicit.",
-            ),
-            sections=(
-                ("risks_counter_evidence", "elevated", "Keep lag, transmission, and false-break risks visible."),
-                ("risk_warning", "elevated", "Mark easing benefits as hypothetical, not observed facts."),
-            ),
-        ),
-    ),
-    LibraryScenario(
-        id="fx_usd_cny_up_5",
-        name="USD/CNY +5%",
-        description="USD strengthens 5% versus CNY (USD/CNY up).",
-        category="fx",
-        markets=("cn", "hk", "us"),
-        assumptions=(
-            WhatIfAssumption(
-                dimension="fx_rate",
-                direction="up",
-                magnitude=5.0,
-                currency_pair="USD/CNY",
-            ),
-        ),
-        risk_framing=_rf(
-            uncertainty="elevated",
-            sizing="tighter",
-            emphasis=(
-                "import_cost_and_margin_pressure",
-                "fx_translation_on_offshore_earnings",
-                "capital_flow_sensitivity",
-            ),
-            tighter=(
-                "Call out FX exposure and margin translation before upgrading confidence.",
-            ),
-            sections=(
-                ("risks_counter_evidence", "elevated", "Emphasize FX drag on importers and CNY earners."),
-                ("risk_control", "tightened", "Reduce size when FX exposure is material and unhedged."),
-            ),
-        ),
-    ),
-    LibraryScenario(
-        id="fx_usd_cny_down_5",
-        name="USD/CNY -5%",
-        description="USD weakens 5% versus CNY (USD/CNY down).",
-        category="fx",
-        markets=("cn", "hk", "us"),
-        assumptions=(
-            WhatIfAssumption(
-                dimension="fx_rate",
-                direction="down",
-                magnitude=5.0,
-                currency_pair="USD/CNY",
-            ),
-        ),
-        risk_framing=_rf(
-            uncertainty="elevated",
-            sizing="unchanged",
-            emphasis=(
-                "export_competitiveness_shift",
-                "fx_is_hypothetical_not_print",
-                "hedge_and_pass_through_uncertainty",
-            ),
-            tighter=(
-                "Do not treat a weaker USD as confirmed bullish evidence for all exporters.",
-            ),
-            sections=(
-                ("risks_counter_evidence", "elevated", "Keep demand elasticity and lag effects in view."),
-                ("risk_warning", "elevated", "Label FX path as scenario-only."),
-            ),
-        ),
-    ),
-    LibraryScenario(
-        id="industry_shock_down_15",
-        name="Industry shock -15%",
-        description="Sector / industry factor shock of -15% (parameterized label).",
-        category="industry",
-        markets=("all",),
-        assumptions=(
-            WhatIfAssumption(
-                dimension="sector_shock",
-                direction="down",
-                magnitude=15.0,
-                label="Target industry / sector instantaneous -15%",
-            ),
-        ),
-        risk_framing=_rf(
-            uncertainty="high",
-            sizing="defensive",
-            emphasis=(
-                "sector_beta_and_peer_contagion",
-                "crowding_and_liquidity_gap",
-                "thesis_invalidation_speed",
-            ),
-            tighter=(
-                "Treat industry shock as elevating peer and liquidity risk; prefer defensive sizing.",
-                "Do not drop refusal or evidence rules to keep a bullish narrative alive.",
-            ),
-            sections=(
-                ("risks_counter_evidence", "elevated", "Lead with sector contagion and peer drawdown."),
-                ("risk_control", "tightened", "Defensive size and faster invalidation under sector stress."),
-                ("time_sensitivity", "accelerated", "Shorten reaction window while the shock path is open."),
-                ("invalidation", "elevated", "Make sector-level breaks first-class invalidation inputs."),
-            ),
-        ),
-    ),
-    LibraryScenario(
-        id="market_down_10",
-        name="Broad market -10%",
-        description="Broad equity index instantaneous move of -10%.",
-        category="market",
-        markets=("all",),
-        assumptions=(WhatIfAssumption(dimension="index_move", direction="down", magnitude=10.0),),
-        risk_framing=_rf(
-            uncertainty="high",
-            sizing="defensive",
-            emphasis=(
-                "beta_and_correlation_spike",
-                "liquidity_and_gap_risk",
-                "preserve_downside_first_framing",
-            ),
-            tighter=(
-                "Under a market-down path, keep downside and liquidity risk ahead of opportunity framing.",
-            ),
-            sections=(
-                ("risks_counter_evidence", "elevated", "Prioritize market-beta and gap risk."),
-                ("risk_control", "tightened", "Defensive posture until the hypothetical path is closed."),
-                ("time_sensitivity", "accelerated", "Faster review cadence while the drawdown path is active."),
-            ),
-        ),
-    ),
-)
+def _parse_assumption(raw: Mapping[str, Any]) -> WhatIfAssumption:
+    # Reuse the what-if parser by wrapping a one-item payload (no private imports).
+    from src.agent.what_if_scenario import parse_what_if_from_context
+
+    parsed = parse_what_if_from_context(
+        {
+            WHAT_IF_CONTEXT_KEY: {
+                "enabled": True,
+                "assumptions": [raw],
+            }
+        }
+    )
+    if parsed is None or not parsed.assumptions:
+        raise ValueError("invalid scenario assumption")
+    return parsed.assumptions[0]
+
+
+
+_BUILTINS_PATH = Path(__file__).with_name("scenario_library_builtins.json")
+# Keep Web copy byte-identical: apps/dsa-web/src/components/chat/scenarioLibraryBuiltins.json
+_WEB_BUILTINS_REL = Path("apps/dsa-web/src/components/chat/scenarioLibraryBuiltins.json")
+
+
+def _library_scenario_from_raw(raw: Mapping[str, Any], *, source: str) -> LibraryScenario:
+    assumptions_raw = raw.get("assumptions") or []
+    if not isinstance(assumptions_raw, list) or not assumptions_raw:
+        raise ValueError(f"builtin scenario '{raw.get('id')}' has no assumptions")
+    assumptions = tuple(_parse_assumption(item) for item in assumptions_raw)
+    framing_raw = raw.get("risk_framing") or {}
+    if not isinstance(framing_raw, Mapping):
+        raise ValueError("risk_framing must be an object")
+    emphasis = list(framing_raw.get("emphasis") or [])
+    tighter = list(framing_raw.get("tighter_constraints") or [])
+    sections: List[Tuple[str, str, str]] = []
+    for item in framing_raw.get("section_deltas") or []:
+        if not isinstance(item, Mapping):
+            continue
+        sections.append(
+            (
+                str(item.get("section") or "").strip(),
+                str(item.get("direction") or "").strip(),
+                str(item.get("note") or "").strip(),
+            )
+        )
+    framing = _rf(
+        uncertainty=str(framing_raw.get("uncertainty_level") or "elevated"),
+        sizing=str(framing_raw.get("position_sizing") or "tighter"),
+        emphasis=emphasis,
+        tighter=tighter,
+        sections=sections,
+    )
+    markets = tuple(str(m).strip().lower() for m in (raw.get("markets") or ["all"]))
+    return LibraryScenario(
+        id=str(raw.get("id") or "").strip(),
+        name=str(raw.get("name") or raw.get("id") or "").strip(),
+        description=str(raw.get("description") or "").strip(),
+        category=str(raw.get("category") or "custom").strip().lower(),
+        markets=markets,
+        assumptions=assumptions,
+        risk_framing=framing,
+        source=source,
+        version=int(raw.get("version") or 1),
+    )
+
+
+def _load_builtin_scenarios() -> Tuple[LibraryScenario, ...]:
+    payload = json.loads(_BUILTINS_PATH.read_text(encoding="utf-8"))
+    items = payload.get("scenarios") if isinstance(payload, Mapping) else None
+    if not isinstance(items, list) or not items:
+        raise RuntimeError("scenario library builtins catalog is empty or invalid")
+    catalog_version = str(payload.get("catalog_version") or "").strip()
+    if catalog_version and catalog_version != SCENARIO_LIBRARY_VERSION:
+        raise RuntimeError(
+            f"builtins catalog_version {catalog_version!r} != module {SCENARIO_LIBRARY_VERSION!r}"
+        )
+    return tuple(_library_scenario_from_raw(item, source="built_in") for item in items)
+
+
+_BUILTIN: Tuple[LibraryScenario, ...] = _load_builtin_scenarios()
+
+
+def builtin_catalog_paths() -> Dict[str, Path]:
+    """Paths that must stay byte-identical for the dual-repo SSOT contract."""
+    root = Path(__file__).resolve().parents[2]
+    return {
+        "backend": _BUILTINS_PATH.resolve(),
+        "web": (root / _WEB_BUILTINS_REL).resolve(),
+    }
+
+
+def assert_builtin_catalog_sync() -> None:
+    """Fail when the Web mirror drifts from the Python builtins JSON."""
+    paths = builtin_catalog_paths()
+    backend = paths["backend"].read_bytes()
+    web = paths["web"].read_bytes()
+    if backend != web:
+        raise AssertionError(
+            "scenario library builtins JSON drifted between backend and web mirrors"
+        )
+
+
+
 
 
 def get_scenario_library_metadata() -> Dict[str, str]:
@@ -394,23 +324,6 @@ def get_scenario(scenario_id: str) -> Dict[str, Any]:
         if target in _custom_scenarios:
             return deepcopy(_custom_scenarios[target])
     raise ValueError(f"Unknown scenario_id '{target}'")
-
-
-def _parse_assumption(raw: Mapping[str, Any]) -> WhatIfAssumption:
-    # Reuse the what-if parser by wrapping a one-item payload (no private imports).
-    from src.agent.what_if_scenario import parse_what_if_from_context
-
-    parsed = parse_what_if_from_context(
-        {
-            WHAT_IF_CONTEXT_KEY: {
-                "enabled": True,
-                "assumptions": [raw],
-            }
-        }
-    )
-    if parsed is None or not parsed.assumptions:
-        raise ValueError("invalid scenario assumption")
-    return parsed.assumptions[0]
 
 
 def _normalize_risk_framing(raw: Any, *, category: str) -> RiskFraming:
@@ -480,30 +393,46 @@ def _normalize_risk_framing(raw: Any, *, category: str) -> RiskFraming:
 
 
 def _assert_no_soul_weakening(payload: Mapping[str, Any]) -> None:
-    """Reject payloads that attempt to weaken Soul refusal/evidence rules."""
+    """Reject payloads that attempt to weaken Soul refusal/evidence rules.
+
+    This is a structured-input guard for scenario packs, not a substitute for
+    Soul prompt authority. Checks top-level keys and selected text fields only
+    (no broad whole-payload keyword scan that false-positives on market prose).
+    """
     lowered_keys = {str(k).strip().lower() for k in payload.keys()}
     bad = lowered_keys & _SOUL_WEAKEN_KEYS
     if bad:
         raise ValueError(f"scenario cannot weaken Soul rules: {sorted(bad)}")
-    # Nested text blobs are scanned for explicit weaken directives.
-    blob = json.dumps(payload, ensure_ascii=True).lower()
-    for key in _SOUL_WEAKEN_KEYS:
-        if key.replace("_", " ") in blob or key in blob:
-            raise ValueError(f"scenario text attempts to weaken Soul rule '{key}'")
-    # Uncertainty/sizing may only stay or tighten relative to baseline.
+
+    text_fields = [
+        str(payload.get("name") or ""),
+        str(payload.get("description") or ""),
+    ]
     framing = payload.get("risk_framing")
     if isinstance(framing, Mapping):
         level = str(framing.get("uncertainty_level") or "elevated").lower()
         if level not in UNCERTAINTY_LEVELS:
             raise ValueError("invalid uncertainty_level")
-        # "none" or inventing a looser level is rejected by UNCERTAINTY_LEVELS.
         sizing = str(framing.get("position_sizing") or "tighter").lower()
         if sizing not in POSITION_SIZING:
             raise ValueError("invalid position_sizing")
-        # Explicit "looser" / "aggressive_size" aliases are not accepted.
-        for banned in ("looser", "aggressive", "ignore_risk", "no_risk"):
-            if banned in json.dumps(framing, ensure_ascii=True).lower():
+        for item in framing.get("emphasis") or []:
+            text_fields.append(str(item))
+        for item in framing.get("tighter_constraints") or []:
+            text_fields.append(str(item))
+        for item in framing.get("section_deltas") or []:
+            if isinstance(item, Mapping):
+                text_fields.append(str(item.get("note") or ""))
+        # Explicit loosen tokens as whole values only (not substrings of prose).
+        for banned in ("looser", "ignore_risk", "no_risk", "aggressive_size"):
+            if sizing == banned or level == banned:
                 raise ValueError("scenario risk_framing cannot loosen risk posture")
+
+    joined = "\n".join(text_fields).lower()
+    for key in _SOUL_WEAKEN_KEYS:
+        token = key.replace("_", " ")
+        if key in joined or token in joined:
+            raise ValueError(f"scenario text attempts to weaken Soul rule '{key}'")
 
 
 def normalize_custom_scenario(raw: Mapping[str, Any]) -> Dict[str, Any]:
@@ -765,6 +694,7 @@ def assert_soul_intact_under_scenarios() -> None:
     assert meta["soul_version"] == AGENT_SOUL_VERSION
     assert meta["soul_hash"] == AGENT_SOUL_HASH
     assert "Never fabricate" in AGENT_SOUL_CHARTER or "fabricate" in AGENT_SOUL_CHARTER.lower()
+    assert_builtin_catalog_sync()
     for item in list_scenarios(include_custom=False):
         _assert_no_soul_weakening(item)
         # Framing may only use allowed tighten-oriented sizing values.
@@ -787,6 +717,7 @@ def build_what_if_enrichment_from_library(
     scenario_id = raw.get("scenario_id")
     if not scenario_id:
         return ""
+    # Unknown / client-only custom ids must not silently claim library framing.
     try:
         projection = project_report_sensitivity(str(scenario_id), language_key=language_key)
     except ValueError:
@@ -821,12 +752,91 @@ def build_what_if_enrichment_from_library(
     return "\n".join(lines)
 
 
+def resolve_report_sensitivity_section(
+    extra_context: Optional[Mapping[str, Any]],
+    *,
+    report_language: str = "zh",
+) -> Optional[Dict[str, Any]]:
+    """Resolve an optional hypothetical sensitivity appendix for report rendering.
+
+    Accepted ``extra_context`` shapes (first match wins):
+
+    - ``report_sensitivity``: ``{"scenario_id": "..."}`` or full scenario object
+    - ``scenario_id`` at top level (built-in / saved server-side only)
+
+    Returns ``None`` when no scenario is requested so baseline reports stay unchanged.
+    """
+    if not isinstance(extra_context, Mapping):
+        return None
+    language_key = "en" if str(report_language or "").lower().startswith("en") else "zh"
+    if report_language in {"ko"}:
+        language_key = "en"
+
+    raw = extra_context.get(REPORT_SENSITIVITY_CONTEXT_KEY)
+    scenario_id: Optional[str] = None
+    scenario_payload: Optional[Mapping[str, Any]] = None
+    if isinstance(raw, Mapping):
+        if raw.get("scenario_id") and not raw.get("assumptions"):
+            scenario_id = str(raw.get("scenario_id"))
+        elif raw.get("id") or raw.get("assumptions"):
+            scenario_payload = raw
+        elif raw.get("scenario_id"):
+            scenario_id = str(raw.get("scenario_id"))
+    if scenario_id is None and extra_context.get("scenario_id"):
+        scenario_id = str(extra_context.get("scenario_id"))
+
+    if scenario_payload is None and not scenario_id:
+        return None
+    try:
+        if scenario_payload is not None:
+            projection = project_report_sensitivity(
+                scenario=scenario_payload,
+                language_key=language_key,
+            )
+        else:
+            projection = project_report_sensitivity(
+                scenario_id,
+                language_key=language_key,
+            )
+    except ValueError:
+        return None
+    markdown = format_report_sensitivity_markdown(projection, language_key=language_key)
+    return {
+        "projection": projection,
+        "markdown": markdown,
+        "hypothetical": True,
+        "mix_with_baseline_conclusions": False,
+    }
+
+
+def append_report_sensitivity_section(
+    report_body: str,
+    section_markdown: Optional[str],
+) -> str:
+    """Append a hypothetical sensitivity appendix without rewriting the baseline body."""
+    body = report_body or ""
+    section = (section_markdown or "").strip()
+    if not section:
+        return body
+    marker = HYPOTHETICAL_RESULT_MARKER
+    if marker in body and (
+        "Report sensitivity" in body or "报告敏感性情景" in body
+    ):
+        return body
+    if not body.strip():
+        return section + "\n"
+    return body.rstrip() + "\n\n" + section + "\n"
+
+
 __all__ = [
     "REPORT_SENSITIVITY_CONTEXT_KEY",
     "SCENARIO_LIBRARY_SCHEMA_VERSION",
     "SCENARIO_LIBRARY_VERSION",
+    "append_report_sensitivity_section",
+    "assert_builtin_catalog_sync",
     "assert_soul_intact_under_scenarios",
     "build_what_if_enrichment_from_library",
+    "builtin_catalog_paths",
     "clear_custom_scenarios",
     "delete_custom_scenario",
     "format_report_sensitivity_markdown",
@@ -838,6 +848,7 @@ __all__ = [
     "list_scenarios",
     "normalize_custom_scenario",
     "project_report_sensitivity",
+    "resolve_report_sensitivity_section",
     "save_custom_scenario",
     "scenario_to_what_if_payload",
 ]

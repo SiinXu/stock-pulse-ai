@@ -52,11 +52,17 @@ describe('whatIfScenario helpers', () => {
       { role: 'user', content: 'plain' },
     ])).toBe(1);
   });
-  it('attaches library scenario metadata to what-if payload', () => {
+  it('attaches library scenario metadata only for built-in ids', () => {
     expect(buildWhatIfContextPayload({ ...baseDraft, scenarioId: 'rate_hike_100bp' })).toMatchObject({
       scenario_id: 'rate_hike_100bp',
       catalog_version: SCENARIO_LIBRARY_VERSION,
     });
+    const customOnly = buildWhatIfContextPayload({ ...baseDraft, scenarioId: 'my_custom_local_only' });
+    expect(customOnly).toMatchObject({
+      enabled: true,
+      assumptions: [{ dimension: 'interest_rate', direction: 'down', magnitude: 50 }],
+    });
+    expect(customOnly).not.toHaveProperty('scenario_id');
   });
 });
 

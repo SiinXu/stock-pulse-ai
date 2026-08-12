@@ -22,6 +22,10 @@
 {{ valuation_section(e.valuation_projection, compact=true) }}
 {% endfor %}
 
+{% if scenario_sensitivity_markdown %}
+{{ scenario_sensitivity_markdown }}
+{% endif %}
+
 {{ report_disclaimer_line() }}
 
 *{{ report_timestamp }}*

@@ -18,8 +18,10 @@
 
 | 层 | 路径 |
 | --- | --- |
+| 预置 SSOT JSON | `src/agent/scenario_library_builtins.json`（Web 镜像 `scenarioLibraryBuiltins.json`） |
 | 目录与风险投影 | `src/agent/scenario_library.py` |
 | what-if 通道扩展 | `src/agent/what_if_scenario.py`（`sector_shock`、`scenario_id`、库附录） |
+| 报告挂载 | `report_renderer` + `report_*.j2` 的 `scenario_sensitivity_markdown` |
 | Web 情景库与保存 | `apps/dsa-web/src/components/chat/scenarioLibrary.ts` |
 | 面板 | `WhatIfScenarioPanel` / `ReportScenarioSensitivityPanel` |
 

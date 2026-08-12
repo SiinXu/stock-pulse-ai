@@ -71,6 +71,29 @@ When `scenario_id` is present, the prompt also injects the library risk-framing 
 
 `format_report_sensitivity_markdown()` renders an appendix section for reports or copy/export. The Web `ReportScenarioSensitivityPanel` shows the same framing in Chat when a library scenario is selected.
 
+### Jinja report wiring
+
+When `report_renderer.render(..., extra_context=...)` includes either:
+
+```json
+{ "report_sensitivity": { "scenario_id": "rate_hike_100bp" } }
+```
+
+or top-level `"scenario_id": "rate_hike_100bp"`, the renderer resolves a **hypothetical appendix** into `scenario_sensitivity_markdown` for `report_markdown.j2` / `report_brief.j2` / `report_wechat.j2`.
+
+- Absent request → baseline report unchanged.
+- Appendix is always marked `[HYPOTHETICAL SCENARIO]` and must not rewrite Decision Card / baseline conclusions.
+- Unknown ids yield no appendix (fail soft).
+
+### Catalog SSOT
+
+Built-in scenarios live in `src/agent/scenario_library_builtins.json`. The Web mirror `apps/dsa-web/src/components/chat/scenarioLibraryBuiltins.json` must stay **byte-identical** (`assert_builtin_catalog_sync`).
+
+### Custom scenarios
+
+- Web localStorage customs send **assumptions only** (no `scenario_id`) so the server never receives an unknown library id.
+- Server process-memory customs via `save_custom_scenario` remain available to Python callers only in this delivery.
+
 ## Custom scenarios
 
 - **Backend process memory**: `save_custom_scenario` / `delete_custom_scenario` (bounded, cannot overwrite built-ins).

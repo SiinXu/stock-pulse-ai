@@ -3,9 +3,24 @@
  * Issue #1136 reuses this channel for the report sensitivity scenario library.
  * Free-text assumptions are intentionally out of scope for v1.
  */
+import builtinsCatalog from './scenarioLibraryBuiltins.json';
+
 export const HYPOTHETICAL_ASSUMPTION_MARKER = '[HYPOTHETICAL ASSUMPTION]';
 export const HYPOTHETICAL_RESULT_MARKER = '[HYPOTHETICAL SCENARIO]';
 export const DEFAULT_WHAT_IF_MAX_TURNS = 5;
+
+function isServerKnownLibraryScenarioId(scenarioId: string): boolean {
+  const scenarios = Array.isArray(builtinsCatalog.scenarios) ? builtinsCatalog.scenarios : [];
+  return scenarios.some(
+    (item) => item && typeof item === 'object' && String((item as { id?: string }).id || '') === scenarioId,
+  );
+}
+
+function libraryCatalogVersion(): string {
+  return typeof builtinsCatalog.catalog_version === 'string' && builtinsCatalog.catalog_version
+    ? builtinsCatalog.catalog_version
+    : '1.0.0';
+}
 export type WhatIfDimension =
   | 'index_move'
   | 'fx_rate'
@@ -80,10 +95,11 @@ export function buildWhatIfContextPayload(draft: WhatIfDraftState): WhatIfScenar
     max_turns: DEFAULT_WHAT_IF_MAX_TURNS,
     assumptions: [assumption],
   };
-  if (draft.scenarioId) {
+  // Only built-in library ids are server-known. Custom localStorage scenarios
+  // reuse the what-if assumptions channel without a scenario_id (Issue #1136).
+  if (draft.scenarioId && isServerKnownLibraryScenarioId(draft.scenarioId)) {
     payload.scenario_id = draft.scenarioId;
-    // Catalog version is filled by the scenario library helper when present.
-    payload.catalog_version = '1.0.0';
+    payload.catalog_version = libraryCatalogVersion();
   }
   return payload;
 }

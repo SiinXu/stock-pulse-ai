@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from src.agent.scenario_library import (
     SCENARIO_LIBRARY_VERSION,
+    append_report_sensitivity_section,
+    assert_builtin_catalog_sync,
     assert_soul_intact_under_scenarios,
     clear_custom_scenarios,
     delete_custom_scenario,
@@ -18,6 +20,7 @@ from src.agent.scenario_library import (
     list_scenarios,
     normalize_custom_scenario,
     project_report_sensitivity,
+    resolve_report_sensitivity_section,
     save_custom_scenario,
     scenario_to_what_if_payload,
 )
@@ -28,6 +31,7 @@ from src.agent.what_if_scenario import (
     build_what_if_prompt_section_from_context,
     parse_what_if_from_context,
 )
+# HYPOTHETICAL_RESULT_MARKER used by report-section tests below.
 
 
 def setup_function():
@@ -184,3 +188,39 @@ def test_cannot_overwrite_builtin_id():
         assert False, "expected ValueError"
     except ValueError as exc:
         assert "built-in" in str(exc).lower() or "overwrite" in str(exc).lower()
+
+
+def test_builtin_catalog_web_mirror_is_byte_identical():
+    assert_builtin_catalog_sync()
+
+
+def test_resolve_report_sensitivity_section_for_renderer():
+    section = resolve_report_sensitivity_section(
+        {"report_sensitivity": {"scenario_id": "market_down_10"}},
+        report_language="en",
+    )
+    assert section is not None
+    assert section["hypothetical"] is True
+    assert section["mix_with_baseline_conclusions"] is False
+    assert HYPOTHETICAL_RESULT_MARKER in section["markdown"]
+    assert "market_down_10" in section["markdown"]
+    assert resolve_report_sensitivity_section({}, report_language="zh") is None
+    assert resolve_report_sensitivity_section(
+        {"report_sensitivity": {"scenario_id": "not_a_real_scenario"}},
+        report_language="en",
+    ) is None
+
+
+def test_append_report_sensitivity_keeps_baseline_body():
+    baseline = "# Baseline report\n\nHold thesis remains intact.\n"
+    section = resolve_report_sensitivity_section(
+        {"scenario_id": "rate_hike_100bp"},
+        report_language="en",
+    )
+    assert section is not None
+    combined = append_report_sensitivity_section(baseline, section["markdown"])
+    assert combined.startswith("# Baseline report")
+    assert HYPOTHETICAL_RESULT_MARKER in combined
+    # Idempotent when appendix already present.
+    again = append_report_sensitivity_section(combined, section["markdown"])
+    assert again == combined
