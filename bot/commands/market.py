@@ -197,6 +197,7 @@ class MarketCommand(BotCommand):
             else:
                 logger.warning("[MarketCommand] Market review returned an empty result")
         except Exception as exc:
+            # broad-exception: fallback_recorded - bot command logs the terminal failure.
             log_safe_exception(
                 logger,
                 "[MarketCommand] Market review failed",
