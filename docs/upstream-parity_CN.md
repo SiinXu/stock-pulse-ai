@@ -1,18 +1,21 @@
 # 上游一致性检查（Upstream Parity）
 
 - 状态：`Living`
-- 最近核对：2026-08-05
-- 范围：`ZhuLinsen/daily_stock_analysis` 漂移报告、白名单语义与分诊流程
+- 最近核对：2026-08-12
+- 范围：`ZhuLinsen/daily_stock_analysis` 漂移报告、白名单语义、分诊流程与维护节奏
 
 StockPulse **手动**移植上游 foundation 修复，不会自动 merge 或同步上游。本文说明每周运行的一致性检查如何报告漂移，以便维护者有计划地分诊移植。
 
 英文版：[upstream-parity.md](upstream-parity.md)。
 
 相关策略：[Foundation Pipeline 与 Product Layer](foundation-product-architecture.md#upstream-porting-policy)。
+节奏责任 Issue：[#1061](https://github.com/SiinXu/stock-pulse-ai/issues/1061)。
+机器跟踪 Issue：[#1002](https://github.com/SiinXu/stock-pulse-ai/issues/1002)。
 
 ## 检查器做什么
 
 脚本：`scripts/check_upstream_parity.py`  
+盘点脚本（路径存在性 + 建议动作）：`scripts/inventory_upstream_drift.py`
 白名单：`scripts/upstream_parity_whitelist.json`  
 工作流：`.github/workflows/upstream-parity.yml`
 
@@ -24,6 +27,8 @@ StockPulse **手动**移植上游 foundation 修复，不会自动 merge 或同�
 4. 按变更路径对照白名单分类。
 5. 交叉引用本地 `Ported-from:` trailer，标记已移植提交。
 6. 上传 Markdown 报告产物，并**原地更新唯一**跟踪 Issue。
+
+机器报告刷新后，维护者应运行**盘点脚本**，把 Attention 提交转为可执行差距清单（本地路径存在性，以及 Port / Design / Record-trailer / Skip-docs 建议）。路径存在性只是启发式，不等于语义等价。
 
 离线 CI 门禁**不会**拉取上游。请使用 `--self-test` 做夹具回归；需要实时报告时再在有网络与 remote 的环境运行脚本。
 
@@ -60,32 +65,65 @@ Ported-from: ZhuLinsen/daily_stock_analysis@<sha>
 
 ## 分诊流程
 
-1. 打开标签为 `upstream-parity` 的跟踪 Issue（标题：`Upstream parity drift report`），或下载工作流产物 `upstream-parity-report-*.md`。
-2. 优先处理 **Attention** 提交。对每个候选：
-   - 确认是否适合 foundation 兼容移植（见上游移植策略）。
-   - 在聚焦的 StockPulse PR 中移植，并适配当前契约与许可证。
-   - 在提交中写入 `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`。
-3. **Informational** 提交可保持不移植，除非路径后来进入共享代码。
-4. 移植后本地复跑：
+1. 打开标签为 `upstream-parity` 的跟踪 Issue（标题：`Upstream parity drift report`，当前为 #1002），或下载工作流产物 `upstream-parity-report-*.md`。
+2. 生成维护者盘点报告（路径存在性 + 建议动作）：
+
+```bash
+python scripts/inventory_upstream_drift.py \
+  --local-ref origin/main \
+  --upstream-ref upstream/main \
+  --output /tmp/upstream-drift-inventory.md
+```
+
+3. 优先处理 **Attention** 提交。对每个候选，按 #1061 分类：
+   - **Port now** — foundation 修复；小而可测的 PR，提交含 `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`
+   - **DESIGN-NEEDED** — 与本地 Agent/策略/报告契约纠缠；先开设计 Issue 再写代码（示例：#805 multi-strategy 集群）
+   - **Record trailer** — 本仓已以 fork-native 布局吸收意图；语义 spot-check 后补 `Ported-from`，使 #1002 不再标为 Attention
+   - **Skip / whitelist** — 仅产品面、docs/changelog 或治理路径，StockPulse 明确不镜像；扩展白名单须审慎
+4. **禁止半移植** 跨 orchestrator/pipeline/报告 schema 的纠缠集群（无设计说明不得拆文件拷贝）。
+5. 对真实残留差距**开子 Issue 或更新既有 Issue**；不要只把差距留在周报正文里。
+6. **Informational** 提交可保持不移植，除非路径后来进入共享代码。
+7. 移植后本地复跑：
 
 ```bash
 python scripts/check_upstream_parity.py --self-test
+python scripts/inventory_upstream_drift.py --self-test
 python scripts/check_upstream_parity.py --fetch \
   --local-ref origin/main \
   --upstream-ref upstream/main \
   --output /tmp/upstream-parity-report.md
+python scripts/inventory_upstream_drift.py \
+  --local-ref origin/main \
+  --upstream-ref upstream/main \
+  --output /tmp/upstream-drift-inventory.md
 ```
 
-5. 不要另开跟踪 Issue。工作流只更新带 `upstream-parity` 标签且含 HTML 标记 `<!-- upstream-parity-tracking-issue -->` 的那一个开放 Issue；重复项会被自动关闭。
+8. 不要另开**机器跟踪** Issue。工作流只更新带 `upstream-parity` 标签且含 HTML 标记 `<!-- upstream-parity-tracking-issue -->` 的那一个开放 Issue；重复项会被自动关闭。Port/Design 子 Issue 是预期产物，应引用 #1002 / #1061。
+
+## 治理节奏（谁 / 何时）
+
+| 节奏 | 责任人 | 动作 |
+| --- | --- | --- |
+| 每周一 04:00 UTC（或 `workflow_dispatch`） | GitHub Actions `upstream-parity` | 刷新 #1002 分类与产物 |
+| 每次刷新后数日内 | 维护者 / #1061 节奏负责人 | 跑 `inventory_upstream_drift.py`，分诊 Attention，开/更新子 Issue |
+| 每个 port PR 合入后 | Port 作者 | 确认 `Ported-from` trailer；复跑盘点使 Attention 收敛 |
+| 白名单变更 | 维护者产品决策 | 同步 JSON + 本文（中英）+ changelog |
+
+**盘点报告消费者：** #1002 分诊评论、#1061 checklist 负责人、规划下一波 port 的作者。
 
 ## 本地命令
 
 ```bash
 python scripts/check_upstream_parity.py --self-test
-python -m pytest tests/scripts/test_upstream_parity.py -q
+python scripts/inventory_upstream_drift.py --self-test
+python -m pytest tests/scripts/test_upstream_parity.py tests/scripts/test_inventory_upstream_drift.py -q
 python scripts/check_upstream_parity.py --fetch \
   --local-ref origin/main \
   --upstream-ref upstream/main
+python scripts/inventory_upstream_drift.py --fetch \
+  --local-ref origin/main \
+  --upstream-ref upstream/main \
+  --output /tmp/upstream-drift-inventory.md
 ```
 
 ## 工作流说明
@@ -97,4 +135,4 @@ python scripts/check_upstream_parity.py --fetch \
 
 ## 文档维护
 
-白名单语义、trailer 格式或分诊流程变更时，请同步更新本文与 `upstream-parity.md`。移植策略本身变更时，更新 `foundation-product-architecture.md`。
+白名单语义、trailer 格式、分诊流程或治理节奏变更时，请同步更新本文与 `upstream-parity.md`。移植策略本身变更时，更新 `foundation-product-architecture.md`。
