@@ -167,18 +167,12 @@ export function ChatThinkingDetails({
                   aria-hidden="true"
                 />
               </summary>
-              <div
-                className="ml-6 mt-1.5 space-y-1 border-l border-border/50 pl-3 pb-1 text-xs text-muted-text"
+              <pre
+                className="ml-6 mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap break-words border-l border-border/50 pl-3 pb-1 text-xs text-secondary-text"
                 data-testid="chat-stage-detail"
               >
-                {stageDetail.stage !== undefined ? <code>stage: {stageDetail.stage}</code> : null}
-                {stageDetail.status !== undefined ? <div><code>status: {stageDetail.status}</code></div> : null}
-                {stageDetail.duration !== undefined ? <div><code>duration: {stageDetail.duration}s</code></div> : null}
-                {stageDetail.reason !== undefined ? <div><code>reason: {stageDetail.reason}</code></div> : null}
-                {stageDetail.timeout !== undefined ? <div><code>timeout: {stageDetail.timeout}</code></div> : null}
-                {stageDetail.remaining !== undefined ? <div><code>remaining: {stageDetail.remaining}</code></div> : null}
-                {stageDetail.minimum !== undefined ? <div><code>minimum: {stageDetail.minimum}</code></div> : null}
-              </div>
+                {JSON.stringify(stageDetail, null, 2)}
+              </pre>
             </details>
           );
         }

@@ -94,7 +94,9 @@ const TimelineRow: React.FC<{
       ) : null}
       <span className="text-xs text-muted-text">{formatDateTime(item.timestamp, language, t)}</span>
       {item.step !== null ? (
-        <span className="font-mono text-xs text-muted-text">step={item.step}</span>
+        <Badge variant="default" className="font-mono text-muted-text">
+          {item.step}
+        </Badge>
       ) : null}
     </div>
   );

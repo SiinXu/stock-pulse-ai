@@ -54,9 +54,9 @@ describe('ChatThinkingDetails', () => {
     expect(screen.getByTestId('chat-stage-detail')).not.toBeVisible();
     fireEvent.click(detailToggle);
     expect(screen.getByTestId('chat-stage-detail')).toBeVisible();
-    expect(screen.getByText(/stage: agent_loop/)).toBeVisible();
-    expect(screen.getByText(/status: completed/)).toBeVisible();
-    expect(screen.getByText(/reason: budget_guard/)).toBeVisible();
+    expect(screen.getByTestId('chat-stage-detail')).toHaveTextContent('"stage": "agent_loop"');
+    expect(screen.getByTestId('chat-stage-detail')).toHaveTextContent('"status": "completed"');
+    expect(screen.getByTestId('chat-stage-detail')).toHaveTextContent('"reason": "budget_guard"');
   });
 
 });
