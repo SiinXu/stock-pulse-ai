@@ -501,6 +501,8 @@ stock-pulse-ai/
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据。可在 Web 设置 → 系统与安全 → 系统设置中编辑；运营预览使用同一公开路由，关闭时返回 404 | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | 计分卡中低于该“已判定”样本数（命中+偏离）的分桶返回 `insufficient_data` 而非比率 | `10` |
+| `RESEARCH_API_ENABLED` | 可选鉴权只读研究 API（`GET /api/v1/research/conclusions*`），按 brief/standard/research 暴露分层结论及 as-of、置信度、证据计数；默认关闭。仅挂主 API 端口（会话鉴权、安全审计、滑动窗口限流）。详见 [research-api.md](research-api.md) | `false` |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | 研究 API 启用时的每主体滑动窗口限流（与 MCP 同一治理模式） | `60` |
 | `DAILY_BRIEF_ENABLED` | 可选每日简报（历史准确率复盘：决策信号 outcome / 回测汇总 / 技能观点表现）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | 本地 `HH:MM`，开启后在该时刻之后可触发（每个本地自然日最多一次） | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | 日程与「昨天」映射使用的 IANA 时区 | `Asia/Shanghai` |

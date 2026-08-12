@@ -130,6 +130,14 @@ def test_invalid_record_id() -> None:
         service.get_conclusion_by_record_id(0)
 
 
+def test_project_missing_record_id_is_not_found() -> None:
+    service = ResearchApiService(history_service=object())
+    broken = _record_with_strata()
+    broken["id"] = None
+    with pytest.raises(ResearchApiNotFoundError):
+        service.project_conclusion(broken, mode="standard")
+
+
 def test_latest_for_stock_uses_list_then_detail() -> None:
     class _Hist:
         def get_history_list(self, **kwargs):

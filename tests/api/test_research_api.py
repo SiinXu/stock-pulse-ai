@@ -6,12 +6,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from api import deps as api_deps
+from api.middlewares.auth import add_auth_middleware
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import research as endpoint
 from src.services.research_api_service import (
@@ -191,3 +192,45 @@ def test_router_exposes_only_get_methods() -> None:
     assert "PUT" not in flattened
     assert "DELETE" not in flattened
     assert "PATCH" not in flattened
+
+
+def test_auth_middleware_requires_session_when_enabled() -> None:
+    """Research routes sit behind AuthMiddleware when ADMIN_AUTH is on."""
+    from src.auth import COOKIE_NAME
+
+    endpoint.reset_research_rate_limiter_for_tests()
+    service = MagicMock(spec=ResearchApiService)
+    service.get_conclusion_by_record_id.return_value = _sample_payload()
+
+    app = FastAPI()
+    add_auth_middleware(app)
+    app.include_router(endpoint.router, prefix="/api/v1/research")
+    add_error_handlers(app)
+    app.dependency_overrides[api_deps.get_config_dep] = lambda: SimpleNamespace(
+        research_api_enabled=True,
+        research_api_rate_limit_per_minute=60,
+    )
+    app.dependency_overrides[api_deps.require_security_audit_service] = (
+        lambda: SecurityAuditRecorderStub()
+    )
+    app.dependency_overrides[endpoint._get_research_service] = lambda: service
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=True), patch(
+        "api.middlewares.auth.verify_session", return_value=False
+    ):
+        client = TestClient(app)
+        denied = client.get("/api/v1/research/conclusions/7")
+        assert denied.status_code == 401
+        assert denied.json()["error"] == "unauthorized"
+        service.get_conclusion_by_record_id.assert_not_called()
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=True), patch(
+        "api.middlewares.auth.verify_session", return_value=True
+    ):
+        client = TestClient(app)
+        ok = client.get(
+            "/api/v1/research/conclusions/7",
+            cookies={COOKIE_NAME: "valid-session-token"},
+        )
+        assert ok.status_code == 200
+        service.get_conclusion_by_record_id.assert_called()

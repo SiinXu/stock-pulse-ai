@@ -16,7 +16,6 @@ from src.services.report_mode import (
     REPORT_MODE_BRIEF,
     REPORT_MODE_RESEARCH,
     REPORT_MODE_STANDARD,
-    VALID_REPORT_MODES,
     apply_list_limits_to_dashboard_view,
     get_mode_limits,
     normalize_report_mode,
@@ -38,6 +37,17 @@ def _as_mapping(value: Any) -> Dict[str, Any]:
     if isinstance(value, Mapping):
         return dict(value)
     return {}
+
+
+def _require_positive_record_id(value: Any) -> int:
+    """Return a positive history primary key or raise not-found."""
+    try:
+        record_id = int(value)
+    except (TypeError, ValueError):
+        raise ResearchApiNotFoundError("Analysis record id is missing or invalid") from None
+    if record_id < 1:
+        raise ResearchApiNotFoundError("Analysis record id is missing or invalid")
+    return record_id
 
 
 def _clean_text(value: Any, *, max_chars: int | None = None) -> Optional[str]:
@@ -227,10 +237,6 @@ class ResearchApiService:
         if not isinstance(record_id, int) or record_id < 1:
             raise ResearchApiValidationError("record_id must be a positive integer")
         report_mode = normalize_report_mode(mode, default=REPORT_MODE_STANDARD)
-        if report_mode not in VALID_REPORT_MODES:
-            raise ResearchApiValidationError(
-                f"mode must be one of: {', '.join(sorted(VALID_REPORT_MODES))}"
-            )
 
         record = self.history_service().get_history_detail_by_id(int(record_id))
         if not record:
@@ -258,11 +264,16 @@ class ResearchApiService:
         if not isinstance(items, list) or not items:
             raise ResearchApiNotFoundError(f"No analysis history for stock_code={code}")
         first = items[0]
-        record_id = first.get("id") if isinstance(first, Mapping) else None
-        if record_id is None:
+        if not isinstance(first, Mapping):
             raise ResearchApiNotFoundError(f"No analysis history for stock_code={code}")
+        try:
+            record_id = _require_positive_record_id(first.get("id"))
+        except ResearchApiNotFoundError as exc:
+            raise ResearchApiNotFoundError(
+                f"No analysis history for stock_code={code}"
+            ) from exc
         return self.get_conclusion_by_record_id(
-            int(record_id),
+            record_id,
             mode=report_mode,
             language=language,
         )
@@ -382,11 +393,12 @@ class ResearchApiService:
             conclusion["analysis_summary"] = _clean_text(record.get("analysis_summary"))
             conclusion["trend_prediction"] = _clean_text(record.get("trend_prediction"))
 
+        record_id = _require_positive_record_id(record.get("id"))
         return {
             "schema_version": RESEARCH_CONCLUSION_SCHEMA_VERSION,
             "mode": report_mode,
             "metadata": {
-                "record_id": int(record.get("id") or 0),
+                "record_id": record_id,
                 "query_id": _clean_text(record.get("query_id")),
                 "stock_code": _clean_text(record.get("stock_code")) or "",
                 "stock_name": _clean_text(record.get("stock_name")),
