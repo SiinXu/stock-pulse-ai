@@ -21,6 +21,7 @@ from src.analyzer import (
     stabilize_decision_with_structure,
 )
 from src.config import FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
+from src.core.contracts import AnalyzeStageOutput
 from src.core.pipeline_stage_results import (
     PipelineStageName,
     PipelineStageResult,
@@ -588,9 +589,8 @@ class _AgentAnalysisStageMixin:
                                 context={"stock_code": code},
                             )
 
-            agent_analysis_succeeded = bool(
-                result and getattr(result, "success", True)
-            )
+            analyze_output = AnalyzeStageOutput.from_result(result)
+            agent_analysis_succeeded = analyze_output.analysis_success
             agent_analysis_reason = (
                 getattr(result, "error_message", None)
                 if result is not None and not agent_analysis_succeeded
@@ -601,11 +601,14 @@ class _AgentAnalysisStageMixin:
                 )
             )
             analysis_stage_result = (
-                PipelineStageResult.success(PipelineStageName.ANALYZE, result)
+                PipelineStageResult.success(
+                    PipelineStageName.ANALYZE,
+                    analyze_output.as_legacy_value(),
+                )
                 if agent_analysis_succeeded
                 else PipelineStageResult.failed(
                     PipelineStageName.ANALYZE,
-                    value=result,
+                    value=analyze_output.as_legacy_value(),
                     retryable=True,
                     reason=agent_analysis_reason,
                 )
@@ -613,11 +616,7 @@ class _AgentAnalysisStageMixin:
             self._finish_pipeline_stage(
                 active_stage,
                 analysis_stage_result,
-                output_summary={
-                    "analysis_result_available": result is not None,
-                    "analysis_success": agent_analysis_succeeded,
-                    "model": getattr(result, "model_used", None) if result else None,
-                },
+                output_summary=analyze_output.to_output_summary(),
             )
             active_stage = None
 

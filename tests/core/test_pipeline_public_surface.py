@@ -11,20 +11,22 @@ ensure_litellm_stub()
 
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
-    AnalysisContextBuilder AnalysisRequestContext AnalysisResult Any Callable
-    ChipDistribution Config ContextVar DailyMarketContext
-    DailyMarketContextService DataFetcherManager Dict ExitStack
-    FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT GeminiAnalyzer
-    IntelligenceService List MARKET_PHASE_SUMMARY_KEY MarketHotspotService
-    MarketStructureService NotificationChannel NotificationService Optional
-    PIPELINE_STAGE_NAMES PipelineAnalysisArtifacts PipelinePersistValue
-    PipelineStageName PipelineStageObservation PipelineStageResult
-    PipelineStageRunner PipelineStageStatus ReportType SearchService
-    SimpleNamespace SocialSentimentService StockAnalysisPipeline
+    AnalysisContextBuilder AnalysisRequestContext AnalyzeStageInput
+    AnalyzeStageOutput AnalysisResult Any Callable ChipDistribution Config
+    ContextVar DailyMarketContext DailyMarketContextService DataFetcherManager
+    Dict ExitStack FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT FetchDailyDataOutput
+    FetchMarketInputsOutput FetchStageInput GeminiAnalyzer IntelligenceService
+    List MARKET_PHASE_SUMMARY_KEY MarketHotspotService MarketStructureService
+    NotificationChannel NotificationService Optional PIPELINE_STAGE_NAMES
+    PipelineAnalysisArtifacts PipelinePersistValue PipelineStageName
+    PipelineStageObservation PipelineStageResult PipelineStageRunner
+    PipelineStageStatus RenderStageInput RenderStageOutput ReportType RunContext
+    SearchService SimpleNamespace SocialSentimentService StageDegradedError
+    StageError StageFailedError StageSkippedError StockAnalysisPipeline
     StockTrendAnalyzer ThreadPoolExecutor TrendAnalysisResult Tuple
     activate_run_diagnostic_context apply_daily_market_context_guardrail
     apply_phase_decision_guardrails as_completed build_market_phase_context
-    current_diagnostic_snapshot date datetime defaultdict
+    build_run_context current_diagnostic_snapshot date datetime defaultdict
     extract_and_persist_from_analysis_result fill_price_position_if_needed
     format_analysis_context_pack_prompt_section
     format_daily_market_context_prompt_section get_config
@@ -40,8 +42,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     record_notification_run record_pipeline_stage
     render_analysis_context_pack_overview render_market_phase_summary
     reset_run_diagnostic_context sanitize_diagnostic_text
-    stabilize_decision_with_structure summarize_decision_signal threading time
-    timedelta timezone uuid
+    stage_result_from_error stabilize_decision_with_structure
+    summarize_decision_signal threading time timedelta timezone uuid
     """.split()
 )
 
