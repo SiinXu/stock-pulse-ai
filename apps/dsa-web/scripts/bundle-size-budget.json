@@ -33,9 +33,9 @@
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 147131,
-      "measuredGzipBytes": 146531,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 147840,
+      "measuredGzipBytes": 147240,
+      "note": "Remeasured after professional backtest methodology disclaimer + commission/slippage field titles (PR #1277 / Refs #211 #242 #133); measured gzip + 600 B headroom."
     },
     {
       "id": "locale-ko",
@@ -47,9 +47,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 147384,
-      "measuredGzipBytes": 146784,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "maxGzipBytes": 147899,
+      "measuredGzipBytes": 147299,
+      "note": "Remeasured after professional backtest methodology strings (PR #1277 / Refs #211 #242 #133); measured gzip + 600 B headroom (was within 85 B of the prior ceiling)."
     },
     {
       "id": "locale-es",
