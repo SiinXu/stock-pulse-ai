@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale/IntelligenceSourcesPanel budgets include PERF_* field-title i18n headroom (Refs #227 / PR #1211) on top of concurrent main settings help growth; failed artifacts use measured gzip + documented headroom.",
+  "baselineNote": "Locale/IntelligenceSourcesPanel budgets include observed-event Daily Brief and Event Research settings help on concurrent main (Refs #149 / #1131); failed artifacts use measured gzip + documented headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 239062,
-      "measuredGzipBytes": 238662,
-      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 238662 B + 400 B headroom."
+      "maxGzipBytes": 239605,
+      "measuredGzipBytes": 239205,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured 239205 B + 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 155316,
-      "measuredGzipBytes": 154616,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 156261,
+      "measuredGzipBytes": 155561,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 148660,
-      "measuredGzipBytes": 147960,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 149582,
+      "measuredGzipBytes": 148882,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 148539,
-      "measuredGzipBytes": 147839,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 149416,
+      "measuredGzipBytes": 148716,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 148659,
-      "measuredGzipBytes": 148259,
-      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 148259 B + 400 B headroom."
+      "maxGzipBytes": 149473,
+      "measuredGzipBytes": 148773,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 144564,
-      "measuredGzipBytes": 143864,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 145395,
+      "measuredGzipBytes": 144695,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 141061,
-      "measuredGzipBytes": 140361,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 141921,
+      "measuredGzipBytes": 141221,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 134565,
-      "measuredGzipBytes": 133865,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 135435,
+      "measuredGzipBytes": 134735,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 134702,
-      "measuredGzipBytes": 134002,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 135522,
+      "measuredGzipBytes": 134822,
+      "note": "Local production build after observed-event Settings help on concurrent main (Refs #149 / #1131); measured gzip + 700 B headroom."
     },
     {
       "id": "vendor-charts",

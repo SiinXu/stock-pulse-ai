@@ -189,7 +189,7 @@ def build_event_research_brief_scheduler_background_tasks(
             build_event_research_brief_background_tasks,
         )
         return build_event_research_brief_background_tasks(config, config_provider=config_provider)
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - optional task does not block scheduler
         log_safe_exception(
             logger, "Event research brief background task initialization failed", exc,
             error_code="event_research_brief_background_task_init_failed", level=logging.WARNING,
@@ -467,6 +467,49 @@ class RuntimeSchedulerService:
             from src.services.daily_brief_service import DAILY_BRIEF_POLL_INTERVAL_SECONDS
 
             interval_seconds = int(DAILY_BRIEF_POLL_INTERVAL_SECONDS)
+
+        run_immediately = (
+            bool(cached.get("run_immediately", False))
+            and name not in self._background_task_registered_names
+        )
+        self._background_task_registered_names.add(name)
+        return [{
+            "task": cached["task"],
+            "interval_seconds": interval_seconds,
+            "run_immediately": run_immediately,
+            "name": name,
+        }]
+
+    def _current_event_research_brief_background_tasks(
+        self,
+        config: Config,
+    ) -> List[Dict[str, Any]]:
+        name = "event_research_brief"
+        if not getattr(config, "event_research_brief_enabled", False):
+            self._background_task_cache.pop(name, None)
+            self._background_task_registered_names.discard(name)
+            return []
+
+        cached = self._background_task_cache.get(name)
+        if cached is None:
+            entries = build_event_research_brief_scheduler_background_tasks(
+                config,
+                config_provider=self._reload_config,
+            )
+            if not entries:
+                self._background_task_cache.pop(name, None)
+                self._background_task_registered_names.discard(name)
+                return []
+            cached = dict(entries[0])
+            cached["name"] = name
+            self._background_task_cache[name] = cached
+            interval_seconds = int(cached["interval_seconds"])
+        else:
+            from src.services.event_research_brief_service import (
+                EVENT_RESEARCH_BRIEF_POLL_INTERVAL_SECONDS,
+            )
+
+            interval_seconds = int(EVENT_RESEARCH_BRIEF_POLL_INTERVAL_SECONDS)
 
         run_immediately = (
             bool(cached.get("run_immediately", False))

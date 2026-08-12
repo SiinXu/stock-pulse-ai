@@ -433,7 +433,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | Scorecard buckets below this decided sample (hit+miss) render as `insufficient_data` instead of a rate | `10` |
-| `DAILY_BRIEF_ENABLED` | Opt-in personal morning brief (holdings, overnight highlights, earnings event foresight, yesterday analyses, watchlist, accuracy review). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
+| `DAILY_BRIEF_ENABLED` | Opt-in personal morning brief (holdings, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, accuracy review). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | Local `HH:MM` after which the enabled brief may fire (at most once per local day) | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | IANA timezone for schedule and “yesterday” mapping | `Asia/Shanghai` |
 | `DAILY_BRIEF_MIN_SAMPLES` | Minimum completed samples before publishing an accuracy percentage; below this the brief states insufficient history | `10` |

@@ -501,7 +501,7 @@ stock-pulse-ai/
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据。可在 Web 设置 → 系统与安全 → 系统设置中编辑；运营预览使用同一公开路由，关闭时返回 404 | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | 计分卡中低于该“已判定”样本数（命中+偏离）的分桶返回 `insufficient_data` 而非比率 | `10` |
-| `DAILY_BRIEF_ENABLED` | 可选个人晨报（持仓 / 隔夜要点 / 财报事件前瞻 / 昨日分析 / 自选 / 历史准确率复盘）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
+| `DAILY_BRIEF_ENABLED` | 可选个人晨报（持仓 / 隔夜要点 / 近期财报事件上下文 / 昨日分析 / 自选 / 历史准确率复盘）。默认关闭。详见 [daily-brief.md](daily-brief.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | 本地 `HH:MM`，开启后在该时刻之后可触发（每个本地自然日最多一次） | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | 日程与「昨天」映射使用的 IANA 时区 | `Asia/Shanghai` |
 | `DAILY_BRIEF_MIN_SAMPLES` | 发布准确率百分比前的最小完成样本；不足时简报明确写出样本不足 | `10` |

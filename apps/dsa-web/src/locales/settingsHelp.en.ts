@@ -1922,18 +1922,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.system.daily_brief': {
     title: 'Daily Brief',
-    summary: 'Scheduled personal morning brief: holdings, overnight highlights, earnings foresight, yesterday analyses, watchlist, and historical accuracy review.',
+    summary: 'Scheduled personal morning brief: portfolio membership, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, and historical accuracy review.',
     usage: 'DAILY_BRIEF_ENABLED turns the feature on. SCHEDULE_TIME/TIMEZONE control timing. MIN_SAMPLES gates accuracy stats. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. QUIET_WHEN_EMPTY skips notify without material content.',
     valueNotes: ['Default off.', 'Accuracy is informational.', 'Quiet mode still generates and may persist.'],
-    impact: ['Affects scheduled brief generation, push, and history.'],
+    impact: ['Affects scheduled brief generation, shared report-route notification, history, and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
   },
   'settings.system.event_research_brief': {
     title: 'Event Research Brief',
-    summary: 'Optional standalone earnings event research briefs with metrics, surprise criteria, and post-event checklist.',
-    usage: 'EVENT_RESEARCH_BRIEF_ENABLED turns standalone scheduler on. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. LOOKBACK_HOURS and CATEGORIES bound the scan (day one: earnings). Daily brief also embeds foresight when events exist.',
+    summary: 'Optional standalone review of observed earnings-event triggers with metrics, surprise criteria, and a post-event checklist.',
+    usage: 'EVENT_RESEARCH_BRIEF_ENABLED turns the standalone scheduler on. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. LOOKBACK_HOURS and CATEGORIES bound recent managed triggers (day one: earnings). The daily brief embeds recent event context; this is not a future-event catalog.',
     valueNotes: ['Default off.', 'Managed corporate-event triggers only.', 'Consensus figures are never fabricated.'],
-    impact: ['Affects event foresight notifications and optional history rows.'],
+    impact: ['Affects recent event-context notifications and optional history rows.'],
     notes: ['Requires schedule mode for the standalone path.'],
   },
   'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {

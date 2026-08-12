@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from src.services.daily_brief_service import (
     DAILY_BRIEF_HISTORY_CODE,
     DAILY_BRIEF_REPORT_TYPE,
+    MAX_DAILY_BRIEF_MARKDOWN_CHARS,
     DailyBriefService,
     resolve_daily_brief_config,
 )
@@ -109,6 +110,10 @@ class _Notifier:
     def send(self, content: str, email_send_to_all: bool = False, route_type: str = "report") -> bool:
         self.sent.append(content)
         return True
+
+    def send_with_results(self, content: str, **_kwargs: Any) -> SimpleNamespace:
+        self.sent.append(content)
+        return SimpleNamespace(status="sent", success=True)
 
 
 
@@ -325,7 +330,7 @@ def test_run_skips_when_disabled_and_notify_failure_does_not_abort():
     def _boom(*_a, **_k):
         raise RuntimeError("channel down")
 
-    notifier.send = _boom  # type: ignore[method-assign]
+    notifier.send_with_results = _boom  # type: ignore[method-assign]
     enabled = _base_config(
         daily_brief_enabled=True,
         daily_brief_notify=True,
@@ -432,3 +437,130 @@ def test_personal_sections_and_quiet_mode():
     assert result.notification_status=="quiet_skipped"
     assert notifier.sent==[]
 
+
+def test_portfolio_membership_never_compares_cross_currency_values():
+    rows = [
+        {
+            "symbol": "MSFT",
+            "market": "us",
+            "market_value_base": 1_000_000,
+            "valuation_currency": "USD",
+            "quantity": float("nan"),
+            "account_id": 1,
+        },
+        {
+            "symbol": "AAPL",
+            "market": "us",
+            "market_value_base": float("inf"),
+            "valuation_currency": "HKD",
+            "quantity": 2,
+            "account_id": 2,
+        },
+        {
+            "symbol": "AAPL",
+            "market": "us",
+            "market_value_base": 3,
+            "valuation_currency": "USD",
+            "quantity": 4,
+            "account_id": 3,
+        },
+    ]
+    service = DailyBriefService(
+        portfolio_repository=SimpleNamespace(
+            list_cached_positions=lambda **_kwargs: rows
+        )
+    )
+
+    portfolio = service._build_portfolio_section()
+
+    assert portfolio["holdings"] == [
+        {"code": "AAPL", "market": "us"},
+        {"code": "MSFT", "market": "us"},
+    ]
+    assert all("market_value_base" not in row for row in portfolio["holdings"])
+    assert all("quantity" not in row and "account_id" not in row for row in portfolio["holdings"])
+
+
+def test_non_finite_accuracy_values_are_withheld_fail_closed():
+    outcomes = [
+        _FakeOutcome(signal_id=1, outcome="hit", stock_return_pct=float("nan")),
+        _FakeOutcome(signal_id=2, outcome="miss", stock_return_pct=float("inf")),
+    ]
+    config = _base_config(daily_brief_min_samples=2)
+    service = DailyBriefService(
+        **_empty_personal_deps(),
+        analysis_repo=SimpleNamespace(get_list=lambda **_kwargs: []),
+        decision_outcome_service=_OutcomeService(outcomes),
+        decision_signal_repo=SimpleNamespace(get=lambda _id: None),
+        backtest_service=SimpleNamespace(
+            get_summary=lambda **_kwargs: {
+                "completed_count": 10,
+                "direction_accuracy_pct": float("nan"),
+                "win_rate_pct": 55,
+            }
+        ),
+        skill_performance_service=SimpleNamespace(
+            get_stats=lambda: {
+                "buckets": [
+                    {
+                        "skill_id": "bad",
+                        "horizon": "5d",
+                        "evaluated": 20,
+                        "hit_rate_pct": float("inf"),
+                        "miss_rate_pct": 20,
+                        "sample_sufficient": True,
+                    }
+                ]
+            }
+        ),
+        config_provider=lambda: config,
+        clock=_fixed_clock(),
+    )
+
+    accuracy = service._build_accuracy_section(min_samples=2)
+
+    assert accuracy["decision_signals"]["hit_rate_pct"] == 50.0
+    assert accuracy["decision_signals"]["avg_return_pct"] is None
+    assert all(
+        item["return_pct"] is None
+        for item in accuracy["decision_signals"]["notable_hits"]
+        + accuracy["decision_signals"]["notable_misses"]
+    )
+    assert accuracy["backtest"]["status"] == "unavailable"
+    assert accuracy["skill_outcomes"]["status"] == "unavailable"
+    markdown = service.render_markdown(service.build_payload(config=config)).lower()
+    assert "nan%" not in markdown
+    assert "inf%" not in markdown
+
+
+def test_partial_notification_succeeds_without_hiding_channel_failure():
+    notifier = _Notifier()
+    notifier.send_with_results = lambda *_args, **_kwargs: SimpleNamespace(
+        status="partial_failed", success=True
+    )
+    service = DailyBriefService(notifier=notifier)
+
+    assert service._send_notification("brief") == ("degraded", True)
+
+
+def test_daily_markdown_obeys_length_budget():
+    service = DailyBriefService()
+    payload = {
+        "report_date": "2026-08-06",
+        "report_timestamp": "2026-08-06T09:00:00+08:00",
+        "report_language": "en",
+        "portfolio": {"status": "ok", "holdings": [], "empty": True},
+        "overnight_highlights": {"status": "empty", "items": [], "empty": True},
+        "event_foresight": {"status": "empty", "briefs": [], "empty": True},
+        "accuracy": {"status": "insufficient_history", "honesty_note": "insufficient"},
+        "yesterday_analyses": [
+            {"code": f"S{i}", "name": "X" * 200, "analysis_summary": "Y" * 500}
+            for i in range(100)
+        ],
+        "watchlist": {"empty": True},
+    }
+
+    markdown = service.render_markdown(payload)
+
+    assert len(markdown) <= MAX_DAILY_BRIEF_MARKDOWN_CHARS
+    assert "Content truncated to the report length budget" in markdown

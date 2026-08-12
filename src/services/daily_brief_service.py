@@ -2,7 +2,7 @@
 """Daily brief: personal morning push + historical accuracy review.
 
 Assembles a scannable morning brief from portfolio holdings (#149), overnight
-Today's Focus highlights (#149), earnings event foresight (#1131), yesterday
+Today's Focus highlights (#149), observed earnings-event context (#1131), yesterday
 analyses, watchlist context, and historical accuracy (#466). Optional quiet
 mode skips notify when no material content is present. Section failures fail-open.
 """
@@ -10,6 +10,7 @@ mode skips notify when no material content is present. Section failures fail-ope
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -34,6 +35,7 @@ MAX_YESTERDAY_ANALYSES = 20
 MAX_WATCHLIST_PREVIEW = 30
 MAX_NOTABLE_OUTCOMES = 5
 MAX_SKILL_BUCKETS = 5
+MAX_DAILY_BRIEF_MARKDOWN_CHARS = 24_000
 
 # Scheduler poll interval for the once-per-day gate (seconds).
 DAILY_BRIEF_POLL_INTERVAL_SECONDS = 60
@@ -248,7 +250,7 @@ class DailyBriefService:
             try:
                 from src.repositories.portfolio_repo import PortfolioRepository
                 self._portfolio_repository = PortfolioRepository()
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - optional portfolio source
                 log_safe_exception(logger, "Daily brief portfolio repository unavailable", exc,
                                    error_code="daily_brief_portfolio_unavailable", level=logging.WARNING)
                 self._portfolio_repository = False
@@ -479,13 +481,19 @@ class DailyBriefService:
         try:
             from jinja2 import Environment, FileSystemLoader, select_autoescape
         except ImportError:
-            return self._fallback_markdown(payload)
+            return _bounded_markdown(
+                self._fallback_markdown(payload),
+                MAX_DAILY_BRIEF_MARKDOWN_CHARS,
+            )
 
         templates_dir = _templates_dir()
         template_path = templates_dir / "daily_brief.j2"
         if not template_path.exists():
             logger.warning("Daily brief template missing: %s", template_path)
-            return self._fallback_markdown(payload)
+            return _bounded_markdown(
+                self._fallback_markdown(payload),
+                MAX_DAILY_BRIEF_MARKDOWN_CHARS,
+            )
 
         try:
             env = Environment(
@@ -496,7 +504,8 @@ class DailyBriefService:
             )
             template = env.get_template("daily_brief.j2")
             labels = self._labels(str(payload.get("report_language") or "zh"))
-            return str(template.render(brief=payload, labels=labels)).strip() + "\n"
+            rendered = str(template.render(brief=payload, labels=labels)).strip() + "\n"
+            return _bounded_markdown(rendered, MAX_DAILY_BRIEF_MARKDOWN_CHARS)
         except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
@@ -505,7 +514,10 @@ class DailyBriefService:
                 error_code="daily_brief_template_render_failed",
                 level=logging.WARNING,
             )
-            return self._fallback_markdown(payload)
+            return _bounded_markdown(
+                self._fallback_markdown(payload),
+                MAX_DAILY_BRIEF_MARKDOWN_CHARS,
+            )
 
     # ------------------------------------------------------------------
     # Sections
@@ -532,7 +544,7 @@ class DailyBriefService:
     def _load_yesterday_analyses(self, *, yesterday: date, timezone_name: str, watchlist: Sequence[str], portfolio_codes: Optional[Set[str]] = None) -> List[Dict[str, Any]]:
         try:
             rows = self.analysis_repo.get_list(code=None, days=3, limit=200)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - section remains explicitly unavailable
             log_safe_exception(logger, "Daily brief yesterday analysis load failed", exc, error_code="daily_brief_yesterday_load_failed", level=logging.WARNING)
             return []
         watch_set = {c.upper() for c in watchlist}
@@ -551,7 +563,9 @@ class DailyBriefService:
             items.append({
                 "code": code, "name": str(getattr(row, "stock_name", None) or code),
                 "operation_advice": getattr(row, "operation_advice", None),
-                "sentiment_score": getattr(row, "sentiment_score", None),
+                "sentiment_score": _finite_float(
+                    getattr(row, "sentiment_score", None), minimum=0, maximum=100
+                ),
                 "trend_prediction": getattr(row, "trend_prediction", None),
                 "analysis_summary": _clip(getattr(row, "analysis_summary", None), 120),
                 "report_type": report_type or None, "created_at": created.isoformat(),
@@ -578,7 +592,7 @@ class DailyBriefService:
             return {"status": "unavailable", "holdings": [], "total": 0, "empty": True, "message": "Portfolio position cache unavailable."}
         try:
             rows = repo.list_cached_positions(account_id=None, cost_method="fifo")
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - section remains explicitly unavailable
             log_safe_exception(logger, "Daily brief portfolio load failed", exc, error_code="daily_brief_portfolio_load_failed", level=logging.WARNING)
             return {"status": "unavailable", "holdings": [], "total": 0, "empty": True, "message": "Portfolio position cache read failed."}
         holdings: List[Dict[str, Any]] = []
@@ -590,25 +604,22 @@ class DailyBriefService:
             if not symbol or symbol in seen:
                 continue
             seen.add(symbol)
-            try:
-                qty = float(row.get("quantity")) if row.get("quantity") is not None else None
-            except (TypeError, ValueError):
-                qty = None
-            try:
-                mv = float(row.get("market_value_base")) if row.get("market_value_base") is not None else None
-            except (TypeError, ValueError):
-                mv = None
-            holdings.append({"code": symbol, "market": str(row.get("market") or "").strip().lower() or None,
-                             "quantity": qty, "market_value_base": mv, "account_id": row.get("account_id")})
+            # Cached positions may use a different valuation currency per
+            # account. The daily brief only needs membership, so do not expose,
+            # aggregate, or rank unnormalised quantities/market values.
+            holdings.append({
+                "code": symbol,
+                "market": str(row.get("market") or "").strip().lower() or None,
+            })
             if len(holdings) >= MAX_WATCHLIST_PREVIEW:
                 break
-        holdings.sort(key=lambda i: (-(i["market_value_base"] if i.get("market_value_base") is not None else -1.0), i["code"]))
+        holdings.sort(key=lambda item: (item["code"], item.get("market") or ""))
         return {"status": "ok", "holdings": holdings, "total": len(holdings), "empty": len(holdings) == 0, "message": None}
 
     def _build_overnight_section(self, *, runtime: Any, report_language: str) -> Dict[str, Any]:
         try:
             focus = self.todays_focus_service.build_focus(max_items=8, language=report_language)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - section remains explicitly unavailable
             log_safe_exception(logger, "Daily brief overnight focus load failed", exc, error_code="daily_brief_overnight_failed", level=logging.WARNING)
             return {"status": "unavailable", "items": [], "item_count": 0, "empty": True, "message": "Overnight highlights unavailable.", "sources_used": [], "degraded_sources": ["todays_focus"]}
         items = []
@@ -622,12 +633,13 @@ class DailyBriefService:
                 "degraded_sources": list(focus.get("degraded_sources") or [])}
 
     def _build_event_foresight_section(self, *, runtime: Any, watchlist: Sequence[str], portfolio_codes: Set[str]) -> Dict[str, Any]:
+        """Build recent-event context under the compatibility payload key."""
         universe = list(dict.fromkeys([*portfolio_codes, *list(watchlist)]))
         try:
             briefs = self.event_research_brief_service.build_briefs_for_universe(codes=universe or None, config=runtime, max_briefs=5)
-        except Exception as exc:  # broad-exception: fallback_recorded
-            log_safe_exception(logger, "Daily brief event foresight load failed", exc, error_code="daily_brief_event_foresight_failed", level=logging.WARNING)
-            return {"status": "unavailable", "briefs": [], "count": 0, "empty": True, "message": "Event foresight unavailable."}
+        except Exception as exc:  # broad-exception: fallback_recorded - section remains explicitly unavailable
+            log_safe_exception(logger, "Daily brief recent-event context load failed", exc, error_code="daily_brief_event_foresight_failed", level=logging.WARNING)
+            return {"status": "unavailable", "briefs": [], "count": 0, "empty": True, "message": "Recent event context unavailable."}
         compact = []
         for brief in briefs or []:
             if not isinstance(brief, Mapping):
@@ -707,7 +719,7 @@ class DailyBriefService:
                 from src.services.decision_signal_outcome_service import (
                     DECISION_SIGNAL_OUTCOME_ENGINE_VERSION,
                 )
-            except Exception:  # broad-exception: fallback_recorded - optional engine version for offline tests
+            except ImportError:
                 DECISION_SIGNAL_OUTCOME_ENGINE_VERSION = None
 
             rows = self.decision_outcome_service.repo.list_stats_rows(
@@ -722,16 +734,21 @@ class DailyBriefService:
                 and getattr(row, "outcome", None) in {"hit", "miss", "neutral"}
             ]
             aggregate = self.decision_outcome_service.aggregate_outcome_rows(completed)
-            decided = int(aggregate.get("hit", 0)) + int(aggregate.get("miss", 0))
+            hit = _non_negative_int(aggregate.get("hit"))
+            miss = _non_negative_int(aggregate.get("miss"))
+            completed_count = _non_negative_int(aggregate.get("completed"))
+            if hit is None or miss is None or completed_count is None:
+                raise ValueError("invalid decision-signal aggregate counts")
+            decided = hit + miss
             notable_hits, notable_misses = self._notable_signal_outcomes(completed)
 
             if decided < min_samples:
                 return {
                     "status": "insufficient_data",
                     "sample_size": decided,
-                    "completed": int(aggregate.get("completed", 0)),
-                    "hit": int(aggregate.get("hit", 0)),
-                    "miss": int(aggregate.get("miss", 0)),
+                    "completed": completed_count,
+                    "hit": hit,
+                    "miss": miss,
                     "hit_rate_pct": None,
                     "avg_return_pct": None,
                     "notable_hits": notable_hits,
@@ -744,11 +761,13 @@ class DailyBriefService:
             return {
                 "status": "ok",
                 "sample_size": decided,
-                "completed": int(aggregate.get("completed", 0)),
-                "hit": int(aggregate.get("hit", 0)),
-                "miss": int(aggregate.get("miss", 0)),
-                "hit_rate_pct": aggregate.get("hit_rate_pct"),
-                "avg_return_pct": aggregate.get("avg_stock_return_pct"),
+                "completed": completed_count,
+                "hit": hit,
+                "miss": miss,
+                "hit_rate_pct": round(hit / decided * 100, 1),
+                "avg_return_pct": _finite_float(
+                    aggregate.get("avg_stock_return_pct")
+                ),
                 "notable_hits": notable_hits,
                 "notable_misses": notable_misses,
                 "message": None,
@@ -782,11 +801,8 @@ class DailyBriefService:
         misses = [row for row in completed if getattr(row, "outcome", None) == "miss"]
 
         def _abs_return(row: Any) -> float:
-            value = getattr(row, "stock_return_pct", None)
-            try:
-                return abs(float(value))
-            except (TypeError, ValueError):
-                return -1.0
+            value = _finite_float(getattr(row, "stock_return_pct", None))
+            return abs(value) if value is not None else -1.0
 
         hits_sorted = sorted(hits, key=_abs_return, reverse=True)[:MAX_NOTABLE_OUTCOMES]
         misses_sorted = sorted(misses, key=_abs_return, reverse=True)[:MAX_NOTABLE_OUTCOMES]
@@ -808,17 +824,14 @@ class DailyBriefService:
         def _serialize(row: Any) -> Dict[str, Any]:
             signal = signal_map.get(int(getattr(row, "signal_id", 0) or 0))
             anchor = getattr(row, "anchor_date", None)
+            return_value = _finite_float(getattr(row, "stock_return_pct", None))
             return {
                 "signal_id": getattr(row, "signal_id", None),
                 "stock_code": getattr(signal, "stock_code", None),
                 "stock_name": getattr(signal, "stock_name", None),
                 "action": getattr(row, "action", None) or getattr(signal, "action", None),
                 "horizon": getattr(row, "horizon", None),
-                "return_pct": (
-                    round(float(row.stock_return_pct), 2)
-                    if getattr(row, "stock_return_pct", None) is not None
-                    else None
-                ),
+                "return_pct": round(return_value, 2) if return_value is not None else None,
                 "anchor_date": (
                     anchor.isoformat()
                     if hasattr(anchor, "isoformat")
@@ -862,7 +875,15 @@ class DailyBriefService:
                 ),
             }
 
-        completed = int(summary.get("completed_count") or 0)
+        completed = _non_negative_int(summary.get("completed_count"))
+        if completed is None:
+            return {
+                "status": "unavailable",
+                "completed_count": 0,
+                "direction_accuracy_pct": None,
+                "win_rate_pct": None,
+                "message": "Backtest summary contains invalid numeric data; metrics were withheld.",
+            }
         if completed < min_samples:
             return {
                 "status": "insufficient_data",
@@ -874,12 +895,26 @@ class DailyBriefService:
                     f"need at least {min_samples} before publishing direction accuracy."
                 ),
             }
+        direction_accuracy = _finite_float(
+            summary.get("direction_accuracy_pct"), minimum=0, maximum=100
+        )
+        win_rate = _finite_float(summary.get("win_rate_pct"), minimum=0, maximum=100)
+        avg_return = _finite_float(summary.get("avg_stock_return_pct"))
+        if direction_accuracy is None or win_rate is None:
+            return {
+                "status": "unavailable",
+                "completed_count": completed,
+                "direction_accuracy_pct": None,
+                "win_rate_pct": None,
+                "avg_stock_return_pct": None,
+                "message": "Backtest summary contains invalid numeric data; metrics were withheld.",
+            }
         return {
             "status": "ok",
             "completed_count": completed,
-            "direction_accuracy_pct": summary.get("direction_accuracy_pct"),
-            "win_rate_pct": summary.get("win_rate_pct"),
-            "avg_stock_return_pct": summary.get("avg_stock_return_pct"),
+            "direction_accuracy_pct": direction_accuracy,
+            "win_rate_pct": win_rate,
+            "avg_stock_return_pct": avg_return,
             "eval_window_days": summary.get("eval_window_days"),
             "engine_version": summary.get("engine_version"),
             "message": None,
@@ -907,21 +942,40 @@ class DailyBriefService:
         buckets = list(stats.get("buckets") or [])
         # Policy sample size is owned by SkillOpinionPerformanceService; we only
         # surface buckets already marked sample_sufficient / with hit_rate_pct.
-        sufficient = [
-            {
+        sufficient = []
+        invalid_sufficient = False
+        for bucket in buckets:
+            if not bucket.get("sample_sufficient"):
+                continue
+            hit_rate = _finite_float(bucket.get("hit_rate_pct"), minimum=0, maximum=100)
+            miss_rate = _finite_float(bucket.get("miss_rate_pct"), minimum=0, maximum=100)
+            evaluated = _non_negative_int(bucket.get("evaluated"))
+            if hit_rate is None or miss_rate is None or evaluated is None:
+                invalid_sufficient = True
+                continue
+            sufficient.append({
                 "skill_id": bucket.get("skill_id"),
                 "horizon": bucket.get("horizon"),
-                "evaluated": bucket.get("evaluated"),
-                "hit_rate_pct": bucket.get("hit_rate_pct"),
-                "miss_rate_pct": bucket.get("miss_rate_pct"),
+                "evaluated": evaluated,
+                "hit_rate_pct": hit_rate,
+                "miss_rate_pct": miss_rate,
                 "sample_status": bucket.get("sample_status"),
-            }
-            for bucket in buckets
-            if bucket.get("sample_sufficient") and bucket.get("hit_rate_pct") is not None
-        ]
+            })
         # Secondary honesty gate: treat very small service thresholds carefully.
         if not sufficient:
-            evaluated_total = sum(int(b.get("evaluated") or 0) for b in buckets)
+            evaluated_total = sum(
+                value
+                for value in (_non_negative_int(b.get("evaluated")) for b in buckets)
+                if value is not None
+            )
+            if invalid_sufficient:
+                return {
+                    "status": "unavailable",
+                    "sufficient_buckets": 0,
+                    "buckets": [],
+                    "evaluated_total": evaluated_total,
+                    "message": "Skill performance contains invalid numeric data; metrics were withheld.",
+                }
             return {
                 "status": "insufficient_data",
                 "sufficient_buckets": 0,
@@ -1049,18 +1103,20 @@ class DailyBriefService:
 
     def _send_notification(self, markdown: str) -> tuple[str, bool]:
         try:
-            if not self.notifier.is_available():
-                return "not_configured", False
-            success = bool(
-                self.notifier.send(
-                    markdown,
-                    email_send_to_all=True,
-                    route_type="report",
-                )
+            dispatch = self.notifier.send_with_results(
+                markdown,
+                email_send_to_all=True,
+                route_type="report",
             )
-            # send() may return False when some channels fail; treat partial
-            # success as degraded rather than aborting the workflow.
-            return ("ok" if success else "degraded"), success
+            status = str(getattr(dispatch, "status", "all_failed") or "all_failed")
+            success = bool(getattr(dispatch, "success", False))
+            if status == "sent" and success:
+                return "ok", True
+            if status == "partial_failed" and success:
+                return "degraded", True
+            if status == "no_channel":
+                return "not_configured", False
+            return "degraded", False
         except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
             log_safe_exception(
                 logger,
@@ -1092,8 +1148,8 @@ class DailyBriefService:
                 "title": "Daily Brief", "portfolio_heading": "Holdings", "portfolio_empty": "No cached portfolio holdings.",
                 "portfolio_unavailable": "Portfolio cache unavailable", "overnight_heading": "Overnight highlights",
                 "overnight_empty": "No fresh overnight alerts, events, or analysis changes.",
-                "overnight_unavailable": "Overnight highlights unavailable", "event_heading": "Event foresight (earnings)",
-                "event_empty": "No recent earnings-class events on holdings/watchlist.", "event_unavailable": "Event foresight unavailable",
+                "overnight_unavailable": "Overnight highlights unavailable", "event_heading": "Recent earnings event context",
+                "event_empty": "No recent earnings-class events on holdings/watchlist.", "event_unavailable": "Recent event context unavailable",
                 "metrics_label": "Watch", "checklist_label": "Post-event check", "yesterday_heading": "Yesterday's analyses",
                 "yesterday_empty": "No analyses were stored for yesterday.", "watchlist_heading": "Today's watchlist",
                 "watchlist_empty": "Watchlist is empty — configure STOCK_LIST to personalize this section.",
@@ -1110,8 +1166,8 @@ class DailyBriefService:
             "title": "每日简报", "portfolio_heading": "持仓要点", "portfolio_empty": "暂无缓存持仓。",
             "portfolio_unavailable": "持仓缓存不可用", "overnight_heading": "隔夜要点",
             "overnight_empty": "暂无新鲜的隔夜告警、事件或分析变化。", "overnight_unavailable": "隔夜要点不可用",
-            "event_heading": "事件前瞻（财报）", "event_empty": "自选/持仓近期无财报类事件。",
-            "event_unavailable": "事件前瞻不可用", "metrics_label": "关注", "checklist_label": "事后核对",
+            "event_heading": "近期财报事件复盘", "event_empty": "自选/持仓近期无财报类事件。",
+            "event_unavailable": "近期事件上下文不可用", "metrics_label": "关注", "checklist_label": "事后核对",
             "yesterday_heading": "昨日分析回顾", "yesterday_empty": "昨日暂无已存储的分析记录。",
             "watchlist_heading": "今日关注列表", "watchlist_empty": "关注列表为空 — 请配置 STOCK_LIST 以个性化本节。",
             "watchlist_covered": "昨日已有分析", "watchlist_missing": "昨日无分析",
@@ -1174,7 +1230,7 @@ def build_daily_brief_background_tasks(config: Any, *, config_provider: Callable
     def daily_brief_task() -> None:
         try:
             result = brief_service.maybe_run(force=False)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - scheduler isolates brief failure
             log_safe_exception(logger, "Daily brief scheduled run failed; other notifications continue", exc,
                                error_code="daily_brief_scheduled_run_failed", level=logging.WARNING)
             return
@@ -1193,3 +1249,43 @@ def _clip(value: Any, max_len: int) -> str:
     if len(text) <= max_len:
         return text
     return text[: max(0, max_len - 1)].rstrip() + "…"
+
+
+def _finite_float(
+    value: Any,
+    *,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+) -> Optional[float]:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(number):
+        return None
+    if minimum is not None and number < minimum:
+        return None
+    if maximum is not None and number > maximum:
+        return None
+    return number
+
+
+def _non_negative_int(value: Any) -> Optional[int]:
+    number = _finite_float(value, minimum=0)
+    if number is None or not number.is_integer():
+        return None
+    return int(number)
+
+
+def _bounded_markdown(markdown: str, max_chars: int) -> str:
+    text = str(markdown or "")
+    if len(text) <= max_chars:
+        return text
+    marker = "\n\n*[Content truncated to the report length budget.]*\n"
+    boundary = max(0, max_chars - len(marker))
+    cut = text.rfind("\n", 0, boundary)
+    if cut <= 0:
+        cut = boundary
+    return text[:cut].rstrip() + marker

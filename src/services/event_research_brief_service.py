@@ -11,6 +11,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set
 
+from src.services.alert_event_context import (
+    extract_event_display_contexts,
+    parse_diagnostics_object,
+)
+from src.services.event_alerts import CORPORATE_EVENT_DATA_SOURCE
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -25,6 +30,8 @@ MAX_LOOKBACK_HOURS = 168
 MAX_BRIEFS_PER_RUN = 10
 MAX_UNIVERSE = 200
 MAX_DETAIL_LEN = 200
+MAX_EVENT_BRIEF_MARKDOWN_CHARS = 12_000
+MAX_EVENT_NOTIFICATION_MARKDOWN_CHARS = 24_000
 
 _EARNINGS_TEMPLATE = {
     "metrics_to_watch": [
@@ -84,7 +91,7 @@ def resolve_event_research_brief_config(config: Any = None) -> EventResearchBrie
         try:
             from src.application_services import get_application_services
             config = get_application_services().config
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - optional service config
             log_safe_exception(logger, "Event research brief config load failed", exc,
                                error_code="event_research_brief_config_failed", level=logging.WARNING)
             config = None
@@ -139,7 +146,7 @@ def build_earnings_event_brief(*, stock_code: str, stock_name: Optional[str] = N
         "stock_code": code, "stock_name": str(stock_name or code),
         "trigger_id": trigger_id, "observed_at": observed_at,
         "on_watchlist": bool(on_watchlist), "in_portfolio": bool(in_portfolio),
-        "phase": "pre_or_peri_event", "what_happened": what or None, "why_it_matters": why or None,
+        "phase": "observed_event_review", "what_happened": what or None, "why_it_matters": why or None,
         "metrics_to_watch": metrics,
         "surprise_criteria": _EARNINGS_TEMPLATE["surprise_criteria"]["en" if lang == "en" else "zh"],
         "linked_hypotheses": hypotheses, "post_event_checklist": checklist,
@@ -165,6 +172,8 @@ class EventResearchBriefService:
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._run_lock = threading.Lock()
         self._seen_trigger_ids: Set[int] = set()
+        self._persisted_trigger_ids: Set[int] = set()
+        self._saved_trigger_ids: Set[int] = set()
 
     def _config(self) -> Any:
         if self._config_provider is not None:
@@ -185,7 +194,7 @@ class EventResearchBriefService:
             try:
                 from src.repositories.portfolio_repo import PortfolioRepository
                 self._portfolio_repository = PortfolioRepository()
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - optional portfolio source
                 log_safe_exception(logger, "portfolio unavailable", exc,
                                    error_code="event_research_brief_portfolio_unavailable", level=logging.WARNING)
                 self._portfolio_repository = False
@@ -216,14 +225,14 @@ class EventResearchBriefService:
         try:
             from src.services.stock_code_utils import build_daily_code_candidates
             aliases = sorted({a for c in universe for a in build_daily_code_candidates(c)})
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - alias fallback preserves universe
             log_safe_exception(logger, "alias expansion failed", exc,
                                error_code="event_research_brief_alias_failed", level=logging.WARNING)
             aliases = sorted(universe)
         try:
             rows = self.alert_repository.list_recent_triggered_for_targets(
                 targets=aliases, triggered_since=since, per_target_limit=2)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - source failure yields no briefs
             log_safe_exception(logger, "trigger load failed", exc,
                                error_code="event_research_brief_triggers_failed", level=logging.WARNING)
             return []
@@ -251,11 +260,14 @@ class EventResearchBriefService:
                                   autoescape=select_autoescape(enabled_extensions=()),
                                   trim_blocks=True, lstrip_blocks=True)
                 labels = self._labels(str(brief.get("report_language") or "zh"))
-                return str(env.get_template("event_research_brief.j2").render(brief=brief, labels=labels)).strip() + "\n"
-        except Exception as exc:  # broad-exception: fallback_recorded
+                rendered = str(env.get_template("event_research_brief.j2").render(brief=brief, labels=labels)).strip() + "\n"
+                return _bounded_markdown(rendered, MAX_EVENT_BRIEF_MARKDOWN_CHARS)
+        except Exception as exc:  # broad-exception: fallback_recorded - plain markdown fallback remains available
             log_safe_exception(logger, "template render failed", exc,
                                error_code="event_research_brief_template_failed", level=logging.WARNING)
-        return self._fallback_markdown(brief)
+        return _bounded_markdown(
+            self._fallback_markdown(brief), MAX_EVENT_BRIEF_MARKDOWN_CHARS
+        )
 
     def maybe_run(self, *, force: bool = False) -> Optional[EventResearchBriefBuildResult]:
         if not resolve_event_research_brief_config(self._config()).enabled and not force:
@@ -275,53 +287,82 @@ class EventResearchBriefService:
                 return EventResearchBriefBuildResult(query_id=qid, skipped_reason="no_fresh_events")
             result = EventResearchBriefBuildResult(query_id=qid, briefs=fresh)
             parts = []
+            completion_candidates: List[tuple[int, bool]] = []
             for brief in fresh:
                 md = self.render_markdown(brief)
                 code = brief["stock_code"]
+                trigger_id = brief.get("trigger_id")
+                tracked_trigger_id = trigger_id if isinstance(trigger_id, int) else None
+                processing_ok = True
                 result.markdown_by_code[code] = md
                 parts.append(md)
-                if isinstance(brief.get("trigger_id"), int):
-                    self._seen_trigger_ids.add(brief["trigger_id"])
-                if view.persist_history and md:
+                if (
+                    view.persist_history
+                    and md
+                    and tracked_trigger_id not in self._persisted_trigger_ids
+                ):
                     hid = self._persist(md, brief, f"{qid}_{code.lower()}")
                     if hid:
                         result.history_ids.append(hid)
+                        if tracked_trigger_id is not None:
+                            self._persisted_trigger_ids.add(tracked_trigger_id)
                     else:
                         result.errors.append(f"persist_failed:{code}")
-                if view.save_report_file and md:
+                        processing_ok = False
+                if (
+                    view.save_report_file
+                    and md
+                    and tracked_trigger_id not in self._saved_trigger_ids
+                ):
                     try:
                         self.notifier.save_report_to_file(md, f"event_research_brief_{code}_{self._clock().strftime('%Y%m%d')}.md")
-                    except Exception as exc:  # broad-exception: fallback_recorded
+                        if tracked_trigger_id is not None:
+                            self._saved_trigger_ids.add(tracked_trigger_id)
+                    except Exception as exc:  # broad-exception: fallback_recorded - file failure does not block other outputs
                         log_safe_exception(logger, "save failed", exc,
                                            error_code="event_research_brief_save_failed", level=logging.WARNING)
                         result.errors.append(f"save_failed:{code}")
-            combined = "\n---\n".join(parts).strip()
+                        processing_ok = False
+                if tracked_trigger_id is not None:
+                    completion_candidates.append((tracked_trigger_id, processing_ok))
+            combined = _bounded_markdown(
+                "\n---\n".join(parts).strip(),
+                MAX_EVENT_NOTIFICATION_MARKDOWN_CHARS,
+            )
             if view.notify and combined:
                 result.notification_status, result.notification_ok = self._send(combined)
             elif not view.notify:
                 result.notification_status = "not_requested"
+            notification_complete = not view.notify or result.notification_ok
+            for trigger_id, processing_ok in completion_candidates:
+                if processing_ok and notification_complete:
+                    self._seen_trigger_ids.add(trigger_id)
             return result
 
     def _brief_from_row(self, row, *, lang, watchlist_codes, portfolio_codes, allowed):
+        if str(getattr(row, "data_source", None) or "").strip() != CORPORATE_EVENT_DATA_SOURCE:
+            return None
         try:
             from src.services.stock_code_utils import canonicalize_analysis_stock_code
             code = canonicalize_analysis_stock_code(str(getattr(row, "target", None) or "").strip())
-        except Exception:
+        except (TypeError, ValueError):
             code = str(getattr(row, "target", None) or "").strip().upper() or None
         if not code:
             return None
-        diagnostics = getattr(row, "diagnostics", None) or {}
-        if not isinstance(diagnostics, Mapping):
-            diagnostics = {}
-        ctx = diagnostics.get("event_context") if isinstance(diagnostics.get("event_context"), Mapping) else {}
-        if not isinstance(ctx, Mapping):
-            ctx = {}
+        raw_diagnostics = getattr(row, "diagnostics", None)
+        if raw_diagnostics and parse_diagnostics_object(raw_diagnostics) is None:
+            return None
+        ctx = extract_event_display_contexts(raw_diagnostics).get("event_context") or {}
         category = str(ctx.get("event_category") or (ctx.get("event_categories") or [None])[0] or "").strip().lower()
         cats = [str(c).strip().lower() for c in (ctx.get("event_categories") or []) if str(c).strip()]
         if category and category not in cats:
             cats = [category] + cats
         if not any(c in allowed for c in (cats or [category])):
-            msg = str(getattr(row, "message", None) or "")
+            msg = str(
+                getattr(row, "reason", None)
+                or getattr(row, "message", None)
+                or ""
+            )
             if PRIMARY_EVENT_CATEGORY not in allowed or not _looks_like_earnings(msg):
                 return None
             category = PRIMARY_EVENT_CATEGORY
@@ -357,11 +398,8 @@ class EventResearchBriefService:
     def _watchlist_codes(self, config) -> Set[str]:
         raw = getattr(config, "stock_list", None) or []
         if isinstance(raw, str):
-            try:
-                from src.utils.stock_list import split_stock_list
-                raw = split_stock_list(raw)
-            except Exception:
-                raw = []
+            from src.utils.stock_list import split_stock_list
+            raw = split_stock_list(raw)
         return {str(c).strip().upper() for c in raw if str(c or "").strip()}
 
     def _portfolio_codes(self) -> Set[str]:
@@ -370,7 +408,7 @@ class EventResearchBriefService:
             return set()
         try:
             rows = repo.list_cached_positions(account_id=None, cost_method="fifo")
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - portfolio membership remains optional
             log_safe_exception(logger, "portfolio read failed", exc,
                                error_code="event_research_brief_portfolio_read_failed", level=logging.WARNING)
             return set()
@@ -405,18 +443,26 @@ class EventResearchBriefService:
                 },
                 save_snapshot=True,
             ) or 0)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - persistence failure remains observable
             log_safe_exception(logger, "history persist failed", exc,
                                error_code="event_research_brief_history_failed", level=logging.WARNING)
             return 0
 
     def _send(self, markdown: str):
         try:
-            if not self.notifier.is_available():
+            dispatch = self.notifier.send_with_results(
+                markdown, email_send_to_all=True, route_type="report"
+            )
+            status = str(getattr(dispatch, "status", "all_failed") or "all_failed")
+            success = bool(getattr(dispatch, "success", False))
+            if status == "sent" and success:
+                return "ok", True
+            if status == "partial_failed" and success:
+                return "degraded", True
+            if status == "no_channel":
                 return "not_configured", False
-            ok = bool(self.notifier.send(markdown, email_send_to_all=True, route_type="report"))
-            return ("ok" if ok else "degraded"), ok
-        except Exception as exc:  # broad-exception: fallback_recorded
+            return "degraded", False
+        except Exception as exc:  # broad-exception: fallback_recorded - notification failure does not abort analysis
             log_safe_exception(logger, "notify failed", exc,
                                error_code="event_research_brief_notification_failed", level=logging.WARNING)
             return "failed", False
@@ -460,7 +506,7 @@ def build_event_research_brief_background_tasks(config, *, config_provider, serv
     def task():
         try:
             result = svc.maybe_run(force=False)
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - scheduler isolates brief failure
             log_safe_exception(logger, "scheduled run failed", exc,
                                error_code="event_research_brief_scheduled_run_failed", level=logging.WARNING)
             return
@@ -477,7 +523,14 @@ def _templates_dir() -> Path:
     try:
         from src.application_services import get_application_services
         configured = Path(getattr(get_application_services().config, "report_templates_dir", "templates") or "templates")
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - default templates remain available
+        log_safe_exception(
+            logger,
+            "Event research brief templates configuration unavailable",
+            exc,
+            error_code="event_research_brief_templates_config_failed",
+            level=logging.WARNING,
+        )
         configured = Path("templates")
     return configured if configured.is_absolute() else base / configured
 
@@ -490,3 +543,15 @@ def _looks_like_earnings(text: str) -> bool:
 def _clip(value: Any, max_len: int) -> str:
     text = str(value or "").strip()
     return text if len(text) <= max_len else text[: max(0, max_len - 1)].rstrip() + "…"
+
+
+def _bounded_markdown(markdown: str, max_chars: int) -> str:
+    text = str(markdown or "")
+    if len(text) <= max_chars:
+        return text
+    marker = "\n\n*[Content truncated to the report length budget.]*\n"
+    boundary = max(0, max_chars - len(marker))
+    cut = text.rfind("\n", 0, boundary)
+    if cut <= 0:
+        cut = boundary
+    return text[:cut].rstrip() + marker
