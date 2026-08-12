@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after AGENT_MODE_BUDGET_* inventory on current main (Refs #1121 / #125).",
+  "baselineNote": "Locale budgets include the translated Home dashboard layout inventory measured on GitHub Actions Linux after merging current main (PR #1158 / Refs #189); default and vendor budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 155316,
-      "measuredGzipBytes": 154616,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 155752,
+      "measuredGzipBytes": 155552,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 148660,
-      "measuredGzipBytes": 147960,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 148969,
+      "measuredGzipBytes": 148769,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 148539,
-      "measuredGzipBytes": 147839,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 148780,
+      "measuredGzipBytes": 148580,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 148106,
-      "measuredGzipBytes": 147506,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 148971,
+      "measuredGzipBytes": 148771,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 144564,
-      "measuredGzipBytes": 143864,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 144779,
+      "measuredGzipBytes": 144579,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 141061,
-      "measuredGzipBytes": 140361,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 141315,
+      "measuredGzipBytes": 141115,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 134565,
-      "measuredGzipBytes": 133865,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 134879,
+      "measuredGzipBytes": 134679,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 134702,
-      "measuredGzipBytes": 134002,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 134943,
+      "measuredGzipBytes": 134743,
+      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "vendor-charts",
