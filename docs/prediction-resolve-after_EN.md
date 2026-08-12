@@ -59,7 +59,7 @@ result = compute_resolve_after(
 
 So `1d` is **not** “calendar day + 1”; it is “after the next trading session close.”
 
-Unsupported under this policy: `swing` / `long` / free-form prose; crypto trading-day close (use `explicit_timestamp`).
+Unsupported under `trading_day_close`: `swing` / `long` / free-form prose; crypto. For crypto or free-form market keys, use `as_of_policy=explicit_timestamp` (session math is skipped; `calendar_approx` remains false).
 
 ---
 

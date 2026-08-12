@@ -347,6 +347,20 @@ class ComputeResolveAfterUnitTestCase(unittest.TestCase):
             )
         self.assertEqual(result.market, "us")
 
+    def test_crypto_explicit_timestamp_allowed(self):
+        """crypto has no session calendar but explicit timestamps must still work."""
+        created = datetime(2026, 3, 27, 12, 0, tzinfo=timezone.utc)
+        explicit = datetime(2026, 3, 28, 12, 0, tzinfo=timezone.utc)
+        result = compute_resolve_after(
+            "crypto",
+            created,
+            explicit,
+            as_of_policy=AsOfPolicy.EXPLICIT_TIMESTAMP,
+        )
+        self.assertEqual(result.resolve_after, explicit)
+        self.assertEqual(result.market, "crypto")
+        self.assertFalse(result.calendar_approx)
+
     def test_unsupported_market_and_invalid_horizon(self):
         created = datetime(2026, 3, 27, 12, 0, tzinfo=timezone.utc)
         with self.assertRaises(UnsupportedMarketError):

@@ -152,33 +152,31 @@ def compute_resolve_after(
         CrossMarketMismatchError: stock_code market disagrees with ``market``.
     """
     policy = _normalize_policy(as_of_policy)
-    market_key = _normalize_market(market)
     created_utc = _as_utc(created_at)
 
-    if stock_code:
-        inferred = get_market_for_stock(stock_code)
-        if (
-            inferred
-            and inferred not in {None, "crypto"}
-            and inferred != market_key
-            and not allow_cross_market
-        ):
-            raise CrossMarketMismatchError(
-                f"stock_code market {inferred!r} disagrees with market {market_key!r}",
-                error_code="cross_market_mismatch",
-                meta={
-                    "market": market_key,
-                    "stock_code_market": inferred,
-                    "stock_code": str(stock_code).strip().upper(),
-                },
-            )
-
+    # explicit_timestamp does not need an exchange calendar, so accept free-form
+    # market keys (including crypto). trading_day_close stays strict.
     if policy is AsOfPolicy.EXPLICIT_TIMESTAMP:
+        market_key = str(market or "").strip().lower() or "unknown"
+        _maybe_reject_cross_market(
+            market_key=market_key,
+            stock_code=stock_code,
+            allow_cross_market=allow_cross_market,
+            require_registered_market=False,
+        )
         return _resolve_explicit(
             market=market_key,
             created_at=created_utc,
             horizon=horizon,
         )
+
+    market_key = _normalize_market(market)
+    _maybe_reject_cross_market(
+        market_key=market_key,
+        stock_code=stock_code,
+        allow_cross_market=allow_cross_market,
+        require_registered_market=True,
+    )
 
     # trading_day_close — absolute timestamps must use explicit_timestamp policy.
     if isinstance(horizon, datetime) or type(horizon) is date:
@@ -195,6 +193,41 @@ def compute_resolve_after(
         sessions_forward=sessions_forward,
         horizon_label=_format_horizon_label(horizon, sessions_forward),
     )
+
+
+def _maybe_reject_cross_market(
+    *,
+    market_key: str,
+    stock_code: Optional[str],
+    allow_cross_market: bool,
+    require_registered_market: bool,
+) -> None:
+    """Optionally reject stock_code market mismatches.
+
+    When ``require_registered_market`` is False (explicit timestamps), skip the
+    check if the declared market is not a known exchange region so callers can
+    pass free-form labels such as ``crypto``.
+    """
+    if not stock_code:
+        return
+    if not require_registered_market and market_key not in MARKET_EXCHANGE:
+        return
+    inferred = get_market_for_stock(stock_code)
+    if (
+        inferred
+        and inferred not in {None, "crypto"}
+        and inferred != market_key
+        and not allow_cross_market
+    ):
+        raise CrossMarketMismatchError(
+            f"stock_code market {inferred!r} disagrees with market {market_key!r}",
+            error_code="cross_market_mismatch",
+            meta={
+                "market": market_key,
+                "stock_code_market": inferred,
+                "stock_code": str(stock_code).strip().upper(),
+            },
+        )
 
 
 def _normalize_policy(as_of_policy: Union[str, AsOfPolicy]) -> AsOfPolicy:

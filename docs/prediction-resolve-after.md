@@ -59,7 +59,7 @@ result = compute_resolve_after(
 
 因此 `1d` **不是**「自然日 +1」，而是「下一根可交易日线收盘后才允许验证」。
 
-不支持：`swing` / `long` / 散文 horizon；crypto 的 trading-day 策略（应使用 `explicit_timestamp`）。
+在 `trading_day_close` 下不支持：`swing` / `long` / 散文 horizon；crypto。crypto 或自由市场键请使用 `as_of_policy=explicit_timestamp`（不走 session 数学；`calendar_approx` 仍为 false）。
 
 ---
 
