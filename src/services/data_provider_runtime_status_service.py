@@ -376,7 +376,15 @@ def _project_market_chain(
         declared = True
         try:
             declared = bool(manager._provider_supports_capability(fetcher, "daily_data"))
-        except Exception:  # broad-exception: fallback_recorded - treat as unsupported
+        except Exception as exc:  # broad-exception: fallback_recorded - treat as unsupported
+            log_safe_exception(
+                logger,
+                "Data provider capability declaration probe failed during status projection",
+                exc,
+                error_code="data_provider_capability_probe_failed",
+                level=logging.DEBUG,
+                context={"provider": getattr(fetcher, "name", "unknown")},
+            )
             declared = False
         if not declared:
             continue
@@ -541,7 +549,15 @@ def _configured_state(
         if callable(probe):
             try:
                 return bool(probe())
-            except Exception:  # broad-exception: fallback_recorded - treat as unconfigured
+            except Exception as exc:  # broad-exception: fallback_recorded - treat as unconfigured
+                log_safe_exception(
+                    logger,
+                    "Longbridge configured-state probe failed during status projection",
+                    exc,
+                    error_code="data_provider_configured_probe_failed",
+                    level=logging.DEBUG,
+                    context={"provider": provider_id},
+                )
                 return False
         return None
     if provider_id == "pytdx":
