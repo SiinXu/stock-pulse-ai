@@ -21,6 +21,7 @@
     "scripts/check_import_layers.py",
     "scripts/check_legacy_facade_imports.py",
     "scripts/check_upstream_parity.py",
+    "scripts/inventory_upstream_drift.py",
     "scripts/check_workflow_supply_chain.py",
     "scripts/coverage_floor_baseline.json",
     "scripts/import_layer_baseline.json",
