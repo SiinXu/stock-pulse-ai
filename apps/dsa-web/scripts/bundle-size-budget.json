@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after ANALYSIS_PARALLEL_FETCH settings help/locale keys (Refs #1126 / PR #1241); failed artifacts use measured gzip + documented headroom.",
+  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after AGENT_MODE_BUDGET_* Settings help/title inventory keys (Refs #1121 / #125).",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 237467,
-      "measuredGzipBytes": 237267,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 236953,
+      "measuredGzipBytes": 236753,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "js-entry",
@@ -26,23 +26,23 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 154539,
-      "measuredGzipBytes": 153939,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 154460,
+      "measuredGzipBytes": 153860,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 147911,
-      "measuredGzipBytes": 147311,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 147839,
+      "measuredGzipBytes": 147239,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 147847,
-      "measuredGzipBytes": 147247,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 147731,
+      "measuredGzipBytes": 147131,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-fr",
@@ -54,30 +54,30 @@
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 143888,
-      "measuredGzipBytes": 143288,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 143803,
+      "measuredGzipBytes": 143203,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 140391,
-      "measuredGzipBytes": 139791,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 140306,
+      "measuredGzipBytes": 139706,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 133829,
-      "measuredGzipBytes": 133229,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 133828,
+      "measuredGzipBytes": 133228,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 133939,
-      "measuredGzipBytes": 133339,
-      "note": "GitHub Actions Linux measurement after parallel-fetch Settings help and locale copy for #1126 / PR #1241; measured gzip + headroom."
+      "maxGzipBytes": 133927,
+      "measuredGzipBytes": 133327,
+      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory (Refs #1121 / #125); measured gzip + headroom."
     },
     {
       "id": "vendor-charts",

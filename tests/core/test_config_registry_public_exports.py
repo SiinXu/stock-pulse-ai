@@ -70,9 +70,6 @@ EXPECTED_SCHEMA_SHA256 = (
     "1551969875540736dd407bbba6263eda19ff15d632d7a67b03c78da7fc2626a8"
 )
 
-    "PLACEHOLDER_SCHEMA"
-)
-
 
 def _json_sha256(value, *, sort_keys: bool = False) -> str:
     payload = json.dumps(
