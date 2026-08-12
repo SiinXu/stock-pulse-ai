@@ -100,10 +100,10 @@ class _TaskQueueApiMethods:
     def is_analyzing(self, stock_code: str) -> bool:
         """
         检查股票是否正在分析中
-
+        
         Args:
             stock_code: 股票代码
-
+            
         Returns:
             True 表示正在分析中
         """
@@ -114,10 +114,10 @@ class _TaskQueueApiMethods:
     def get_analyzing_task_id(self, stock_code: str) -> Optional[str]:
         """
         获取正在分析该股票的任务 ID
-
+        
         Args:
             stock_code: 股票代码
-
+            
         Returns:
             任务 ID，如果没有则返回 None
         """
@@ -757,10 +757,10 @@ class _TaskQueueApiMethods:
     def get_task(self, task_id: str) -> Optional[TaskInfo]:
         """
         获取任务信息
-
+        
         Args:
             task_id: 任务 ID
-
+            
         Returns:
             TaskInfo 或 None
         """
@@ -816,7 +816,7 @@ class _TaskQueueApiMethods:
     def list_pending_tasks(self) -> List[TaskInfo]:
         """
         获取所有进行中的任务（pending + processing）
-
+        
         Returns:
             任务列表（副本）
         """
@@ -829,10 +829,10 @@ class _TaskQueueApiMethods:
     def list_all_tasks(self, limit: int = 50) -> List[TaskInfo]:
         """
         获取所有任务（按创建时间倒序）
-
+        
         Args:
             limit: 返回数量限制
-
+            
         Returns:
             任务列表（副本）
         """
@@ -847,7 +847,7 @@ class _TaskQueueApiMethods:
     def get_task_stats(self) -> Dict[str, int]:
         """
         获取任务统计信息
-
+        
         Returns:
             统计信息字典
         """

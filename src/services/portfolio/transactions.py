@@ -28,7 +28,7 @@ if TYPE_CHECKING:
         build_portfolio_idempotency_storage_id,
         date,
         datetime,
-        get_config,
+        _get_config,
         hashlib,
         json,
         timedelta,
@@ -593,7 +593,7 @@ class _PortfolioTransactionMethods:
     def _idempotency_replay_cutoff(self) -> datetime:
         """Return the inclusive lower bound for replayable operations."""
 
-        config = get_config()
+        config = _get_config()
         replay_window_days = int(
             getattr(
                 config,

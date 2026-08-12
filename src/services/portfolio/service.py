@@ -17,7 +17,7 @@ if TYPE_CHECKING:
         VALID_ACCOUNT_TYPES,
         VALID_COST_METHODS,
         VALID_MARKETS,
-        get_config,
+        _get_config,
     )
 
 
@@ -76,7 +76,7 @@ class _PortfolioServiceCoreMethods:
     def _seed_paper_cash(self, *, account_id: int, currency: str) -> None:
         """Seed a new paper account with the configurable initial cash balance."""
         initial_cash = float(
-            getattr(get_config(), "paper_portfolio_initial_cash", 0.0) or 0.0
+            getattr(_get_config(), "paper_portfolio_initial_cash", 0.0) or 0.0
         )
         if initial_cash <= 0:
             return

@@ -122,3 +122,18 @@ class _ResolvedPositionPrice:
     is_stale: bool
     is_available: bool
     provider: Optional[str] = None
+
+
+# Preserve the legacy facade identities used by introspection and pickle.
+for _legacy_facade_member in (
+    PortfolioConflictError,
+    PortfolioIdempotencyConflictError,
+    PortfolioOversellError,
+    _AvgState,
+    _ResolvedPositionPrice,
+    _merge_portfolio_limitations,
+    _portfolio_limitations_for_market,
+):
+    _legacy_facade_member.__module__ = "src.services.portfolio_service"
+
+del _legacy_facade_member

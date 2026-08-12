@@ -17,7 +17,7 @@ if TYPE_CHECKING:
         Set,
         Tuple,
         date,
-        get_config,
+        _get_config,
         log_safe_exception,
         logger,
         logging,
@@ -36,7 +36,7 @@ class _PortfolioRiskMethods:
     ) -> Dict[str, Any]:
         """Refresh account FX pairs online with stale fallback when fetch fails."""
         as_of_date = as_of or date.today()
-        config = get_config()
+        config = _get_config()
         refresh_enabled = bool(getattr(config, "portfolio_fx_update_enabled", True))
         if account_id is not None:
             account_rows = [self._require_active_account(account_id)]

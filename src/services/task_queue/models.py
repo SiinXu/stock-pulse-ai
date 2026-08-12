@@ -550,3 +550,22 @@ class _QueueTaskEventStream:
             return
         self._owner._detach_stream(self._token)
         self._close_local()
+
+
+# Preserve the legacy facade identities used by introspection and pickle.
+for _legacy_facade_member in (
+    AnalysisTaskCoalescingContract,
+    DuplicateTaskError,
+    KnownTaskFailure,
+    TaskInfo,
+    TaskQueueInflightStore,
+    _QueueTaskEventStream,
+    _RetryReservation,
+    _dedupe_stock_code_key,
+    _task_message_metadata,
+    public_task_error,
+    public_task_message,
+):
+    _legacy_facade_member.__module__ = "src.services.task_queue"
+
+del _legacy_facade_member

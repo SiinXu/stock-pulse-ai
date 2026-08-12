@@ -63,6 +63,13 @@ logger = logging.getLogger(__name__)
 # Preserve the historical alias assignment on this facade module.
 PortfolioBusyError = RepoPortfolioBusyError
 
+
+def _get_config():
+    """Keep legacy facade monkeypatches effective for split service methods."""
+
+    return get_config()
+
+
 try:
     import yfinance as yf
 except Exception:  # pragma: no cover - broad-exception: optional_metadata - yfinance is optional for FX refresh
