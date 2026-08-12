@@ -59,9 +59,19 @@ export function useDashboardLifecycle({
   const previousTaskStatusesRef = useRef<Map<string, TaskInfo['status']>>(new Map());
   const handledTerminalStatusesRef = useRef<Map<string, TaskInfo['status']>>(new Map());
   const [isInitialStockBarLoadSettled, setIsInitialStockBarLoadSettled] = useState(false);
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const onInitialStockBarSettled = useCallback(() => {
-    setIsInitialStockBarLoadSettled(true);
+    // Parity with the previous loadStockBar().finally({ if (active) ... }) unmount guard.
+    if (isMountedRef.current) {
+      setIsInitialStockBarLoadSettled(true);
+    }
   }, []);
 
   useDashboardDataRefreshQuery({
