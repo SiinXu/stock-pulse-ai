@@ -1371,6 +1371,29 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
     notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
   },
+
+  'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
+    title: 'Analysis Quality Gate',
+    summary: 'Binds factual claims in the analysis conclusion to input evidence using the offline agent-eval dimensions.',
+    usage: 'Leave enabled for normal runs. Disable only when diagnosing gate projection or local fixtures.',
+    valueNotes: [
+      'Default on; uses factuality and boundary_honesty from the agent-eval suite.',
+      'Gate decisions are written to quality_gate_result and dashboard.quality_gate.',
+    ],
+    impact: ['Affects whether ungrounded numbers stay in verified facts or are demoted / blocked.'],
+    notes: ['Gate-internal errors fail closed to annotate and never silent-pass.'],
+  },
+  'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
+    title: 'Quality Gate Failure Policy',
+    summary: 'Choose annotate (default) or intercept when ungrounded factual claims are found.',
+    usage: 'annotate demotes ungrounded verified facts to model opinion; intercept fails the analysis result.',
+    valueNotes: [
+      'Supported values: annotate, intercept. Invalid values stop configuration loading.',
+      'Internal gate errors always fail closed to annotate, even if intercept is selected.',
+    ],
+    impact: ['Controls whether a failed quality check blocks publication or only annotates the report.'],
+    notes: ['Does not replace the offline agent-eval benchmark or invent a second scoring standard.'],
+  },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
     summary: 'Controls the token budget and timeout for Deep Research.',

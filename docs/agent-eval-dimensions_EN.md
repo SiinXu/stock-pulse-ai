@@ -61,7 +61,11 @@ python scripts/run_agent_benchmark.py --strict-baseline \
   --json-out /tmp/agent-eval.json
 ```
 
-There is no environment switch or production runtime hook. Invocation is the opt-in boundary. Fixtures contain frozen, secret-free evidence only; raw private prompts, credentials, and tool payloads must not be stored in cases or reports.
+Offline suite invocation remains the opt-in boundary for the full fixture catalog and baseline comparison. Fixtures contain frozen, secret-free evidence only; raw private prompts, credentials, and tool payloads must not be stored in cases or reports.
+
+### Runtime pipeline hook (#887)
+
+The analysis pipeline reuses the **same rule dimensions** (especially `factuality` and `boundary_honesty`) via `src/services/analysis_quality_gate.py`. That gate projects live evidence and conclusion claims into the `FinancialFact` / `FinancialClaim` shapes above, records scores under `quality_gate_result.eval_hook`, and applies `annotate` (default) or `intercept` on failure. Gate-internal errors fail closed to annotate. See [analysis-quality-gate_EN.md](analysis-quality-gate_EN.md).
 
 ## Explicit non-goals
 

@@ -536,6 +536,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPORT_TEMPLATES_DIR` | `templates` | 是 | 模板中注释; Report Engine P0 (Jinja2 / integrity check / Historical comparison) |
 | `REPORT_TYPE` | `simple` | 是 | 模板中注释; Report type: simple (concise), full (complete), brief (3-5 sentence summary) In a Docker environment, if content is n... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
+| `ANALYSIS_QUALITY_GATE_ENABLED` | `true` | 是 | 模板中注释; 管线质量门：结论事实绑定输入证据（默认开启） |
+| `ANALYSIS_QUALITY_GATE_ON_FAILURE` | `annotate` | 是 | 模板中注释; 未绑定事实时 annotate（默认）或 intercept |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |
 | `RUN_IMMEDIATELY` | `true` | 是 | Whether to immediately execute an analysis when the non-time mode is started (true/false) |

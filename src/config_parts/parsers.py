@@ -44,6 +44,15 @@ def parse_risk_gate_profile(value: Optional[str]) -> str:
     return normalized
 
 
+def parse_quality_gate_failure_policy(value: Optional[str]) -> str:
+    """Parse analysis quality-gate failure policy (annotate|intercept)."""
+    from src.services.analysis_quality_gate import (
+        parse_quality_gate_failure_policy as _parse,
+    )
+
+    return _parse(value)
+
+
 def parse_env_int(
     value: Optional[str],
     default: int,

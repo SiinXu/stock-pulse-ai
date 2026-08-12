@@ -1010,6 +1010,7 @@ class HistoryService:
                 key_points=raw_result.get("key_points", ""),
                 risk_warning=raw_result.get("risk_warning", ""),
                 risk_gate_result=raw_result.get("risk_gate_result"),
+                quality_gate_result=raw_result.get("quality_gate_result"),
                 buy_reason=raw_result.get("buy_reason", ""),
                 market_snapshot=raw_result.get("market_snapshot"),
                 search_performed=raw_result.get("search_performed", False),

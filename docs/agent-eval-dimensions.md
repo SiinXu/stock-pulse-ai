@@ -62,7 +62,11 @@ python scripts/run_agent_benchmark.py --strict-baseline \
   --json-out /tmp/agent-eval.json
 ```
 
-没有环境开关或生产 runtime hook；显式调用就是 opt-in 边界。fixture 只能包含冻结且无秘密的证据，不得存储私有 prompt、凭据或原始敏感工具 payload。
+完整夹具目录与基线对比仍以离线套件显式调用为 opt-in 边界。fixture 只能包含冻结且无秘密的证据，不得存储私有 prompt、凭据或原始敏感工具 payload。
+
+### 运行时管线钩子（#887）
+
+分析管线通过 `src/services/analysis_quality_gate.py` **复用同一套规则维度**（尤其 `factuality` 与 `boundary_honesty`）。该质量门将现场证据与结论声明投影为上文的 `FinancialFact` / `FinancialClaim` 形状，把分数记入 `quality_gate_result.eval_hook`，失败时按 `annotate`（默认）或 `intercept` 处理；门自身异常 fail-closed 到 annotate。详见 [analysis-quality-gate.md](analysis-quality-gate.md)。
 
 ## 明确不做
 
