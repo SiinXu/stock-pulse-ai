@@ -3,6 +3,12 @@
 import type { UiTextKey } from '../../i18n/uiText';
 import { WEB_BUILD_INFO } from '../../utils/constants';
 
+export type DesktopCliGuidanceActionResult = {
+  ok?: boolean;
+  message?: string;
+  urlHost?: string;
+};
+
 export type DesktopWindow = Window & {
   dsaDesktop?: {
     version?: unknown;
@@ -10,9 +16,12 @@ export type DesktopWindow = Window & {
     checkForUpdates?: () => Promise<RawDesktopUpdateState>;
     installDownloadedUpdate?: () => Promise<boolean>;
     openReleasePage?: (releaseUrl?: string) => Promise<boolean>;
-    getEnvDiagnostics?: (payload?: { locale?: string }) => Promise<unknown>;
-    openOperatorTerminal?: (payload?: { locale?: string }) => Promise<unknown>;
-    openCliInstallGuide?: (payload?: { command?: string; locale?: string }) => Promise<unknown>;
+    getEnvDiagnostics?: (payload?: { locale?: string }) => Promise<Record<string, unknown>>;
+    openOperatorTerminal?: (payload?: { locale?: string }) => Promise<DesktopCliGuidanceActionResult>;
+    openCliInstallGuide?: (payload?: {
+      command?: string;
+      locale?: string;
+    }) => Promise<DesktopCliGuidanceActionResult>;
     onUpdateStateChange?: (listener: (state: RawDesktopUpdateState) => void) => (() => void) | void;
   };
 };

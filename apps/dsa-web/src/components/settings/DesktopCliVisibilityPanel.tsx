@@ -71,7 +71,7 @@ export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPane
   const [payload, setPayload] = useState<DesktopCliGuidancePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => isDesktopCliGuidanceApiAvailable());
   const locale = language === 'zh' ? 'zh' : 'en';
 
   const refresh = useCallback(async () => {
@@ -87,7 +87,7 @@ export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPane
     setLoading(true);
     setError(null);
     try {
-      const next = await api.getEnvDiagnostics({ locale });
+      const next = await api.getEnvDiagnostics({ locale }) as DesktopCliGuidancePayload;
       assertDesktopCliGuidancePathSafe(next);
       setPayload(next);
     } catch (refreshError) {
@@ -112,6 +112,15 @@ export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPane
 
   const copy = payload?.copy;
   const commands = Array.isArray(payload?.commands) ? payload.commands : [];
+  const title = typeof copy?.title === 'string' ? copy.title.trim() : '';
+  const intro = typeof copy?.intro === 'string' ? copy.intro.trim() : '';
+  const openTerminalLabel = typeof copy?.openTerminal === 'string' ? copy.openTerminal.trim() : '';
+  const openInstallGuideLabel = typeof copy?.openInstallGuide === 'string' ? copy.openInstallGuide.trim() : '';
+  const recheckLabel = typeof copy?.recheck === 'string' ? copy.recheck.trim() : '';
+
+  if (!loading && !title && !error) {
+    return null;
+  }
 
   const onOpenTerminal = async () => {
     const api = getDesktopRuntimeApi() as
@@ -122,7 +131,7 @@ export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPane
     if (!api?.openOperatorTerminal) {
       return;
     }
-    const result = await api.openOperatorTerminal({ locale });
+    const result = await api.openOperatorTerminal({ locale }) as { ok?: boolean; message?: string };
     setActionMessage(typeof result?.message === 'string' ? result.message : null);
   };
 
@@ -138,7 +147,10 @@ export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPane
     if (!api?.openCliInstallGuide) {
       return;
     }
-    const result = await api.openCliInstallGuide({ command, locale });
+    const result = await api.openCliInstallGuide({ command, locale }) as {
+      ok?: boolean;
+      message?: string;
+    };
     setActionMessage(typeof result?.message === 'string' ? result.message : null);
   };
 
@@ -151,30 +163,36 @@ export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPane
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="space-y-1">
           <h3 id="desktop-cli-visibility-heading" className="text-sm font-semibold text-foreground">
-            {copy?.title || (language === 'zh' ? '本机 CLI 可见性' : 'Local CLI visibility')}
+            {title || '…'}
           </h3>
-          <p className="text-xs text-secondary-text">
-            {copy?.intro || ''}
-          </p>
+          {intro ? (
+            <p className="text-xs text-secondary-text">
+              {intro}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
-            onClick={() => void onOpenTerminal()}
-            data-testid="desktop-cli-open-terminal"
-          >
-            {copy?.openTerminal || (language === 'zh' ? '打开系统终端' : 'Open system terminal')}
-          </button>
-          <button
-            type="button"
-            className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
-            onClick={() => void refresh()}
-            disabled={loading}
-            data-testid="desktop-cli-recheck"
-          >
-            {copy?.recheck || (language === 'zh' ? '重新检测' : 'Recheck')}
-          </button>
+          {openTerminalLabel ? (
+            <button
+              type="button"
+              className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+              onClick={() => void onOpenTerminal()}
+              data-testid="desktop-cli-open-terminal"
+            >
+              {openTerminalLabel}
+            </button>
+          ) : null}
+          {recheckLabel ? (
+            <button
+              type="button"
+              className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+              onClick={() => void refresh()}
+              disabled={loading}
+              data-testid="desktop-cli-recheck"
+            >
+              {recheckLabel}
+            </button>
+          ) : null}
         </div>
       </div>
       {copy?.pathUnavailable ? (
@@ -205,14 +223,14 @@ export function DesktopCliVisibilityPanel({ language }: DesktopCliVisibilityPane
                   {' · '}
                   {command.statusLabel}
                 </span>
-                {command.installGuideAvailable && command.status !== 'available' ? (
+                {command.installGuideAvailable && command.status !== 'available' && openInstallGuideLabel ? (
                   <button
                     type="button"
                     className="settings-accent-text inline-flex min-h-11 min-w-11 items-center underline-offset-2 hover:underline"
                     onClick={() => void onOpenGuide(command.name)}
                     data-testid={`desktop-cli-install-${command.name}`}
                   >
-                    {copy?.openInstallGuide || (language === 'zh' ? '打开安装说明' : 'Open install guide')}
+                    {openInstallGuideLabel}
                   </button>
                 ) : null}
               </div>
