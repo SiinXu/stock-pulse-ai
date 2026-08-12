@@ -12,6 +12,9 @@ ToolSurface denials. Pattern injection is a read-only, quota-bounded checklist.
 from src.agent.evolution.error_patterns import (
     DEFAULT_INJECT_CHAR_BUDGET,
     DEFAULT_INJECT_TOP_K,
+    DEFAULT_STATE_FILENAME,
+    ERROR_PATTERN_IDS_KEY,
+    ERROR_PATTERN_PROMPT_KEY,
     MAX_PATTERN_INJECTION,
     ErrorPatternCard,
     ErrorPatternEncyclopedia,
@@ -21,8 +24,10 @@ from src.agent.evolution.error_patterns import (
     cluster_lessons_into_cards,
     format_error_pattern_checklist,
     inject_error_pattern_checklist,
+    inject_error_patterns_into_analysis_context,
     is_error_pattern_enabled,
     retrieve_error_patterns,
+    resolve_error_pattern_state_path,
 )
 from src.agent.evolution.guards import (
     SoulIdentitySnapshot,
@@ -42,6 +47,9 @@ from src.agent.evolution.lessons import (
 __all__ = [
     "DEFAULT_INJECT_CHAR_BUDGET",
     "DEFAULT_INJECT_TOP_K",
+    "DEFAULT_STATE_FILENAME",
+    "ERROR_PATTERN_IDS_KEY",
+    "ERROR_PATTERN_PROMPT_KEY",
     "LESSON_KINDS",
     "MAX_PATTERN_INJECTION",
     "EpisodeLessonBundle",
@@ -58,9 +66,11 @@ __all__ = [
     "cluster_lessons_into_cards",
     "format_error_pattern_checklist",
     "inject_error_pattern_checklist",
+    "inject_error_patterns_into_analysis_context",
     "is_error_pattern_enabled",
     "lessons_from_kinds",
     "parse_lessons_payload",
     "retrieve_error_patterns",
+    "resolve_error_pattern_state_path",
     "snapshot_soul_identity",
 ]

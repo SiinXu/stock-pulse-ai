@@ -1,6 +1,6 @@
 # 从教训沉淀的错误模式百科
 
-**状态**：Issue [#1138](https://github.com/SiinXu/stock-pulse-ai/issues/1138) 的 V1 库路径
+**状态**：Issue [#1138](https://github.com/SiinXu/stock-pulse-ai/issues/1138) 的 V1 持久化分析路径
 
 **English**: [agent-error-pattern-encyclopedia_EN.md](agent-error-pattern-encyclopedia_EN.md)
 
@@ -20,7 +20,7 @@
 
 1. 将复发教训按 typed kind 聚类为可检索卡片。
 2. 人类可编辑 title / description / triggers / remedy，或禁用卡片。
-3. 每次人工编辑（含禁用 / 启用 / 改判）**必须追加审计事件**。
+3. 每次人工编辑（含禁用 / 启用 / 改判）必须追加有界审计事件。
 4. 分析时只注入 **enabled** 卡片，并受 **top-K** 与 **字符配额** 约束。
 5. 注入内容是只读清单，以非权威数据块包装，**不得改变** Agent Soul 宪章字节。
 6. 默认关闭（`AGENT_ERROR_PATTERN_ENABLED=false`）。
@@ -60,6 +60,20 @@
 | `src/agent/evolution/lessons.py` | 共享教训 taxonomy（输入契约；与 #1196 共用） |
 | `src/agent/evolution/error_patterns.py` | 卡片、聚类、存储、人工编辑留痕、检索 |
 | `src/agent/evolution/guards.py` | Soul 身份快照 / 断言 |
+| `scripts/error_pattern_admin.py` | 真实 list/ingest/edit/enable/disable 运维入口 |
+
+状态以 `agent_error_patterns.json` 原子写入 `DATABASE_PATH` 同目录；快照有版本、
+大小与条目上限。损坏或不支持的快照不会加载卡片，并在运维人员修复或移除
+无效文件前拒绝后续写入，避免静默覆盖审计证据。无需数据库迁移。
+
+```bash
+python scripts/error_pattern_admin.py ingest --input lessons.json --actor ops:reviewer
+python scripts/error_pattern_admin.py list
+python scripts/error_pattern_admin.py disable pattern:overconfidence --actor ops:reviewer --note noisy
+```
+
+启用 `AGENT_ERROR_PATTERN_ENABLED=true` 后，股票分析阶段会读取该持久化状态，
+并在 top-K 与字符硬配额内把 enabled 卡片加入分析提示词。
 
 ## 配置
 
@@ -77,12 +91,11 @@
 | 禁用卡片不注入 | `enabled=false` 被分析路径排除 |
 | 注入不改 Soul 宪章字节 | Soul 快照 + 宪章字节断言测试 |
 | 模式引用 episode | `stats.episode_refs` |
-| 人工编辑留痕 | `PatternEditEvent` 追加日志 |
+| 人工编辑留痕 | 持久化、有界的 `PatternEditEvent` 日志 |
 | 配额 | top-K + 字符预算 |
 
 ## V1 非目标
 
-- 生产 Orchestrator 自动接线（库路径；默认关）
 - 多租户 DB 表 / Web 卡片编辑 UI
 - 完整后验 / 反思环（由 #1196 / #1103 / #1089 负责）
 

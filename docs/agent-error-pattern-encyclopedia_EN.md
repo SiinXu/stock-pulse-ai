@@ -1,6 +1,6 @@
 # Error-pattern encyclopedia from lessons
 
-**Status**: V1 library path for [Issue #1138](https://github.com/SiinXu/stock-pulse-ai/issues/1138)
+**Status**: V1 persisted analysis path for [Issue #1138](https://github.com/SiinXu/stock-pulse-ai/issues/1138)
 
 **Chinese**: [agent-error-pattern-encyclopedia.md](agent-error-pattern-encyclopedia.md)
 
@@ -20,7 +20,7 @@ Stats note: `occurrence_count` and severity counters are **episode-idempotent** 
 
 1. Cluster recurring lessons by typed kind into searchable cards.
 2. Humans may edit title / description / triggers / remedy, or disable a card.
-3. Every human edit (including disable/enable/re-judge) **leaves an append-only audit trail**.
+3. Every human edit (including disable/enable/re-judge) appends a bounded audit event.
 4. Analysis-time retrieval injects only **enabled** cards, under **top-K** and **char budget** quotas.
 5. Injection is a **read-only checklist** wrapped as untrusted data. It must not change Agent Soul charter bytes.
 6. Default **off** (`AGENT_ERROR_PATTERN_ENABLED=false`).
@@ -58,8 +58,9 @@ Stats note: `occurrence_count` and severity counters are **episode-idempotent** 
 | Module | Role |
 | --- | --- |
 | `src/agent/evolution/lessons.py` | Shared lesson taxonomy (input contract; shared with #1196) |
-| `src/agent/evolution/error_patterns.py` | Cards, clustering, store, human edit audit, retrieval |
+| `src/agent/evolution/error_patterns.py` | Cards, clustering, atomic persisted store, human edit audit, retrieval |
 | `src/agent/evolution/guards.py` | Soul identity snapshot / assert |
+| `scripts/error_pattern_admin.py` | Real list/ingest/edit/enable/disable operator surface |
 
 ## API surface (library)
 
@@ -70,7 +71,7 @@ from src.agent.evolution import (
     retrieve_error_patterns,
 )
 
-store = ErrorPatternEncyclopedia()
+store = ErrorPatternEncyclopedia.from_config(config)
 store.ingest_lessons(episode_lesson_bundles)   # cluster / merge
 store.human_edit("pattern:overconfidence", actor="analyst:a", title="...", remedy="...")
 store.disable("pattern:overconfidence", actor="analyst:a", note="noisy")
@@ -82,7 +83,25 @@ result = retrieve_error_patterns(store, top_k=3, char_budget=2000)
 
 Human edit audit: `store.list_edit_events(pattern_id=...)`.
 
-Optional snapshot: `export_snapshot()` / `import_snapshot()` (V1 has no DB migration).
+State is atomically persisted as `agent_error_patterns.json` beside `DATABASE_PATH`.
+The snapshot is bounded and versioned. Corrupt or unsupported snapshots load no
+cards and reject later writes until an operator repairs or removes the invalid
+file, so preserved audit evidence is never silently overwritten. V1 requires no
+DB migration.
+
+## Operator CLI
+
+```bash
+python scripts/error_pattern_admin.py ingest --input lessons.json --actor ops:reviewer
+python scripts/error_pattern_admin.py list
+python scripts/error_pattern_admin.py disable pattern:overconfidence --actor ops:reviewer --note noisy
+python scripts/error_pattern_admin.py edit pattern:evidence_gap --actor ops:reviewer \
+  --expected-revision 2 --remedy "Require a second source"
+```
+
+When `AGENT_ERROR_PATTERN_ENABLED=true`, the stock-analysis stage loads this
+persisted state and appends enabled cards to the analyzer prompt under the hard
+top-K and character budgets.
 
 ## Configuration
 
@@ -100,12 +119,11 @@ Optional snapshot: `export_snapshot()` / `import_snapshot()` (V1 has no DB migra
 | Disabled cards not injected | `enabled=false` excluded from analysis path |
 | Injection does not change Soul charter bytes | Soul snapshot + charter byte assert in retrieval tests |
 | Pattern refs back to episodes | `stats.episode_refs` |
-| Human edit leaves audit trail | `PatternEditEvent` append-only log |
+| Human edit leaves audit trail | persisted, bounded `PatternEditEvent` log |
 | Quota | top-K + char budget |
 
 ## Out of scope (V1)
 
-- Production Orchestrator auto-wire (library path; default off)
 - Durable multi-tenant DB tables / Web UI for card editing
 - Full post-mortem / reflection loop (owned by #1196 / #1103 / #1089)
 

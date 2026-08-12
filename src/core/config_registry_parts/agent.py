@@ -973,7 +973,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 670,
-        "help_key": "settings.agent.AGENT_MEMORY_ENABLED",
+        "help_key": "settings.agent.AGENT_ERROR_PATTERN_ENABLED",
         "examples": [
             "AGENT_ERROR_PATTERN_ENABLED=false",
             "AGENT_ERROR_PATTERN_ENABLED=true",
@@ -1000,7 +1000,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 0, "max": 3},
         "display_order": 671,
-        "help_key": "settings.agent.AGENT_MEMORY_ENABLED",
+        "help_key": "settings.agent.AGENT_ERROR_PATTERN_ENABLED",
         "examples": ["AGENT_ERROR_PATTERN_INJECT_TOP_K=3"],
         "docs": [{
             "label": "Error-pattern encyclopedia",
@@ -1024,7 +1024,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 0, "max": 8000},
         "display_order": 672,
-        "help_key": "settings.agent.AGENT_MEMORY_ENABLED",
+        "help_key": "settings.agent.AGENT_ERROR_PATTERN_ENABLED",
         "examples": ["AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET=2000"],
         "docs": [{
             "label": "Error-pattern encyclopedia",

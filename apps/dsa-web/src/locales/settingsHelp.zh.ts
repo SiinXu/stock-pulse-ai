@@ -1460,6 +1460,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 置信度校准和长期分析质量。'],
     notes: ['需要配合回测功能使用效果更佳。'],
   },
+  'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
+    title: '错误模式百科',
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent 规划循环',
     summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',

@@ -512,6 +512,9 @@ class GeminiAnalyzer:
         framework_prompt = context.get("personal_investment_framework_prompt")
         if isinstance(framework_prompt, str) and framework_prompt:
             prompt += framework_prompt
+        error_pattern_prompt = context.get("error_pattern_checklist_prompt")
+        if isinstance(error_pattern_prompt, str) and error_pattern_prompt:
+            prompt += "\n\n" + error_pattern_prompt
         prompt += f"""
 
 ## 📈 技术面数据

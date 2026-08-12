@@ -645,6 +645,25 @@ class _StockAnalysisStageMixin:
                     context={"stock_code": code},
                 )
 
+            try:
+                from src.agent.evolution.error_patterns import (
+                    inject_error_patterns_into_analysis_context,
+                )
+
+                inject_error_patterns_into_analysis_context(
+                    enhanced_context,
+                    config=self.config,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Optional checklist failures are logged and omitted.
+                log_safe_exception(
+                    logger,
+                    "Error-pattern checklist injection failed",
+                    exc,
+                    error_code="pipeline_error_pattern_injection_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+
             # Step 7: Call AI Analysis (Pass in Enhanced Context and News)
             (
                 analysis_context_pack_summary,
