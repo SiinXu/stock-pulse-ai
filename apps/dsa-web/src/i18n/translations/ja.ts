@@ -2115,6 +2115,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.watchlistScore.sortManual": "手動順",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreDesc": "AIスコア 高→低",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreAsc": "AIスコア 低→高",
+  "i18n.uiText.UI_TEXT.watchlistScore.loadFailed": "AIスコアを利用できません。更新に成功するまでスコアは非表示となり、スコア順の並べ替えも無効です。",
   "i18n.uiText.UI_TEXT.watchlist.createGroup": "グループを作成",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupBadge": "デフォルト",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupName": "デフォルトグループ",

@@ -217,6 +217,7 @@ const HomePage: React.FC = () => {
     EMPTY_ATTENTION_AVAILABILITY,
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [scoreRefreshGeneration, setScoreRefreshGeneration] = useState(0);
   const [failedSourceCount, setFailedSourceCount] = useState(0);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [setupStatusLoading, setSetupStatusLoading] = useState(true);
@@ -373,10 +374,20 @@ const HomePage: React.FC = () => {
   }, []);
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
+    setScoreRefreshGeneration((generation) => generation + 1);
     void loadAttentionData();
     void loadSetupStatus();
     void loadTodaysFocus();
   }, [loadAttentionData, loadSetupStatus, loadTodaysFocus]);
+
+  const watchlistScoreRefreshKey = useMemo(() => JSON.stringify({
+    refreshGeneration: scoreRefreshGeneration,
+    recentAnalyses: data.recentAnalyses.map((item) => ({
+      id: item.id,
+      stockCode: item.stockCode,
+      createdAt: item.createdAt,
+    })),
+  }), [data.recentAnalyses, scoreRefreshGeneration]);
 
   const analysisHref = buildAnalysisWorkbenchHref({
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
@@ -455,7 +466,7 @@ const HomePage: React.FC = () => {
 
       {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
           avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}
-      <HomeWatchlistGroupsSection />
+      <HomeWatchlistGroupsSection scoreRefreshKey={watchlistScoreRefreshKey} />
 
       {/* xl (1280+) only: at 1024 the shell compact rail + a single content column
           avoid the historical three-surface clip (UI01-P1-02 / #879 B1). */}

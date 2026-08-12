@@ -2115,6 +2115,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.watchlistScore.sortManual": "Urutan manual",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreDesc": "Skor AI tinggi → rendah",
   "i18n.uiText.UI_TEXT.watchlistScore.sortScoreAsc": "Skor AI rendah → tinggi",
+  "i18n.uiText.UI_TEXT.watchlistScore.loadFailed": "Skor dan pengurutan tidak tersedia. Coba lagi.",
   "i18n.uiText.UI_TEXT.watchlist.createGroup": "Buat grup",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupBadge": "Bawaan",
   "i18n.uiText.UI_TEXT.watchlist.defaultGroupName": "Grup bawaan",

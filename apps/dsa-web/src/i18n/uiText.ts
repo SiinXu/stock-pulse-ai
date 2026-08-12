@@ -907,6 +907,7 @@ const zh = {
   'watchlistScore.sortManual': '手动排序',
   'watchlistScore.sortScoreDesc': '按 AI 分从高到低',
   'watchlistScore.sortScoreAsc': '按 AI 分从低到高',
+  'watchlistScore.loadFailed': 'AI 评分暂时不可用；刷新成功前不会显示评分或按评分排序。',
 
   'stockTrend.allHistory': '全部历史',
   'stockTrend.averageScore': '平均分 {score}',
@@ -2838,6 +2839,7 @@ const en: Record<UiTextKey, string> = {
   'watchlistScore.sortManual': 'Manual order',
   'watchlistScore.sortScoreDesc': 'AI score high → low',
   'watchlistScore.sortScoreAsc': 'AI score low → high',
+  'watchlistScore.loadFailed': 'AI scores are unavailable. Scores stay hidden and score sorting stays off until refresh succeeds.',
 
   'stockTrend.allHistory': 'All history',
   'stockTrend.averageScore': 'Average {score}',
