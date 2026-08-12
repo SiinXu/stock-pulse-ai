@@ -40,6 +40,10 @@ logger = logging.getLogger("src.agent.factory")
 # Module-level caches
 # ---------------------------------------------------------------------------
 _TOOL_REGISTRY = None
+# In-progress process registry visible only to re-entrant callers that already
+# hold ``_TOOL_REGISTRY_LOCK`` (agent_tool plugin attach during construction).
+_TOOL_REGISTRY_BUILDING = None
+_TOOL_REGISTRY_LOCK = threading.RLock()
 _SKILL_MANAGER_PROTOTYPE = None
 # Sentinel used as initial value so None (i.e. no custom dir) compares as "changed"
 # on the very first call, forcing a build rather than accidentally skipping it.
@@ -236,164 +240,230 @@ def get_installed_tool_registry():
     return _TOOL_REGISTRY
 
 
-def get_tool_registry():
-    """Return a cached ToolRegistry (built once, shared across requests)."""
-    global _TOOL_REGISTRY
+def peek_process_tool_registry():
+    """Return installed or in-progress process registry without constructing.
+
+    Used by agent_tool plugin registration to attach to an existing build or
+    defer until the first real ``get_tool_registry()`` construction.
+    """
+
     if _TOOL_REGISTRY is not None:
         return _TOOL_REGISTRY
+    return _TOOL_REGISTRY_BUILDING
 
-    from src.agent.tools.registry import ToolRegistry
-    from src.agent.tools.data_tools import ALL_DATA_TOOLS
-    from src.agent.tools.analysis_tools import ALL_ANALYSIS_TOOLS
-    from src.agent.tools.market_tools import ALL_MARKET_TOOLS
-    from src.agent.tools.backtest_tools import ALL_BACKTEST_TOOLS
 
-    registry = ToolRegistry()
-    # Core non-plugin tools. Agent Web Search tools register via the
-    # builtin.web_search agent_tool plugin (issue #432); optional tools below
-    # remain configuration-gated.
-    for tool_fn in (
-        ALL_DATA_TOOLS
-        + ALL_ANALYSIS_TOOLS
-        + ALL_MARKET_TOOLS
-        + ALL_BACKTEST_TOOLS
-    ):
-        registry.register(tool_fn)
+def get_tool_registry():
+    """Return a cached ToolRegistry (built once, shared across requests)."""
+    global _TOOL_REGISTRY, _TOOL_REGISTRY_BUILDING
 
-    # Publish early so re-entrant agent_tool plugin registration (triggered when
-    # optional factories call get_application_services → start_plugins) attaches
-    # to this process registry instead of building a second incomplete cache.
-    _TOOL_REGISTRY = registry
+    with _TOOL_REGISTRY_LOCK:
+        if _TOOL_REGISTRY is not None:
+            return _TOOL_REGISTRY
+        # Re-entrant construction (same thread holds the RLock): expose the
+        # in-progress registry so agent_tool plugins can attach without nesting
+        # a second incomplete cache. Concurrent callers block on the lock until
+        # the complete registry is published.
+        if _TOOL_REGISTRY_BUILDING is not None:
+            return _TOOL_REGISTRY_BUILDING
 
-    # Optional multimodal PDF/chart tools (issue #253): default-off.
-    try:
-        from src.agent.tools.multimodal_tools import (
-            PARSE_PDF_TOOL_NAME,
-            READ_CHART_TOOL_NAME,
-            build_multimodal_tools,
-        )
-        from src.application_services import get_application_services
+        from src.agent.tools.registry import ToolRegistry
+        from src.agent.tools.data_tools import ALL_DATA_TOOLS
+        from src.agent.tools.analysis_tools import ALL_ANALYSIS_TOOLS
+        from src.agent.tools.market_tools import ALL_MARKET_TOOLS
+        from src.agent.tools.backtest_tools import ALL_BACKTEST_TOOLS
 
-        config = get_application_services().config
-        enabled = getattr(config, "multimodal_agent_tools_enabled", False) is True
-        root = str(getattr(config, "multimodal_file_root", "") or "").strip()
-        configured = enabled and bool(root)
-        reason_code = None if configured else (
-            "missing_config" if enabled else "feature_disabled"
-        )
-        names = (PARSE_PDF_TOOL_NAME, READ_CHART_TOOL_NAME)
-        _declare_optional_tools(
-            registry,
-            names,
-            configured=configured,
-            reason_code=reason_code,
-            scopes=("multimodal:read",),
-        )
+        registry = ToolRegistry()
+        _TOOL_REGISTRY_BUILDING = registry
         try:
-            multimodal_tools = build_multimodal_tools(config)
-        except Exception:
-            _declare_optional_tools(
-                registry,
-                names,
-                configured=configured,
-                reason_code="construction_failed",
-                scopes=("multimodal:read",),
-                dependency_ready=False,
+            # Core non-plugin tools. Agent Web Search tools register via the
+            # builtin.web_search agent_tool plugin (issue #432); optional tools
+            # below remain configuration-gated.
+            for tool_fn in (
+                ALL_DATA_TOOLS
+                + ALL_ANALYSIS_TOOLS
+                + ALL_MARKET_TOOLS
+                + ALL_BACKTEST_TOOLS
+            ):
+                registry.register(tool_fn)
+
+            # Always-on agent_tool builtins may have deferred during start_plugins
+            # before any process registry existed, or they re-enter now while
+            # BUILDING is visible via peek_process_tool_registry().
+            try:
+                from src.application_services import get_application_services
+
+                get_application_services()
+            except Exception as exc:  # broad-exception: fallback_recorded
+                log_safe_exception(
+                    logger,
+                    "Application services unavailable during tool registry build",
+                    exc,
+                    error_code="tool_registry_application_services_unavailable",
+                    level=logging.DEBUG,
+                )
+            from src.plugins.agent_tools import flush_deferred_agent_tool_registrations
+
+            flush_deferred_agent_tool_registrations(registry)
+
+            # Availability safety net: always-on search tools must remain present
+            # even when composition-root plugin attach did not run (partial test
+            # isolation / failed root install). Plugin ownership still applies
+            # when builtin.web_search registered first (idempotent same object).
+            from src.agent.tools.search_tools import build_search_tools
+
+            for tool_def in build_search_tools():
+                if registry.get(tool_def.name) is None:
+                    registry.register(tool_def)
+
+            # Optional multimodal PDF/chart tools (issue #253): default-off.
+            try:
+                from src.agent.tools.multimodal_tools import (
+                    PARSE_PDF_TOOL_NAME,
+                    READ_CHART_TOOL_NAME,
+                    build_multimodal_tools,
+                )
+                from src.application_services import get_application_services
+
+                config = get_application_services().config
+                enabled = getattr(config, "multimodal_agent_tools_enabled", False) is True
+                root = str(getattr(config, "multimodal_file_root", "") or "").strip()
+                configured = enabled and bool(root)
+                reason_code = None if configured else (
+                    "missing_config" if enabled else "feature_disabled"
+                )
+                names = (PARSE_PDF_TOOL_NAME, READ_CHART_TOOL_NAME)
+                _declare_optional_tools(
+                    registry,
+                    names,
+                    configured=configured,
+                    reason_code=reason_code,
+                    scopes=("multimodal:read",),
+                )
+                try:
+                    multimodal_tools = build_multimodal_tools(config)
+                except Exception:
+                    _declare_optional_tools(
+                        registry,
+                        names,
+                        configured=configured,
+                        reason_code="construction_failed",
+                        scopes=("multimodal:read",),
+                        dependency_ready=False,
+                    )
+                    raise
+                built = {tool_def.name for tool_def in (multimodal_tools or ())}
+                for tool_def in multimodal_tools or ():
+                    registry.register(tool_def)
+                # A configured optional tool that the owner's factory did not produce is
+                # a construction failure, not a plain "not registered" absence.
+                _declare_optional_tools(
+                    registry,
+                    tuple(name for name in names if name not in built),
+                    configured=configured,
+                    reason_code=reason_code or "construction_produced_no_tool",
+                    scopes=("multimodal:read",),
+                    dependency_ready=False if configured else None,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - optional tools stay absent.
+                log_safe_exception(
+                    logger,
+                    "Optional multimodal tool registration skipped",
+                    exc,
+                    error_code="multimodal_tool_registration_failed",
+                    level=logging.WARNING,
+                )
+
+            # Optional earnings-transcript tool (issue #253 remaining): default-off.
+            # Separate module/name from OCR (T29) and PDF/chart multimodal tools.
+            try:
+                from src.agent.tools.earnings_transcript_tools import (
+                    build_earnings_transcript_tools,
+                )
+                from src.application_services import get_application_services
+
+                transcript_tools = build_earnings_transcript_tools(
+                    get_application_services().config
+                )
+                if transcript_tools:
+                    for tool_def in transcript_tools:
+                        registry.register(tool_def)
+            except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
+                log_safe_exception(
+                    logger,
+                    "Optional earnings transcript tool registration skipped",
+                    exc,
+                    error_code="earnings_transcript_tool_registration_failed",
+                    level=logging.WARNING,
+                )
+
+            # Optional valuation tool (issue #238): default-off, registered only when enabled.
+            try:
+                from src.agent.tools.valuation_tools import (
+                    VALUATION_TOOL_NAME,
+                    build_valuation_tool,
+                )
+                from src.application_services import get_application_services
+
+                config = get_application_services().config
+                configured = getattr(config, "valuation_agent_tool_enabled", False) is True
+                reason_code = None if configured else "feature_disabled"
+                names = (VALUATION_TOOL_NAME,)
+                _declare_optional_tools(
+                    registry, names, configured=configured, reason_code=reason_code,
+                )
+                try:
+                    valuation_tool = build_valuation_tool(config)
+                except Exception:
+                    _declare_optional_tools(
+                        registry,
+                        names,
+                        configured=configured,
+                        reason_code="construction_failed",
+                        dependency_ready=False,
+                    )
+                    raise
+                if valuation_tool is not None:
+                    registry.register(valuation_tool)
+                else:
+                    _declare_optional_tools(
+                        registry,
+                        names,
+                        configured=configured,
+                        reason_code=reason_code or "construction_produced_no_tool",
+                        dependency_ready=False if configured else None,
+                    )
+            except Exception as exc:  # broad-exception: fallback_recorded - optional tools stay absent.
+                log_safe_exception(
+                    logger,
+                    "Optional valuation tool registration skipped",
+                    exc,
+                    error_code="valuation_tool_registration_failed",
+                    level=logging.WARNING,
+                )
+
+            # Commit deferred agent_tool plugin registrations that arrived before
+            # any process registry existed (always-on builtins such as web_search).
+            from src.plugins.agent_tools import (
+                flush_deferred_agent_tool_registrations,
             )
-            raise
-        built = {tool_def.name for tool_def in (multimodal_tools or ())}
-        for tool_def in multimodal_tools or ():
-            registry.register(tool_def)
-        # A configured optional tool that the owner's factory did not produce is
-        # a construction failure, not a plain "not registered" absence.
-        _declare_optional_tools(
-            registry,
-            tuple(name for name in names if name not in built),
-            configured=configured,
-            reason_code=reason_code or "construction_produced_no_tool",
-            scopes=("multimodal:read",),
-            dependency_ready=False if configured else None,
-        )
-    except Exception as exc:  # broad-exception: fallback_recorded - optional tools stay absent.
-        log_safe_exception(
-            logger,
-            "Optional multimodal tool registration skipped",
-            exc,
-            error_code="multimodal_tool_registration_failed",
-            level=logging.WARNING,
-        )
 
-    # Optional earnings-transcript tool (issue #253 remaining): default-off.
-    # Separate module/name from OCR (T29) and PDF/chart multimodal tools.
-    try:
-        from src.agent.tools.earnings_transcript_tools import (
-            build_earnings_transcript_tools,
-        )
-        from src.application_services import get_application_services
+            flush_deferred_agent_tool_registrations(registry)
 
-        transcript_tools = build_earnings_transcript_tools(
-            get_application_services().config
-        )
-        if transcript_tools:
-            for tool_def in transcript_tools:
-                registry.register(tool_def)
-    except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
-        log_safe_exception(
-            logger,
-            "Optional earnings transcript tool registration skipped",
-            exc,
-            error_code="earnings_transcript_tool_registration_failed",
-            level=logging.WARNING,
-        )
+            from src.agent.tools.search_tools import build_search_tools
 
-    # Optional valuation tool (issue #238): default-off, registered only when enabled.
-    try:
-        from src.agent.tools.valuation_tools import (
-            VALUATION_TOOL_NAME,
-            build_valuation_tool,
-        )
-        from src.application_services import get_application_services
+            for tool_def in build_search_tools():
+                if registry.get(tool_def.name) is None:
+                    registry.register(tool_def)
 
-        config = get_application_services().config
-        configured = getattr(config, "valuation_agent_tool_enabled", False) is True
-        reason_code = None if configured else "feature_disabled"
-        names = (VALUATION_TOOL_NAME,)
-        _declare_optional_tools(
-            registry, names, configured=configured, reason_code=reason_code,
-        )
-        try:
-            valuation_tool = build_valuation_tool(config)
-        except Exception:
-            _declare_optional_tools(
-                registry,
-                names,
-                configured=configured,
-                reason_code="construction_failed",
-                dependency_ready=False,
+            _TOOL_REGISTRY = registry
+            logger.info(
+                "[AgentFactory] ToolRegistry cached (%d tools)",
+                len(registry._tools) if hasattr(registry, "_tools") else -1,
             )
-            raise
-        if valuation_tool is not None:
-            registry.register(valuation_tool)
-        else:
-            _declare_optional_tools(
-                registry,
-                names,
-                configured=configured,
-                reason_code=reason_code or "construction_produced_no_tool",
-                dependency_ready=False if configured else None,
-            )
-    except Exception as exc:  # broad-exception: fallback_recorded - optional tool stays absent.
-        log_safe_exception(
-            logger,
-            "Optional valuation tool registration skipped",
-            exc,
-            error_code="valuation_tool_registration_failed",
-            level=logging.WARNING,
-        )
+            return _TOOL_REGISTRY
+        finally:
+            _TOOL_REGISTRY_BUILDING = None
 
-    _TOOL_REGISTRY = registry
-    logger.info("[AgentFactory] ToolRegistry cached (%d tools)", len(registry._tools) if hasattr(registry, "_tools") else -1)
-    return _TOOL_REGISTRY
 
 
 def build_declarative_skill_manager(config: Config):

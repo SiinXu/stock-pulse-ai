@@ -312,8 +312,36 @@ def validate_agent_tool_definition(implementation: object) -> bool:
     return True
 
 
+_DEFERRED_BACKENDS: list[object] = []
+_DEFERRED_BACKENDS_LOCK = threading.RLock()
+
+
+def _register_deferred_backend(backend: object) -> None:
+    with _DEFERRED_BACKENDS_LOCK:
+        if backend not in _DEFERRED_BACKENDS:
+            _DEFERRED_BACKENDS.append(backend)
+
+
+def flush_deferred_agent_tool_registrations(registry: ToolRegistry) -> None:
+    """Flush process agent_tool backends that deferred until registry construction."""
+
+    with _DEFERRED_BACKENDS_LOCK:
+        backends = list(_DEFERRED_BACKENDS)
+    for backend in backends:
+        flush = getattr(backend, "flush_deferred", None)
+        if callable(flush):
+            flush(registry)
+
+
 class AgentToolRegistrationBackend:
-    """Delegate exact-owner plugin registrations to one native ToolRegistry."""
+    """Delegate exact-owner plugin registrations to one native ToolRegistry.
+
+    When the process registry is provided as a callable factory and has not been
+    constructed yet, registrations are deferred until the first
+    ``get_tool_registry()`` build flushes them. That keeps always-on agent_tool
+    builtins (for example ``builtin.web_search``) from forcing a full registry
+    construction during ``start_plugins()``.
+    """
 
     def __init__(
         self,
@@ -325,7 +353,10 @@ class AgentToolRegistrationBackend:
         self._owned_registries: dict[
             tuple[str, int], tuple[object, ToolRegistry]
         ] = {}
+        self._deferred: list[tuple[str, ToolDefinition]] = []
         self._lock = threading.RLock()
+        if callable(registry):
+            _register_deferred_backend(self)
 
     def _registry(self) -> ToolRegistry:
         candidate = self._registry_or_provider
@@ -334,8 +365,49 @@ class AgentToolRegistrationBackend:
             raise TypeError("agent tool registry provider returned an invalid registry")
         return registry
 
+    def _active_registry(self) -> ToolRegistry | None:
+        """Return an existing registry without forcing process construction."""
+
+        candidate = self._registry_or_provider
+        if isinstance(candidate, ToolRegistry):
+            return candidate
+        if callable(candidate):
+            from src.agent.runtime_assembly import peek_process_tool_registry
+
+            peeked = peek_process_tool_registry()
+            if peeked is not None and isinstance(peeked, ToolRegistry):
+                return peeked
+            return None
+        return None
+
     def contains(self, registration_id: str) -> bool:
-        return self._registry().get(registration_id) is not None
+        with self._lock:
+            if any(tool_id == registration_id for tool_id, _ in self._deferred):
+                return True
+            registry = self._active_registry()
+            if registry is None:
+                return False
+            return registry.get(registration_id) is not None
+
+    def _commit(
+        self,
+        registry: ToolRegistry,
+        registration_id: str,
+        implementation: ToolDefinition,
+    ) -> None:
+        owner_key = (registration_id, id(implementation))
+        existing = registry.get(registration_id)
+        if existing is not None:
+            if existing is implementation:
+                # Same ToolDefinition already present (for example deferred flush
+                # after a re-entrant attach). Record ownership and continue.
+                self._owned_registries[owner_key] = (implementation, registry)
+                return
+            raise ValueError("agent tool registration conflicts with an existing tool")
+        if owner_key in self._owned_registries:
+            raise ValueError("agent tool implementation is already registered")
+        self._owned_registries[owner_key] = (implementation, registry)
+        registry.register(implementation)
 
     def register(self, registration_id: str, implementation: object) -> None:
         if (
@@ -343,19 +415,38 @@ class AgentToolRegistrationBackend:
             or implementation.name != registration_id
         ):
             raise TypeError("agent tool registration identity is invalid")
-        registry = self._registry()
-        if registry.get(registration_id) is not None:
-            raise ValueError("agent tool registration conflicts with an existing tool")
-        owner_key = (registration_id, id(implementation))
         with self._lock:
-            if owner_key in self._owned_registries:
-                raise ValueError("agent tool implementation is already registered")
-            self._owned_registries[owner_key] = (implementation, registry)
-            registry.register(implementation)
+            if any(tool_id == registration_id for tool_id, _ in self._deferred):
+                raise ValueError("agent tool registration conflicts with an existing tool")
+            registry = self._active_registry()
+            if registry is None:
+                if not callable(self._registry_or_provider):
+                    raise TypeError(
+                        "agent tool registry provider returned an invalid registry"
+                    )
+                self._deferred.append((registration_id, implementation))
+                return
+            self._commit(registry, registration_id, implementation)
+
+    def flush_deferred(self, registry: ToolRegistry) -> None:
+        """Commit registrations deferred before the process registry existed."""
+
+        if not isinstance(registry, ToolRegistry):
+            raise TypeError("agent tool registry must be a ToolRegistry")
+        with self._lock:
+            pending = list(self._deferred)
+            self._deferred.clear()
+            for registration_id, implementation in pending:
+                self._commit(registry, registration_id, implementation)
 
     def unregister(self, registration_id: str, implementation: object) -> None:
         owner_key = (registration_id, id(implementation))
         with self._lock:
+            self._deferred = [
+                (tool_id, tool)
+                for tool_id, tool in self._deferred
+                if not (tool_id == registration_id and tool is implementation)
+            ]
             owner = self._owned_registries.get(owner_key)
             if owner is None or owner[0] is not implementation:
                 return

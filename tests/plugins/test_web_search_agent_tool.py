@@ -80,6 +80,10 @@ def test_plugin_registration_matches_module_level_tool_identity() -> None:
 def test_application_services_registers_search_tools_on_process_registry(
     monkeypatch,
 ) -> None:
+    import src.agent.runtime_assembly as runtime_assembly
+
+    runtime_assembly._TOOL_REGISTRY = None
+    runtime_assembly._TOOL_REGISTRY_BUILDING = None
     registry = ToolRegistry()
     monkeypatch.setattr(
         "src.agent.runtime_assembly.get_tool_registry",
@@ -92,11 +96,18 @@ def test_application_services_registers_search_tools_on_process_registry(
     )
     results = services.start_plugins()
     assert results[0].success is True
+    # Process agent_tool backends defer until a registry exists; tests inject a
+    # stub registry without going through get_tool_registry construction.
+    from src.plugins.agent_tools import flush_deferred_agent_tool_registrations
+
+    flush_deferred_agent_tool_registrations(registry)
     for name in SEARCH_TOOL_NAMES:
         assert registry.get(name) is not None
     services.close()
     for name in SEARCH_TOOL_NAMES:
         assert registry.get(name) is None
+    runtime_assembly._TOOL_REGISTRY = None
+    runtime_assembly._TOOL_REGISTRY_BUILDING = None
 
 
 def test_get_tool_registry_includes_search_tools_after_composition_root() -> None:
@@ -124,3 +135,49 @@ def test_get_tool_registry_includes_search_tools_after_composition_root() -> Non
     finally:
         runtime_assembly._TOOL_REGISTRY = original_registry
         set_application_services(None)
+
+
+def test_start_plugins_defers_search_tools_until_registry_build(monkeypatch) -> None:
+    """Always-on web_search must not force full ToolRegistry construction."""
+
+    import src.agent.runtime_assembly as runtime_assembly
+    from src.application_services import set_application_services
+
+    calls: list[str] = []
+    real_get = runtime_assembly.get_tool_registry
+
+    def _counting_get_tool_registry():
+        calls.append("get_tool_registry")
+        return real_get()
+
+    monkeypatch.setattr(
+        runtime_assembly,
+        "get_tool_registry",
+        _counting_get_tool_registry,
+    )
+
+    original_registry = runtime_assembly._TOOL_REGISTRY
+    try:
+        runtime_assembly._TOOL_REGISTRY = None
+        runtime_assembly._TOOL_REGISTRY_BUILDING = None
+        set_application_services(None)
+
+        services = ApplicationServices(
+            config=SimpleNamespace(kronos_enabled=False, ocr_agent_tool_enabled=False),
+            builtin_plugins=(WebSearchAgentToolPlugin(),),
+            plugins_dir="",
+        )
+        calls.clear()
+        results = services.start_plugins()
+        assert results[0].success is True
+        assert calls == []
+        assert runtime_assembly.get_installed_tool_registry() is None
+
+        registry = real_get()
+        for name in SEARCH_TOOL_NAMES:
+            assert registry.get(name) is not None, name
+    finally:
+        runtime_assembly._TOOL_REGISTRY = original_registry
+        runtime_assembly._TOOL_REGISTRY_BUILDING = None
+        set_application_services(None)
+
