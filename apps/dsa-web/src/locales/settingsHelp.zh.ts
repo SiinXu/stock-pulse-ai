@@ -630,6 +630,39 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响聚合基本面校验失败如何向上游调用方暴露。'],
     notes: ['与 DATA_VALIDATION_STRICT 的 provider 候选拒绝相互独立。'],
   },
+  'settings.data_source.DATA_VALIDATION_FUND_PE_SUSPECT_ABS': {
+    title: '基本面 PE 可疑阈值',
+    summary: 'PE 绝对值软阈值。达到或超过该值时标记为可疑并保留数值。',
+    usage: '默认 200。仅当目标标的常见合法 PE 经常超过该软带时再调高。',
+    valueNotes: [
+      '可疑发现仅为告警；PE 数值仍保留给分析使用。',
+      '硬性极端仍拒绝，与该软阈值相互独立。',
+    ],
+    impact: ['改变诊断与上下文证据中 PE 被标记为可疑的时机。'],
+    notes: ['硬/软基本面区间说明见 docs/data-validation-layer.md。'],
+  },
+  'settings.data_source.DATA_VALIDATION_FUND_PB_SUSPECT_ABS': {
+    title: '基本面 PB 可疑阈值',
+    summary: 'PB 绝对值软阈值。达到或超过该值时标记为可疑并保留数值。',
+    usage: '默认 50。仅当目标标的常见合法 PB 经常超过该软带时再调高。',
+    valueNotes: [
+      '可疑发现仅为告警；PB 数值仍保留给分析使用。',
+      '硬性极端仍拒绝，与该软阈值相互独立。',
+    ],
+    impact: ['改变诊断与上下文证据中 PB 被标记为可疑的时机。'],
+    notes: ['ETF 与部分海外源缺失 PE/PB 仍视为合法。'],
+  },
+  'settings.data_source.DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD': {
+    title: '跨源相对差异阈值',
+    summary: '多数据源同字段相对差异告警阈值。',
+    usage: '默认 0.05（5%）。当数据源报价口径差异较大时可适当调高以减少告警。',
+    valueNotes: [
+      '仅当两个及以上数据源提供同一有限字段时生效。',
+      '差异值会保留并附带来源归因；单一数据源失败不会中断整体分析。',
+    ],
+    impact: ['控制跨源 WARN 证据写入运行诊断的时机。'],
+    notes: ['比对为观测性逻辑，比对异常 fail-open。'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: '飞书群机器人 Webhook',
     summary: '配置飞书自定义群机器人，用于把分析报告推送到指定飞书群。',

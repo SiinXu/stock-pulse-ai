@@ -374,6 +374,12 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DATA_VALIDATION_STRICT_SCOPES` | Comma-separated `market/instrument` strict-mode selectors such as `cn/equity,hk/etf,us/index`; `*` is a wildcard. | `*/*` | Optional |
 | `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | Authoritative comma-separated `SYMBOL=instrument` identities for offshore symbols whose ETF/index type cannot be inferred safely from code alone. | - | Optional |
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | Final aggregated-fundamental policy: `warn` preserves data with evidence; `reject` raises explicitly and is not provider failover. | `warn` | Optional |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | Soft absolute PE bound; values at or above this magnitude are marked suspect (warn) and kept. | `200` | Optional |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | Soft absolute PB bound; values at or above this magnitude are marked suspect (warn) and kept. | `50` | Optional |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | Relative multi-provider divergence threshold; above-threshold differences warn with attribution and keep values. | `0.05` | Optional |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | Soft absolute PE bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `200` | Optional |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | Soft absolute PB bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `50` | Optional |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | Relative multi-provider field divergence threshold; excess difference records a warn with attribution while keeping values. | `0.05` | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `8.0` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call; market-structure industry/concept rankings share this budget | `8.0` | Optional |

@@ -1,8 +1,10 @@
 {
-  "baselineNote": "Budgets remeasured on GitHub Actions Linux after Home customizable dashboard layout (Refs #189 / PR #1158); raised locale chunks, HomeWatchlistGroupsSection, and vendor-icons using measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
-  "gzipLevel": 9,
   "version": 1,
+  "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
+  "outDir": "../../static",
+  "gzipLevel": 9,
   "measuredAt": "2026-08-12",
+  "baselineNote": "Budgets remeasured on GitHub Actions Linux after Home customizable dashboard layout (Refs #189 / PR #1158); raised locale chunks, HomeWatchlistGroupsSection, and vendor-icons using measured gzip + 200 B headroom where needed. Untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -11,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 234690,
-      "measuredGzipBytes": 234490,
-      "note": "Remeasured after Data Sources Hub runtime projection merge with main (Refs #867); measured 234490 B + 200 B headroom."
+      "maxGzipBytes": 236063,
+      "measuredGzipBytes": 235863,
+      "note": "GitHub Actions Linux measurement after data-validation Settings help inventory (PR #1161 / Refs #185); measured gzip + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -24,56 +26,56 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 153581,
+      "maxGzipBytes": 153720,
       "measuredGzipBytes": 153381,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 146870,
+      "maxGzipBytes": 147131,
       "measuredGzipBytes": 146670,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 146795,
+      "maxGzipBytes": 147091,
       "measuredGzipBytes": 146595,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 146955,
-      "measuredGzipBytes": 146755,
+      "maxGzipBytes": 147384,
+      "measuredGzipBytes": 146784,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 142833,
+      "maxGzipBytes": 143171,
       "measuredGzipBytes": 142633,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 139407,
+      "maxGzipBytes": 139684,
       "measuredGzipBytes": 139207,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 132852,
+      "maxGzipBytes": 133151,
       "measuredGzipBytes": 132652,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 132876,
+      "maxGzipBytes": 133234,
       "measuredGzipBytes": 132676,
       "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
     },
@@ -204,7 +206,5 @@
       "maxGzipBytes": 576,
       "measuredGzipBytes": 523
     }
-  ],
-  "outDir": "../../static",
-  "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification."
+  ]
 }

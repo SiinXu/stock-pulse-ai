@@ -433,6 +433,12 @@ stock-pulse-ai/
 | `DATA_VALIDATION_STRICT_SCOPES` | 严格模式适用范围，逗号分隔 `市场/品种`，如 `cn/equity,hk/etf,us/index`；`*` 为通配符。 | `*/*` | 可选 |
 | `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | 海外代码无法可靠推断 ETF/指数身份时使用的权威映射，逗号分隔 `代码=品种`。 | - | 可选 |
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | 聚合基本面最终出口策略：`warn` 保留结果并记录证据，`reject` 显式抛错；该模式不是数据源回退。 | `warn` | 可选 |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | PE 绝对值软阈值；达到或超过时标记可疑（告警）并保留数值。 | `200` | 可选 |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | PB 绝对值软阈值；达到或超过时标记可疑（告警）并保留数值。 | `50` | 可选 |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | 多源同字段相对差异阈值；超过则告警并保留数值与来源归因。 | `0.05` | 可选 |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | PE 软合理性上界：达到该绝对值标记为可疑（warn）并保留；硬极限仍为 reject。 | `200` | 可选 |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | PB 软合理性上界：达到该绝对值标记为可疑（warn）并保留；硬极限仍为 reject。 | `50` | 可选 |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | 多数据源同一字段的相对差异阈值；超阈值记 warning 并保留归因，不丢弃数值。 | `0.05` | 可选 |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | 基本面聚合总开关；关闭时仅返回 `not_supported` 块，不改变原分析链路 | `true` | 可选 |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | 基本面阶段总时延预算（秒） | `8.0` | 可选 |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | 单能力源调用超时（秒）；市场结构行业/概念排行也复用该预算 | `8.0` | 可选 |

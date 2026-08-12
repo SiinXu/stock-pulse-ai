@@ -603,6 +603,39 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects how final aggregated fundamental validation failures are surfaced to callers.'],
     notes: ['Independent of DATA_VALIDATION_STRICT provider-candidate rejection.'],
   },
+  'settings.data_source.DATA_VALIDATION_FUND_PE_SUSPECT_ABS': {
+    title: 'Fundamental PE Suspect Bound',
+    summary: 'Soft absolute PE bound. Values at or above this magnitude are marked suspect and kept.',
+    usage: 'Default 200. Raise only when legitimate PE values commonly exceed the soft band for your universe.',
+    valueNotes: [
+      'Suspect findings are warn-only; the PE value is retained for analysis.',
+      'Hard feed extremes still reject and remain separate from this soft bound.',
+    ],
+    impact: ['Changes when PE is annotated as suspect in diagnostics and context evidence.'],
+    notes: ['See docs/data-validation-layer.md for hard vs soft fundamental ranges.'],
+  },
+  'settings.data_source.DATA_VALIDATION_FUND_PB_SUSPECT_ABS': {
+    title: 'Fundamental PB Suspect Bound',
+    summary: 'Soft absolute PB bound. Values at or above this magnitude are marked suspect and kept.',
+    usage: 'Default 50. Raise only when legitimate PB values commonly exceed the soft band for your universe.',
+    valueNotes: [
+      'Suspect findings are warn-only; the PB value is retained for analysis.',
+      'Hard feed extremes still reject and remain separate from this soft bound.',
+    ],
+    impact: ['Changes when PB is annotated as suspect in diagnostics and context evidence.'],
+    notes: ['Missing PE/PB remains valid for ETFs and partial offshore providers.'],
+  },
+  'settings.data_source.DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD': {
+    title: 'Cross-Source Relative Threshold',
+    summary: 'Relative divergence threshold for multi-provider field comparison.',
+    usage: 'Default 0.05 (5%). Increase to reduce warnings when providers use different quote conventions.',
+    valueNotes: [
+      'Only applies when two or more providers supply the same finite field.',
+      'Divergent values are kept with provider attribution; a single source never interrupts analysis.',
+    ],
+    impact: ['Controls when cross-source WARN evidence is written to run diagnostics.'],
+    notes: ['Comparison is observational and fail-open on comparison errors.'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
     summary: 'Sends analysis reports to a Feishu group through a custom bot webhook.',

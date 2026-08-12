@@ -1,0 +1,16 @@
+{
+  "schema_version": "data-validation-fixtures-v1",
+  "description": "Frozen edge-instrument OHLCV and valuation samples for false-positive calibration of the data validation layer (Issue #185).",
+  "license": "recorded-fixture-sanitized",
+  "related_docs": [
+    "docs/data-validation-layer.md"
+  ],
+  "fixtures": [
+    "cn_etf_510300_daily.json",
+    "us_etf_spy_daily.json",
+    "hk_etf_02800_quote.json",
+    "cn_index_000300_bar.json",
+    "us_equity_high_pe_growth.json",
+    "suspended_etf_zero_turnover.json"
+  ]
+}
