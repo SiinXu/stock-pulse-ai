@@ -84,6 +84,7 @@ def _build_budget_guard_result(
     messages: List[Dict[str, Any]],
     remaining_timeout_s: float,
     min_step_budget_s: float,
+    budget_snapshot: Optional[Dict[str, Any]] = None,
 ) -> RunLoopResult:
     return RunLoopResult(
         success=False,
@@ -99,6 +100,35 @@ def _build_budget_guard_result(
         ),
         failure_reason=StageFailureReason.BUDGET_SKIP,
         messages=messages,
+        budget_snapshot=budget_snapshot,
+    )
+
+
+def _build_mode_budget_result(
+    *,
+    step: int,
+    tool_calls_log: List[Dict[str, Any]],
+    total_tokens: int,
+    provider_used: str,
+    models_used: List[str],
+    messages: List[Dict[str, Any]],
+    breach_message: str,
+    failure_reason: StageFailureReason,
+    budget_snapshot: Optional[Dict[str, Any]] = None,
+) -> RunLoopResult:
+    """Terminal result for hard mode budget breaches (turns/tools/cost/tokens)."""
+    return RunLoopResult(
+        success=False,
+        content="",
+        tool_calls_log=tool_calls_log,
+        total_steps=step,
+        total_tokens=total_tokens,
+        provider=provider_used,
+        models_used=models_used,
+        error=breach_message,
+        failure_reason=failure_reason,
+        messages=messages,
+        budget_snapshot=budget_snapshot,
     )
 
 
