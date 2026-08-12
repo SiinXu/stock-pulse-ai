@@ -5,6 +5,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PeerValuationCanvas as PeerCanvasPayload } from '../../../api/valuation';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import {
+  PEER_VALUATION_TRANSLATION_REVIEW_STATUS,
+  VALUATION_TEXT,
+} from '../../../locales/valuation';
 import { PeerValuationCanvas } from '../PeerValuationCanvas';
 
 const sampleCanvas: PeerCanvasPayload = {
@@ -71,6 +75,14 @@ const renderPanel = (ui: ReactElement) =>
   render(<UiLanguageProvider initialLanguage="en">{ui}</UiLanguageProvider>);
 
 describe('PeerValuationCanvas', () => {
+  it('ships localized peer copy with explicit native-review status for every added locale', () => {
+    for (const locale of ['zh-TW', 'ja', 'ko', 'de', 'es', 'ms', 'fr', 'id'] as const) {
+      expect(VALUATION_TEXT[locale].peerTitle).not.toBe(VALUATION_TEXT.en.peerTitle);
+      expect(VALUATION_TEXT[locale].peerDescription).not.toBe(VALUATION_TEXT.en.peerDescription);
+      expect(PEER_VALUATION_TRANSLATION_REVIEW_STATUS[locale]).toBe('PENDING_NATIVE_REVIEW');
+    }
+  });
+
   it('renders peer grid with missing data annotated', () => {
     renderPanel(<PeerValuationCanvas canvas={sampleCanvas} stockCode="600519" readOnly />);
     expect(screen.getByTestId('peer-valuation-canvas')).toBeInTheDocument();

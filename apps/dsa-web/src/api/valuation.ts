@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 
 const sensitivityRowSchema = z.object({
   growthRate: z.number().optional(),
@@ -62,7 +62,12 @@ export async function estimateStockValuation(params: ValuationEstimateParams): P
       projection_years: params.projectionYears ?? undefined,
       peer_codes: params.peerCodes,
     });
-    return valuationEstimateSchema.parse(toCamelCase(response.data) as unknown);
+    return parseCamelCasePayload<ValuationEstimate>(
+      response.data,
+      valuationEstimateSchema,
+      'ValuationEstimateResponse',
+      'valuation',
+    );
   } catch (error) {
     throw createApiError(getParsedApiError(error), { cause: error });
   }
@@ -130,7 +135,12 @@ export async function buildPeerValuationCanvas(
       industry_label: params.industryLabel ?? undefined,
       base_currency: params.baseCurrency ?? undefined,
     });
-    return peerValuationCanvasSchema.parse(toCamelCase(response.data) as unknown);
+    return parseCamelCasePayload<PeerValuationCanvas>(
+      response.data,
+      peerValuationCanvasSchema,
+      'PeerValuationCanvasResponse',
+      'valuation',
+    );
   } catch (error) {
     throw createApiError(getParsedApiError(error), { cause: error });
   }

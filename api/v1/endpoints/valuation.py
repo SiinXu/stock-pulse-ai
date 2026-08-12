@@ -102,7 +102,7 @@ def estimate_stock_valuation(
         )
     except ValueError as exc:
         raise _bad_request(str(exc)) from exc
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Unexpected valuation failures are safely logged and mapped to a sanitized API error.
         log_safe_exception(
             logger,
             "Valuation estimate failed",
@@ -167,7 +167,7 @@ def build_peer_valuation_canvas(body: PeerValuationCanvasRequest) -> PeerValuati
         )
     except ValueError as exc:
         raise _bad_request(str(exc)) from exc
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - Unexpected canvas failures are safely logged and mapped to a sanitized API error.
         log_safe_exception(
             logger,
             "Peer valuation canvas failed",

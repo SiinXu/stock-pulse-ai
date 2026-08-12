@@ -235,7 +235,7 @@ def _portfolio_fx_converter() -> FxConvertFn:
                 to_currency=to_currency,
                 as_of_date=date.today(),
             )
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - FX failures are recorded before the cell uses explicit identity provenance.
             log_safe_exception(
                 logger,
                 "Peer canvas FX conversion fell back to identity",
@@ -466,7 +466,7 @@ class PeerValuationCanvasService:
             try:
                 payload = self._fundamental_provider(stock_code)
                 return payload if isinstance(payload, Mapping) else {}
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - Provider failure becomes annotated missing fundamentals for this peer.
                 log_safe_exception(
                     logger,
                     "Peer canvas fundamental lookup failed",
@@ -485,7 +485,7 @@ class PeerValuationCanvasService:
             try:
                 payload = self._quote_provider(stock_code)
                 return payload if isinstance(payload, Mapping) else {}
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - Provider failure becomes annotated missing quote data for this peer.
                 log_safe_exception(
                     logger,
                     "Peer canvas quote lookup failed",

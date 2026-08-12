@@ -153,6 +153,7 @@ describe('StockDetailsPage', () => {
     // Product page consumes the shared KlineChart with history API candles.
     expect(screen.getByTestId('stock-details-kline-chart')).toBeTruthy();
     expect(screen.getByTestId('stock-details-kline-chart-canvas')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Peer relative-value canvas' })).toBeTruthy();
     // history table rows (dates also appear in the K-line readout/axis)
     expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('2026-01-06').length).toBeGreaterThanOrEqual(1);

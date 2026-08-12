@@ -7,6 +7,7 @@ import {
   type PeerValuationCanvas as PeerCanvasPayload,
   type PeerValuationCanvasParams,
 } from '../../api/valuation';
+import { getParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { VALUATION_TEXT } from '../../locales/valuation';
 import {
@@ -241,11 +242,7 @@ export const PeerValuationCanvas: React.FC<PeerValuationCanvasProps> = ({
       });
       setCanvas(next);
     } catch (err) {
-      const message =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message?: string }).message || text.loadFailed)
-          : text.loadFailed;
-      setError(message);
+      setError(getParsedApiError(err, language).message || text.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -257,6 +254,7 @@ export const PeerValuationCanvas: React.FC<PeerValuationCanvasProps> = ({
     peerSource,
     stockCode,
     text,
+    language,
   ]);
 
   return (
