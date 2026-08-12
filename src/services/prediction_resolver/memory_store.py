@@ -5,8 +5,8 @@
 Due-scan contract (must stay aligned with A3 store predicates when that lands):
 
 - ``pending`` with ``resolve_after <= as_of``
-- ``data_unavailable`` with ``resolve_after <= as_of``, not retry-exhausted, and
-  ``next_attempt_at`` null or ``<= as_of`` (backoff)
+- ``data_unavailable`` rows remain visible to status-specific scans so the
+  resolver can requeue them after durable backoff
 - ``resolving`` with expired or missing lease (crash recovery reclaim)
 """
 
@@ -16,7 +16,7 @@ import copy
 import threading
 import uuid
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 
@@ -25,7 +25,7 @@ STATUS_RESOLVING = "resolving"
 STATUS_RESOLVED = "resolved"
 STATUS_DATA_UNAVAILABLE = "data_unavailable"
 
-CLAIMABLE = frozenset({STATUS_PENDING, STATUS_DATA_UNAVAILABLE})
+CLAIMABLE = frozenset({STATUS_PENDING})
 RESOLVABLE = frozenset({STATUS_PENDING, STATUS_RESOLVING})
 TERMINAL = frozenset({STATUS_RESOLVED})
 
@@ -65,6 +65,7 @@ class MemoryPredictionRecord:
     claims: List[Any]
     created_at: datetime
     updated_at: datetime
+    as_of: date
     attempts: int = 0
     lease_owner: Optional[str] = None
     lease_token: Optional[str] = None
@@ -119,6 +120,7 @@ class InMemoryPredictionStore:
         resolve_after: datetime,
         claims: Sequence[Any],
         created_at: Optional[datetime] = None,
+        as_of: Optional[date] = None,
         model_meta: Optional[Mapping[str, Any]] = None,
         status: str = STATUS_PENDING,
         attempts: int = 0,
@@ -141,6 +143,7 @@ class InMemoryPredictionStore:
             claims=list(claims),
             created_at=now,
             updated_at=now,
+            as_of=as_of or now.date(),
             attempts=int(attempts or 0),
             lease_owner=lease_owner,
             lease_token=lease_token,
@@ -161,13 +164,21 @@ class InMemoryPredictionStore:
             row = self._rows.get(str(prediction_id))
             return row.snapshot() if row is not None else None
 
-    def list_due(self, *, as_of: datetime, limit: int) -> List[MemoryPredictionRecord]:
+    def list_due(
+        self,
+        *,
+        as_of: datetime,
+        limit: int,
+        statuses: Optional[Sequence[str]] = None,
+    ) -> List[MemoryPredictionRecord]:
         bound = max(1, min(int(limit), 1000))
+        allowed = frozenset(statuses) if statuses is not None else None
         with self._lock:
             due = [
                 row.snapshot()
                 for row in self._rows.values()
-                if _row_is_due(row, as_of)
+                if (allowed is None or row.status in allowed)
+                and _row_is_due(row, as_of)
             ]
         due.sort(key=lambda r: (r.resolve_after, r.prediction_id))
         return due[:bound]
@@ -281,6 +292,32 @@ class InMemoryPredictionStore:
             # with A3 stores that only persist outcome_json.
             row.next_attempt_at = _parse_optional_datetime(payload.get("next_attempt_at"))
             row.retry_exhausted = bool(payload.get("retry_exhausted", False))
+            return True, row.snapshot()
+
+    def requeue_pending(
+        self,
+        *,
+        prediction_id: str,
+        as_of: Optional[datetime] = None,
+    ) -> tuple[bool, Optional[MemoryPredictionRecord]]:
+        canonical = str(prediction_id or "").strip()
+        if not canonical:
+            raise ValueError("prediction_id is required")
+        now = as_of or self._clock()
+        with self._lock:
+            row = self._rows.get(canonical)
+            if row is None:
+                return False, None
+            if row.status != STATUS_DATA_UNAVAILABLE:
+                return False, row.snapshot()
+            row.status = STATUS_PENDING
+            row.outcome = None
+            row.updated_at = now
+            row.lease_owner = None
+            row.lease_token = None
+            row.lease_expires_at = None
+            row.next_attempt_at = None
+            row.retry_exhausted = False
             return True, row.snapshot()
 
 

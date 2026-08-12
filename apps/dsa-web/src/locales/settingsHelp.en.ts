@@ -1572,8 +1572,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.agent.prediction_resolve': {
     title: 'Prediction Horizon Resolver',
-    description:
-      'When enabled, the process scheduler runs PredictionResolver.tick automatically. Provider failures mark data_unavailable and retry with backoff; never fabricates hit/miss. Default off.',
+    summary: 'Automatically resolves due predictions through the existing scheduler; provider failures remain data_unavailable and retry only after durable backoff.',
   },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: 'Event Alert Rules (Legacy JSON)',

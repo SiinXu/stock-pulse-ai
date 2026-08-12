@@ -197,15 +197,28 @@ class _SystemConfigUpdateMethods:
                     updates=update_map,
                 )
             )
+            prediction_resolver_keys = submitted_keys & {
+                "PREDICTION_RESOLVE_ENABLED",
+                "PREDICTION_RESOLVE_INTERVAL_SECONDS",
+                "PREDICTION_RESOLVE_MAX_PER_TICK",
+                "PREDICTION_RESOLVE_LEASE_SECONDS",
+                "PREDICTION_RESOLVE_MAX_ATTEMPTS",
+            }
             if self._runtime_scheduler is not None and submitted_keys & {
                 "SCHEDULE_ENABLED",
                 "SCHEDULE_TIME",
                 "SCHEDULE_TIMES",
+                *prediction_resolver_keys,
             }:
                 try:
-                    self._runtime_scheduler.reconcile_from_config(
-                        clear_enabled_override="SCHEDULE_ENABLED" in submitted_keys,
-                    )
+                    reconcile_kwargs = {
+                        "clear_enabled_override": "SCHEDULE_ENABLED" in submitted_keys,
+                    }
+                    if prediction_resolver_keys:
+                        reconcile_kwargs["refresh_background_tasks"] = {
+                            "prediction_resolver"
+                        }
+                    self._runtime_scheduler.reconcile_from_config(**reconcile_kwargs)
                 except Exception as exc:  # pragma: no cover; broad-exception: fallback_recorded - report scheduler failure
                     log_safe_exception(
                         logger,
@@ -300,15 +313,29 @@ class _SystemConfigUpdateMethods:
                 )
                 raise RuntimeError("Last-known-good configuration activation failed") from exc
 
-            if self._runtime_scheduler is not None and set(changed_keys) & {
+            changed_key_set = set(changed_keys)
+            prediction_resolver_keys = changed_key_set & {
+                "PREDICTION_RESOLVE_ENABLED",
+                "PREDICTION_RESOLVE_INTERVAL_SECONDS",
+                "PREDICTION_RESOLVE_MAX_PER_TICK",
+                "PREDICTION_RESOLVE_LEASE_SECONDS",
+                "PREDICTION_RESOLVE_MAX_ATTEMPTS",
+            }
+            if self._runtime_scheduler is not None and changed_key_set & {
                 "SCHEDULE_ENABLED",
                 "SCHEDULE_TIME",
                 "SCHEDULE_TIMES",
+                *prediction_resolver_keys,
             }:
                 try:
-                    self._runtime_scheduler.reconcile_from_config(
-                        clear_enabled_override="SCHEDULE_ENABLED" in changed_keys,
-                    )
+                    reconcile_kwargs = {
+                        "clear_enabled_override": "SCHEDULE_ENABLED" in changed_key_set,
+                    }
+                    if prediction_resolver_keys:
+                        reconcile_kwargs["refresh_background_tasks"] = {
+                            "prediction_resolver"
+                        }
+                    self._runtime_scheduler.reconcile_from_config(**reconcile_kwargs)
                 except Exception as exc:  # broad-exception: fallback_recorded - report rollback scheduler failure
                     log_safe_exception(
                         logger,

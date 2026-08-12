@@ -6134,4 +6134,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Tarikan data pasaran selari",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Had global tarikan selari",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Had per-pembekal tarikan selari",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Menyelesaikan ramalan yang matang secara automatik melalui penjadual sedia ada; kegagalan penyedia kekal data_unavailable dan hanya dicuba semula selepas tempoh tunggu tersimpan.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "Penyelesaian ufuk ramalan",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_ENABLED": "Penyelesaian ramalan automatik",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Selang penyelesaian ramalan",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Tempoh pajakan penyelesaian",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Percubaan penyelesaian maksimum",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Had kelompok penyelesaian",
 } as const;

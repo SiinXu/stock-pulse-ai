@@ -6134,4 +6134,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Extraction parallèle des données de marché",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Plafond global d’extraction parallèle",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Plafond par fournisseur d’extraction parallèle",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Résout automatiquement les prévisions arrivées à échéance via le planificateur existant ; les échecs du fournisseur restent data_unavailable et ne sont réessayés qu’après le délai persistant.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "Résolution de l’horizon de prévision",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_ENABLED": "Résolution automatique des prévisions",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Intervalle de résolution des prévisions",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Durée du bail de résolution",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Nombre maximal de tentatives de résolution",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Limite de lot de résolution",
 } as const;

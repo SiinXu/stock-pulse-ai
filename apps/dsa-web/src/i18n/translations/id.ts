@@ -6134,4 +6134,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Tarikan data pasar paralel",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Batas global tarikan paralel",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Batas per-penyedia tarikan paralel",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Menyelesaikan prediksi yang jatuh tempo secara otomatis melalui penjadwal yang ada; kegagalan penyedia tetap data_unavailable dan hanya dicoba ulang setelah jeda tersimpan.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "Penyelesaian horizon prediksi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_ENABLED": "Penyelesaian prediksi otomatis",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Interval penyelesaian prediksi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Durasi sewa penyelesaian",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Maksimum percobaan penyelesaian",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Batas batch penyelesaian",
 } as const;

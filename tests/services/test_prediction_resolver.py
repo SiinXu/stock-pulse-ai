@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 from unittest.mock import patch
@@ -16,6 +17,7 @@ from src.services.prediction_resolver import (
     PREDICTION_RESOLVER_BACKGROUND_TASK_NAME,
     InMemoryPredictionStore,
     PredictionResolver,
+    TickSummary,
     build_prediction_resolver_background_tasks,
     derive_aggregate_label,
 )
@@ -59,6 +61,23 @@ class _Snapshot:
             "ok": self.ok,
             "data_unavailable": self.data_unavailable,
         }
+
+
+@dataclass
+class _DatedSnapshot(_Snapshot):
+    as_of: date = date(2026, 8, 11)
+    end: date = date(2026, 8, 12)
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = super().to_dict()
+        payload.update({"as_of": self.as_of.isoformat(), "end": self.end.isoformat()})
+        return payload
+
+
+class _JsonStrictMemoryStore(InMemoryPredictionStore):
+    def resolve(self, **kwargs: Any):
+        json.dumps(kwargs["outcome"], allow_nan=False)
+        return super().resolve(**kwargs)
 
 
 class _FakeFetcher:
@@ -223,7 +242,67 @@ def test_tick_resolves_due_prediction_end_to_end() -> None:
     assert row.lease_token is None
     assert fetcher.calls
     assert scorer.calls
+    assert fetcher.calls[0]["as_of"] == date(2026, 8, 11)
+    # A4 exposes only the final session's high/low, not full-window extrema.
+    # They must not be forwarded as proof that a level was never crossed.
+    assert scorer.calls[0][1]["high_price"] is None
+    assert scorer.calls[0][1]["low_price"] is None
     assert "prediction.resolve.completed" in events
+
+
+def test_tick_uses_prediction_as_of_not_row_creation_time() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    store.insert(
+        prediction_id="pred-window",
+        run_id="run-window",
+        symbol="AAPL",
+        market="us",
+        horizon="1d",
+        as_of=date(2026, 8, 8),
+        resolve_after=_now() - timedelta(hours=1),
+        created_at=_now() - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+    )
+    fetcher = _FakeFetcher(
+        _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(101.0))
+    )
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=fetcher,
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+
+    assert resolver.tick().resolved == 1
+    assert fetcher.calls[0]["as_of"] == date(2026, 8, 8)
+
+
+def test_tick_uses_snapshot_json_projection_for_persistence() -> None:
+    store = _JsonStrictMemoryStore()
+    store._clock = _now
+    _seed(store)
+    fetcher = _FakeFetcher(
+        _DatedSnapshot(
+            status="ok",
+            as_of_bar=_Bar(100.0),
+            end_bar=_Bar(105.0),
+            return_pct=5.0,
+        )
+    )
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=fetcher,
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+
+    summary = resolver.tick()
+
+    assert summary.resolved == 1
+    row = store.get("pred-1")
+    assert row is not None and row.outcome is not None
+    assert row.outcome["actuals"]["as_of"] == "2026-08-11"
 
 
 def test_tick_provider_failure_never_fabricates_hit() -> None:
@@ -249,6 +328,27 @@ def test_tick_provider_failure_never_fabricates_hit() -> None:
     assert row.outcome is not None
     assert row.outcome["label"] == "data_unavailable"
     assert row.outcome.get("reason") == "provider_failure"
+
+
+def test_non_retryable_provider_outcome_is_not_requeued() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="delisted", reason="delisted", retryable=False)
+        ),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+
+    assert resolver.tick().data_unavailable == 1
+    row = store.get("pred-1")
+    assert row is not None
+    assert row.retry_exhausted is True
+    assert row.next_attempt_at is None
+    assert resolver.tick(now=_now() + timedelta(days=10)).claimed == 0
 
 
 def test_tick_overlap_skips_second_call() -> None:
@@ -389,6 +489,41 @@ def test_cli_main_json_success(capsys: pytest.CaptureFixture[str]) -> None:
     assert code == 0
     out = capsys.readouterr().out
     assert "resolved" in out
+
+
+def test_cli_honors_zero_batch_cap() -> None:
+    from src.services.prediction_resolver.__main__ import main
+
+    config = SimpleNamespace(
+        prediction_resolve_lease_seconds=120,
+        prediction_resolve_max_per_tick=0,
+        prediction_resolve_max_attempts=5,
+    )
+    resolver = SimpleNamespace(tick=lambda **kwargs: TickSummary())
+    with patch(
+        "src.application_services.get_application_services",
+        return_value=SimpleNamespace(config=config),
+    ), patch(
+        "src.services.prediction_resolver.__main__.build_prediction_resolver",
+        return_value=resolver,
+    ) as build_resolver:
+        assert main([]) == 0
+
+    assert build_resolver.call_args.kwargs["max_per_tick"] == 0
+
+
+def test_cli_config_failure_does_not_run_with_defaults() -> None:
+    from src.services.prediction_resolver.__main__ import main
+
+    with patch(
+        "src.application_services.get_application_services",
+        side_effect=RuntimeError("config unavailable"),
+    ), patch(
+        "src.services.prediction_resolver.__main__.build_prediction_resolver",
+    ) as build_resolver:
+        assert main([]) == 2
+
+    build_resolver.assert_not_called()
 
 
 def test_runtime_scheduler_registers_prediction_resolver_task() -> None:
@@ -551,9 +686,90 @@ def test_data_unavailable_respects_backoff_and_max_attempts() -> None:
     assert fourth.claimed == 0
 
 
+def test_a3_style_status_scan_still_honors_durable_backoff() -> None:
+    class _A3ShapeStore(InMemoryPredictionStore):
+        def list_due(self, *, as_of, limit, statuses=None):
+            if statuses == (STATUS_DATA_UNAVAILABLE,):
+                with self._lock:
+                    rows = [
+                        row.snapshot()
+                        for row in self._rows.values()
+                        if row.status == STATUS_DATA_UNAVAILABLE
+                        and row.resolve_after <= as_of
+                    ]
+                return rows[:limit]
+            return super().list_due(as_of=as_of, limit=limit, statuses=statuses)
+
+    store = _A3ShapeStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="provider_down", reason="provider_failure", retryable=True)
+        ),
+        claim_scorer=_FakeScorer(),
+        max_attempts=2,
+        clock=_now,
+    )
+
+    assert resolver.tick().data_unavailable == 1
+    row = store.get("pred-1")
+    assert row is not None and row.next_attempt_at is not None
+    assert resolver.tick(now=_now() + timedelta(seconds=1)).claimed == 0
+    assert resolver.tick(now=row.next_attempt_at + timedelta(seconds=1)).claimed == 1
+
+
+def test_writeback_failure_is_reported_and_lease_is_left_for_recovery() -> None:
+    class _FailingWriteStore(InMemoryPredictionStore):
+        def mark_data_unavailable(self, **kwargs):
+            raise RuntimeError("database unavailable")
+
+    store = _FailingWriteStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="provider_down", reason="provider_failure", retryable=True)
+        ),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+
+    summary = resolver.tick()
+    assert summary.data_unavailable == 0
+    assert summary.errors == 1
+    assert summary.items[0].reason == "data_unavailable_write_failed"
+    row = store.get("pred-1")
+    assert row is not None and row.status == STATUS_RESOLVING
+
+
+def test_aware_clock_is_normalized_for_a3_naive_utc_contract() -> None:
+    aware_now = _now().replace(tzinfo=timezone.utc)
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(101.0))
+        ),
+        claim_scorer=_FakeScorer(),
+        clock=lambda: aware_now,
+    )
+
+    assert resolver.tick().resolved == 1
+
+
 def test_compute_retry_delay_is_bounded() -> None:
     from src.services.prediction_resolver import compute_retry_delay_seconds
 
     assert compute_retry_delay_seconds(1, base_seconds=30, max_seconds=3600) == 30
     assert compute_retry_delay_seconds(2, base_seconds=30, max_seconds=3600) == 60
     assert compute_retry_delay_seconds(20, base_seconds=30, max_seconds=3600) == 3600
+    assert compute_retry_delay_seconds(10**9, base_seconds=30, max_seconds=3600) == 3600
+    with pytest.raises(ValueError):
+        compute_retry_delay_seconds(True)
+    with pytest.raises(ValueError):
+        compute_retry_delay_seconds(1, base_seconds=float("nan"))

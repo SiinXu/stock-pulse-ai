@@ -11,7 +11,13 @@ from typing import Any, List, Mapping, Optional, Protocol, Sequence
 class PredictionStorePort(Protocol):
     """Persistence surface required by one resolver tick."""
 
-    def list_due(self, *, as_of: datetime, limit: int) -> List[Any]:
+    def list_due(
+        self,
+        *,
+        as_of: datetime,
+        limit: int,
+        statuses: Optional[Sequence[str]] = None,
+    ) -> List[Any]:
         ...
 
     def claim_for_resolve(
@@ -43,6 +49,14 @@ class PredictionStorePort(Protocol):
         expected_lease_token: Optional[str] = None,
         as_of: Optional[datetime] = None,
         outcome: Optional[Mapping[str, Any]] = None,
+    ) -> tuple[bool, Optional[Any]]:
+        ...
+
+    def requeue_pending(
+        self,
+        *,
+        prediction_id: str,
+        as_of: Optional[datetime] = None,
     ) -> tuple[bool, Optional[Any]]:
         ...
 

@@ -1685,7 +1685,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "PREDICTION_RESOLVE_MAX_ATTEMPTS": {
         "title": "Prediction Resolver Max Attempts",
-        "description": "Soft attempt counter for retry policy / diagnostics.",
+        "description": "Hard ceiling for provider/data-unavailable resolution attempts.",
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",

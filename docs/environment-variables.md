@@ -505,7 +505,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PREDICTION_RESOLVE_ENABLED` | `false` | 是 | 模板中注释; 预测到期解析总开关（Issues #1102 / #1116；默认关闭） |
 | `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | 是 | 模板中注释; PredictionResolver.tick 轮询间隔（秒） |
 | `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | 是 | 模板中注释; resolving 租约 TTL（秒） |
-| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 是 | 模板中注释; 重试诊断用尝试计数 |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 是 | 模板中注释; 数据不可用解析的最大尝试次数 |
 | `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | 是 | 模板中注释; 每次 tick 最多认领条数 |
 | `PREFETCH_REALTIME_QUOTES` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |

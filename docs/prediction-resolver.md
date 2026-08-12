@@ -44,10 +44,11 @@
 - 存储层租约 + 条件写回防止跨进程双写。
 - **过期的 `resolving` 租约**会在下一次 tick 重新进入 due 扫描（崩溃恢复）。
 - `data_unavailable` 使用有界指数退避（outcome 中的 `next_attempt_at`），并在达到 `PREDICTION_RESOLVE_MAX_ATTEMPTS` 后标记 `retry_exhausted` 停止重试。
+- 重试信息持久化在 A3 outcome 中；每次 tick 只会重新排队已到 `next_attempt_at` 的可重试记录，停牌/退市及已耗尽尝试的记录保持 `data_unavailable`。
+- 实际行情窗口从预测的规范 `as_of` 字段开始；最终交易日的最高/最低价不会被误当成整个窗口的路径极值。
 
 ## 本 PR 边界
 
 已实现：tick 编排、调度/CLI、租约回收、尝试上限与基础退避、`max_per_tick`。
 
 **不在本 PR**：全局并发池/批量 coalesce（#1104）、预测查询 HTTP API、交易日历 `resolve_after`（#1109）、复盘/适配器（#1103 / #1106）。
-

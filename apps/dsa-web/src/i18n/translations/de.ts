@@ -6134,4 +6134,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Parallele Marktdaten-Abfrage",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Parallele Abfrage – globales Limit",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Parallele Abfrage – Limit pro Provider",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Löst fällige Prognosen automatisch über den vorhandenen Scheduler auf; Anbieterfehler bleiben data_unavailable und werden erst nach der dauerhaften Wartezeit erneut versucht.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "Auswertung des Prognosehorizonts",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_ENABLED": "Automatische Prognoseauswertung",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Intervall der Prognoseauswertung",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Lease-Dauer der Prognoseauswertung",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Maximale Auswertungsversuche",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Batch-Limit der Prognoseauswertung",
 } as const;

@@ -6134,4 +6134,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "分析內並行取數",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取數全域並行上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取數單源並行上限",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "透過既有排程器自動核驗已到期預測；資料來源失敗會保持 data_unavailable，且僅在持久化退避時間到期後重試。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "預測到期解析",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_ENABLED": "預測到期解析",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "預測解析間隔（秒）",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "預測解析租約 TTL",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "預測解析最大嘗試次數",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "預測解析批次上限",
 } as const;

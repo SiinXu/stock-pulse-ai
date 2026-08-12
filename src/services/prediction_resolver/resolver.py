@@ -5,12 +5,13 @@
 from __future__ import annotations
 
 import logging
+import math
 import socket
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from src.services.prediction_resolver.memory_store import new_lease_token
 from src.services.prediction_resolver.ports import (
@@ -39,6 +40,14 @@ OUTCOME_DATA_UNAVAILABLE = "data_unavailable"
 TERMINAL_SCORE_LABELS = frozenset({OUTCOME_HIT, OUTCOME_MISS, OUTCOME_PARTIAL})
 
 
+def _require_int(name: str, value: Any, *, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be an integer")
+    if not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be between {minimum} and {maximum}")
+    return value
+
+
 def _utc_naive_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -65,18 +74,32 @@ def _to_date(value: Any) -> Optional[date]:
         return None
 
 
+def _to_datetime(value: Any) -> Optional[datetime]:
+    if value is None or value is False:
+        return None
+    if isinstance(value, datetime):
+        return _as_utc_naive(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return _as_utc_naive(datetime.fromisoformat(text.replace("Z", "+00:00")))
+    except ValueError:
+        return None
+
+
 def _mapping(value: Any) -> Dict[str, Any]:
     if value is None:
         return {}
     if isinstance(value, Mapping):
         return dict(value)
-    if is_dataclass(value) and not isinstance(value, type):
-        return asdict(value)
     to_dict = getattr(value, "to_dict", None)
     if callable(to_dict):
         payload = to_dict()
         if isinstance(payload, Mapping):
             return dict(payload)
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
     return {}
 
 
@@ -120,9 +143,19 @@ def compute_retry_delay_seconds(
     max_seconds: float = PREDICTION_RESOLVER_RETRY_MAX_SECONDS,
 ) -> float:
     """Bounded exponential backoff from the current attempt count."""
-    safe_attempts = max(1, int(attempts))
-    delay = float(base_seconds) * (2.0 ** max(0, safe_attempts - 1))
-    return min(float(max_seconds), delay)
+    if isinstance(attempts, bool) or not isinstance(attempts, int):
+        raise ValueError("attempts must be an integer")
+    safe_attempts = max(1, attempts)
+    base = float(base_seconds)
+    maximum = float(max_seconds)
+    if not math.isfinite(base) or base <= 0.0:
+        raise ValueError("base_seconds must be finite and positive")
+    if not math.isfinite(maximum) or maximum < base:
+        raise ValueError("max_seconds must be finite and >= base_seconds")
+    # Avoid constructing 2 ** attempts for corrupt/untrusted persisted counters.
+    if safe_attempts > 1 + math.ceil(math.log2(maximum / base)):
+        return maximum
+    return min(maximum, base * (2.0 ** (safe_attempts - 1)))
 
 
 def build_data_unavailable_outcome(
@@ -139,7 +172,8 @@ def build_data_unavailable_outcome(
     Stores that only persist ``outcome_json`` can still honor backoff by reading
     ``next_attempt_at`` / ``retry_exhausted`` from the payload (memory store does).
     """
-    exhausted = int(attempts) >= int(max_attempts)
+    retryable = bool((extra or {}).get("retryable", True))
+    exhausted = int(attempts) >= int(max_attempts) or not retryable
     payload: Dict[str, Any] = {
         "label": OUTCOME_DATA_UNAVAILABLE,
         "reason": str(reason or "data_unavailable"),
@@ -195,10 +229,8 @@ def _claim_actuals_from_snapshot(snapshot: Any) -> Dict[str, Any]:
     end_price = _attr(snapshot, "end_price", end_price)
     high_price = _attr(snapshot, "high_price")
     low_price = _attr(snapshot, "low_price")
-    if high_price is None and end_bar is not None:
-        high_price = _attr(end_bar, "high")
-    if low_price is None and end_bar is not None:
-        low_price = _attr(end_bar, "low")
+    # A4 end_bar.high/low cover only the final session. They are not path
+    # extrema for the full [as_of, end] window and must not prove a false miss.
     payload: Dict[str, Any] = {
         "start_price": start_price,
         "end_price": end_price,
@@ -261,12 +293,15 @@ class PredictionResolver:
         clock: Optional[Callable[[], datetime]] = None,
         score_config: Any = None,
     ) -> None:
-        if lease_seconds < 1:
-            raise ValueError("lease_seconds must be >= 1")
-        if max_per_tick < 0:
-            raise ValueError("max_per_tick must be >= 0")
-        if max_attempts < 1:
-            raise ValueError("max_attempts must be >= 1")
+        lease_seconds = _require_int(
+            "lease_seconds", lease_seconds, minimum=5, maximum=86_400
+        )
+        max_per_tick = _require_int(
+            "max_per_tick", max_per_tick, minimum=0, maximum=10_000
+        )
+        max_attempts = _require_int(
+            "max_attempts", max_attempts, minimum=1, maximum=100
+        )
         self._store = store
         self._actuals = actuals_fetcher
         self._scorer = claim_scorer
@@ -298,11 +333,12 @@ class PredictionResolver:
             )
             return summary
         try:
-            as_of = _as_utc_naive(now) if now is not None else self._clock()
+            as_of = _as_utc_naive(now if now is not None else self._clock())
             claim_limit = self._max_per_tick if limit is None else max(0, int(limit))
             if claim_limit == 0:
                 return summary
-            due = list(self._store.list_due(as_of=as_of, limit=claim_limit))
+            self._requeue_ready_retries(as_of=as_of)
+            due = self._list_claimable(as_of=as_of, limit=claim_limit)
             for candidate in due:
                 prediction_id = str(_attr(candidate, "prediction_id") or "").strip()
                 if not prediction_id:
@@ -336,6 +372,64 @@ class PredictionResolver:
             return summary
         finally:
             self._tick_lock.release()
+
+    def _requeue_ready_retries(self, *, as_of: datetime) -> None:
+        """Move durable A3 data-unavailable rows back to pending after backoff."""
+        retry_rows = self._store.list_due(
+            as_of=as_of,
+            limit=1000,
+            statuses=(OUTCOME_DATA_UNAVAILABLE,),
+        )
+        for row in retry_rows:
+            outcome = _mapping(_attr(row, "outcome"))
+            if bool(outcome.get("retry_exhausted", False)):
+                continue
+            if outcome.get("retryable") is False:
+                continue
+            next_attempt_at = _to_datetime(outcome.get("next_attempt_at"))
+            if next_attempt_at is None or next_attempt_at > as_of:
+                continue
+            prediction_id = str(_attr(row, "prediction_id") or "").strip()
+            if not prediction_id:
+                continue
+            self._store.requeue_pending(
+                prediction_id=prediction_id,
+                as_of=as_of,
+            )
+
+    def _list_claimable(self, *, as_of: datetime, limit: int) -> List[Any]:
+        """Combine pending rows with only genuinely expired A3 leases."""
+        pending = list(
+            self._store.list_due(
+                as_of=as_of,
+                limit=limit,
+                statuses=("pending",),
+            )
+        )
+        # A3's generic status scan does not itself filter resolving lease age.
+        # Inspect a bounded recovery window without allowing active leases to
+        # crowd pending work out of the per-tick cap.
+        resolving = self._store.list_due(
+            as_of=as_of,
+            limit=1000,
+            statuses=("resolving",),
+        )
+        expired = [
+            row
+            for row in resolving
+            if (
+                _to_datetime(_attr(row, "lease_expires_at")) is None
+                or _to_datetime(_attr(row, "lease_expires_at")) <= as_of
+            )
+        ]
+        combined = pending + expired
+        combined.sort(
+            key=lambda row: (
+                _to_datetime(_attr(row, "resolve_after")) or datetime.max,
+                str(_attr(row, "prediction_id") or ""),
+            )
+        )
+        return combined[:limit]
 
     def _resolve_one(self, candidate: Any, *, as_of: datetime) -> TickItemResult:
         prediction_id = str(_attr(candidate, "prediction_id") or "").strip()
@@ -401,13 +495,28 @@ class PredictionResolver:
                 context={"prediction_id": prediction_id},
                 level=logging.WARNING,
             )
-            applied = self._mark_unavailable(
-                prediction_id=prediction_id,
-                reason="resolver_exception",
-                lease_token=lease_token,
-                as_of=as_of,
-                attempts=attempts,
-            )
+            try:
+                applied = self._mark_unavailable(
+                    prediction_id=prediction_id,
+                    reason="resolver_exception",
+                    lease_token=lease_token,
+                    as_of=as_of,
+                    attempts=attempts,
+                )
+            except Exception as write_exc:  # broad-exception: fallback_recorded - preserve failed lease for recovery
+                log_safe_exception(
+                    logger,
+                    "Prediction data_unavailable write-back failed",
+                    write_exc,
+                    error_code="prediction_resolver_writeback_failed",
+                    context={"prediction_id": prediction_id},
+                    level=logging.WARNING,
+                )
+                return TickItemResult(
+                    prediction_id=prediction_id,
+                    disposition="error",
+                    reason="data_unavailable_write_failed",
+                )
             return TickItemResult(
                 prediction_id=prediction_id,
                 disposition="data_unavailable",
@@ -466,9 +575,9 @@ class PredictionResolver:
         symbol = str(_attr(claimed, "symbol") or "").strip()
         market = str(_attr(claimed, "market") or "").strip().lower() or None
         claims = list(_attr(claimed, "claims") or [])
-        created_at = _attr(claimed, "created_at")
+        prediction_as_of = _attr(claimed, "as_of")
         resolve_after = _attr(claimed, "resolve_after")
-        as_of_date = _to_date(created_at) or _to_date(as_of)
+        as_of_date = _to_date(prediction_as_of)
         end_date = _to_date(resolve_after) or _to_date(as_of)
 
         if not symbol or as_of_date is None or end_date is None:
@@ -736,9 +845,9 @@ def build_prediction_resolver_background_tasks(
     if not _resolver_enabled(config):
         return []
 
-    lease_seconds = int(getattr(config, "prediction_resolve_lease_seconds", 120) or 120)
-    max_per_tick = int(getattr(config, "prediction_resolve_max_per_tick", 50) or 50)
-    max_attempts = int(getattr(config, "prediction_resolve_max_attempts", 5) or 5)
+    lease_seconds = int(getattr(config, "prediction_resolve_lease_seconds", 120))
+    max_per_tick = int(getattr(config, "prediction_resolve_max_per_tick", 50))
+    max_attempts = int(getattr(config, "prediction_resolve_max_attempts", 5))
 
     active = resolver
     if active is None:

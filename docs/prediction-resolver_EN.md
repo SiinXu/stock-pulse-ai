@@ -50,6 +50,8 @@ Exit codes: `0` ok (including empty/overlap), `1` deps missing, `2` unexpected f
 - Store leases + conditional resolve prevent cross-process double-scoring.
 - **Expired `resolving` leases are re-scanned** on the next tick (crash recovery).
 - `data_unavailable` uses bounded exponential backoff (`next_attempt_at` in outcome) and stops after `PREDICTION_RESOLVE_MAX_ATTEMPTS` (`retry_exhausted`).
+- Retry metadata is durable in the A3 outcome. Each tick requeues only retryable rows whose `next_attempt_at` has elapsed; halted/delisted and exhausted rows remain `data_unavailable`.
+- The actuals window starts at the prediction's canonical `as_of` field. A final-session high/low is never treated as the full-window path extreme.
 
 ## Scope boundaries (this PR)
 

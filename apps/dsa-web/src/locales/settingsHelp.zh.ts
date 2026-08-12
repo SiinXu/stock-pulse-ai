@@ -1601,8 +1601,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.prediction_resolve': {
     title: '预测到期解析',
-    description:
-      '开启后由既有进程调度器自动执行 PredictionResolver.tick。数据源失败写入 data_unavailable 并退避重试，永不伪造 hit/miss。默认关闭。',
+    summary: '通过既有调度器自动核验已到期预测；数据源失败保持 data_unavailable，且仅在持久化退避时间到期后重试。',
   },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: '事件告警规则（Legacy JSON）',

@@ -43,9 +43,20 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             os.environ.pop(key, None)
         self._saved_non_llm_env = {
             key: os.environ.get(key)
-            for key in ("ENV_FILE", "STOCK_LIST", "SCHEDULE_TIME", "LOG_LEVEL")
+            for key in (
+                "ENV_FILE",
+                "STOCK_LIST",
+                "SCHEDULE_TIME",
+                "LOG_LEVEL",
+                "PREDICTION_RESOLVE_ENABLED",
+            )
         }
-        for key in ("STOCK_LIST", "SCHEDULE_TIME", "LOG_LEVEL"):
+        for key in (
+            "STOCK_LIST",
+            "SCHEDULE_TIME",
+            "LOG_LEVEL",
+            "PREDICTION_RESOLVE_ENABLED",
+        ):
             os.environ.pop(key, None)
         self._original_queue = AnalysisTaskQueue._instance
         AnalysisTaskQueue._instance = None
@@ -394,6 +405,49 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
         self.assertEqual(Config.get_instance().schedule_time, "18:00")
         runtime_scheduler.reconcile_from_config.assert_called_once_with(
             clear_enabled_override=False,
+        )
+
+    def test_prediction_resolver_config_refreshes_runtime_background_task(self) -> None:
+        runtime_scheduler = Mock()
+        service = SystemConfigService(
+            manager=self.manager,
+            runtime_scheduler=runtime_scheduler,
+        )
+
+        with patch.object(service, "_reload_runtime_singletons"):
+            result = service.update(
+                config_version=self.manager.get_config_version(),
+                items=[{"key": "PREDICTION_RESOLVE_ENABLED", "value": "true"}],
+            )
+
+        self.assertTrue(result["success"])
+        runtime_scheduler.reconcile_from_config.assert_called_once_with(
+            clear_enabled_override=False,
+            refresh_background_tasks={"prediction_resolver"},
+        )
+
+    def test_prediction_resolver_rollback_refreshes_runtime_background_task(self) -> None:
+        runtime_scheduler = Mock()
+        service = SystemConfigService(
+            manager=self.manager,
+            runtime_scheduler=runtime_scheduler,
+        )
+
+        with patch.object(service, "_reload_runtime_singletons"):
+            updated = service.update(
+                config_version=self.manager.get_config_version(),
+                items=[{"key": "PREDICTION_RESOLVE_ENABLED", "value": "true"}],
+            )
+            runtime_scheduler.reset_mock()
+            restored = service.restore_last_good_config(
+                config_version=updated["config_version"],
+                actor="authenticated_admin",
+            )
+
+        self.assertTrue(restored["success"])
+        runtime_scheduler.reconcile_from_config.assert_called_once_with(
+            clear_enabled_override=False,
+            refresh_background_tasks={"prediction_resolver"},
         )
 
     def test_rollback_cannot_change_admin_authentication_state(self) -> None:

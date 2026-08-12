@@ -17,6 +17,7 @@ import sys
 from typing import Optional, Sequence
 
 from src.services.prediction_resolver.resolver import build_prediction_resolver
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -53,20 +54,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     max_per_tick = 50
     max_attempts = 5
     try:
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        config = get_config()
+        config = get_application_services().config
         lease_seconds = int(
-            getattr(config, "prediction_resolve_lease_seconds", lease_seconds) or lease_seconds
+            getattr(config, "prediction_resolve_lease_seconds", lease_seconds)
         )
         max_per_tick = int(
-            getattr(config, "prediction_resolve_max_per_tick", max_per_tick) or max_per_tick
+            getattr(config, "prediction_resolve_max_per_tick", max_per_tick)
         )
         max_attempts = int(
-            getattr(config, "prediction_resolve_max_attempts", max_attempts) or max_attempts
+            getattr(config, "prediction_resolve_max_attempts", max_attempts)
         )
-    except Exception as exc:  # broad-exception: fallback_recorded - CLI still usable
-        logger.debug("Config load skipped for prediction resolver CLI: %s", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - do not run with invented defaults
+        log_safe_exception(
+            logger,
+            "PredictionResolver configuration load failed",
+            exc,
+            error_code="prediction_resolver_config_load_failed",
+        )
+        return 2
 
     resolver = build_prediction_resolver(
         worker_id=args.worker_id,

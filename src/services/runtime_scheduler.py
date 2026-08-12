@@ -622,9 +622,13 @@ class RuntimeSchedulerService:
         run_immediately: bool = False,
         clear_enabled_override: bool = False,
         include_legacy: bool = True,
+        refresh_background_tasks: Optional[Set[str]] = None,
     ) -> None:
         if clear_enabled_override:
             self._force_enabled = False
+        for name in refresh_background_tasks or ():
+            self._background_task_cache.pop(name, None)
+            self._background_task_registered_names.discard(name)
         if not self._owns_schedule:
             self.stop()
             return
