@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Optional
@@ -395,7 +397,37 @@ def _extension_records(
     return records
 
 
-def _resolve_skill_catalog() -> tuple[int, tuple[Any, ...], tuple[Any, ...]]:
+def _declarative_skill_projections(
+    skills: tuple[Any, ...],
+    *,
+    reserved_names: Iterable[str] = (),
+) -> tuple[tuple[str, str, bool, str, tuple[str, ...]], ...]:
+    """Normalize exactly the declarative fields published in skill records."""
+
+    seen = set(reserved_names)
+    projected: list[tuple[str, str, bool, str, tuple[str, ...]]] = []
+    for skill in skills:
+        name = str(getattr(skill, "name", "") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        projected.append(
+            (
+                name,
+                str(getattr(skill, "source", "custom") or "custom"),
+                bool(getattr(skill, "enabled", True)),
+                _bounded_display_name(
+                    str(getattr(skill, "display_name", name) or name)
+                ),
+                _bounded_dependencies(
+                    getattr(skill, "required_tools", None) or ()
+                ),
+            )
+        )
+    return tuple(projected)
+
+
+def _resolve_skill_catalog() -> tuple[str, tuple[Any, ...], tuple[Any, ...]]:
     """Read plugin analysis strategies and declarative skills from live owners."""
 
     from src.application_services import get_installed_application_services
@@ -442,20 +474,39 @@ def _resolve_skill_catalog() -> tuple[int, tuple[Any, ...], tuple[Any, ...]]:
         )
         raise OwnerReadError("skill_catalog_unavailable") from exc
     plugin_skills = tuple(snapshot.registrations)
-    # Identity-stable generation: equal-count catalog swaps must advance it.
+    # Plugin field changes advance the owner's generation. Declarative skills
+    # do not expose an owner generation, so hash every normalized field that
+    # _skill_records publishes for them.
     plugin_ids = ",".join(
         sorted(
             f"{getattr(item, 'plugin_id', '')}:{getattr(getattr(item, 'definition', None), 'name', '')}"
             for item in plugin_skills
         )
     )
-    declarative_ids = ",".join(
-        sorted(str(getattr(skill, "name", "") or "") for skill in declarative)
+    plugin_names = {
+        str(getattr(getattr(item, "definition", None), "name", ""))
+        for item in plugin_skills
+    }
+    declarative_projection = sorted(
+        _declarative_skill_projections(
+            declarative,
+            reserved_names=plugin_names,
+        ),
+        key=lambda item: item[0],
     )
-    generation = f"{int(snapshot.generation)}|{plugin_ids}|{declarative_ids}"
+    declarative_payload = json.dumps(
+        declarative_projection,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    declarative_digest = hashlib.sha256(
+        declarative_payload.encode("utf-8")
+    ).hexdigest()
+    generation = (
+        f"{int(snapshot.generation)}|{plugin_ids}|"
+        f"declarative={declarative_digest}"
+    )
     if len(generation) > 256:
-        import hashlib
-
         generation = (
             f"{int(snapshot.generation)}|"
             f"{hashlib.sha256(generation.encode('utf-8')).hexdigest()}"
@@ -506,8 +557,6 @@ def _resolve_pipeline_stages() -> tuple[str, tuple[str, ...], frozenset[str]]:
         mixin_method_names.extend(str(name) for name in values)
     if not mixin_method_names:
         raise OwnerReadError("pipeline_source_unavailable")
-
-    import hashlib
 
     method_digest = hashlib.sha256(
         ",".join(sorted(set(mixin_method_names))).encode("utf-8")
@@ -596,15 +645,15 @@ def _skill_records(
                 getattr(definition, "required_tools", ())
             ),
         ))
-    for skill in declarative_skills:
-        name = str(getattr(skill, "name", "") or "").strip()
-        if not name or name in seen:
-            continue
-        seen.add(name)
-        enabled = bool(getattr(skill, "enabled", True))
+    for name, source, enabled, display_name, dependencies in (
+        _declarative_skill_projections(
+            declarative_skills,
+            reserved_names=seen,
+        )
+    ):
         records.append(CapabilityRecord(
             f"skill:{name}", "skill", "analysis_skill",
-            "agent.skill_manager", str(getattr(skill, "source", "custom") or "custom"),
+            "agent.skill_manager", source,
             "1", generation, now,
             registered=True,
             configured=True,
@@ -612,12 +661,8 @@ def _skill_records(
             healthy=None,
             degraded=None,
             reason_code=None if enabled else "skill_disabled",
-            display_name=_bounded_display_name(
-                str(getattr(skill, "display_name", name) or name)
-            ),
-            dependencies=_bounded_dependencies(
-                getattr(skill, "required_tools", None) or ()
-            ),
+            display_name=display_name,
+            dependencies=dependencies,
         ))
     return records
 
