@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after PREDICTION_EXTRACT_ENABLED Settings help keys (Refs #1108) on post-#1121/#1126 main.",
+  "baselineNote": "Locale and IntelligenceSourcesPanel budgets remeasured on GitHub Actions Linux after PREDICTION_EXTRACT_ENABLED Settings help keys merged onto current main (Refs #1108).",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 239062,
-      "measuredGzipBytes": 238786,
-      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 238662 B + 400 B headroom."
+      "maxGzipBytes": 239706,
+      "measuredGzipBytes": 239306,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 155316,
-      "measuredGzipBytes": 154616,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 155934,
+      "measuredGzipBytes": 155534,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 148660,
-      "measuredGzipBytes": 147960,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 149190,
+      "measuredGzipBytes": 148790,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 148539,
-      "measuredGzipBytes": 147839,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 149170,
+      "measuredGzipBytes": 148770,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 148659,
-      "measuredGzipBytes": 148414,
-      "note": "GitHub Actions Linux after PERF_* field-title i18n on concurrent main (Refs #227 / PR #1211); measured 148259 B + 400 B headroom."
+      "maxGzipBytes": 149128,
+      "measuredGzipBytes": 148728,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 144564,
-      "measuredGzipBytes": 143864,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 145053,
+      "measuredGzipBytes": 144653,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 141061,
-      "measuredGzipBytes": 140361,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 141711,
+      "measuredGzipBytes": 141311,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 134565,
-      "measuredGzipBytes": 133865,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 135084,
+      "measuredGzipBytes": 134684,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 134702,
-      "measuredGzipBytes": 134002,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 135193,
+      "measuredGzipBytes": 134793,
+      "note": "GitHub Actions Linux remeasure after PREDICTION_EXTRACT_ENABLED Settings help on merged main (Refs #1108); measured gzip + 400 B headroom."
     },
     {
       "id": "vendor-charts",
