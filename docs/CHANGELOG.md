@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
+- [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split `data_provider/akshare_fetcher.py` into capability-domain modules under `data_provider/akshare_parts/` (symbols, timeout client, history, realtime quotes, market boards, enhanced data, pure Tencent parsers) behind an ADR-006 compatibility facade with stable re-exports and patch targets; no intentional provider fallback or cache behavior change (Refs #1068).
 - [Added] Strict PredictionRecord schema with typed verifiable claims, no_verifiable_claim path for unparseable prose, and finite-number rejection (Refs #1101, #1107).
 - [Tests] Offline provider fallback / circuit / cache contract suite covers multi-hop order, circuit open-close, cache hit and expiry, multi-provider stale degradation, and multi-symbol isolation (Refs #1069).
+- [Added] Unified hard per-mode Agent budgets (LLM turns, tool calls, estimated cost, optional tokens) with explicit terminate reason codes and diagnostic snapshots; residual wall-clock budget_skip/timeout share the same budget account (Refs #1121, #125).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).
