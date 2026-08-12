@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale/IntelligenceSourcesPanel budgets include event-triggered analysis Settings help and alert action locale inventory (Refs #129, #152, #1133 / PR #1243); failed artifacts use measured gzip + documented headroom.",
+  "baselineNote": "Locale/IntelligenceSourcesPanel budgets cover event-triggered analysis (#1243) and observed-event Daily/Event Research briefs on main; failed artifacts use measured gzip + headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -15,188 +15,203 @@
       "match": "assets/IntelligenceSourcesPanel-*.js",
       "maxGzipBytes": 239676,
       "measuredGzipBytes": 239276,
-      "note": "Local production build after event-triggered analysis Settings help and alert action locale inventory (Refs #129, #152, #1133); measured 239276 B + 400 B headroom."
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=239676."
     },
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
       "maxGzipBytes": 177591,
-      "measuredGzipBytes": 161446
+      "measuredGzipBytes": 161446,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=177591."
     },
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 156218,
-      "measuredGzipBytes": 155518,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "maxGzipBytes": 156261,
+      "measuredGzipBytes": 155561,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=156261."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 149530,
-      "measuredGzipBytes": 148830,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "maxGzipBytes": 149582,
+      "measuredGzipBytes": 148882,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=149582."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 149343,
-      "measuredGzipBytes": 148643,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "maxGzipBytes": 149416,
+      "measuredGzipBytes": 148716,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=149416."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 149469,
-      "measuredGzipBytes": 148769,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "maxGzipBytes": 149473,
+      "measuredGzipBytes": 148773,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=149473."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 145304,
-      "measuredGzipBytes": 144604,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "maxGzipBytes": 145395,
+      "measuredGzipBytes": 144695,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=145395."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
       "maxGzipBytes": 141962,
       "measuredGzipBytes": 141262,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=141962."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 135369,
-      "measuredGzipBytes": 134669,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "maxGzipBytes": 135435,
+      "measuredGzipBytes": 134735,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=135435."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 135498,
-      "measuredGzipBytes": 134798,
-      "note": "Local production build after event-triggered analysis locale inventory (Refs #129, #152, #1133); measured gzip + 700 B headroom."
+      "maxGzipBytes": 135522,
+      "measuredGzipBytes": 134822,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=135522."
     },
     {
       "id": "vendor-charts",
       "match": "assets/vendor-charts-*.js",
       "maxGzipBytes": 122352,
-      "measuredGzipBytes": 111229
+      "measuredGzipBytes": 111229,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=122352."
     },
     {
       "id": "vendor-react",
       "match": "assets/vendor-react-*.js",
       "maxGzipBytes": 66666,
-      "measuredGzipBytes": 60605
+      "measuredGzipBytes": 60605,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=66666."
     },
     {
       "id": "vendor-markdown",
       "match": "assets/vendor-markdown-*.js",
       "maxGzipBytes": 48618,
-      "measuredGzipBytes": 44198
+      "measuredGzipBytes": 44198,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=48618."
     },
     {
       "id": "vendor-motion",
       "match": "assets/vendor-motion-*.js",
       "maxGzipBytes": 43373,
-      "measuredGzipBytes": 39430
+      "measuredGzipBytes": 39430,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=43373."
     },
     {
       "id": "vendor-router",
       "match": "assets/vendor-router-*.js",
       "maxGzipBytes": 33202,
-      "measuredGzipBytes": 30183
+      "measuredGzipBytes": 30183,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=33202."
     },
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
       "maxGzipBytes": 10376,
-      "measuredGzipBytes": 9432
+      "measuredGzipBytes": 9432,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=10376."
     },
     {
       "id": "vendor-misc",
       "match": "assets/vendor-*.js",
       "maxGzipBytes": 86562,
       "measuredGzipBytes": 78692,
-      "note": "First-match residual for vendor-* after the more-specific vendor-* rules above (measured from vendor-CRoa6YUW)."
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=86562."
     },
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
       "maxGzipBytes": 73318,
       "measuredGzipBytes": 73118,
-      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=73318."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
       "maxGzipBytes": 57276,
       "measuredGzipBytes": 57076,
-      "note": "Rebaselined after adding the reasoning-trace export controls Playground story (PR #1040); measured 57076 B + 200 B headroom."
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=57276."
     },
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
       "maxGzipBytes": 45391,
-      "measuredGzipBytes": 41264
+      "measuredGzipBytes": 41264,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=45391."
     },
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
       "maxGzipBytes": 46602,
-      "measuredGzipBytes": 42365
+      "measuredGzipBytes": 42365,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=46602."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
       "match": "assets/PortfolioRiskMetricsPanel-*.js",
       "maxGzipBytes": 10654,
       "measuredGzipBytes": 9685,
-      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=10654."
     },
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 26363,
       "measuredGzipBytes": 26163,
-      "note": "GitHub Actions Linux measurement after the integrated portfolio flow; measured 26163 B + 200 B headroom."
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=26363."
     },
     {
       "id": "DecisionSignalsPage",
       "match": "assets/DecisionSignalsPage-*.js",
       "maxGzipBytes": 23042,
-      "measuredGzipBytes": 20947
+      "measuredGzipBytes": 20947,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=23042."
     },
     {
       "id": "ChatPage",
       "match": "assets/ChatPage-*.js",
       "maxGzipBytes": 18277,
-      "measuredGzipBytes": 16615
+      "measuredGzipBytes": 16615,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=18277."
     },
     {
       "id": "screening",
       "match": "assets/screening-*.js",
       "maxGzipBytes": 17866,
-      "measuredGzipBytes": 16241
+      "measuredGzipBytes": 16241,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=17866."
     },
     {
       "id": "BacktestPage",
       "match": "assets/BacktestPage-*.js",
       "maxGzipBytes": 15368,
-      "measuredGzipBytes": 13970
+      "measuredGzipBytes": 13970,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=15368."
     },
     {
       "id": "css-entry",
       "match": "assets/index-*.css",
       "maxGzipBytes": 28791,
-      "measuredGzipBytes": 26173
+      "measuredGzipBytes": 26173,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=28791."
     },
     {
       "id": "css-vendor",
       "match": "assets/vendor-*.css",
       "maxGzipBytes": 576,
-      "measuredGzipBytes": 523
+      "measuredGzipBytes": 523,
+      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=576."
     }
   ]
 }

@@ -198,10 +198,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | `空` | 是 | 模板中注释; Optional: For Webhooks requiring authentication (Header Authorization: Bearer <token>) |
 | `CUSTOM_WEBHOOK_BODY_TEMPLATE` | `空` | 是 | 模板中注释; Optional global JSON body template, overrides Bark/Slack/Discord etc |
 | `CUSTOM_WEBHOOK_URLS` | `https://oapi.dingtalk.com/robot/send?access_token=xxx,https://hooks.slack.com/services/xxx` | 是 | 模板中注释; Custom Webhook (Supports multiple, comma-separated) Suitable for: DingTalk, Discord, Slack, Bark, and any service tha... |
-| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Daily brief with historical accuracy review (Issue #466; default off) When enabled, the runtime scheduler may emit at... |
+| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Personal daily morning brief (#149) + historical accuracy review (#466; default off) |
 | `DAILY_BRIEF_MIN_SAMPLES` | `10` | 是 | 模板中注释 |
 | `DAILY_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
 | `DAILY_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
+| `DAILY_BRIEF_QUIET_WHEN_EMPTY` | `false` | 是 | 模板中注释 |
 | `DAILY_BRIEF_SAVE_REPORT_FILE` | `true` | 是 | 模板中注释 |
 | `DAILY_BRIEF_SCHEDULE_TIME` | `08:30` | 是 | 模板中注释 |
 | `DAILY_BRIEF_TIMEZONE` | `Asia/Shanghai` | 是 | 模板中注释 |
@@ -247,11 +248,17 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ENABLE_FUNDAMENTAL_PIPELINE` | `true` | 是 | 模板中注释; Enable fundamental aggregation (new P0 capability) |
 | `ENABLE_REALTIME_QUOTE` | `true` | 是 | 模板中注释; Enable real-time quotes (disabling uses historical closing prices for analysis) |
 | `ENABLE_REALTIME_TECHNICAL_INDICATORS` | `true` | 是 | 模板中注释; Intraday technical analysis: when enabled, real-time prices are used to calculate moving averages and bullish MA alig... |
-| `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 是 | 模板中注释; Event-triggered deep analysis (issues #129/#152) |
+| `EVENT_RESEARCH_BRIEF_CATEGORIES` | `earnings` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Event-driven research briefs (#1131; default off) |
+| `EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS` | `48` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE` | `true` | 是 | 模板中注释 |
 | `EVENT_TRIGGER_COOLDOWN_MINUTES` | `180` | 是 | 模板中注释 |
 | `EVENT_TRIGGER_DEFAULT_PIPELINE` | `standard` | 是 | 模板中注释 |
 | `EVENT_TRIGGER_MAX_PER_DAY` | `20` | 是 | 模板中注释 |
 | `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | 是 | 模板中注释 |
+| `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 是 | 模板中注释; Event-triggered deep analysis (issues #129/#152) |
 | `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |
