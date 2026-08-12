@@ -517,6 +517,26 @@ class _DashboardMethods:
         if strategy_synthesis:
             dashboard_block["strategy_synthesis"] = strategy_synthesis
 
+        # Structured disagreement handling (#246 / #193): never silently drop.
+        dashboard_block.pop("disagreement_handling", None)
+        handling = None
+        if isinstance(strategy_synthesis, dict):
+            handling = strategy_synthesis.get("disagreement_handling")
+        if not isinstance(handling, dict):
+            meta_handling = ctx.meta.get("disagreement_handling")
+            if isinstance(meta_handling, dict):
+                handling = meta_handling
+        if isinstance(handling, dict) and handling.get("enabled"):
+            from src.agent.disagreement_handling import public_disagreement_handling_payload
+
+            public = public_disagreement_handling_payload(handling)
+            if public is not None:
+                dashboard_block["disagreement_handling"] = public
+                if isinstance(strategy_synthesis, dict) and "disagreement_handling" not in strategy_synthesis:
+                    strategy_synthesis = dict(strategy_synthesis)
+                    strategy_synthesis["disagreement_handling"] = public
+                    dashboard_block["strategy_synthesis"] = strategy_synthesis
+
         # Committee deliberation section (#545): additive, only when mode active.
         # Strip any model-authored committee payload; deterministic builder only.
         dashboard_block.pop("committee_deliberation", None)

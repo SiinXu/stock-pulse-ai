@@ -57,6 +57,8 @@ from src.report_language import (
     localize_trend_prediction,
     normalize_report_language,
     normalize_strategy_synthesis_payload,
+    normalize_disagreement_handling_payload,
+    localize_disagreement_verdict_mode,
     strategy_invalid_opinion_count,
 )
 from src.schemas.decision_action import (
@@ -664,7 +666,43 @@ class NotificationBuilder:
 def get_notification_service() -> NotificationService:
     """获取通知服务实例"""
     return NotificationService()
+    _append_disagreement_handling_block(lines, strategy_synthesis, labels, report_language)
 
+
+
+def _append_disagreement_handling_block(
+    lines: List[str],
+    strategy_synthesis: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    dashboard: Any = None,
+) -> None:
+    """Append high-disagreement annotation so final products never silently smooth conflicts."""
+    handling = None
+    if isinstance(strategy_synthesis, dict):
+        handling = strategy_synthesis.get("disagreement_handling")
+    if not isinstance(handling, dict) and isinstance(dashboard, dict):
+        handling = dashboard.get("disagreement_handling")
+    handling = normalize_disagreement_handling_payload(handling)
+    if not handling or not handling.get("high_disagreement"):
+        return
+    lines.append(f"- ⚠️ {labels.get('disagreement_high_banner', 'High disagreement')}")
+    lines.append(
+        f"- {labels.get('disagreement_verdict_label', 'Verdict mode')}: "
+        f"{localize_disagreement_verdict_mode(handling.get('verdict_mode'), report_language)} | "
+        f"{labels.get('disagreement_escalation_label', 'Escalation')}: {handling.get('escalation')} | "
+        f"{labels.get('disagreement_score_label', 'Disagreement score')}: "
+        f"{(handling.get('disagreement_score') or 0) * 100:.0f}%"
+    )
+    lines.append(f"- {labels.get('disagreement_no_majority_note', 'Majority vote was not used')}")
+    for point in (handling.get("points") or [])[:3]:
+        if not isinstance(point, dict):
+            continue
+        lines.append(
+            f"- {labels.get('disagreement_points_label', 'Disagreement points')}: "
+            f"[{point.get('source')}] {point.get('severity')}/{point.get('kind')}"
+        )
 
 def send_daily_report(results: List[AnalysisResult]) -> bool:
     """

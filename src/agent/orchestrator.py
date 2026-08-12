@@ -284,10 +284,18 @@ class AgentOrchestrator:
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
         self.skill_manager = skill_manager
         self.config = config
+        from src.agent.disagreement_handling import disagreement_handling_thresholds
+
+        high_threshold, medium_threshold = disagreement_handling_thresholds(config)
         self.strategy_engine = StrategyEngine(
             deliberation_enabled=bool(
                 getattr(config, "agent_multi_strategy_deliberation", False)
             ),
+            disagreement_handling_enabled=bool(
+                getattr(config, "agent_disagreement_handling", False)
+            ),
+            disagreement_high_confidence_threshold=high_threshold,
+            disagreement_medium_confidence_threshold=medium_threshold,
         )
         self.runtime_guard_policy = (
             runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)

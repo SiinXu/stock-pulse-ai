@@ -73,6 +73,10 @@
 {% set strategy_synthesis = normalize_strategy_synthesis_payload(dashboard.get('strategy_synthesis')) %}
 {% if strategy_synthesis %}
 🧩 **{{ labels.strategy_synthesis_heading }}**: {{ localize_strategy_signal(strategy_synthesis.get('final_signal', 'N/A'), report_language) }} | {{ labels.strategy_consensus_level_label }} {{ localize_consensus_level(strategy_synthesis.get('consensus_level', 'N/A'), report_language) }} | {{ labels.strategy_conflict_label }} {{ localize_conflict_severity(strategy_synthesis.get('conflict_severity', 'none'), report_language) }}({{ strategy_synthesis.get('conflict_count', 0) }})
+{% set disagreement_handling = normalize_disagreement_handling_payload(strategy_synthesis.get('disagreement_handling') or (dashboard.get('disagreement_handling') if dashboard else none)) %}
+{% if disagreement_handling and disagreement_handling.get('high_disagreement') %}
+⚠️ **{{ labels.disagreement_high_banner }}** | {{ labels.disagreement_verdict_label }} {{ localize_disagreement_verdict_mode(disagreement_handling.get('verdict_mode'), report_language) }} | {{ labels.disagreement_no_majority_note }}
+{% endif %}
 - {{ labels.strategy_supporting_skills_label }}: {{ format_strategy_skill_items(strategy_synthesis.get('supporting_skills'), report_language, include_details=false) }}
 - {{ labels.strategy_opposing_skills_label }}: {{ format_strategy_skill_items(strategy_synthesis.get('opposing_skills'), report_language, include_details=false) }}
 {% set invalid_opinion_count = strategy_invalid_opinion_count(strategy_synthesis) %}
