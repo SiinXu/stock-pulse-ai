@@ -118,17 +118,17 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MAX_STEPS` | `10` | 是 | 模板中注释; Agent maximum inference step limit (default 10, each sub-agent runs according to its preset value; higher than the de... |
 | `AGENT_MEMORY_ENABLED` | `false` | 是 | 模板中注释; Memory and calibration system (tracks historical accuracy and automatically adjusts confidence) |
 | `AGENT_MODE` | `true` | 是 | 模板中注释; =================================== Agent strategy dialogue configuration (Web dialogue page) =======================... |
+| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | 模板中注释; Hard per-mode budgets (LLM turns / tool calls / estimated USD cost / optional tokens) |
+| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
-| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | Enable hard per-mode budgets (turns/tools/cost); breach terminates with explicit reason |
-| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | Global tightener for mode LLM turn caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | Global tightener for mode tool-call caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | Global tightener for mode estimated cost caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | Optional global token ceiling; 0 disables token dimension |
 | `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |
 | `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 是 | 模板中注释 |
@@ -247,6 +247,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ENABLE_FUNDAMENTAL_PIPELINE` | `true` | 是 | 模板中注释; Enable fundamental aggregation (new P0 capability) |
 | `ENABLE_REALTIME_QUOTE` | `true` | 是 | 模板中注释; Enable real-time quotes (disabling uses historical closing prices for analysis) |
 | `ENABLE_REALTIME_TECHNICAL_INDICATORS` | `true` | 是 | 模板中注释; Intraday technical analysis: when enabled, real-time prices are used to calculate moving averages and bullish MA alig... |
+| `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 是 | 模板中注释; Event-triggered deep analysis (issues #129/#152) |
+| `EVENT_TRIGGER_COOLDOWN_MINUTES` | `180` | 是 | 模板中注释 |
+| `EVENT_TRIGGER_DEFAULT_PIPELINE` | `standard` | 是 | 模板中注释 |
+| `EVENT_TRIGGER_MAX_PER_DAY` | `20` | 是 | 模板中注释 |
+| `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | 是 | 模板中注释 |
 | `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |
