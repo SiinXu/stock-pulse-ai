@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Rebaseline Web locale gzip budgets after research persona settings help keys (Refs #119, #467).
 - [Added] Investor Persona framework: data-defined research stances (default-off config/request/framework field), investment-lens Skills with style-reference-only aliases, analysis/Agent inject, and report labels (Refs #119, #467).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).

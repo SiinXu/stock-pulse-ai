@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after data-validation Settings help and fieldTitleMaps inventory keys (Refs #185 / PR #1161); failed locales use measured gzip + 600 B headroom.",
+  "baselineNote": "Locale budgets raised +2500 B for AGENT_RESEARCH_PERSONA settings help inventory (Refs #119, #467 / PR #1246).",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 153720,
+      "maxGzipBytes": 156220,
       "measuredGzipBytes": 153120,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 147131,
+      "maxGzipBytes": 149631,
       "measuredGzipBytes": 146531,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 147091,
+      "maxGzipBytes": 149591,
       "measuredGzipBytes": 146491,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 147384,
+      "maxGzipBytes": 149884,
       "measuredGzipBytes": 146784,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 143171,
+      "maxGzipBytes": 145671,
       "measuredGzipBytes": 142571,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 139684,
+      "maxGzipBytes": 142184,
       "measuredGzipBytes": 139084,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 133151,
+      "maxGzipBytes": 135651,
       "measuredGzipBytes": 132551,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 133234,
+      "maxGzipBytes": 135734,
       "measuredGzipBytes": 132634,
-      "note": "GitHub Actions Linux measurement after data-validation Settings help + field title inventory keys (PR #1161 / Refs #185); measured gzip + 600 B headroom."
+      "note": "Budget +2500 B after research persona settings help/title keys (Refs #119, #467 / PR #1246); prior headroom was 600 B and risked fail-closed on GHA."
     },
     {
       "id": "vendor-charts",
