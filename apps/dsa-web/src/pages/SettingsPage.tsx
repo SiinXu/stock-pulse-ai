@@ -9,17 +9,13 @@ import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   AGENT_SETTINGS_ESSENTIALS_SOURCE,
-  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
-  buildAnalysisWorkbenchHref,
-  RUN_FLOW_ROUTE_QUERY_VALUES,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
 } from '../routing/routes';
-import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
-import { extractExistingTaskId, isTaskBusyError } from '../utils/asyncTaskUx';
-import { analysisApi } from '../api/analysis';
+import { getParsedApiError, type ParsedApiError } from '../api/error';
+import { runSetupSmokeAnalysis } from '../utils/setupSmokeTask';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
@@ -1282,69 +1278,21 @@ const SettingsPage: React.FC = () => {
     setSetupSmokeError(null);
     setSetupSmokeSuccess('');
     setSetupSmokeTasksHref(null);
-
-    if (!setupStatus?.readyForSmoke) {
-      setSetupSmokeError(createParsedApiError({
-        title: t('settings.setupGuideSmokeUnavailableTitle'),
-        message: t('settings.setupGuideSmokeNotReady'),
-        rawMessage: t('settings.setupGuideSmokeNotReady'),
-        category: 'missing_params',
-      }));
-      return;
-    }
-
-    if (!firstSetupStockCode) {
-      setSetupSmokeError(createParsedApiError({
-        title: t('settings.setupGuideSmokeUnavailableTitle'),
-        message: t('settings.setupGuideSmokeNeedsStock'),
-        rawMessage: t('settings.setupGuideSmokeNeedsStock'),
-        category: 'missing_params',
-      }));
-      return;
-    }
-
     setIsRunningSetupSmoke(true);
     try {
-      const result = await analysisApi.analyzeAsync({
+      const outcome = await runSetupSmokeAnalysis({
+        readyForSmoke: Boolean(setupStatus?.readyForSmoke),
         stockCode: firstSetupStockCode,
-        reportType: 'brief',
-        asyncMode: true,
-        notify: false,
-        originalQuery: firstSetupStockCode,
-        selectionSource: 'manual',
+        t,
       });
-      const taskId = 'taskId' in result ? result.taskId : result.accepted?.[0]?.taskId;
-      // Primary copy never surfaces a bare task id (#885 / #879 A6).
-      setSetupSmokeSuccess(t('settings.setupGuideSmokeAccepted', { stock: firstSetupStockCode }));
-      setSetupSmokeTasksHref(
-        taskId
-          ? buildAnalysisWorkbenchHref({
-              segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
-              runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
-              runFlowTaskId: taskId,
-            })
-          : buildAnalysisWorkbenchHref({
-              segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
-            }),
-      );
-      void refreshSetupStatus();
-    } catch (error: unknown) {
-      const parsed = getParsedApiError(error);
-      setSetupSmokeError(parsed);
-      const existingTaskId = extractExistingTaskId(parsed);
-      if (isTaskBusyError(parsed)) {
-        setSetupSmokeTasksHref(
-          existingTaskId
-            ? buildAnalysisWorkbenchHref({
-                segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
-                runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
-                runFlowTaskId: existingTaskId,
-              })
-            : buildAnalysisWorkbenchHref({
-                segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
-              }),
-        );
+      if (outcome.status === 'blocked' || outcome.status === 'failed') {
+        setSetupSmokeError(outcome.error);
+        if (outcome.status === 'failed') setSetupSmokeTasksHref(outcome.tasksHref);
+        return;
       }
+      setSetupSmokeSuccess(outcome.successMessage);
+      setSetupSmokeTasksHref(outcome.tasksHref);
+      void refreshSetupStatus();
     } finally {
       setIsRunningSetupSmoke(false);
     }
