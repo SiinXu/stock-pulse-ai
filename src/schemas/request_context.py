@@ -51,8 +51,8 @@ class NotificationReplyTarget(BaseModel):
         address: Any = _UNSET,
         **data: Any,
     ) -> None:
-        # Preserve former dataclass positional construction:
-        # NotificationReplyTarget("feishu", "chat-1").
+        # Compatibility shim only (not a general pattern): preserve former
+        # dataclass positional construction NotificationReplyTarget("feishu", "chat-1").
         if kind is not _UNSET:
             if "kind" in data:
                 raise TypeError("got multiple values for argument 'kind'")
