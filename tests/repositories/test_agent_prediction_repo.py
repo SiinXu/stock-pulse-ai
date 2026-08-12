@@ -20,8 +20,13 @@ from src.migrations.registry import (
 )
 from src.migrations.runner import MigrationRunner
 from src.migrations.versions import v202608120001_agent_prediction_schema as migration_mod
-from src.repositories.agent_prediction_repo import AgentPredictionRepository
+from src.repositories.agent_prediction_repo import (
+    AgentPredictionRepository,
+    _is_unique_or_primary_key_conflict,
+)
+from src.repositories.base import RepositoryError
 from src.schemas.agent_prediction import (
+    AGENT_PREDICTION_STATUSES,
     STATUS_DATA_UNAVAILABLE,
     STATUS_PENDING,
     STATUS_RESOLVED,
@@ -109,6 +114,9 @@ def test_fresh_database_manager_applies_prediction_schema(isolated_db) -> None:
     assert "ck_agent_prediction_status" in ddl
     assert "ck_agent_prediction_attempts" in ddl
     assert "data_unavailable" in ddl
+    # A1 PredictionRecord allows prediction_id/run_id up to 128 characters.
+    assert "prediction_id VARCHAR(128)" in ddl
+    assert "run_id VARCHAR(128)" in ddl
     indexes = _index_names(isolated_db._engine, "agent_predictions")
     assert {
         "ix_agent_prediction_status_resolve_after",
@@ -125,6 +133,24 @@ def test_fresh_database_manager_applies_prediction_schema(isolated_db) -> None:
         ).scalar_one()
     assert applied == 1
     assert get_migrations()[-1].id == AGENT_PREDICTION_SCHEMA_MIGRATION.id
+
+
+def test_due_query_uses_status_resolve_after_index(isolated_db) -> None:
+    """Acceptance: due scans use index-friendly predicates (EXPLAIN)."""
+    with isolated_db.get_session() as session:
+        plan_rows = session.execute(
+            text(
+                "EXPLAIN QUERY PLAN "
+                "SELECT prediction_id FROM agent_predictions "
+                "WHERE status IN ('pending', 'data_unavailable') "
+                "AND resolve_after <= :as_of "
+                "ORDER BY resolve_after, prediction_id "
+                "LIMIT 10"
+            ),
+            {"as_of": _fixed_now()},
+        ).fetchall()
+    plan_text = " ".join(str(row) for row in plan_rows).lower()
+    assert "ix_agent_prediction_status_resolve_after" in plan_text
 
 
 def test_migration_applies_on_existing_database_without_predictions(
@@ -236,6 +262,78 @@ def test_insert_is_idempotent_and_does_not_overwrite(isolated_db) -> None:
     assert second.claims[0]["payload"]["side"] == "up"
 
 
+def test_accepts_a1_max_length_ids_and_normalizes_market(isolated_db) -> None:
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    prediction_id = "p" * 128
+    run_id = "r" * 128
+    created, record = repo.insert_pending(
+        AgentPredictionInsert(
+            prediction_id=prediction_id,
+            run_id=run_id,
+            symbol="600519",
+            market="CN",
+            horizon="5d",
+            resolve_after=_fixed_now(),
+            claims=[{"type": "direction", "payload": {"side": "up"}}],
+        )
+    )
+    assert created is True
+    assert record.prediction_id == prediction_id
+    assert record.run_id == run_id
+    assert record.market == "cn"
+    listed = repo.list_by_symbol_market(symbol="600519", market="CN")
+    assert [row.prediction_id for row in listed] == [prediction_id]
+    with pytest.raises(ValueError, match="at most 128"):
+        repo.insert_pending(
+            AgentPredictionInsert(
+                prediction_id="x" * 129,
+                run_id="run",
+                symbol="600519",
+                market="cn",
+                horizon="5d",
+                resolve_after=_fixed_now(),
+                claims=[],
+            )
+        )
+
+
+def test_check_constraint_failure_is_not_treated_as_collision(
+    isolated_db, monkeypatch
+) -> None:
+    """Counterexample: IntegrityError from CHECK must not look like PK race."""
+    assert _is_unique_or_primary_key_conflict(
+        Exception("UNIQUE constraint failed: agent_predictions.prediction_id")
+    )
+    assert not _is_unique_or_primary_key_conflict(
+        Exception("CHECK constraint failed: ck_agent_prediction_status")
+    )
+    assert not _is_unique_or_primary_key_conflict(
+        Exception("NOT NULL constraint failed: agent_predictions.claims_json")
+    )
+
+    # Expand the Python allowlist so the DB CHECK is the failing layer.
+    monkeypatch.setattr(
+        "src.repositories.agent_prediction_repo.AGENT_PREDICTION_STATUSES",
+        frozenset(AGENT_PREDICTION_STATUSES | {"bogus_status"}),
+    )
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    with pytest.raises(RepositoryError) as raised:
+        repo.insert_pending(
+            AgentPredictionInsert(
+                prediction_id="pred-check",
+                run_id="run-check",
+                symbol="600519",
+                market="cn",
+                horizon="5d",
+                resolve_after=_fixed_now(),
+                claims=[{"type": "direction"}],
+                status="bogus_status",
+            )
+        )
+    assert raised.value.error_code == "agent_prediction_insert_constraint"
+    assert repo.get("pred-check") is None
+
+
 def test_due_query_and_symbol_market_list(isolated_db) -> None:
     repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
     _insert(
@@ -288,6 +386,16 @@ def test_claim_resolve_and_data_unavailable_state_machine(isolated_db) -> None:
         as_of=_fixed_now(),
     )
     assert lost is None
+
+    # Lease holder must bind resolve/unavailable to expected_lease_token.
+    wrong_token_ok, _ = repo.mark_data_unavailable(
+        prediction_id="pred-sm",
+        reason="should_fail",
+        expected_lease_token="token-b",
+        as_of=_fixed_now(),
+    )
+    assert wrong_token_ok is False
+    assert repo.get("pred-sm").status == STATUS_RESOLVING  # type: ignore[union-attr]
 
     unavailable_ok, unavailable = repo.mark_data_unavailable(
         prediction_id="pred-sm",

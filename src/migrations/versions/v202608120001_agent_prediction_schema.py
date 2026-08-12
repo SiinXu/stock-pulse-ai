@@ -19,8 +19,8 @@ _STATUS_CHECK = (
 _TABLE_STATEMENTS = (
     f"""
     CREATE TABLE IF NOT EXISTS agent_predictions (
-        prediction_id VARCHAR(64) NOT NULL PRIMARY KEY,
-        run_id VARCHAR(64) NOT NULL,
+        prediction_id VARCHAR(128) NOT NULL PRIMARY KEY,
+        run_id VARCHAR(128) NOT NULL,
         symbol VARCHAR(32) NOT NULL,
         market VARCHAR(16) NOT NULL,
         horizon VARCHAR(32) NOT NULL,

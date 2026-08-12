@@ -54,6 +54,20 @@ def _json_loads(raw: Optional[str], *, default: Any) -> Any:
     return parsed
 
 
+def _is_unique_or_primary_key_conflict(exc: BaseException) -> bool:
+    """Return True only for PK/UNIQUE collisions, not CHECK/NOT NULL failures."""
+    message = str(exc).lower()
+    if "check constraint failed" in message:
+        return False
+    if "not null constraint failed" in message:
+        return False
+    if "unique constraint failed" in message:
+        return True
+    if "primary key" in message:
+        return True
+    return False
+
+
 class AgentPredictionRepository(BaseRepository):
     """Persist predictions and apply one-shot resolve transitions."""
 
@@ -104,6 +118,8 @@ class AgentPredictionRepository(BaseRepository):
         prediction_id = str(fields.prediction_id or "").strip()
         run_id = str(fields.run_id or "").strip()
         symbol = str(fields.symbol or "").strip()
+        # Persistence normalizes market to lowercase so symbol/market indexes
+        # and list filters share one canonical casing (A1 may send mixed case).
         market = str(fields.market or "").strip().lower()
         horizon = str(fields.horizon or "").strip()
         status = str(fields.status or STATUS_PENDING).strip()
@@ -111,6 +127,10 @@ class AgentPredictionRepository(BaseRepository):
             raise ValueError(
                 "prediction_id, run_id, symbol, market, and horizon are required"
             )
+        if len(prediction_id) > 128 or len(run_id) > 128:
+            raise ValueError("prediction_id and run_id must be at most 128 characters")
+        if len(symbol) > 32 or len(market) > 16 or len(horizon) > 32:
+            raise ValueError("symbol/market/horizon exceed column width")
         if fields.resolve_after is None:
             raise ValueError("resolve_after is required")
         if not isinstance(fields.claims, list):
@@ -156,7 +176,23 @@ class AgentPredictionRepository(BaseRepository):
                     context={"prediction_id": prediction_id},
                 )
             return True, created
-        except IntegrityError:
+        except IntegrityError as exc:
+            # Only PK/UNIQUE collisions are idempotent no-overwrite; CHECK and
+            # NOT NULL failures must not be reported as "existing row" races.
+            if not _is_unique_or_primary_key_conflict(exc):
+                context = {"prediction_id": prediction_id}
+                log_safe_exception(
+                    logger,
+                    "Agent prediction insert constraint failed",
+                    exc,
+                    error_code="agent_prediction_insert_constraint",
+                    context=context,
+                )
+                raise RepositoryError(
+                    "Agent prediction insert constraint failed",
+                    error_code="agent_prediction_insert_constraint",
+                    context=context,
+                ) from exc
             existing = self.get(prediction_id)
             if existing is None:
                 raise RepositoryError(
@@ -338,6 +374,12 @@ class AgentPredictionRepository(BaseRepository):
 
         Returns ``(applied, record)``. Concurrent winners see ``applied=False``
         and the terminal row that already won.
+
+        Callers that previously claimed the row via :meth:`claim_for_resolve`
+        **should always pass** ``expected_lease_token`` so another worker cannot
+        complete the resolve without the lease. Omitting the token still uses
+        status CAS (terminal write happens at most once) but does not bind the
+        writer to a specific lease holder.
         """
         canonical = str(prediction_id or "").strip()
         if not canonical:

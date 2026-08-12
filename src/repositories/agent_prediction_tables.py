@@ -18,8 +18,9 @@ metadata = MetaData()
 agent_predictions_table = Table(
     "agent_predictions",
     metadata,
-    Column("prediction_id", String(64), primary_key=True),
-    Column("run_id", String(64), nullable=False),
+    # Widths align with A1 PredictionRecord (prediction_id/run_id max_length=128).
+    Column("prediction_id", String(128), primary_key=True),
+    Column("run_id", String(128), nullable=False),
     Column("symbol", String(32), nullable=False),
     Column("market", String(16), nullable=False),
     Column("horizon", String(32), nullable=False),

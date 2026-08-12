@@ -41,9 +41,9 @@ Migration id: `202608120001_agent_prediction_schema`.
 
 | Column | Notes |
 | --- | --- |
-| `prediction_id` | Primary key |
-| `run_id` | Analysis / agent run linkage |
-| `symbol`, `market` | Instrument identity for history queries |
+| `prediction_id` | Primary key (`VARCHAR(128)`, aligned with A1 `PredictionRecord`) |
+| `run_id` | Analysis / agent run linkage (`VARCHAR(128)`) |
+| `symbol`, `market` | Instrument identity for history queries; **`market` is normalized to lowercase** on write |
 | `horizon` | Horizon token or policy label |
 | `resolve_after` | UTC-naive datetime used by due scans |
 | `status` | See state machine below |
@@ -75,9 +75,10 @@ Also accepted in the CHECK constraint for forward compatibility with the A1 cont
 
 ## Concurrency
 
-- Insert uses primary-key uniqueness; collisions return the existing row without overwrite.
+- Insert uses primary-key uniqueness; collisions return the existing row without overwrite. CHECK / NOT NULL failures are **not** treated as collisions.
 - Claim and resolve use conditional `UPDATE ... WHERE` and require `rowcount == 1`.
 - Concurrent resolvers of the same id: exactly one applies; losers observe the winner’s terminal outcome.
+- After `claim_for_resolve`, the worker **should always pass** `expected_lease_token` into `resolve` / `mark_data_unavailable` so only the lease holder can finish the transition. Omitting the token still enforces terminal CAS but does not bind the writer to a lease.
 
 ## Rollback
 
