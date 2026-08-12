@@ -75,7 +75,6 @@ describe('navigation IA route inventory', () => {
       APP_ROUTE_PATHS.signals,
       APP_ROUTE_PATHS.approvals,
       APP_ROUTE_PATHS.stockDetails,
-      APP_ROUTE_PATHS.eventCalendar,
       APP_ROUTE_PATHS.eventAlerts,
       APP_ROUTE_PATHS.login,
       APP_ROUTE_PATHS.playground,
