@@ -56,6 +56,7 @@ This is the entry point for project documentation. The README covers the project
 | [Local Model Catalog](local-model-catalog.md) | Curated local models, verified artifacts and licenses, RAM tiers, distribution status, and Ollama packaging guidance |
 | [StockPulse Model Packs](model-packs.md) | Versioned GGUF pack format, offline import, validation failures, build tooling, and release limits |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Market-aware provider order, bounded health learning, circuit control, stale degradation, and production/zero-cost profiles |
+| [Parallel dependency-free data pulls](parallel-data-fetch.md) | Single-stock parallel realtime/chip/money-flow/fundamental pulls with concurrency caps and serial fallback (Issue #1126) |
 | [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Provider presets, GitHub Actions mapping, error categories, and diagnostics |
 | [LiteLLM YAML Example](examples/litellm_config.example.yaml) | Example LiteLLM multi-provider configuration |
 | [Notification Baseline](notifications.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | WeChat Work, Feishu, Telegram, Discord, Slack, Email, and other notification channels |
