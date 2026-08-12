@@ -72,7 +72,7 @@ def snapshot_tool_surface_denials(
     if tool_surface is not None:
         try:
             public = tool_surface.list_tools(format="public")
-        except Exception:  # broad-exception: fallback_recorded - Snapshot falls back to empty tool list when listing fails.
+        except Exception:  # broad-exception: optional_metadata - Tool list snapshot is best-effort for immutability proofs only.
             public = []
         for item in public or []:
             if isinstance(item, dict):
