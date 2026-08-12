@@ -387,7 +387,8 @@ class _RenderingMethods:
     def generate_dashboard_report(
         self,
         results: List[AnalysisResult],
-        report_date: Optional[str] = None
+        report_date: Optional[str] = None,
+        report_type: Any = None,
     ) -> str:
         """
         生成决策仪表盘格式的日报（详细版）
@@ -397,6 +398,7 @@ class _RenderingMethods:
         Args:
             results: 分析结果列表
             report_date: 报告日期（默认今天）
+            report_type: Persisted report shape used for history delta lookup
 
         Returns:
             Markdown 格式的决策仪表盘日报
@@ -404,6 +406,11 @@ class _RenderingMethods:
         config = get_config()
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
+        resolved_report_type = (
+            report_type
+            if report_type is not None
+            else getattr(config, "report_type", "simple")
+        )
 
         def _nlabel(en: str, zh: str, ko: str) -> str:
             if report_language == "en":
@@ -448,7 +455,11 @@ class _RenderingMethods:
                     extra_context=build_extra_context(),
                 )
             if out:
-                return out
+                return self._prepend_report_delta_section(
+                    out,
+                    results,
+                    resolved_report_type,
+                )
 
         if report_date is None:
             report_date = datetime.now().strftime('%Y-%m-%d')
@@ -832,7 +843,11 @@ class _RenderingMethods:
         if models:
             report_lines.append(f"*{labels['analysis_model_label']}：{', '.join(models)}*")
 
-        return "\n".join(report_lines)
+        return self._prepend_report_delta_section(
+            "\n".join(report_lines),
+            results,
+            resolved_report_type,
+        )
 
     def generate_wechat_dashboard(self, results: List[AnalysisResult]) -> str:
         """
@@ -1101,6 +1116,7 @@ class _RenderingMethods:
         self,
         results: List[AnalysisResult],
         report_date: Optional[str] = None,
+        report_type: Any = None,
     ) -> str:
         """
         Generate brief report (3-5 sentences per stock) for mobile/push.
@@ -1108,6 +1124,7 @@ class _RenderingMethods:
         Args:
             results: Analysis results list (use [result] for single stock).
             report_date: Report date (default: today).
+            report_type: Persisted report shape used for history delta lookup.
 
         Returns:
             Brief markdown content.
@@ -1117,6 +1134,11 @@ class _RenderingMethods:
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
         config = get_config()
+        resolved_report_type = (
+            report_type
+            if report_type is not None
+            else getattr(config, "report_type", "brief")
+        )
         if results:
             from src.services.report_renderer import render, render_plugin_template
 
@@ -1131,7 +1153,11 @@ class _RenderingMethods:
             if not out and getattr(config, 'report_renderer_enabled', False):
                 out = render(**render_kwargs)
             if out:
-                return out
+                return self._prepend_report_delta_section(
+                    out,
+                    results,
+                    resolved_report_type,
+                )
         # Fallback: brief summary from dashboard report
         if not results:
             return f"# {report_date} {labels['brief_title']}\n\n{labels['no_results']}"
@@ -1159,9 +1185,17 @@ class _RenderingMethods:
         models = self._collect_models_used(results)
         if models:
             lines.append(f"*{labels['analysis_model_label']}: {', '.join(models)}*")
-        return "\n".join(lines)
+        return self._prepend_report_delta_section(
+            "\n".join(lines),
+            results,
+            resolved_report_type,
+        )
 
-    def generate_single_stock_report(self, result: AnalysisResult) -> str:
+    def generate_single_stock_report(
+        self,
+        result: AnalysisResult,
+        report_type: Any = None,
+    ) -> str:
         """
         生成单只股票的分析报告（用于单股推送模式 #55）
 
@@ -1169,6 +1203,7 @@ class _RenderingMethods:
 
         Args:
             result: 单只股票的分析结果
+            report_type: Persisted report shape used for history delta lookup
 
         Returns:
             Markdown 格式的单股报告
@@ -1176,6 +1211,12 @@ class _RenderingMethods:
         report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         report_language = self._get_report_language(result)
         labels = get_report_labels(report_language)
+        resolved_report_type = (
+            report_type
+            if report_type is not None
+            else getattr(getattr(self, "_config", None), "report_type", None)
+            or "simple"
+        )
         signal_text, signal_emoji, _ = self._get_signal_level(result)
         dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
         core = dashboard.get('core_conclusion', {}) if dashboard else {}
@@ -1335,7 +1376,11 @@ class _RenderingMethods:
                 lines.append(f"*{labels['analysis_model_label']}: {model_used}*")
         lines.append(f"*{labels['not_investment_advice']}*")
 
-        return "\n".join(lines)
+        return self._prepend_report_delta_section(
+            "\n".join(lines),
+            [result],
+            resolved_report_type,
+        )
 
     def _get_source_display_name(self, source: Any, language: Optional[str]) -> str:
         raw_source = str(source or "N/A")

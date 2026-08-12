@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.fr,
+  ...DR.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -3033,6 +3035,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Copier la source Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Copier le texte brut",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Échec de l'export",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Télécharger HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "L'export HTML n'est pas disponible",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Télécharger Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Télécharger PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "L'export PDF n'est pas disponible",

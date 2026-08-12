@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
+  ...DR.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -3033,6 +3035,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Markdown 소스 복사",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "일반 텍스트 복사",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "내보내기 실패",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "HTML 다운로드",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML 내보내기를 사용할 수 없음",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Markdown 다운로드",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "PDF 다운로드",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF 내보내기를 사용할 수 없음",

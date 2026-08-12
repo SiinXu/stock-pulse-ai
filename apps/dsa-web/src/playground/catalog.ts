@@ -208,6 +208,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'auth-settings-card', 'AuthSettingsCard', 'components/settings/AuthSettingsCard.tsx', ['interactive', 'error']),
   entry('settings', 'change-password-card', 'ChangePasswordCard', 'components/settings/ChangePasswordCard.tsx', ['interactive', 'error']),
   entry('settings', 'data-providers-panel', 'DataProvidersPanel', 'components/settings/DataProvidersPanel.tsx', ['interactive', 'empty']),
+  entry('settings', 'data-provider-runtime-status-panel', 'DataProviderRuntimeStatusPanel', 'components/settings/DataProviderRuntimeStatusPanel.tsx', ['default', 'loading', 'error', 'empty']),
   entry('settings', 'first-run-wizard', 'FirstRunWizard', 'components/settings/FirstRunWizard.tsx', ['interactive', 'error']),
   entry('settings', 'generation-backend-status-panel', 'GenerationBackendStatusPanel', 'components/settings/GenerationBackendStatusPanel.tsx', ['default', 'loading', 'error']),
   entry('settings', 'kronos-status-panel', 'KronosStatusPanel', 'components/settings/KronosStatusPanel.tsx', ['default', 'loading', 'error']),

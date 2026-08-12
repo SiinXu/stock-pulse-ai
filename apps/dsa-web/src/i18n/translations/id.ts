@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
+  ...DR.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -3033,6 +3035,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Salin sumber Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Salin teks biasa",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Ekspor gagal",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "Unduh HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "Ekspor HTML tidak tersedia",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Unduh Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "Unduh PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "Ekspor PDF tidak tersedia",

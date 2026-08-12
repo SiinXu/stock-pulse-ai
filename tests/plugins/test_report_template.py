@@ -478,7 +478,11 @@ def test_aggregate_report_paths_select_plugins_before_jinja(
     ) as build_history:
         rendered = getattr(service, method_name)([_result()])
 
-    assert rendered == f"plugin:{platform}"
+    if method_name == "generate_wechat_dashboard":
+        assert rendered == f"plugin:{platform}"
+    else:
+        assert rendered.endswith(f"plugin:{platform}")
+        assert rendered != f"plugin:{platform}"  # delta section prepended
     jinja_render.assert_not_called()
     assert build_history.call_count == (1 if platform == "markdown" else 0)
     if platform == "markdown":
@@ -509,7 +513,8 @@ def test_declined_markdown_template_builds_history_once_for_jinja_fallback(
             report_date="2026-07-24",
         )
 
-    assert rendered == "jinja fallback"
+    assert rendered.endswith("jinja fallback")
+    assert "jinja fallback" in rendered
     build_history.assert_called_once()
     jinja_render.assert_called_once()
     assert declined.requests[0].extra_context["history_by_code"] == {
@@ -534,7 +539,7 @@ def test_all_declined_templates_continue_to_jinja_fallback(
         service = NotificationService()
         rendered = service.generate_brief_report([_result()], report_date="2026-07-24")
 
-    assert rendered == "jinja fallback"
+    assert rendered.endswith("jinja fallback")
     jinja_render.assert_called_once()
 
 

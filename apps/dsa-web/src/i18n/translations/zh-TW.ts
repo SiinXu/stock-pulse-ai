@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M['zh-TW'],
+  ...DR["zh-TW"],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -3033,6 +3035,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "複製 Markdown 原始碼",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "複製純文字",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "匯出失敗",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "下載 HTML",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML 匯出目前不可用",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "下載 Markdown",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "下載 PDF",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF 匯出目前不可用",
