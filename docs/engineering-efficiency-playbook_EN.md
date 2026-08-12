@@ -14,7 +14,7 @@
 | **This playbook** | **Operations**: how to batch merges, group conflicts, run registry guards, avoid squash false-closes, bound local resources, protect workspaces | Only for execution tactics that do not weaken the contract. |
 | **Skills under `.claude/skills/`** | Encode process order; they must stay consistent with `AGENTS.md` | Skills operationalize the contract; they do not replace it. |
 
-Do **not** restate or paste `AGENTS.md` here. Link it. Commands below are operational recipes; required CI names, commit/PR language rules, and confirmation gates remain those defined in the contract.
+Do **not** restate or paste `AGENTS.md` here. Link it. Commands below are operational recipes; required CI names, commit/PR language rules, and confirmation gates (no agent `git push` / merge / force-push without explicit human confirmation) remain those defined in the contract.
 
 ---
 
@@ -39,6 +39,8 @@ Do **not** restate or paste `AGENTS.md` here. Link it. Commands below are operat
 
 ### Commands (integrator)
 
+Integrator actions that change remote state (`gh pr merge`, `git push`) require an **explicit human confirmation** for agents — same gate as `AGENTS.md` (agents do not merge or force-push by default). The commands below are the recipe *after* that confirmation.
+
 ```bash
 git fetch --all --prune
 git checkout main
@@ -49,7 +51,12 @@ gh pr list --state open --limit 50
 gh pr checks <pr_number>
 gh pr view <pr_number> --json mergeable,mergeStateStatus,baseRefName,headRefOid,statusCheckRollup
 
-# Land one PR only when required checks are green on the exact head
+# Before merge: scan for accidental auto-close keywords (ch. 4)
+gh pr view <pr_number> --json title,body,commits \
+  --jq '{title,body,commits:[.commits[].messageHeadline]}'
+
+# Land one PR only when required checks are green on the **exact** head
+# Prefer squash when that is the repo default; keep tracking issues open with Refs (ch. 4)
 gh pr merge <pr_number> --squash --delete-branch
 
 # Advance local main and announce the new tip for workers
@@ -63,7 +70,9 @@ Workers refresh against the train tip:
 git fetch origin
 git rebase origin/main
 # or: merge origin/main into the feature branch when rebase is impractical
-git push --force-with-lease   # only on the worker's own branch; never force shared main
+# Push only the worker's own topic branch. Never force-push shared branches (main, release/*).
+# Agents still need explicit confirmation before any push.
+git push --force-with-lease origin HEAD
 ```
 
 ### Counterexamples
@@ -74,6 +83,7 @@ git push --force-with-lease   # only on the worker's own branch; never force sha
 | Parallel integrators merging different PRs simultaneously | Lost races on shared files; "green then red" on `main` |
 | Treating "CI was green yesterday" as mergeable today | Stale head; required checks must match **exact head** |
 | Closing the whole train issue after one CI slice | Tracking issues stay open until acceptance criteria complete (`Refs` vs `Fixes` — ch. 4) |
+| Agents merging or force-pushing without confirmation | Violates the collaboration contract; keep merge/push behind human gates |
 
 ---
 

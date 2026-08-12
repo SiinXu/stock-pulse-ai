@@ -14,7 +14,7 @@
 | **本手册** | **操作指南**：如何火车合并、冲突图分组、跑注册守卫、防 squash 误关 Issue、约束本机资源、保护工作区 | 仅覆盖不削弱合同的执行战术。 |
 | **`.claude/skills/`** | 把合同流程编码成可调用步骤 | Skills 操作化合同，不替代合同。 |
 
-**不要**在本手册中整段粘贴 `AGENTS.md`。下列命令是操作配方；CI 名称、提交/PR 语言、需人工确认的动作等硬约束仍以合同为准。
+**不要**在本手册中整段粘贴 `AGENTS.md`。下列命令是操作配方；CI 名称、提交/PR 语言、以及「Agent 未经明确人工确认不得 `git push` / merge / force-push」等硬约束仍以合同为准。
 
 ---
 
@@ -39,6 +39,8 @@
 
 ### 命令（整合者）
 
+会改变远端状态的整合者动作（`gh pr merge`、`git push`）对 Agent 需要**明确的人工确认**——与 `AGENTS.md` 一致（Agent 默认不合入、不 force-push）。下列命令是确认**之后**的操作配方。
+
 ```bash
 git fetch --all --prune
 git checkout main
@@ -49,7 +51,12 @@ gh pr list --state open --limit 50
 gh pr checks <pr_number>
 gh pr view <pr_number> --json mergeable,mergeStateStatus,baseRefName,headRefOid,statusCheckRollup
 
+# 合入前：扫描是否误含自动关闭关键字（第 4 章）
+gh pr view <pr_number> --json title,body,commits \
+  --jq '{title,body,commits:[.commits[].messageHeadline]}'
+
 # 仅在「精确 head」上必过检查全绿时合入
+# 仓库默认 squash 时优先 squash；追踪型 Issue 用 Refs 保持开放（第 4 章）
 gh pr merge <pr_number> --squash --delete-branch
 
 # 推进本地 main，向 worker 公布新 tip
@@ -63,7 +70,9 @@ Worker 跟进车次 tip：
 git fetch origin
 git rebase origin/main
 # 或在不便 rebase 时：merge origin/main 进特性分支
-git push --force-with-lease   # 仅限自己的特性分支；禁止 force 共享 main
+# 只 push worker 自己的 topic 分支；禁止 force 共享分支（main、release/*）
+# Agent 在任何 push 前仍需明确人工确认
+git push --force-with-lease origin HEAD
 ```
 
 ### 反例
@@ -74,6 +83,7 @@ git push --force-with-lease   # 仅限自己的特性分支；禁止 force 共�
 | 多个整合者同时合不同 PR | 共享文件竞态；`main`「先绿后红」 |
 | 把「昨天 CI 绿」当成今天可合 | head 已过期；必过检查必须对齐**精确 head** |
 | 一个 CI 切片合入后就关整个追踪 Issue | 追踪 Issue 应保持开放直到验收项完成（`Refs` vs `Fixes`——见第 4 章） |
+| Agent 未经确认就 merge 或 force-push | 违反协作合同；merge/push 必须留在人工闸门后 |
 
 ---
 
