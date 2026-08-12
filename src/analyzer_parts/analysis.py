@@ -386,7 +386,10 @@ class GeminiAnalyzer:
                     break
 
             if should_persist_usage_telemetry(llm_usage):
-                persist_llm_usage(llm_usage, model_used, call_type="analysis", stock_code=code)
+                persist_llm_usage(
+                    llm_usage, model_used, call_type="analysis", stock_code=code,
+                    stage="analysis", call_success=True,
+                )
 
             logger.info(f"[LLM解析] {name}({code}) 分析完成: {result.trend_prediction}, 评分 {result.sentiment_score}")
 

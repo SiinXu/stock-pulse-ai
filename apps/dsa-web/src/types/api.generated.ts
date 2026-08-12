@@ -3828,6 +3828,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentModeBreakdown */
+        AgentModeBreakdown: {
+            /** Agent Mode */
+            agent_mode: string;
+            /** Calls */
+            calls: number;
+            /**
+             * Completion Tokens
+             * @default 0
+             */
+            completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
+            /**
+             * Prompt Tokens
+             * @default 0
+             */
+            prompt_tokens: number;
+            /** Total Tokens */
+            total_tokens: number;
+        };
         /** AgentModelDeployment */
         AgentModelDeployment: {
             /** Api Base */
@@ -5737,6 +5758,8 @@ export interface components {
              * @default 0
              */
             completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
             /**
              * Prompt Tokens
              * @default 0
@@ -9259,6 +9282,8 @@ export interface components {
              * @default 0
              */
             completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
             /**
              * Max Total Tokens
              * @default 0
@@ -13639,6 +13664,37 @@ export interface components {
             /** Skills */
             skills: components["schemas"]["SkillInfo"][];
         };
+        /** StageBreakdown */
+        StageBreakdown: {
+            /**
+             * Avg Latency Ms
+             * @default 0
+             */
+            avg_latency_ms: number;
+            /** Calls */
+            calls: number;
+            /**
+             * Completion Tokens
+             * @default 0
+             */
+            completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
+            /**
+             * Prompt Tokens
+             * @default 0
+             */
+            prompt_tokens: number;
+            /** Stage */
+            stage: string;
+            /**
+             * Success Calls
+             * @default 0
+             */
+            success_calls: number;
+            /** Total Tokens */
+            total_tokens: number;
+        };
         /**
          * StockAnalysisScheduledPayload
          * @description Version-one stock-analysis execution payload.
@@ -15613,6 +15669,10 @@ export interface components {
         };
         /** UsageCallRecord */
         UsageCallRecord: {
+            /** Agent Mode */
+            agent_mode?: string | null;
+            /** Call Success */
+            call_success?: boolean | null;
             /** Call Type */
             call_type: string;
             /**
@@ -15622,12 +15682,28 @@ export interface components {
             called_at: string;
             /** Completion Tokens */
             completion_tokens: number;
+            /** Cost Status */
+            cost_status?: string | null;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
             /** Id */
             id: number;
+            /** Latency Ms */
+            latency_ms?: number | null;
             /** Model */
             model: string;
+            /** Primary Model */
+            primary_model?: string | null;
             /** Prompt Tokens */
             prompt_tokens: number;
+            /** Route Attempt */
+            route_attempt?: number | null;
+            /** Route Outcome */
+            route_outcome?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Stage */
+            stage?: string | null;
             /** Stock Code */
             stock_code?: string | null;
             /** Total Tokens */
@@ -15635,26 +15711,48 @@ export interface components {
         };
         /** UsageDashboardResponse */
         UsageDashboardResponse: {
+            /** By Agent Mode */
+            by_agent_mode?: components["schemas"]["AgentModeBreakdown"][];
             /** By Call Type */
             by_call_type: components["schemas"]["CallTypeBreakdown"][];
             /** By Model */
             by_model: components["schemas"]["ModelBreakdown"][];
-            /**
-             * From Date
-             * @description ISO date string
-             */
+            /** By Stage */
+            by_stage?: components["schemas"]["StageBreakdown"][];
+            /** From Date */
             from_date: string;
             /**
              * Period
              * @description 'today' | 'month' | 'all'
              */
             period: string;
+            /**
+             * Priced Calls
+             * @default 0
+             */
+            priced_calls: number;
             /** Recent Calls */
             recent_calls: components["schemas"]["UsageCallRecord"][];
             /**
-             * To Date
-             * @description ISO date string
+             * Routing Failed
+             * @default 0
              */
+            routing_failed: number;
+            /** Routing Fallback Rate */
+            routing_fallback_rate?: number | null;
+            /**
+             * Routing Fallback Success
+             * @default 0
+             */
+            routing_fallback_success: number;
+            /**
+             * Routing Primary Success
+             * @default 0
+             */
+            routing_primary_success: number;
+            /** Routing Success Rate */
+            routing_success_rate?: number | null;
+            /** To Date */
             to_date: string;
             /** Total Calls */
             total_calls: number;
@@ -15663,6 +15761,8 @@ export interface components {
              * @default 0
              */
             total_completion_tokens: number;
+            /** Total Estimated Cost Usd */
+            total_estimated_cost_usd?: number | null;
             /**
              * Total Prompt Tokens
              * @default 0
@@ -15670,17 +15770,23 @@ export interface components {
             total_prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+            /**
+             * Unpriced Calls
+             * @default 0
+             */
+            unpriced_calls: number;
         };
         /** UsageSummaryResponse */
         UsageSummaryResponse: {
+            /** By Agent Mode */
+            by_agent_mode?: components["schemas"]["AgentModeBreakdown"][];
             /** By Call Type */
             by_call_type: components["schemas"]["CallTypeBreakdown"][];
             /** By Model */
             by_model: components["schemas"]["ModelBreakdown"][];
-            /**
-             * From Date
-             * @description ISO date string
-             */
+            /** By Stage */
+            by_stage?: components["schemas"]["StageBreakdown"][];
+            /** From Date */
             from_date: string;
             /**
              * Period
@@ -15688,9 +15794,30 @@ export interface components {
              */
             period: string;
             /**
-             * To Date
-             * @description ISO date string
+             * Priced Calls
+             * @default 0
              */
+            priced_calls: number;
+            /**
+             * Routing Failed
+             * @default 0
+             */
+            routing_failed: number;
+            /** Routing Fallback Rate */
+            routing_fallback_rate?: number | null;
+            /**
+             * Routing Fallback Success
+             * @default 0
+             */
+            routing_fallback_success: number;
+            /**
+             * Routing Primary Success
+             * @default 0
+             */
+            routing_primary_success: number;
+            /** Routing Success Rate */
+            routing_success_rate?: number | null;
+            /** To Date */
             to_date: string;
             /** Total Calls */
             total_calls: number;
@@ -15699,6 +15826,8 @@ export interface components {
              * @default 0
              */
             total_completion_tokens: number;
+            /** Total Estimated Cost Usd */
+            total_estimated_cost_usd?: number | null;
             /**
              * Total Prompt Tokens
              * @default 0
@@ -15706,6 +15835,11 @@ export interface components {
             total_prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+            /**
+             * Unpriced Calls
+             * @default 0
+             */
+            unpriced_calls: number;
         };
         /**
          * UserOnboardingProfile

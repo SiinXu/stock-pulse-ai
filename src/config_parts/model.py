@@ -166,6 +166,9 @@ class Config:
     llm_prompt_cache_hints_enabled: bool = False
     llm_prompt_cache_diagnostics_level: str = "off"
 
+    # Fine-grained cost attribution + routing quality on llm_usage (Refs #166/#248).
+    llm_usage_attribution_enabled: bool = True
+
     # --- Multi-channel LLM config (new) ---
     # LITELLM_CONFIG: path to a standard litellm_config.yaml file (most powerful)
     litellm_config_path: Optional[str] = None
