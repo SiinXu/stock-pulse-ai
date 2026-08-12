@@ -25,6 +25,8 @@ Also reports:
 - **cn_en_mismatch**: keys present in only one language inventory
 - **default_mismatch**: inventory default cells that disagree with
   ``.env.example`` (when the cell is a concrete default, not a placeholder)
+- **registry_status_mismatch**: a CN/EN ``Registered`` cell is invalid or
+  disagrees with the live registry
 
 Exit codes:
 
@@ -32,9 +34,10 @@ Exit codes:
 - ``1`` when a selected failure class has findings
 - ``2`` on usage / I/O / parse errors
 
-Failure classes default to ``docs,env,cn_en,defaults`` so registry debt does not
-block documentation PRs. Pass ``--fail-on registry`` (or ``all``) to enforce
-registry coverage as well.
+Failure classes default to ``docs,env,cn_en,defaults,registry_status``. Historical
+missing-registry debt remains informational unless ``--fail-on registry`` (or
+``all``) is selected, while stale documentation about registration fails by
+default.
 
 Usage:
 
@@ -96,17 +99,25 @@ PLACEHOLDER_DEFAULTS = frozenset(
 FAIL_CLASS_DOCS = "docs"
 FAIL_CLASS_ENV = "env"
 FAIL_CLASS_REGISTRY = "registry"
+FAIL_CLASS_REGISTRY_STATUS = "registry_status"
 FAIL_CLASS_CN_EN = "cn_en"
 FAIL_CLASS_DEFAULTS = "defaults"
 ALL_FAIL_CLASSES = (
     FAIL_CLASS_DOCS,
     FAIL_CLASS_ENV,
     FAIL_CLASS_REGISTRY,
+    FAIL_CLASS_REGISTRY_STATUS,
     FAIL_CLASS_CN_EN,
     FAIL_CLASS_DEFAULTS,
 )
 DEFAULT_FAIL_ON = frozenset(
-    {FAIL_CLASS_DOCS, FAIL_CLASS_ENV, FAIL_CLASS_CN_EN, FAIL_CLASS_DEFAULTS}
+    {
+        FAIL_CLASS_DOCS,
+        FAIL_CLASS_ENV,
+        FAIL_CLASS_REGISTRY_STATUS,
+        FAIL_CLASS_CN_EN,
+        FAIL_CLASS_DEFAULTS,
+    }
 )
 
 
@@ -133,6 +144,7 @@ class ConsistencyReport:
     missing_from_docs_en: List[str] = field(default_factory=list)
     missing_from_env: List[str] = field(default_factory=list)
     missing_from_registry: List[str] = field(default_factory=list)
+    registry_status_mismatch: List[Dict[str, str]] = field(default_factory=list)
     cn_en_mismatch: List[str] = field(default_factory=list)
     default_mismatch: List[Dict[str, str]] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
@@ -144,6 +156,11 @@ class ConsistencyReport:
         if FAIL_CLASS_ENV in selected and self.missing_from_env:
             return True
         if FAIL_CLASS_REGISTRY in selected and self.missing_from_registry:
+            return True
+        if (
+            FAIL_CLASS_REGISTRY_STATUS in selected
+            and self.registry_status_mismatch
+        ):
             return True
         if FAIL_CLASS_CN_EN in selected and self.cn_en_mismatch:
             return True
@@ -306,6 +323,18 @@ def _normalize_default_cell(value: str) -> str:
     return value.strip().strip("`").strip()
 
 
+def _parse_registered_cell(value: str, *, locale: str) -> Optional[bool]:
+    """Normalize one locale's strict yes/no literal, or reject it."""
+
+    normalized = value.strip().lower() if locale == "en" else value.strip()
+    accepted = (
+        {"yes": True, "no": False}
+        if locale == "en"
+        else {"是": True, "否": False}
+    )
+    return accepted.get(normalized)
+
+
 def _is_placeholder_default(value: str) -> bool:
     normalized = _normalize_default_cell(value)
     if normalized in PLACEHOLDER_DEFAULTS:
@@ -413,6 +442,29 @@ def collect_report(
     missing_from_registry = sorted(env_keys - registry_keys)
     cn_en_mismatch = sorted(doc_cn_keys.symmetric_difference(doc_en_keys))
 
+    registry_status_mismatch: List[Dict[str, str]] = []
+    for locale, rows in (("cn", doc_cn), ("en", doc_en)):
+        for key in sorted(rows):
+            actual_cell = rows[key]["registered"]
+            actual = _parse_registered_cell(actual_cell, locale=locale)
+            expected = key in registry_keys
+            if actual is None or actual != expected:
+                registry_status_mismatch.append(
+                    {
+                        "key": key,
+                        "locale": locale,
+                        "expected": (
+                            "yes" if expected else "no"
+                        ) if locale == "en" else ("是" if expected else "否"),
+                        "documented": actual_cell,
+                        "reason": (
+                            "invalid_literal"
+                            if actual is None
+                            else "registry_status_mismatch"
+                        ),
+                    }
+                )
+
     default_mismatch: List[Dict[str, str]] = []
     for key in sorted(env_keys & doc_cn_keys & doc_en_keys):
         env_default = env_entries[key].default
@@ -451,6 +503,7 @@ def collect_report(
         missing_from_docs_en=missing_from_docs_en,
         missing_from_env=missing_from_env,
         missing_from_registry=missing_from_registry,
+        registry_status_mismatch=registry_status_mismatch,
         cn_en_mismatch=cn_en_mismatch,
         default_mismatch=default_mismatch,
         notes=notes,
@@ -489,6 +542,25 @@ def format_human_report(report: ConsistencyReport) -> str:
     lines.extend(_section("missing_from_env", report.missing_from_env))
     lines.append("")
     lines.extend(_section("missing_from_registry", report.missing_from_registry))
+    lines.append("")
+    lines.append(
+        "## registry_status_mismatch "
+        f"({len(report.registry_status_mismatch)})"
+    )
+    if not report.registry_status_mismatch:
+        lines.append("(none)")
+    else:
+        for item in report.registry_status_mismatch[:40]:
+            lines.append(
+                f"- `{item['key']}` [{item['locale']}]: "
+                f"expected={item['expected']!r} "
+                f"documented={item['documented']!r} "
+                f"reason={item['reason']}"
+            )
+        if len(report.registry_status_mismatch) > 40:
+            lines.append(
+                f"- ... and {len(report.registry_status_mismatch) - 40} more"
+            )
     lines.append("")
     lines.extend(_section("cn_en_mismatch", report.cn_en_mismatch))
     lines.append("")
@@ -627,6 +699,7 @@ def _self_test() -> None:
         )
         assert report2.missing_from_docs == []
         assert report2.cn_en_mismatch == []
+        assert report2.registry_status_mismatch == []
         assert "ORPHAN_REGISTRY_KEY" in report2.missing_from_env
         assert "CRYPTO_PROVIDER_ENABLED" in report2.missing_from_registry
         assert report2.has_findings({FAIL_CLASS_ENV})
@@ -715,7 +788,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--fail-on",
         default="default",
         help=(
-            "Comma-separated failure classes: docs,env,registry,cn_en,defaults "
+            "Comma-separated failure classes: docs,env,registry,"
+            "registry_status,cn_en,defaults "
             "(or all / none / default). Default fails on docs/env/cn_en/defaults."
         ),
     )
