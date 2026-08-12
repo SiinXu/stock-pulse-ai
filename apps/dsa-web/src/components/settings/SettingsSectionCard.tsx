@@ -26,8 +26,8 @@ export const SettingsSectionCard: React.FC<SettingsSectionCardProps> = ({
       actions={actions}
       level="section"
       padding="none"
-      className={cn('p-3 md:p-4', className)}
-      contentClassName={cn('space-y-4', contentBordered && 'rounded-xl border settings-border p-4')}
+      className={cn('density-surface-pad-sm', className)}
+      contentClassName={cn('space-y-4', contentBordered && 'rounded-xl border settings-border density-surface-pad-sm')}
     >
       {children}
     </Section>
