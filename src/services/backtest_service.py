@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import and_, select
 
@@ -963,8 +963,9 @@ class BacktestService:
         if not skill_key:
             return None
 
-        config = get_config()
-        cost_model = self._resolve_cost_model(config)
+        # Skill-opinion outcomes are scored offline without backtest commission/slippage.
+        # Do not add another bare get_config() site; keep cost disclosure explicit and zero here.
+        cost_model = CostModelConfig()
         horizon, window_days = self._resolve_skill_horizon(eval_window_days)
         try:
             stats = SkillOpinionPerformanceService(db_manager=self.db).get_stats(
@@ -1048,6 +1049,11 @@ class BacktestService:
             engine_version=str(summary["engine_version"]),
             eval_window_days=window_days,
             metric_source="skill_opinion_outcomes",
+            extra_limitations=(
+                "Skill-opinion outcome returns are gross directional percentages "
+                "from the offline skill evaluator; backtest commission/slippage "
+                "bps are not re-applied on this skill rollup path.",
+            ),
         )
         return self._normalize_learning_summary(with_methodology)
 
@@ -1559,6 +1565,7 @@ class BacktestService:
         engine_version: str,
         eval_window_days: Optional[int],
         metric_source: str = "analysis_advice",
+        extra_limitations: Optional[Sequence[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         if summary is None:
             return None
@@ -1573,6 +1580,7 @@ class BacktestService:
                 else payload.get("eval_window_days")
             ),
             metric_source=metric_source,
+            extra_limitations=extra_limitations,
         )
         payload["methodology"] = methodology
         diagnostics = payload.get("diagnostics")
