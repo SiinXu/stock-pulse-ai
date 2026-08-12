@@ -37,6 +37,7 @@ from src.agent.public_contract import (
     sanitize_agent_diagnostic,
 )
 from src.agent.runner import parse_dashboard_json_result, run_agent_loop
+from src.agent.runtime.mode_budget import create_mode_budget_account
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.runtime_facts import (
@@ -122,6 +123,9 @@ class AgentResult:
     timed_out: bool = False
     # Opt-in plan→act→observe product path metadata (default None when unused).
     planning_metadata: Optional[Dict[str, Any]] = None
+    # Unified mode hard-budget snapshot (limits / used / breach).
+    budget_snapshot: Optional[Dict[str, Any]] = None
+    failure_reason: Optional[str] = None
 
 
 # ============================================================

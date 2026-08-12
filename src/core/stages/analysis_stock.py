@@ -144,109 +144,19 @@ class _StockAnalysisStageMixin:
             # Get stock name (first try light name path, then overwrite with realtime_quote.name if available)
             stock_name = self.fetcher_manager.get_stock_name(code, allow_realtime=False)
 
-            # Step 1: Get real-time quotes (volume ratio, turnover rate, etc.) - Use a unified entry with automatic failover
-            realtime_quote = None
-            try:
-                if self.config.enable_realtime_quote:
-                    realtime_quote = self.fetcher_manager.get_realtime_quote(code, log_final_failure=False)
-                    if realtime_quote:
-                        # Use the actual stock name returned from real-time market data.
-                        if realtime_quote.name:
-                            stock_name = realtime_quote.name
-                        # Compatible with fields from different data sources (some data sources may not have volume_ratio).
-                        volume_ratio = getattr(realtime_quote, 'volume_ratio', None)
-                        turnover_rate = getattr(realtime_quote, 'turnover_rate', None)
-                        logger.info(
-                            "%s(%s) realtime quote: price=%s volume_ratio=%s "
-                            "turnover_rate=%s%% source=%s",
-                            stock_name,
-                            code,
-                            realtime_quote.price,
-                            volume_ratio,
-                            turnover_rate,
-                            realtime_quote.source.value
-                            if hasattr(realtime_quote, "source")
-                            else "unknown",
-                        )
-                    else:
-                        logger.warning(
-                            "%s(%s) all realtime quote sources failed; using historical close price",
-                            stock_name,
-                            code,
-                        )
-                else:
-                    logger.info(
-                        "%s(%s) realtime quotes are disabled; using historical close price",
-                        stock_name,
-                        code,
-                    )
-            except Exception as e:  # broad-exception: fallback_recorded - Realtime failure is safely logged before historical-price fallback.
-                log_safe_exception(
-                    logger,
-                    "Realtime quote retrieval failed; using historical close data",
-                    e,
-                    error_code="pipeline_realtime_quote_failed",
-                    level=logging.WARNING,
-                    context={"stock_code": code},
-                )
-
-            # If a name is still not available, use the code as the name.
-            if not stock_name:
-                stock_name = f'股票{code}'
-
-            # Step 2: Get Position Distribution - Using a Unified Entry with Circuit Protection
-            chip_data = None
-            try:
-                chip_data = self.fetcher_manager.get_chip_distribution(code)
-                if chip_data:
-                    logger.info(
-                        "%s(%s) chip distribution: profit_ratio=%.1f%% concentration_90=%.2f%%",
-                        stock_name,
-                        code,
-                        chip_data.profit_ratio * 100,
-                        chip_data.concentration_90 * 100,
-                    )
-                else:
-                    logger.debug(
-                        "%s(%s) chip-distribution data is unavailable or disabled",
-                        stock_name,
-                        code,
-                    )
-            except Exception as e:  # broad-exception: fallback_recorded - Chip-data failure is safely logged before optional-input degradation.
-                log_safe_exception(
-                    logger,
-                    "Chip distribution retrieval failed",
-                    e,
-                    error_code="pipeline_chip_distribution_failed",
-                    level=logging.WARNING,
-                    context={"stock_code": code},
-                )
-
-            # Step 2b: Optional SmartMoney money-flow (default off; fail-open).
-            money_flow_data = None
-            try:
-                if getattr(self.config, "smartmoney_enabled", False):
-                    money_flow_data = self.fetcher_manager.get_money_flow(code)
-                    if money_flow_data is not None:
-                        snapshot = getattr(money_flow_data, "snapshot", None)
-                        logger.info(
-                            "%s(%s) money flow: status=%s main_net_inflow=%s source=%s",
-                            stock_name,
-                            code,
-                            getattr(getattr(money_flow_data, "status", None), "value", None),
-                            getattr(snapshot, "main_net_inflow", None),
-                            getattr(snapshot, "source", None),
-                        )
-            except Exception as e:  # broad-exception: fallback_recorded - money-flow is optional
-                log_safe_exception(
-                    logger,
-                    "SmartMoney money flow retrieval failed",
-                    e,
-                    error_code="pipeline_money_flow_failed",
-                    level=logging.WARNING,
-                    context={"stock_code": code},
-                )
-                money_flow_data = None
+            # Steps 1–2.5: dependency-free market inputs (realtime / chip / money-flow /
+            # fundamental). Parallel when enabled; same provider-governed call sites
+            # and deterministic merge order when serial (Issue #1126).
+            (
+                realtime_quote,
+                chip_data,
+                money_flow_data,
+                fundamental_context,
+                stock_name,
+            ) = self._fetch_dependency_free_market_inputs(
+                code=code,
+                stock_name=stock_name,
+            )
 
             # If agent mode is explicitly enabled, or specific agent skills are configured, use the Agent analysis pipeline.
             # NOTE: use config.agent_mode (explicit opt-in) instead of
@@ -266,47 +176,6 @@ class _StockAnalysisStageMixin:
                     logger.info(f"{stock_name}({code}) Auto-enabled agent mode due to configured skills: {configured_skills}")
 
             self._emit_progress(32, f"{stock_name}：正在聚合基本面与趋势数据")
-
-            # Step 2.5: Fundamental Capability Aggregation (unified entry, exception degradation)
-            # - Return partial/failed if timeout, does not affect existing technical indicator/news link
-            # - Return not_supported structure when the switch is closed.
-            fundamental_context = None
-            from data_provider.data_validation import DataValidationRejected
-
-            try:
-                fundamental_context = self.fetcher_manager.get_fundamental_context(
-                    code,
-                    budget_seconds=getattr(
-                        self.config,
-                        'fundamental_stage_timeout_seconds',
-                        FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
-                    ),
-                )
-            except DataValidationRejected as rejection:
-                log_safe_exception(
-                    logger,
-                    "Fundamental data rejected by validation policy",
-                    rejection,
-                    error_code="pipeline_fundamental_validation_rejected",
-                    level=logging.WARNING,
-                    context={"stock_code": code},
-                )
-                fundamental_context = (
-                    self.fetcher_manager.build_validation_rejected_fundamental_context(
-                        code,
-                        rejection,
-                    )
-                )
-            except Exception as e:  # broad-exception: fallback_recorded - Fundamental failure is safely logged before a failed-context fallback is built.
-                log_safe_exception(
-                    logger,
-                    "Fundamental data aggregation failed",
-                    e,
-                    error_code="pipeline_fundamental_aggregation_failed",
-                    level=logging.WARNING,
-                    context={"stock_code": code},
-                )
-                fundamental_context = self.fetcher_manager.build_failed_fundamental_context(code, str(e))
 
             fundamental_context = self._attach_belong_boards_to_fundamental_context(
                 code,
@@ -1172,6 +1041,231 @@ class _StockAnalysisStageMixin:
                 context={"stock_code": code},
             )
             return None
+
+    def _fetch_dependency_free_market_inputs(
+        self,
+        *,
+        code: str,
+        stock_name: str,
+    ) -> Tuple[Any, Optional[ChipDistribution], Any, Optional[Dict[str, Any]], str]:
+        """Fetch realtime/chip/money-flow/fundamental inputs with optional parallelism.
+
+        Each branch still calls ``DataFetcherManager`` (provider fallback, cache,
+        circuit, validation). Parallel mode only coordinates independent call
+        sites; disable via ``ANALYSIS_PARALLEL_FETCH_ENABLED=false`` for serial
+        declaration-order execution (Issue #1126).
+        """
+        from data_provider.data_validation import DataValidationRejected
+        from src.services.parallel_data_fetch import (
+            FetchTask,
+            is_parallel_fetch_enabled,
+            limits_from_config,
+            run_parallel_fetches,
+        )
+
+        name_holder = {"value": stock_name}
+
+        def _pull_realtime():
+            if not self.config.enable_realtime_quote:
+                logger.info(
+                    "%s(%s) realtime quotes are disabled; using historical close price",
+                    name_holder["value"],
+                    code,
+                )
+                return None
+            try:
+                quote = self.fetcher_manager.get_realtime_quote(
+                    code, log_final_failure=False
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Realtime failure is safely logged before historical-price fallback.
+                log_safe_exception(
+                    logger,
+                    "Realtime quote retrieval failed; using historical close data",
+                    exc,
+                    error_code="pipeline_realtime_quote_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                return None
+            if not quote:
+                logger.warning(
+                    "%s(%s) all realtime quote sources failed; using historical close price",
+                    name_holder["value"],
+                    code,
+                )
+                return None
+            if getattr(quote, "name", None):
+                name_holder["value"] = quote.name
+            volume_ratio = getattr(quote, "volume_ratio", None)
+            turnover_rate = getattr(quote, "turnover_rate", None)
+            logger.info(
+                "%s(%s) realtime quote: price=%s volume_ratio=%s "
+                "turnover_rate=%s%% source=%s",
+                name_holder["value"],
+                code,
+                quote.price,
+                volume_ratio,
+                turnover_rate,
+                quote.source.value if hasattr(quote, "source") else "unknown",
+            )
+            return quote
+
+        def _pull_chip():
+            try:
+                chip = self.fetcher_manager.get_chip_distribution(code)
+            except Exception as exc:  # broad-exception: fallback_recorded - Chip-data failure is safely logged before optional-input degradation.
+                log_safe_exception(
+                    logger,
+                    "Chip distribution retrieval failed",
+                    exc,
+                    error_code="pipeline_chip_distribution_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                return None
+            if chip:
+                logger.info(
+                    "%s(%s) chip distribution: profit_ratio=%.1f%% concentration_90=%.2f%%",
+                    name_holder["value"],
+                    code,
+                    chip.profit_ratio * 100,
+                    chip.concentration_90 * 100,
+                )
+            else:
+                logger.debug(
+                    "%s(%s) chip-distribution data is unavailable or disabled",
+                    name_holder["value"],
+                    code,
+                )
+            return chip
+
+        def _pull_money_flow():
+            if not getattr(self.config, "smartmoney_enabled", False):
+                return None
+            try:
+                money_flow = self.fetcher_manager.get_money_flow(code)
+            except Exception as exc:  # broad-exception: fallback_recorded - money-flow is optional and must not block analysis.
+                log_safe_exception(
+                    logger,
+                    "SmartMoney money flow retrieval failed",
+                    exc,
+                    error_code="pipeline_money_flow_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                return None
+            if money_flow is not None:
+                snapshot = getattr(money_flow, "snapshot", None)
+                logger.info(
+                    "%s(%s) money flow: status=%s main_net_inflow=%s source=%s",
+                    name_holder["value"],
+                    code,
+                    getattr(getattr(money_flow, "status", None), "value", None),
+                    getattr(snapshot, "main_net_inflow", None),
+                    getattr(snapshot, "source", None),
+                )
+            return money_flow
+
+        def _pull_fundamental():
+            try:
+                return self.fetcher_manager.get_fundamental_context(
+                    code,
+                    budget_seconds=getattr(
+                        self.config,
+                        "fundamental_stage_timeout_seconds",
+                        FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
+                    ),
+                )
+            except DataValidationRejected as rejection:
+                log_safe_exception(
+                    logger,
+                    "Fundamental data rejected by validation policy",
+                    rejection,
+                    error_code="pipeline_fundamental_validation_rejected",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                return self.fetcher_manager.build_validation_rejected_fundamental_context(
+                    code,
+                    rejection,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Fundamental failure is safely logged before a failed-context fallback is built.
+                log_safe_exception(
+                    logger,
+                    "Fundamental data aggregation failed",
+                    exc,
+                    error_code="pipeline_fundamental_aggregation_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                return self.fetcher_manager.build_failed_fundamental_context(
+                    code, str(exc)
+                )
+
+        # Declaration order is the merge order into stage IO / AgentContext.
+        # Disabled optional capabilities are omitted so they do not consume slots.
+        tasks = [
+            FetchTask(
+                key="realtime_quote",
+                fn=_pull_realtime,
+                provider_key="realtime",
+                optional=True,
+            ),
+            FetchTask(
+                key="chip_distribution",
+                fn=_pull_chip,
+                provider_key="chip",
+                optional=True,
+            ),
+        ]
+        if getattr(self.config, "smartmoney_enabled", False):
+            tasks.append(
+                FetchTask(
+                    key="money_flow",
+                    fn=_pull_money_flow,
+                    provider_key="money_flow",
+                    optional=True,
+                )
+            )
+        tasks.append(
+            FetchTask(
+                key="fundamental_context",
+                fn=_pull_fundamental,
+                provider_key="fundamental",
+                optional=True,
+            )
+        )
+        report = run_parallel_fetches(
+            tasks,
+            enabled=is_parallel_fetch_enabled(self.config),
+            limits=limits_from_config(self.config),
+        )
+        logger.debug(
+            "%s(%s) dependency-free market fetch wave: %s",
+            name_holder["value"],
+            code,
+            report.to_diagnostics(),
+        )
+
+        values = report.values_by_key()
+        realtime_quote = values.get("realtime_quote")
+        chip_data = values.get("chip_distribution")
+        money_flow_data = values.get("money_flow")
+        fundamental_context = values.get("fundamental_context")
+
+        resolved_name = name_holder["value"]
+        if not resolved_name:
+            resolved_name = f"股票{code}"
+        return (
+            realtime_quote,
+            chip_data,
+            money_flow_data,
+            fundamental_context,
+            resolved_name,
+        )
+
+
+
 
 
 
