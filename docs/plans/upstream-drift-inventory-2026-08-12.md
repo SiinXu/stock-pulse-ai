@@ -561,4 +561,3 @@ Automated path presence can miss behavioral gaps and fork-native renames. Spot-c
 | #1222 | Docs / product | `3b98aa1d7` AIHubMix → InferEra referral decision |
 
 Also registered: screening/AlphaSift path divergence remains under existing #325 (and prior ports); multi-strategy design remains #805.
-

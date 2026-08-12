@@ -8,14 +8,14 @@ StockPulse **手动**移植上游 foundation 修复，不会自动 merge 或同�
 
 英文版：[upstream-parity.md](upstream-parity.md)。
 
-相关策略：[Foundation Pipeline 与 Product Layer](foundation-product-architecture.md#upstream-porting-policy)。  
-节奏责任 Issue：[#1061](https://github.com/SiinXu/stock-pulse-ai/issues/1061)。  
+相关策略：[Foundation Pipeline 与 Product Layer](foundation-product-architecture.md#upstream-porting-policy)。
+节奏责任 Issue：[#1061](https://github.com/SiinXu/stock-pulse-ai/issues/1061)。
 机器跟踪 Issue：[#1002](https://github.com/SiinXu/stock-pulse-ai/issues/1002)。
 
 ## 检查器做什么
 
 脚本：`scripts/check_upstream_parity.py`  
-盘点脚本（路径存在性 + 建议动作）：`scripts/inventory_upstream_drift.py`  
+盘点脚本（路径存在性 + 建议动作）：`scripts/inventory_upstream_drift.py`
 白名单：`scripts/upstream_parity_whitelist.json`  
 工作流：`.github/workflows/upstream-parity.yml`
 

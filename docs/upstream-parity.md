@@ -10,14 +10,14 @@ that reports drift so maintainers can triage ports deliberately.
 
 Chinese version: [upstream-parity_CN.md](upstream-parity_CN.md).
 
-Related policy: [Foundation Pipeline And Product Layer](foundation-product-architecture.md#upstream-porting-policy).  
-Cadence owner issue: [#1061](https://github.com/SiinXu/stock-pulse-ai/issues/1061).  
+Related policy: [Foundation Pipeline And Product Layer](foundation-product-architecture.md#upstream-porting-policy).
+Cadence owner issue: [#1061](https://github.com/SiinXu/stock-pulse-ai/issues/1061).
 Machine tracking issue: [#1002](https://github.com/SiinXu/stock-pulse-ai/issues/1002).
 
 ## What The Checker Does
 
 Script: `scripts/check_upstream_parity.py`  
-Inventory (path presence + suggested actions): `scripts/inventory_upstream_drift.py`  
+Inventory (path presence + suggested actions): `scripts/inventory_upstream_drift.py`
 Whitelist: `scripts/upstream_parity_whitelist.json`  
 Workflow: `.github/workflows/upstream-parity.yml`
 
