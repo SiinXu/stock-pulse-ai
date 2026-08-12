@@ -150,11 +150,23 @@ class MarketCommand(BotCommand):
                     "[MarketCommand] Relevant markets are closed; skipping market review"
                 )
                 if notifier.is_available():
-                    notifier.send(
+                    dispatch = notifier.send_with_results(
                         "🎯 大盘复盘\n\n今日相关市场休市，已跳过大盘复盘。",
                         email_send_to_all=True,
                         route_type="report",
                     )
+                    # Surface structured per-channel outcomes without changing
+                    # the skip-closed-market control flow (Issue #1081).
+                    if getattr(dispatch, "status", None) in {
+                        "partial_failed",
+                        "all_failed",
+                    }:
+                        logger.warning(
+                            "[MarketCommand] Closed-market skip notice dispatch "
+                            "status=%s channels=%s",
+                            dispatch.status,
+                            getattr(dispatch, "channel_summaries", lambda: [])(),
+                        )
                 return
 
             from src.core.market_review_runtime import build_market_review_runtime

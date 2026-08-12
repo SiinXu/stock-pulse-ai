@@ -290,7 +290,12 @@ class NotificationChannel(Enum):
 
 @dataclass
 class ChannelAttemptResult:
-    """One static notification channel send attempt."""
+    """One notification channel send attempt (built-in or plugin).
+
+    Callers that need a stable, JSON-friendly shape should use
+    :meth:`as_summary` (minimal ``channel`` / ``ok`` / ``error``) or
+    :meth:`as_dict` (includes retry and diagnostic fields).
+    """
 
     channel: str
     success: bool
@@ -299,16 +304,61 @@ class ChannelAttemptResult:
     latency_ms: Optional[int] = None
     diagnostics: Optional[str] = None
 
+    def as_summary(self) -> Dict[str, Any]:
+        """Return the minimal queryable per-channel shape (Issue #1081)."""
+
+        return {
+            "channel": self.channel,
+            "ok": bool(self.success),
+            "error": self.error_code,
+        }
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return the full queryable per-channel attempt record."""
+
+        summary = self.as_summary()
+        summary.update(
+            {
+                "retryable": bool(self.retryable),
+                "latency_ms": self.latency_ms,
+                "diagnostics": self.diagnostics,
+            }
+        )
+        return summary
+
 
 @dataclass
 class NotificationDispatchResult:
-    """Structured result for notification dispatch diagnostics."""
+    """Structured multi-channel notification dispatch result.
+
+    Separates analysis success from notification delivery outcomes:
+    ``status`` may be ``sent``, ``partial_failed``, ``all_failed``,
+    ``no_channel``, or ``noise_suppressed`` while ``channel_results``
+    retains every attempted channel for query and diagnostics.
+    """
 
     dispatched: bool
     success: bool
     status: str
     channel_results: List[ChannelAttemptResult] = field(default_factory=list)
     message: Optional[str] = None
+
+    def channel_summaries(self) -> List[Dict[str, Any]]:
+        """Return ``[{channel, ok, error}, ...]`` for API/bot callers."""
+
+        return [item.as_summary() for item in self.channel_results]
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return a JSON-friendly dispatch record for query and logging."""
+
+        return {
+            "dispatched": bool(self.dispatched),
+            "success": bool(self.success),
+            "status": self.status,
+            "message": self.message,
+            "channels": self.channel_summaries(),
+            "channel_results": [item.as_dict() for item in self.channel_results],
+        }
 
 
 class ChannelDetector:
@@ -546,6 +596,7 @@ class NotificationService(
     _send_to_plugin_channel = None
     send_with_results = None
     _send_with_results_under_lease = None
+    get_last_dispatch_result = None
     send = None
     save_report_to_file = None
     save_and_send_feishu_file = None

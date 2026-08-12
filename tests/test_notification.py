@@ -257,6 +257,22 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         self.assertNotIn("secret-token", by_channel["wechat"].diagnostics)
         self.assertTrue(by_channel["custom"].success)
 
+        # Queryable caller contract (Issue #1081): channel/ok/error + last result.
+        summaries = {item["channel"]: item for item in result.channel_summaries()}
+        self.assertFalse(summaries["wechat"]["ok"])
+        self.assertEqual(summaries["wechat"]["error"], "exception")
+        self.assertTrue(summaries["custom"]["ok"])
+        self.assertIsNone(summaries["custom"]["error"])
+        public = result.as_dict()
+        self.assertEqual(public["status"], "partial_failed")
+        self.assertTrue(public["success"])
+        self.assertEqual(public["channels"], result.channel_summaries())
+        self.assertIs(service.get_last_dispatch_result(), result)
+        # Historical bool API still reports overall success when any channel ok.
+        with mock.patch.object(service, "send_to_wechat", side_effect=RuntimeError("boom")), \
+             mock.patch.object(service, "send_to_custom", return_value=True):
+            self.assertTrue(service.send("content-again"))
+
     @mock.patch("src.notification.get_config")
     def test_send_with_results_reports_route_no_channel(self, mock_get_config: mock.MagicMock):
         cfg = _make_config(

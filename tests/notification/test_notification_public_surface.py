@@ -199,11 +199,12 @@ EXPECTED_GROUPS = (
             "_send_to_plugin_channel",
             "send_with_results",
             "_send_with_results_under_lease",
+            "get_last_dispatch_result",
             "send",
             "save_report_to_file",
             "save_and_send_feishu_file",
         ),
-        "bd3a155f47f94c13080048d5fc01ce42920930567516054625c87b4ac0e81aa2",
+        "ad70c8fbbad00f488dca906dded8f8fd8c14e87e0dcaf295d46148500c129272",
     ),
 )
 
@@ -365,7 +366,7 @@ def test_notification_method_order_matches_pre_split_contract():
         )
     )
 
-    assert len(expected_names) == 68
+    assert len(expected_names) == 69
     assert actual_names == expected_names
 
 
