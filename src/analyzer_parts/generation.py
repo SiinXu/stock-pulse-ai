@@ -974,6 +974,12 @@ class GeminiAnalyzer:
             or 8192
         )
         requested_temperature = generation_config.get('temperature', 0.7)
+        from src.services.analysis_stage_checkpoint import resolve_repro_generation_params
+
+        requested_temperature, repro_seed = resolve_repro_generation_params(
+            config,
+            requested_temperature,
+        )
         requested_timeout = generation_config.get("timeout")
 
         models_to_try = [config.litellm_model] + (config.litellm_fallback_models or [])
@@ -1055,6 +1061,8 @@ class GeminiAnalyzer:
                     requested_temperature,
                     model_list=recovery_model_list,
                 )
+                if repro_seed is not None:
+                    call_kwargs["seed"] = repro_seed
                 route_context = build_provider_cache_route_context(
                     model=model,
                     provider=usage_provider,

@@ -22,13 +22,15 @@ import hashlib
 import json
 import logging
 import os
-import random
 import re
 import shutil
 import threading
 import time
+import uuid
+from contextvars import ContextVar, Token
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -44,6 +46,21 @@ META_REPRO_KEY = "run_configuration"
 AGENT_STAGE_NAMESPACE = "agent"
 PIPELINE_STAGE_NAMESPACE = "pipeline"
 _SAFE_RUN_KEY = re.compile(r"[^A-Za-z0-9._-]+")
+_CHECKPOINT_IO_LOCK = threading.RLock()
+_CURRENT_CHECKPOINT_SESSION: ContextVar[Optional["AnalysisStageCheckpointSession"]] = (
+    ContextVar("analysis_stage_checkpoint_session", default=None)
+)
+_CHECKPOINT_RUNTIME_META_KEYS = frozenset({"mode_budget", "mode_budget_account"})
+_CONFIG_CONTRACT_PREFIXES = (
+    "agent_",
+    "decision_",
+    "generation_",
+    "llm_",
+    "report_",
+    "repro_",
+    "risk_",
+)
+_SENSITIVE_CONFIG_FRAGMENTS = ("api_key", "password", "secret", "token")
 
 
 def _utc_now_iso() -> str:
@@ -62,14 +79,14 @@ def _json_default(value: Any) -> Any:
     if hasattr(value, "value") and not isinstance(value, (str, bytes, int, float, bool)):
         try:
             return value.value
-        except Exception:
+        except Exception:  # broad-exception: optional_metadata - Enum-like adapters may expose a failing value property; the next supported projection is attempted.
             pass
     if hasattr(value, "to_dict") and callable(value.to_dict):
         try:
             return value.to_dict()
-        except Exception:
+        except Exception:  # broad-exception: optional_metadata - Optional object projections may fail; unsupported values are rejected below.
             pass
-    return str(value)
+    raise TypeError(f"Unsupported checkpoint value: {type(value).__name__}")
 
 
 def stable_json_dumps(payload: Any) -> str:
@@ -79,6 +96,7 @@ def stable_json_dumps(payload: Any) -> str:
         sort_keys=True,
         separators=(",", ":"),
         default=_json_default,
+        allow_nan=False,
     )
 
 
@@ -89,9 +107,7 @@ def stable_hash(payload: Any) -> str:
 def sanitize_run_key(query_id: str, stock_code: str) -> str:
     raw = f"{str(query_id or '').strip()}__{str(stock_code or '').strip()}"
     cleaned = _SAFE_RUN_KEY.sub("_", raw).strip("._-") or "unknown_run"
-    if len(cleaned) > 120:
-        cleaned = f"{cleaned[:80]}_{stable_hash(raw)[:16]}"
-    return cleaned
+    return f"{cleaned[:80]}_{stable_hash(raw)[:16]}"
 
 
 def _resolve_app_revision() -> Optional[str]:
@@ -101,19 +117,78 @@ def _resolve_app_revision() -> Optional[str]:
             return value[:64]
     try:
         root = Path(__file__).resolve().parents[2]
-        head = root / ".git" / "HEAD"
+        git_dir = root / ".git"
+        if git_dir.is_file():
+            marker = git_dir.read_text(encoding="utf-8").strip()
+            if marker.startswith("gitdir:"):
+                git_dir = (root / marker.split(":", 1)[1].strip()).resolve()
+        head = git_dir / "HEAD"
         if not head.is_file():
             return None
         text = head.read_text(encoding="utf-8").strip()
         if text.startswith("ref:"):
             ref = text.split(":", 1)[1].strip()
-            ref_path = root / ".git" / ref
+            ref_path = git_dir / ref
             if ref_path.is_file():
                 return ref_path.read_text(encoding="utf-8").strip()[:40]
             return ref
         return text[:40] or None
-    except Exception:
+    except OSError:
         return None
+
+
+@lru_cache(maxsize=1)
+def _runtime_contract_hash() -> str:
+    """Hash executable Agent/strategy sources that can change resumed conclusions."""
+    root = Path(__file__).resolve().parents[2]
+    candidates: List[Path] = []
+    for relative in ("src/agent", "strategies"):
+        directory = root / relative
+        if directory.is_dir():
+            candidates.extend(
+                path
+                for path in directory.rglob("*")
+                if path.is_file() and path.suffix in {".py", ".yaml", ".yml"}
+            )
+    for relative in (
+        "src/core/stages/analysis_agent.py",
+        "src/core/stages/orchestration.py",
+        "src/services/analysis_stage_checkpoint.py",
+    ):
+        path = root / relative
+        if path.is_file():
+            candidates.append(path)
+    digest = hashlib.sha256()
+    for path in sorted(set(candidates), key=lambda item: item.as_posix()):
+        try:
+            content = path.read_bytes()
+        except OSError:
+            return "unavailable"
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(content)
+        digest.update(b"\0")
+    return digest.hexdigest()[:32] if candidates else "unavailable"
+
+
+def _configuration_contract_hash(config: Any) -> str:
+    try:
+        raw = vars(config)
+    except TypeError:
+        raw = {}
+    projection: Dict[str, Any] = {}
+    for key, value in raw.items():
+        normalized_key = str(key).lower()
+        if not normalized_key.startswith(_CONFIG_CONTRACT_PREFIXES):
+            continue
+        if any(fragment in normalized_key for fragment in _SENSITIVE_CONFIG_FRAGMENTS):
+            continue
+        try:
+            stable_json_dumps(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        projection[str(key)] = value
+    return stable_hash(projection)
 
 
 def build_repro_snapshot(
@@ -130,7 +205,7 @@ def build_repro_snapshot(
     snapshot: Dict[str, Any] = {
         "schema": "run_configuration.v1",
         "recorded_at": _utc_now_iso(),
-        "repro_mode_enabled": bool(getattr(config, "repro_mode_enabled", False)),
+        "repro_mode_enabled": getattr(config, "repro_mode_enabled", False) is True,
         "seed": seed if seed is not None else getattr(config, "repro_seed", None),
         "models": {
             "litellm_model": getattr(config, "litellm_model", None),
@@ -176,6 +251,8 @@ def build_repro_snapshot(
             "schema_version": SCHEMA_VERSION,
             "backtest_engine_version": getattr(config, "backtest_engine_version", None),
             "app_revision": _resolve_app_revision(),
+            "runtime_contract_hash": _runtime_contract_hash(),
+            "configuration_contract_hash": _configuration_contract_hash(config),
         },
         "limitations": [
             "Provider-side sampling may remain non-deterministic even when temperature is pinned.",
@@ -192,9 +269,7 @@ def build_repro_snapshot(
             "pipeline": snapshot["pipeline"],
             "skills": snapshot["skills"],
             "feature_flags": snapshot["feature_flags"],
-            "versions": {
-                k: v for k, v in snapshot["versions"].items() if k != "app_revision"
-            },
+            "versions": snapshot["versions"],
             "seed": snapshot["seed"],
         }
     )
@@ -220,58 +295,40 @@ def build_compatibility_fingerprint(
     )
 
 
-def apply_repro_mode(config: Any) -> Dict[str, Any]:
-    enabled = bool(getattr(config, "repro_mode_enabled", False))
-    status: Dict[str, Any] = {
-        "enabled": enabled,
-        "seed_applied": False,
-        "temperature_pinned": False,
-        "seed": None,
-        "numpy_seed_applied": False,
-    }
-    if not enabled:
-        return status
-    seed = getattr(config, "repro_seed", None)
-    if seed is None:
-        seed = 0
+def _normalize_repro_seed(value: Any) -> int:
     try:
-        seed_int = int(seed)
-    except (TypeError, ValueError):
-        seed_int = 0
-    status["seed"] = seed_int
-    try:
-        random.seed(seed_int)
-        status["seed_applied"] = True
-    except Exception as exc:
-        log_safe_exception(
-            logger,
-            "Failed to pin random.seed for repro mode",
-            exc,
-            error_code="analysis_repro_seed_failed",
-            level=logging.WARNING,
-        )
-    try:
-        import numpy as np  # type: ignore
+        return max(0, int(value if value is not None else 0))
+    except (TypeError, ValueError, OverflowError):
+        return 0
 
-        np.random.seed(seed_int)
-        status["numpy_seed_applied"] = True
-    except Exception:
-        status["numpy_seed_applied"] = False
-    try:
-        current = float(getattr(config, "llm_temperature", 0.0) or 0.0)
-        if current != 0.0:
-            config.llm_temperature = 0.0
-            status["temperature_pinned"] = True
-            status["previous_llm_temperature"] = current
-    except Exception as exc:
-        log_safe_exception(
-            logger,
-            "Failed to pin llm_temperature for repro mode",
-            exc,
-            error_code="analysis_repro_temperature_failed",
-            level=logging.WARNING,
-        )
-    return status
+
+def build_repro_status(config: Any) -> Dict[str, Any]:
+    """Describe request-scoped reproducibility controls without global mutation."""
+    enabled = getattr(config, "repro_mode_enabled", False) is True
+    seed = _normalize_repro_seed(getattr(config, "repro_seed", None)) if enabled else None
+    return {
+        "enabled": enabled,
+        "seed": seed,
+        "seed_forwarded_to_provider": enabled,
+        "effective_llm_temperature": 0.0 if enabled else getattr(config, "llm_temperature", None),
+        "temperature_pinned": enabled,
+        "scope": "request",
+    }
+
+
+def resolve_repro_generation_params(
+    config: Any,
+    requested_temperature: Any,
+) -> Tuple[Any, Optional[int]]:
+    """Return per-call temperature/seed overrides for compatible providers."""
+    if getattr(config, "repro_mode_enabled", False) is not True:
+        return requested_temperature, None
+    return 0.0, _normalize_repro_seed(getattr(config, "repro_seed", None))
+
+
+def apply_repro_mode(config: Any) -> Dict[str, Any]:
+    """Backward-compatible pure status helper; never mutates shared runtime state."""
+    return build_repro_status(config)
 
 
 def serialize_agent_opinion(opinion: Any) -> Dict[str, Any]:
@@ -379,7 +436,7 @@ class AnalysisStageCheckpointStore:
     def __init__(self, root_dir: str | Path, *, ttl_hours: int = 24) -> None:
         self.root_dir = Path(root_dir).expanduser()
         self.ttl_hours = max(0, int(ttl_hours))
-        self._lock = threading.RLock()
+        self._lock = _CHECKPOINT_IO_LOCK
 
     def _run_dir(self, query_id: str, stock_code: str) -> Path:
         return self.root_dir / sanitize_run_key(query_id, stock_code)
@@ -387,12 +444,34 @@ class AnalysisStageCheckpointStore:
     def _manifest_path(self, run_dir: Path) -> Path:
         return run_dir / "manifest.json"
 
+    def run_exists(self, query_id: str, stock_code: str) -> bool:
+        return self._run_dir(query_id, stock_code).exists()
+
     def _stage_path(self, run_dir: Path, stage: str) -> Path:
         safe = _SAFE_RUN_KEY.sub("_", stage).strip("._-") or "stage"
         return run_dir / "stages" / f"{safe}.json"
 
     def ensure_root(self) -> None:
         self.root_dir.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(
+            f".{path.name}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp"
+        )
+        try:
+            with temporary.open("w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, path)
+        finally:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def cleanup_expired(self) -> int:
         if self.ttl_hours <= 0 or not self.root_dir.exists():
@@ -442,7 +521,18 @@ class AnalysisStageCheckpointStore:
             return None
         if not isinstance(raw, dict):
             return None
-        return AnalysisCheckpointManifest.from_dict(raw)
+        try:
+            manifest = AnalysisCheckpointManifest.from_dict(raw)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if (
+            manifest.schema != CHECKPOINT_SCHEMA
+            or manifest.schema_version != SCHEMA_VERSION
+            or manifest.query_id != str(query_id)
+            or manifest.stock_code != str(stock_code)
+        ):
+            return None
+        return manifest
 
     def save_manifest(self, manifest: AnalysisCheckpointManifest) -> bool:
         run_dir = self._run_dir(manifest.query_id, manifest.stock_code)
@@ -451,12 +541,12 @@ class AnalysisStageCheckpointStore:
                 run_dir.mkdir(parents=True, exist_ok=True)
                 (run_dir / "stages").mkdir(parents=True, exist_ok=True)
                 manifest.updated_at = _utc_now_iso()
-                self._manifest_path(run_dir).write_text(
-                    json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2),
-                    encoding="utf-8",
+                self._atomic_write_json(
+                    self._manifest_path(run_dir),
+                    manifest.to_dict(),
                 )
             return True
-        except OSError as exc:
+        except (OSError, TypeError, ValueError) as exc:
             log_safe_exception(
                 logger,
                 "Failed to write analysis checkpoint manifest",
@@ -481,31 +571,40 @@ class AnalysisStageCheckpointStore:
         if not stage_name:
             return manifest
         run_dir = self._run_dir(query_id, stock_code)
-        record = StageCheckpointRecord(
-            stage=stage_name,
-            status=status,
-            payload=json.loads(stable_json_dumps(dict(payload))),
-        )
         try:
+            record = StageCheckpointRecord(
+                stage=stage_name,
+                status=status,
+                payload=json.loads(stable_json_dumps(dict(payload))),
+            )
             with self._lock:
+                persisted = self.load_manifest(query_id, stock_code)
+                if (
+                    persisted is not None
+                    and manifest is not None
+                    and persisted.compatibility_fingerprint
+                    != manifest.compatibility_fingerprint
+                ):
+                    return None
+                manifest = persisted or manifest or AnalysisCheckpointManifest(
+                    query_id=query_id,
+                    stock_code=stock_code,
+                )
+                updated = AnalysisCheckpointManifest.from_dict(manifest.to_dict())
+                if stage_name not in updated.completed_stages:
+                    updated.completed_stages.append(stage_name)
+                updated.query_id = query_id
+                updated.stock_code = stock_code
                 run_dir.mkdir(parents=True, exist_ok=True)
                 (run_dir / "stages").mkdir(parents=True, exist_ok=True)
-                self._stage_path(run_dir, stage_name).write_text(
-                    json.dumps(asdict(record), ensure_ascii=False, indent=2),
-                    encoding="utf-8",
+                self._atomic_write_json(
+                    self._stage_path(run_dir, stage_name),
+                    asdict(record),
                 )
-                if manifest is None:
-                    manifest = self.load_manifest(query_id, stock_code) or AnalysisCheckpointManifest(
-                        query_id=query_id,
-                        stock_code=stock_code,
-                    )
-                if stage_name not in manifest.completed_stages:
-                    manifest.completed_stages.append(stage_name)
-                manifest.query_id = query_id
-                manifest.stock_code = stock_code
-                self.save_manifest(manifest)
-            return manifest
-        except OSError as exc:
+                if not self.save_manifest(updated):
+                    return None
+            return updated
+        except (OSError, TypeError, ValueError) as exc:
             log_safe_exception(
                 logger,
                 "Failed to write analysis stage checkpoint",
@@ -514,7 +613,7 @@ class AnalysisStageCheckpointStore:
                 level=logging.WARNING,
                 context={"query_id": query_id, "stock_code": stock_code, "stage": stage_name},
             )
-            return manifest
+            return None
 
     def load_stage(
         self, query_id: str, stock_code: str, stage: str
@@ -524,16 +623,22 @@ class AnalysisStageCheckpointStore:
             return None
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, TypeError, ValueError):
+            if not isinstance(raw, dict):
+                return None
+            payload = raw.get("payload") or {}
+            if not isinstance(payload, dict):
+                return None
+            record = StageCheckpointRecord(
+                stage=str(raw.get("stage") or stage),
+                status=str(raw.get("status") or "success"),
+                payload=dict(payload),
+                completed_at=str(raw.get("completed_at") or _utc_now_iso()),
+            )
+        except (OSError, TypeError, ValueError, OverflowError):
             return None
-        if not isinstance(raw, dict):
+        if record.stage != stage:
             return None
-        return StageCheckpointRecord(
-            stage=str(raw.get("stage") or stage),
-            status=str(raw.get("status") or "success"),
-            payload=dict(raw.get("payload") or {}),
-            completed_at=str(raw.get("completed_at") or _utc_now_iso()),
-        )
+        return record
 
     def delete_run(self, query_id: str, stock_code: str) -> bool:
         run_dir = self._run_dir(query_id, stock_code)
@@ -583,11 +688,17 @@ class AnalysisStageCheckpointSession:
     force_full: bool
     compatibility_fingerprint: str
     repro_snapshot: Dict[str, Any]
+    record_config: bool = True
     repro_status: Dict[str, Any] = field(default_factory=dict)
     manifest: Optional[AnalysisCheckpointManifest] = None
     restored_stages: List[str] = field(default_factory=list)
     consistency: str = "full_run"
     annotation: Dict[str, Any] = field(default_factory=dict)
+
+    def __deepcopy__(self, memo: Dict[int, Any]) -> "AnalysisStageCheckpointSession":
+        """Keep the request-scoped session shared across isolated Agent contexts."""
+        memo[id(self)] = self
+        return self
 
     @property
     def completed_stages(self) -> Tuple[str, ...]:
@@ -598,6 +709,28 @@ class AnalysisStageCheckpointSession:
     def is_stage_complete(self, stage: str) -> bool:
         return stage in self.completed_stages
 
+    def _disable_after_persistence_failure(self, note: str) -> None:
+        self.enabled = False
+        self.manifest = None
+        self.restored_stages = []
+        self.consistency = "checkpoint_unavailable"
+        self._refresh_annotation(resumed=False, note=note)
+
+    def _begin_fresh(self, consistency: str, *, note: Optional[str] = None) -> None:
+        self.manifest = AnalysisCheckpointManifest(
+            query_id=self.query_id,
+            stock_code=self.stock_code,
+            compatibility_fingerprint=self.compatibility_fingerprint,
+            repro_snapshot=self.repro_snapshot,
+            consistency=consistency,
+            invalidate_reason=note,
+        )
+        self.consistency = consistency
+        if not self.store.save_manifest(self.manifest):
+            self._disable_after_persistence_failure("manifest_write_failed")
+            return
+        self._refresh_annotation(resumed=False, note=note)
+
     def begin(self) -> "AnalysisStageCheckpointSession":
         if not self.enabled:
             self.consistency = "checkpoint_disabled"
@@ -605,55 +738,32 @@ class AnalysisStageCheckpointSession:
             return self
         if self.force_full:
             self.store.invalidate(self.query_id, self.stock_code, "force_full_rerun", delete=True)
-            self.manifest = AnalysisCheckpointManifest(
-                query_id=self.query_id,
-                stock_code=self.stock_code,
-                compatibility_fingerprint=self.compatibility_fingerprint,
-                repro_snapshot=self.repro_snapshot,
-                consistency="full_rerun_forced",
-            )
-            self.store.save_manifest(self.manifest)
-            self.consistency = "full_rerun_forced"
-            self._refresh_annotation(resumed=False)
+            self._begin_fresh("full_rerun_forced", note="force_full_rerun")
             return self
         existing = self.store.load_manifest(self.query_id, self.stock_code)
         if existing is None:
-            self.manifest = AnalysisCheckpointManifest(
-                query_id=self.query_id,
-                stock_code=self.stock_code,
-                compatibility_fingerprint=self.compatibility_fingerprint,
-                repro_snapshot=self.repro_snapshot,
-            )
-            self.store.save_manifest(self.manifest)
-            self.consistency = "full_run"
-            self._refresh_annotation(resumed=False)
+            if self.store.run_exists(self.query_id, self.stock_code):
+                self.store.invalidate(
+                    self.query_id,
+                    self.stock_code,
+                    "corrupt_manifest",
+                    delete=True,
+                )
+                self._begin_fresh(
+                    "full_rerun_corrupt_checkpoint",
+                    note="corrupt_manifest",
+                )
+            else:
+                self._begin_fresh("full_run")
             return self
         if existing.invalidated:
             self.store.delete_run(self.query_id, self.stock_code)
-            self.manifest = AnalysisCheckpointManifest(
-                query_id=self.query_id,
-                stock_code=self.stock_code,
-                compatibility_fingerprint=self.compatibility_fingerprint,
-                repro_snapshot=self.repro_snapshot,
-            )
-            self.store.save_manifest(self.manifest)
-            self.consistency = "full_run"
-            self._refresh_annotation(resumed=False, note="prior_invalidated")
+            self._begin_fresh("full_run", note="prior_invalidated")
             return self
         if existing.compatibility_fingerprint != self.compatibility_fingerprint:
             reason = "compatibility_fingerprint_mismatch"
             self.store.invalidate(self.query_id, self.stock_code, reason, delete=True)
-            self.manifest = AnalysisCheckpointManifest(
-                query_id=self.query_id,
-                stock_code=self.stock_code,
-                compatibility_fingerprint=self.compatibility_fingerprint,
-                repro_snapshot=self.repro_snapshot,
-                consistency="full_rerun_incompatible",
-                invalidate_reason=reason,
-            )
-            self.store.save_manifest(self.manifest)
-            self.consistency = "full_rerun_incompatible"
-            self._refresh_annotation(resumed=False, note=reason)
+            self._begin_fresh("full_rerun_incompatible", note=reason)
             logger.info(
                 "Analysis checkpoint invalidated for %s (%s): %s",
                 self.stock_code,
@@ -661,13 +771,32 @@ class AnalysisStageCheckpointSession:
                 reason,
             )
             return self
+        corrupt_stage = next(
+            (
+                stage
+                for stage in existing.completed_stages
+                if (
+                    (record := self.store.load_stage(self.query_id, self.stock_code, stage))
+                    is None
+                    or record.status != "success"
+                )
+            ),
+            None,
+        )
+        if corrupt_stage is not None:
+            reason = f"missing_stage_payload:{corrupt_stage}"
+            self.store.invalidate(self.query_id, self.stock_code, reason, delete=True)
+            self._begin_fresh("full_rerun_corrupt_checkpoint", note=reason)
+            return self
         existing.resumed = True
         existing.resume_count = int(existing.resume_count or 0) + 1
         existing.repro_snapshot = self.repro_snapshot
         existing.compatibility_fingerprint = self.compatibility_fingerprint
         existing.consistency = "exact_replay"
         self.manifest = existing
-        self.store.save_manifest(self.manifest)
+        if not self.store.save_manifest(self.manifest):
+            self._disable_after_persistence_failure("manifest_write_failed")
+            return self
         self.consistency = "exact_replay"
         self.restored_stages = list(existing.completed_stages)
         self._refresh_annotation(resumed=bool(self.restored_stages))
@@ -690,7 +819,7 @@ class AnalysisStageCheckpointSession:
                 compatibility_fingerprint=self.compatibility_fingerprint,
                 repro_snapshot=self.repro_snapshot,
             )
-        self.manifest = self.store.save_stage(
+        saved_manifest = self.store.save_stage(
             query_id=self.query_id,
             stock_code=self.stock_code,
             stage=stage,
@@ -698,6 +827,10 @@ class AnalysisStageCheckpointSession:
             status=status,
             manifest=self.manifest,
         )
+        if saved_manifest is None:
+            self._disable_after_persistence_failure(f"stage_write_failed:{stage}")
+            return
+        self.manifest = saved_manifest
         self._refresh_annotation(resumed=bool(self.restored_stages))
 
     def load_stage_payload(self, stage: str) -> Optional[Dict[str, Any]]:
@@ -711,9 +844,13 @@ class AnalysisStageCheckpointSession:
     def complete(self) -> None:
         if not self.enabled:
             return
-        self.store.delete_run(self.query_id, self.stock_code)
+        deleted = self.store.delete_run(self.query_id, self.stock_code)
         self.manifest = None
-        self._refresh_annotation(resumed=bool(self.restored_stages), completed=True)
+        self._refresh_annotation(
+            resumed=bool(self.restored_stages),
+            completed=True,
+            note=None if deleted else "checkpoint_cleanup_failed",
+        )
 
     def fail_keep(self) -> None:
         self._refresh_annotation(resumed=bool(self.restored_stages), completed=False)
@@ -721,7 +858,9 @@ class AnalysisStageCheckpointSession:
     def metadata_for_snapshot(self) -> Dict[str, Any]:
         return {
             "checkpoint": dict(self.annotation),
-            "run_configuration": dict(self.repro_snapshot),
+            "run_configuration": (
+                dict(self.repro_snapshot) if self.record_config else {}
+            ),
             "repro_status": dict(self.repro_status),
         }
 
@@ -757,36 +896,35 @@ def create_checkpoint_session(
     report_type: Optional[str] = None,
     analysis_phase: Optional[str] = None,
     force_full: bool = False,
+    active: bool = True,
     store: Optional[AnalysisStageCheckpointStore] = None,
 ) -> AnalysisStageCheckpointSession:
-    enabled = bool(getattr(config, "analysis_checkpoint_enabled", True))
+    enabled = bool(active) and bool(getattr(config, "analysis_checkpoint_enabled", True))
     force = bool(force_full) or bool(getattr(config, "analysis_checkpoint_force_full", False))
     root = getattr(config, "analysis_checkpoint_dir", None) or "./data/checkpoints"
-    ttl = int(getattr(config, "analysis_checkpoint_ttl_hours", 24) or 24)
+    ttl_value = getattr(config, "analysis_checkpoint_ttl_hours", 24)
+    ttl = int(24 if ttl_value is None else ttl_value)
     if store is None:
         store = AnalysisStageCheckpointStore(root, ttl_hours=ttl)
-        try:
-            store.ensure_root()
-            store.cleanup_expired()
-        except OSError as exc:
-            log_safe_exception(
-                logger,
-                "Analysis checkpoint store init failed; continuing without checkpoints",
-                exc,
-                error_code="analysis_checkpoint_store_init_failed",
-                level=logging.WARNING,
-            )
-            enabled = False
-    repro_status = (
-        apply_repro_mode(config)
-        if bool(getattr(config, "repro_mode_enabled", False))
-        else {"enabled": False}
-    )
+        if enabled:
+            try:
+                store.ensure_root()
+                store.cleanup_expired()
+            except OSError as exc:
+                log_safe_exception(
+                    logger,
+                    "Analysis checkpoint store init failed; continuing without checkpoints",
+                    exc,
+                    error_code="analysis_checkpoint_store_init_failed",
+                    level=logging.WARNING,
+                )
+                enabled = False
+    repro_status = build_repro_status(config)
     seed = repro_status.get("seed")
     if seed is None:
         seed = getattr(config, "repro_seed", None)
     record_config = bool(getattr(config, "repro_record_config", True))
-    if record_config or enabled or bool(getattr(config, "repro_mode_enabled", False)):
+    if record_config or enabled or getattr(config, "repro_mode_enabled", False) is True:
         repro_snapshot = build_repro_snapshot(config, skills=skills, seed=seed)
     else:
         repro_snapshot = {
@@ -808,6 +946,7 @@ def create_checkpoint_session(
         force_full=force,
         compatibility_fingerprint=fingerprint,
         repro_snapshot=repro_snapshot,
+        record_config=record_config,
         repro_status=repro_status,
     )
     return session.begin()
@@ -821,63 +960,118 @@ def pipeline_stage_name(stage: str) -> str:
     return f"{PIPELINE_STAGE_NAMESPACE}.{stage}"
 
 
+def _public_checkpoint_meta(meta: Any) -> Dict[str, Any]:
+    if not isinstance(meta, Mapping):
+        return {}
+    return {
+        str(key): value
+        for key, value in meta.items()
+        if not str(key).startswith("_")
+        and str(key) not in {META_ANNOTATION_KEY, META_REPRO_KEY}
+        and str(key) not in _CHECKPOINT_RUNTIME_META_KEYS
+    }
+
+
+def build_agent_input_fingerprint(ctx: Any) -> Optional[str]:
+    """Fingerprint the fully assembled Agent input before any stage runs."""
+    projection = {
+        "query": getattr(ctx, "query", ""),
+        "stock_code": getattr(ctx, "stock_code", ""),
+        "stock_name": getattr(ctx, "stock_name", ""),
+        "session_id": getattr(ctx, "session_id", ""),
+        "data": dict(getattr(ctx, "data", {}) or {}),
+        "risk_flags": list(getattr(ctx, "risk_flags", []) or []),
+        "meta": _public_checkpoint_meta(getattr(ctx, "meta", {})),
+    }
+    try:
+        return stable_hash(projection)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _restart_after_invalid_restore(
+    session: AnalysisStageCheckpointSession,
+    reason: str,
+) -> None:
+    session.store.invalidate(session.query_id, session.stock_code, reason, delete=True)
+    session.restored_stages = []
+    session._begin_fresh("full_rerun_corrupt_checkpoint", note=reason)
+
+
 def restore_agent_context_from_session(
     session: AnalysisStageCheckpointSession, ctx: Any
 ) -> List[str]:
-    restored: List[str] = []
     if not session.enabled:
-        return restored
-    for stage in session.completed_stages:
-        if not stage.startswith(f"{AGENT_STAGE_NAMESPACE}."):
-            continue
-        bare = stage.split(".", 1)[1]
-        payload = session.load_stage_payload(stage)
-        if not payload:
-            session.store.invalidate(
-                session.query_id,
-                session.stock_code,
-                f"missing_stage_payload:{stage}",
-                delete=True,
-            )
-            session.manifest = None
-            session.restored_stages = []
-            session.consistency = "full_rerun_corrupt_checkpoint"
-            session._refresh_annotation(resumed=False, note=f"missing_stage_payload:{stage}")
-            return []
-        for opinion_raw in payload.get("opinions") or []:
-            if isinstance(opinion_raw, Mapping):
-                opinion = deserialize_agent_opinion(opinion_raw)
-                existing_names = {
-                    getattr(item, "agent_name", None) for item in getattr(ctx, "opinions", [])
-                }
-                if opinion.agent_name and opinion.agent_name in existing_names:
-                    continue
-                ctx.add_opinion(opinion)
-        for flag in payload.get("risk_flags") or []:
-            if isinstance(flag, Mapping):
-                ctx.risk_flags.append(dict(flag))
-        data_patch = payload.get("data") or {}
-        if isinstance(data_patch, Mapping):
-            for key, value in data_patch.items():
-                ctx.set_data(key, value)
-        meta_patch = payload.get("meta") or {}
-        if isinstance(meta_patch, Mapping):
-            for key, value in meta_patch.items():
-                if str(key).startswith("_"):
-                    continue
-                ctx.meta[key] = value
-        restored.append(bare)
-    if restored:
-        ctx.meta["_checkpoint_restored_agent_stages"] = list(restored)
-        session.restored_stages = [
-            agent_stage_name(name) for name in restored
-        ] + [
-            stage
-            for stage in session.completed_stages
-            if stage.startswith(f"{PIPELINE_STAGE_NAMESPACE}.")
+        return []
+    agent_stages = [
+        stage
+        for stage in session.completed_stages
+        if stage.startswith(f"{AGENT_STAGE_NAMESPACE}.")
+    ]
+    if not agent_stages:
+        return []
+    latest_stage = agent_stages[-1]
+    payload = session.load_stage_payload(latest_stage)
+    context_snapshot = payload.get("context") if isinstance(payload, Mapping) else None
+    if not isinstance(context_snapshot, Mapping):
+        _restart_after_invalid_restore(session, f"invalid_context_snapshot:{latest_stage}")
+        return []
+    current_input_fingerprint = build_agent_input_fingerprint(ctx)
+    saved_input_fingerprint = str(payload.get("input_fingerprint") or "")
+    if (
+        not current_input_fingerprint
+        or not saved_input_fingerprint
+        or current_input_fingerprint != saved_input_fingerprint
+    ):
+        _restart_after_invalid_restore(session, "agent_input_fingerprint_mismatch")
+        return []
+    opinions_raw = context_snapshot.get("opinions")
+    risk_flags_raw = context_snapshot.get("risk_flags")
+    data_raw = context_snapshot.get("data")
+    meta_raw = context_snapshot.get("meta")
+    if (
+        not isinstance(opinions_raw, list)
+        or not isinstance(risk_flags_raw, list)
+        or not isinstance(data_raw, Mapping)
+        or not isinstance(meta_raw, Mapping)
+    ):
+        _restart_after_invalid_restore(session, f"invalid_context_snapshot:{latest_stage}")
+        return []
+    try:
+        restored_opinions = [
+            deserialize_agent_opinion(item)
+            for item in opinions_raw
+            if isinstance(item, Mapping)
         ]
-        session.consistency = "exact_replay"
-        session._refresh_annotation(resumed=True)
+        if len(restored_opinions) != len(opinions_raw):
+            raise ValueError("invalid opinion payload")
+        restored_risk_flags = [dict(item) for item in risk_flags_raw if isinstance(item, Mapping)]
+        if len(restored_risk_flags) != len(risk_flags_raw):
+            raise ValueError("invalid risk flag payload")
+    except (TypeError, ValueError, OverflowError):
+        _restart_after_invalid_restore(session, f"invalid_context_snapshot:{latest_stage}")
+        return []
+
+    private_meta = {
+        key: value
+        for key, value in (getattr(ctx, "meta", {}) or {}).items()
+        if str(key).startswith("_")
+        or str(key) in {META_ANNOTATION_KEY, META_REPRO_KEY}
+        or str(key) in _CHECKPOINT_RUNTIME_META_KEYS
+    }
+    ctx.opinions[:] = restored_opinions
+    ctx.risk_flags[:] = restored_risk_flags
+    ctx.data.clear()
+    ctx.data.update(dict(data_raw))
+    ctx.meta.clear()
+    ctx.meta.update(dict(meta_raw))
+    ctx.meta.update(private_meta)
+
+    restored = [stage.split(".", 1)[1] for stage in agent_stages]
+    ctx.meta["_checkpoint_restored_agent_stages"] = list(restored)
+    session.restored_stages = list(session.completed_stages)
+    session.consistency = "exact_replay"
+    session._refresh_annotation(resumed=True)
     return restored
 
 
@@ -887,44 +1081,16 @@ def capture_agent_stage_payload(
     stage_name: str,
     stage_result: Any = None,
 ) -> Dict[str, Any]:
-    all_opinions = [
-        serialize_agent_opinion(item) for item in (getattr(ctx, "opinions", []) or [])
-    ]
-    stage_opinions = [
-        item
-        for item in all_opinions
-        if not item.get("agent_name")
-        or item.get("agent_name") == stage_name
-        or str(item.get("agent_name")).startswith(f"{stage_name}_")
-        or stage_name in str(item.get("agent_name") or "")
-    ]
-    data_keys = (
-        "final_response_text",
-        "dashboard",
-        "strategy_results",
-        "deliberation_summary",
-        "agent_disagreement_summary",
+    all_opinions = [serialize_agent_opinion(item) for item in (getattr(ctx, "opinions", []) or [])]
+    input_fingerprint = (getattr(ctx, "meta", {}) or {}).get(
+        "_checkpoint_agent_input_fingerprint"
     )
-    data_out: Dict[str, Any] = {}
-    for key in data_keys:
-        value = ctx.get_data(key) if hasattr(ctx, "get_data") else (getattr(ctx, "data", {}) or {}).get(key)
-        if value is not None:
-            data_out[key] = value
-    meta_keys = (
-        "skills_requested",
-        "strategies_requested",
-        "report_language",
-        "invalid_opinions",
-        "skill_scheduler",
-        "critic",
-        "risk_gate_result",
-        "agent_disagreement_explanation",
-    )
-    meta_out: Dict[str, Any] = {}
-    meta = getattr(ctx, "meta", {}) or {}
-    for key in meta_keys:
-        if key in meta:
-            meta_out[key] = meta[key]
+    context_snapshot = {
+        "opinions": all_opinions,
+        "risk_flags": list(getattr(ctx, "risk_flags", []) or []),
+        "data": dict(getattr(ctx, "data", {}) or {}),
+        "meta": _public_checkpoint_meta(getattr(ctx, "meta", {})),
+    }
     result_meta = {}
     if stage_result is not None:
         result_meta = {
@@ -937,13 +1103,27 @@ def capture_agent_stage_payload(
         }
     return {
         "stage": stage_name,
-        "opinions": all_opinions,
-        "stage_opinions": stage_opinions,
-        "risk_flags": list(getattr(ctx, "risk_flags", []) or []),
-        "data": json.loads(stable_json_dumps(data_out)),
-        "meta": json.loads(stable_json_dumps(meta_out)),
+        "input_fingerprint": input_fingerprint,
+        "context": json.loads(stable_json_dumps(context_snapshot)),
         "stage_result": result_meta,
     }
+
+
+def activate_checkpoint_session(
+    session: AnalysisStageCheckpointSession,
+) -> Token[Optional[AnalysisStageCheckpointSession]]:
+    return _CURRENT_CHECKPOINT_SESSION.set(session)
+
+
+def current_checkpoint_session() -> Optional[AnalysisStageCheckpointSession]:
+    return _CURRENT_CHECKPOINT_SESSION.get()
+
+
+def reset_checkpoint_session(
+    token: Optional[Token[Optional[AnalysisStageCheckpointSession]]],
+) -> None:
+    if token is not None:
+        _CURRENT_CHECKPOINT_SESSION.reset(token)
 
 
 def session_from_agent_context(ctx: Any) -> Optional[AnalysisStageCheckpointSession]:

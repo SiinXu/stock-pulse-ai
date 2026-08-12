@@ -162,7 +162,9 @@ class _AgentAnalysisStageMixin:
                 daily_market_context,
                 report_language=report_language,
             )
-            checkpoint_session = getattr(self, "_analysis_checkpoint_session", None)
+            from src.services.analysis_stage_checkpoint import current_checkpoint_session
+
+            checkpoint_session = current_checkpoint_session()
             if checkpoint_session is not None:
                 from src.services.analysis_stage_checkpoint import (
                     META_ANNOTATION_KEY,

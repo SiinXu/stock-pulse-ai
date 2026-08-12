@@ -101,6 +101,7 @@ class _PipelineMethods:
         # Stage-level exact-replay resume (Issues #121 / #136).
         from src.services.analysis_stage_checkpoint import (
             agent_stage_name,
+            build_agent_input_fingerprint,
             capture_agent_stage_payload,
             restore_agent_context_from_session,
             session_from_agent_context,
@@ -109,6 +110,9 @@ class _PipelineMethods:
         checkpoint_session = session_from_agent_context(ctx)
         restored_agent_stages: set = set()
         if checkpoint_session is not None and checkpoint_session.enabled:
+            ctx.meta["_checkpoint_agent_input_fingerprint"] = (
+                build_agent_input_fingerprint(ctx)
+            )
             restored_agent_stages = set(
                 restore_agent_context_from_session(checkpoint_session, ctx)
             )
@@ -117,15 +121,7 @@ class _PipelineMethods:
                     "[Orchestrator] exact-replay resume restored agent stages: %s",
                     ",".join(sorted(restored_agent_stages)),
                 )
-            _base_agent_names = {
-                "technical",
-                "intel",
-                "risk",
-                "decision",
-                "critic",
-                _critic.CRITIC_STAGE_NAME,
-            }
-            if any(name not in _base_agent_names for name in restored_agent_stages):
+            if "specialist_batch" in restored_agent_stages:
                 specialist_agents_inserted = True
 
         # Minimum seconds required for a stage to do useful work.  Starting
@@ -332,28 +328,31 @@ class _PipelineMethods:
                             "completed_skill_count": sum(1 for item in batch.stage_results if item.success),
                             "invalid_skill_count": len(batch.invalid_records),
                         }
-                        if checkpoint_session is not None and checkpoint_session.enabled:
-                            for stage_result in batch.stage_results:
-                                if stage_result.status != StageStatus.COMPLETED:
-                                    continue
-                                try:
-                                    checkpoint_session.save_stage(
-                                        agent_stage_name(stage_result.stage_name),
-                                        capture_agent_stage_payload(
-                                            ctx,
-                                            stage_name=stage_result.stage_name,
-                                            stage_result=stage_result,
-                                        ),
-                                    )
-                                except Exception as exc:  # broad-exception: fallback_recorded
-                                    log_safe_exception(
-                                        logger,
-                                        "[Orchestrator] specialist stage checkpoint save failed",
-                                        exc,
-                                        error_code="agent_specialist_checkpoint_save_failed",
-                                        level=logging.WARNING,
-                                        context={"stage": stage_result.stage_name},
-                                    )
+                        if (
+                            checkpoint_session is not None
+                            and checkpoint_session.enabled
+                            and batch.stage_results
+                            and all(
+                                item.status == StageStatus.COMPLETED
+                                for item in batch.stage_results
+                            )
+                        ):
+                            try:
+                                checkpoint_session.save_stage(
+                                    agent_stage_name("specialist_batch"),
+                                    capture_agent_stage_payload(
+                                        ctx,
+                                        stage_name="specialist_batch",
+                                    ),
+                                )
+                            except Exception as exc:  # broad-exception: fallback_recorded - Checkpoint failure is logged and disables only optional resume state.
+                                log_safe_exception(
+                                    logger,
+                                    "[Orchestrator] specialist batch checkpoint save failed",
+                                    exc,
+                                    error_code="agent_specialist_checkpoint_save_failed",
+                                    level=logging.WARNING,
+                                )
                         continue
                     agents[index:index] = specialist_agents
                     continue
@@ -484,7 +483,7 @@ class _PipelineMethods:
                                     stage_result=result,
                                 ),
                             )
-                        except Exception as exc:  # broad-exception: fallback_recorded
+                        except Exception as exc:  # broad-exception: fallback_recorded - Checkpoint failure is logged and disables only optional resume state.
                             log_safe_exception(
                                 logger,
                                 "[Orchestrator] stage checkpoint save failed",

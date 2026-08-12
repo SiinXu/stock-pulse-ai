@@ -22,7 +22,7 @@ English: [analysis-checkpoint-resume_EN.md](./analysis-checkpoint-resume_EN.md)
 恢复 **必须** 保持结果一致性：
 
 1. 仅当 `compatibility_fingerprint` 与当前运行完全一致时，才复用已完成阶段输出（exact-replay）。
-2. 模型、温度、pipeline/persona/skill、关键 feature flags、report type / analysis phase 任一变化 → **作废检查点并全量重跑**，不会静默产出不同结论。
+2. 模型、温度、pipeline/persona/skill、关键 feature flags、report type / analysis phase、Agent/策略源码契约或重新组装的行情/新闻/组合输入任一变化 → **作废检查点并全量重跑**，不会混用新旧输入。
 3. 阶段 payload 缺失/损坏 → 作废并全量重跑。
 4. `force_full` / `force_refresh` / `ANALYSIS_CHECKPOINT_FORCE_FULL=true` → 忽略已有检查点。
 5. 报告 `context_snapshot` 中写入 `analysis_checkpoint` 与 `run_configuration`，标注是否 resumed、consistency 类别。
@@ -35,7 +35,7 @@ English: [analysis-checkpoint-resume_EN.md](./analysis-checkpoint-resume_EN.md)
 | `ANALYSIS_CHECKPOINT_DIR` | `./data/checkpoints` | 检查点目录 |
 | `ANALYSIS_CHECKPOINT_TTL_HOURS` | `24` | 过期清理（小时；0 关闭） |
 | `ANALYSIS_CHECKPOINT_FORCE_FULL` | `false` | 强制全量重跑 |
-| `REPRO_MODE_ENABLED` | `false` | 可复现模式（pin seed + temperature=0） |
+| `REPRO_MODE_ENABLED` | `false` | 可复现模式（请求级 temperature=0，并在 provider 支持时传递 seed） |
 | `REPRO_RECORD_CONFIG` | `true` | 始终记录 run configuration 快照 |
 | `REPRO_SEED` | 空 / 0 | 可复现种子 |
 
@@ -44,6 +44,7 @@ API 分析的 `force_refresh=true` 同时会绕过阶段检查点。
 ## 限制（务必知悉）
 
 - 供应商侧采样即使 temperature=0 也可能非确定性。
+- seed 与 temperature 仅按单次请求传递，不修改共享 Config，也不重置进程级 Python/NumPy 随机数状态。
 - 实时行情 / 搜索结果在完整运行与稍后重放之间可能变化；exact-replay 复用的是 **已保存的 Agent 阶段输出**，不会对已完成阶段再次调用 LLM。
 - 检查点是进程本地文件系统存储，不是分布式队列（ADR-004 / ADR-008）。
 

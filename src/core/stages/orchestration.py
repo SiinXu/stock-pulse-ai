@@ -300,8 +300,10 @@ class _OrchestrationStageMixin:
         """
         from src.plugins.event_hooks import dispatch_analysis_event
         from src.services.analysis_stage_checkpoint import (
+            activate_checkpoint_session,
             create_checkpoint_session,
             pipeline_stage_name,
+            reset_checkpoint_session,
         )
 
         logger.info("========== Processing %s ==========", code)
@@ -311,6 +313,7 @@ class _OrchestrationStageMixin:
         effective_trace_id = getattr(self, "trace_id", None) or effective_query_id
         diag_token = None
         frozen_target_token = None
+        checkpoint_token = None
         force_full_checkpoint = bool(
             getattr(self, "analysis_checkpoint_force_full", False)
             or getattr(self.config, "analysis_checkpoint_force_full", False)
@@ -323,8 +326,13 @@ class _OrchestrationStageMixin:
             report_type=getattr(report_type, "value", report_type),
             analysis_phase=getattr(self, "analysis_phase", None),
             force_full=force_full_checkpoint,
+            active=(
+                not skip_analysis
+                and bool(getattr(self.config, "agent_mode", False))
+                and str(getattr(self.config, "agent_arch", "single") or "single").lower()
+                == "multi"
+            ),
         )
-        self._analysis_checkpoint_session = checkpoint_session
         if get_current_diagnostic_context() is None:
             diag_token = activate_run_diagnostic_context(
                 trace_id=effective_trace_id,
@@ -401,6 +409,7 @@ class _OrchestrationStageMixin:
                 trigger_source=getattr(self, "query_source", None) or "system",
             )
 
+        checkpoint_token = activate_checkpoint_session(checkpoint_session)
         try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
             # Step 1: Get and save data
@@ -598,6 +607,7 @@ class _OrchestrationStageMixin:
                 )
             return None
         finally:
+            reset_checkpoint_session(checkpoint_token)
             reset_run_diagnostic_context(diag_token)
             if frozen_target_token is not None:
                 reset_frozen_target_date(frozen_target_token)

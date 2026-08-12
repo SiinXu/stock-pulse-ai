@@ -2352,6 +2352,27 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Bounds per-call analysis cost.',
     ],
   },
+  'settings.system.analysis_checkpoint': {
+    title: 'Analysis stage checkpoints',
+    summary: 'Persist completed multi-Agent stage state for fail-closed resume after an interruption.',
+    usage: 'Enabled only for multi-Agent analyses. A code, configuration, or assembled-input mismatch forces a full rerun.',
+    impact: [
+      'The directory and TTL control process-local checkpoint storage and cleanup.',
+      'Force Full ignores and replaces any matching checkpoint for the request.',
+    ],
+    notes: [
+      'Disable this feature to avoid checkpoint disk writes; completed successful runs remove their temporary checkpoint.',
+    ],
+  },
+  'settings.system.repro_mode': {
+    title: 'Reproducibility controls',
+    summary: 'Record run configuration and optionally request deterministic provider settings.',
+    usage: 'Repro mode sends temperature 0 and the configured seed per request when supported.',
+    impact: [
+      'Provider-side sampling can remain non-deterministic.',
+      'The seed does not reset shared Python or NumPy random state.',
+    ],
+  },
 };
 
 export default settingsHelpEnUS;
