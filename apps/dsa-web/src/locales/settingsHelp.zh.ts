@@ -1367,8 +1367,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '配置总开关与规则级 opt-in 都必须显式开启。',
       '适用类型：corporate_event、volume_spike、price_change_percent。',
     ],
-    impact: ['触发后可能通过任务队列异步提交分析，不会在告警热路径内联跑完分析。'],
+    impact: [
+      '开启且规则 opt-in 后，告警触发可能通过共享任务队列异步入队分析任务。',
+    ],
     notes: [
+      '不会在告警热路径内联跑完分析。',
       '通知静默时段仍由 NOTIFICATION_QUIET_HOURS 控制 alert 路由投递。',
     ],
     examples: [
