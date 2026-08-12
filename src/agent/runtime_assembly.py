@@ -293,7 +293,7 @@ def get_tool_registry():
                 from src.application_services import get_application_services
 
                 get_application_services()
-            except Exception as exc:  # broad-exception: fallback_recorded
+            except Exception as exc:  # broad-exception: fallback_recorded - keep core tool registry construction available when application services fail
                 log_safe_exception(
                     logger,
                     "Application services unavailable during tool registry build",
