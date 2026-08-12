@@ -45,7 +45,11 @@ Auth matches neighboring `/api/v1/portfolio/*` routes (global admin session when
 2. **Daily closes** — `StockRepository.get_range` over already-stored `stock_daily` rows.
 
 Cash is excluded from weights. Weights are market-value shares of equity positions
-(`market_value_base`), rebased to sum to 1.0.
+in the **response base currency**: each position `market_value_base` (account base)
+is converted via `PortfolioService.convert_amount_with_provenance` into the snapshot
+`currency` (default CNY) before aggregation and rebased to sum to 1.0.
+**Never** sum mixed account-base currency units. Stale FX sets `fx_stale=true` and
+may mark overall status `partial`.
 
 ## Formulas and assumptions
 

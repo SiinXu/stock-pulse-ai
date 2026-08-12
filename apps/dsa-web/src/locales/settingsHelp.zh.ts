@@ -630,6 +630,39 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响聚合基本面校验失败如何向上游调用方暴露。'],
     notes: ['与 DATA_VALIDATION_STRICT 的 provider 候选拒绝相互独立。'],
   },
+  'settings.data_source.DATA_VALIDATION_FUND_PE_SUSPECT_ABS': {
+    title: '基本面 PE 可疑阈值',
+    summary: 'PE 绝对值软阈值。达到或超过该值时标记为可疑并保留数值。',
+    usage: '默认 200。仅当目标标的常见合法 PE 经常超过该软带时再调高。',
+    valueNotes: [
+      '可疑发现仅为告警；PE 数值仍保留给分析使用。',
+      '硬性极端仍拒绝，与该软阈值相互独立。',
+    ],
+    impact: ['改变诊断与上下文证据中 PE 被标记为可疑的时机。'],
+    notes: ['硬/软基本面区间说明见 docs/data-validation-layer.md。'],
+  },
+  'settings.data_source.DATA_VALIDATION_FUND_PB_SUSPECT_ABS': {
+    title: '基本面 PB 可疑阈值',
+    summary: 'PB 绝对值软阈值。达到或超过该值时标记为可疑并保留数值。',
+    usage: '默认 50。仅当目标标的常见合法 PB 经常超过该软带时再调高。',
+    valueNotes: [
+      '可疑发现仅为告警；PB 数值仍保留给分析使用。',
+      '硬性极端仍拒绝，与该软阈值相互独立。',
+    ],
+    impact: ['改变诊断与上下文证据中 PB 被标记为可疑的时机。'],
+    notes: ['ETF 与部分海外源缺失 PE/PB 仍视为合法。'],
+  },
+  'settings.data_source.DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD': {
+    title: '跨源相对差异阈值',
+    summary: '多数据源同字段相对差异告警阈值。',
+    usage: '默认 0.05（5%）。当数据源报价口径差异较大时可适当调高以减少告警。',
+    valueNotes: [
+      '仅当两个及以上数据源提供同一有限字段时生效。',
+      '差异值会保留并附带来源归因；单一数据源失败不会中断整体分析。',
+    ],
+    impact: ['控制跨源 WARN 证据写入运行诊断的时机。'],
+    notes: ['比对为观测性逻辑，比对异常 fail-open。'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: '飞书群机器人 Webhook',
     summary: '配置飞书自定义群机器人，用于把分析报告推送到指定飞书群。',
@@ -1220,6 +1253,47 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 推理深度、耗时和 token 消耗。'],
     notes: ['设为 0 或极低值可能导致推理不完整。'],
   },
+  'settings.agent.AGENT_MODE_BUDGET_ENABLED': {
+    title: '启用按模式硬预算',
+    summary: '启用按模式的 Agent 硬预算（轮次/工具/成本）。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS': {
+    title: '模式预算最大 LLM 轮次（全局）',
+    summary: '全局收紧各模式 LLM 轮次上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS': {
+    title: '模式预算最大工具调用（全局）',
+    summary: '全局收紧各模式工具调用上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_COST_USD': {
+    title: '模式预算最大成本 USD（全局）',
+    summary: '全局收紧估算成本上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOKENS': {
+    title: '模式预算最大 Token（全局）',
+    summary: '可选全局 token 上限；0 关闭 token 维度。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+
   'settings.agent.AGENT_SKILLS': {
     title: 'Agent 策略列表',
     summary: '指定 Agent 使用的策略技能列表。',
@@ -1840,6 +1914,26 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['影响分析总耗时和 API 调用频率。'],
     notes: ['并发过高可能导致 API 返回限流错误。'],
+  },
+  'settings.system.ANALYSIS_PARALLEL_FETCH': {
+    title: '分析内并行取数',
+    summary:
+      '在单只股票分析内，对无依赖的行情输入（实时行情、筹码、资金流、基本面）并发拉取。',
+    usage:
+      'ANALYSIS_PARALLEL_FETCH_ENABLED 控制并行/串行；MAX_CONCURRENT 为全局并发上限；PER_PROVIDER_LIMIT 限制同一逻辑 provider key 的并发；BUDGET_SECONDS 为可选墙钟预算（0 关闭），未启动分支会以 budget_skipped 缺口返回。',
+    valueNotes: [
+      '仍走 DataFetcherManager（故障切换、缓存、熔断、校验），并行层不是旁路 HTTP。',
+      '默认并发 3、单源 1，在重叠无依赖能力的同时降低踩限流风险。',
+      '排查数据源问题时可关闭开关，强制按声明顺序串行。',
+    ],
+    impact: [
+      '影响单股分析延迟，以及单次运行内对数据源的峰值并发。',
+      '不改变跨股票队列的 MAX_WORKERS 并发语义。',
+    ],
+    notes: [
+      '写入 stage IO / AgentContext 的合并顺序按声明 key，不按完成先后。',
+      '与预测 ActualsFetcher 的 coalesce 兼容：重叠标的仍经 provider manager 路径。',
+    ],
   },
   'settings.system.ANALYSIS_DELAY': {
     title: '分析间隔',

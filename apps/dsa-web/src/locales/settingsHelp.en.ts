@@ -603,6 +603,39 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects how final aggregated fundamental validation failures are surfaced to callers.'],
     notes: ['Independent of DATA_VALIDATION_STRICT provider-candidate rejection.'],
   },
+  'settings.data_source.DATA_VALIDATION_FUND_PE_SUSPECT_ABS': {
+    title: 'Fundamental PE Suspect Bound',
+    summary: 'Soft absolute PE bound. Values at or above this magnitude are marked suspect and kept.',
+    usage: 'Default 200. Raise only when legitimate PE values commonly exceed the soft band for your universe.',
+    valueNotes: [
+      'Suspect findings are warn-only; the PE value is retained for analysis.',
+      'Hard feed extremes still reject and remain separate from this soft bound.',
+    ],
+    impact: ['Changes when PE is annotated as suspect in diagnostics and context evidence.'],
+    notes: ['See docs/data-validation-layer.md for hard vs soft fundamental ranges.'],
+  },
+  'settings.data_source.DATA_VALIDATION_FUND_PB_SUSPECT_ABS': {
+    title: 'Fundamental PB Suspect Bound',
+    summary: 'Soft absolute PB bound. Values at or above this magnitude are marked suspect and kept.',
+    usage: 'Default 50. Raise only when legitimate PB values commonly exceed the soft band for your universe.',
+    valueNotes: [
+      'Suspect findings are warn-only; the PB value is retained for analysis.',
+      'Hard feed extremes still reject and remain separate from this soft bound.',
+    ],
+    impact: ['Changes when PB is annotated as suspect in diagnostics and context evidence.'],
+    notes: ['Missing PE/PB remains valid for ETFs and partial offshore providers.'],
+  },
+  'settings.data_source.DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD': {
+    title: 'Cross-Source Relative Threshold',
+    summary: 'Relative divergence threshold for multi-provider field comparison.',
+    usage: 'Default 0.05 (5%). Increase to reduce warnings when providers use different quote conventions.',
+    valueNotes: [
+      'Only applies when two or more providers supply the same finite field.',
+      'Divergent values are kept with provider attribution; a single source never interrupts analysis.',
+    ],
+    impact: ['Controls when cross-source WARN evidence is written to run diagnostics.'],
+    notes: ['Comparison is observational and fail-open on comparison errors.'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
     summary: 'Sends analysis reports to a Feishu group through a custom bot webhook.',
@@ -1179,6 +1212,47 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects reasoning depth, duration, and token consumption.'],
     notes: ['Very low values may cause incomplete reasoning.'],
   },
+  'settings.agent.AGENT_MODE_BUDGET_ENABLED': {
+    title: 'Mode Hard Budget Enabled',
+    summary: 'Enable hard per-mode Agent budgets for turns, tools, and cost.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS': {
+    title: 'Mode Budget Max LLM Turns (global)',
+    summary: 'Global tightener for mode LLM turn caps; 0 keeps mode defaults.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS': {
+    title: 'Mode Budget Max Tool Calls (global)',
+    summary: 'Global tightener for mode tool-call caps; 0 keeps mode defaults.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_COST_USD': {
+    title: 'Mode Budget Max Cost USD (global)',
+    summary: 'Global tightener for estimated USD cost caps; 0 keeps mode defaults.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOKENS': {
+    title: 'Mode Budget Max Tokens (global)',
+    summary: 'Optional global token ceiling; 0 disables the token dimension.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+
   'settings.agent.AGENT_SKILLS': {
     title: 'Agent Strategies',
     summary: 'Specifies the list of strategy skills the Agent uses.',
@@ -1811,6 +1885,26 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Affects total analysis time and API call frequency.'],
     notes: ['Too many workers can cause API rate-limit errors.'],
+  },
+  'settings.system.ANALYSIS_PARALLEL_FETCH': {
+    title: 'Parallel Market-Input Fetch',
+    summary:
+      'Runs dependency-free market-input pulls (realtime, chip, money-flow, fundamental) concurrently inside one stock analysis.',
+    usage:
+      'ANALYSIS_PARALLEL_FETCH_ENABLED toggles parallel vs serial declaration-order execution. MAX_CONCURRENT is the global slot cap. PER_PROVIDER_LIMIT caps branches that share a logical provider key. BUDGET_SECONDS is an optional wall-clock budget (0 disables); unstarted branches become typed budget_skipped gaps.',
+    valueNotes: [
+      'Still uses DataFetcherManager (fallback, cache, circuit, validation); parallel mode is not a side-channel HTTP path.',
+      'Default concurrent=3 and per-provider=1 reduce stampede risk while overlapping independent capabilities.',
+      'Disable the switch to force serial fetch order when diagnosing provider issues.',
+    ],
+    impact: [
+      'Affects single-stock analysis latency and peak concurrent provider calls within one run.',
+      'Does not change multi-stock MAX_WORKERS concurrency across the queue.',
+    ],
+    notes: [
+      'Merge order into stage IO / AgentContext follows declared task keys, never completion order.',
+      'Compatible with prediction ActualsFetcher coalesce: overlapping symbol pulls still go through the provider manager path.',
+    ],
   },
   'settings.system.ANALYSIS_DELAY': {
     title: 'Analysis Delay',
