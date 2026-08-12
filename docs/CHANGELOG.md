@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Rebaseline Web locale gzip budgets after HTML report-export download chrome strings (Refs #163).
 - [Added] Report Markdown panel one-click HTML export uses history export capabilities so office-friendly HTML is user-reachable alongside Markdown and PDF (Refs #163).
 - [Fixed] Fail the bilingual configuration inventory check when documented registry status is invalid or differs from the live registry (Refs #1026).
 - [Changed] Mount the interactive DCF sensitivity panel on Stock Details and reset its stock-bound estimate and assumptions when the canonical route stock changes (Refs #238, #1008).
