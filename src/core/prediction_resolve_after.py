@@ -537,7 +537,8 @@ def _session_is_early_close(calendar: Any, session_ts: Any) -> bool:
     try:
         if session_ts in early_closes:
             return True
-    except Exception:  # broad-exception: optional_metadata - Early-close membership probe is best-effort metadata only.
+    except (TypeError, ValueError, KeyError):
+        # Membership against non-index-like early_closes is optional metadata.
         pass
     try:
         session_date = (
@@ -547,6 +548,7 @@ def _session_is_early_close(calendar: Any, session_ts: Any) -> bool:
             item_ts = pd.Timestamp(item)
             if item_ts.date() == session_date:
                 return True
-    except Exception:  # broad-exception: optional_metadata - Early-close date scan is best-effort metadata only.
+    except (TypeError, ValueError, AttributeError):
+        # Timestamp coercion failures leave is_early_close as false.
         return False
     return False
