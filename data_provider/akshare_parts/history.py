@@ -54,7 +54,7 @@ class _HistoryMethods:
             # akshare may not directly expose the session, here fake_useragent is used as a supplement
             random_ua = random.choice(USER_AGENTS)
             logger.debug(f"设置 User-Agent: {random_ua[:50]}...")
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare user agent selection failed",
@@ -141,7 +141,7 @@ class _HistoryMethods:
                 if df is not None and not df.empty:
                     logger.info(f"[数据源] {source_name} 获取成功")
                     return df
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
                 last_error = e
                 log_safe_exception(
                     logger,

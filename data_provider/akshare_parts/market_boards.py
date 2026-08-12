@@ -93,7 +93,7 @@ class _MarketBoardsMethods:
                         })
             return results
 
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare market indices fetch failed",
@@ -137,7 +137,7 @@ class _MarketBoardsMethods:
                 "[MarketStats] component=market_stats provider=AkshareFetcher "
                 "api=ak.stock_zh_a_spot_em action=parse status=empty"
             )
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare Eastmoney market statistics failed; trying Sina fallback",
@@ -169,7 +169,7 @@ class _MarketBoardsMethods:
                 "[MarketStats] component=market_stats provider=AkshareFetcher "
                 "api=ak.stock_zh_a_spot action=parse status=empty"
             )
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare Sina market statistics fallback failed",
@@ -309,7 +309,7 @@ class _MarketBoardsMethods:
                 name = '板块名称'
                 return _get_rank_top_n(df, change_col, name, n)
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare Eastmoney sector ranking failed; trying Sina fallback",
@@ -331,7 +331,7 @@ class _MarketBoardsMethods:
             name = '板块'
             return _get_rank_top_n(df, change_col, name, n)
         
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare Sina sector ranking fallback failed",
@@ -374,7 +374,7 @@ class _MarketBoardsMethods:
                     for _, row in bottom.iterrows()
                 ],
             )
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare concept ranking fetch failed",
@@ -399,7 +399,7 @@ class _MarketBoardsMethods:
                 rows = fetch(n)
                 if rows:
                     return rows[:n]
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
                 had_error = True
                 log_safe_exception(
                     logger,
@@ -535,7 +535,7 @@ class _MarketBoardsMethods:
                     'industry': str(row.get('所属行业', '')).strip(),
                 })
             return rows
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare limit-up pool fetch failed",

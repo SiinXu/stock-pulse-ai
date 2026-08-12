@@ -135,7 +135,7 @@ class _EnhancedMethods:
                        f"70%集中度={chip.concentration_70:.2%}")
             return chip
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare chip distribution fetch failed",
@@ -168,7 +168,7 @@ class _EnhancedMethods:
         try:
             df = self.get_daily_data(stock_code, days=days)
             result['daily_data'] = df
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare daily data fetch failed",

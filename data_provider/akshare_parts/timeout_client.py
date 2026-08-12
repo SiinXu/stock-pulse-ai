@@ -62,10 +62,10 @@ def _akshare_call_with_timeout(
 def _akshare_timeout_worker(conn, func, args, kwargs) -> None:
     try:
         conn.send((True, func(*args, **kwargs)))
-    except BaseException as exc:
+    except BaseException as exc:  # broad-exception: cleanup - child IPC is unusable
         try:
             conn.send((False, exc))
-        except BaseException:
+        except BaseException:  # broad-exception: cleanup - child IPC is unusable
             try:
                 conn.send((False, RuntimeError(f"{type(exc).__name__}: {exc}")))
             except BaseException:  # broad-exception: cleanup - child IPC is unusable.

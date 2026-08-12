@@ -133,7 +133,7 @@ class _RealtimeQuotesMethods:
                         logger.info(f"[API返回] ak.stock_zh_a_spot_em 成功: 返回 {len(df)} 只股票, 耗时 {api_elapsed:.2f}s")
                         circuit_breaker.record_success(source_key)
                         break
-                    except Exception as e:
+                    except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
                         log_safe_exception(
                             logger,
                             "Akshare A-share realtime snapshot attempt failed",
@@ -197,7 +197,7 @@ class _RealtimeQuotesMethods:
                        f"量比={quote.volume_ratio}, 换手率={quote.turnover_rate}%")
             return quote
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare Eastmoney realtime quote failed",
@@ -346,7 +346,7 @@ class _RealtimeQuotesMethods:
             )
             return quote
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             category, _ = _classify_realtime_http_error(e)
             log_safe_exception(
                 logger,
@@ -502,7 +502,7 @@ class _RealtimeQuotesMethods:
             )
             return quote
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             category, _ = _classify_realtime_http_error(e)
             log_safe_exception(
                 logger,
@@ -561,7 +561,7 @@ class _RealtimeQuotesMethods:
                         logger.info(f"[API返回] ak.fund_etf_spot_em 成功: 返回 {len(df)} 只ETF, 耗时 {api_elapsed:.2f}s")
                         circuit_breaker.record_success(source_key)
                         break
-                    except Exception as e:
+                    except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
                         log_safe_exception(
                             logger,
                             "Akshare ETF realtime snapshot attempt failed",
@@ -620,7 +620,7 @@ class _RealtimeQuotesMethods:
                        f"换手率={quote.turnover_rate}%")
             return quote
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Provider I/O failure is safely logged before fallback or skip
             log_safe_exception(
                 logger,
                 "Akshare ETF realtime quote failed",
