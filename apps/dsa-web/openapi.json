@@ -6608,6 +6608,423 @@
         "title": "DataCapabilityItem",
         "type": "object"
       },
+      "DataProviderRuntimeCacheStatus": {
+        "description": "Daily-data cache counters projected for Hub quality labels.",
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "fetch_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetch Mode"
+          },
+          "hits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hits"
+          },
+          "misses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Misses"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "quality": {
+            "default": "unknown",
+            "enum": [
+              "active",
+              "idle",
+              "cold",
+              "stale",
+              "local_only",
+              "unknown"
+            ],
+            "title": "Quality",
+            "type": "string"
+          },
+          "stale_hits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Hits"
+          },
+          "writes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Writes"
+          }
+        },
+        "title": "DataProviderRuntimeCacheStatus",
+        "type": "object"
+      },
+      "DataProviderRuntimeMarketChain": {
+        "description": "Active daily-data routing chain for one overview market.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data_type": {
+            "title": "Data Type",
+            "type": "string"
+          },
+          "fallback_provider_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fallback Provider Ids",
+            "type": "array"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "ordered_provider_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ordered Provider Ids",
+            "type": "array"
+          },
+          "primary_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Provider Id"
+          },
+          "primary_selection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Selection"
+          },
+          "quality": {
+            "default": "unknown",
+            "enum": [
+              "ok",
+              "degraded",
+              "unknown",
+              "unavailable"
+            ],
+            "title": "Quality",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market",
+          "data_type"
+        ],
+        "title": "DataProviderRuntimeMarketChain",
+        "type": "object"
+      },
+      "DataProviderRuntimeProviderStatus": {
+        "description": "Process-local health and role for one registered market-data provider.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "circuit_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Circuit State"
+          },
+          "config_directory": {
+            "default": false,
+            "title": "Config Directory",
+            "type": "boolean"
+          },
+          "configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "health_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Score"
+          },
+          "health_status": {
+            "enum": [
+              "healthy",
+              "degraded",
+              "unknown",
+              "unavailable",
+              "not_configured",
+              "circuit_open",
+              "failed"
+            ],
+            "title": "Health Status",
+            "type": "string"
+          },
+          "is_fallback_for": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Is Fallback For",
+            "type": "array"
+          },
+          "is_primary_for": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Is Primary For",
+            "type": "array"
+          },
+          "last_failure_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Failure At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "baseline",
+              "enhancer",
+              "specialist"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "sample_count": {
+            "default": 0,
+            "title": "Sample Count",
+            "type": "integer"
+          },
+          "static_priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Static Priority"
+          }
+        },
+        "required": [
+          "provider_id",
+          "display_name",
+          "role",
+          "available",
+          "health_status"
+        ],
+        "title": "DataProviderRuntimeProviderStatus",
+        "type": "object"
+      },
+      "DataProviderRuntimeStatusResponse": {
+        "description": "Read-only Data Sources Hub runtime projection.\n\nObserves the live ``DataFetcherManager`` only. Probe failures and missing\nowners are explicit; availability is never defaulted to true on failure.\nDoes not open third-party connections or mutate circuits/config.",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "cache": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataProviderRuntimeCacheStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "markets": {
+            "items": {
+              "$ref": "#/components/schemas/DataProviderRuntimeMarketChain"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/DataProviderRuntimeProviderStatus"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_state": {
+            "enum": [
+              "ok",
+              "not_initialized",
+              "error"
+            ],
+            "title": "Source State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "as_of",
+          "partial",
+          "source_state"
+        ],
+        "title": "DataProviderRuntimeStatusResponse",
+        "type": "object"
+      },
       "DecisionSignalCreateRequest": {
         "properties": {
           "action": {
@@ -46317,6 +46734,38 @@
           }
         },
         "summary": "Update system configuration",
+        "tags": [
+          "SystemConfig"
+        ]
+      }
+    },
+    "/api/v1/system/config/data-providers/runtime-status": {
+      "get": {
+        "description": "Read a side-effect-free projection of the live market-data provider runtime: CN/HK/US daily routing (primary/fallback), process-local health, cache quality, and enhancer configured state. Probe failures and missing owners are explicit; availability is never defaulted to true on failure. Does not call third-party APIs or mutate config.",
+        "operationId": "getDataProviderRuntimeStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataProviderRuntimeStatusResponse"
+                }
+              }
+            },
+            "description": "Data provider runtime status loaded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal server error"
+          }
+        },
+        "summary": "Get data provider runtime status",
         "tags": [
           "SystemConfig"
         ]

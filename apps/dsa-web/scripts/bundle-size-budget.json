@@ -3,7 +3,7 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-11",
+  "measuredAt": "2026-08-12",
   "baselineNote": "Integration rebuild on current main. Changed chunks use the GitHub Actions Linux gzip measurement from PR #1050 plus 200 B headroom; untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 233722,
-      "measuredGzipBytes": 233522,
-      "note": "GitHub Actions Linux measurement after the integrated Settings changes in PR #1050; measured 233522 B + 200 B headroom."
+      "maxGzipBytes": 234047,
+      "measuredGzipBytes": 233847,
+      "note": "Remeasured after Data Sources Hub runtime projection i18n/OpenAPI (Refs #867); measured 233847 B + 200 B headroom."
     },
     {
       "id": "js-entry",
@@ -54,9 +54,9 @@
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 141744,
-      "measuredGzipBytes": 141544,
-      "note": "Remeasured after the integration rebuild translation additions; measured 141544 B + 200 B headroom."
+      "maxGzipBytes": 141946,
+      "measuredGzipBytes": 141746,
+      "note": "Remeasured after Data Sources Hub runtime projection i18n/OpenAPI (Refs #867); measured 141746 B + 200 B headroom."
     },
     {
       "id": "locale-zh-TW",
@@ -68,16 +68,16 @@
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 131717,
-      "measuredGzipBytes": 131517,
-      "note": "Remeasured after the integration rebuild translation additions; measured 131517 B + 200 B headroom."
+      "maxGzipBytes": 131922,
+      "measuredGzipBytes": 131722,
+      "note": "Remeasured after Data Sources Hub runtime projection i18n/OpenAPI (Refs #867); measured 131722 B + 200 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 131772,
-      "measuredGzipBytes": 131572,
-      "note": "Remeasured after the integration rebuild translation additions; measured 131572 B + 200 B headroom."
+      "maxGzipBytes": 131974,
+      "measuredGzipBytes": 131774,
+      "note": "Remeasured after Data Sources Hub runtime projection i18n/OpenAPI (Refs #867); measured 131774 B + 200 B headroom."
     },
     {
       "id": "vendor-charts",

@@ -6,6 +6,24 @@ import type { SystemConfigItem } from '../../../types/systemConfig';
 import { DataProvidersPanel } from '../DataProvidersPanel';
 import { isDataProviderKey } from '../dataProviders';
 
+vi.mock('../DataProviderRuntimeStatusPanel', () => ({
+  DataProviderRuntimeStatusPanel: () => <div data-testid="data-runtime-status-panel-mock" />,
+}));
+
+vi.mock('../../../api/systemConfig', () => ({
+  systemConfigApi: {
+    getDataProviderRuntimeStatus: vi.fn().mockResolvedValue({
+      schemaVersion: 'data_provider_runtime_status_v1',
+      asOf: '2026-08-12T00:00:00+00:00',
+      partial: false,
+      sourceState: 'ok',
+      markets: [],
+      providers: [],
+      cache: null,
+    }),
+  },
+}));
+
 function buildItem(
   key: string,
   value: string,
