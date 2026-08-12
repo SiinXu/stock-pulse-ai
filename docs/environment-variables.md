@@ -161,6 +161,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ALPHASIFT_SOURCE_CALL_TIMEOUT_SEC` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHAVANTAGE_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ANALYSIS_DELAY` | `0` | 是 | 模板中注释; =================================== Analyze interval configuration (optional) =================================== Del... |
+| `ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS` | `0` | 是 | 模板中注释; Coordinator wall-clock budget in seconds; 0 disables (individual stage timeouts still apply). |
+| `ANALYSIS_PARALLEL_FETCH_ENABLED` | `true` | 是 | 模板中注释; Parallel dependency-free market-input pulls inside one stock analysis (realtime / chip / money-flow / fundamental) |
+| `ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT` | `3` | 是 | 模板中注释 |
+| `ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT` | `1` | 是 | 模板中注释 |
 | `ANSPIRE_API_KEYS` | `空` | 是 | Anspire Open API keys (supports multiple comma-separated values) Get keys from: https://open.anspire.cn/ When no high... |
 | `ANSPIRE_LLM_BASE_URL` | `https://open-gateway.anspire.cn/v6` | 是 | 模板中注释 |
 | `ANSPIRE_LLM_ENABLED` | `true` | 是 | 模板中注释 |
@@ -198,7 +202,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DAILY_BRIEF_TIMEZONE` | `Asia/Shanghai` | 是 | 模板中注释 |
 | `DAILY_MARKET_CONTEXT_ENABLED` | `true` | 是 | Should the market summary be injected into individual stock analysis prompts and should conservative barriers be enab... |
 | `DATABASE_PATH` | `./data/stock_analysis.db` | 否 | 注册表缺口（见清单文档 / 跟踪 issue） |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | `0.05` | 是 | 模板中注释; Multi-provider relative divergence threshold (default 0.05 = 5%) |
 | `DATA_VALIDATION_ENABLED` | `true` | 是 | 模板中注释; Financial data validation layer at provider candidate and synthesis boundaries |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | `50` | 是 | 模板中注释 |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | `200` | 是 | 模板中注释; Soft PE/PB plausibility bounds: values beyond these are marked suspect (warn) and kept; hard feed extremes still reject. |
 | `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | `空` | 是 | 模板中注释; Optional authoritative identities for symbols whose instrument type cannot be inferred safely from their market code,... |
 | `DATA_VALIDATION_STRICT` | `false` | 是 | 模板中注释; Reject invalid daily/realtime provider candidates before acceptance/cache so the existing bounded provider loop can c... |
 | `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | 是 | 模板中注释; Comma-separated market/instrument selectors; supported instruments are equity, etf, and index |

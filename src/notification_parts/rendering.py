@@ -1142,12 +1142,18 @@ class _RenderingMethods:
         if results:
             from src.services.report_renderer import render, render_plugin_template
 
+            # ReportType.BRIEF is the push/mobile density contract: always render
+            # with report_mode=brief so Decision Card length budgets hold even when
+            # global REPORT_MODE is standard/research (#861/#874).
             render_kwargs = {
                 "platform": "brief",
                 "results": results,
                 "report_date": report_date,
                 "summary_only": False,
-                "extra_context": {"report_language": report_language},
+                "extra_context": {
+                    "report_language": report_language,
+                    "report_mode": "brief",
+                },
             }
             out = render_plugin_template(**render_kwargs)
             if not out and getattr(config, 'report_renderer_enabled', False):

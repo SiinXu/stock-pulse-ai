@@ -133,7 +133,8 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
         </p>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-[var(--settings-border)]">
+      {/* #879 B3: keep the wide task table scrollable inside the content column at 320/390. */}
+      <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-[var(--settings-border)]">
         <DataTable
           caption={text.overviewTitle}
           columns={columns}

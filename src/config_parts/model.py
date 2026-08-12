@@ -88,6 +88,11 @@ class Config:
     data_validation_strict_scopes: str = "*/*"
     data_validation_instrument_overrides: str = ""
     data_validation_upper_layer_mode: str = "warn"
+    # Soft fundamental plausibility bounds (WARN/suspect; values are kept).
+    data_validation_fund_pe_suspect_abs: float = 200.0
+    data_validation_fund_pb_suspect_abs: float = 50.0
+    # Multi-provider relative divergence threshold (WARN with attribution).
+    data_validation_cross_source_rel_threshold: float = 0.05
     plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
@@ -368,6 +373,15 @@ class Config:
 
     # System Configuration
     max_workers: int = 3  # Low concurrency anti-ban
+    # Parallel dependency-free market-input pulls inside one stock analysis
+    # (realtime / chip / money-flow / fundamental). Does not bypass provider
+    # governance or cache; set enabled=false to force serial declaration order.
+    analysis_parallel_fetch_enabled: bool = True
+    analysis_parallel_fetch_max_concurrent: int = 3
+    analysis_parallel_fetch_per_provider_limit: int = 1
+    # 0 disables the coordinator-level wall-clock budget (individual stage
+    # timeouts such as FUNDAMENTAL_STAGE_TIMEOUT_SECONDS still apply).
+    analysis_parallel_fetch_budget_seconds: float = 0.0
     debug: bool = False
     http_proxy: Optional[str] = None  # HTTP Proxy (e.g., http://127.0.0.1:10809)
     https_proxy: Optional[str] = None # HTTPS Proxy
