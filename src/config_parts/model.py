@@ -277,6 +277,29 @@ class Config:
     agent_arch: str = "single"     # Agent architecture: 'single' (legacy) or 'multi' (orchestrator)
     agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/specialist
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
+    # Hard per-mode budgets (LLM turns / tool calls / cost / tokens). Built-in
+    # mode defaults live in src.agent.runtime.mode_budget; 0 on overrides means
+    # "keep mode default". Residual wall-clock skips remain budget_skip.
+    agent_mode_budget_enabled: bool = True
+    agent_mode_budget_max_llm_turns: int = 0
+    agent_mode_budget_max_tool_calls: int = 0
+    agent_mode_budget_max_cost_usd: float = 0.0
+    agent_mode_budget_max_tokens: int = 0
+    agent_mode_budget_quick_max_llm_turns: int = 0
+    agent_mode_budget_quick_max_tool_calls: int = 0
+    agent_mode_budget_quick_max_cost_usd: float = 0.0
+    agent_mode_budget_standard_max_llm_turns: int = 0
+    agent_mode_budget_standard_max_tool_calls: int = 0
+    agent_mode_budget_standard_max_cost_usd: float = 0.0
+    agent_mode_budget_full_max_llm_turns: int = 0
+    agent_mode_budget_full_max_tool_calls: int = 0
+    agent_mode_budget_full_max_cost_usd: float = 0.0
+    agent_mode_budget_specialist_max_llm_turns: int = 0
+    agent_mode_budget_specialist_max_tool_calls: int = 0
+    agent_mode_budget_specialist_max_cost_usd: float = 0.0
+    agent_mode_budget_chat_max_llm_turns: int = 0
+    agent_mode_budget_chat_max_tool_calls: int = 0
+    agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
@@ -319,6 +342,9 @@ class Config:
     agent_context_protected_turns: int = 4
     agent_observability_enabled: bool = True  # Lightweight agent run events (default on)
     agent_observability_deep_payload: bool = False  # Capture sanitized tool/model payloads (default off)
+    # Performance baseline collection / optional cProfile (Issue #227). Default off.
+    perf_collection_enabled: bool = False
+    perf_profile_enabled: bool = False
     agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
     agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
@@ -377,6 +403,15 @@ class Config:
 
     # System Configuration
     max_workers: int = 3  # Low concurrency anti-ban
+    # Parallel dependency-free market-input pulls inside one stock analysis
+    # (realtime / chip / money-flow / fundamental). Does not bypass provider
+    # governance or cache; set enabled=false to force serial declaration order.
+    analysis_parallel_fetch_enabled: bool = True
+    analysis_parallel_fetch_max_concurrent: int = 3
+    analysis_parallel_fetch_per_provider_limit: int = 1
+    # 0 disables the coordinator-level wall-clock budget (individual stage
+    # timeouts such as FUNDAMENTAL_STAGE_TIMEOUT_SECONDS still apply).
+    analysis_parallel_fetch_budget_seconds: float = 0.0
     debug: bool = False
     http_proxy: Optional[str] = None  # HTTP Proxy (e.g., http://127.0.0.1:10809)
     https_proxy: Optional[str] = None # HTTPS Proxy

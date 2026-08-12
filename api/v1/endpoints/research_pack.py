@@ -218,7 +218,7 @@ def export_research_pack(
             reason_code=exc.code,
         )
         raise api_error(413, exc.code, exc.message)
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - map unexpected export failures to a sanitized API error
         log_safe_exception(
             logger,
             "Research pack export failed",

@@ -112,7 +112,7 @@ def _resolve_runtime_config(config: Any = None) -> Any:
     try:
         from src.application_services import get_application_services
         return get_application_services().config
-    except Exception as exc:  # broad-exception: fallback_recorded
+    except Exception as exc:  # broad-exception: fallback_recorded - config lookup falls back to safe defaults without failing export
         log_safe_exception(
             logger, "Research pack export config lookup failed; using safe defaults", exc,
             error_code="research_pack_export_config_lookup_failed", level=logging.DEBUG,
@@ -626,7 +626,7 @@ class ResearchPackExportService:
                     truncation_notes.append("report_chars")
                 report_text = str(redact_export_payload(report_text))
                 tracker.complete("report", f"chars={len(report_text)}")
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - report generation failure is recorded and export continues with gaps
             log_safe_exception(logger, "Research pack report generation failed", exc,
                                error_code="research_pack_report_failed", context={"record_id": record_id}, level=logging.WARNING)
             report_missing = "markdown report generation failed"
@@ -651,7 +651,7 @@ class ResearchPackExportService:
             news_raw = self.history_service.resolve_and_get_news(record_id, limit=12)
             if isinstance(news_raw, list):
                 news_items = [i for i in news_raw if isinstance(i, Mapping)]
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - news lookup failure is recorded and evidence export continues
             log_safe_exception(logger, "Research pack news lookup failed", exc,
                                error_code="research_pack_news_failed", context={"record_id": record_id}, level=logging.DEBUG)
         evidence = redact_export_payload(_extract_evidence_refs(
@@ -690,7 +690,7 @@ class ResearchPackExportService:
                 truncated = True
                 truncation_notes.append("reasoning_trace")
             tracker.complete("reasoning_trace", f"truncated={bool(trace_result.truncated)}")
-        except Exception as exc:  # broad-exception: fallback_recorded
+        except Exception as exc:  # broad-exception: fallback_recorded - reasoning-trace projection failure is recorded and export continues with gaps
             log_safe_exception(logger, "Research pack reasoning-trace projection failed", exc,
                                error_code="research_pack_trace_failed", context={"record_id": record_id}, level=logging.WARNING)
             trace_missing = "reasoning_trace_projection_failed"
