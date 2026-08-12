@@ -447,7 +447,7 @@ const StockDetailsPage: React.FC = () => {
                   variant="info"
                   size="sm"
                   className="font-mono shadow-none"
-                  aria-label={`Market ${marketBadge}`}
+                  aria-label={t('stocks.workspace.marketBadgeAria', { code: marketBadge })}
                   data-testid="stock-details-market-badge"
                 >
                   {marketBadge}

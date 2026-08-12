@@ -314,7 +314,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                       variant="info"
                       size="sm"
                       className="shrink-0 font-mono shadow-none"
-                      aria-label={`Market ${marketBadge}`}
+                      aria-label={t('stocks.workspace.marketBadgeAria', { code: marketBadge })}
                       data-testid="report-overview-market-badge"
                     >
                       {marketBadge}
