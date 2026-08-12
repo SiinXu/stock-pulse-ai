@@ -220,6 +220,63 @@ def test_rollback_pin_applied_on_skill_load(isolated_service: PromptArtifactServ
     assert "version: 2.0.0" in disk_text
 
 
+def test_key_prompt_pin_resolved_after_rollback(isolated_service: PromptArtifactService):
+    """Rolled-back key prompts serve pin body; tip stays live when not rolled back."""
+    from src.agent.prompt_versioning import resolve_key_prompt_text
+
+    prompt_id = "agent.system"
+    live = resolve_key_prompt_text(prompt_id)
+    assert live  # live loader body
+
+    isolated_service.ensure_content(
+        kind=ArtifactKind.PROMPT,
+        artifact_id=prompt_id,
+        content="PINNED_V1_TEMPLATE {market_role}",
+        label="1.0.0",
+        change_summary="v1",
+    )
+    isolated_service.ensure_content(
+        kind=ArtifactKind.PROMPT,
+        artifact_id=prompt_id,
+        content="PINNED_V2_TEMPLATE {market_role}",
+        label="2.0.0",
+        change_summary="v2",
+    )
+    # Tip active → still live module body (not auto-switched to store tip text
+    # unless pin is behind tip). Store tip is v2; live module may differ — when
+    # active==latest we intentionally keep live loader text.
+    assert resolve_key_prompt_text(prompt_id) == live
+
+    isolated_service.rollback(
+        kind=ArtifactKind.PROMPT,
+        artifact_id=prompt_id,
+        to_version=1,
+    )
+    assert resolve_key_prompt_text(prompt_id) == "PINNED_V1_TEMPLATE {market_role}"
+
+    # Soul must never be overlaid by a history pin.
+    soul_live = resolve_key_prompt_text("agent.soul")
+    isolated_service.ensure_content(
+        kind=ArtifactKind.PROMPT,
+        artifact_id="agent.soul",
+        content="FAKE_SOUL_V1",
+        label="1.0.0",
+    )
+    isolated_service.ensure_content(
+        kind=ArtifactKind.PROMPT,
+        artifact_id="agent.soul",
+        content="FAKE_SOUL_V2",
+        label="2.0.0",
+    )
+    isolated_service.rollback(
+        kind=ArtifactKind.PROMPT,
+        artifact_id="agent.soul",
+        to_version=1,
+    )
+    assert resolve_key_prompt_text("agent.soul") == soul_live
+    assert "FAKE_SOUL" not in resolve_key_prompt_text("agent.soul")
+
+
 def test_history_persists_across_store_reopen(tmp_path, monkeypatch):
     root = tmp_path / "store"
     monkeypatch.setenv("PROMPT_ARTIFACT_STORE_DIR", str(root))

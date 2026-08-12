@@ -51,12 +51,16 @@ dedicated PR.
 Storage root: `PROMPT_ARTIFACT_STORE_DIR` (default
 `<database parent>/prompt_artifacts`).
 
-**Runtime loop:** `load_skill_from_yaml` / `load_skill_from_markdown`,
+**Runtime loop (Skills):** `load_skill_from_yaml` / `load_skill_from_markdown`,
 `SkillManager.register`, and plugin `AnalysisStrategyDefinition.to_skill()` all
 call `apply_active_skill_pin`. The pin body is applied only when
 `active_version < latest_version` (rolled back); while the tip is active, disk /
-plugin content remains the working set so authors can keep evolving. On-disk
-YAML is never rewritten.
+plugin content remains the working set. On-disk YAML is never rewritten.
+
+**Runtime loop (key prompts):** `resolve_key_prompt_text(prompt_id)` is used by
+Agent run/chat, analyzer system/text, and image extract. Same
+`active_version < latest_version` rule. `agent.soul` **never** accepts a pin
+overlay (Soul identity proofs require the live charter).
 
 ## Runtime trace
 

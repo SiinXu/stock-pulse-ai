@@ -25,6 +25,7 @@ from src.agent.prompt_versioning.service import (
     apply_active_skill_pin,
     get_prompt_artifact_service,
     reset_prompt_artifact_service_for_tests,
+    resolve_key_prompt_text,
 )
 from src.agent.prompt_versioning.types import (
     ArtifactKind,
@@ -51,6 +52,7 @@ __all__ = [
     "get_prompt_artifact_service",
     "list_key_prompt_identities",
     "reset_prompt_artifact_service_for_tests",
+    "resolve_key_prompt_text",
     "skill_canonical_payload",
     "skill_content_hash",
     "skill_version_label",

@@ -456,10 +456,47 @@ def apply_active_skill_pin(skill: Any) -> Any:
         return skill
 
 
+# Soul charter is identity-proofed elsewhere; never overlay a history pin onto it.
+_PIN_FORBIDDEN_PROMPT_IDS = frozenset({"agent.soul"})
+
+
+def resolve_key_prompt_text(prompt_id: str) -> str:
+    """Return live key-prompt text, or a rolled-back pin body when active < latest.
+
+    Does not rewrite module-level prompt constants. ``agent.soul`` always uses
+    the live charter (runtime Soul identity proofs forbid pin overlays).
+    Fail-open to the live loader body when history is missing or unreadable.
+    """
+    from src.agent.prompt_versioning.registry import get_key_prompt_spec
+
+    artifact_id = str(prompt_id or "").strip()
+    spec = get_key_prompt_spec(artifact_id)
+    live = spec.loader()
+    if artifact_id in _PIN_FORBIDDEN_PROMPT_IDS:
+        return live
+    try:
+        service = get_prompt_artifact_service()
+        snapshot = service.get_snapshot(
+            kind=ArtifactKind.PROMPT,
+            artifact_id=artifact_id,
+        )
+    except Exception:
+        return live
+    if snapshot is None:
+        return live
+    if int(snapshot.active_version) >= int(snapshot.latest_version):
+        return live
+    active = snapshot.active_revision()
+    if active is None or not str(active.content or "").strip():
+        return live
+    return str(active.content)
+
+
 __all__ = [
     "PromptArtifactService",
     "apply_active_skill_pin",
     "default_prompt_artifact_store_root",
     "get_prompt_artifact_service",
     "reset_prompt_artifact_service_for_tests",
+    "resolve_key_prompt_text",
 ]

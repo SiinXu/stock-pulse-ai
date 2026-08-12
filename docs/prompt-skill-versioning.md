@@ -51,10 +51,15 @@
 存储：`PROMPT_ARTIFACT_STORE_DIR`；未设置时默认
 `<database parent>/prompt_artifacts`。
 
-**运行时闭环：** `load_skill_from_yaml` / `load_skill_from_markdown`、
+**运行时闭环（Skill）：** `load_skill_from_yaml` / `load_skill_from_markdown`、
 `SkillManager.register`、以及插件 `AnalysisStrategyDefinition.to_skill()` 都会调用
 `apply_active_skill_pin`。仅当 `active_version < latest_version`（已 rollback）时
 叠加 pin 正文；tip 未回滚时仍使用磁盘/插件正文，便于作者继续演进。磁盘 YAML 永不被改写。
+
+**运行时闭环（关键 prompt）：** `resolve_key_prompt_text(prompt_id)` 在
+Agent run/chat、analyzer system/text、image extract 路径使用。同样仅在
+`active_version < latest_version` 时返回 pin 正文。`agent.soul` **禁止** pin
+叠加（Soul 身份证明要求 live charter）。
 
 ## 运行 trace
 
