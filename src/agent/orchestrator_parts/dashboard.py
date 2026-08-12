@@ -93,10 +93,13 @@ class _DashboardMethods:
             analysis_context_pack_summary = context.get("analysis_context_pack_summary")
             if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
                 ctx.meta["analysis_context_pack_summary"] = analysis_context_pack_summary
+            analysis_context_snapshot_meta = context.get("analysis_context_snapshot")
+            if isinstance(analysis_context_snapshot_meta, dict) and analysis_context_snapshot_meta:
+                ctx.meta["analysis_context_snapshot"] = dict(analysis_context_snapshot_meta)
 
             # Pre-populate data fields that the caller already has
             for data_key in ("realtime_quote", "daily_history", "chip_distribution",
-                             "trend_result", "news_context"):
+                             "trend_result", "news_context", "fundamental_context"):
                 if context.get(data_key):
                     ctx.set_data(data_key, context[data_key])
 
@@ -130,6 +133,10 @@ class _DashboardMethods:
         if "report_language" not in ctx.meta:
             ctx.meta["report_language"] = "zh"
 
+        # Issue #182: seal market inputs + pack identity so multi-agent stages
+        # share one versioned snapshot and cannot mutate bars/news in place.
+        self._seal_agent_input_snapshot(ctx, context)
+
         # Investment Committee preset (#545): default-off; different seam from
         # pipeline weight aggregation. Injects persona skills_requested only.
         try:
@@ -151,6 +158,80 @@ class _DashboardMethods:
             )
 
         return ctx
+
+    def _seal_agent_input_snapshot(
+        self,
+        ctx: AgentContext,
+        request_context: Optional[Dict[str, Any]],
+    ) -> None:
+        """Seal AnalysisContextPack + market inputs onto the shared AgentContext."""
+        try:
+            from src.analysis_context_pack.snapshot import (
+                SNAPSHOT_DATA_KEYS,
+                seal_analysis_context_snapshot,
+            )
+            from src.schemas.analysis_context_pack import (
+                AnalysisContextPack,
+                AnalysisSubject,
+            )
+
+            request = request_context if isinstance(request_context, dict) else {}
+            pack_payload = request.get("analysis_context_pack")
+            pack: Any
+            if isinstance(pack_payload, AnalysisContextPack):
+                pack = pack_payload
+            elif isinstance(pack_payload, dict) and pack_payload.get("subject"):
+                pack = AnalysisContextPack.model_validate(pack_payload)
+            else:
+                subject_code = ctx.stock_code or "unknown"
+                pack = AnalysisContextPack(
+                    subject=AnalysisSubject(
+                        code=subject_code,
+                        stock_name=ctx.stock_name or None,
+                        market=None,
+                    ),
+                    metadata={
+                        "source": "agent_orchestrator_seed",
+                        "trigger_source": "multi_agent",
+                    },
+                )
+
+            data_bag: Dict[str, Any] = {}
+            for key in SNAPSHOT_DATA_KEYS:
+                if key in ctx.data and ctx.data.get(key) is not None:
+                    data_bag[key] = ctx.data[key]
+                elif key in request and request.get(key) is not None:
+                    data_bag[key] = request[key]
+
+            prior = request.get("analysis_context_snapshot")
+            snapshot_id = None
+            snapshot_revision = None
+            as_of = None
+            if isinstance(prior, dict):
+                snapshot_id = prior.get("snapshot_id")
+                snapshot_revision = prior.get("snapshot_revision")
+                as_of = prior.get("as_of")
+            if snapshot_id is None and isinstance(pack, AnalysisContextPack):
+                snapshot_id = pack.snapshot_id
+                snapshot_revision = pack.snapshot_revision
+                as_of = pack.as_of
+
+            snapshot = seal_analysis_context_snapshot(
+                pack,
+                data_bag,
+                snapshot_id=str(snapshot_id) if snapshot_id else None,
+                snapshot_revision=int(snapshot_revision) if snapshot_revision else None,
+                as_of=str(as_of) if as_of else None,
+            )
+            ctx.seal_input_snapshot(snapshot)
+        except Exception as exc:  # broad-exception: fallback_recorded - Seal is best-effort; multi-agent continues without freeze.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] analysis context snapshot seal failed",
+                exc,
+                error_code="agent_analysis_context_snapshot_seal_failed",
+                level=logging.WARNING,
+            )
 
     @staticmethod
     def _fallback_summary(ctx: AgentContext) -> str:

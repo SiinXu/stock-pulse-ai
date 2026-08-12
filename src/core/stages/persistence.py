@@ -137,6 +137,26 @@ class _PersistenceStageMixin:
             snapshot["news_result_count"] = news_result_count
         if analysis_context_pack_overview is not None:
             snapshot["analysis_context_pack_overview"] = analysis_context_pack_overview
+            # Issue #182: surface low-sensitivity snapshot identity at the
+            # context_snapshot top level for audit/diagnostics consumers.
+            snapshot_identity = {
+                key: analysis_context_pack_overview.get(key)
+                for key in (
+                    "snapshot_id",
+                    "snapshot_revision",
+                    "as_of",
+                    "pack_version",
+                    "created_at",
+                )
+                if analysis_context_pack_overview.get(key) is not None
+            }
+            overview_meta = analysis_context_pack_overview.get("metadata")
+            if isinstance(overview_meta, dict):
+                digest = overview_meta.get("content_digest")
+                if digest:
+                    snapshot_identity["content_digest"] = digest
+            if snapshot_identity:
+                snapshot["analysis_context_snapshot"] = snapshot_identity
         if market_phase_summary is not None:
             snapshot[MARKET_PHASE_SUMMARY_KEY] = market_phase_summary
         diagnostic_snapshot = current_diagnostic_snapshot()
@@ -758,6 +778,27 @@ class _PersistenceStageMixin:
                 pack,
                 report_language=report_language,
             )
+            # Issue #182: record snapshot identity on diagnostics without
+            # exposing full pack item values to public consumers.
+            try:
+                from src.services.run_diagnostics import get_current_diagnostic_context
+
+                identity = pack.audit_identity()
+                diag = get_current_diagnostic_context()
+                if diag is not None:
+                    diag.record_agent_event(
+                        {
+                            "type": "analysis_context_snapshot",
+                            "stage": "context",
+                            **{
+                                key: value
+                                for key, value in identity.items()
+                                if value is not None
+                            },
+                        }
+                    )
+            except Exception:  # broad-exception: optional_metadata - audit identity is best-effort
+                pass
             return summary, overview
         except Exception as exc:  # broad-exception: fallback_recorded - Context-pack failures are logged and fall back to empty optional context.
             log_safe_exception(

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
+from src.analysis_context_pack.snapshot import stamp_pack_snapshot_identity
 from src.schemas.analysis_context_pack import (
     AnalysisContextBlock,
     AnalysisContextItem,
@@ -116,7 +117,7 @@ class AnalysisContextBuilder:
             validation_evidence=evidence,
         )
 
-        return AnalysisContextPack(
+        pack = AnalysisContextPack(
             subject=AnalysisSubject(
                 code=artifacts.code,
                 stock_name=artifacts.stock_name or None,
@@ -127,6 +128,9 @@ class AnalysisContextBuilder:
             data_quality=data_quality,
             metadata=metadata,
         )
+        # Issue #182: stamp per-run snapshot identity so multi-agent stages
+        # share one versioned, digest-addressable input pack.
+        return stamp_pack_snapshot_identity(pack)
 
     @staticmethod
     def build_batch(items: Sequence[PipelineAnalysisArtifacts]) -> List[AnalysisContextPack]:
