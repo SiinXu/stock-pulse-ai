@@ -187,19 +187,21 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
           ...item,
           state: result.state,
           desiredEnabled: enabled,
-          // Fail closed until the next list refresh confirms active registrations.
+          // Fail closed until refresh confirms active registrations.
           notificationChannels: [],
           extensionPoints: enabled
             ? item.extensionPoints
             : item.extensionPoints.filter((point) => point !== 'notification_channel'),
         };
       }));
+      // Re-read the roster so channel deep-links match active registrations.
+      void load('refresh');
     } catch (error: unknown) {
       setActionError(getParsedApiError(error, language).message);
     } finally {
       setPendingPluginId(null);
     }
-  }, [language, t]);
+  }, [language, load, t]);
 
   const openSettings = useCallback(async (plugin: PluginInfo) => {
     setPendingPluginId(plugin.id);

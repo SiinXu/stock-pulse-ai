@@ -206,24 +206,43 @@ describe('LoadedExtensionsPanel', () => {
   });
 
   it('persists an enable action through the lifecycle API', async () => {
-    vi.mocked(pluginsApi.list).mockResolvedValue({
-      total: 1,
-      items: [{
-        id: 'toggle-demo',
-        name: 'Toggle Demo',
-        version: '1.0.0',
-        source: 'external',
-        state: 'disabled',
-        desiredEnabled: false,
-        reloadable: true,
-        packageRoot: '/opt/plugins/toggle-demo',
-        extensionPoints: [],
-        notificationChannels: [],
-        description: '',
-        author: '',
-        settingsCount: 0,
-      }],
-    });
+    vi.mocked(pluginsApi.list)
+      .mockResolvedValueOnce({
+        total: 1,
+        items: [{
+          id: 'toggle-demo',
+          name: 'Toggle Demo',
+          version: '1.0.0',
+          source: 'external',
+          state: 'disabled',
+          desiredEnabled: false,
+          reloadable: true,
+          packageRoot: '/opt/plugins/toggle-demo',
+          extensionPoints: [],
+          notificationChannels: [],
+          description: '',
+          author: '',
+          settingsCount: 0,
+        }],
+      })
+      .mockResolvedValue({
+        total: 1,
+        items: [{
+          id: 'toggle-demo',
+          name: 'Toggle Demo',
+          version: '1.0.0',
+          source: 'external',
+          state: 'enabled',
+          desiredEnabled: true,
+          reloadable: true,
+          packageRoot: '/opt/plugins/toggle-demo',
+          extensionPoints: [],
+          notificationChannels: [],
+          description: '',
+          author: '',
+          settingsCount: 0,
+        }],
+      });
     vi.mocked(pluginsApi.updateLifecycle).mockResolvedValue({
       pluginId: 'toggle-demo',
       action: 'enable',
@@ -241,6 +260,9 @@ describe('LoadedExtensionsPanel', () => {
     await waitFor(() => {
       expect(pluginsApi.updateLifecycle).toHaveBeenCalledWith('toggle-demo', 'enable');
       expect(toggle).toHaveAttribute('aria-checked', 'true');
+    });
+    await waitFor(() => {
+      expect(pluginsApi.list).toHaveBeenCalledTimes(2);
     });
   });
 
