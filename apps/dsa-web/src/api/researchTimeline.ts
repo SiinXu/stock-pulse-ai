@@ -112,8 +112,10 @@ function parseResponse(data: unknown): ResearchTimelineResponse {
   const result = researchTimelineResponseSchema.safeParse(camel);
   if (!result.success) {
     throw createApiError(createParsedApiError({
-      code: 'invalid_response',
+      title: 'Invalid research timeline response',
       message: `ResearchTimelineResponse validation failed: ${result.error.message}`,
+      code: 'api_response_validation_failed',
+      category: 'unknown',
     }));
   }
   const parsed = camel as ResearchTimelineResponse;

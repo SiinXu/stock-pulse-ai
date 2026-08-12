@@ -273,5 +273,20 @@ class ResearchTimelineServiceTestCase(unittest.TestCase):
         self.assertEqual(page.sources["chat"], "empty")
 
 
+    def test_exact_page_size_does_not_false_positive_has_more(self) -> None:
+        """A source that returns exactly `limit` rows and is exhausted must not claim more."""
+        base = datetime(2026, 6, 1, 9, 0, 0)
+        for index in range(2):
+            self._add_analysis(
+                created_at=base + timedelta(days=index),
+                query_id=f"exact-{index}",
+                advice=f"exact-{index}",
+            )
+        page = self.service.list_timeline("600519", limit=2)
+        self.assertEqual(len(page.items), 2)
+        self.assertFalse(page.has_more)
+        self.assertIsNone(page.next_cursor)
+
+
 if __name__ == "__main__":
     unittest.main()

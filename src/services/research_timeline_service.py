@@ -118,6 +118,9 @@ class ResearchTimelineService:
             code_candidates = [display_code]
 
         safe_limit = max(1, min(int(limit), MAX_LIMIT))
+        # Overscan one extra row per source so has_more does not false-positive
+        # when a source returns exactly `limit` and is exhausted.
+        fetch_limit = safe_limit + 1
         kind_filter = self._normalize_kinds(kinds)
         cursor_key = self._decode_cursor(cursor) if cursor else None
 
@@ -128,15 +131,22 @@ class ResearchTimelineService:
             "hypothesis": "unavailable",
         }
         candidates: List[ResearchTimelineNode] = []
+        source_overscan: Dict[str, bool] = {
+            "analysis_run": False,
+            "chat": False,
+            "signal": False,
+            "hypothesis": False,
+        }
 
         if "analysis_run" in kind_filter:
             nodes, status = self._load_analysis_nodes(
                 code_candidates=code_candidates,
                 display_code=display_code,
                 cursor_key=cursor_key,
-                limit=safe_limit,
+                limit=fetch_limit,
             )
             sources["analysis_run"] = status
+            source_overscan["analysis_run"] = len(nodes) >= fetch_limit
             candidates.extend(nodes)
 
         if "chat" in kind_filter:
@@ -144,9 +154,10 @@ class ResearchTimelineService:
                 code_candidates=code_candidates,
                 display_code=display_code,
                 cursor_key=cursor_key,
-                limit=safe_limit,
+                limit=fetch_limit,
             )
             sources["chat"] = status
+            source_overscan["chat"] = len(nodes) >= fetch_limit
             candidates.extend(nodes)
 
         if "signal" in kind_filter:
@@ -154,9 +165,10 @@ class ResearchTimelineService:
                 code_candidates=code_candidates,
                 display_code=display_code,
                 cursor_key=cursor_key,
-                limit=safe_limit,
+                limit=fetch_limit,
             )
             sources["signal"] = status
+            source_overscan["signal"] = len(nodes) >= fetch_limit
             candidates.extend(nodes)
 
         if "hypothesis" in kind_filter:
@@ -164,19 +176,17 @@ class ResearchTimelineService:
                 code_candidates=code_candidates,
                 display_code=display_code,
                 cursor_key=cursor_key,
-                limit=safe_limit,
+                limit=fetch_limit,
             )
             sources["hypothesis"] = status
+            source_overscan["hypothesis"] = len(nodes) >= fetch_limit
             candidates.extend(nodes)
 
         ordered = sorted(candidates, key=self._node_sort_key, reverse=True)
         page_items = ordered[:safe_limit]
-        source_may_have_more = any(
-            sources.get(kind) == "ok"
-            and sum(1 for node in candidates if node.kind == kind) >= safe_limit
-            for kind in kind_filter
+        has_more = len(ordered) > safe_limit or any(
+            source_overscan.get(kind) for kind in kind_filter
         )
-        has_more = len(ordered) > safe_limit or source_may_have_more
         next_cursor = (
             self._encode_cursor(page_items[-1])
             if has_more and page_items
@@ -282,7 +292,9 @@ class ResearchTimelineService:
             ):
                 continue
             direction = self._first_text(row.trend_prediction, row.operation_advice)
-            confidence = self._confidence_from_sentiment(row.sentiment_score)
+            confidence = self._clamp_unit_interval(
+                self._confidence_from_sentiment(row.sentiment_score)
+            )
             summary = self._first_text(row.analysis_summary, row.operation_advice)
             title = self._first_text(row.operation_advice, row.trend_prediction) or "Analysis run"
             nodes.append(
@@ -464,13 +476,7 @@ class ResearchTimelineService:
                 continue
             action = self._first_text(row.action_label, row.action)
             title = f"Signal · {action}" if action else "Decision signal"
-            confidence = (
-                float(row.confidence)
-                if row.confidence is not None and row.confidence == row.confidence
-                else None
-            )
-            if confidence is not None and confidence > 1.0:
-                confidence = confidence / 100.0
+            confidence = self._clamp_unit_interval(self._optional_float(row.confidence))
             nodes.append(
                 ResearchTimelineNode(
                     id=node_id,
@@ -621,7 +627,9 @@ class ResearchTimelineService:
                         if raw.get("direction") is not None
                         else None
                     ),
-                    confidence=self._optional_float(raw.get("confidence")),
+                    confidence=self._clamp_unit_interval(
+                        self._optional_float(raw.get("confidence"))
+                    ),
                     status=(
                         str(raw.get("status")).strip()
                         if raw.get("status") is not None
@@ -700,6 +708,14 @@ class ResearchTimelineService:
         return None
 
     @staticmethod
+    def _clamp_unit_interval(value: Optional[float]) -> Optional[float]:
+        if value is None or value != value:
+            return None
+        if value < 0.0 or value > 1.0:
+            return None
+        return value
+
+    @staticmethod
     def _confidence_from_sentiment(value: Any) -> Optional[float]:
         if value is None:
             return None
@@ -723,7 +739,14 @@ class ResearchTimelineService:
             parsed = float(value)
         except (TypeError, ValueError):
             return None
-        return parsed if parsed == parsed else None
+        if parsed != parsed:
+            return None
+        # Accept unit interval or legacy 0-100 scores for cross-source compare fields.
+        if 0.0 <= parsed <= 1.0:
+            return parsed
+        if 0.0 <= parsed <= 100.0:
+            return parsed / 100.0
+        return None
 
     @staticmethod
     def _normalize_datetime(value: Optional[datetime]) -> datetime:

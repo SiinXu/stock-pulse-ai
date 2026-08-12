@@ -453,17 +453,7 @@ describe('StockDetailsPage', () => {
   it('mounts the research timeline on the product Stock Details page (reachability)', async () => {
     getQuoteMock.mockResolvedValue(makeQuote());
     getHistoryMock.mockResolvedValue(makeHistory());
-    render(
-      wrapWithQueryClient(
-        <UiLanguageProvider>
-          <MemoryRouter initialEntries={['/stocks/600519']}>
-            <Routes>
-              <Route path="/stocks/:stockCode" element={<StockDetailsPage />} />
-            </Routes>
-          </MemoryRouter>
-        </UiLanguageProvider>,
-      ),
-    );
+    renderPage();
     expect(await screen.findByTestId('stock-details-research-timeline')).toBeInTheDocument();
   });
 
