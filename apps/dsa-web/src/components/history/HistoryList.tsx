@@ -8,13 +8,19 @@ import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_VERSION_COMPARE_TEXT } from '../../locales/reportVersionCompare';
+import { useVirtualWindow } from '../../hooks/useVirtualWindow';
+import {
+  HISTORY_LIST_ESTIMATED_ROW_HEIGHT_PX,
+  HISTORY_LIST_OVERSCAN,
+  HISTORY_LIST_VIRTUALIZE_THRESHOLD,
+} from '../../performance/runtimeBudgets';
 
 interface HistoryListProps {
   items: HistoryItem[];
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
-  selectedId?: number;  // Currently selected history record ID.
+  selectedId?: number;
   selectedIds: Set<number>;
   isDeleting?: boolean;
   onItemClick: (recordId: number) => void;
@@ -29,7 +35,7 @@ interface HistoryListProps {
   className?: string;
 }
 
-/** History list with batch selection and incremental loading. */
+/** History list with batch selection, incremental loading, and windowed rows. */
 export const HistoryList: React.FC<HistoryListProps> = ({
   items,
   isLoading,
@@ -54,6 +60,17 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const selectAllId = useId();
+  const virtualize = items.length >= HISTORY_LIST_VIRTUALIZE_THRESHOLD;
+  const {
+    range,
+    onScroll: onVirtualScroll,
+    setViewportHeight,
+  } = useVirtualWindow({
+    itemCount: items.length,
+    estimatedItemHeight: HISTORY_LIST_ESTIMATED_ROW_HEIGHT_PX,
+    overscan: HISTORY_LIST_OVERSCAN,
+    enabled: virtualize,
+  });
 
   const selectedCount = items.filter((item) => selectedIds.has(item.id)).length;
   const selectedItems = [...selectedIds]
@@ -70,7 +87,6 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   const allVisibleSelected = items.length > 0 && selectedCount === items.length;
   const someVisibleSelected = selectedCount > 0 && !allVisibleSelected;
 
-  // Load the next page when the bottom sentinel enters the scroll viewport.
   const handleObserver = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       const target = entries[0];
@@ -105,6 +121,38 @@ export const HistoryList: React.FC<HistoryListProps> = ({
     }
   }, [someVisibleSelected]);
 
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !virtualize) {
+      return;
+    }
+
+    const updateHeight = () => {
+      setViewportHeight(container.clientHeight);
+    };
+    updateHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [setViewportHeight, virtualize, items.length, isLoading]);
+
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      if (virtualize) {
+        onVirtualScroll(event);
+      }
+    },
+    [onVirtualScroll, virtualize],
+  );
+
+  const visibleItems = virtualize
+    ? items.slice(range.startIndex, range.endIndex + 1)
+    : items;
+
   return (
     <div className={className}>
       <Surface as="aside" level="interactive" className="flex h-full flex-col overflow-hidden">
@@ -112,6 +160,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
         viewportRef={scrollContainerRef}
         viewportClassName="p-4"
         testId="home-history-list-scroll"
+        onScroll={handleScroll}
       >
         <div className="mb-4 space-y-3">
           <DashboardPanelHeader
@@ -188,8 +237,21 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             )}
           />
         ) : (
-          <div className="space-y-2">
-            {items.map((item) => (
+          <div
+            className="space-y-2"
+            data-testid="history-list-window"
+            data-virtualized={virtualize ? 'true' : 'false'}
+            data-mounted-count={visibleItems.length}
+            data-total-count={items.length}
+          >
+            {virtualize && range.offsetTop > 0 ? (
+              <div
+                aria-hidden="true"
+                data-testid="history-list-spacer-top"
+                style={{ height: range.offsetTop }}
+              />
+            ) : null}
+            {visibleItems.map((item) => (
               <HistoryListItem
                 key={item.id}
                 item={item}
@@ -200,9 +262,16 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 onClick={onItemClick}
               />
             ))}
+            {virtualize && range.offsetBottom > 0 ? (
+              <div
+                aria-hidden="true"
+                data-testid="history-list-spacer-bottom"
+                style={{ height: range.offsetBottom }}
+              />
+            ) : null}
 
             <div ref={loadMoreTriggerRef} className="h-4" />
-            
+
             {isLoadingMore && (
               <div className="flex justify-center py-4">
                 <Spinner size="md" label={t('history.loading')} />

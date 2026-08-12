@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "description": "Runtime performance budgets for apps/dsa-web lists, Settings forms, and SSE chat streams (Issue #883). Soft gate by default: exceedances warn in CI without failing the Web gate. Use --strict to fail closed once thresholds are proven stable.",
+  "modeDefault": "soft",
+  "referenceHardware": "Apple Silicon / modern x86 laptop, production build, Chrome; wall-clock targets are guidance for manual profiling, not CI hard gates.",
+  "measuredAt": "2026-08-12",
+  "baselineNote": "Structural metrics are CI-reproducible. Wall-clock targets come from issue #883 starting points and must not be met by shrinking measurement scope or removing features.",
+  "scenarios": [
+    {
+      "id": "history-list-virtualization",
+      "surface": "HistoryList (Home / Workbench history rail)",
+      "metric": "mounted_row_count",
+      "unit": "rows",
+      "inputItemCount": 150,
+      "budget": 40,
+      "rationale": "Issue #883: tables/lists > 100 rows virtualize or hard-paginate. History already pages (20/page) but accumulates; with 150 loaded items, mounted HistoryListItem nodes must stay within viewport + overscan rather than O(n). Budget = ceil(viewport/estimatedRow) + 2*overscan with headroom (viewport 480px, row ~72px, overscan 6 => ~19+12=31, cap 40).",
+      "measurement": "vitest contract: render HistoryList with 150 items in a fixed-height scroll viewport; count [data-history-list-item] nodes.",
+      "manualTarget": "Scroll remains interactive; no multi-second main-thread freezes when the rail holds 100+ history rows."
+    },
+    {
+      "id": "settings-field-isolation",
+      "surface": "SettingsField (active config panel)",
+      "metric": "sibling_rerender_count",
+      "unit": "renders",
+      "inputFieldCount": 40,
+      "budget": 0,
+      "rationale": "Issue #883: Settings field edit must not full-page remount or re-render every sibling field on each keystroke. With memo boundaries, changing one field value yields 0 sibling SettingsField commits.",
+      "measurement": "vitest contract: mount 40 fields; change one value; assert sibling React.Profiler commits stay at 0.",
+      "manualTarget": "Typing in a large category panel does not visibly lock the shell or nav."
+    },
+    {
+      "id": "sse-progress-batching",
+      "surface": "agentChatStore SSE progressSteps",
+      "metric": "store_commits_per_event_burst",
+      "unit": "commits",
+      "inputEventCount": 60,
+      "budget": 4,
+      "rationale": "Issue #883: chat stream must keep Stop responsive and avoid multi-second UI freezes. Pre-fix path committed progressSteps once per SSE event (O(n) React commits per burst). rAF batching bounds commits to ~1/frame; budget of 4 allows startStream setup + flush frames + terminal cleanup without requiring exact frame timing.",
+      "measurement": "vitest contract: feed 60 progress events in one readable stream chunk; count progressSteps-affecting setState commits until the stream settles; stopStream remains callable mid-stream.",
+      "manualTarget": "Stop button responds within ~100ms perceived latency under long tool/progress streams; UI is not frozen multi-second."
+    }
+  ],
+  "wallClockGuidance": {
+    "primaryRouteSwitchMs": 300,
+    "settingsFieldEditLocksShell": false,
+    "chatStopResponsiveMs": 100,
+    "note": "Wall-clock numbers are reference-laptop guidance for manual profiling (React Profiler + Performance panel). CI enforces only structural metrics above to avoid flake."
+  }
+}
