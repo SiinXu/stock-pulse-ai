@@ -11,6 +11,9 @@
 {% endif %}
 {% for e in enriched %}
 {{ decision_card(e, compact='brief') }}
+{# Layered reading: optional compact/full strata immediately under the card when
+   REPORT_MODE is standard/research. Notification ReportType.BRIEF forces brief
+   mode so push stays on the Decision Card budget (see generate_brief_report). #}
 {% set dash = e.result.dashboard or {} %}
 {%- set strata = e.report_strata or (dash.get('report_strata') if dash else none) %}
 {% if mode_limits.strata_style != 'none' and strata %}
