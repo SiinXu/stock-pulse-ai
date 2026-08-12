@@ -32,7 +32,6 @@ export function buildModelSelectorOptions(
     };
   });
 }
-
 export function buildAvailableModelRefSet(availableModels: AvailableModelEntry[]): Set<string> {
   return new Set(availableModels.map((entry) => entry.modelRef || entry.route));
 }
@@ -75,4 +74,27 @@ export function formatConfiguredModel(
   }
   const connectionLabel = entry.connectionName ?? entry.connection ?? entry.connectionId;
   return connectionLabel ? `${entry.display} · ${connectionLabel}` : entry.display;
+}
+
+/**
+ * Drop models owned by connections that failed a session health check.
+ * Connection identity matches AvailableModelEntry.connectionName/connection/connectionId.
+ */
+export function filterAssignableAvailableModels(
+  availableModels: AvailableModelEntry[],
+  failedConnectionNames: ReadonlySet<string> | readonly string[] = [],
+): AvailableModelEntry[] {
+  const failed = failedConnectionNames instanceof Set
+    ? failedConnectionNames
+    : new Set(failedConnectionNames);
+  if (failed.size === 0) {
+    return availableModels;
+  }
+  return availableModels.filter((entry) => {
+    const connectionLabel = entry.connectionName ?? entry.connection ?? entry.connectionId;
+    if (!connectionLabel) {
+      return true;
+    }
+    return !failed.has(connectionLabel);
+  });
 }

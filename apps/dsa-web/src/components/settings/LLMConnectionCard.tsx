@@ -93,7 +93,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
       case 'testing':
         return <Badge variant="warning" data-testid={`source-availability-${channel.name}`}>{text.testing}</Badge>;
       case 'incomplete':
-        return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.untested}</Badge>;
+        return (
+          <Tooltip content={issues.map((issue) => localizeModelAccessIssue(issue, language)).join(getUiListSeparator(language))}>
+            <span className="inline-flex" data-testid={`source-availability-${channel.name}`}>
+              <Badge variant="warning">{text.incompleteDraft}</Badge>
+            </span>
+          </Tooltip>
+        );
       case 'disabled':
         return <Badge variant="default" data-testid={`source-availability-${channel.name}`}>{text.untested}</Badge>;
       case 'untested':
@@ -120,7 +126,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             <span className="truncate text-sm font-semibold text-foreground">{displayLabel}</span>
             <span className="truncate text-xs text-muted-text">{channel.displayName}</span>
             {unsaved ? <Badge variant="warning">{text.unsaved}</Badge> : null}
-            {!isComplete ? (
+            {!isComplete && availability !== 'incomplete' ? (
               <Tooltip content={issues.map((issue) => localizeModelAccessIssue(issue, language)).join(getUiListSeparator(language))}>
                 <span className="inline-flex">
                   <Badge variant="warning">{text.incompleteDraft}</Badge>
@@ -131,6 +137,11 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               {channel.enabled ? text.enabled : text.disabled}
             </Badge>
             {availabilityBadge}
+            {testState?.status === 'success' ? (
+              <Badge variant="success">{text.testPassed}</Badge>
+            ) : testState?.status === 'error' ? (
+              <Badge variant="danger">{text.testFailed}</Badge>
+            ) : null}
           </div>
           {selectedModels.length > 0 ? (
             <button

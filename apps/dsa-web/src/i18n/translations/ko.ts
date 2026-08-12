@@ -1,8 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.ko,
+  ...DR.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -199,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "사람 승인",
   "approvals.APPROVALS_TEXT.unavailableRule": "승인 규칙을 사용할 수 없음",
   "components.settings.agentSetupPresets.COPY.active": "현재 일치",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "전략 경로, 리서치 예산, 거버넌스 및 진단 토글. 기본은 접힘; 펼치면 전체 편집 가능.",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "고급 필드",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "전략 경로, 라우팅, 메모리 및 오케스트레이터 세부 항목. 기본은 접힘. 펼치면 전체 집합을 편집할 수 있습니다.",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "모델 소스 구성",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "프리셋이 준비되면 동작 또는 거버넌스 계층을 열지 않고 Q&A로 이어집니다.",
+  "components.settings.agentSetupPresets.COPY.askCta": "질문하기",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "위험 및 HITL, 딥 리서치 예산, 도구 정책, 전문가 JSON. 기본은 접힘. 펼치면 모든 컨트롤에 계속 접근할 수 있습니다.",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "거버넌스 / 전문가",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "동작",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "Agent 사용 안 함 확인됨",
   "components.settings.agentSetupPresets.COPY.apply": "프리셋 적용",
   "components.settings.agentSetupPresets.COPY.cancel": "취소",
@@ -2985,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Markdown 소스 복사",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "일반 텍스트 복사",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "내보내기 실패",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "HTML 다운로드",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML 내보내기를 사용할 수 없음",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Markdown 다운로드",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "PDF 다운로드",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF 내보내기를 사용할 수 없음",

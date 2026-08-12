@@ -1033,6 +1033,95 @@ class HistoryService:
             )
             return None
 
+    def _history_delta_loader_for_record(self, record):
+        """Build a delta_loader that compares ``record`` to its prior sibling.
+
+        Uses ``history_comparison_service`` only — never recomputes field diffs.
+        """
+        from src.services.history_comparison_service import (
+            AnalysisDelta,
+            BASELINE_MISSING_HISTORY,
+            compare_analyses,
+            get_latest_delta,
+        )
+
+        target_id = getattr(record, "id", None)
+        target_code = str(getattr(record, "code", "") or "").strip()
+        target_report_type = str(getattr(record, "report_type", "") or "").strip()
+
+        def _empty_missing(code: str, report_type: str) -> AnalysisDelta:
+            return AnalysisDelta(
+                has_baseline=False,
+                baseline_status=BASELINE_MISSING_HISTORY,
+                stock_code=code,
+                report_type=report_type or None,
+                target_record_id=int(target_id) if isinstance(target_id, int) else None,
+                baseline_reason="only one analysis history row; no prior baseline",
+            )
+
+        def loader(code: str, report_type: str) -> AnalysisDelta:
+            normalized_code = str(code or "").strip() or target_code
+            normalized_type = str(report_type or "").strip() or target_report_type
+            if not normalized_code or not normalized_type:
+                return _empty_missing(normalized_code, normalized_type)
+            if not isinstance(target_id, int) or target_id <= 0:
+                return get_latest_delta(normalized_code, normalized_type)
+
+            records = self.db.get_analysis_history(
+                code=normalized_code,
+                report_type=normalized_type,
+                days=None,
+                limit=50,
+            )
+            ids = [
+                int(row.id)
+                for row in records
+                if isinstance(getattr(row, "id", None), int) and int(row.id) > 0
+            ]
+            if target_id not in ids:
+                return get_latest_delta(normalized_code, normalized_type)
+            idx = ids.index(target_id)
+            if idx + 1 >= len(ids):
+                return _empty_missing(normalized_code, normalized_type)
+            previous_id = ids[idx + 1]
+            return compare_analyses(normalized_code, previous_id, target_id)
+
+        return loader
+
+    def _prepend_history_delta_section(
+        self,
+        report_content: str,
+        result: AnalysisResult,
+        record,
+    ) -> str:
+        """Prepend the top-of-report delta section for history/Web markdown views."""
+        if not report_content or result is None:
+            return report_content
+        try:
+            from src.services.notification_delta_formatter import (
+                prepend_report_delta_section,
+            )
+
+            report_type = getattr(record, "report_type", None) or "simple"
+            return prepend_report_delta_section(
+                report_content,
+                [result],
+                report_type,
+                delta_loader=self._history_delta_loader_for_record(record),
+                error_code="history_report_delta_comparison_unavailable",
+                log_message="History report delta comparison unavailable",
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - delta presentation cannot block report reads
+            log_safe_exception(
+                logger,
+                "History report delta section skipped",
+                exc,
+                error_code="history_report_delta_section_skipped",
+                level=logging.WARNING,
+                context={"record_id": getattr(record, "id", None)},
+            )
+            return report_content
+
     def _generate_single_stock_markdown(
         self,
         result: AnalysisResult,
@@ -1386,7 +1475,8 @@ class HistoryService:
             f"*{labels['generated_at_label']}: {report_time}*",
         ])
 
-        return "\n".join(report_lines)
+        content = "\n".join(report_lines)
+        return self._prepend_history_delta_section(content, result, record)
 
     @staticmethod
     def _escape_md(text: Optional[str]) -> str:

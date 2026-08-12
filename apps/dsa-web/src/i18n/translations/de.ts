@@ -1,8 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.de,
+  ...DR.de,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktiviere den Agentenmodus und versuche es erneut.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agentenmodus ist nicht aktiviert",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Anfrage nicht erfüllt; bitte überprüfen Sie die Details und versuchen Sie es erneut.",
@@ -199,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "Menschliche Freigaben",
   "approvals.APPROVALS_TEXT.unavailableRule": "Freigaberegel ist nicht verfügbar",
   "components.settings.agentSetupPresets.COPY.active": "Aktuelle Übereinstimmung",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "Strategien, Forschungsbudgets, Governance und Diagnose-Schalter. Standardmäßig eingeklappt; ausklappen zum vollständigen Bearbeiten.",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "Erweiterte Felder",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "Strategiepfade, Routing, Speicher und Orchestrierungsdetails. Standardmäßig eingeklappt; erweitern, um den vollständigen Satz zu bearbeiten.",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "Modellquelle konfigurieren",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "Wenn ein Preset bereit ist, weiter zur Q&A, ohne Verhaltens- oder Governance-Ebenen zu öffnen.",
+  "components.settings.agentSetupPresets.COPY.askCta": "Frage stellen",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "Risiko und HITL, Deep-Research-Budgets, Tool-Richtlinien und Experten-JSON. Standardmäßig eingeklappt; erweitern, um alle Steuerungen erreichbar zu halten.",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "Governance / Experten",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "Verhalten",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "Agent-Nutzung als deaktiviert bestätigt",
   "components.settings.agentSetupPresets.COPY.apply": "Profil anwenden",
   "components.settings.agentSetupPresets.COPY.cancel": "Abbrechen",
@@ -2985,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Markdown-Quelle kopieren",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "Klartext kopieren",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "Export fehlgeschlagen",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "HTML herunterladen",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML-Export ist derzeit nicht verfügbar",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Markdown herunterladen",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "PDF herunterladen",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF-Export ist derzeit nicht verfügbar",

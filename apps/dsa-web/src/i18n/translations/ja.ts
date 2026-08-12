@@ -1,8 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.ja,
+  ...DR.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -199,8 +203,13 @@ export const translations: Record<UiTranslationKey, string> = {
   "approvals.APPROVALS_TEXT.title": "人による承認",
   "approvals.APPROVALS_TEXT.unavailableRule": "承認ルールは利用できません",
   "components.settings.agentSetupPresets.COPY.active": "現在の一致",
-  "components.settings.agentSetupPresets.COPY.advancedDescription": "戦略パス、研究予算、ガバナンス、診断トグル。既定では折りたたみ。展開して全項目を編集できます。",
-  "components.settings.agentSetupPresets.COPY.advancedTitle": "詳細フィールド",
+  "components.settings.agentSetupPresets.COPY.advancedDescription": "戦略パス、ルーティング、メモリ、オーケストレータの詳細。既定では折りたたみ。展開して全項目を編集できます。",
+  "components.settings.agentSetupPresets.COPY.configureModelCta": "モデルソースを設定",
+  "components.settings.agentSetupPresets.COPY.askCtaDescription": "プリセットの準備ができたら、動作やガバナンス層を開かずに Q&A へ進めます。",
+  "components.settings.agentSetupPresets.COPY.askCta": "質問する",
+  "components.settings.agentSetupPresets.COPY.governanceDescription": "リスクと HITL、Deep Research 予算、ツール方針、エキスパート JSON。既定では折りたたみ。展開すれば全コントロールにアクセスできます。",
+  "components.settings.agentSetupPresets.COPY.governanceTitle": "ガバナンス / エキスパート",
+  "components.settings.agentSetupPresets.COPY.advancedTitle": "動作",
   "components.settings.agentSetupPresets.COPY.agentAcknowledgedOff": "Agent を使用しないことを確認済み",
   "components.settings.agentSetupPresets.COPY.apply": "プリセットを適用",
   "components.settings.agentSetupPresets.COPY.cancel": "キャンセル",
@@ -2985,6 +2994,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.reportChrome.REPORT_CHROME_TEXT.copyMarkdownSource": "Markdownソースをコピー",
   "locales.reportChrome.REPORT_CHROME_TEXT.copyPlainText": "プレーンテキストをコピー",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadFailed": "エクスポートに失敗しました",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtml": "HTML をダウンロード",
+  "locales.reportChrome.REPORT_CHROME_TEXT.downloadHtmlUnavailable": "HTML エクスポートは利用できません",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadMarkdown": "Markdown をダウンロード",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdf": "PDF をダウンロード",
   "locales.reportChrome.REPORT_CHROME_TEXT.downloadPdfUnavailable": "PDF エクスポートは利用できません",
