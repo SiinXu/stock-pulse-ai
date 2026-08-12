@@ -42,7 +42,8 @@
 outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
 
 1. **准入**：仅 size-capped 的结构化已结算 outcome，且带 `signal_id` 来源
-   （`admit_decision_memory`）；不注入自由文本 `reason`。
+   （`admit_decision_memory`）；不注入自由文本 `reason`。本股胜率与列表同源
+   （同一 lookback 准入集合）。
 2. **隔离**：Prompt 块经 `isolate_untrusted_memory_body` 标注为不可信数据。
 3. **可关闭**：`DECISION_MEMORY_ENABLED` / 请求级 `use_memory`。
 

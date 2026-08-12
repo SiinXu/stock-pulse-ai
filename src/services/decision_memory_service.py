@@ -226,26 +226,53 @@ def admit_decision_memory(
             )
         )
 
-    source_ids = tuple(call.signal_id for call in admitted_calls)
-    truncated = bool(reflection.truncated) or (
-        len(reflection.recent_calls) > len(admitted_calls)
-    )
-
-    if not admitted_calls and reflection.same_stock_total < 1:
+    # No per-call provenance → do not inject. Aggregate-only blocks without
+    # source_signal_ids are rejected so every reflection stays auditable.
+    if not admitted_calls:
         return None
+
+    source_ids = tuple(call.signal_id for call in admitted_calls)
+    hits = sum(1 for call in admitted_calls if call.outcome == "hit")
+    misses = sum(1 for call in admitted_calls if call.outcome == "miss")
+    neutrals = sum(1 for call in admitted_calls if call.outcome == "neutral")
+    decided = hits + misses
+    min_samples = max(1, int(reflection.min_samples))
+    hit_rate: Optional[float]
+    if decided >= min_samples:
+        hit_rate = round(100.0 * hits / decided, 2)
+    else:
+        hit_rate = None
+
+    # truncated means lookback omitted older candidates — not admission drops.
+    truncated = bool(reflection.truncated)
+
+    # Keep builder window when the listed set is unchanged; otherwise fall back
+    # to admitted call created_at dates.
+    if len(admitted_calls) == len(reflection.recent_calls):
+        window_start, window_end = reflection.window_start, reflection.window_end
+    else:
+        dates = [
+            call.created_at.date()
+            for call in admitted_calls
+            if isinstance(call.created_at, datetime)
+        ]
+        if dates:
+            window_start, window_end = min(dates), max(dates)
+        else:
+            window_start, window_end = reflection.window_start, reflection.window_end
 
     return DecisionReflection(
         stock_code=str(reflection.stock_code or ""),
         market=str(reflection.market or ""),
         lookback=int(reflection.lookback),
-        min_samples=int(reflection.min_samples),
-        window_start=reflection.window_start,
-        window_end=reflection.window_end,
-        same_stock_total=int(reflection.same_stock_total),
-        same_stock_hits=int(reflection.same_stock_hits),
-        same_stock_misses=int(reflection.same_stock_misses),
-        same_stock_neutrals=int(reflection.same_stock_neutrals),
-        same_stock_hit_rate_pct=reflection.same_stock_hit_rate_pct,
+        min_samples=min_samples,
+        window_start=window_start,
+        window_end=window_end,
+        same_stock_total=len(admitted_calls),
+        same_stock_hits=hits,
+        same_stock_misses=misses,
+        same_stock_neutrals=neutrals,
+        same_stock_hit_rate_pct=hit_rate,
         recent_calls=tuple(admitted_calls),
         pattern_calibration=tuple(admitted_patterns),
         source_signal_ids=source_ids,
@@ -447,34 +474,43 @@ class DecisionMemoryService:
         if not decided_rows:
             return None
 
-        aggregate = self.outcome_service.aggregate_outcome_rows(decided_rows)
-        hits = int(aggregate.get("hit", 0))
-        misses = int(aggregate.get("miss", 0))
-        neutrals = int(aggregate.get("neutral", 0))
-        decided = hits + misses
-
-        # Guardrail 1: suppress the rate when decided samples are below threshold.
-        hit_rate = (
-            aggregate.get("hit_rate_pct")
-            if decided >= max(1, int(min_samples))
-            else None
-        )
-
-        window_start, window_end = self._window_bounds(decided_rows, signal_by_id)
+        # One representative outcome per signal, then lookback-cap. Same-stock
+        # rates are computed only over this listed set so stats never include
+        # non-listed scan history (review contract for #118).
         all_calls = self._recent_calls(decided_rows, signal_by_id, memorable_ids)
         truncated = len(all_calls) > lookback_n
         recent_calls = all_calls[:lookback_n]
+        if not recent_calls:
+            return None
+
+        hits = sum(1 for call in recent_calls if call.outcome == "hit")
+        misses = sum(1 for call in recent_calls if call.outcome == "miss")
+        neutrals = sum(1 for call in recent_calls if call.outcome == "neutral")
+        decided = hits + misses
+        min_samples_n = max(1, int(min_samples))
+        # Guardrail 1: suppress the rate when decided samples are below threshold.
+        hit_rate = (
+            round(100.0 * hits / decided, 2) if decided >= min_samples_n else None
+        )
+
+        # Window is drawn only from the listed lookback signals' outcome anchors
+        # (regime annotation), never from non-listed scan leftovers.
+        listed_ids = {call.signal_id for call in recent_calls}
+        listed_rows = [
+            row for row in decided_rows if int(row.signal_id) in listed_ids
+        ]
+        window_start, window_end = self._window_bounds(listed_rows, signal_by_id)
         actions_present = {call.action for call in recent_calls}
-        pattern = self._pattern_calibration(actions_present, min_samples)
+        pattern = self._pattern_calibration(actions_present, min_samples_n)
 
         raw = DecisionReflection(
             stock_code=normalized_code,
             market=str(normalized_market or getattr(signals[0], "market", "") or ""),
             lookback=lookback_n,
-            min_samples=max(1, int(min_samples)),
+            min_samples=min_samples_n,
             window_start=window_start,
             window_end=window_end,
-            same_stock_total=len(decided_rows),
+            same_stock_total=len(recent_calls),
             same_stock_hits=hits,
             same_stock_misses=misses,
             same_stock_neutrals=neutrals,
@@ -517,6 +553,7 @@ class DecisionMemoryService:
             today = date.today()
             return today, today
         return min(dates), max(dates)
+
 
     def _recent_calls(
         self,
@@ -712,7 +749,8 @@ def _reflection_lines(reflection: DecisionReflection, lang: str) -> List[str]:
             lines.append(f"- Source signal ids: {ids}")
         if reflection.truncated:
             lines.append(
-                f"- Note: recall truncated to lookback={reflection.lookback} admitted calls."
+                f"- Note: same-stock rate and list both use the lookback={reflection.lookback} "
+                f"admitted set; older evaluated history was omitted by lookback."
             )
         return lines
 
@@ -752,7 +790,8 @@ def _reflection_lines(reflection: DecisionReflection, lang: str) -> List[str]:
         lines.append(f"- 来源 signal_id：{ids}")
     if reflection.truncated:
         lines.append(
-            f"- 说明：已按 lookback={reflection.lookback} 截断准入后的复盘条目。"
+            f"- 说明：本股胜率与列表均只使用 lookback={reflection.lookback} "
+            f"准入集合；更早的已评估记录因 lookback 未纳入。"
         )
     return lines
 

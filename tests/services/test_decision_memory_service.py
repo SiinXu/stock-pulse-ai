@@ -426,6 +426,32 @@ def test_lookback_quota_caps_admitted_calls(isolated_db) -> None:
     assert len(reflection.recent_calls) == 3
     assert len(reflection.source_signal_ids) == 3
     assert reflection.truncated is True
+    # Rate/list share the lookback set: not inflated by non-listed scan history.
+    assert reflection.same_stock_total == 3
+    assert reflection.same_stock_hits == 3
+
+
+def test_same_stock_rate_uses_only_listed_lookback_calls(isolated_db) -> None:
+    """Older scan history must not inflate hit-rate beyond the lookback list."""
+    # 4 older hits + 1 recent miss; lookback=1 → list is miss-only, rate suppressed.
+    for _ in range(4):
+        _seed_signal_with_outcome(
+            isolated_db, outcome="hit", stock_return_pct=5.0, age_days=40
+        )
+    _seed_signal_with_outcome(
+        isolated_db, outcome="miss", stock_return_pct=-5.0, age_days=10
+    )
+
+    reflection = _build(isolated_db, lookback=1, min_samples=1)
+
+    assert reflection is not None
+    assert len(reflection.recent_calls) == 1
+    assert reflection.recent_calls[0].outcome == "miss"
+    assert reflection.same_stock_total == 1
+    assert reflection.same_stock_hits == 0
+    assert reflection.same_stock_misses == 1
+    assert reflection.same_stock_hit_rate_pct == 0.0
+    assert reflection.source_signal_ids == (reflection.recent_calls[0].signal_id,)
 
 
 def test_ignored_signals_excluded_from_memory(isolated_db) -> None:
@@ -478,6 +504,30 @@ def test_admission_rejects_incomplete_provenance() -> None:
     assert admitted.admitted is True
     assert admitted.source_signal_ids == (42,)
     assert len(admitted.recent_calls) == 1
+    # Stats recompute from admitted calls only (not the pre-admission totals).
+    assert admitted.same_stock_total == 1
+    assert admitted.same_stock_hits == 1
+
+
+def test_admission_rejects_aggregate_only_without_call_provenance() -> None:
+    """Empty recent_calls must not inject even when aggregate totals are non-zero."""
+    raw = DecisionReflection(
+        stock_code="600519",
+        market="cn",
+        lookback=5,
+        min_samples=1,
+        window_start=date(2024, 5, 1),
+        window_end=date(2024, 5, 1),
+        same_stock_total=3,
+        same_stock_hits=2,
+        same_stock_misses=1,
+        same_stock_neutrals=0,
+        same_stock_hit_rate_pct=66.67,
+        recent_calls=tuple(),
+        admitted=False,
+    )
+    assert admit_decision_memory(raw, max_calls=5) is None
+    assert format_decision_memory_prompt_section(raw) == ""
 
 
 def test_prompt_never_includes_freeform_signal_reason(isolated_db) -> None:

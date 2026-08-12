@@ -78,6 +78,13 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - `GET /api/v1/decision-signals/{signal_id}`：查询单条。
 - `PATCH /api/v1/decision-signals/{signal_id}/status`：更新状态和可选 metadata。object/null 替换只替换调用方 metadata；已持久化的 `report_language` 作为 canonical presentation provenance 保留，没有正式 provenance 时也不会从替换 object 提升该键，避免单纯状态更新改变同一信号的本地化标签。
 - `GET/PATCH /api/v1/decision-signals/{signal_id}/memory-flag`：读取或局部更新独立的 `memorable` / `ignored` 标记；请求省略的字段保持原值。`ignored` 会排除历史决策记忆检索，`memorable` 会提高优先级，两者同时为 `true` 时以 `ignored` 为准。
+- `GET /api/v1/decision-signals/latest/{stock_code}`：查询股票最新 active 信号。
+- `POST /api/v1/decision-signals/outcomes/run`：显式触发后验评估。
+- `GET /api/v1/decision-signals/outcomes`、`GET /api/v1/decision-signals/outcomes/stats`、`GET /api/v1/decision-signals/{signal_id}/outcomes`：查询后验结果与统计。全局 outcome 列表实际支持 `signal_id`、`horizon`、`engine_version`、`eval_status`、`outcome`、`page` 和 `page_size`。
+- `GET/PUT /api/v1/decision-signals/{signal_id}/feedback`：查询或写入 useful / not useful 反馈。
+- `POST /api/v1/decision-signals/reassess`：基于来源历史报告快照重新计算不同决策风格下的信号；`persist=false` 只预览，`persist=true` 由服务端重算并保存通过 guardrail 的结果。
+
+这些接口继承现有 `/api/v1/*` 管理员鉴权；`ADMIN_AUTH_ENABLED=true` 时需要有效管理员会话 Cookie。
 
 ## 历史决策记忆注入（Decision Memory / #118）
 
@@ -91,9 +98,9 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 **准入（对齐 #1119 情节记忆 size-cap，不得绕过）**
 
 - 仅 `eval_status=completed` 且 `outcome∈{hit,miss,neutral}` 的权威后验可进入注入。
-- 每条复盘行必须带 `signal_id` 来源；`source_signal_ids` 可追溯。
+- 每条复盘行必须带 `signal_id` 来源；`source_signal_ids` 可追溯。无 per-call provenance 时**不注入**。
 - **不**注入信号 `reason` 等自由文本，避免用户笔记/对抗文本作为事实进入 Prompt。
-- `DECISION_MEMORY_LOOKBACK` 限制准入条数；扫描窗口可略大于 lookback，以免「最近未结算信号」饿死已结算记忆。
+- 扫描窗口可略大于 lookback 以发现已结算信号；**本股胜率与列表同源**，都只使用 lookback 准入集合。
 - `ignored` 标记的信号整条排除；`memorable` 优先排序。
 
 **不可信隔离与关闭**
@@ -101,14 +108,6 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - Prompt 块经 `isolate_untrusted_memory_body` 包裹（`BEGIN_UNTRUSTED_MEMORY_DATA` / data-only 指令），与分层记忆隔离契约一致（#1017）。
 - 复盘仅校准置信度与风险提示，**不得**翻转方向（文案与数据结构均无方向建议字段）。
 - 全局 `DECISION_MEMORY_ENABLED`（默认 `true`）或请求 `use_memory=false` 可关闭。
-
-- `GET /api/v1/decision-signals/latest/{stock_code}`：查询股票最新 active 信号。
-- `POST /api/v1/decision-signals/outcomes/run`：显式触发后验评估。
-- `GET /api/v1/decision-signals/outcomes`、`GET /api/v1/decision-signals/outcomes/stats`、`GET /api/v1/decision-signals/{signal_id}/outcomes`：查询后验结果与统计。全局 outcome 列表实际支持 `signal_id`、`horizon`、`engine_version`、`eval_status`、`outcome`、`page` 和 `page_size`。
-- `GET/PUT /api/v1/decision-signals/{signal_id}/feedback`：查询或写入 useful / not useful 反馈。
-- `POST /api/v1/decision-signals/reassess`：基于来源历史报告快照重新计算不同决策风格下的信号；`persist=false` 只预览，`persist=true` 由服务端重算并保存通过 guardrail 的结果。
-
-这些接口继承现有 `/api/v1/*` 管理员鉴权；`ADMIN_AUTH_ENABLED=true` 时需要有效管理员会话 Cookie。
 
 ## 决策风格历史表现（profile calibration）
 
