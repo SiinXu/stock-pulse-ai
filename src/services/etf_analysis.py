@@ -74,7 +74,7 @@ def is_a_share_etf_code(stock_code: Optional[str]) -> bool:
         from data_provider.symbol_normalization import _is_etf_code
 
         return bool(_is_etf_code(raw))
-    except Exception:
+    except (ImportError, TypeError, ValueError, AttributeError, RuntimeError):
         # Fail-open local mirror of the shared prefix rule when provider package is unavailable.
         code = raw.split(".")[0]
         if code.upper().endswith(("SH", "SZ", "SS")):
@@ -88,7 +88,7 @@ def is_market_index_code(stock_code: Optional[str]) -> bool:
         from data_provider.us_index_mapping import is_us_index_code
 
         return bool(is_us_index_code(stock_code or ""))
-    except Exception:
+    except (ImportError, TypeError, ValueError, AttributeError, RuntimeError):
         return False
 
 
@@ -109,7 +109,7 @@ def is_etf_instrument(
         from src.search_service import SearchService
 
         return bool(SearchService.is_index_or_etf(stock_code or "", stock_name or ""))
-    except Exception:
+    except (ImportError, TypeError, ValueError, AttributeError, RuntimeError):
         return False
 
 
@@ -138,7 +138,7 @@ def _normalize_code(stock_code: Optional[str]) -> str:
         from data_provider.symbol_normalization import normalize_stock_code
 
         return normalize_stock_code(raw)
-    except Exception:
+    except (ImportError, TypeError, ValueError, AttributeError, RuntimeError):
         return raw.split(".")[0].upper() if "." in raw else raw
 
 

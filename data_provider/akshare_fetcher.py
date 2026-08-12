@@ -1532,7 +1532,7 @@ class AkshareFetcher(BaseFetcher):
                        f"换手率={quote.turnover_rate}%")
             return quote
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics and circuit state preserve ETF quote failover.
             log_safe_exception(
                 logger,
                 "Akshare ETF realtime quote failed",

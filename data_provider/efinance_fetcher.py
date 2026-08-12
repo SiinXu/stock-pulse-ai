@@ -905,7 +905,7 @@ class EfinanceFetcher(BaseFetcher):
                 f"价格={quote.price}, 涨跌={quote.change_pct}%, 换手率={quote.turnover_rate}%"
             )
             return quote
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics and circuit state preserve ETF quote failover.
             log_safe_exception(
                 logger,
                 "Efinance ETF realtime quote failed",
