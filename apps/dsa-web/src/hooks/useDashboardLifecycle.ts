@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TaskInfo } from '../types/analysis';
+import { useDashboardDataRefreshQuery } from './useDashboardDataRefreshQuery';
 import { useTaskStream } from './useTaskStream';
 
 type UseDashboardLifecycleOptions = {
@@ -57,54 +58,20 @@ export function useDashboardLifecycle({
   const handledTerminalStatusesRef = useRef<Map<string, TaskInfo['status']>>(new Map());
   const [isInitialStockBarLoadSettled, setIsInitialStockBarLoadSettled] = useState(false);
 
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
+  const onInitialStockBarSettled = useCallback(() => {
+    setIsInitialStockBarLoadSettled(true);
+  }, []);
 
-    void loadInitialHistory();
-    let active = true;
-    void loadStockBar().finally(() => {
-      if (active) setIsInitialStockBarLoadSettled(true);
-    });
-    void refreshActiveTasks();
-    return () => {
-      active = false;
-    };
-  }, [enabled, loadInitialHistory, loadStockBar, refreshActiveTasks]);
-
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      void refreshHistory(true);
-      void refreshStockBar();
-      void refreshActiveTasks();
-      onDashboardDataRefresh?.();
-    }, 30_000);
-
-    return () => window.clearInterval(intervalId);
-  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshStockBar, refreshActiveTasks]);
-
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshHistory(true);
-        void refreshStockBar();
-        void refreshActiveTasks();
-        onDashboardDataRefresh?.();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshStockBar, refreshActiveTasks]);
+  useDashboardDataRefreshQuery({
+    enabled,
+    loadInitialHistory,
+    refreshHistory,
+    loadStockBar,
+    refreshStockBar,
+    refreshActiveTasks,
+    onDashboardDataRefresh,
+    onInitialStockBarSettled,
+  });
 
   useEffect(() => {
     const removalTimeouts = removalTimeoutsRef.current;
