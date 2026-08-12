@@ -175,7 +175,7 @@ def test_run_multi_model_attaches_dashboard_and_trace_identities():
                 return _result(success=False, model=model)
             signal = "buy" if model == "model-a" else "sell"
             score = 80 if signal == "buy" else 20
-            return _result(signal=signal, score=score, model=model)
+            return _result(signal=signal, score=score, model=model, confidence="高")
 
     analyzer = FakeAnalyzer()
     config = SimpleNamespace(
@@ -199,12 +199,43 @@ def test_run_multi_model_attaches_dashboard_and_trace_identities():
     assert result.dashboard["multi_model_comparison"]["enabled"] is True
     assert result.dashboard["multi_model_comparison"]["disagreement_handling"]["high_disagreement"] is True
     assert result.dashboard.get("multi_model_high_disagreement") is True
+    # Product honesty: confidence is capped; direction is not averaged.
+    assert result.confidence_level == "低"
+    assert result.decision_type == "buy"
+    assert "多模型高分歧" in (result.risk_warning or "")
     identities = comparison["trace"]["model_identities"]
     assert len(identities) == 2
     assert {item["model_id"] for item in identities} == {"model-a", "model-b"}
     # Shared snapshot: both calls saw the same code.
     assert all(code == "600519" for _, _, code in analyzer.calls)
     assert all(disable is True for _, disable, _ in analyzer.calls)
+
+
+def test_partial_failure_attaches_degradation_dashboard_flag():
+    class FakeAnalyzer:
+        def analyze(self, context, **kwargs):
+            model = kwargs.get("model_override")
+            if model == "model-b":
+                raise RuntimeError("down")
+            return _result(signal="buy", score=70, model=model)
+
+    result, comparison = run_multi_model_consensus_analysis(
+        analyzer=FakeAnalyzer(),
+        config=SimpleNamespace(
+            multi_model_consensus_enabled=True,
+            multi_model_consensus_models=["model-a", "model-b"],
+            multi_model_consensus_max_models=3,
+            multi_model_consensus_preset="",
+            multi_model_consensus_max_cost_usd=None,
+            litellm_model="model-a",
+            litellm_fallback_models=[],
+        ),
+        context={"code": "600519"},
+        parallel=False,
+    )
+    assert result is not None
+    assert comparison["status"] == "degraded_single"
+    assert result.dashboard["multi_model_degradation"]["annotation"] == "single_model_fallback"
 
 
 def test_run_multi_model_partial_failure_keeps_single_success():

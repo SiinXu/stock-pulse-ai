@@ -912,7 +912,8 @@ class _StockAnalysisStageMixin:
                         analysis_context_pack_summary=analysis_context_pack_summary,
                         progress_callback=self._emit_progress,
                         stream_progress_callback=_on_llm_stream,
-                        parallel=True,
+                        # Analyzer instances are not thread-safe; keep sequential.
+                        parallel=False,
                         record_llm_run=record_llm_run,
                         record_llm_run_started=record_llm_run_started,
                     )

@@ -1302,6 +1302,58 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects agent orchestration depth and report committee sections.'],
     notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
   },
+  'settings.agent.MULTI_MODEL_CONSENSUS_ENABLED': {
+    title: 'Multi-Model Consensus Comparison',
+    summary: 'Optional same-task multi-model comparison with structured consensus and disagreement points.',
+    usage: 'Default off. Enable only when you accept higher LLM cost. Requires at least two resolvable models (explicit list, preset, or primary + fallbacks).',
+    valueNotes: [
+      'Off keeps the legacy single-model analysis path unchanged.',
+      'On runs the shared data snapshot across models and attaches dashboard.multi_model_comparison.',
+      'Disagreements are recorded; they are never majority-voted or averaged into a synthetic middle signal.',
+    ],
+    impact: [
+      'Increases analysis token cost and latency (typically 2–3× on the legacy path).',
+      'Adds multi-model sections to Markdown/WeChat/history products when comparison data exists.',
+    ],
+    notes: [
+      'Agent multi-agent disagreement handling remains a separate surface.',
+      'Model id/version are written into diagnostics with call_type=multi_model_consensus.',
+    ],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_MODELS': {
+    title: 'Multi-Model Consensus Model List',
+    summary: 'Comma-separated LiteLLM model ids used for multi-model comparison.',
+    usage: 'Example: deepseek/deepseek-chat,gemini/gemini-2.0-flash. Leave empty to use the preset or primary + fallback models.',
+    valueNotes: [
+      'Empty list defers to MULTI_MODEL_CONSENSUS_PRESET or LITELLM_MODEL + LITELLM_FALLBACK_MODELS.',
+      'Models are capped by MULTI_MODEL_CONSENSUS_MAX_MODELS.',
+    ],
+    impact: ['Selects which models participate when multi-model consensus is enabled.'],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_PRESET': {
+    title: 'Multi-Model Consensus Preset',
+    summary: 'Optional fast/quality preset when the explicit model list is empty.',
+    usage: 'Use fast for up to two models, quality for up to the configured max. Leave empty to use primary + fallbacks only.',
+    valueNotes: [
+      'fast: prefer fewer models for a cheaper check.',
+      'quality: use up to MULTI_MODEL_CONSENSUS_MAX_MODELS models.',
+      'Empty: primary LITELLM_MODEL plus fallbacks.',
+    ],
+    impact: ['Changes how many models are resolved when MULTI_MODEL_CONSENSUS_MODELS is empty.'],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_MAX_MODELS': {
+    title: 'Multi-Model Consensus Max Models',
+    summary: 'Hard cap on models per multi-model comparison run.',
+    usage: 'Allowed range 2–5. Default 3. Lower values reduce cost when many fallbacks are configured.',
+    impact: ['Limits multi-model fan-out and total LLM spend for one analysis.'],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_MAX_COST_USD': {
+    title: 'Multi-Model Consensus Max Cost USD',
+    summary: 'Optional soft cost budget annotation for multi-model comparison.',
+    usage: 'Leave empty for no extra cost ceiling beyond max models. When set, the budget is recorded on the product payload; disagreement is never averaged away under budget pressure.',
+    valueNotes: ['Soft annotation only; does not invent majority consensus.'],
+    impact: ['Surfaces budget metadata on dashboard.multi_model_comparison.budget.'],
+  },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
     summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',

@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -462,7 +463,7 @@ def run_multi_model_consensus_analysis(
     analysis_context_pack_summary: Optional[str] = None,
     progress_callback: Optional[Callable[[int, str], None]] = None,
     stream_progress_callback: Optional[Callable[[int], None]] = None,
-    parallel: bool = True,
+    parallel: bool = False,
     record_llm_run: Optional[Callable[..., None]] = None,
     record_llm_run_started: Optional[Callable[..., None]] = None,
 ) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
@@ -470,6 +471,10 @@ def run_multi_model_consensus_analysis(
 
     When fewer than two models are resolvable, returns (None, None) so the caller
     can fall back to the single-model path without product annotation.
+
+    Model runs are **sequential by default**. The shared analyzer instance is not
+    assumed thread-safe; ``parallel=True`` is accepted for callers that inject a
+    thread-safe facade, but the stock pipeline keeps sequential execution.
     """
     models = resolve_consensus_models(config)
     if len(models) < 2:
@@ -484,13 +489,13 @@ def run_multi_model_consensus_analysis(
         "models_requested": list(models),
         "max_cost_usd": max_cost if isinstance(max_cost, (int, float)) else None,
         "skipped_for_budget": [],
+        "execution": "parallel" if parallel else "sequential",
     }
-    # Soft budget: when a positive max cost is configured, still run at most
-    # max_models but record the budget constraint for product visibility.
-    # Hard abort of the whole analysis is intentionally not done here.
+    # Soft budget annotation only: hard abort is intentionally not done here so
+    # partial model failures still degrade to annotated single-model results.
 
     fingerprint = fingerprint_shared_snapshot(context, news_context)
-    # Freeze a shallow-safe copy of context so concurrent workers share one snapshot.
+    # Freeze a shallow copy so each model sees the same top-level snapshot keys.
     shared_context = dict(context)
 
     def _run_one(model_id: str) -> Tuple[str, Optional[Any], Optional[BaseException], int]:
@@ -568,9 +573,20 @@ def run_multi_model_consensus_analysis(
 
     outcomes: List[Tuple[str, Optional[Any], Optional[BaseException], int]] = []
     if parallel and len(models) > 1:
+        # Optional parallel path: serialize analyzer.analyze via a lock so a
+        # shared non-thread-safe analyzer cannot corrupt internal state.
+        analyze_lock = threading.Lock()
+        original_run_one = _run_one
+
+        def _run_one_locked(model_id: str) -> Tuple[str, Optional[Any], Optional[BaseException], int]:
+            with analyze_lock:
+                return original_run_one(model_id)
+
         max_workers = min(len(models), 3)
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(_run_one, model_id): model_id for model_id in models}
+            futures = {
+                pool.submit(_run_one_locked, model_id): model_id for model_id in models
+            }
             for future in as_completed(futures):
                 try:
                     outcomes.append(future.result())
@@ -647,13 +663,61 @@ def run_multi_model_consensus_analysis(
             dashboard = dict(dashboard)
             primary_result.dashboard = dashboard
         dashboard["multi_model_comparison"] = public_payload
-        # Annotate when high multi-model disagreement would otherwise look like
-        # a confident single-model call; never average directions into the product.
-        handling = public_payload.get("disagreement_handling") or {}
-        if handling.get("high_disagreement"):
-            dashboard["multi_model_high_disagreement"] = True
+        _apply_product_honesty_to_primary(primary_result, public_payload)
 
     return primary_result, comparison
+
+
+def _apply_product_honesty_to_primary(result: Any, public_payload: Mapping[str, Any]) -> None:
+    """Surface multi-model honesty on the primary product without averaging signals.
+
+    - High disagreement: cap displayed confidence and prepend a risk note; do **not**
+      rewrite ``decision_type`` / ``operation_advice`` into a synthetic blend.
+    - Degradation: keep explicit annotation on the dashboard payload (already set).
+    """
+    handling = public_payload.get("disagreement_handling")
+    if not isinstance(handling, Mapping):
+        handling = {}
+    dashboard = getattr(result, "dashboard", None)
+    if not isinstance(dashboard, dict):
+        dashboard = {}
+        result.dashboard = dashboard
+
+    if handling.get("high_disagreement"):
+        dashboard["multi_model_high_disagreement"] = True
+        report_language = str(getattr(result, "report_language", "zh") or "zh").lower()
+        result.confidence_level = _low_confidence_label(report_language)
+        note = _high_disagreement_risk_note(report_language)
+        existing = str(getattr(result, "risk_warning", None) or "").strip()
+        if note and note not in existing:
+            result.risk_warning = f"{note} {existing}".strip() if existing else note
+
+    degradation = public_payload.get("degradation")
+    if isinstance(degradation, Mapping) and degradation.get("annotation"):
+        dashboard["multi_model_degradation"] = {
+            "annotation": degradation.get("annotation"),
+            "reason": degradation.get("reason"),
+            "failed_models": list(degradation.get("failed_models") or [])[:5],
+        }
+
+
+def _low_confidence_label(report_language: str) -> str:
+    if report_language.startswith("zh"):
+        return "低"
+    if report_language.startswith("ko"):
+        return "낮음"
+    return "Low"
+
+
+def _high_disagreement_risk_note(report_language: str) -> str:
+    if report_language.startswith("zh"):
+        return "【多模型高分歧】模型方向冲突已结构化记录，未做多数表决或均值抹平；置信度已下调。"
+    if report_language.startswith("ko"):
+        return "[다중 모델 고이견] 모델 방향 충돌이 구조화 기록되었으며 다수결/평균 없이 신뢰도가 하향 조정되었습니다."
+    return (
+        "[Multi-model high disagreement] Opposing model directions are recorded "
+        "structurally without majority vote or averaging; confidence was reduced."
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -2110,6 +2110,58 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
     notes: ['需要 Agent multi 能力。'],
   },
+  'settings.agent.MULTI_MODEL_CONSENSUS_ENABLED': {
+    title: '多模型共识对比',
+    summary: '可选：同一任务多模型对比，输出结构化共识度与分歧点。',
+    usage: '默认关闭。仅在可接受更高 LLM 成本时开启。需要至少两个可解析模型（显式列表、预设，或主模型 + 回退）。',
+    valueNotes: [
+      '关闭时传统单模型分析路径保持不变。',
+      '开启后在同一数据快照上跑多模型，并写入 dashboard.multi_model_comparison。',
+      '分歧只做结构化记录，不做多数表决，也不对方向取平均。',
+    ],
+    impact: [
+      '会提高分析 token 成本与耗时（传统路径通常约 2–3 倍）。',
+      '有对比数据时，Markdown/微信/历史报告会增加多模型章节。',
+    ],
+    notes: [
+      '与 Agent 多 Agent 分歧处理是不同能力面。',
+      '模型 id/版本会写入诊断，call_type=multi_model_consensus。',
+    ],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_MODELS': {
+    title: '多模型共识模型列表',
+    summary: '多模型对比使用的 LiteLLM 模型 id（逗号分隔）。',
+    usage: '示例：deepseek/deepseek-chat,gemini/gemini-2.0-flash。留空则使用预设或主模型 + 回退模型。',
+    valueNotes: [
+      '留空时回退到 MULTI_MODEL_CONSENSUS_PRESET 或 LITELLM_MODEL + LITELLM_FALLBACK_MODELS。',
+      '数量受 MULTI_MODEL_CONSENSUS_MAX_MODELS 上限约束。',
+    ],
+    impact: ['决定开启多模型共识时参与对比的模型集合。'],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_PRESET': {
+    title: '多模型共识预设',
+    summary: '显式模型列表为空时可选的 fast/quality 预设。',
+    usage: 'fast 最多 2 个模型；quality 用到配置的最大模型数。留空则仅用主模型 + 回退。',
+    valueNotes: [
+      'fast：更少模型，成本更低。',
+      'quality：最多 MULTI_MODEL_CONSENSUS_MAX_MODELS 个模型。',
+      '空：LITELLM_MODEL 主模型加回退列表。',
+    ],
+    impact: ['在 MULTI_MODEL_CONSENSUS_MODELS 为空时影响解析出的模型数量。'],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_MAX_MODELS': {
+    title: '多模型共识最大模型数',
+    summary: '单次多模型对比的硬上限。',
+    usage: '允许 2–5，默认 3。回退模型较多时可调低以控制成本。',
+    impact: ['限制单次分析的多模型扇出与总 LLM 花费。'],
+  },
+  'settings.agent.MULTI_MODEL_CONSENSUS_MAX_COST_USD': {
+    title: '多模型共识成本上限（USD）',
+    summary: '多模型对比的可选软成本预算标注。',
+    usage: '留空表示除最大模型数外无额外成本上限。设置后预算会写入产物；预算压力下也不会用平均化抹平分歧。',
+    valueNotes: ['仅作软标注，不会发明多数共识。'],
+    impact: ['在 dashboard.multi_model_comparison.budget 上展示预算元数据。'],
+  },
 
 
   'settings.mcp.MCP_SERVER_ENABLED': {

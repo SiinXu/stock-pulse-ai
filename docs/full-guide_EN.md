@@ -1316,7 +1316,7 @@ HK daily history skips efinance, pytdx, baostock, and other built-in providers t
 
 ### Multi-Model Consensus Comparison (optional)
 
-Default **off**. When `MULTI_MODEL_CONSENSUS_ENABLED=true`, the legacy stock analysis path can run the **same shared data snapshot** across 2–3 models (explicit list, `fast`/`quality` preset, or primary + fallbacks), then attach a structured product payload:
+Default **off**. When `MULTI_MODEL_CONSENSUS_ENABLED=true`, the legacy stock analysis path can run the **same shared data snapshot** across 2–3 models sequentially (explicit list, `fast`/`quality` preset, or primary + fallbacks; sequential by default because the shared analyzer is not thread-safe), then attach a structured product payload:
 
 - Agreement table: action / score band / key risks per model
 - Consensus level + agreement score (not a blended trading signal)
