@@ -6,6 +6,24 @@ This guide explains how StockPulse chooses market-data providers, changes order 
 
 For model routing and LLM failures, see [LLM routing and degradation order](LLM_CONFIG_GUIDE_EN.md#routing-and-degradation-order). Configuration changes use the [transactional hot-reload and one-step rollback contract](LLM_CONFIG_GUIDE_EN.md#transactional-hot-reload-and-one-step-rollback).
 
+## Data Sources Hub runtime projection
+
+Settings → Integrations → Data sources shows a **read-only runtime projection** above the saved provider configuration directory:
+
+| Surface | Source of truth |
+| --- | --- |
+| Market primary / fallback (CN/HK/US daily) | Live `DataFetcherManager` ordered chain after market, capability, availability, and circuit filters |
+| Provider health / sample counts | Process-local daily provider health windows (not a static catalog) |
+| Enhancer configured (e.g. Tushare) | Credential presence on the registered fetcher; never secrets |
+| Cache quality | Daily-cache counters (`hits` / `misses` / `stale_hits`) and fetch mode |
+| As-of | Snapshot time of the status request |
+
+API: `GET /api/v1/system/config/data-providers/runtime-status`. Probe failures and a missing manager are returned with `partial=true` and explicit `source_state` / `error_code`; availability is never defaulted to healthy on failure. This endpoint does not open third-party connections or mutate config/circuits.
+
+The configuration directory below the projection still edits saved tokens and priorities only; refresh the projection after save to re-read health.
+
+Not in this projection (tracked separately under issue #867): authenticated Tushare connect-wizard smoke tests, Today/analysis/screening empty-state CTAs driven by `source_errors`, and moving web-search credentials fully under Integrations → Search.
+
 
 ## Module ownership
 

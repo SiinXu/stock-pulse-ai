@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale budgets merge PR #1166 Linux rebaseline with HTML report-export chrome (Refs #163 / PR #1159); caps keep stack headroom for both key sets.",
+  "baselineNote": "Merged concurrent rebaselines for Agent three-layer disclosure (#868) and Data Sources Hub runtime projection (#867); locale conflicts take the larger measured value + 200 B headroom. Untouched budgets remain unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 233722,
-      "measuredGzipBytes": 233522,
-      "note": "GitHub Actions Linux measurement after the integrated Settings changes in PR #1050; measured 233522 B + 200 B headroom."
+      "maxGzipBytes": 234690,
+      "measuredGzipBytes": 234490,
+      "note": "Remeasured after Data Sources Hub runtime projection merge with main (Refs #867); measured 234490 B + 200 B headroom."
     },
     {
       "id": "js-entry",
