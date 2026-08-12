@@ -1,5 +1,5 @@
 {
-  "baselineNote": "Locale and HomeWatchlistGroupsSection budgets remeasured on GitHub Actions Linux after Home customizable dashboard layout (Refs #189 / PR #1158); failed assets use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
+  "baselineNote": "Budgets remeasured on GitHub Actions Linux after Home customizable dashboard layout (Refs #189 / PR #1158); raised locale chunks, HomeWatchlistGroupsSection, and vendor-icons using measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
   "gzipLevel": 9,
   "version": 1,
   "measuredAt": "2026-08-12",
@@ -110,8 +110,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10376,
-      "measuredGzipBytes": 9432
+      "maxGzipBytes": 10599,
+      "measuredGzipBytes": 10399,
+      "note": "GitHub Actions Linux measurement after Home dashboard layout icons (PR #1158 / Refs #189); measured 10399 B + 200 B headroom."
     },
     {
       "id": "vendor-misc",
