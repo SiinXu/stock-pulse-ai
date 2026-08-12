@@ -115,32 +115,22 @@ def record_provider_run_started(**kwargs):
 STANDARD_COLUMNS = ['date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
 
 
-def unwrap_exception(exc: Exception) -> Exception:
-    """
-    Follow chained exceptions and return the deepest non-cyclic cause.
-    """
-    current = exc
-    visited = set()
-
-    while current is not None and id(current) not in visited:
-        visited.add(id(current))
-        next_exc = current.__cause__ or current.__context__
-        if next_exc is None:
-            break
-        current = next_exc
-
-    return current
-
-
-def summarize_exception(exc: Exception) -> Tuple[str, str]:
-    """
-    Build a stable summary for logs while preserving the application-layer message.
-    """
-    root = unwrap_exception(exc)
-    error_type = type(root).__name__
-    message = str(exc).strip() or str(root).strip() or error_type
-    return error_type, sanitize_diagnostic_text(" ".join(message.split()))
-
+# Typed failures + exception summary helpers live in errors.py.
+# Chip metric helpers live in chip_helpers.py.
+# Re-export here so data_provider.base remains the compatibility facade
+# (ADR-006): public names, patch targets, and existing imports stay stable.
+from .errors import (  # noqa: E402
+    CircuitOpenError,
+    DataFetchError,
+    DataSourceUnavailableError,
+    RateLimitError,
+    summarize_exception,
+    unwrap_exception,
+)
+from .chip_helpers import (  # noqa: E402
+    _coerce_chip_metric,
+    _is_meaningful_chip_distribution,
+)
 
 # Symbol / market normalization helpers live in symbol_normalization.py.
 # Re-export here so data_provider.base remains the compatibility facade
@@ -160,61 +150,6 @@ is_bse_code = _symbol_normalization.is_bse_code
 is_kc_cy_stock = _symbol_normalization.is_kc_cy_stock
 is_st_stock = _symbol_normalization.is_st_stock
 normalize_stock_code = _symbol_normalization.normalize_stock_code
-
-
-def _coerce_chip_metric(value: Any) -> Optional[float]:
-    try:
-        if value is None:
-            return None
-        numeric = float(value)
-        if np.isnan(numeric):
-            return None
-        return numeric
-    except (TypeError, ValueError):
-        return None
-
-
-def _is_meaningful_chip_distribution(chip: Any) -> bool:
-    """Validate that a provider returned usable core chip metrics."""
-    if chip is None:
-        return False
-    avg_cost = _coerce_chip_metric(getattr(chip, "avg_cost", None))
-    concentration_90 = _coerce_chip_metric(getattr(chip, "concentration_90", None))
-    concentration_70 = _coerce_chip_metric(getattr(chip, "concentration_70", None))
-    return (
-        avg_cost is not None
-        and avg_cost > 0
-        and (
-            (concentration_90 is not None and concentration_90 >= 0)
-            or (concentration_70 is not None and concentration_70 >= 0)
-        )
-    )
-
-
-
-
-
-class DataFetchError(Exception):
-    """数据获取异常基类"""
-
-    def __init__(self, message: str, *, provider_failure_count: int = 0) -> None:
-        self.provider_failure_count = provider_failure_count
-        super().__init__(message)
-
-
-class RateLimitError(DataFetchError):
-    """API 速率限制异常"""
-    pass
-
-
-class DataSourceUnavailableError(DataFetchError):
-    """数据源不可用异常"""
-    pass
-
-
-class CircuitOpenError(DataSourceUnavailableError):
-    """A provider call was skipped because its circuit is in cooldown."""
-    pass
 
 
 class DataProvider(ABC):
@@ -703,124 +638,17 @@ class DataFetcherManager:
     log_daily_provider_health_report = None
     reset_daily_source_health = None
 
-    def _get_daily_data_cache(self) -> DailyDataCache:
-        self._ensure_concurrency_guards()
-        with self._fetchers_lock:
-            if self._daily_data_cache is None:
-                self._daily_data_cache = DailyDataCache.from_env()
-            return self._daily_data_cache
-
-    def is_market_data_local_only(self) -> bool:
-        """Return whether manager-owned market-data helpers must avoid providers."""
-
-        return self._get_daily_data_cache().fetch_mode is MarketDataFetchMode.LOCAL_ONLY
-
-    def _daily_adjustment_identity(self) -> str:
-        """Return the active adjustment policy that partitions persistent bars."""
-
-        for fetcher in self._get_fetchers_snapshot():
-            if fetcher.name != "TickFlowFetcher":
-                continue
-            adjustment = str(getattr(fetcher, "kline_adjust", "none") or "none")
-            return f"tickflow:{adjustment.strip().lower()}"
-        return "provider_default"
-
-    @staticmethod
-    def _daily_cache_key(
-        stock_code: str,
-        start_date: Optional[str],
-        end_date: Optional[str],
-        days: int,
-        *,
-        adjustment: str = "provider_default",
-    ) -> DailyCacheKey:
-        effective_end = end_date or datetime.now().strftime("%Y-%m-%d")
-        effective_start = start_date
-        if effective_start is None:
-            start_dt = datetime.strptime(effective_end, "%Y-%m-%d") - timedelta(days=days * 2)
-            effective_start = start_dt.strftime("%Y-%m-%d")
-        return DailyCacheKey(
-            symbol=canonical_stock_code(stock_code),
-            start_date=effective_start,
-            end_date=effective_end,
-            days=days,
-            adjustment=adjustment,
-            allow_end_rollover=end_date is None,
-        )
-
-    @staticmethod
-    def _record_daily_cache_result(
-        cache_result: MarketDataResolveResult,
-        request_start: float,
-    ) -> None:
-        record_provider_run(
-            data_type="daily_data",
-            provider=cache_result.source_name,
-            operation="get_daily_data",
-            success=True,
-            latency_ms=int((time.time() - request_start) * 1000),
-            cache_hit=True,
-            stale_seconds=int(cache_result.age_seconds),
-            record_count=len(cache_result.frame),
-        )
-
-    @staticmethod
-    def _validate_daily_candidate(
-        frame: pd.DataFrame,
-        *,
-        stock_code: str,
-        source_name: str,
-    ) -> pd.DataFrame:
-        """Apply the active quality policy to provider and cached candidates."""
-        from data_provider.data_validation import (
-            DataValidationRejected,
-            infer_instrument_type,
-            validate_and_annotate,
-        )
-
-        try:
-            validate_and_annotate(
-                frame,
-                data_type="daily_data",
-                market=_market_tag(normalize_stock_code(stock_code)),
-                stock_code=stock_code,
-                provider=source_name,
-                instrument_type=(
-                    frame.attrs.get("instrument_type")
-                    or infer_instrument_type(stock_code)
-                ),
-            )
-        except DataValidationRejected as exc:
-            raise CachedCandidateRejected(
-                "cached daily-data candidate rejected by active quality policy"
-            ) from exc
-        return frame
-
-    def get_daily_cache_stats(self) -> Dict[str, int]:
-        """Return manager-local daily cache hit, miss, and lifecycle counters."""
-        return self._get_daily_data_cache().stats_snapshot()
-
-    def invalidate_daily_cache(self, stock_code: Optional[str] = None) -> int:
-        """Invalidate daily cache entries for one symbol, or every symbol when omitted."""
-        normalized = (
-            None
-            if stock_code is None
-            else canonical_stock_code(normalize_stock_code(stock_code))
-        )
-        return self._get_daily_data_cache().invalidate(normalized)
-
-    def _get_cached_stock_name(self, stock_code: str) -> Optional[str]:
-        self._ensure_concurrency_guards()
-        with self._stock_name_cache_lock:
-            return self._stock_name_cache.get(stock_code)
-
-    def _cache_stock_name(self, stock_code: str, name: Optional[str]) -> Optional[str]:
-        if name is None:
-            return None
-        self._ensure_concurrency_guards()
-        with self._stock_name_cache_lock:
-            self._stock_name_cache[stock_code] = name
-        return name
+    # Rebound from manager_parts.daily_cache_methods after the class is built.
+    _get_daily_data_cache = None
+    is_market_data_local_only = None
+    _daily_adjustment_identity = None
+    _daily_cache_key = None
+    _record_daily_cache_result = None
+    _validate_daily_candidate = None
+    get_daily_cache_stats = None
+    invalidate_daily_cache = None
+    _get_cached_stock_name = None
+    _cache_stock_name = None
 
     def _get_tickflow_fetcher(self):
         """Lazily create a TickFlow fetcher for market-review-only calls."""
@@ -4638,10 +4466,12 @@ class DataFetcherManager:
 
 
 # Keep ``data_provider.base.DataFetcherManager`` as the ADR-006 compatibility
-# facade while focused parts own inventory/selection and daily health/circuit
-# mechanics. Rebinding preserves method globals so existing patches against
-# this module continue to intercept moved implementations.
+# facade while focused parts own inventory/selection, daily health/circuit,
+# and daily-cache orchestration mechanics. Rebinding preserves method globals
+# so existing patches against this module continue to intercept moved
+# implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
+from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
 
 _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
@@ -4705,14 +4535,30 @@ def _assemble_daily_source_health_facade(
         )
 
 
+def _assemble_daily_cache_methods_facade(
+    cache_module=_daily_cache_methods_module,
+) -> None:
+    bound_method_names = cache_module.bind_daily_cache_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != cache_module.EXPECTED_DAILY_CACHE_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager daily cache methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_data_fetcher_manager_facades(
     assemble_capability=_assemble_capability_catalog_facade,
     assemble_health=_assemble_daily_source_health_facade,
+    assemble_daily_cache=_assemble_daily_cache_methods_facade,
 ) -> None:
     # Default args capture the assembler callables so reload hooks keep working
     # after the facade module deletes the temporary assembly names.
     assemble_capability()
     assemble_health()
+    assemble_daily_cache()
 
 
 _assemble_data_fetcher_manager_facades()
@@ -4722,12 +4568,17 @@ _capability_catalog_module._install_facade_reload_hook(
 _daily_source_health_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_daily_cache_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 
 del (
     _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
     _assemble_capability_catalog_facade,
     _assemble_daily_source_health_facade,
+    _assemble_daily_cache_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
     _daily_source_health_module,
+    _daily_cache_methods_module,
 )
