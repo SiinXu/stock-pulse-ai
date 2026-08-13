@@ -138,7 +138,7 @@ describe('CommandPalette', () => {
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     expect(input).toHaveAttribute('aria-activedescendant', 'command-palette-option-page-home');
-    expect(screen.getByRole('option', { name: '首页' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: '今日' })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     expect(screen.getByRole('option', { name: '再评估与统计' })).toHaveAttribute('aria-selected', 'true');
@@ -267,7 +267,7 @@ describe('CommandPalette', () => {
   it('preserves canonical page, analysis, and one-shot market-review routes', () => {
     renderPalette(null);
 
-    fireEvent.click(screen.getByRole('option', { name: '首页' }));
+    fireEvent.click(screen.getByRole('option', { name: '今日' }));
     expect(onNavigate).toHaveBeenLastCalledWith('/');
     fireEvent.click(screen.getByRole('option', { name: '分析工作台' }));
     expect(onNavigate).toHaveBeenLastCalledWith('/research/analysis');
