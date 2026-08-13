@@ -124,7 +124,7 @@ def run_trajectory_layer(
     if isinstance(meta, dict) and isinstance(meta.get(REFLECTION_META_KEY), dict):
         meta[REFLECTION_META_KEY]["layer"] = "trajectory"
 
-    lessons = record_reflection_lessons(
+    record_reflection_lessons(
         sink,
         result,
         layer="trajectory",

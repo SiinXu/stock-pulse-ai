@@ -171,14 +171,15 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     tokens: ['dynamic:className'],
   }]],
   ['../report/ReportOverview.tsx', [
-    ...[318, 341].map((line) => ({
+    // Opening-element line numbers (not className line) for Card allowlist matches.
+    ...[360, 383].map((line) => ({
       line,
       owner: 'UIUX-HARNESS' as const,
       removeWhen: 'Report insight cards receive an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-insight-card'],
     })),
     {
-      line: 402,
+      line: 444,
       owner: 'UIUX-HARNESS',
       removeWhen: 'The report sentiment rail receives an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-rail-card'],
@@ -2067,7 +2068,7 @@ function appendSurfaceLevelContractViolations(
   const overlay = classesFor('overlay');
   enforceExactClasses('overlay', 'background', semanticClasses(overlay, 'bg'), ['bg-elevated']);
   enforceExactClasses('overlay', 'border', semanticClasses(overlay, 'border'), ['border', 'border-border']);
-  enforceExactClasses('overlay', 'shadow', semanticClasses(overlay, 'shadow'), ['shadow-soft-card-strong']);
+  enforceExactClasses('overlay', 'shadow', semanticClasses(overlay, 'shadow'), ['shadow-elevation-overlay']);
 }
 
 function buttonHeightClasses(fragments: StaticClassFragment[]): string[] {
@@ -3091,7 +3092,7 @@ describe('production design guard', () => {
       expect.objectContaining({ token: 'interactive:shadow-soft-card' }),
       expect.objectContaining({ token: 'overlay:background:bg-elevated:missing' }),
       expect.objectContaining({ token: 'overlay:bg-card' }),
-      expect.objectContaining({ token: 'overlay:shadow:shadow-soft-card-strong:missing' }),
+      expect.objectContaining({ token: 'overlay:shadow:shadow-elevation-overlay:missing' }),
       expect.objectContaining({ token: 'overlay:shadow-lg' }),
     ]));
   });

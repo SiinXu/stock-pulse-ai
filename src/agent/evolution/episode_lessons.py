@@ -103,7 +103,8 @@ class EpisodeLessonSink(Protocol):
         lessons: Sequence[Dict[str, Any]],
         layer: str,
         meta: Optional[Dict[str, Any]] = None,
-    ) -> None: ...
+    ) -> None:
+        ...
 
 
 @dataclass

@@ -32,12 +32,14 @@ from api.v1.endpoints import (
     notification_inbox,
     plugins,
     onboarding,
+    paper_decision_quality,
     portfolio,
     portfolio_health,
     portfolio_risk_metrics,
     portfolio_stress_test,
     reasoning_trace,
     report_export,
+    research,
     report_version_compare,
     scheduled_tasks,
     scorecard,
@@ -150,6 +152,12 @@ router.include_router(
 )
 
 router.include_router(
+    paper_decision_quality.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
     portfolio_risk_metrics.router,
     prefix="/portfolio",
     tags=["Portfolio"]
@@ -231,6 +239,12 @@ router.include_router(
     scorecard.router,
     prefix="/scorecard",
     tags=["Scorecard"]
+)
+
+router.include_router(
+    research.router,
+    prefix="/research",
+    tags=["Research"],
 )
 
 router.include_router(

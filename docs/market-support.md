@@ -1,5 +1,9 @@
 # 市场支持与边界
 
+## 预测验证 `resolve_after` 与交易日历
+
+Agent 预测验证（Issue #1109 / Epic #1107）按 **交易所 session** 换算 `resolve_after`（A 股 `XSHG` / 港股 `XHKG` / 美股 `XNYS`），复用 `src/core/trading_calendar.py`，处理节假日、周末、半日市与跨时区，且 **禁止自然日近似交易日**。完整契约见 [prediction-resolve-after.md](prediction-resolve-after.md)（英文：[prediction-resolve-after_EN.md](prediction-resolve-after_EN.md)）。
+
 ## 港股 (Hong Kong)
 
 港股是项目 headline 市场之一（与 A 股、美股并列），个股分析、大盘复盘区域 `hk`、以及 Market Light 告警区域均包含港股。完整多源优先级、熔断与降级见 [数据源稳定性](data-source-stability.md)（英文：[data-source-stability_EN.md](data-source-stability_EN.md)）。
@@ -46,6 +50,29 @@ A 股大盘复盘会复用既有行业/概念涨跌榜和主要指数行情，�
 - 无新增配置、数据库字段、API 参数或通知分支。CLI、schedule、API 和 Bot 通过既有 `run_market_review()` 自然消费同一报告。
 
 回滚方式：revert 对应 A2 squash merge；不需要恢复配置、数据库或用户数据。
+
+## A 股 ETF 分析语义（Issue #173）
+
+A 股 ETF 在个股分析入口中被识别为独立品种，并进入 **ETF 专属分析路径**；报告仍与个股共用决策仪表盘结构。
+
+### 支持与期望
+
+| 能力 | 期望 | 缺失时 |
+| --- | --- | --- |
+| 代码识别 | 前缀 `51/52/56/58/15/16/18`（沪深 ETF） | 不按 ETF 路径分析 |
+| 日线 / 实时 | 既有 AkShare / efinance ETF 路由 | 明确数据缺失，不阻断整批 |
+| 跟踪标的 | 高流动性 bootstrap + 名称启发式 | `not_available`，禁止臆造指数 ID |
+| 溢价 / 折价 | 实时行情映射 IOPV/净值（AkShare/efinance 有字段时写入 `UnifiedRealtimeQuote`，再注入分析上下文）后计算；纯指数为 `not_applicable` | 缺 IOPV/净值 → `not_available` |
+| 持仓暴露 | 粗粒度 broad_index / sector_theme | 完整成分穿透 `not_available` |
+| 个股基本面指标 | PE/PB/ROE/财报等标为 `not_applicable` | 不得硬算或当作数据错误 |
+
+代表性代码：`510300`、`510050`、`159915`、`159919`、`512880`。实现见 `src/services/etf_analysis.py`。
+
+### 边界
+
+- **不**覆盖数据校验层对 ETF 缺失 PE/PB 的误报校准（#185 Remaining）；分析语义与校验语义分离。
+- **不**承诺全市场持仓穿透或官方 IOPV 全覆盖；公共 provider 未返回时保持 `not_available`。
+- 基金管理人诉讼、声誉、高管变动不得作为 ETF 本身的风险警报（延续 #274）。
 
 ## 日本/韩国个股 suffix-only MVP（Issue #1718，Refs #1718）
 

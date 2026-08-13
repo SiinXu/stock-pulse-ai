@@ -87,6 +87,8 @@ jobs:
             backend_non_web:
               - '**'
               - '!apps/dsa-web/**'
+              - '!docs/CHANGELOG.md'
+              - '!docs/changelog.d/**'
 
   ai-governance:
     name: ai-governance
@@ -103,6 +105,13 @@ jobs:
           python-version: '3.11'
       - name: 🤖 Check AI governance assets
         run: python scripts/check_ai_assets.py
+      - name: 🧾 Validate changelog fragments
+        run: python scripts/collect_changelog.py --check
+      - name: 🧾 Require changelog entry for product-code PRs
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          python scripts/collect_changelog.py --require-entry --base "origin/${{ github.base_ref }}"
 
   # ---------------------------------------------------------------------------
   # PR tier: fast backend-gate (selective pytest; full suite on uncertain path
@@ -769,6 +778,13 @@ jobs:
       - name: 🧪 Unit tests
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm run test
+      - name: ⏱ Runtime performance budget (soft)
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
+        working-directory: apps/dsa-web
+        run: |
+          # Soft gate: prints WARN on exceedance, exits 0 so Web gate stays green
+          # while runtime budgets stabilize (Issue #883). Use --strict later.
+          node scripts/check-runtime-performance.mjs
       - name: 🏗️ Build
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: npm run build

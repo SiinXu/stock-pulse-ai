@@ -1,6 +1,50 @@
 {
   "components": {
     "schemas": {
+      "AgentModeBreakdown": {
+        "properties": {
+          "agent_mode": {
+            "title": "Agent Mode",
+            "type": "string"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_mode",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "AgentModeBreakdown",
+        "type": "object"
+      },
       "AgentModelDeployment": {
         "properties": {
           "api_base": {
@@ -5266,6 +5310,17 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "prompt_tokens": {
             "default": 0,
             "title": "Prompt Tokens",
@@ -9719,12 +9774,27 @@
       "ErrorResponse": {
         "description": "Stable API error envelope.",
         "example": {
+          "category": "not_found",
           "error": "not_found",
           "message": "Resource not found",
           "params": {},
+          "severity": "warning",
           "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         },
         "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)",
+            "example": "not_found",
+            "title": "Category"
+          },
           "detail": {
             "anyOf": [
               {},
@@ -9764,6 +9834,19 @@
             "description": "Localization interpolation parameters",
             "title": "Params",
             "type": "object"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy severity: info | warning | error | critical",
+            "example": "warning",
+            "title": "Severity"
           },
           "trace_id": {
             "anyOf": [
@@ -14248,6 +14331,17 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "max_total_tokens": {
             "default": 0,
             "title": "Max Total Tokens",
@@ -14558,7 +14652,10 @@
               "analysis_complete",
               "alert_triggered",
               "scheduled_task_result",
-              "decision_signal"
+              "decision_signal",
+              "daily_brief",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Kind",
             "type": "string"
@@ -14591,7 +14688,10 @@
               "analysisCompleteTitle",
               "alertTriggeredTitle",
               "scheduledTaskResultTitle",
-              "decisionSignalTitle"
+              "decisionSignalTitle",
+              "dailyBriefTitle",
+              "highDisagreementTitle",
+              "portfolioHealthTitle"
             ],
             "title": "Title Key",
             "type": "string"
@@ -14824,7 +14924,10 @@
               "analysis",
               "alerts",
               "scheduled_tasks",
-              "decision_signals"
+              "decision_signals",
+              "daily_briefs",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Source",
             "type": "string"
@@ -15525,6 +15628,445 @@
         "title": "OutboundActivityPage",
         "type": "object"
       },
+      "PaperDecisionQualityAggregate": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityAggregateDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "max_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Process Score"
+          },
+          "min_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Process Score"
+          },
+          "process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Score"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "empty"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sample_size"
+        ],
+        "title": "PaperDecisionQualityAggregate",
+        "type": "object"
+      },
+      "PaperDecisionQualityAggregateDimension": {
+        "properties": {
+          "sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Size"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityAggregateDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDimension": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Inputs",
+            "type": "object"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDivisionOfLabor": {
+        "properties": {
+          "does_not_own": {
+            "title": "Does Not Own",
+            "type": "string"
+          },
+          "outcome_owner_issue": {
+            "default": 987,
+            "title": "Outcome Owner Issue",
+            "type": "integer"
+          },
+          "owns": {
+            "title": "Owns",
+            "type": "string"
+          },
+          "this_issue": {
+            "default": 1134,
+            "title": "This Issue",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "owns",
+          "does_not_own"
+        ],
+        "title": "PaperDecisionQualityDivisionOfLabor",
+        "type": "object"
+      },
+      "PaperDecisionQualityItem": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "effective_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Effective Weights",
+            "type": "object"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "linked_signal_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Signal Id"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "process_score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Process Score",
+            "type": "number"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "trade_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Date"
+          },
+          "trade_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Id"
+          }
+        },
+        "required": [
+          "process_score",
+          "dimensions",
+          "formula_version"
+        ],
+        "title": "PaperDecisionQualityItem",
+        "type": "object"
+      },
+      "PaperDecisionQualityReason": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimension"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "PaperDecisionQualityReason",
+        "type": "object"
+      },
+      "PaperDecisionQualityResponse": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "account_type": {
+            "const": "paper",
+            "default": "paper",
+            "title": "Account Type",
+            "type": "string"
+          },
+          "aggregate": {
+            "$ref": "#/components/schemas/PaperDecisionQualityAggregate"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "division_of_labor": {
+            "$ref": "#/components/schemas/PaperDecisionQualityDivisionOfLabor"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "total_trade_count": {
+            "title": "Total Trade Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "formula_version",
+          "disclaimer",
+          "account_id",
+          "as_of",
+          "sample_size",
+          "total_trade_count",
+          "truncated",
+          "aggregate",
+          "division_of_labor"
+        ],
+        "title": "PaperDecisionQualityResponse",
+        "type": "object"
+      },
       "PaperTradeCreateRequest": {
         "properties": {
           "note": {
@@ -15620,6 +16162,261 @@
           "price_source"
         ],
         "title": "PaperTradeCreatedResponse",
+        "type": "object"
+      },
+      "PeerValuationCanvasRequest": {
+        "description": "Request body for the constrained peer relative-value canvas (issue #1139).",
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Base currency for cross-market estimate normalization (default: target listing currency)",
+            "title": "Base Currency"
+          },
+          "industry_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional industry label override when peer_source=industry",
+            "title": "Industry Label"
+          },
+          "peer_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Peer stock codes (required for comparison; never invented server-side)",
+            "title": "Peer Codes"
+          },
+          "peer_source": {
+            "default": "custom",
+            "description": "Explainable peer-set source: custom codes or industry-constrained set",
+            "enum": [
+              "custom",
+              "industry"
+            ],
+            "title": "Peer Source",
+            "type": "string"
+          },
+          "stock_code": {
+            "description": "Target stock code",
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code"
+        ],
+        "title": "PeerValuationCanvasRequest",
+        "type": "object"
+      },
+      "PeerValuationCanvasResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "currency_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Metrics"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "fx_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Stale"
+          },
+          "heatmap_cells": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heatmap Cells"
+          },
+          "medians": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medians"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "multiple_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiple Metrics"
+          },
+          "peer_set": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Set"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "relative_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Summary"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "valuation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Status"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status"
+        ],
+        "title": "PeerValuationCanvasResponse",
         "type": "object"
       },
       "PerformanceMetrics": {
@@ -18765,6 +19562,41 @@
         "title": "PortfolioImportCommitResponse",
         "type": "object"
       },
+      "PortfolioImportFailedRow": {
+        "description": "One source row rejected during spreadsheet parse (correctable).",
+        "properties": {
+          "reason": {
+            "description": "Human-readable rejection reason",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "description": "Stable machine code for the rejection reason",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "row_number": {
+            "description": "1-based line number in the source file (header is 1)",
+            "title": "Row Number",
+            "type": "integer"
+          },
+          "source": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Non-empty original cells from the rejected row for download/correction",
+            "title": "Source",
+            "type": "object"
+          }
+        },
+        "required": [
+          "row_number",
+          "reason_code",
+          "reason"
+        ],
+        "title": "PortfolioImportFailedRow",
+        "type": "object"
+      },
       "PortfolioImportParseResponse": {
         "properties": {
           "broker": {
@@ -18780,6 +19612,14 @@
               "type": "string"
             },
             "title": "Errors",
+            "type": "array"
+          },
+          "failed_rows": {
+            "description": "Structured rejected rows with original cells for client download",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioImportFailedRow"
+            },
+            "title": "Failed Rows",
             "type": "array"
           },
           "record_count": {
@@ -20104,6 +20944,128 @@
           "value_bp"
         ],
         "title": "RateStressShock",
+        "type": "object"
+      },
+      "ReadinessCheckItem": {
+        "description": "One structured readiness dimension (ok | degraded | failed).",
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion"
+          },
+          "timed_out": {
+            "default": false,
+            "title": "Timed Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "reason_code",
+          "reason"
+        ],
+        "title": "ReadinessCheckItem",
+        "type": "object"
+      },
+      "ReadinessReportResponse": {
+        "description": "On-demand structured readiness/self-check report.\n\nComposes existing observational probes (setup status, data-provider runtime\nstatus, generation-backend cheap status, task-queue stats). Never mutates\nconfiguration and is not invoked automatically at process startup.\nFailures and timeouts are explicit and never reported as ready.",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessCheckItem"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "title": "Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status",
+          "generated_at",
+          "summary",
+          "timeout_seconds"
+        ],
+        "title": "ReadinessReportResponse",
         "type": "object"
       },
       "ReasoningTraceAgent": {
@@ -22640,6 +23602,407 @@
         "title": "ReportVersionRunListResponse",
         "type": "object"
       },
+      "ResearchConclusionBody": {
+        "additionalProperties": false,
+        "description": "Mode-density stratified conclusion body (no secrets, no raw_result dump).",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Label"
+          },
+          "analysis_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Summary"
+          },
+          "confidence_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Reason"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchGapItem"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "omitted_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Omitted Count",
+            "type": "integer"
+          },
+          "one_sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Sentence"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "position_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Advice"
+          },
+          "positive_catalysts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Catalysts"
+          },
+          "report_strata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mode-filtered report strata; null in brief mode",
+            "title": "Report Strata"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "signal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Type"
+          },
+          "time_sensitivity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Sensitivity"
+          },
+          "trend_prediction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend Prediction"
+          },
+          "truncation_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncation Notice"
+          }
+        },
+        "title": "ResearchConclusionBody",
+        "type": "object"
+      },
+      "ResearchConclusionMetadata": {
+        "additionalProperties": false,
+        "description": "Record-level metadata for embed/portal clients.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Best-effort data as-of timestamp from strata facts or record time",
+            "title": "As Of"
+          },
+          "confidence_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Level"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "evidence_counts": {
+            "$ref": "#/components/schemas/ResearchEvidenceCounts"
+          },
+          "evidence_refs": {
+            "description": "Bounded unique evidence reference ids (source_id values)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "minimum": 1.0,
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "report_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Language"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Type"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Name"
+          }
+        },
+        "required": [
+          "record_id",
+          "stock_code"
+        ],
+        "title": "ResearchConclusionMetadata",
+        "type": "object"
+      },
+      "ResearchConclusionResponse": {
+        "additionalProperties": false,
+        "description": "Compact stratified conclusion response for embed/portal use.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ResearchConclusionBody"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ResearchConclusionMetadata"
+          },
+          "mode": {
+            "enum": [
+              "brief",
+              "standard",
+              "research"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "research-conclusion-v1",
+            "default": "research-conclusion-v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "metadata",
+          "conclusion"
+        ],
+        "title": "ResearchConclusionResponse",
+        "type": "object"
+      },
+      "ResearchEvidenceCounts": {
+        "additionalProperties": false,
+        "description": "Counts derived from the mode-filtered strata projection.",
+        "properties": {
+          "evidence_refs": {
+            "default": 0,
+            "description": "Unique source_id / source_ids count",
+            "minimum": 0.0,
+            "title": "Evidence Refs",
+            "type": "integer"
+          },
+          "missing_or_conflicts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Missing Or Conflicts",
+            "type": "integer"
+          },
+          "model_inference": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Model Inference",
+            "type": "integer"
+          },
+          "risks_counter_evidence": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Risks Counter Evidence",
+            "type": "integer"
+          },
+          "verified_facts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Verified Facts",
+            "type": "integer"
+          }
+        },
+        "title": "ResearchEvidenceCounts",
+        "type": "object"
+      },
+      "ResearchGapItem": {
+        "additionalProperties": false,
+        "description": "One missing-data or conflict gap the client can render without full history.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "default": "missing",
+            "enum": [
+              "missing",
+              "conflict"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "ResearchGapItem",
+        "type": "object"
+      },
       "ResearchRequest": {
         "properties": {
           "question": {
@@ -24126,8 +25489,9 @@
           },
           "process_mode": {
             "enum": [
-              "serve",
+              "serve+schedule",
               "desktop",
+              "cli-schedule",
               "not_attached"
             ],
             "title": "Process Mode",
@@ -25826,6 +27190,60 @@
           "skills"
         ],
         "title": "SkillsResponse",
+        "type": "object"
+      },
+      "StageBreakdown": {
+        "properties": {
+          "avg_latency_ms": {
+            "default": 0,
+            "title": "Avg Latency Ms",
+            "type": "integer"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "success_calls": {
+            "default": 0,
+            "title": "Success Calls",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "StageBreakdown",
         "type": "object"
       },
       "StockAnalysisScheduledPayload": {
@@ -30287,6 +31705,28 @@
       },
       "UsageCallRecord": {
         "properties": {
+          "agent_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Mode"
+          },
+          "call_success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Success"
+          },
           "call_type": {
             "title": "Call Type",
             "type": "string"
@@ -30300,17 +31740,105 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "cost_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Status"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
           },
           "model": {
             "title": "Model",
             "type": "string"
           },
+          "primary_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Model"
+          },
           "prompt_tokens": {
             "title": "Prompt Tokens",
             "type": "integer"
+          },
+          "route_attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Attempt"
+          },
+          "route_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Outcome"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
           },
           "stock_code": {
             "anyOf": [
@@ -30342,6 +31870,13 @@
       },
       "UsageDashboardResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30356,8 +31891,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30366,6 +31907,11 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
           "recent_calls": {
             "items": {
               "$ref": "#/components/schemas/UsageCallRecord"
@@ -30373,8 +31919,44 @@
             "title": "Recent Calls",
             "type": "array"
           },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30387,6 +31969,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30394,6 +31987,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },
@@ -30412,6 +32010,13 @@
       },
       "UsageSummaryResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30426,8 +32031,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30436,8 +32047,49 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30450,6 +32102,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30457,6 +32120,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },
@@ -41197,6 +42865,134 @@
         ]
       }
     },
+    "/api/v1/portfolio/accounts/{account_id}/paper-decision-quality": {
+      "get": {
+        "description": "Returns explainable process scores for simulated trades on a paper account: analysis support, risk-gate compliance, and position discipline. This is not a return or win-rate evaluation. Outcome metrics remain owned by DecisionSignal post-hoc calibration (issue #987).",
+        "operationId": "getPaperDecisionQuality",
+        "parameters": [
+          {
+            "description": "Paper account ID",
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "description": "Paper account ID",
+              "minimum": 1,
+              "title": "Account Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional trade date from",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date from",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Optional trade date to",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date to",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Max trades to score",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Max trades to score",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperDecisionQualityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Score paper-trading decisions on process quality (not PnL)",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
     "/api/v1/portfolio/accounts/{account_id}/paper-trades": {
       "post": {
         "operationId": "create_paper_trade_api_v1_portfolio_accounts__account_id__paper_trades_post",
@@ -42436,7 +44232,7 @@
             "description": "Internal Server Error"
           }
         },
-        "summary": "Parse broker CSV into normalized trade records",
+        "summary": "Parse broker CSV/XLSX into normalized trade records",
         "tags": [
           "Portfolio"
         ]
@@ -44071,6 +45867,298 @@
         "summary": "List analysis runs for version comparison",
         "tags": [
           "ReportVersionCompare"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions": {
+      "get": {
+        "description": "Returns the newest analysis history row for stock_code as a mode-filtered stratified conclusion. Same governance as GET by record id. Default-off.",
+        "operationId": "getLatestResearchConclusion",
+        "parameters": [
+          {
+            "description": "Stock code",
+            "in": "query",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "description": "Stock code",
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing stock_code or invalid mode"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or no history for stock_code"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get latest stratified research conclusion for a stock code",
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions/{record_id}": {
+      "get": {
+        "description": "Authenticated read-only projection of stratified conclusions (brief / standard / research) plus metadata (as-of, confidence, evidence counts and refs). Default-off via RESEARCH_API_ENABLED; no write methods; reuses session auth, security audit, and sliding-window rate limits on the main API port.",
+        "operationId": "getResearchConclusionByRecordId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid mode or record_id"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or analysis record not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get stratified research conclusion by history record id",
+        "tags": [
+          "Research"
         ]
       }
     },
@@ -47738,6 +49826,48 @@
         ]
       }
     },
+    "/api/v1/system/readiness": {
+      "get": {
+        "description": "On-demand structured readiness for data providers, LLM/generation backend, task queue, and selected setup dependencies. Reuses existing observational probes; does not write config, does not run model smoke tests, and is not invoked automatically at process startup. Probe failures and per-check timeouts are reported as failed or degraded and never as ready.",
+        "operationId": "getSystemReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReportResponse"
+                }
+              }
+            },
+            "description": "Structured readiness report loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal server error"
+          }
+        },
+        "summary": "Get structured readiness / self-check report",
+        "tags": [
+          "SystemConfig"
+        ]
+      }
+    },
     "/api/v1/system/scheduler/run-now": {
       "post": {
         "description": "Trigger one scheduled analysis run in the current process.",
@@ -48102,6 +50232,68 @@
           }
         },
         "summary": "Estimate stock valuation with body overrides",
+        "tags": [
+          "Valuation"
+        ]
+      }
+    },
+    "/api/v1/valuation/peer-canvas": {
+      "post": {
+        "description": "Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.",
+        "operationId": "buildPeerValuationCanvas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeerValuationCanvasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerValuationCanvasResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Peer canvas build failed"
+          }
+        },
+        "summary": "Build peer relative-value comparison canvas",
         "tags": [
           "Valuation"
         ]
