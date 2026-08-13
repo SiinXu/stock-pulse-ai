@@ -224,7 +224,9 @@
 {% for conflict in (strategy_synthesis.get('conflicts') or [])[:3] %}
 {% if conflict.get('conflict_type') %}- {{ localize_conflict_severity(conflict.get('severity', 'medium'), report_language) }}: {{ localize_strategy_conflict_description(conflict.get('conflict_type'), report_language) }}{% if conflict.get('participants') %}（{% for participant in conflict.get('participants') %}{{ localize_strategy_skill(participant, report_language) }}{{ '、' if not loop.last else '' }}{% endfor %}）{% endif %}{% endif %}
 {% endfor %}
-{% set disagreement_handling = normalize_disagreement_handling_payload(strategy_synthesis.get('disagreement_handling') or (dashboard.get('disagreement_handling') if dashboard else none)) %}
+
+{% endif %}
+{% set disagreement_handling = normalize_disagreement_handling_payload((strategy_synthesis.get('disagreement_handling') if strategy_synthesis else none) or (dashboard.get('disagreement_handling') if dashboard else none)) %}
 {% if disagreement_handling and disagreement_handling.get('high_disagreement') %}
 - **⚠️ {{ labels.disagreement_high_banner }}**
 - {{ labels.disagreement_verdict_label }}: {{ localize_disagreement_verdict_mode(disagreement_handling.get('verdict_mode'), report_language) }} | {{ labels.disagreement_escalation_label }}: {{ disagreement_handling.get('escalation') }} | {{ labels.disagreement_score_label }}: {{ '%.0f%%' | format((disagreement_handling.get('disagreement_score') or 0) * 100) }}
@@ -235,8 +237,6 @@
 {% for point in (disagreement_handling.get('points') or [])[:5] %}
 - {{ labels.disagreement_points_label }}: [{{ point.get('source') }}] {{ localize_conflict_severity(point.get('severity', 'medium'), report_language) }} / {{ point.get('kind') }}{% if point.get('participants') %}（{% for participant in point.get('participants') %}{{ localize_strategy_skill(participant, report_language) }}{{ '、' if not loop.last else '' }}{% endfor %}）{% endif %}
 {% endfor %}
-{% endif %}
-
 {% endif %}
 
 {% set research_persona = dashboard.get('active_research_persona') if dashboard else none %}

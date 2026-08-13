@@ -263,6 +263,8 @@ def test_final_dashboard_cannot_restore_direction_after_split_verdict():
     assert dashboard is not None
     assert dashboard["decision_type"] == "hold"
     assert "观望" in str(dashboard["operation_advice"])
+    assert "风控下调" not in str(dashboard["operation_advice"])
+    assert "高分歧" in str(dashboard["operation_advice"])
     assert dashboard["sentiment_score"] <= 60
 
 
@@ -443,3 +445,68 @@ def test_high_disagreement_is_annotated_in_notification_block():
     assert normalize_disagreement_handling_payload(synthesis["disagreement_handling"])[
         "high_disagreement"
     ]
+
+
+def _role_only_high_disagreement_payload() -> dict:
+    record = build_disagreement_handling_record(
+        role_summary={
+            "conflict_type": "mixed_directional_signals",
+            "bullish_agents": [
+                {"agent_name": "technical", "signal": "buy", "confidence": 0.9}
+            ],
+            "bearish_agents": [
+                {"agent_name": "intel", "signal": "sell", "confidence": 0.88}
+            ],
+            "neutral_agents": [],
+        }
+    )
+    public = public_disagreement_handling_payload(record)
+    assert public is not None
+    assert public["high_disagreement"] is True
+    return public
+
+
+def test_role_only_split_is_annotated_without_strategy_synthesis():
+    """Role-layer split must still render the product banner when synthesis is absent."""
+    from src.analyzer import AnalysisResult
+    from src.config import Config
+    from src.notification import NotificationService
+    from src.services.history_service import HistoryService
+    from src.services.report_renderer import render
+
+    handling = _role_only_high_disagreement_payload()
+    labels = get_report_labels("en")
+    dashboard = {
+        "core_conclusion": {"one_sentence": "Role-layer split"},
+        "disagreement_handling": handling,
+    }
+    result = AnalysisResult(
+        code="600519",
+        name="Test Stock",
+        sentiment_score=50,
+        trend_prediction="neutral",
+        operation_advice="hold",
+        report_language="en",
+        dashboard=dashboard,
+    )
+
+    with patch(
+        "src.notification.get_config",
+        return_value=Config(stock_list=[], report_renderer_enabled=False),
+    ):
+        notification_text = NotificationService().generate_dashboard_report([result])
+    assert labels["disagreement_high_banner"] in notification_text
+    assert labels["disagreement_no_majority_note"] in notification_text
+
+    class MockRecord:
+        created_at = None
+
+    history_text = HistoryService.__new__(HistoryService)._generate_single_stock_markdown(
+        result, MockRecord()
+    )
+    assert labels["disagreement_high_banner"] in history_text
+
+    markdown = render("markdown", [result], summary_only=False)
+    wechat = render("wechat", [result], summary_only=False)
+    assert markdown is not None and labels["disagreement_high_banner"] in markdown
+    assert wechat is not None and labels["disagreement_high_banner"] in wechat

@@ -189,10 +189,27 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
-def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, labels: Dict[str, str], report_language: str) -> None:
-    """Append the full localized strategy synthesis block when present."""
+def _append_strategy_synthesis_block(
+    lines: List[str],
+    strategy_synthesis: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    dashboard: Any = None,
+) -> None:
+    """Append the strategy synthesis block and any standalone disagreement banner."""
     strategy_synthesis = normalize_strategy_synthesis_payload(strategy_synthesis)
     if not strategy_synthesis:
+        before = len(lines)
+        _append_disagreement_handling_block(
+            lines,
+            None,
+            labels,
+            report_language,
+            dashboard=dashboard,
+        )
+        if len(lines) > before:
+            lines.append("")
         return
     confidence = strategy_synthesis.get("confidence")
     confidence_text = f"{confidence:.0%}" if isinstance(confidence, (int, float)) else "N/A"
@@ -240,6 +257,7 @@ def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, 
         strategy_synthesis,
         labels,
         report_language,
+        dashboard=dashboard,
     )
     lines.append("")
 

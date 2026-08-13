@@ -792,7 +792,13 @@ class _RenderingMethods:
                 strategy_synthesis = normalize_strategy_synthesis_payload(
                     dashboard.get('strategy_synthesis') if dashboard else None
                 )
-                _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
+                _append_strategy_synthesis_block(
+                    report_lines,
+                    strategy_synthesis,
+                    labels,
+                    report_language,
+                    dashboard=dashboard,
+                )
 
                 # ========== Investment Committee (compact for notifications) ==========
                 _append_committee_deliberation_block(
@@ -1378,7 +1384,13 @@ class _RenderingMethods:
         strategy_synthesis = normalize_strategy_synthesis_payload(
             dashboard.get('strategy_synthesis') if dashboard else None
         )
-        _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
+        _append_strategy_synthesis_block(
+            lines,
+            strategy_synthesis,
+            labels,
+            report_language,
+            dashboard=dashboard,
+        )
 
         # ========== Investment Committee (compact for notifications) ==========
         _append_committee_deliberation_block(

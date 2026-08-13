@@ -530,6 +530,7 @@ class _DashboardMethods:
             operation_advice = _adjust_operation_advice(
                 pre_risk_advice,
                 decision_type,
+                source="disagreement" if disagreement_applied else "risk",
             )
         else:
             operation_advice = _normalize_operation_advice_value(

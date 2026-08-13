@@ -415,7 +415,7 @@ def _adjust_sentiment_score(score: int, signal: str) -> int:
     return max(low, min(high, score))
 
 
-def _adjust_operation_advice(advice: str, signal: str) -> str:
+def _adjust_operation_advice(advice: str, signal: str, *, source: str = "risk") -> str:
     """Normalize action wording to the overridden decision signal."""
     mapping = {
         "buy": "买入",
@@ -426,6 +426,8 @@ def _adjust_operation_advice(advice: str, signal: str) -> str:
         return advice
     if advice == mapping[signal]:
         return advice
+    if source == "disagreement":
+        return f"{mapping[signal]}（原建议因高分歧下调）"
     return f"{mapping[signal]}（原建议已被风控下调）"
 
 

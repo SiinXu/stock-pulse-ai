@@ -1,1 +1,2 @@
 - [Fixed] Complete notification facade and settings metadata contracts for structured disagreement handling. (Refs #246).
+- [Fixed] Attribute disagreement-only hold overrides to high disagreement instead of risk control, and render the high-disagreement banner when only the role layer splits. (Refs #1205).

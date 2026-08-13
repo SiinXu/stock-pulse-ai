@@ -1436,21 +1436,25 @@ class HistoryService:
                 except (KeyError, IndexError):
                     invalid_text = f"{invalid_label_template}: {invalid_count}"
                 report_lines.append(f"- {invalid_text}")
-            disagreement_handling = normalize_disagreement_handling_payload(
-                strategy_synthesis.get("disagreement_handling")
-                or (dashboard.get("disagreement_handling") if isinstance(dashboard, dict) else None)
+
+        disagreement_handling = normalize_disagreement_handling_payload(
+            (strategy_synthesis.get("disagreement_handling") if strategy_synthesis else None)
+            or (dashboard.get("disagreement_handling") if isinstance(dashboard, dict) else None)
+        )
+        if disagreement_handling and disagreement_handling.get("high_disagreement"):
+            report_lines.append(
+                f"- ⚠️ {labels.get('disagreement_high_banner', 'High disagreement')}"
             )
-            if disagreement_handling and disagreement_handling.get("high_disagreement"):
-                report_lines.append(
-                    f"- ⚠️ {labels.get('disagreement_high_banner', 'High disagreement')}"
-                )
-                report_lines.append(
-                    f"- {labels.get('disagreement_verdict_label', 'Verdict mode')}: "
-                    f"{localize_disagreement_verdict_mode(disagreement_handling.get('verdict_mode'), report_language)} | "
-                    f"{labels.get('disagreement_escalation_label', 'Escalation')}: "
-                    f"{disagreement_handling.get('escalation')} | "
-                    f"{labels.get('disagreement_no_majority_note', 'Majority vote was not used')}"
-                )
+            report_lines.append(
+                f"- {labels.get('disagreement_verdict_label', 'Verdict mode')}: "
+                f"{localize_disagreement_verdict_mode(disagreement_handling.get('verdict_mode'), report_language)} | "
+                f"{labels.get('disagreement_escalation_label', 'Escalation')}: "
+                f"{disagreement_handling.get('escalation')} | "
+                f"{labels.get('disagreement_no_majority_note', 'Majority vote was not used')}"
+            )
+        if strategy_synthesis or (
+            disagreement_handling and disagreement_handling.get("high_disagreement")
+        ):
             report_lines.append("")
 
         # ========== Investment Committee (real deliberation trace) ==========
