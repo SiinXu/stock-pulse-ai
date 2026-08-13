@@ -849,8 +849,7 @@ Return only one JSON object:
                 call_model = getattr(self.llm_adapter, "_call_litellm_model", None)
                 if not callable(call_model):
                     logger.warning(
-                        "[Debate] dedicated model route unavailable: model=%s",
-                        model_name,
+                        "[Debate] dedicated model route unavailable",
                     )
                     return None, 0, "", 0.0
                 response = call_model(
