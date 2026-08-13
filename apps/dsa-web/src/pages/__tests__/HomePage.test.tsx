@@ -354,7 +354,7 @@ describe('HomePage attention hub', () => {
   it('renders exactly the three default attention blocks and keeps configuration collapsed', async () => {
     renderHome();
 
-    expect(await screen.findByRole('heading', { name: 'Home', level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Today', level: 1 })).toBeInTheDocument();
     const core = screen.getByTestId('home-core-blocks');
     expect(within(core).getAllByRole('region')).toHaveLength(3);
     expect(within(core).getByRole('heading', { name: "Today's Focus" })).toBeInTheDocument();
