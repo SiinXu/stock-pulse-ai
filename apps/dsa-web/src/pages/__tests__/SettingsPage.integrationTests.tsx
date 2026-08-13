@@ -163,6 +163,19 @@ export function registerSettingsPageIntegrationTests(): void {
     const notificationItems = [
       notifyField('REPORT_TYPE'),
       notifyField('REPORT_LANGUAGE'),
+      {
+        ...notifyField('RESEARCH_PRESENTATION_PROFILE', 'select'),
+        value: 'balanced',
+        schema: {
+          ...notifyField('RESEARCH_PRESENTATION_PROFILE', 'select').schema,
+          title: 'Research Presentation Profile',
+          options: [
+            { label: 'Conservative', value: 'conservative' },
+            { label: 'Balanced', value: 'balanced' },
+            { label: 'Aggressive', value: 'aggressive' },
+          ],
+        },
+      },
       notifyField('NOTIFICATION_ALERT_CHANNELS'),
       notifyField('NOTIFICATION_QUIET_HOURS'),
       notifyField('WECHAT_WEBHOOK_URL'),
@@ -178,6 +191,7 @@ export function registerSettingsPageIntegrationTests(): void {
     const { rerender } = render(<SettingsPage />);
     expect(screen.getByTestId('settings-field-REPORT_TYPE')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-REPORT_LANGUAGE')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Research Presentation Profile' })).toHaveValue('balanced');
     expect(screen.queryByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
 
