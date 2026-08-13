@@ -72,6 +72,29 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 
+def _resolve_scenario_sensitivity_context(
+    extra_context: Optional[Dict[str, Any]],
+    *,
+    report_language: str,
+) -> Optional[Dict[str, Any]]:
+    """Optional hypothetical scenario appendix for report templates (Issue #1136)."""
+    try:
+        from src.agent.scenario_library import resolve_report_sensitivity_section
+    except Exception as exc:  # broad-exception: fallback_recorded - report render must not fail closed on optional sensitivity import
+        log_safe_exception(
+            logger,
+            "Report scenario sensitivity import failed",
+            exc,
+            error_code="report_scenario_sensitivity_import_failed",
+            level=logging.DEBUG,
+        )
+        return None
+    return resolve_report_sensitivity_section(
+        extra_context,
+        report_language=report_language,
+    )
+
+
 def _resolve_report_language(
     results: List[AnalysisResult],
     extra_context: Optional[Dict[str, Any]],
@@ -451,6 +474,10 @@ def render(
                     return line
         return ""
 
+    sensitivity = _resolve_scenario_sensitivity_context(
+        extra_context,
+        report_language=report_language,
+    )
     context: Dict[str, Any] = {
         "report_date": report_date,
         "report_timestamp": report_timestamp,
@@ -496,6 +523,9 @@ def render(
         "strategy_invalid_opinion_count": strategy_invalid_opinion_count,
         "signal_attribution_has_content": signal_attribution_has_content,
         "signal_attribution_weight_items": signal_attribution_weight_items,
+        # Issue #1136: hypothetical only; templates must not mix with baseline conclusions.
+        "scenario_sensitivity": sensitivity,
+        "scenario_sensitivity_markdown": (sensitivity or {}).get("markdown") if sensitivity else None,
     }
     if extra_context:
         safe_extra_context = dict(extra_context)
@@ -507,6 +537,9 @@ def render(
         safe_extra_context.pop("presentation_plan", None)
         safe_extra_context.pop("presentation_framing_notice", None)
         safe_extra_context.pop("report_truncation_notice", None)
+        # Keep renderer-owned sensitivity resolution authoritative.
+        safe_extra_context.pop("scenario_sensitivity", None)
+        safe_extra_context.pop("scenario_sensitivity_markdown", None)
         context.update(safe_extra_context)
 
     try:
