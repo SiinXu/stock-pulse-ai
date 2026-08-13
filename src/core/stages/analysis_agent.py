@@ -370,6 +370,30 @@ class _AgentAnalysisStageMixin:
             )
             if analysis_context_pack_summary:
                 initial_context["analysis_context_pack_summary"] = analysis_context_pack_summary
+            if isinstance(analysis_context_pack_overview, dict):
+                # Issue #182: pass snapshot identity + value-stripped pack audit
+                # so multi-agent seal reuses the same content_digest (no raw values).
+                snapshot_identity = {
+                    key: analysis_context_pack_overview.get(key)
+                    for key in (
+                        "snapshot_id",
+                        "snapshot_revision",
+                        "as_of",
+                        "pack_version",
+                        "created_at",
+                    )
+                    if analysis_context_pack_overview.get(key) is not None
+                }
+                overview_meta = analysis_context_pack_overview.get("metadata")
+                if isinstance(overview_meta, dict):
+                    digest = overview_meta.get("content_digest")
+                    if digest:
+                        snapshot_identity["content_digest"] = digest
+                pack_audit = analysis_context_pack_overview.pop("_pack_audit", None)
+                if isinstance(pack_audit, dict) and pack_audit:
+                    initial_context["analysis_context_pack_audit"] = pack_audit
+                if snapshot_identity:
+                    initial_context["analysis_context_snapshot"] = snapshot_identity
 
             agent_pack_counts = (
                 analysis_context_pack_overview.get("counts", {})
