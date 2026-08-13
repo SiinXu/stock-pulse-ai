@@ -774,7 +774,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 66,
         "help_key": "settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD",
         "examples": ["AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD=0.7"],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Multi-strategy contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multi-strategy-contract.md",
+            }
+        ],
         "warning_codes": [],
     },
     "AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD": {
@@ -792,7 +797,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 67,
         "help_key": "settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD",
         "examples": ["AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD=0.55"],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Multi-strategy contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multi-strategy-contract.md",
+            }
+        ],
         "warning_codes": [],
     },
 

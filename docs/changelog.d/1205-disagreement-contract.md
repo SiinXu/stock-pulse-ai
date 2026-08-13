@@ -1,0 +1,1 @@
+- [Fixed] Complete notification facade and settings metadata contracts for structured disagreement handling. (Refs #246).

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from src.agent.disagreement_handling import (
+    DISAGREEMENT_HANDLING_SCHEMA_VERSION,
     ESCALATION_SPLIT,
     VERDICT_SPLIT,
     apply_disagreement_handling_to_synthesis,
@@ -286,9 +287,26 @@ def test_public_payload_strips_and_forbids_majority_vote_claim():
     raw["policy"]["confidence_cap"] = float("nan")
     public = public_disagreement_handling_payload(raw)
     assert public is not None
+    assert public["schema_version"] == DISAGREEMENT_HANDLING_SCHEMA_VERSION
+    assert set(public["points"][0]) == {
+        "source",
+        "kind",
+        "severity",
+        "participants",
+        "summary_key",
+    }
     assert public["policy"]["majority_vote_used"] is False
     assert public["policy"]["confidence_cap"] is None
     assert public["high_disagreement"] is True
+
+
+def test_public_payload_rejects_unversioned_or_unknown_records():
+    record = build_disagreement_handling_record()
+    record.pop("schema_version")
+    assert public_disagreement_handling_payload(record) is None
+
+    record["schema_version"] = "disagreement-handling-v999"
+    assert public_disagreement_handling_payload(record) is None
 
 
 def test_high_disagreement_is_annotated_in_markdown_product():

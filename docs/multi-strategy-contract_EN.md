@@ -15,5 +15,10 @@ When enabled, StrategyEngine and the Decision pre-stage build a structured `disa
 3. **Escalates** high disagreement to a **split verdict**: forced conservative `hold`, capped confidence, `high_disagreement=true`, `resolution_status=unresolved`.
 4. **Surfaces** the record on `dashboard.disagreement_handling` and `strategy_synthesis.disagreement_handling`, rendered in Markdown / WeChat / Notification / History.
 
-Product honesty: unresolved disagreement is a legitimate reported outcome. Escalation must not invent artificial consensus.
+The authoritative public record uses `schema_version=disagreement-handling-v1`.
+Every public `points[]` item has the same bounded fields across report and alert
+consumers: `source`, `kind`, `severity`, `participants`, and `summary_key`.
+Consumers must reject missing or unknown schema versions instead of inferring a
+record from similarly named raw fields.
 
+Product honesty: unresolved disagreement is a legitimate reported outcome. Escalation must not invent artificial consensus.

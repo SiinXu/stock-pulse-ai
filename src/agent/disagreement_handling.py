@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 
 from src.agent.protocols import strategy_signal_score
 
+DISAGREEMENT_HANDLING_SCHEMA_VERSION = "disagreement-handling-v1"
+
 ESCALATION_NONE = "none"
 ESCALATION_RECORD = "record"
 ESCALATION_CROSS_VALIDATE = "cross_validate"
@@ -131,6 +133,7 @@ def build_disagreement_handling_record(
 
     confidence_cap = _SPLIT_CONFIDENCE_CAP if escalation == ESCALATION_SPLIT else None
     return {
+        "schema_version": DISAGREEMENT_HANDLING_SCHEMA_VERSION,
         "enabled": True,
         "high_disagreement": bool(high_disagreement),
         "verdict_mode": verdict_mode,
@@ -293,6 +296,8 @@ def disagreement_handling_thresholds(config: Any) -> tuple[float, float]:
 def public_disagreement_handling_payload(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping) or not value:
         return None
+    if value.get("schema_version") != DISAGREEMENT_HANDLING_SCHEMA_VERSION:
+        return None
     if value.get("enabled") is not True:
         return None
     points: List[Dict[str, Any]] = []
@@ -328,6 +333,7 @@ def public_disagreement_handling_payload(value: Any) -> Optional[Dict[str, Any]]
         }
     policy = value.get("policy") if isinstance(value.get("policy"), Mapping) else {}
     return {
+        "schema_version": DISAGREEMENT_HANDLING_SCHEMA_VERSION,
         "enabled": True,
         "high_disagreement": bool(value.get("high_disagreement")),
         "verdict_mode": str(value.get("verdict_mode") or VERDICT_CONSENSUS),
@@ -675,6 +681,7 @@ def _optional_unit_float(value):
 
 
 __all__ = [
+    "DISAGREEMENT_HANDLING_SCHEMA_VERSION",
     "ESCALATION_NONE", "ESCALATION_RECORD", "ESCALATION_CROSS_VALIDATE", "ESCALATION_SPLIT",
     "VERDICT_CONSENSUS", "VERDICT_SPLIT", "VERDICT_INSUFFICIENT",
     "apply_disagreement_handling_to_synthesis", "build_disagreement_handling_record",
