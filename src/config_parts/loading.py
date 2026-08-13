@@ -977,6 +977,26 @@ class _ConfigLoadingMethods:
                 minimum=1,
                 maximum=50000,
             ),
+            agent_reflection_max_revise=parse_env_int(
+                os.getenv('AGENT_REFLECTION_MAX_REVISE'),
+                1,
+                field_name='AGENT_REFLECTION_MAX_REVISE',
+                minimum=0,
+            ),
+            agent_postmortem_enabled=parse_env_bool(
+                os.getenv('AGENT_POSTMORTEM_ENABLED'),
+                False,
+            ),
+            agent_postmortem_llm_budget=parse_env_int(
+                os.getenv('AGENT_POSTMORTEM_LLM_BUDGET'),
+                8,
+                field_name='AGENT_POSTMORTEM_LLM_BUDGET',
+                minimum=0,
+            ),
+            agent_postmortem_skip_clean_hits=parse_env_bool(
+                os.getenv('AGENT_POSTMORTEM_SKIP_CLEAN_HITS'),
+                True,
+            ),
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,

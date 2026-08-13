@@ -624,6 +624,183 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_REFLECTION_ENABLED": {
+        "title": "Run-local Reflection Loop",
+        "description": (
+            "Default-off run-local reflection after analysis/decision. Emits typed "
+            "ReflectionLesson values only; never mutates Agent Soul or ToolSurface "
+            "denials. LLM critique is hard-budgeted (see AGENT_REFLECTION_LLM_BUDGET)."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 64,
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
+        "examples": [
+            "AGENT_REFLECTION_ENABLED=false",
+            "AGENT_REFLECTION_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Agent reflection and post-mortem",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_REFLECTION_LLM_BUDGET": {
+        "title": "Reflection LLM Call Budget",
+        "description": (
+            "Maximum LLM calls for one run-local reflection loop (default 1). "
+            "Budget exhaustion records an explicit budget skip; it does not silently "
+            "continue as a successful reflection."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 65,
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
+        "examples": [
+            "AGENT_REFLECTION_LLM_BUDGET=1",
+            "AGENT_REFLECTION_LLM_BUDGET=0",
+        ],
+        "docs": [
+            {
+                "label": "Agent reflection and post-mortem",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_REFLECTION_MAX_REVISE": {
+        "title": "Reflection Max Revise Passes",
+        "description": (
+            "Maximum in-run revise passes after reflection critique (default 1). "
+            "Does not authorize Soul or ToolSurface mutation."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 66,
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
+        "examples": [
+            "AGENT_REFLECTION_MAX_REVISE=1",
+            "AGENT_REFLECTION_MAX_REVISE=0",
+        ],
+        "docs": [
+            {
+                "label": "Agent reflection and post-mortem",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_POSTMORTEM_ENABLED": {
+        "title": "Resolved Forecast Post-mortem",
+        "description": (
+            "Default-off automatic post-mortem on miss/partial resolved forecasts. "
+            "Produces typed lessons linked to the episode under a hard batch LLM "
+            "budget. Research/quality-ops only; never mutates Agent Soul."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 67,
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
+        "examples": [
+            "AGENT_POSTMORTEM_ENABLED=false",
+            "AGENT_POSTMORTEM_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Agent reflection and post-mortem",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_POSTMORTEM_LLM_BUDGET": {
+        "title": "Post-mortem Batch LLM Budget",
+        "description": (
+            "Maximum post-mortem LLM calls per resolution batch (default 8). "
+            "Exhaustion records budget_skipped per remaining item; no silent degradation."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "8",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 68,
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
+        "examples": [
+            "AGENT_POSTMORTEM_LLM_BUDGET=8",
+            "AGENT_POSTMORTEM_LLM_BUDGET=1",
+        ],
+        "docs": [
+            {
+                "label": "Agent reflection and post-mortem",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_POSTMORTEM_SKIP_CLEAN_HITS": {
+        "title": "Skip Post-mortem on Clean Hits",
+        "description": (
+            "When true (default), clean hit resolutions skip the post-mortem LLM path "
+            "to save cost. Miss and partial outcomes still enter the budgeted path."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 69,
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
+        "examples": [
+            "AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true",
+            "AGENT_POSTMORTEM_SKIP_CLEAN_HITS=false",
+        ],
+        "docs": [
+            {
+                "label": "Agent reflection and post-mortem",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_STEP_CRITIQUE_ENABLED": {
         "title": "Step Critique",
         "description": (
@@ -643,45 +820,6 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 726,
         "help_key": "settings.agent.multi_level_reflection",
         "examples": ["AGENT_STEP_CRITIQUE_ENABLED=false", "AGENT_STEP_CRITIQUE_ENABLED=true"],
-        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
-        "warning_codes": [],
-    },
-    "AGENT_REFLECTION_ENABLED": {
-        "title": "Reflection",
-        "description": (
-            "Default-off end-of-run trajectory reflection. Emits typed "
-            "ReflectionLesson values for episode storage. Never mutates Soul/ToolSurface."
-        ),
-        "category": "agent",
-        "data_type": "boolean",
-        "ui_control": "switch",
-        "is_sensitive": False,
-        "is_required": False,
-        "is_editable": True,
-        "default_value": "false",
-        "options": [],
-        "validation": {},
-        "display_order": 728,
-        "help_key": "settings.agent.multi_level_reflection",
-        "examples": ["AGENT_REFLECTION_ENABLED=false", "AGENT_REFLECTION_ENABLED=true"],
-        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
-        "warning_codes": [],
-    },
-    "AGENT_REFLECTION_LLM_BUDGET": {
-        "title": "Reflection Budget",
-        "description": "Maximum LLM calls for one trajectory reflection loop (default 1).",
-        "category": "agent",
-        "data_type": "integer",
-        "ui_control": "number",
-        "is_sensitive": False,
-        "is_required": False,
-        "is_editable": True,
-        "default_value": "1",
-        "options": [],
-        "validation": {"min": 0, "max": 1},
-        "display_order": 729,
-        "help_key": "settings.agent.multi_level_reflection",
-        "examples": ["AGENT_REFLECTION_LLM_BUDGET=1", "AGENT_REFLECTION_LLM_BUDGET=0"],
         "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
         "warning_codes": [],
     },
