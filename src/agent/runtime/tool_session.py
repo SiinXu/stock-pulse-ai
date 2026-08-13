@@ -598,8 +598,8 @@ class BoundToolSession:
                 and trust.get("instructions_authoritative") is False
             ):
                 # Untrusted document tools (earnings transcript, OCR, …) raise a
-                # follow-on fence so embedded document text cannot chain into
-                # other tools within the same execution turn.
+                # follow-on fence so attacker-controlled document text cannot
+                # chain-authorize other tools within the same execution turn.
                 self._untrusted_document_follow_on_fence = True
                 self._untrusted_document_source_tool = tool_name
             self._audit_trail.append(result["audit"])

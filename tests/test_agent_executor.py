@@ -568,7 +568,18 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.total_tokens, 0)
         self.assertEqual(usage["cache_observation"], "invalid_provider_usage")
-        persist_usage.assert_called_once_with(usage, "openai/gpt-test", call_type="agent")
+        persist_usage.assert_called_once()
+        self.assertEqual(persist_usage.call_args.args, (usage, "openai/gpt-test"))
+        self.assertEqual(
+            set(persist_usage.call_args.kwargs),
+            {"call_type", "run_id", "stage", "agent_mode", "latency_ms", "call_success"},
+        )
+        self.assertEqual(persist_usage.call_args.kwargs["call_type"], "agent")
+        self.assertEqual(persist_usage.call_args.kwargs["stage"], "agent_step")
+        self.assertEqual(persist_usage.call_args.kwargs["agent_mode"], "standard")
+        self.assertTrue(persist_usage.call_args.kwargs["call_success"])
+        self.assertGreaterEqual(persist_usage.call_args.kwargs["latency_ms"], 0)
+        self.assertEqual(len(persist_usage.call_args.kwargs["run_id"]), 16)
 
     def test_run_agent_loop_persists_agent_usage_with_provider_usage(self):
         registry = _make_registry_with_echo()
@@ -592,7 +603,18 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(result.total_tokens, 5)
-        persist_usage.assert_called_once_with(usage, "openai/gpt-test", call_type="agent")
+        persist_usage.assert_called_once()
+        self.assertEqual(persist_usage.call_args.args, (usage, "openai/gpt-test"))
+        self.assertEqual(
+            set(persist_usage.call_args.kwargs),
+            {"call_type", "run_id", "stage", "agent_mode", "latency_ms", "call_success"},
+        )
+        self.assertEqual(persist_usage.call_args.kwargs["call_type"], "agent")
+        self.assertEqual(persist_usage.call_args.kwargs["stage"], "agent_step")
+        self.assertEqual(persist_usage.call_args.kwargs["agent_mode"], "standard")
+        self.assertTrue(persist_usage.call_args.kwargs["call_success"])
+        self.assertGreaterEqual(persist_usage.call_args.kwargs["latency_ms"], 0)
+        self.assertEqual(len(persist_usage.call_args.kwargs["run_id"]), 16)
 
     def test_run_agent_loop_blocks_conflicting_stock_scoped_tool_and_keeps_tool_result(self):
         executed_calls = []

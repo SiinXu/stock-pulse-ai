@@ -1,0 +1,29 @@
+{
+  "schema_version": "perf-baseline-v1",
+  "workloads": [
+    {
+      "category": "analysis_run",
+      "duration_ms": 74.066,
+      "iterations": 8,
+      "name": "analysis_trend",
+      "notes": "StockTrendAnalyzer.analyze on 750 synthetic daily bars",
+      "ops_per_sec": 108.011
+    },
+    {
+      "category": "data_fetch",
+      "duration_ms": 59.19,
+      "iterations": 12,
+      "name": "data_fetch_indicators",
+      "notes": "BaseFetcher._calculate_indicators on 750 synthetic daily bars",
+      "ops_per_sec": 202.736
+    },
+    {
+      "category": "report_generate",
+      "duration_ms": 32.676,
+      "iterations": 6,
+      "name": "report_generate",
+      "notes": "generate_single_stock_report + generate_daily_report for 12 synthetic AnalysisResult rows",
+      "ops_per_sec": 183.624
+    }
+  ]
+}

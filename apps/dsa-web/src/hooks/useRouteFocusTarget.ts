@@ -8,14 +8,18 @@ import {
 
 export type { RouteFocusTarget } from '../contexts/routeFocusContext';
 
+/**
+ * Register the page H1 for post-navigation focus (#879 F3).
+ *
+ * Production always mounts RouteFocusCoordinator in App. When the context is
+ * missing (isolated unit tests / playground stories), registration is a no-op
+ * so page unit tests do not need a full coordinator shell.
+ */
 export function useRouteFocusTarget({ routeId, headingRef, ready }: RouteFocusTarget): void {
   const context = useContext(RouteFocusRegistrationContext);
-  if (!context) {
-    throw new Error('useRouteFocusTarget must be used inside RouteFocusCoordinator');
-  }
 
-  useLayoutEffect(
-    () => context.register({ routeId, headingRef, ready }),
-    [context, headingRef, ready, routeId],
-  );
+  useLayoutEffect(() => {
+    if (!context) return undefined;
+    return context.register({ routeId, headingRef, ready });
+  }, [context, headingRef, ready, routeId]);
 }

@@ -46,9 +46,13 @@ def _assert_error(
         "params",
         "details",
         "detail",
+        "category",
+        "severity",
         "trace_id",
     }
     assert body["error"] == code
+    assert isinstance(body["category"], str) and body["category"]
+    assert body["severity"] in {"info", "warning", "error", "critical"}
     if message is not None:
         assert body["message"] == message
     if params is not None:

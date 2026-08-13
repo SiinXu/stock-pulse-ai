@@ -41,6 +41,11 @@ export type UsageCallRecord = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  estimatedCostUsd?: number | null;
+  routeOutcome?: string | null;
+  stage?: string | null;
+  agentMode?: string | null;
+  costStatus?: string | null;
 };
 
 export type UsageDashboard = {
@@ -51,8 +56,18 @@ export type UsageDashboard = {
   totalPromptTokens?: number;
   totalCompletionTokens?: number;
   totalTokens: number;
+  totalEstimatedCostUsd?: number | null;
+  pricedCalls?: number;
+  unpricedCalls?: number;
+  routingPrimarySuccess?: number;
+  routingFallbackSuccess?: number;
+  routingFailed?: number;
+  routingSuccessRate?: number | null;
+  routingFallbackRate?: number | null;
   byCallType: UsageCallTypeBreakdown[];
   byModel: UsageModelBreakdown[];
+  byStage?: Array<{ stage: string; calls: number; totalTokens: number }>;
+  byAgentMode?: Array<{ agentMode: string; calls: number; totalTokens: number }>;
   recentCalls: UsageCallRecord[];
 };
 

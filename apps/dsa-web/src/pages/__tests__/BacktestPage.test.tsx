@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
   APP_ROUTE_PATHS,
@@ -148,28 +152,42 @@ beforeEach(() => {
   });
 });
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 describe('BacktestPage', () => {
   function renderPage() {
     return render(
-      <BrowserRouter>
-        <BacktestPage />
-      </BrowserRouter>,
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <BrowserRouter>
+          <BacktestPage />
+        </BrowserRouter>
+      </RouteFocusRegistrationContext.Provider>,
     );
   }
 
   function renderEnglishPage() {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     render(
-      <BrowserRouter>
-        <UiLanguageProvider>
-          <BacktestPage />
-        </UiLanguageProvider>
-      </BrowserRouter>,
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <BrowserRouter>
+          <UiLanguageProvider>
+            <BacktestPage />
+          </UiLanguageProvider>
+        </BrowserRouter>
+      </RouteFocusRegistrationContext.Provider>,
     );
   }
 
   it('renders shared surface inputs and prediction tracking outputs', async () => {
     renderPage();
+
+    expect(routeFocusRegister).toHaveBeenCalledWith(expect.objectContaining({
+      routeId: APP_ROUTE_PATHS.researchBacktest,
+      ready: true,
+    }));
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');

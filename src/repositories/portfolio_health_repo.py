@@ -220,3 +220,116 @@ class PortfolioHealthRepository(BaseRepository):
                 error_code="portfolio_health_get_error",
                 context=context,
             ) from exc
+
+    def list_recent_snapshots(
+        self,
+        *,
+        updated_from: Optional[datetime] = None,
+        limit: int = 500,
+    ) -> list[Dict[str, Any]]:
+        """Return newest durable health snapshots for inbox projection.
+
+        Rows are ordered by ``updated_at`` descending, then ``id`` descending.
+        Missing-schema failures raise ``RepositoryError`` with
+        ``portfolio_health_migration_required`` so the inbox can mark the
+        source temporarily unavailable without inventing occurrences.
+        """
+        safe_limit = max(1, min(int(limit), 5000))
+        since_text: Optional[str] = None
+        if updated_from is not None:
+            value = updated_from
+            if value.tzinfo is not None and value.utcoffset() is not None:
+                value = value.astimezone().replace(tzinfo=None)
+            since_text = value.replace(microsecond=0).isoformat(sep=" ")
+        context = {"limit": safe_limit, "updated_from": since_text}
+        try:
+            with self.db.get_session() as session:
+                if since_text is None:
+                    rows = session.execute(
+                        text(
+                            """
+                            SELECT
+                                id, account_key, snapshot_date, cost_method,
+                                score, status, band, calculated_at,
+                                created_at, updated_at
+                            FROM portfolio_health_snapshots
+                            ORDER BY updated_at DESC, id DESC
+                            LIMIT :limit
+                            """
+                        ),
+                        {"limit": safe_limit},
+                    ).fetchall()
+                else:
+                    rows = session.execute(
+                        text(
+                            """
+                            SELECT
+                                id, account_key, snapshot_date, cost_method,
+                                score, status, band, calculated_at,
+                                created_at, updated_at
+                            FROM portfolio_health_snapshots
+                            WHERE updated_at >= :updated_from
+                            ORDER BY updated_at DESC, id DESC
+                            LIMIT :limit
+                            """
+                        ),
+                        {"limit": safe_limit, "updated_from": since_text},
+                    ).fetchall()
+            results: list[Dict[str, Any]] = []
+            for row in rows:
+                mapping = row._mapping if hasattr(row, "_mapping") else None
+                if mapping is not None:
+                    results.append({
+                        "id": mapping["id"],
+                        "account_key": mapping["account_key"],
+                        "snapshot_date": mapping["snapshot_date"],
+                        "cost_method": mapping["cost_method"],
+                        "score": mapping["score"],
+                        "status": mapping["status"],
+                        "band": mapping["band"],
+                        "calculated_at": mapping["calculated_at"],
+                        "created_at": mapping["created_at"],
+                        "updated_at": mapping["updated_at"],
+                    })
+                    continue
+                results.append({
+                    "id": row[0],
+                    "account_key": row[1],
+                    "snapshot_date": row[2],
+                    "cost_method": row[3],
+                    "score": row[4],
+                    "status": row[5],
+                    "band": row[6],
+                    "calculated_at": row[7],
+                    "created_at": row[8],
+                    "updated_at": row[9],
+                })
+            return results
+        except OperationalError as exc:
+            if _is_missing_schema(exc):
+                raise RepositoryError(
+                    "Portfolio health migration is required",
+                    error_code="portfolio_health_migration_required",
+                    context=context,
+                ) from exc
+            self._log_and_raise(
+                logger,
+                "list portfolio health snapshots failed",
+                exc,
+                error_code="portfolio_health_list_error",
+                context=context,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - repository boundary
+            log_safe_exception(
+                logger,
+                "list portfolio health snapshots failed",
+                exc,
+                error_code="portfolio_health_list_error",
+                context=context,
+            )
+            raise RepositoryError(
+                "list portfolio health snapshots failed",
+                error_code="portfolio_health_list_error",
+                context=context,
+            ) from exc
+

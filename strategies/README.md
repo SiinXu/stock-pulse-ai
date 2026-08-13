@@ -61,10 +61,14 @@ aliases: [我的战法, 我的模型]
 # default_router: 是否属于路由 fallback 技能集
 # default_priority: 默认展示/排序优先级，数值越小越靠前
 # market_regimes: 该技能优先适配的市场状态标签
+# version: 可选作者版本号；缺省时使用 content-addressed 标识 ca-<hash12>（#249）
+# lifecycle: 可选 draft|active|deprecated|archived（默认 active；晋升见 #1093）
 default_active: true
 default_router: false
 default_priority: 100
 market_regimes: [trending_up]
+# version: "1.0.0"
+# lifecycle: active
 
 # 策略详细说明（自然语言，支持 Markdown 格式）
 instructions: |
@@ -97,6 +101,9 @@ instructions: |
 | 7 | 强势趋势股放宽：龙头股可适当放宽标准 |
 
 ## 投资委员会 Persona Skills（默认关闭）
+
+完整合同见 [Investor Personas](../docs/investor-personas_EN.md) / [投资者 Persona](../docs/investor-personas.md)（#119/#467）。人物名别名仅为风格参考。
+
 
 `personas/` 提供五个互补的研究视角：价值与护城河、心智模型、逆向深度价值、颠覆式成长和尾部风险。它们是普通 YAML Skill，会随内置 catalog 一起被发现，但全部声明 `default_active: false` 和 `default_router: false`，因此留空 `AGENT_SKILLS` 时仍只使用既有默认策略，不会改变默认分析结果。
 

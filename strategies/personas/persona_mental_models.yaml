@@ -8,7 +8,8 @@ required_tools:
   - get_stock_info
   - get_daily_history
   - search_comprehensive_intel
-aliases: [心智模型, 反演, 多学科检查]
+# Style-reference aliases only (not affiliation or return endorsement).
+aliases: [心智模型, 反演, 多学科检查, munger-style, 芒格风格]
 default_active: false
 default_router: false
 default_priority: 220

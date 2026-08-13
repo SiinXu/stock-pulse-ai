@@ -3,6 +3,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import NotificationCenterPage from '../NotificationCenterPage';
 
@@ -19,15 +23,23 @@ vi.mock('../../api/notificationInbox', () => ({
   },
 }));
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 function renderPage() {
   return render(
-    <UiLanguageProvider initialLanguage="en">
+    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <UiLanguageProvider initialLanguage="en">
       <MemoryRouter>
         <NotificationCenterPage />
       </MemoryRouter>
-    </UiLanguageProvider>,
+    </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>,
   );
 }
+
 
 describe('NotificationCenterPage', () => {
   beforeEach(() => {

@@ -555,7 +555,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         {isHistoryOpen ? (
           <aside
             id="investment-framework-history-drawer"
-            className="min-w-0 self-start rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card"
+            className="min-w-0 self-start rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] density-surface-pad-sm"
             aria-label={t('settings.frameworkHistory')}
           >
             <div className="flex items-start justify-between gap-3">

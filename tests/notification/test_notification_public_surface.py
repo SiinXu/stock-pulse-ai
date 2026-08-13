@@ -22,9 +22,9 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     NotificationNoiseDecision NotificationService NtfySender Optional
     PushoverSender PushplusSender ReportType Serverchan3Sender SlackSender
     TYPE_CHECKING TelegramSender Tuple WECHAT_IMAGE_MAX_BYTES WechatSender
-    annotations dataclass datetime display_action_fields_for_result
+    annotations datetime display_action_fields_for_result
     display_decision_type_for_result display_operation_advice_for_result
-    evaluate_notification_noise field format_public_market_status_line
+    evaluate_notification_noise format_public_market_status_line
     format_public_phase_pack_excerpt format_strategy_skill_items
     get_chip_unavailable_reason get_config get_localized_stock_name
     get_notification_route_config get_notification_service get_report_labels
@@ -95,6 +95,7 @@ EXPECTED_UNRESOLVED_HINT_METHODS = frozenset(
         "_get_display_operation_advice",
         "_get_fundamental_blocks",
         "_get_history_compare_context",
+        "_prepend_report_delta_section",
         "_get_signal_level",
         "_public_market_status_line",
         "_public_phase_pack_excerpt",
@@ -118,6 +119,7 @@ EXPECTED_GROUPS = (
             "_get_labels",
             "_get_display_name",
             "_get_history_compare_context",
+            "_prepend_report_delta_section",
             "generate_aggregate_report",
             "_collect_models_used",
             "_public_phase_pack_excerpt",
@@ -125,7 +127,7 @@ EXPECTED_GROUPS = (
             "_append_market_status_line",
             "_should_show_llm_model",
         ),
-        "2b2ae6b5437065cff1cba53b5a9897c4bcafe6937586171fa07739b0c68ec79c",
+        "e43757976154d28c970d1a9e385f980d0b5735459ff4834014aa8728668bcd82",
     ),
     (
         "_RoutingMethods",
@@ -185,7 +187,7 @@ EXPECTED_GROUPS = (
             "_append_institutional_flow",
             "_append_related_boards",
         ),
-        "8354d7d3976ce5bc42bd8af959d226da4e54df254107efb1d9e4bb3511cbbb0e",
+        "0129790cc3f7a29bf5699dfc3fe39508f5d07035df07ba7594a446d813f23343",  # committee rendering
     ),
     (
         "_DispatchMethods",
@@ -197,11 +199,12 @@ EXPECTED_GROUPS = (
             "_send_to_plugin_channel",
             "send_with_results",
             "_send_with_results_under_lease",
+            "get_last_dispatch_result",
             "send",
             "save_report_to_file",
             "save_and_send_feishu_file",
         ),
-        "bd3a155f47f94c13080048d5fc01ce42920930567516054625c87b4ac0e81aa2",
+        "9106021ab3dcb5d7b052be63948cf899677b636b533a976dbd7c27fec49abbf5",
     ),
 )
 
@@ -363,7 +366,7 @@ def test_notification_method_order_matches_pre_split_contract():
         )
     )
 
-    assert len(expected_names) == 67
+    assert len(expected_names) == 69
     assert actual_names == expected_names
 
 

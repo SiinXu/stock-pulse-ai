@@ -9,7 +9,7 @@ enable the canonical ``LOCAL_ONLY_MODE`` gate.
 
 Supported document kinds (issue #196 coverage expansion):
 ``screenshot``, ``filing_page``, ``table_statement``, ``chart_annotation``,
-and ``pdf_page`` (embedded raster pages; text-layer PDFs stay with
+and ``pdf_page`` (embedded raster pages only; text-layer PDFs stay with
 ``parse_financial_pdf``). OCR output is never decision-authoritative.
 """
 
@@ -55,9 +55,6 @@ MAX_OCR_DECODED_PIXELS = 25_000_000
 MAX_OCR_DIMENSION = 10_000
 MAX_OCR_FRAMES = 1
 MAX_OCR_PDF_PAGE_INDEX = 49
-MAX_OCR_CANDIDATE_ROWS = 40
-MAX_OCR_CANDIDATE_COLS = 12
-MAX_OCR_ANNOTATION_TOKENS = 32
 DEFAULT_OCR_TIMEOUT_SECONDS = 30
 MIN_OCR_TIMEOUT_SECONDS = 1
 MAX_OCR_TIMEOUT_SECONDS = 120
@@ -73,13 +70,6 @@ OCR_DOCUMENT_KINDS = frozenset(
         "pdf_page",
     }
 )
-_TESSERACT_CONFIG_BY_KIND = {
-    "screenshot": "--psm 6",
-    "filing_page": "--psm 4",
-    "table_statement": "--psm 6",
-    "chart_annotation": "--psm 11",
-    "pdf_page": "--psm 4",
-}
 
 ALLOWED_OCR_IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 ALLOWED_OCR_PDF_SUFFIXES = frozenset({".pdf"})
@@ -145,6 +135,18 @@ _REDACTION_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
 OcrEngine = Callable[[bytes, str, str], str]
 """``(image_bytes, mime_type, langs) -> raw text`` test/extension contract."""
 
+MAX_OCR_CANDIDATE_ROWS = 40
+MAX_OCR_CANDIDATE_COLS = 12
+MAX_OCR_ANNOTATION_TOKENS = 32
+
+_TESSERACT_CONFIG_BY_KIND: dict[str, str] = {
+    "screenshot": "--psm 6",
+    "filing_page": "--psm 4",
+    "table_statement": "--psm 6",
+    "chart_annotation": "--psm 11",
+    "pdf_page": "--psm 4",
+}
+
 
 def _truncate_utf8(text: str, max_bytes: int) -> tuple[str, bool]:
     encoded = text.encode("utf-8")
@@ -184,77 +186,6 @@ def clamp_ocr_page_index(raw: Any) -> int:
     return max(0, min(value, MAX_OCR_PDF_PAGE_INDEX))
 
 
-def _structure_for_kind(document_kind: str, redacted_text: str) -> dict[str, Any]:
-    """Best-effort structural hints that never claim verified cells or semantics."""
-    kind = normalize_ocr_document_kind(document_kind)
-    if kind == "table_statement":
-        rows: list[list[str]] = []
-        for line in str(redacted_text or "").splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            cells = [cell for cell in re.split(r"\s{2,}|\t+", stripped) if cell]
-            if len(cells) <= 1:
-                cells = [cell for cell in re.split(r"\s+", stripped) if cell]
-            if not cells:
-                continue
-            rows.append(cells[:MAX_OCR_CANDIDATE_COLS])
-            if len(rows) >= MAX_OCR_CANDIDATE_ROWS:
-                break
-        return {
-            "status": "unverified_candidates",
-            "kind": kind,
-            "verified": False,
-            "decision_authority": False,
-            "candidate_rows": rows,
-            "row_count": len(rows),
-            "note": "Whitespace-split recovery only; not verified brokerage table cells.",
-        }
-    if kind == "chart_annotation":
-        tokens: list[str] = []
-        for match in re.finditer(
-            r"(?i)\b(?:support|resistance|ma\d{1,3}|breakout|stop|target|"
-            r"支撑|压力|均线|突破)\b|"
-            r"[-+]?\d{1,6}(?:\.\d{1,4})%?",
-            str(redacted_text or ""),
-        ):
-            token = match.group(0).strip()
-            if token and token not in tokens:
-                tokens.append(token)
-            if len(tokens) >= MAX_OCR_ANNOTATION_TOKENS:
-                break
-        return {
-            "status": "unverified_candidates",
-            "kind": kind,
-            "verified": False,
-            "decision_authority": False,
-            "not_chart_semantics": True,
-            "use_for_semantic_chart": "read_price_chart",
-            "candidate_tokens": tokens,
-            "token_count": len(tokens),
-            "note": "Sparse label recovery only; not semantic K-line interpretation.",
-        }
-    if kind in {"filing_page", "pdf_page"}:
-        return {
-            "status": "raw_text_only",
-            "kind": kind,
-            "verified": False,
-            "decision_authority": False,
-            "note": (
-                "Filing/PDF page image OCR; text-layer PDFs should use "
-                "parse_financial_pdf when available."
-            ),
-        }
-    return {
-        "status": "raw_text_only",
-        "kind": kind,
-        "verified": False,
-        "decision_authority": False,
-        "note": "Bounded screenshot text recovery only.",
-    }
-
-
-
 def _result(
     *,
     status: str,
@@ -288,6 +219,7 @@ def _result(
             "trust": "untrusted_document_data",
             "instructions_authoritative": False,
             "decision_authority": False,
+            "authoritative_for_decisions": False,
             "boundary": "text JSON field only",
             "original_char_count": max(0, int(original_char_count)),
             "original_line_count": max(0, int(original_line_count)),
@@ -295,12 +227,16 @@ def _result(
             "redaction_counts": dict(redaction_counts or {}),
             "truncated": False,
         },
+        # Top-level trust envelope mirrors untrusted document tools so
+        # BoundToolSession can apply the follow-on fence without treating OCR
+        # text as decision- or permission-authoritative.
         "trust": {
             "classification": "untrusted_user_document",
             "instructions_authoritative": False,
             "may_grant_permissions": False,
             "may_change_stock_scope": False,
             "may_authorize_actions": False,
+            "may_authorize_decisions": False,
             "authoritative_for_decisions": False,
             "decision_authority": False,
             "local_parsing": True,
@@ -421,6 +357,76 @@ def _redact_ocr_text(raw_text: str) -> tuple[str, dict[str, int]]:
     return redacted, counts
 
 
+def _structure_for_kind(document_kind: str, redacted_text: str) -> dict[str, Any]:
+    """Best-effort structural hints that never claim verified cells or semantics."""
+    kind = normalize_ocr_document_kind(document_kind)
+    if kind == "table_statement":
+        rows: list[list[str]] = []
+        for line in str(redacted_text or "").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            cells = [cell for cell in re.split(r"\s{2,}|\t+", stripped) if cell]
+            if len(cells) <= 1:
+                cells = [cell for cell in re.split(r"\s+", stripped) if cell]
+            if not cells:
+                continue
+            rows.append(cells[:MAX_OCR_CANDIDATE_COLS])
+            if len(rows) >= MAX_OCR_CANDIDATE_ROWS:
+                break
+        return {
+            "status": "unverified_candidates",
+            "kind": kind,
+            "verified": False,
+            "decision_authority": False,
+            "candidate_rows": rows,
+            "row_count": len(rows),
+            "note": "Whitespace-split recovery only; not verified brokerage table cells.",
+        }
+    if kind == "chart_annotation":
+        tokens: list[str] = []
+        for match in re.finditer(
+            r"(?i)\b(?:support|resistance|ma\d{1,3}|breakout|stop|target|"
+            r"支撑|压力|均线|突破)\b|"
+            r"[-+]?\d{1,6}(?:\.\d{1,4})%?",
+            str(redacted_text or ""),
+        ):
+            token = match.group(0).strip()
+            if token and token not in tokens:
+                tokens.append(token)
+            if len(tokens) >= MAX_OCR_ANNOTATION_TOKENS:
+                break
+        return {
+            "status": "unverified_candidates",
+            "kind": kind,
+            "verified": False,
+            "decision_authority": False,
+            "not_chart_semantics": True,
+            "use_for_semantic_chart": "read_price_chart",
+            "candidate_tokens": tokens,
+            "token_count": len(tokens),
+            "note": "Sparse label recovery only; not semantic K-line interpretation.",
+        }
+    if kind in {"filing_page", "pdf_page"}:
+        return {
+            "status": "raw_text_only",
+            "kind": kind,
+            "verified": False,
+            "decision_authority": False,
+            "note": (
+                "Filing/PDF page image OCR; text-layer PDFs should use "
+                "parse_financial_pdf when available."
+            ),
+        }
+    return {
+        "status": "raw_text_only",
+        "kind": kind,
+        "verified": False,
+        "decision_authority": False,
+        "note": "Bounded screenshot text recovery only.",
+    }
+
+
 def assess_ocr_dependencies(
     *, import_probe: Optional[Callable[[str], bool]] = None,
 ) -> dict[str, Any]:
@@ -511,7 +517,10 @@ def _bind_default_tesseract_engine(document_kind: str) -> OcrEngine:
 
     def _engine(image_bytes: bytes, mime_type: str, langs: str) -> str:
         return _default_tesseract_engine(
-            image_bytes, mime_type, langs, document_kind=kind
+            image_bytes,
+            mime_type,
+            langs,
+            document_kind=kind,
         )
 
     return _engine
@@ -653,25 +662,73 @@ def _guess_image_mime(image_bytes: bytes, suggested_name: str = "") -> str:
     raise ValueError("unsupported_embedded_image")
 
 
-def _extract_pdf_page_image(
+def _estimate_pdf_page_count(pdf_bytes: bytes) -> int:
+    """Best-effort page count without optional PDF libraries."""
+    matches = re.findall(rb"/Type\s*/Page(?![sA-Za-z])", pdf_bytes)
+    return max(1, len(matches)) if matches else 1
+
+
+def _extract_embedded_images_builtin(pdf_bytes: bytes) -> list[tuple[bytes, str]]:
+    """Scan PDF bytes for embedded JPEG/PNG payloads without pypdf.
+
+    Used when optional pypdf is not installed (CI baseline). Does not rasterize
+    vector or text-only pages; returns only complete image payloads found
+    inline. Prefer pypdf when available for multi-page object graph accuracy.
+    """
+    found: list[tuple[bytes, str]] = []
+    seen: set[bytes] = set()
+
+    # JPEG: SOI ... EOI markers.
+    cursor = 0
+    while True:
+        start = pdf_bytes.find(b"\xff\xd8\xff", cursor)
+        if start < 0:
+            break
+        end = pdf_bytes.find(b"\xff\xd9", start + 3)
+        if end < 0:
+            break
+        end += 2
+        blob = pdf_bytes[start:end]
+        cursor = end
+        if len(blob) < 64 or len(blob) > MAX_OCR_IMAGE_BYTES:
+            continue
+        digest = hashlib.sha256(blob).digest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        found.append((blob, "image/jpeg"))
+
+    # PNG: signature ... IEND chunk + CRC.
+    cursor = 0
+    while True:
+        start = pdf_bytes.find(b"\x89PNG\r\n\x1a\n", cursor)
+        if start < 0:
+            break
+        iend = pdf_bytes.find(b"IEND", start + 8)
+        if iend < 0:
+            break
+        end = iend + 8  # "IEND" + 4-byte CRC
+        if end > len(pdf_bytes):
+            break
+        blob = pdf_bytes[start:end]
+        cursor = end
+        if len(blob) < 64 or len(blob) > MAX_OCR_IMAGE_BYTES:
+            continue
+        digest = hashlib.sha256(blob).digest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        found.append((blob, "image/png"))
+
+    return found
+
+
+def _extract_pdf_page_image_pypdf(
     pdf_bytes: bytes,
     *,
-    page_index: int = 0,
+    page_index: int,
 ) -> tuple[bytes, str, dict[str, Any]]:
-    """Extract one embedded raster from a PDF page for offline OCR.
-
-    Does not rasterize vector/text-only pages. Text-layer PDFs remain owned by
-    ``parse_financial_pdf``. Missing images degrade with an explicit reason.
-    """
-    try:
-        from pypdf import PdfReader  # type: ignore[import-not-found]
-    except Exception as exc:  # broad-exception: fallback_recorded - optional path
-        logger.debug(
-            "OCR PDF reader unavailable error_code=pdf_reader_unavailable "
-            "exception_type=%s",
-            type(exc).__name__,
-        )
-        raise ValueError("pdf_reader_unavailable") from exc
+    from pypdf import PdfReader  # type: ignore[import-not-found]
 
     try:
         reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
@@ -707,8 +764,8 @@ def _extract_pdf_page_image(
         image_bytes = bytes(getattr(first, "data", b"") or b"")
     except Exception as exc:  # broad-exception: fallback_recorded - image payload edge cases
         logger.debug(
-            "OCR PDF image payload failed error_code=pdf_image_extract_failed "
-            "exception_type=%s",
+            "OCR PDF embedded image payload failed "
+            "error_code=pdf_image_extract_failed exception_type=%s",
             type(exc).__name__,
         )
         raise ValueError("pdf_image_extract_failed") from exc
@@ -724,9 +781,96 @@ def _extract_pdf_page_image(
         "pdf_page_count": int(page_count),
         "pdf_embedded_image_count": len(images),
         "embedded_image_name_present": bool(suggested),
+        "pdf_extractor": "pypdf",
         "input_form": "pdf_page_raster",
     }
     return image_bytes, mime_type, meta
+
+
+def _extract_pdf_page_image_builtin(
+    pdf_bytes: bytes,
+    *,
+    page_index: int,
+) -> tuple[bytes, str, dict[str, Any]]:
+    if page_index < 0:
+        raise ValueError("pdf_page_out_of_range")
+
+    page_count = _estimate_pdf_page_count(pdf_bytes)
+    images = _extract_embedded_images_builtin(pdf_bytes)
+    if not images:
+        raise ValueError("pdf_no_embedded_image")
+
+    # Builtin scan cannot map XObjects to page trees reliably. Bound the index
+    # by the larger of detected page objects and embedded image count.
+    bound = max(page_count, len(images))
+    if page_index >= bound:
+        raise ValueError("pdf_page_out_of_range")
+
+    pick = images[min(page_index, len(images) - 1)]
+    image_bytes, mime_type = pick
+    meta = {
+        "pdf_page_index": int(page_index),
+        "pdf_page_count": int(page_count),
+        "pdf_embedded_image_count": len(images),
+        "embedded_image_name_present": False,
+        "pdf_extractor": "builtin_scan",
+        "input_form": "pdf_page_raster",
+    }
+    return image_bytes, mime_type, meta
+
+
+def _extract_pdf_page_image(
+    pdf_bytes: bytes,
+    *,
+    page_index: int = 0,
+) -> tuple[bytes, str, dict[str, Any]]:
+    """Extract one embedded raster from a PDF page for offline OCR.
+
+    This intentionally does not rasterize vector/text-only pages. Text-layer
+    PDFs remain owned by ``parse_financial_pdf``. Missing or unreadable
+    embedded images degrade with an explicit reason code rather than inventing
+    pixels.
+
+    Prefers optional pypdf when installed; falls back to a pure-Python scan of
+    embedded JPEG/PNG payloads so CI baseline hosts without pypdf still cover
+    raster PDF fixtures.
+    """
+    pypdf_error: Optional[BaseException] = None
+    try:
+        import pypdf  # type: ignore[import-not-found]  # noqa: F401
+
+        return _extract_pdf_page_image_pypdf(pdf_bytes, page_index=page_index)
+    except ImportError as exc:
+        pypdf_error = exc
+        logger.debug(
+            "OCR PDF reader unavailable; using builtin embedded-image scan "
+            "error_code=pdf_reader_unavailable exception_type=%s",
+            type(exc).__name__,
+        )
+    except ValueError:
+        # Domain errors from pypdf path (no image, bad page, malformed) stay.
+        raise
+    except Exception as exc:  # broad-exception: fallback_recorded - optional path
+        pypdf_error = exc
+        logger.debug(
+            "OCR PDF pypdf path failed; trying builtin scan "
+            "error_code=pdf_image_extract_failed exception_type=%s",
+            type(exc).__name__,
+        )
+
+    try:
+        return _extract_pdf_page_image_builtin(pdf_bytes, page_index=page_index)
+    except ValueError:
+        raise
+    except Exception as exc:  # broad-exception: fallback_recorded - builtin path
+        logger.debug(
+            "OCR PDF builtin image scan failed error_code=pdf_image_extract_failed "
+            "exception_type=%s",
+            type(exc).__name__,
+        )
+        if pypdf_error is not None:
+            raise ValueError("pdf_image_extract_failed") from exc
+        raise ValueError("pdf_image_extract_failed") from exc
 
 
 _OCR_POLICY_DENY_REASONS = frozenset(
@@ -758,6 +902,7 @@ _OCR_POLICY_DENY_REASONS = frozenset(
         "pdf_no_embedded_image",
         "pdf_image_extract_failed",
         "unsupported_embedded_image",
+        "invalid_document_kind",
         "special_file_not_allowed",
         "empty_file",
         "malformed_image",
@@ -801,7 +946,13 @@ class OcrExtractionService:
         document_kind: Optional[str] = None,
         page_index: int = 0,
     ) -> dict[str, Any]:
-        """Extract text with a durable local-process security-audit trail."""
+        """Extract text with a durable local-process security-audit trail.
+
+        Attempt is recorded before path policy evaluation. Deny and failure
+        paths complete the same correlation id. Audit storage outages raise
+        ``SecurityAuditUnavailable`` (fail closed) rather than silently
+        continuing the local worker process.
+        """
         from src.services.local_process_audit import get_local_process_auditor
         from src.services.security_audit_service import SecurityAuditUnavailable
 

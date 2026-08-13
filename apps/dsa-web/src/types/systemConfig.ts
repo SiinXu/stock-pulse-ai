@@ -206,6 +206,80 @@ export interface KronosStatusResponse {
   downloadSizeHint?: string | null;
 }
 
+export type DataProviderRuntimeSourceState = 'ok' | 'not_initialized' | 'error';
+export type DataProviderRole = 'baseline' | 'enhancer' | 'specialist';
+export type DataProviderHealthStatus =
+  | 'healthy'
+  | 'degraded'
+  | 'unknown'
+  | 'unavailable'
+  | 'not_configured'
+  | 'circuit_open'
+  | 'failed';
+export type DataProviderMarketQuality = 'ok' | 'degraded' | 'unknown' | 'unavailable';
+export type DataProviderCacheQuality =
+  | 'active'
+  | 'idle'
+  | 'cold'
+  | 'stale'
+  | 'local_only'
+  | 'unknown';
+
+export interface DataProviderRuntimeMarketChain {
+  market: string;
+  dataType: string;
+  orderedProviderIds: string[];
+  primaryProviderId?: string | null;
+  fallbackProviderIds: string[];
+  primarySelection?: string | null;
+  quality: DataProviderMarketQuality;
+  asOf?: string | null;
+}
+
+export interface DataProviderRuntimeProviderStatus {
+  providerId: string;
+  displayName: string;
+  role: DataProviderRole;
+  markets: string[];
+  capabilities: string[];
+  configured?: boolean | null;
+  available: boolean;
+  healthStatus: DataProviderHealthStatus;
+  healthScore?: number | null;
+  circuitState?: string | null;
+  sampleCount: number;
+  staticPriority?: number | null;
+  lastSuccessAt?: string | null;
+  lastFailureAt?: string | null;
+  failureReason?: string | null;
+  isPrimaryFor: string[];
+  isFallbackFor: string[];
+  configDirectory: boolean;
+}
+
+export interface DataProviderRuntimeCacheStatus {
+  enabled?: boolean | null;
+  fetchMode?: string | null;
+  hits?: number | null;
+  misses?: number | null;
+  staleHits?: number | null;
+  writes?: number | null;
+  quality: DataProviderCacheQuality;
+  note?: string | null;
+}
+
+export interface DataProviderRuntimeStatusResponse {
+  schemaVersion: string;
+  asOf: string;
+  partial: boolean;
+  sourceState: DataProviderRuntimeSourceState;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  markets: DataProviderRuntimeMarketChain[];
+  providers: DataProviderRuntimeProviderStatus[];
+  cache?: DataProviderRuntimeCacheStatus | null;
+}
+
 export type LLMConfigMode = 'auto' | 'channels' | 'yaml' | 'legacy';
 export type LLMConfigModeSource = 'yaml' | 'channels' | 'legacy';
 
@@ -404,7 +478,8 @@ export interface SchedulerStatusResponse {
   enabled: boolean;
   running: boolean;
   attached?: boolean;
-  processMode?: 'serve' | 'desktop' | 'not_attached';
+  /** Authoritative process mode. Legacy `serve` may appear from older servers. */
+  processMode?: 'serve+schedule' | 'desktop' | 'cli-schedule' | 'not_attached' | 'serve';
   scheduleTimezone?: string;
   runNowAvailable?: boolean;
   runNowBlockReason?: string | null;
