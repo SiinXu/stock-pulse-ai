@@ -16,7 +16,11 @@ from src.agent.persona_catalog import (
 )
 from src.report_language import normalize_report_language
 from src.schemas.investment_framework import InvestmentFrameworkAnalysisContext
-from src.schemas.investor_persona import ActiveResearchPersona, ResearchStanceContent
+from src.schemas.investor_persona import (
+    ActiveResearchPersona,
+    ResearchPersonaSource,
+    ResearchStanceContent,
+)
 from src.services.investment_framework_prompt import load_active_framework_context_soft
 
 RESEARCH_PERSONA_PROMPT_KEY = "research_persona_prompt"
@@ -114,7 +118,7 @@ def resolve_active_research_persona(
     preset_id: Optional[str] = None
     custom_text: Optional[str] = None
     preferred_lenses: list[str] = []
-    source = "off"
+    source: ResearchPersonaSource = "off"
 
     if framework_context is None and _load_framework_if_missing:
         framework_context = load_active_framework_context_soft()
@@ -158,7 +162,7 @@ def resolve_active_research_persona(
         enabled=True,
         preset_id=preset_id,
         display_name=display_name,
-        source=source,  # type: ignore[arg-type]
+        source=source,
         style_references=style_refs[:_STYLE_REF_MAX],
         preferred_lens_skill_ids=list(preferred_lenses),
         has_custom_text=bool(custom_text),
