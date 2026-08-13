@@ -27,8 +27,28 @@ export interface BacktestAppliedConfig {
   limit: number;
   engineVersion: string;
   neutralBandPct: number;
+  commissionBps?: number;
+  slippageBps?: number;
+  roundTripCostPct?: number;
   analysisDateFrom?: string | null;
   analysisDateTo?: string | null;
+}
+
+export interface BacktestMethodology {
+  version?: string;
+  engineVersion: string;
+  metricSource?: string;
+  evalWindowDays?: number | null;
+  isReturnPromise: boolean;
+  disclaimer: string;
+  disclaimerCodes?: string[];
+  lookAheadPolicy?: string;
+  survivorshipPolicy?: string;
+  costModel?: Record<string, unknown>;
+  sampleSplit?: Record<string, unknown>;
+  returnUnits?: string;
+  currencyPolicy?: string;
+  limitations?: string[];
 }
 
 export interface BacktestRunResponse {
@@ -41,6 +61,8 @@ export interface BacktestRunResponse {
   appliedEvalWindowDays: number | null;
   /** Echo of the effective run configuration for result honesty. */
   appliedConfig?: BacktestAppliedConfig | null;
+  /** Methodology limitations; never a return promise. */
+  methodology?: BacktestMethodology | null;
   message?: string | null;
   diagnostics?: Record<string, unknown>;
 }
@@ -104,6 +126,7 @@ export interface BacktestResultsResponse {
 export interface PerformanceMetrics {
   scope: string;
   code?: string;
+  skillId?: string | null;
   evalWindowDays: number;
   engineVersion: string;
   computedAt?: string;
@@ -131,4 +154,5 @@ export interface PerformanceMetrics {
   /** OpenAPI: optional. */
   adviceBreakdown?: Record<string, unknown>;
   diagnostics?: Record<string, unknown>;
+  methodology?: BacktestMethodology | null;
 }

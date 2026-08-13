@@ -4370,6 +4370,12 @@
             "description": "Normalized stock filter, if any",
             "title": "Code"
           },
+          "commission_bps": {
+            "default": 0.0,
+            "description": "Commission cost in basis points per side applied to simulated long returns",
+            "title": "Commission Bps",
+            "type": "number"
+          },
           "engine_version": {
             "description": "Effective backtest engine version label",
             "title": "Engine Version",
@@ -4400,6 +4406,18 @@
             "description": "Neutral outcome band percentage",
             "title": "Neutral Band Pct",
             "type": "number"
+          },
+          "round_trip_cost_pct": {
+            "default": 0.0,
+            "description": "Total round-trip cost percentage deducted from long simulated returns",
+            "title": "Round Trip Cost Pct",
+            "type": "number"
+          },
+          "slippage_bps": {
+            "default": 0.0,
+            "description": "Slippage cost in basis points per side applied to simulated long returns",
+            "title": "Slippage Bps",
+            "type": "number"
           }
         },
         "required": [
@@ -4410,6 +4428,103 @@
           "neutral_band_pct"
         ],
         "title": "BacktestAppliedConfig",
+        "type": "object"
+      },
+      "BacktestMethodology": {
+        "description": "Research-honesty methodology block. Never a return promise.",
+        "properties": {
+          "cost_model": {
+            "additionalProperties": true,
+            "title": "Cost Model",
+            "type": "object"
+          },
+          "currency_policy": {
+            "default": "percent_returns_currency_agnostic;absolute_prices_not_aggregated_across_currencies",
+            "title": "Currency Policy",
+            "type": "string"
+          },
+          "disclaimer": {
+            "description": "Primary user-facing limitation statement (historical simulation only)",
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "disclaimer_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disclaimer Codes",
+            "type": "array"
+          },
+          "engine_version": {
+            "description": "Engine version label for the run/summary",
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "eval_window_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Evaluation window when known",
+            "title": "Eval Window Days"
+          },
+          "is_return_promise": {
+            "default": false,
+            "description": "Always false. Metrics must not be presented as guaranteed future returns.",
+            "title": "Is Return Promise",
+            "type": "boolean"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "look_ahead_policy": {
+            "default": "forward_only_after_resolved_start_session",
+            "description": "Look-ahead bias protection policy",
+            "title": "Look Ahead Policy",
+            "type": "string"
+          },
+          "metric_source": {
+            "default": "analysis_advice",
+            "description": "analysis_advice | skill_opinion_outcomes",
+            "title": "Metric Source",
+            "type": "string"
+          },
+          "return_units": {
+            "default": "percent_relative",
+            "title": "Return Units",
+            "type": "string"
+          },
+          "sample_split": {
+            "additionalProperties": true,
+            "title": "Sample Split",
+            "type": "object"
+          },
+          "survivorship_policy": {
+            "default": "analyzed_universe_only",
+            "description": "Survivorship bias disclosure policy",
+            "title": "Survivorship Policy",
+            "type": "string"
+          },
+          "version": {
+            "default": "v1",
+            "description": "Methodology contract version",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine_version",
+          "disclaimer"
+        ],
+        "title": "BacktestMethodology",
         "type": "object"
       },
       "BacktestResultItem": {
@@ -4980,6 +5095,17 @@
             ],
             "description": "空结果或降级时的诊断说明",
             "title": "Message"
+          },
+          "methodology": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMethodology"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Methodology limitations; historical simulation only, not a return promise"
           },
           "processed": {
             "description": "候选记录数",
@@ -17115,6 +17241,17 @@
             "title": "Loss Count",
             "type": "integer"
           },
+          "methodology": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMethodology"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Methodology limitations; never a return promise"
+          },
           "neutral_count": {
             "title": "Neutral Count",
             "type": "integer"
@@ -17133,6 +17270,18 @@
           "scope": {
             "title": "Scope",
             "type": "string"
+          },
+          "skill_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when scope=skill (YAML skill / strategy metrics)",
+            "title": "Skill Id"
           },
           "stop_loss_trigger_rate": {
             "anyOf": [
@@ -37813,6 +37962,42 @@
               "description": "分析阶段过滤：premarket/intraday/postmarket/unknown",
               "title": "Analysis Phase"
             }
+          },
+          {
+            "description": "Sample split: full | in_sample | out_of_sample",
+            "in": "query",
+            "name": "sample_split",
+            "required": false,
+            "schema": {
+              "default": "full",
+              "description": "Sample split: full | in_sample | out_of_sample",
+              "enum": [
+                "full",
+                "in_sample",
+                "out_of_sample"
+              ],
+              "title": "Sample Split",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required when sample_split is in_sample or out_of_sample",
+            "in": "query",
+            "name": "split_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Required when sample_split is in_sample or out_of_sample",
+              "title": "Split Date"
+            }
           }
         ],
         "responses": {
@@ -37966,6 +38151,42 @@
               ],
               "description": "分析阶段过滤：premarket/intraday/postmarket/unknown",
               "title": "Analysis Phase"
+            }
+          },
+          {
+            "description": "Sample split: full | in_sample | out_of_sample",
+            "in": "query",
+            "name": "sample_split",
+            "required": false,
+            "schema": {
+              "default": "full",
+              "description": "Sample split: full | in_sample | out_of_sample",
+              "enum": [
+                "full",
+                "in_sample",
+                "out_of_sample"
+              ],
+              "title": "Sample Split",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required when sample_split is in_sample or out_of_sample",
+            "in": "query",
+            "name": "split_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Required when sample_split is in_sample or out_of_sample",
+              "title": "Split Date"
             }
           }
         ],
@@ -38265,6 +38486,99 @@
           }
         },
         "summary": "触发回测",
+        "tags": [
+          "Backtest"
+        ]
+      }
+    },
+    "/api/v1/backtest/skills/{skill_id}/performance": {
+      "get": {
+        "description": "Return skill-scoped metrics isomorphic to analysis-advice PerformanceMetrics. Sourced from attributable skill-opinion outcomes for YAML strategies/skills. Includes methodology limitations; not a return promise.",
+        "operationId": "get_skill_performance_api_v1_backtest_skills__skill_id__performance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Preferred evaluation window; mapped onto skill horizons 1d/3d/5d/10d",
+            "in": "query",
+            "name": "eval_window_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 120,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Preferred evaluation window; mapped onto skill horizons 1d/3d/5d/10d",
+              "title": "Eval Window Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformanceMetrics"
+                }
+              }
+            },
+            "description": "YAML skill / strategy backtest-style metrics"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "请求参数错误"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "无技能后验汇总"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "服务器错误"
+          }
+        },
+        "summary": "获取技能策略回测风格表现",
         "tags": [
           "Backtest"
         ]
