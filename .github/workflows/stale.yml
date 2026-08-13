@@ -61,7 +61,7 @@ jobs:
           # ===== Exclusions =====
           # Do not mark items with these labels as stale.
           # Include common backlog labels so planning issues are never stale-nudged.
-          exempt-issue-labels: 'pinned,security,enhancement,feature,help wanted,good first issue,documentation,P0,P1,P2,P3'
+          exempt-issue-labels: 'pinned,security,enhancement,help wanted,good first issue,documentation,P0,P1,P2,P3'
           exempt-pr-labels: 'pinned,security,work-in-progress,wip'
           
           # Exclude draft pull requests.
