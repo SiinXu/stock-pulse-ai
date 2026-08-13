@@ -5,6 +5,8 @@ import { ChatComposer } from '../../components/chat/ChatComposer';
 import { ChatSendFeedbackAlert } from '../../components/chat/ChatSendFeedback';
 import { ChatMessageList } from '../../components/chat/ChatMessageList'
 import { WhatIfScenarioPanel } from '../../components/chat/WhatIfScenarioPanel'
+import { ReportScenarioSensitivityPanel } from '../../components/chat/ReportScenarioSensitivityPanel'
+import { getScenarioById, projectClientSensitivity } from '../../components/chat/scenarioLibrary'
 import { DEFAULT_WHAT_IF_DRAFT } from '../../components/chat/whatIfScenario';
 import { ChatSessionSidebar } from '../../components/chat/ChatSessionSidebar';
 import {
@@ -648,6 +650,7 @@ const WhatIfScenarioPanelStory = () => {
     ...DEFAULT_WHAT_IF_DRAFT,
     enabled,
     turnCount: scenario === 'empty' ? 5 : scenario === 'states' ? 1 : 0,
+    scenarioId: scenario === 'states' ? 'rate_hike_100bp' : null,
   };
   return (
     <div className="max-w-3xl rounded-lg border border-subtle bg-card p-2">
@@ -657,6 +660,17 @@ const WhatIfScenarioPanelStory = () => {
         onChange={() => undefined}
         promoteHref={scenario === 'states' ? '/research/analysis?stock=600519' : null}
       />
+    </div>
+  );
+};
+
+const ReportScenarioSensitivityPanelStory = () => {
+  const t = (key: string) => key;
+  const scenario = getScenarioById('industry_shock_down_15')!;
+  const projection = projectClientSensitivity(scenario);
+  return (
+    <div className="max-w-3xl rounded-lg border border-subtle bg-card p-2">
+      <ReportScenarioSensitivityPanel t={t as never} projection={projection} />
     </div>
   );
 };
@@ -929,6 +943,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'chat-send-feedback-alert': ChatSendFeedbackAlertStory,
   'chat-message-list': ChatMessageListStory,
   'what-if-scenario-panel': WhatIfScenarioPanelStory,
+  'report-scenario-sensitivity-panel': ReportScenarioSensitivityPanelStory,
   'chat-session-sidebar': ChatSessionSidebarStory,
   'chat-thinking-details': ChatThinkingDetailsStory,
   'chat-thinking-toggle': ChatThinkingToggleStory,
