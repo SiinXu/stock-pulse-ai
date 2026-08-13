@@ -46,6 +46,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.search_service import SearchService
+from src.services.sentiment_pipeline_service import SentimentPipelineService
 from src.services.daily_market_context import (
     DailyMarketContext,
     DailyMarketContextService,
@@ -273,6 +274,50 @@ class _AgentAnalysisStageMixin:
             )
             active_stage = None
 
+
+            # Sentiment evidence for Agent path (news/event text only; no new sources).
+            market_for_sentiment = get_market_for_stock(normalize_stock_code(code)) or "cn"
+            sentiment_snapshot: Optional[Dict[str, Any]] = None
+            try:
+                window_days = 7
+                try:
+                    window_days = max(
+                        1,
+                        int(self.config.get_effective_news_window_days() or 7),
+                    )
+                except Exception:  # broad-exception: optional_metadata - window fallback keeps scoring usable
+                    window_days = int(
+                        getattr(self.config, "news_max_age_days", 7) or 7
+                    )
+                remote_search_available = bool(
+                    self.search_service is not None and self.search_service.is_available
+                )
+                sentiment_snapshot = SentimentPipelineService(
+                    window_days=window_days
+                ).build_from_news_context(
+                    stock_code=code,
+                    stock_name=stock_name,
+                    market=market_for_sentiment,
+                    news_context=initial_context.get("news_context"),
+                    remote_search_available=remote_search_available,
+                ).to_public_dict()
+            except Exception as exc:  # broad-exception: fallback_recorded - optional evidence
+                log_safe_exception(
+                    logger,
+                    "Agent sentiment pipeline failed; continuing without sentiment evidence",
+                    exc,
+                    error_code="pipeline_agent_sentiment_snapshot_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                sentiment_snapshot = SentimentPipelineService().build_unavailable(
+                    stock_code=code,
+                    stock_name=stock_name,
+                    market=market_for_sentiment,
+                    reason_code="scoring_failed",
+                    gaps=["scoring_failed"],
+                ).to_public_dict()
+
             # Issue #1066: ensure deep history is in DB before agent tools run
             active_stage = observe_pipeline_stage(
                 "context",
@@ -304,6 +349,7 @@ class _AgentAnalysisStageMixin:
                     query_id=query_id,
                     base_context=analysis_context,
                     portfolio_context=portfolio_context,
+                    sentiment_snapshot=sentiment_snapshot,
                 ),
                 report_language=report_language,
                 code=code,
@@ -707,6 +753,7 @@ class _AgentAnalysisStageMixin:
                         chip_data=chip_data,
                         analysis_context_pack_overview=analysis_context_pack_overview,
                         market_phase_summary=market_phase_summary,
+                        sentiment_snapshot=sentiment_snapshot,
                     )
                     context_snapshot["stock_name"] = resolved_stock_name
                     from src.agent.runtime_facts import (

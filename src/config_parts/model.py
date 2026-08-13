@@ -21,6 +21,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
 )
 from src.config_parts.domain_facade import (
     install_flat_domain_facade,
@@ -125,6 +126,10 @@ class Config:
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
 
+    # === Read-only research API for stratified conclusions (Issue #1143) ===
+    research_api_enabled: bool = False
+    research_api_rate_limit_per_minute: int = 60
+
     # === Reasoning-trace export (Issue #135) — default off ===
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
@@ -174,6 +179,9 @@ class Config:
     llm_prompt_cache_telemetry_enabled: bool = True
     llm_prompt_cache_hints_enabled: bool = False
     llm_prompt_cache_diagnostics_level: str = "off"
+
+    # Fine-grained cost attribution + routing quality on llm_usage (Refs #166/#248).
+    llm_usage_attribution_enabled: bool = True
 
     # --- Multi-channel LLM config (new) ---
     # LITELLM_CONFIG: path to a standard litellm_config.yaml file (most powerful)
@@ -411,6 +419,8 @@ class Config:
 
     # System Configuration
     max_workers: int = 3  # Low concurrency anti-ban
+    # Per-check timeout for structured readiness/self-check (on-demand only; never auto-run at startup).
+    readiness_check_timeout_seconds: float = READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT
     # Parallel dependency-free market-input pulls inside one stock analysis
     # (realtime / chip / money-flow / fundamental). Does not bypass provider
     # governance or cache; set enabled=false to force serial declaration order.

@@ -3,14 +3,11 @@ import type {
   PortfolioCashDirection,
   PortfolioCorporateActionType,
   PortfolioFxRefreshResponse,
-  PortfolioImportCommitResponse,
-  PortfolioImportParseResponse,
   PortfolioPositionItem,
   PortfolioSide,
 } from '../types/portfolio';
 import { toDateInputValue } from './format';
 import type { UiLanguage } from '../i18n/uiText';
-import { prefersChineseContent } from '../i18n/uiLanguages';
 import { formatUiText } from '../i18n/uiText';
 import {
   PORTFOLIO_CASH_DIRECTION_LABELS,
@@ -24,16 +21,9 @@ export type FxRefreshFeedback = {
   text: string;
 };
 
-export type PortfolioAlertVariant = 'info' | 'success' | 'warning' | 'danger';
-
 const POSITION_PRICE_LABELS = createUiLanguageRecord('utils.portfolioFormat.POSITION_PRICE_LABELS', {
   zh: { missing: '缺价', realtime: '实时价', close: '收盘价', unknown: '未知来源' },
   en: { missing: 'Price unavailable', realtime: 'Live price', close: 'Close', unknown: 'Unknown source' },
-});
-
-const BROKER_FALLBACK_NAMES: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord('utils.portfolioFormat.BROKER_FALLBACK_NAMES', {
-  zh: { huatai: '华泰', citic: '中信', cmb: '招商' },
-  en: { huatai: 'Huatai', citic: 'CITIC', cmb: 'CMB' },
 });
 
 const FX_REFRESH_TEXT = createUiLanguageRecord('utils.portfolioFormat.FX_REFRESH_TEXT', {
@@ -102,12 +92,6 @@ export function formatCorporateActionLabel(value: PortfolioCorporateActionType, 
   return PORTFOLIO_CORPORATE_ACTION_LABELS[language][value];
 }
 
-export function formatBrokerLabel(value: string, displayName?: string, language: UiLanguage = 'zh'): string {
-  const name = displayName?.trim() || BROKER_FALLBACK_NAMES[language][value];
-  if (name) return prefersChineseContent(language) ? `${value}（${name}）` : `${value} (${name})`;
-  return value;
-}
-
 export function buildFxRefreshFeedback(data: PortfolioFxRefreshResponse, language: UiLanguage = 'zh'): FxRefreshFeedback {
   const text = FX_REFRESH_TEXT[language];
   if (data.refreshEnabled === false) {
@@ -145,17 +129,10 @@ export function buildFxRefreshFeedback(data: PortfolioFxRefreshResponse, languag
   };
 }
 
-export function getFxRefreshFeedbackVariant(tone: FxRefreshFeedback['tone']): PortfolioAlertVariant {
+export function getFxRefreshFeedbackVariant(
+  tone: FxRefreshFeedback['tone'],
+): 'info' | 'success' | 'warning' {
   if (tone === 'success') return 'success';
   if (tone === 'warning') return 'warning';
   return 'info';
-}
-
-export function getCsvParseVariant(result: PortfolioImportParseResponse): PortfolioAlertVariant {
-  return result.errorCount > 0 || result.skippedCount > 0 ? 'warning' : 'info';
-}
-
-export function getCsvCommitVariant(result: PortfolioImportCommitResponse, isDryRun: boolean): PortfolioAlertVariant {
-  if (isDryRun) return 'info';
-  return result.failedCount > 0 || result.duplicateCount > 0 ? 'warning' : 'success';
 }

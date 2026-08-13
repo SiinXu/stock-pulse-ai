@@ -225,6 +225,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['帮助区分不同密钥生成的 HMAC，避免错误比较不同部署或不同版本的指纹。'],
     notes: ['该字段只是版本标签，不是密钥。'],
   },
+  'settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED': {
+    title: '用量成本归因',
+    summary: '在 llm_usage 行上附加 run/stage/mode 成本估算与模型路由质量字段。',
+    usage: '默认开启。关闭后跳过成本估算与归因列写入，但 token 计数仍会落库。',
+    valueNotes: ['与每模式预算（#1213）共用 src/llm/cost.py 计量；未计价模型保持 cost_status=unpriced，不伪造 $0。'],
+    impact: ['影响 Usage 页成本与路由成功率展示，以及预算门可消费的计量字段。'],
+    notes: ['采集开销小；排查成本异常时可临时关闭。'],
+  },
+  'settings.ai_model.LLM_COST_PRICING_PATH': {
+    title: 'LLM 成本定价表路径',
+    summary: '可选 JSON 定价表路径，用于 estimated_cost_usd。',
+    usage: '留空则使用 LiteLLM model_cost；也可指向自维护的 per-model 输入/输出单价表。',
+    valueNotes: ['支持 input_cost_per_token / output_cost_per_token，或 per-1M tokens 字段。'],
+    impact: ['改变成本估算来源，不改变模型调用本身。'],
+    notes: ['详见 docs/llm-cost-attribution.md。'],
+  },
   'settings.ai_model.provider_keys': {
     title: '模型服务 API Key',
     summary: '配置模型服务商或聚合网关的访问密钥。',
@@ -1021,6 +1037,29 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=false',
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=true',
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
+    ],
+  },
+  'settings.system.research_api': {
+    title: '只读研究 API',
+    summary: '控制面向嵌入/门户客户端的只读研究 API，用于暴露分层结论。',
+    usage: '除非明确需要 GET /api/v1/research/conclusions*，否则保持 RESEARCH_API_ENABLED 关闭。启用后客户端可按 brief/standard/research 密度读取结论，并获取 as-of、置信度与证据计数。RESEARCH_API_RATE_LIMIT_PER_MINUTE 设置每主体滑动窗口限流（与 MCP 同一治理模式）。',
+    valueNotes: [
+      '默认关闭；关闭时路由返回 404。',
+      '仅挂载在主 API 端口，不另开监听端口。',
+      '复用会话鉴权（ADMIN_AUTH_ENABLED 开启时）、fail-closed 安全审计与滑动窗口限流。',
+      '响应仅为紧凑投影：不返回 raw_result 全量，且无写方法。',
+    ],
+    impact: [
+      '影响认证后是否可访问 /api/v1/research/conclusions*。',
+      '不改变分析生成、历史存储或 MCP 工具清单。',
+    ],
+    notes: [
+      '能力注册表相关工作独立推进，不在本开关内完成。',
+    ],
+    examples: [
+      'RESEARCH_API_ENABLED=false',
+      'RESEARCH_API_ENABLED=true',
+      'RESEARCH_API_RATE_LIMIT_PER_MINUTE=60',
     ],
   },
   'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
@@ -2178,6 +2217,19 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
     ],
   },
+
+  'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
+    title: '就绪自检超时',
+    summary: '结构化就绪/自检报告的单检查超时。',
+    usage:
+      '默认 1.0 秒（限制在 0.1–5.0）。仅用于按需调用 GET /api/v1/system/readiness，' +
+      '不会在进程启动时自动运行。超时或失败的探测不得报就绪。',
+    examples: [
+      'READINESS_CHECK_TIMEOUT_SECONDS=1.0',
+      'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
+    ],
+  },
+
 
   'settings.system.portfolio_health': {
     title: '投资组合健康度公式',
