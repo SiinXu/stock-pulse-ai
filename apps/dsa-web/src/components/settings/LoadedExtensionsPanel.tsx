@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { RefreshCw, Settings2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import {
@@ -12,6 +13,7 @@ import {
   type PluginSettingsResponse,
 } from '../../api/plugins';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
+import { SETTINGS_ROUTE_QUERY_KEYS } from '../../routing/routes';
 import {
   ApiErrorAlert,
   Badge,
@@ -23,6 +25,11 @@ import {
   InlineAlert,
   StatePanel,
 } from '../common';
+import {
+  buildNotificationsChannelHref,
+  getLinkableNotificationChannelIds,
+  pluginClaimsNotificationAdapter,
+} from './extensionNotificationLinks';
 import { SettingsSwitch } from './SettingsSwitch';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
@@ -74,11 +81,51 @@ function failureReason(plugin: PluginInfo, t: LoadedExtensionsPanelProps['t']): 
   return t('settings.loadedExtensionsFailureReasonUnavailable');
 }
 
+function NotificationCapabilityLinks({
+  plugin,
+  t,
+}: {
+  plugin: PluginInfo;
+  t: LoadedExtensionsPanelProps['t'];
+}) {
+  if (!pluginClaimsNotificationAdapter(plugin)) return null;
+  const channelIds = getLinkableNotificationChannelIds(plugin);
+  if (channelIds.length === 0) {
+    return (
+      <p
+        className="text-xs leading-5 text-muted-text"
+        data-testid={`loaded-extension-notification-inactive-${plugin.id}`}
+      >
+        {t('settings.loadedExtensionsNotificationInactive')}
+      </p>
+    );
+  }
+  return (
+    <div
+      className="flex flex-col gap-1"
+      data-testid={`loaded-extension-notification-links-${plugin.id}`}
+    >
+      {channelIds.map((channelId) => (
+        <Link
+          key={channelId}
+          to={buildNotificationsChannelHref(channelId)}
+          className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+          data-testid={`loaded-extension-notification-link-${plugin.id}-${channelId}`}
+        >
+          {t('settings.loadedExtensionsOpenNotificationChannel', { channel: channelId })}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
   disabled = false,
   t,
   language,
 }) => {
+  const [searchParams] = useSearchParams();
+  const focusedPluginId = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.plugin);
   const [items, setItems] = useState<PluginInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,8 +147,12 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
       setItems(response.items);
       setTotal(response.total);
     } catch (error: unknown) {
-      setItems([]);
-      setTotal(0);
+      // Keep a previously loaded roster on refresh so a transient GET
+      // failure cannot wipe rows after a completed lifecycle change.
+      if (mode === 'initial') {
+        setItems([]);
+        setTotal(0);
+      }
       setLoadError(getParsedApiError(error));
     } finally {
       setIsLoading(false);
@@ -112,6 +163,16 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
   useEffect(() => {
     void load('initial');
   }, [load]);
+
+  useEffect(() => {
+    if (!focusedPluginId || isLoading) return;
+    const row = document.querySelector(
+      `[data-testid="loaded-extension-row-${CSS.escape(focusedPluginId)}"]`,
+    );
+    if (row instanceof HTMLElement) {
+      row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [focusedPluginId, isLoading, items]);
 
   const updateLifecycle = useCallback(async (plugin: PluginInfo, enabled: boolean) => {
     setPendingPluginId(plugin.id);
@@ -130,14 +191,21 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
           ...item,
           state: result.state,
           desiredEnabled: enabled,
+          // Fail closed until refresh confirms active registrations.
+          notificationChannels: [],
+          extensionPoints: enabled
+            ? item.extensionPoints
+            : item.extensionPoints.filter((point) => point !== 'notification_channel'),
         };
       }));
+      // Re-read the roster so channel deep-links match active registrations.
+      void load('refresh');
     } catch (error: unknown) {
       setActionError(getParsedApiError(error, language).message);
     } finally {
       setPendingPluginId(null);
     }
-  }, [language, t]);
+  }, [language, load, t]);
 
   const openSettings = useCallback(async (plugin: PluginInfo) => {
     setPendingPluginId(plugin.id);
@@ -228,17 +296,20 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
       id: 'capabilities',
       header: t('settings.loadedExtensionsColCapabilities'),
       cell: (plugin) => (
-        plugin.extensionPoints.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {plugin.extensionPoints.map((point) => (
-              <Badge key={point} variant="history" size="sm">
-                {point}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <span className="text-xs text-muted-text">—</span>
-        )
+        <div className="space-y-2">
+          {plugin.extensionPoints.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {plugin.extensionPoints.map((point) => (
+                <Badge key={point} variant="history" size="sm">
+                  {point}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-text">—</span>
+          )}
+          <NotificationCapabilityLinks plugin={plugin} t={t} />
+        </div>
       ),
     },
     {
@@ -346,6 +417,7 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
             rows={items}
             getRowKey={(plugin) => plugin.id}
             getRowTestId={(plugin) => `loaded-extension-row-${plugin.id}`}
+            isRowSelected={(plugin) => focusedPluginId === plugin.id}
             emptyState={{
               title: t('settings.loadedExtensionsEmptyTitle'),
               description: t('settings.loadedExtensionsEmptyDescription'),
