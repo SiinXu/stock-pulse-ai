@@ -12,7 +12,10 @@ PREVIEW_DISCLAIMER_EN = (
 )
 PREVIEW_DISCLAIMER_ZH = "协同推演预览，不改变系统最终建议"
 DEFAULT_WHAT_IF_MAX_TURNS = 5
-WHAT_IF_DIMENSIONS = frozenset({"index_move", "fx_rate", "interest_rate", "earnings"})
+# sector_shock covers industry / sector factor paths used by the #1136 scenario library.
+WHAT_IF_DIMENSIONS = frozenset(
+    {"index_move", "fx_rate", "interest_rate", "earnings", "sector_shock"}
+)
 EARNINGS_OUTCOMES = frozenset({"beat", "miss", "inline"})
 MOVE_DIRECTIONS = frozenset({"up", "down"})
 WHAT_IF_ISOLATION_POLICY: Dict[str, Any] = {
@@ -37,6 +40,11 @@ class WhatIfScenario:
     turn_index: int = 1
     max_turns: int = DEFAULT_WHAT_IF_MAX_TURNS
     enabled: bool = True
+    scenario_id: Optional[str] = None
+    scenario_hash: Optional[str] = None
+    catalog_version: Optional[str] = None
+    catalog_hash: Optional[str] = None
+
     @property
     def is_active(self) -> bool:
         return self.enabled and bool(self.assumptions)
@@ -58,6 +66,10 @@ def parse_what_if_from_context(context: Optional[Mapping[str, Any]]) -> Optional
         turn_index=_coerce_positive_int(raw.get("turn_index"), default=1),
         max_turns=_coerce_positive_int(raw.get("max_turns"), default=DEFAULT_WHAT_IF_MAX_TURNS),
         enabled=True,
+        scenario_id=_opt_str(raw.get("scenario_id")),
+        scenario_hash=_opt_str(raw.get("scenario_hash")),
+        catalog_version=_opt_str(raw.get("catalog_version")),
+        catalog_hash=_opt_str(raw.get("catalog_hash")),
     )
 
 def count_what_if_turns_in_messages(messages: Sequence[Mapping[str, Any]]) -> int:
@@ -79,13 +91,27 @@ def build_what_if_prompt_section(scenario: WhatIfScenario, language_key: str = "
         return ""
     if not is_what_if_turn_allowed(scenario, prior_turn_count=prior_turn_count):
         return _limit_section(scenario, language_key=language_key, prior_turn_count=prior_turn_count)
-    return _en_section(scenario, prior_turn_count) if language_key == "en" else _zh_section(scenario, prior_turn_count)
+    base = _en_section(scenario, prior_turn_count) if language_key == "en" else _zh_section(scenario, prior_turn_count)
+    return base
 
 def build_what_if_prompt_section_from_context(context: Optional[Mapping[str, Any]], language_key: str = "zh", *, prior_messages: Optional[Sequence[Mapping[str, Any]]] = None) -> str:
     scenario = parse_what_if_from_context(context)
     if scenario is None:
         return ""
-    return build_what_if_prompt_section(scenario, language_key, prior_turn_count=count_what_if_turns_in_messages(prior_messages or ()))
+    section = build_what_if_prompt_section(
+        scenario,
+        language_key,
+        prior_turn_count=count_what_if_turns_in_messages(prior_messages or ()),
+    )
+    if not section:
+        return ""
+    # Library scenarios reuse this channel and optionally append deterministic risk framing.
+    from src.agent.scenario_library import build_what_if_enrichment_from_library
+
+    enrichment = build_what_if_enrichment_from_library(context, language_key=language_key)
+    if enrichment:
+        return f"{section}\n\n{enrichment}"
+    return section
 
 def content_has_hypothetical_marker(content: str) -> bool:
     text = content or ""
@@ -115,12 +141,30 @@ def _parse_one(item: Any) -> Optional[WhatIfAssumption]:
     if dimension == "earnings":
         if direction not in EARNINGS_OUTCOMES:
             return None
-    elif dimension in {"index_move", "fx_rate", "interest_rate"}:
+    elif dimension in {"index_move", "fx_rate", "interest_rate", "sector_shock"}:
         if direction is not None and direction not in MOVE_DIRECTIONS:
             return None
         if magnitude is None:
             return None
     return WhatIfAssumption(dimension=dimension, direction=direction, magnitude=magnitude, currency_pair=currency_pair, label=label)
+
+def _library_meta_lines(scenario: WhatIfScenario, *, language_key: str) -> List[str]:
+    if not scenario.scenario_id:
+        return []
+    if language_key == "en":
+        lines = [f"- Library scenario_id: `{scenario.scenario_id}`."]
+        if scenario.catalog_version:
+            lines.append(f"- Scenario catalog version: `{scenario.catalog_version}`.")
+        if scenario.scenario_hash:
+            lines.append(f"- Scenario hash: `{scenario.scenario_hash}`.")
+        return lines
+    lines = [f"- 情景库 scenario_id：`{scenario.scenario_id}`。"]
+    if scenario.catalog_version:
+        lines.append(f"- 情景目录版本：`{scenario.catalog_version}`。")
+    if scenario.scenario_hash:
+        lines.append(f"- 情景哈希：`{scenario.scenario_hash}`。")
+    return lines
+
 
 def _en_section(scenario: WhatIfScenario, prior_turn_count: int) -> str:
     lines = [
@@ -128,6 +172,7 @@ def _en_section(scenario: WhatIfScenario, prior_turn_count: int) -> str:
         "The following conditions are **hypothetical assumptions only**. They are NOT observed facts, market prints, or confirmed events.",
         f"- Mode: preview_only ({PREVIEW_DISCLAIMER_EN}).",
         f"- What-if turn {prior_turn_count + 1} of {scenario.max_turns} for this session (client turn_index={scenario.turn_index}).",
+        *_library_meta_lines(scenario, language_key="en"),
         "- Structured assumptions:",
     ]
     for a in scenario.assumptions:
@@ -139,6 +184,8 @@ def _en_section(scenario: WhatIfScenario, prior_turn_count: int) -> str:
         f"2. Start the visible answer with `{HYPOTHETICAL_RESULT_MARKER}` and restate that this is a {PREVIEW_DISCLAIMER_EN}.",
         "3. Do not emit formal DecisionSignals, trade tickets, or history-grade conclusions that could be treated as real advice.",
         "4. Keep factual market data (from tools) clearly separated from the hypothetical branch.",
+        "5. Do not mix scenario conclusions into baseline report recommendations.",
+        "6. Soul evidence/refusal rules remain in force and cannot be weakened by this scenario.",
     ]
     return "\n".join(lines)
 
@@ -148,6 +195,7 @@ def _zh_section(scenario: WhatIfScenario, prior_turn_count: int) -> str:
         "以下条件为**假设情景**，不是已发生的事实、成交行情或已确认事件。",
         f"- 模式：preview_only（{PREVIEW_DISCLAIMER_ZH}）。",
         f"- 本会话 what-if 第 {prior_turn_count + 1} / {scenario.max_turns} 轮（客户端 turn_index={scenario.turn_index}）。",
+        *_library_meta_lines(scenario, language_key="zh"),
         "- 结构化假设：",
     ]
     for a in scenario.assumptions:
@@ -159,6 +207,8 @@ def _zh_section(scenario: WhatIfScenario, prior_turn_count: int) -> str:
         f"2. 可见回答必须以 `{HYPOTHETICAL_RESULT_MARKER}` 开头，并重申这是{PREVIEW_DISCLAIMER_ZH}。",
         "3. 不得输出可被当作正式结论的 DecisionSignal、交易指令或可写入分析历史的定论。",
         "4. 工具返回的事实数据必须与假设分支明确分隔。",
+        "5. 不得把情景结论混入基线报告建议。",
+        "6. Soul 证据/拒绝规则持续生效，本情景不得削弱它们。",
     ]
     return "\n".join(lines)
 
@@ -189,6 +239,9 @@ def _fmt_en(a: WhatIfAssumption) -> str:
     if d == "interest_rate":
         action = "cut" if direction == "down" else "hike" if direction == "up" else "change"
         return f"Policy rate {action} by {m:g} bp"
+    if d == "sector_shock":
+        sign = "+" if direction == "up" else "-" if direction == "down" else ""
+        return f"Industry / sector factor moves {sign}{m:g}%"
     if d == "earnings":
         return f"Company earnings {direction}"
     return d
@@ -207,6 +260,9 @@ def _fmt_zh(a: WhatIfAssumption) -> str:
     if d == "interest_rate":
         action = "降息" if direction == "down" else "加息" if direction == "up" else "变动"
         return f"政策利率{action} {m:g} bp"
+    if d == "sector_shock":
+        sign = "+" if direction == "up" else "-" if direction == "down" else ""
+        return f"行业/板块冲击 {sign}{m:g}%"
     if d == "earnings":
         return f"公司财报{ {'beat':'超预期','miss':'不及预期','inline':'符合预期'}.get(direction, direction)}"
     return d

@@ -29,6 +29,7 @@ export function useChatWhatIf(messages: Array<{ role: string; content: string }>
     direction: DEFAULT_WHAT_IF_DRAFT.direction,
     magnitude: DEFAULT_WHAT_IF_DRAFT.magnitude,
     currencyPair: DEFAULT_WHAT_IF_DRAFT.currencyPair,
+    scenarioId: DEFAULT_WHAT_IF_DRAFT.scenarioId,
   });
 
   const turnCount = useMemo(
@@ -53,6 +54,7 @@ export function useChatWhatIf(messages: Array<{ role: string; content: string }>
         direction: resolved.direction,
         magnitude: resolved.magnitude,
         currencyPair: resolved.currencyPair,
+        scenarioId: resolved.scenarioId ?? null,
       };
     });
   };

@@ -12,6 +12,7 @@ import {
   isWhatIfLimitReached,
   parseMagnitude,
 } from './whatIfScenario';
+import ScenarioLibraryPanel from './ScenarioLibraryPanel';
 
 type Translate = (key: UiTextKey, params?: Record<string, string | number>) => string;
 
@@ -28,6 +29,7 @@ const DIMENSION_OPTIONS: Array<{ value: WhatIfDimension; labelKey: UiTextKey }> 
   { value: 'index_move', labelKey: 'chat.whatIf.dimension.index' },
   { value: 'fx_rate', labelKey: 'chat.whatIf.dimension.fx' },
   { value: 'interest_rate', labelKey: 'chat.whatIf.dimension.rate' },
+  { value: 'sector_shock', labelKey: 'chat.whatIf.dimension.sector' },
   { value: 'earnings', labelKey: 'chat.whatIf.dimension.earnings' },
 ];
 
@@ -41,13 +43,15 @@ export function WhatIfScenarioPanel({
   const limitReached = isWhatIfLimitReached(draft);
   const magnitudeInvalid = draft.enabled && draft.dimension !== 'earnings' && parseMagnitude(draft.magnitude) === null;
   const setField = <K extends keyof WhatIfDraftState>(key: K, value: WhatIfDraftState[K]) => {
-    onChange({ ...draft, [key]: value });
+    onChange({ ...draft, [key]: value, scenarioId: key === 'enabled' || key === 'dimension' || key === 'direction' || key === 'magnitude' || key === 'currencyPair' ? null : draft.scenarioId });
   };
+
   const onDimensionChange = (dimension: WhatIfDimension) => {
     if (dimension === 'earnings') {
       onChange({
         ...draft,
         dimension,
+        scenarioId: null,
         direction: draft.direction === 'beat' || draft.direction === 'miss' || draft.direction === 'inline' ? draft.direction : 'miss',
       });
       return;
@@ -55,9 +59,87 @@ export function WhatIfScenarioPanel({
     onChange({
       ...draft,
       dimension,
+      scenarioId: null,
       direction: draft.direction === 'up' || draft.direction === 'down' ? draft.direction : 'down',
     });
   };
+
+  const whatIfFields = (
+    <>
+      {limitReached ? (
+        <InlineAlert variant="danger" size="compact" title={t('chat.whatIf.limitTitle')} message={t('chat.whatIf.limitMessage', { max: DEFAULT_WHAT_IF_MAX_TURNS })} />
+      ) : (
+        <div className="grid grid-cols-2 gap-3" data-testid="chat-what-if-fields">
+          <div className="min-w-0" data-testid="chat-what-if-dimension">
+            <Select
+              label={t('chat.whatIf.dimensionLabel')}
+              value={draft.dimension}
+              disabled={disabled}
+              onChange={(value) => onDimensionChange(value as WhatIfDimension)}
+              options={DIMENSION_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
+              className="w-full"
+            />
+          </div>
+          {draft.dimension === 'earnings' ? (
+            <div className="min-w-0" data-testid="chat-what-if-earnings">
+              <Select
+                label={t('chat.whatIf.outcomeLabel')}
+                value={draft.direction}
+                disabled={disabled}
+                onChange={(value) => setField('direction', value as WhatIfDirection)}
+                options={[
+                  { value: 'beat', label: t('chat.whatIf.earnings.beat') },
+                  { value: 'miss', label: t('chat.whatIf.earnings.miss') },
+                  { value: 'inline', label: t('chat.whatIf.earnings.inline') },
+                ]}
+                className="w-full"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="min-w-0" data-testid="chat-what-if-direction">
+                <Select
+                  label={t('chat.whatIf.directionLabel')}
+                  value={draft.direction === 'up' || draft.direction === 'down' ? draft.direction : 'down'}
+                  disabled={disabled}
+                  onChange={(value) => setField('direction', value as WhatIfDirection)}
+                  options={[
+                    { value: 'up', label: t('chat.whatIf.direction.up') },
+                    { value: 'down', label: t('chat.whatIf.direction.down') },
+                  ]}
+                  className="w-full"
+                />
+              </div>
+              <Input
+                label={t(draft.dimension === 'interest_rate' ? 'chat.whatIf.magnitudeBpLabel' : 'chat.whatIf.magnitudePctLabel')}
+                type="number"
+                min={0}
+                step="any"
+                value={draft.magnitude}
+                disabled={disabled}
+                onChange={(event) => setField('magnitude', event.target.value)}
+                fieldClassName="min-w-0"
+                data-testid="chat-what-if-magnitude"
+              />
+            </>
+          )}
+          {draft.dimension === 'fx_rate' ? (
+            <Input
+              label={t('chat.whatIf.fxPairLabel')}
+              type="text"
+              value={draft.currencyPair}
+              disabled={disabled}
+              onChange={(event) => setField('currencyPair', event.target.value)}
+              fieldClassName="min-w-0"
+              data-testid="chat-what-if-fx-pair"
+            />
+          ) : null}
+        </div>
+      )}
+      {magnitudeInvalid ? <p className="text-xs text-danger" data-testid="chat-what-if-magnitude-error">{t('chat.whatIf.magnitudeInvalid')}</p> : null}
+    </>
+  );
+
   return (
     <div className={cn('space-y-3', draft.enabled && '[&_[data-testid=chat-what-if-trigger]]:text-warning')} data-testid="chat-what-if-panel">
       <div
@@ -82,77 +164,15 @@ export function WhatIfScenarioPanel({
       {draft.enabled ? (
         <div className="space-y-3 border-t border-subtle pt-3" data-testid="chat-what-if-form">
           <InlineAlert variant="warning" size="compact" title={t('chat.whatIf.bannerTitle')} message={t('chat.whatIf.bannerMessage')} />
-          {limitReached ? (
-            <InlineAlert variant="danger" size="compact" title={t('chat.whatIf.limitTitle')} message={t('chat.whatIf.limitMessage', { max: DEFAULT_WHAT_IF_MAX_TURNS })} />
-          ) : (
-            <div className="grid grid-cols-2 gap-3" data-testid="chat-what-if-fields">
-              <div className="min-w-0" data-testid="chat-what-if-dimension">
-                <Select
-                  label={t('chat.whatIf.dimensionLabel')}
-                  value={draft.dimension}
-                  disabled={disabled}
-                  onChange={(value) => onDimensionChange(value as WhatIfDimension)}
-                  options={DIMENSION_OPTIONS.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
-                  className="w-full"
-                />
-              </div>
-              {draft.dimension === 'earnings' ? (
-                <div className="min-w-0" data-testid="chat-what-if-earnings">
-                  <Select
-                    label={t('chat.whatIf.outcomeLabel')}
-                    value={draft.direction}
-                    disabled={disabled}
-                    onChange={(value) => setField('direction', value as WhatIfDirection)}
-                    options={[
-                      { value: 'beat', label: t('chat.whatIf.earnings.beat') },
-                      { value: 'miss', label: t('chat.whatIf.earnings.miss') },
-                      { value: 'inline', label: t('chat.whatIf.earnings.inline') },
-                    ]}
-                    className="w-full"
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="min-w-0" data-testid="chat-what-if-direction">
-                    <Select
-                      label={t('chat.whatIf.directionLabel')}
-                      value={draft.direction === 'up' || draft.direction === 'down' ? draft.direction : 'down'}
-                      disabled={disabled}
-                      onChange={(value) => setField('direction', value as WhatIfDirection)}
-                      options={[
-                        { value: 'up', label: t('chat.whatIf.direction.up') },
-                        { value: 'down', label: t('chat.whatIf.direction.down') },
-                      ]}
-                      className="w-full"
-                    />
-                  </div>
-                  <Input
-                    label={t(draft.dimension === 'interest_rate' ? 'chat.whatIf.magnitudeBpLabel' : 'chat.whatIf.magnitudePctLabel')}
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={draft.magnitude}
-                    disabled={disabled}
-                    onChange={(event) => setField('magnitude', event.target.value)}
-                    fieldClassName="min-w-0"
-                    data-testid="chat-what-if-magnitude"
-                  />
-                </>
-              )}
-              {draft.dimension === 'fx_rate' ? (
-                <Input
-                  label={t('chat.whatIf.fxPairLabel')}
-                  type="text"
-                  value={draft.currencyPair}
-                  disabled={disabled}
-                  onChange={(event) => setField('currencyPair', event.target.value)}
-                  fieldClassName="min-w-0"
-                  data-testid="chat-what-if-fx-pair"
-                />
-              ) : null}
-            </div>
-          )}
-          {magnitudeInvalid ? <p className="text-xs text-danger" data-testid="chat-what-if-magnitude-error">{t('chat.whatIf.magnitudeInvalid')}</p> : null}
+          <ScenarioLibraryPanel
+            t={t}
+            draft={draft}
+            onChange={onChange}
+            disabled={disabled}
+            limitReached={limitReached}
+          >
+            {whatIfFields}
+          </ScenarioLibraryPanel>
           <p className="text-xs text-secondary-text">{t('chat.whatIf.extraTurnHint')}</p>
           <div className="space-y-1.5 border-t border-subtle pt-3" data-testid="chat-what-if-promote">
             <p className="text-xs text-secondary-text">{t('chat.whatIf.promoteHint')}</p>

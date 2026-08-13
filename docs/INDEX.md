@@ -82,6 +82,7 @@
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [组合再平衡与风险调整仓位](portfolio-rebalancing.md) | 风险带再平衡建议、仓位区间、拒绝条件；`GET /api/v1/portfolio/rebalancing-recommendations`（[英文](portfolio-rebalancing_EN.md)） |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
+| [报告敏感性情景库](report-scenario-library.md) | 版本化利率/汇率/行业预置 + 自定义保存复用，复用 Chat what-if 通道；假设风险表述用于报告敏感性（#1136）（[英文](report-scenario-library_EN.md)） |
 | [投资者 Persona](investor-personas.md) | 默认关闭的研究立场与投资视角 Skills（#119, #467） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
 | [A 股特化角色](ashare-specialist-roles.md) | 默认关闭的政策 / 资金流 / 微观结构 Skill，缺数据显式降级（#192） |
