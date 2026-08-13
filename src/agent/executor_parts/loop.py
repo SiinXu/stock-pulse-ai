@@ -7,6 +7,7 @@ import json
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent.runner import parse_dashboard_json_result, run_agent_loop
+from src.agent.runtime.mode_budget import create_mode_budget_account
 from src.agent.stock_scope import StockScope
 from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
@@ -36,6 +37,8 @@ class _LoopMethods:
         mode always preserves the raw text.
         """
         chat_tool_registry = _CHAT_TOOL_REGISTRY.get()
+        budget_account = create_mode_budget_account(mode="chat", chat=True)
+        effective_max_steps = budget_account.limits.effective_max_steps(self.max_steps)
         loop_result = run_agent_loop(
             messages=messages,
             tool_registry=(
@@ -44,14 +47,20 @@ class _LoopMethods:
                 else self.tool_registry
             ),
             llm_adapter=self.llm_adapter,
-            max_steps=self.max_steps,
+            max_steps=effective_max_steps,
             progress_callback=progress_callback,
             max_wall_clock_seconds=self.timeout_seconds,
             stock_scope=stock_scope,
             cancelled_check=cancelled_check,
+            mode_budget_account=budget_account,
         )
 
         model_str = loop_result.model
+        failure_reason = getattr(loop_result, "failure_reason", None)
+        failure_reason_value = (
+            failure_reason.value if failure_reason is not None else None
+        )
+        budget_snapshot = getattr(loop_result, "budget_snapshot", None)
 
         if parse_dashboard and loop_result.success:
             parse_result = parse_dashboard_json_result(loop_result.content)
@@ -73,6 +82,8 @@ class _LoopMethods:
                 messages=loop_result.messages,
                 cancelled=loop_result.cancelled,
                 timed_out=loop_result.timed_out,
+                budget_snapshot=budget_snapshot,
+                failure_reason=failure_reason_value,
             )
 
         return AgentResult(
@@ -88,6 +99,8 @@ class _LoopMethods:
             messages=loop_result.messages,
             cancelled=loop_result.cancelled,
             timed_out=loop_result.timed_out,
+            budget_snapshot=budget_snapshot,
+            failure_reason=failure_reason_value,
         )
 
     def _build_user_message(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
