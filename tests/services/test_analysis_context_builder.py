@@ -596,6 +596,79 @@ def test_builder_output_safe_dict_redacts_sensitive_mapping_keys() -> None:
     assert safe["blocks"]["fundamentals"]["metadata"]["coverage"]["valuation"] == "ok"
 
 
+
+def test_sentiment_block_is_auxiliary_evidence_not_conclusion() -> None:
+    snapshot = {
+        "schema_version": "sentiment-snapshot-v1",
+        "role": "evidence",
+        "stock_code": "600519",
+        "as_of": "2026-08-12T12:00:00Z",
+        "window_days": 7,
+        "status": "available",
+        "degraded": False,
+        "reason_code": "ok",
+        "score": 72,
+        "label": "bullish",
+        "confidence": 0.61,
+        "confidence_basis": "items=3; dated=2",
+        "freshness": "fresh",
+        "freshness_as_of": "2026-08-12T10:00:00Z",
+        "sources": [
+            {
+                "source_id": "news_search",
+                "source_type": "news",
+                "status": "available",
+                "item_count": 3,
+                "as_of_status": "present",
+            }
+        ],
+        "evidence": [
+            {
+                "evidence_id": "sent-1",
+                "source_type": "news",
+                "source_id": "wire",
+                "snippet": "Company beat expectations.",
+                "as_of": "2026-08-12T10:00:00Z",
+                "as_of_status": "present",
+                "confidence": 0.7,
+                "polarity": 0.8,
+            }
+        ],
+        "gaps": [],
+        "item_count": 3,
+        "method": "news_lexicon_v1",
+        "disclaimer": "evidence only",
+    }
+    pack = AnalysisContextBuilder.build(_artifacts(sentiment_snapshot=snapshot))
+    block = pack.blocks["sentiment"]
+    assert block.status == ContextFieldStatus.AVAILABLE
+    assert block.metadata["role"] == "evidence"
+    assert block.metadata["quality_weighted"] is False
+    assert block.metadata["auxiliary"] is True
+    assert block.items["role"].value == "evidence"
+    assert block.items["score"].value == 72
+    assert block.items["confidence"].value == 0.61
+    assert "sentiment_is_evidence_not_conclusion" in block.warnings
+    assert "sentiment" not in pack.data_quality.block_scores
+
+    missing = AnalysisContextBuilder.build(
+        _artifacts(
+            sentiment_snapshot={
+                **snapshot,
+                "status": "unavailable",
+                "degraded": True,
+                "reason_code": "news_source_unavailable",
+                "score": None,
+                "confidence": None,
+                "evidence": [],
+                "item_count": 0,
+            }
+        )
+    ).blocks["sentiment"]
+    assert missing.status == ContextFieldStatus.MISSING
+    assert missing.items["score"].missing_reason == "sentiment_score_unavailable"
+
+
 def test_builder_module_stays_zero_fetch_and_zero_storage_import(monkeypatch) -> None:
     forbidden_modules = (
         "data_provider",

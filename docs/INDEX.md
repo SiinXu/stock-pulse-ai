@@ -47,6 +47,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | 模型服务商与连接、三层配置、Web 设置页和常见模型配置 |
+| [LLM 成本归因与路由遥测](llm-cost-attribution.md) | 按 run/stage/model/mode 归因 token 与成本，路由成功率 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | 市场感知的 provider 顺序、健康评分、自适应排序、熔断、stale 降级与推荐配置 |
 | [分析内无依赖并行取数](parallel-data-fetch.md) | 单股分析内 realtime/chip/money-flow/fundamental 并行拉取、并发护栏与串行回退（Issue #1126） |
 | [LLM 服务商配置指南](llm-providers.md) | Provider 预设、Actions 映射、错误分类和诊断建议 |
@@ -69,7 +70,8 @@
 | [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界（含 #241 企业事件/影响上下文） |
 | [Alert Center English companion](alerts_EN.md) | Issue #241 后端 V0 英文摘要（企业事件告警与 impact context） |
 | [定时任务 API 与执行契约（英文）](scheduled-tasks.md) | 版本化每日分析/研究任务、今日只读视图、交易日策略、运行记录、重试与 local/Docker/API 调度所有权边界 |
-| [每日简报（历史准确率复盘）](daily-brief.md) | 配置门控的晨间简报：昨日分析、关注列表与基于既有 outcome 存储的诚实准确率复盘（[英文](daily-brief_EN.md)） |
+| [每日简报（个人晨报 + 准确率）](daily-brief.md) | 持仓、隔夜要点、近期财报事件上下文、昨日分析、自选与诚实准确率（[英文](daily-brief_EN.md)） |
+| [事件研究简报](event-research-brief.md) | 财报 EventBrief（指标、超预期定义、事后清单）（[英文](event-research-brief_EN.md)） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
@@ -77,8 +79,10 @@
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
+| [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
 | [资讯 / 情报源](intelligence-sources.md) | RSS/Atom 合规资讯源配置、测试、拉取、去重、存储、查询与安全边界 |
 | [分析上下文包契约、运行态消费与可见性](analysis-context-pack.md) | AnalysisContextPack 首版范围、字段质量状态、P1/P2 内部契约、P3 Prompt 摘要消费、P4 历史/API/Web 低敏可见性、P5 数据质量评分、P6 迁移回滚与源码锚点；完整指南补充 #1386 阶段感知分析、迁移与回滚入口 |
+| [情绪分析管线](sentiment-analysis-pipeline.md) | 基于已接入新闻/事件源的情绪评分证据（来源可追溯、时效、置信度），进入 AnalysisContextPack 作为证据而非结论（#179） |
 | [图片识别 Prompt](image-extract-prompt.md) | 图片识别股票信息的 Prompt 与使用边界 |
 | [OpenClaw Skill 集成](openclaw-skill-integration.md) | OpenClaw / Skill 外部集成说明 |
 
@@ -115,6 +119,7 @@
 | [Analysis Strategy 插件作者指南（英文）](analysis-strategy-plugin-authoring.md) | 声明式优先边界、`Skill` 注册字段、catalog 优先级、生命周期、诊断、测试与信任模型 |
 | [供应链维护策略](supply-chain-maintenance.md) | 依赖与 GitHub Actions 的固定、权限、更新、例外、验证和回滚契约（英文） |
 | [Web UI 基础控件契约](web-ui-foundation.md) | Button、IconButton、Input、Field、Textarea 的语义、尺寸、命中区、守卫和迁移边界 |
+| [Web 运行时性能预算](web-runtime-performance_CN.md) | 长列表虚拟化、Settings 隔离、SSE 批处理软门（#883）；[English](web-runtime-performance.md) |
 | [导航信息架构提案](navigation-ia-proposal_zh.md) | 路由/导航现状审计、遗留重定向、孤儿项与 #368 目标选项（**需要决策**；[English](navigation-ia-proposal.md)） |
 | [多语言金融术语指导](financial-terminology-guide.md) | 十语言 UI 金融术语单一治理源：语义边界、术语表、已知译文漂移、风险表达、格式化与审查流程 |
 | [高风险 i18n 语义审计](high-risk-i18n-audit.md) | 交易动作、风险、认证、Credential、错误与免责声明的来源、审查状态、code/display 边界和机器快照 |

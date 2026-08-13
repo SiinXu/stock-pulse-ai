@@ -46,6 +46,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.search_service import SearchService
+from src.services.sentiment_pipeline_service import SentimentPipelineService
 from src.services.daily_market_context import (
     DailyMarketContext,
     DailyMarketContextService,
@@ -377,6 +378,8 @@ class _StockAnalysisStageMixin:
                 market=market or "cn",
             )
             news_result_count: Optional[int] = None
+            intel_results: Optional[Dict[str, Any]] = None
+            sentiment_snapshot: Optional[Dict[str, Any]] = None
             self._emit_progress(46, f"{stock_name}：正在检索新闻与舆情")
             if self.search_service is not None and self.search_service.is_available:
                 logger.info("%s(%s) starting multi-dimensional intelligence search", stock_name, code)
@@ -472,6 +475,55 @@ class _StockAnalysisStageMixin:
                 self.search_service is not None
                 and self.search_service.is_available
             )
+
+            # First-class sentiment evidence from already-fetched news/events only.
+            # Explicit degradation when sources are missing; never blocks analysis.
+            try:
+                window_days = 7
+                try:
+                    window_days = max(
+                        1,
+                        int(self.config.get_effective_news_window_days() or 7),
+                    )
+                except Exception:  # broad-exception: optional_metadata - window fallback keeps scoring usable
+                    window_days = int(
+                        getattr(self.config, "news_max_age_days", 7) or 7
+                    )
+                sentiment_service = SentimentPipelineService(window_days=window_days)
+                sentiment_model = sentiment_service.build_from_intel_results(
+                    stock_code=code,
+                    stock_name=stock_name,
+                    market=market or "cn",
+                    intel_results=intel_results,
+                    remote_search_available=remote_search_available,
+                    news_context=news_context,
+                )
+                sentiment_snapshot = sentiment_model.to_public_dict()
+                logger.info(
+                    "%s(%s) sentiment evidence: status=%s score=%s label=%s freshness=%s",
+                    stock_name,
+                    code,
+                    sentiment_model.status,
+                    sentiment_model.score,
+                    sentiment_model.label,
+                    sentiment_model.freshness,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - sentiment is optional evidence
+                log_safe_exception(
+                    logger,
+                    "Sentiment pipeline failed; continuing without sentiment evidence",
+                    exc,
+                    error_code="pipeline_sentiment_snapshot_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                sentiment_snapshot = SentimentPipelineService().build_unavailable(
+                    stock_code=code,
+                    stock_name=stock_name,
+                    market=market or "cn",
+                    reason_code="scoring_failed",
+                    gaps=["scoring_failed"],
+                ).to_public_dict()
             using_persisted_fallback = bool(
                 persisted_intelligence_context
                 and not fresh_intelligence_available
@@ -666,6 +718,7 @@ class _StockAnalysisStageMixin:
                     query_id=query_id,
                     portfolio_context=portfolio_context,
                     money_flow_data=money_flow_data,
+                    sentiment_snapshot=sentiment_snapshot,
                 ),
                 report_language=report_language,
                 code=code,
@@ -907,6 +960,7 @@ class _StockAnalysisStageMixin:
                         chip_data=chip_data,
                         analysis_context_pack_overview=analysis_context_pack_overview,
                         market_phase_summary=market_phase_summary,
+                        sentiment_snapshot=sentiment_snapshot,
                     )
 
                 persistence_result = self._persist_analysis_history_stage(
