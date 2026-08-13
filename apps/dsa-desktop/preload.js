@@ -6,6 +6,9 @@ const DESKTOP_CHECK_FOR_UPDATES_CHANNEL = 'desktop:check-for-updates';
 const DESKTOP_INSTALL_DOWNLOADED_UPDATE_CHANNEL = 'desktop:install-downloaded-update';
 const DESKTOP_OPEN_RELEASE_PAGE_CHANNEL = 'desktop:open-release-page';
 const DESKTOP_UPDATE_STATE_EVENT = 'desktop:update-state';
+const DESKTOP_GET_ENV_DIAGNOSTICS_CHANNEL = 'desktop:get-env-diagnostics';
+const DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL = 'desktop:open-operator-terminal';
+const DESKTOP_OPEN_CLI_INSTALL_GUIDE_CHANNEL = 'desktop:open-cli-install-guide';
 const DESKTOP_LOCAL_MODEL_GET_STATE_CHANNEL = 'desktop-local-model:get-state';
 const DESKTOP_LOCAL_MODEL_DETECT_CHANNEL = 'desktop-local-model:detect';
 const DESKTOP_LOCAL_MODEL_START_CHANNEL = 'desktop-local-model:start';
@@ -40,6 +43,15 @@ function createDesktopBridge({
     },
     openReleasePage(releaseUrl) {
       return renderer.invoke(DESKTOP_OPEN_RELEASE_PAGE_CHANNEL, releaseUrl);
+    },
+    getEnvDiagnostics(payload = {}) {
+      return renderer.invoke(DESKTOP_GET_ENV_DIAGNOSTICS_CHANNEL, payload);
+    },
+    openOperatorTerminal(payload = {}) {
+      return renderer.invoke(DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL, payload);
+    },
+    openCliInstallGuide(payload = {}) {
+      return renderer.invoke(DESKTOP_OPEN_CLI_INSTALL_GUIDE_CHANNEL, payload);
     },
     onUpdateStateChange(listener) {
       if (typeof listener !== 'function') {
@@ -108,6 +120,9 @@ module.exports = {
   DESKTOP_INSTALL_DOWNLOADED_UPDATE_CHANNEL,
   DESKTOP_OPEN_RELEASE_PAGE_CHANNEL,
   DESKTOP_UPDATE_STATE_EVENT,
+  DESKTOP_GET_ENV_DIAGNOSTICS_CHANNEL,
+  DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL,
+  DESKTOP_OPEN_CLI_INSTALL_GUIDE_CHANNEL,
   DESKTOP_VERSION_ARG_PREFIX,
   DESKTOP_LOCAL_MODEL_GET_STATE_CHANNEL,
   DESKTOP_LOCAL_MODEL_DETECT_CHANNEL,

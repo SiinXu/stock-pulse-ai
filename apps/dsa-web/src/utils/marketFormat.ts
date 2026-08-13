@@ -1,35 +1,30 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Multi-market number / timezone / change-color formatting contract (Issue #889).
+ * Multi-market number / timezone / change-color formatting contract
+ * (Issues #889 / #881).
  *
- * Module-first delivery: this file defines the shared contract only.
- * Existing pages/components still format independently; wiring is a second wave
- * of small PRs (one surface at a time). Color semantics are high-risk in
- * finance UIs — adopt only after per-call-site human review.
+ * Shared contract for quote, report, and history surfaces. Color semantics are
+ * high-risk in finance UIs — adopt only with sign/text, never color alone.
  *
  * Rule sources (do not invent):
  * - Currency code display: docs/financial-terminology-guide.md §11 (`currencyDisplay: 'code'`).
- * - Market IANA timezones: src/core/trading_calendar.py `MARKET_TIMEZONE`.
+ * - Market IANA timezones: src/core/trading_calendar.py `MARKET_TIMEZONE`
+ *   (cn/hk/us) and docs/crypto-market-support.md (crypto → UTC, 24×7).
  * - Change color preference values: backend `MARKET_REVIEW_COLOR_SCHEME`
  *   (`green_up` / `red_up`) in src/core/config_registry_parts/system.py.
  * - Market default color convention: backend share_image `_stock_positive_tone`
- *   treats CN/HK symbols as red-up; US/international as green-up.
- * - A-share display precision 2dp: SSE/SZSE quotation unit 0.01 CNY; backend
- *   limit-up/limit-down math rounds to two decimals.
- * - HK display precision 3dp: multi-market UI display default; HKEX tick size
- *   varies by price band (not a single tick). Consumers needing band-aware
- *   ticks must pass an override once that API exists.
- * - US display precision 2dp: standard equity quote display; sub-dollar names
- *   may quote finer but the contract default is 2.
- * - Trading calendar: not implemented here — see `TRADING_CALENDAR_DEPENDENCY`.
+ *   treats CN/HK symbols as red-up; US/international (incl. crypto) as green-up.
+ * - A-share display precision 2dp; HK 3dp; US/crypto 2dp USD quote default.
+ * - Crypto identity: explicit `crypto:TICKER` only (docs/crypto-market-support.md).
+ * - Trading calendar: equity markets stay backend-backed; crypto is always open.
  */
 
 import type { UiLanguage } from '../i18n/uiText';
 import { formatUiNumber, getUiLocale } from './uiLocale';
 
 /** Primary multi-market IDs covered by this contract (Issue #889). */
-export type MarketId = 'cn' | 'hk' | 'us';
+export type MarketId = 'cn' | 'hk' | 'us' | 'crypto';
 
 /**
  * User/config color preference for up/down presentation.
@@ -71,6 +66,7 @@ export const MARKET_CURRENCY: Readonly<Record<MarketId, string>> = {
   cn: 'CNY',
   hk: 'HKD',
   us: 'USD',
+  crypto: 'USD',
 };
 
 /**
@@ -81,6 +77,7 @@ export const MARKET_PRICE_FRACTION_DIGITS: Readonly<Record<MarketId, number>> = 
   cn: 2,
   hk: 3,
   us: 2,
+  crypto: 2,
 };
 
 /**
@@ -90,25 +87,29 @@ export const MARKET_IANA_TIMEZONE: Readonly<Record<MarketId, string>> = {
   cn: 'Asia/Shanghai',
   hk: 'Asia/Hong_Kong',
   us: 'America/New_York',
+  crypto: 'UTC',
+};
+
+/** Short market badge codes for quote/report chrome (Issue #881). */
+export const MARKET_DISPLAY_CODE: Readonly<Record<MarketId, string>> = {
+  cn: 'CN',
+  hk: 'HK',
+  us: 'US',
+  crypto: 'CRYPTO',
 };
 
 /**
- * Trading-day data is intentionally not resolved in the Web client.
+ * Trading-day data for equity markets is not re-implemented in the Web client.
+ * Crypto is always open (24×7 UTC). See docs/crypto-market-support.md.
  *
- * Authoritative backend source:
- * - Module: `src/core/trading_calendar.py`
- * - Exchange codes: cn=`XSHG`, hk=`XHKG`, us=`XNYS` (via `exchange-calendars` when installed)
- * - Timezones: `MARKET_IANA_TIMEZONE` above
- * - Existing consumers: scheduled tasks (`calendar_market`, `non_trading_day_policy`),
- *   market phase (`is_trading_day` on phase context)
- *
- * Client code that needs trading-day truth should call a backend API rather than
- * re-implement calendars here.
+ * Authoritative equity source: `src/core/trading_calendar.py`
+ * (cn=`XSHG`, hk=`XHKG`, us=`XNYS` when exchange-calendars is installed).
  */
 export const TRADING_CALENDAR_DEPENDENCY = {
-  status: 'stub' as const,
+  status: 'partial' as const,
   backendModule: 'src/core/trading_calendar.py',
   exchangeCalendars: { cn: 'XSHG', hk: 'XHKG', us: 'XNYS' } as const,
+  alwaysOpenMarkets: ['crypto'] as const,
   timeZones: MARKET_IANA_TIMEZONE,
 };
 
@@ -131,7 +132,7 @@ export const PRICE_DIRECTION_CSS_VAR: Readonly<Record<'up' | 'down', string>> = 
 };
 
 function isMarketId(value: string): value is MarketId {
-  return value === 'cn' || value === 'hk' || value === 'us';
+  return value === 'cn' || value === 'hk' || value === 'us' || value === 'crypto';
 }
 
 /**
@@ -144,6 +145,11 @@ function isMarketId(value: string): value is MarketId {
 export function resolveMarketIdFromStockCode(code: string | null | undefined): MarketId | null {
   if (!code || !code.trim()) return null;
   const normalized = code.trim().toUpperCase();
+
+  // Crypto explicit namespace first — never reclassify bare equity tickers.
+  if (/^CRYPTO:[A-Z0-9][A-Z0-9._-]{0,31}$/.test(normalized)) {
+    return 'crypto';
+  }
 
   // HK: HK00700, HK.00700, 00700.HK, or pure 5-digit
   if (/^HK\.?\d{1,5}$/.test(normalized) || normalized.endsWith('.HK')) {
@@ -178,6 +184,15 @@ export function resolveMarketIdFromStockCode(code: string | null | undefined): M
 }
 
 /**
+ * Short market badge label for quote/report chrome (e.g. `US`, `CRYPTO`).
+ * Returns null when market is unknown — never invent a badge.
+ */
+export function formatMarketBadge(market: MarketId | null | undefined): string | null {
+  if (!market || !isMarketId(market)) return null;
+  return MARKET_DISPLAY_CODE[market];
+}
+
+/**
  * Coerce a raw config/settings string into a known ChangeColorPreference.
  * Unknown or empty values → null (caller uses market convention).
  */
@@ -194,10 +209,10 @@ export function parseChangeColorPreference(
 
 /**
  * Market convention default for change colors when the user has not set a preference.
- * CN/HK: red-up / green-down. US: green-up / red-down.
+ * CN/HK: red-up / green-down. US/crypto (international): green-up / red-down.
  */
 export function defaultChangeColorPreference(market: MarketId): ChangeColorPreference {
-  return market === 'us' ? 'green_up' : 'red_up';
+  return market === 'us' || market === 'crypto' ? 'green_up' : 'red_up';
 }
 
 /**
@@ -357,9 +372,10 @@ function resolveTimeZoneLabel(date: Date, timeZone: string, locale: string): str
   const shortName = shortParts.find((part) => part.type === 'timeZoneName')?.value;
   if (shortName) return shortName;
 
-  // Stable fallbacks aligned with common market labels (plan: GMT+8 / EST).
+  // Stable fallbacks aligned with common market labels (plan: GMT+8 / EST / UTC).
   if (timeZone === 'Asia/Shanghai' || timeZone === 'Asia/Hong_Kong') return 'GMT+8';
   if (timeZone === 'America/New_York') return 'EST';
+  if (timeZone === 'UTC' || timeZone === 'Etc/UTC') return 'UTC';
   return timeZone;
 }
 
@@ -408,15 +424,17 @@ export function formatMarketTime(
 }
 
 /**
- * Trading-day stub. Always returns `null` (unknown) until a backend-backed
- * client API is adopted. See `TRADING_CALENDAR_DEPENDENCY`.
+ * Trading-day answer for the formatting contract.
  *
- * Parameters are part of the stable contract surface for second-wave adopters.
- *
- * @returns null — unknown; never invents a yes/no answer client-side
+ * - crypto: always open (24×7 UTC) — returns `true` for any non-empty date token
+ * - cn / hk / us: returns `null` (unknown) until a backend-backed client API
+ *   is adopted — never invents equity calendar answers client-side
  */
-export function isTradingDay(market: MarketId, date: string): null {
-  void market;
-  void date;
+export function isTradingDay(market: MarketId, date: string): boolean | null {
+  if (!isMarketId(market)) {
+    throw new Error(`Unsupported market for isTradingDay: ${String(market)}`);
+  }
+  if (!date || !String(date).trim()) return null;
+  if (market === 'crypto') return true;
   return null;
 }

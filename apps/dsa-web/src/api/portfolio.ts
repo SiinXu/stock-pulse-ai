@@ -21,6 +21,7 @@ import type {
   PortfolioImportParseResponse,
   PaperTradeCreateRequest,
   PaperTradeCreatedResponse,
+  PaperDecisionQualityResponse,
   PortfolioPositionAnalysisRequest,
   PortfolioRiskResponse,
   PortfolioSnapshotResponse,
@@ -74,6 +75,44 @@ const portfolioSnapshotResponseSchema = z.object({
 const portfolioDeleteResponseSchema = z.object({ deleted: z.number() }).passthrough();
 const portfolioEventCreatedResponseSchema = z.object({ id: z.number() }).passthrough();
 const paperTradeCreatedResponseSchema = z.object({ id: z.number(), price: z.number(), priceSource: z.string() }).passthrough();
+const paperDecisionQualityReasonSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  dimension: z.string().nullable().optional(),
+}).passthrough();
+const paperDecisionQualityDimensionSchema = z.object({
+  status: z.enum(['ok', 'unavailable']).optional(),
+  score: z.number().nullable().optional(),
+  reasons: z.array(paperDecisionQualityReasonSchema).optional(),
+  inputs: z.record(z.string(), z.number()).optional(),
+}).passthrough();
+const paperDecisionQualityResponseSchema = z.object({
+  scoreKind: z.literal('process'),
+  formulaVersion: z.string(),
+  disclaimer: z.string(),
+  accountId: z.number(),
+  accountType: z.literal('paper'),
+  asOf: z.string(),
+  sampleSize: z.number(),
+  totalTradeCount: z.number(),
+  truncated: z.boolean(),
+  aggregate: z.object({
+    sampleSize: z.number(),
+    processScore: z.number().nullable().optional(),
+    status: z.enum(['ok', 'empty']),
+  }).passthrough(),
+  items: z.array(z.object({
+    processScore: z.number(),
+    formulaVersion: z.string(),
+    dimensions: z.record(z.string(), paperDecisionQualityDimensionSchema),
+  }).passthrough()).optional(),
+  divisionOfLabor: z.object({
+    thisIssue: z.number(),
+    owns: z.string(),
+    doesNotOwn: z.string(),
+    outcomeOwnerIssue: z.number(),
+  }).passthrough(),
+}).passthrough();
 const portfolioRiskResponseSchema = z.object({
   asOf: z.string(), costMethod: z.string(), currency: z.string(), accountId: z.number().nullable().optional(),
   concentration: z.record(z.string(), z.unknown()).optional(), sectorConcentration: z.record(z.string(), z.unknown()).optional(),
@@ -117,9 +156,17 @@ const portfolioImportTradeItemSchema = z.object({
   fee: z.number(), tax: z.number(), dedupHash: z.string(), tradeUid: z.string().nullable().optional(),
   currency: z.string().nullable().optional(),
 }).passthrough();
+const portfolioImportFailedRowSchema = z.object({
+  rowNumber: z.number(),
+  reasonCode: z.string(),
+  reason: z.string(),
+  source: z.record(z.string(), z.string()).optional(),
+}).passthrough();
 const portfolioImportParseResponseSchema = z.object({
   broker: z.string(), recordCount: z.number(), skippedCount: z.number(), errorCount: z.number(),
-  records: z.array(portfolioImportTradeItemSchema).optional(), errors: z.array(z.string()).optional(),
+  records: z.array(portfolioImportTradeItemSchema).optional(),
+  errors: z.array(z.string()).optional(),
+  failedRows: z.array(portfolioImportFailedRowSchema).optional(),
 }).passthrough();
 const portfolioImportCommitResponseSchema = z.object({
   accountId: z.number(), recordCount: z.number(), insertedCount: z.number(), duplicateCount: z.number(),
@@ -364,6 +411,29 @@ export const portfolioApi = {
     return parseCamelCasePayload<PaperTradeCreatedResponse>(response.data, paperTradeCreatedResponseSchema, 'PaperTradeCreatedResponse');
   },
 
+  async getPaperDecisionQuality(
+    accountId: number,
+    query: { dateFrom?: string; dateTo?: string; limit?: number } = {},
+  ): Promise<PaperDecisionQualityResponse> {
+    const params: Record<string, string | number> = {};
+    if (query.dateFrom) params.date_from = query.dateFrom;
+    if (query.dateTo) params.date_to = query.dateTo;
+    if (query.limit != null) params.limit = query.limit;
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/portfolio/accounts/${accountId}/paper-decision-quality`,
+      { params },
+    );
+    const parsed = parseCamelCasePayload<PaperDecisionQualityResponse>(
+      response.data,
+      paperDecisionQualityResponseSchema,
+      'PaperDecisionQualityResponse',
+    );
+    return {
+      ...parsed,
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+    };
+  },
+
   async deleteTrade(tradeId: number): Promise<PortfolioDeleteResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/portfolio/trades/${tradeId}`);
     return parseCamelCasePayload<PortfolioDeleteResponse>(response.data, portfolioDeleteResponseSchema, 'PortfolioDeleteResponse');
@@ -456,7 +526,17 @@ export const portfolioApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     const parsed = parseCamelCasePayload<PortfolioImportParseResponse>(response.data, portfolioImportParseResponseSchema, 'PortfolioImportParseResponse');
-    return { ...parsed, records: Array.isArray(parsed.records) ? parsed.records : [], errors: Array.isArray(parsed.errors) ? parsed.errors : [] };
+    return {
+      ...parsed,
+      records: Array.isArray(parsed.records) ? parsed.records : [],
+      errors: Array.isArray(parsed.errors) ? parsed.errors : [],
+      failedRows: Array.isArray(parsed.failedRows)
+        ? parsed.failedRows.map((row) => ({
+          ...row,
+          source: row.source && typeof row.source === 'object' ? row.source : {},
+        }))
+        : [],
+    };
   },
 
   async commitCsvImport(
