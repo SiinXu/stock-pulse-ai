@@ -1387,6 +1387,26 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.AGENT_STEP_CRITIQUE_ENABLED': {
+    title: 'Immediate Step Critique',
+    summary: 'Adds deterministic typed critique after failed or contradictory planning observations.',
+  },
+  'settings.agent.AGENT_REFLECTION_ENABLED': {
+    title: 'Trajectory Reflection',
+    summary: 'Runs an optional end-of-run reflection over bounded, redacted trajectory evidence.',
+  },
+  'settings.agent.AGENT_REFLECTION_LLM_BUDGET': {
+    title: 'Trajectory Reflection LLM Budget',
+    summary: 'Caps provider calls for one trajectory reflection.',
+  },
+  'settings.agent.AGENT_META_REVIEW_ENABLED': {
+    title: 'Cross-run Meta Review',
+    summary: 'Aggregates validated episode lessons into deterministic offline reports.',
+  },
+  'settings.agent.AGENT_META_REVIEW_MIN_EPISODES': {
+    title: 'Meta Review Sample Threshold',
+    summary: 'Requires a minimum number of validated episodes before recommendations are emitted.',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',

@@ -28,7 +28,7 @@ from src.agent.evolution.multilevel import (
     run_immediate_layer,
     run_trajectory_layer,
 )
-from src.agent.evolution.reflection import parse_reflection_output
+from src.agent.evolution.reflection import parse_reflection_output, run_reflection_loop
 from src.agent.evolution.step_critique import (
     critique_step_observations,
     map_replan_reason_kind,
@@ -159,6 +159,63 @@ def test_trajectory_layer_rejects_corrupt_immediate_lesson_payload() -> None:
                 agent_reflection_in_chat=False,
             ),
         )
+
+
+def test_reflection_boundaries_are_explicit_for_zero_lessons_and_revision_cap() -> None:
+    config = SimpleNamespace(agent_reflection_enabled=True)
+    no_lesson_calls = 0
+
+    def unexpected_revision(_ctx, _lessons):
+        nonlocal no_lesson_calls
+        no_lesson_calls += 1
+        raise AssertionError("zero lessons must not trigger revision")
+
+    empty = run_reflection_loop(
+        _Ctx(run_id="run-empty"),
+        config=config,
+        llm_complete=lambda _system, _user: json.dumps(
+            {"lessons": [], "revised": False}
+        ),
+        revise_fn=unexpected_revision,
+        budget=LlmCallBudget(total=1),
+        max_revise=1,
+    )
+
+    assert empty.status == "completed"
+    assert empty.terminate_reason == "ok"
+    assert empty.validation_status == "valid"
+    assert empty.lessons == []
+    assert empty.revised is False
+    assert no_lesson_calls == 0
+
+    revision_calls = 0
+    events = []
+
+    def revise_once(_ctx, lessons):
+        nonlocal revision_calls
+        revision_calls += 1
+        assert [lesson.kind for lesson in lessons] == ["evidence_gap"]
+        return True
+
+    revised = run_reflection_loop(
+        _Ctx(run_id="run-revised"),
+        config=config,
+        llm_complete=lambda _system, _user: json.dumps(
+            {
+                "lessons": [{"kind": "evidence_gap", "severity": "medium"}],
+                "revised": False,
+            }
+        ),
+        revise_fn=revise_once,
+        budget=LlmCallBudget(total=1),
+        max_revise=1,
+        event_sink=lambda name, payload: events.append((name, payload)),
+    )
+
+    assert revised.status == "completed"
+    assert revised.revised is True
+    assert revision_calls == 1
+    assert [name for name, _payload in events].count("reflect_revise") == 1
 
 
 def test_meta_review_sample_threshold_and_actions(tmp_path):

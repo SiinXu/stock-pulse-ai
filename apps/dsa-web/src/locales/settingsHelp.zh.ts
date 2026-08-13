@@ -1416,6 +1416,26 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.AGENT_STEP_CRITIQUE_ENABLED': {
+    title: '即时步骤批评',
+    summary: '在规划观察失败或相互矛盾后追加确定性的类型化批评。',
+  },
+  'settings.agent.AGENT_REFLECTION_ENABLED': {
+    title: '轨迹反思',
+    summary: '在运行结束后，对有界且已脱敏的轨迹证据执行可选反思。',
+  },
+  'settings.agent.AGENT_REFLECTION_LLM_BUDGET': {
+    title: '轨迹反思 LLM 预算',
+    summary: '限制单次轨迹反思可调用 provider 的次数。',
+  },
+  'settings.agent.AGENT_META_REVIEW_ENABLED': {
+    title: '跨运行元审查',
+    summary: '把已校验的 episode lesson 聚合为确定性的离线报告。',
+  },
+  'settings.agent.AGENT_META_REVIEW_MIN_EPISODES': {
+    title: '元审查样本阈值',
+    summary: '达到最少已校验 episode 数量后才输出建议。',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
