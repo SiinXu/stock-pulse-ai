@@ -13424,7 +13424,7 @@ export interface components {
              * Process Mode
              * @enum {string}
              */
-            process_mode: "serve" | "desktop" | "not_attached";
+            process_mode: "serve+schedule" | "desktop" | "cli-schedule" | "not_attached";
             /** Run Now Available */
             run_now_available: boolean;
             /** Run Now Block Reason */
