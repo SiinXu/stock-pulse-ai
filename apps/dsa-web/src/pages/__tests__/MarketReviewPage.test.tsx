@@ -47,7 +47,7 @@ vi.mock('../../api/history', () => ({
     getNews: vi.fn().mockResolvedValue({ total: 0, items: [] }),
     getMarkdown: vi.fn().mockResolvedValue('# Market review'),
     getDiagnostics: vi.fn(),
-    getRecordFlow: vi.fn(),
+    getRecordFlow: vi.fn().mockResolvedValue(null),
     deleteRecords: vi.fn(),
   },
 }));
