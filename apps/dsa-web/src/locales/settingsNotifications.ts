@@ -58,6 +58,16 @@ const zh = {
   noEligibleEvents: '该渠道已接收所有事件类型。',
   testDraftOnly: '草稿已测试',
   testDraftOnlyDescription: '当前测试针对未保存草稿；保存完成后需重新测试，才能绑定事件。',
+  pluginChannelsTitle: '插件通知渠道',
+  pluginChannelsDescription: '由已启用扩展注册的通知适配器。仅在插件真实加载并注册渠道后显示，不会把内置渠道伪装成插件。',
+  pluginChannelsEmptyTitle: '当前没有已加载的插件通知渠道',
+  pluginChannelsEmptyDescription: '启用提供 notification_channel 扩展点的插件后，渠道会出现在这里。未加载时不会显示为已连接。',
+  pluginChannelsOpenExtensions: '打开已加载扩展',
+  pluginChannelsUnavailableTitle: '无法读取插件名册',
+  pluginChannelsUnavailableDescription: '扩展列表暂时不可用，因此不会显示插件渠道。请稍后重试，切勿假设渠道已连接。',
+  pluginChannelLoaded: '已由插件加载',
+  pluginChannelProvidedBy: '由插件提供：{plugin}',
+  pluginChannelOpenExtension: '在扩展面板中查看',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -115,6 +125,16 @@ const en: Record<keyof typeof zh, string> = {
   noEligibleEvents: 'This channel already receives every event type.',
   testDraftOnly: 'Draft tested',
   testDraftOnlyDescription: 'This test covered an unsaved draft. Save and retest before binding events.',
+  pluginChannelsTitle: 'Plugin notification channels',
+  pluginChannelsDescription: 'Notification adapters registered by enabled extensions. Shown only after a plugin truly loads and registers a channel—built-in channels are never disguised as plugins.',
+  pluginChannelsEmptyTitle: 'No plugin notification channels loaded',
+  pluginChannelsEmptyDescription: 'Enable a plugin that registers the notification_channel extension point and its channels appear here. Nothing is shown as connected while unloaded.',
+  pluginChannelsOpenExtensions: 'Open loaded extensions',
+  pluginChannelsUnavailableTitle: 'Plugin roster unavailable',
+  pluginChannelsUnavailableDescription: 'The extensions list could not be loaded, so plugin channels are hidden. Retry later—do not assume a channel is connected.',
+  pluginChannelLoaded: 'Loaded by plugin',
+  pluginChannelProvidedBy: 'Provided by plugin: {plugin}',
+  pluginChannelOpenExtension: 'View in Extensions',
 };
 
 export const SETTINGS_NOTIFICATION_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT", { zh, en });

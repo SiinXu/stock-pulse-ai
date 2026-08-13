@@ -69,6 +69,7 @@ def validate_analysis_strategy_definition(implementation: object) -> bool:
         or not _valid_string_list(implementation.allowed_tools)
         or not _valid_string_list(implementation.aliases)
         or not _valid_string_list(implementation.market_regimes)
+        or not _valid_string_list(implementation.market_scopes)
     ):
         return False
     return True
@@ -93,6 +94,7 @@ class AnalysisStrategyDefinition:
     default_router: bool
     default_priority: int
     market_regimes: tuple[str, ...]
+    market_scopes: tuple[str, ...]
     execution_context: str
     subagent_type: str
     preferred_model: str
@@ -119,6 +121,7 @@ class AnalysisStrategyDefinition:
             default_router=skill.default_router,
             default_priority=skill.default_priority,
             market_regimes=tuple(skill.market_regimes),
+            market_scopes=tuple(skill.market_scopes),
             execution_context=skill.execution_context,
             subagent_type=skill.subagent_type,
             preferred_model=skill.preferred_model,
@@ -167,6 +170,7 @@ class AnalysisStrategyDefinition:
             default_router=self.default_router,
             default_priority=self.default_priority,
             market_regimes=list(self.market_regimes),
+            market_scopes=list(self.market_scopes),
             execution_context=self.execution_context,
             subagent_type=self.subagent_type,
             preferred_model=self.preferred_model,
