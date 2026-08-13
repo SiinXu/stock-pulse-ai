@@ -5,6 +5,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { analysisApi } from '../../api/analysis';
 import { historyApi } from '../../api/history';
 import {
@@ -114,15 +118,22 @@ function MarketReviewRoute() {
   );
 }
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 function renderMarketReview(initialEntry: string = APP_ROUTE_PATHS.researchMarket) {
   return render(
     wrapWithQueryClient(
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path={APP_ROUTE_PATHS.researchMarket} element={<MarketReviewRoute />} />
-          <Route path={APP_ROUTE_PATHS.home} element={<LocationProbe />} />
-        </Routes>
-      </MemoryRouter>,
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path={APP_ROUTE_PATHS.researchMarket} element={<MarketReviewRoute />} />
+            <Route path={APP_ROUTE_PATHS.home} element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </RouteFocusRegistrationContext.Provider>,
     ),
   );
 }

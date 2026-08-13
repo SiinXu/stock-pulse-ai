@@ -4,13 +4,20 @@ import axios from 'axios';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
 
-export type ReportExportFormat = 'md' | 'pdf';
+export type ReportExportFormat = 'md' | 'html' | 'pdf';
 
 export type ReportExportCapabilities = {
   formats: {
     md: { available: boolean };
+    html: { available: boolean; reason?: string | null };
     pdf: { available: boolean; reason?: string | null };
   };
+};
+
+const EXPORT_EXTENSION: Record<ReportExportFormat, string> = {
+  md: 'md',
+  html: 'html',
+  pdf: 'pdf',
 };
 
 function filenameFromDisposition(header: string | undefined, fallback: string): string {
@@ -80,12 +87,17 @@ export const reportExportApi = {
       const data = response.data as {
         formats?: {
           md?: { available?: boolean };
+          html?: { available?: boolean; reason?: string | null };
           pdf?: { available?: boolean; reason?: string | null };
         };
       };
       return {
         formats: {
           md: { available: data.formats?.md?.available !== false },
+          html: {
+            available: Boolean(data.formats?.html?.available),
+            reason: data.formats?.html?.reason ?? null,
+          },
           pdf: {
             available: Boolean(data.formats?.pdf?.available),
             reason: data.formats?.pdf?.reason ?? null,
@@ -118,7 +130,7 @@ export const reportExportApi = {
         }
         throw createApiError(getParsedApiError({ response: { status: 500, data } }));
       }
-      const fallback = `stockpulse-report-${recordId}.${format === 'pdf' ? 'pdf' : 'md'}`;
+      const fallback = `stockpulse-report-${recordId}.${EXPORT_EXTENSION[format]}`;
       const filename = filenameFromDisposition(
         response.headers?.['content-disposition'] as string | undefined,
         fallback,

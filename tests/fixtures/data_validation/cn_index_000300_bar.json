@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "symbol": "000300",
+    "market": "cn",
+    "instrument_type": "index",
+    "note": "CSI 300 index bar: amount may be null; volume can be 0."
+  },
+  "bar": {
+    "date": "2026-05-06",
+    "open": 3850.12,
+    "high": 3872.55,
+    "low": 3841.2,
+    "close": 3865.4,
+    "volume": 0,
+    "amount": null,
+    "pct_chg": 0.41,
+    "pre_close": 3849.6
+  },
+  "valuation": {
+    "pe_ratio": 12.8,
+    "pb_ratio": 1.35
+  }
+}

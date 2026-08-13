@@ -1,7 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouteFocusTarget } from '../components/routing';
+import { APP_ROUTE_PATHS } from '../routing/routes';
 import { CheckCheck, RefreshCw } from 'lucide-react';
 import { notificationInboxApi } from '../api/notificationInbox';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
@@ -37,6 +39,12 @@ const KIND_OPTIONS: Array<{ value: '' | NotificationInboxKind; labelKey: keyof t
 
 const NotificationCenterPage: React.FC = () => {
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.notifications,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const text = NOTIFICATION_CENTER_TEXT[language];
   const notificationText = NOTIFICATIONS_TEXT[language];
   const [pageData, setPageData] = useState<NotificationInboxPage | null>(null);
@@ -130,6 +138,7 @@ const NotificationCenterPage: React.FC = () => {
   return (
     <WorkspacePage data-testid="notification-center-page">
       <PageHeader
+        ref={pageHeadingRef}
         title={text.title}
         description={text.description}
         actions={(

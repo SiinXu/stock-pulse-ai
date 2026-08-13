@@ -54,7 +54,7 @@ class _CriticalSectionTrackingNotifier:
         with self._state_lock:
             self._inflight -= 1
 
-    def _generate_single_stock_report(self, result: AnalysisResult) -> str:
+    def _generate_single_stock_report(self, result: AnalysisResult, report_type=None) -> str:
         self._enter("generate", result.code)
         return f"single:{result.code}"
 

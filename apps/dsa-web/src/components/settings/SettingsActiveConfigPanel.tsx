@@ -63,6 +63,8 @@ export type SettingsActiveConfigPanelProps = {
   resetDraftKeys: (keys: string[]) => void;
   activeSaveStatus: SettingsSaveStatus;
   agentModelSummary: AgentModelSummary;
+  /** When true, Agent Behavior opens essentials-first (chat/remediation deep links). */
+  agentEssentialsFocus?: boolean;
   readOnlyDiagnosticForItem: (item: SystemConfigItem, categoryHint?: string) => string | undefined;
   activeCategory: string;
   /** Optional mask token so notification channel cards can run test-to-bind. */
@@ -105,6 +107,7 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   resetDraftKeys,
   activeSaveStatus,
   agentModelSummary,
+  agentEssentialsFocus = false,
   readOnlyDiagnosticForItem,
   activeCategory,
   maskToken,
@@ -190,6 +193,7 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
           persistedValuesByKey={persistedValuesByKey}
           saveStatus={activeSaveStatus}
           modelSummary={agentModelSummary}
+          essentialsFocus={agentEssentialsFocus}
           fieldGroups={activeFieldGroupOrder ?? []}
           fieldGroupIdOf={fieldGroupIdOf}
           fieldGroupOrderOf={fieldGroupOrderOf}

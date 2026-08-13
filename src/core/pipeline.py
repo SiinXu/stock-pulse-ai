@@ -65,6 +65,7 @@ from src.services.daily_market_context import (
     format_daily_market_context_prompt_section,
 )
 from src.services.social_sentiment_service import SocialSentimentService
+from src.services.sentiment_pipeline_service import SentimentPipelineService
 from src.services.intelligence_service import IntelligenceService
 from src.services.market_hotspot_service import MarketHotspotService
 from src.services.analysis_context_builder import (

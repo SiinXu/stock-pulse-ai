@@ -5,6 +5,7 @@ import type { UiTextKey } from '../../i18n/uiText';
 import {
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
+  buildAgentExecutionSettingsHref,
   buildSettingsHref,
 } from '../../routing/routes';
 import { legacyToSectionView } from '../settings/settingsInformationArchitecture';
@@ -84,11 +85,7 @@ export function resolveSetupCheckHref(check: Pick<SetupStatusCheck, 'key' | 'cat
         source: 'home_readiness',
       });
     case 'llm_agent':
-      return buildSettingsHref({
-        section: 'agent_behavior',
-        view: 'execution',
-        source: 'home_readiness',
-      });
+      return buildAgentExecutionSettingsHref({ essentialsFocus: true });
     case 'stock_list':
       return buildSettingsHref({
         section: 'overview',

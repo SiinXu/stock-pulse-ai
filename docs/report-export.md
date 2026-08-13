@@ -172,12 +172,20 @@ header encoding.
 | 503 | `export_deadline_exceeded` | Isolated PDF render worker was terminated at the deadline |
 | 503 | `export_worker_unavailable` | The isolated render worker could not start or return safely |
 
+## Web download surface
+
+The report Markdown panel exposes one-click downloads for Markdown (always),
+HTML (when `markdown-it-py` is ready), and PDF (when the optional PDF stack and
+font coverage are ready). Capability probing uses
+`GET /api/v1/history/export/capabilities`; unavailable optional formats stay
+visible but disabled with an explicit unavailable label.
+
 ## Remaining Issue #163 scope
 
 - DOCX structured binary export (if product still needs native OOXML)
 - XLSX score/metric sheets
 - optional evidence/audit appendix toggle (#127)
-- Web one-click export controls on report and DecisionSignal surfaces
+- DecisionSignal one-click export surface (report Markdown panel is covered)
 
-This work is backend-only; it does not change templates, report generation,
-Desktop, `pdf_parsing_service.py`, share-image, or `md2img`.
+This path does not change templates, report generation, Desktop,
+`pdf_parsing_service.py`, share-image, or `md2img`.

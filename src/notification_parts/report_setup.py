@@ -96,6 +96,35 @@ class _ReportSetupMethods:
         self._history_compare_cache[cache_key] = history_by_code
         return {"history_by_code": history_by_code}
 
+    def _prepend_report_delta_section(
+        self,
+        report_content: str,
+        results: List[AnalysisResult],
+        report_type: Any,
+    ) -> str:
+        """Prepend the history-comparison delta section for saved and notified reports."""
+        if not report_content or not results:
+            return report_content
+        try:
+            from src.services.notification_delta_formatter import (
+                prepend_report_delta_section,
+            )
+
+            return prepend_report_delta_section(
+                report_content,
+                results,
+                report_type,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - delta presentation cannot block report generation
+            log_safe_exception(
+                logger,
+                "Report delta section skipped",
+                exc,
+                error_code="notification_report_delta_section_skipped",
+                level=logging.WARNING,
+            )
+            return report_content
+
     def generate_aggregate_report(
         self,
         results: List[AnalysisResult],
@@ -105,8 +134,16 @@ class _ReportSetupMethods:
         """Generate the aggregate report content used by merge/save/push paths."""
         normalized_type = self._normalize_report_type(report_type)
         if normalized_type == ReportType.BRIEF:
-            return self.generate_brief_report(results, report_date=report_date)
-        return self.generate_dashboard_report(results, report_date=report_date)
+            return self.generate_brief_report(
+                results,
+                report_date=report_date,
+                report_type=normalized_type,
+            )
+        return self.generate_dashboard_report(
+            results,
+            report_date=report_date,
+            report_type=normalized_type,
+        )
 
     def _collect_models_used(self, results: List[AnalysisResult]) -> List[str]:
         if not self._should_show_llm_model():

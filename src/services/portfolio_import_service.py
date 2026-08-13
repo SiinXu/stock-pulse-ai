@@ -170,6 +170,7 @@ class PortfolioImportService:
             "error_count": 0,
             "records": records,
             "errors": [],
+            "failed_rows": [],
         }
 
     def import_futu_positions(
@@ -200,39 +201,74 @@ class PortfolioImportService:
         *,
         broker: str,
         content: bytes,
+        filename: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Parse broker CSV/XLSX into normalized trade records.
+
+        Invalid data rows are rejected with structured ``failed_rows`` (reason +
+        original cell snapshot) so the client can preview, download, and correct
+        them. Completely empty rows remain counted as ``skipped`` without error.
+        """
         broker_norm = self._normalize_broker(broker, allow_live_sources=False)
         parser_spec = self._parser_registry[broker_norm]
-        df = self._read_csv(content)
+        df = self._read_table(content, filename=filename)
 
         records: List[Dict[str, Any]] = []
         skipped = 0
         errors: List[str] = []
+        failed_rows: List[Dict[str, Any]] = []
 
         for idx, row in df.iterrows():
-            normalized = self._normalize_trade_row(row=row, parser_spec=parser_spec)
-            if normalized is None:
+            # Header is row 1 in the source file; DataFrame index 0 -> line 2.
+            row_number = int(idx) + 2
+            outcome = self._normalize_trade_row(row=row, parser_spec=parser_spec)
+            status = outcome["status"]
+            if status == "empty":
                 skipped += 1
                 continue
+            if status == "reject":
+                reason_code = str(outcome.get("reason_code") or "invalid_row")
+                reason = str(outcome.get("reason") or "Row rejected")
+                source = dict(outcome.get("source") or {})
+                failed_entry = {
+                    "row_number": row_number,
+                    "reason_code": reason_code,
+                    "reason": reason,
+                    "source": source,
+                }
+                failed_rows.append(failed_entry)
+                errors.append(f"row={row_number}: [{reason_code}] {reason}")
+                continue
+            normalized = dict(outcome["record"] or {})
             try:
                 # Keep a stable line-level marker so repeated imports of the same
                 # file remain idempotent, while identical split fills on separate
                 # CSV lines do not collapse into one dedup key.
-                normalized["_source_line_number"] = int(idx) + 2
+                normalized["_source_line_number"] = row_number
                 normalized["dedup_hash"] = self._build_dedup_hash(normalized)
                 records.append(normalized)
             except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
                 log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
-                skipped += 1
-                errors.append(f"row={idx + 1}: {exc}")
+                reason = str(exc)
+                source = self._row_source_snapshot(row)
+                failed_rows.append(
+                    {
+                        "row_number": row_number,
+                        "reason_code": "normalize_failed",
+                        "reason": reason,
+                        "source": source,
+                    }
+                )
+                errors.append(f"row={row_number}: [normalize_failed] {reason}")
 
         return {
             "broker": broker_norm,
             "record_count": len(records),
             "skipped_count": skipped,
-            "error_count": len(errors),
+            "error_count": len(failed_rows),
             "records": records,
-            "errors": errors[:20],
+            "errors": errors[:50],
+            "failed_rows": failed_rows[:500],
         }
 
     def commit_trade_records(
@@ -383,6 +419,46 @@ class PortfolioImportService:
 
     @staticmethod
     def _read_csv(content: bytes) -> pd.DataFrame:
+        """Backward-compatible CSV reader; prefer :meth:`_read_table` for new call sites."""
+        return PortfolioImportService._read_table(content, filename="import.csv")
+
+    @staticmethod
+    def _read_table(content: bytes, filename: Optional[str] = None) -> pd.DataFrame:
+        """Read broker trade rows from CSV or XLSX bytes with encoding tolerance."""
+        if not content:
+            raise ValueError("Import file is empty")
+
+        name = (filename or "").strip().lower()
+        looks_like_zip = len(content) >= 4 and content[:4] == b"PK\x03\x04"
+        is_legacy_xls = name.endswith(".xls") and not name.endswith(".xlsx")
+        if is_legacy_xls:
+            raise ValueError(
+                "Only .xlsx Excel files are supported. Save the workbook as .xlsx and retry."
+            )
+
+        prefer_xlsx = name.endswith(".xlsx") or (
+            looks_like_zip and not name.endswith((".csv", ".txt", ".tsv"))
+        )
+        if prefer_xlsx:
+            try:
+                df = pd.read_excel(
+                    io.BytesIO(content),
+                    sheet_name=0,
+                    engine="openpyxl",
+                    dtype=str,
+                )
+            except Exception as exc:  # broad-exception: cleanup - Translate pandas/openpyxl workbook failures to a stable import validation error.
+                raise ValueError(
+                    "Excel parse failed. Confirm the file is a valid .xlsx workbook "
+                    "with a non-empty first sheet."
+                ) from exc
+            if df is None or df.empty:
+                return pd.DataFrame()
+            df = df.fillna("")
+            df.columns = [str(col).strip() for col in df.columns]
+            return df.astype(str)
+
+        last_decode_error: Optional[Exception] = None
         for encoding in ("utf-8-sig", "gbk", "gb18030"):
             try:
                 return pd.read_csv(
@@ -391,8 +467,17 @@ class PortfolioImportService:
                     dtype=str,
                     keep_default_na=False,
                 )
-            except UnicodeDecodeError:
+            except UnicodeDecodeError as exc:
+                last_decode_error = exc
                 continue
+            except Exception as exc:  # broad-exception: cleanup - Translate pandas CSV parser failures to a stable import validation error.
+                raise ValueError(
+                    "CSV parse failed. Check delimiter consistency and quoting."
+                ) from exc
+        if last_decode_error is not None:
+            raise ValueError(
+                "Unable to decode the spreadsheet text. Use UTF-8 or GBK encoding."
+            ) from last_decode_error
         return pd.read_csv(io.BytesIO(content), dtype=str, keep_default_na=False)
 
     def _normalize_trade_row(
@@ -400,8 +485,12 @@ class PortfolioImportService:
         *,
         row: Any,
         parser_spec: CsvParserSpec,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
+        """Classify one source row as ok / empty / reject with an explicit reason."""
         broker_hints = parser_spec.column_hints
+        source = self._row_source_snapshot(row)
+        if not source:
+            return {"status": "empty", "record": None, "reason_code": None, "reason": None, "source": {}}
 
         trade_date_raw = self._pick(
             row,
@@ -413,7 +502,13 @@ class PortfolioImportService:
         )
         trade_date_obj = self._parse_date(trade_date_raw)
         if trade_date_obj is None:
-            return None
+            return {
+                "status": "reject",
+                "record": None,
+                "reason_code": "invalid_trade_date",
+                "reason": "Missing or unparseable trade date",
+                "source": source,
+            }
 
         symbol_raw = self._pick(
             row,
@@ -424,7 +519,13 @@ class PortfolioImportService:
         )
         symbol = canonical_stock_code(str(symbol_raw or "").strip())
         if not symbol:
-            return None
+            return {
+                "status": "reject",
+                "record": None,
+                "reason_code": "invalid_symbol",
+                "reason": "Missing or unrecognized symbol",
+                "source": source,
+            }
 
         side_raw = self._pick(
             row,
@@ -437,7 +538,13 @@ class PortfolioImportService:
         )
         side = self._normalize_side(side_raw)
         if side is None:
-            return None
+            return {
+                "status": "reject",
+                "record": None,
+                "reason_code": "invalid_side",
+                "reason": "Side must be buy or sell (broker buy/sell markers)",
+                "source": source,
+            }
 
         quantity = self._parse_float(
             self._pick(row, *(broker_hints.get("quantity") or ()), "成交数量", "数量", "成交股数")
@@ -445,8 +552,22 @@ class PortfolioImportService:
         price = self._parse_float(
             self._pick(row, *(broker_hints.get("price") or ()), "成交均价", "成交价格", "价格", "成交价", "均价")
         )
-        if quantity is None or quantity <= 0 or price is None or price <= 0:
-            return None
+        if quantity is None or quantity <= 0:
+            return {
+                "status": "reject",
+                "record": None,
+                "reason_code": "invalid_quantity",
+                "reason": "Quantity must be a positive number",
+                "source": source,
+            }
+        if price is None or price <= 0:
+            return {
+                "status": "reject",
+                "record": None,
+                "reason_code": "invalid_price",
+                "reason": "Price must be a positive number",
+                "source": source,
+            }
 
         fee = 0.0
         for col in ("手续费", "佣金", "交易费", "规费", "过户费"):
@@ -472,16 +593,42 @@ class PortfolioImportService:
         currency = self._pick(row, "币种", "货币")
 
         return {
-            "trade_date": trade_date_obj,
-            "symbol": symbol,
-            "side": side,
-            "quantity": float(quantity),
-            "price": float(price),
-            "fee": float(fee),
-            "tax": float(tax),
-            "trade_uid": (str(trade_uid).strip() if trade_uid is not None else None) or None,
-            "currency": (str(currency).strip().upper() if currency is not None else None) or None,
+            "status": "ok",
+            "record": {
+                "trade_date": trade_date_obj,
+                "symbol": symbol,
+                "side": side,
+                "quantity": float(quantity),
+                "price": float(price),
+                "fee": float(fee),
+                "tax": float(tax),
+                "trade_uid": (str(trade_uid).strip() if trade_uid is not None else None) or None,
+                "currency": (str(currency).strip().upper() if currency is not None else None) or None,
+            },
+            "reason_code": None,
+            "reason": None,
+            "source": source,
         }
+
+    @staticmethod
+    def _row_source_snapshot(row: Any) -> Dict[str, str]:
+        """Capture non-empty source cells for failed-row download/correction."""
+        snapshot: Dict[str, str] = {}
+        try:
+            items = list(row.items())  # type: ignore[attr-defined]
+        except Exception:  # broad-exception: optional_metadata - Unsupported row objects fall back to index-based source metadata.
+            try:
+                items = [(col, row[col]) for col in list(row.index)]  # type: ignore[index]
+            except Exception:  # broad-exception: optional_metadata - Unreadable optional source metadata becomes an empty snapshot.
+                return snapshot
+        for col, value in items:
+            if value is None:
+                continue
+            cell = str(value).strip()
+            if not cell or cell.lower() == "nan":
+                continue
+            snapshot[str(col)] = cell
+        return snapshot
 
     @staticmethod
     def _pick(row: Any, *candidates: str) -> Any:

@@ -22,6 +22,7 @@ const CANONICAL_SHELL_ROUTES = [
   APP_ROUTE_PATHS.researchBacktest,
   APP_ROUTE_PATHS.calculators,
   APP_ROUTE_PATHS.researchSkillOutcomes,
+  APP_ROUTE_PATHS.eventCalendar,
   APP_ROUTE_PATHS.settings,
 ] as const;
 
@@ -74,6 +75,7 @@ describe('navigation IA route inventory', () => {
       APP_ROUTE_PATHS.signals,
       APP_ROUTE_PATHS.approvals,
       APP_ROUTE_PATHS.stockDetails,
+      APP_ROUTE_PATHS.eventAlerts,
       APP_ROUTE_PATHS.login,
       APP_ROUTE_PATHS.playground,
     ];
