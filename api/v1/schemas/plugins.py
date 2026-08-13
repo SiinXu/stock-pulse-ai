@@ -38,6 +38,13 @@ class PluginInfo(BaseModel):
         description="Absolute package directory for external plugins when known",
     )
     extension_points: List[str] = Field(default_factory=list)
+    notification_channels: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Canonical notification channel IDs from active notification_channel "
+            "registrations; empty when the adapter is not loaded or not active"
+        ),
+    )
     description: str = ""
     author: str = ""
     last_error_code: Optional[str] = Field(
