@@ -7,6 +7,20 @@ import type {
   OutboundActivityPage,
 } from '../types/outboundActivity';
 import apiClient, { locallyRecoverableResourceConfig } from './index';
+import type { components } from '../types/api.generated';
+type OpenApiLocalOnly = components['schemas']['LocalOnlyModeStatus'];
+type OpenApiOutboundPage = components['schemas']['OutboundActivityPage'];
+type OpenApiOutboundItem = components['schemas']['OutboundActivityItem'];
+type _AssertLocalOnly = keyof OpenApiLocalOnly;
+type _AssertPage = keyof OpenApiOutboundPage;
+type _AssertItem = keyof OpenApiOutboundItem;
+const _localOnlyAnchor: _AssertLocalOnly = 'enabled';
+const _pageAnchor: _AssertPage = 'local_only_mode';
+const _itemAnchor: _AssertItem = 'destination_class';
+void _localOnlyAnchor;
+void _pageAnchor;
+void _itemAnchor;
+
 import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 
