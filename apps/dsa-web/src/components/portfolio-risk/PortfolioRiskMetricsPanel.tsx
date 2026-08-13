@@ -5,9 +5,11 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { Badge, Button, Card, DataTable, type DataTableColumn, EmptyState, InlineAlert, Loading } from '../common';
+import { HelpKeyButton } from '../help';
 import { formatParsedApiError, getParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage } from '../../i18n/uiText';
+import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
 import { PORTFOLIO_RISK_METRICS_TEXT } from '../../locales/portfolioRiskMetrics';
 import { usePortfolioRiskMetricsQuery } from '../../hooks/portfolio/usePortfolioRiskMetricsQuery';
 import type {
@@ -126,7 +128,13 @@ const VaRCard: React.FC<{
   return (
     <Card padding="md" data-testid="portfolio-risk-var-card">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{text.varTitle}</h3>
+        <h3 className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
+          <span>{text.varTitle}</span>
+          <HelpKeyButton
+            helpKey={EDUCATION_HELP_KEYS.portfolioVar}
+            data-testid="portfolio-risk-var-help"
+          />
+        </h3>
         <Badge variant={statusBadgeVariant(block.status)} size="sm">
           {statusLabel(block.status, text)}
         </Badge>
@@ -297,7 +305,17 @@ const ConcentrationCard: React.FC<{
   return (
     <Card padding="md" data-testid="portfolio-risk-concentration-card">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{text.concentrationTitle}</h3>
+        <h3 className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
+          <span>{text.concentrationTitle}</span>
+          <HelpKeyButton
+            helpKey={EDUCATION_HELP_KEYS.portfolioConcentration}
+            data-testid="portfolio-risk-concentration-help"
+          />
+          <HelpKeyButton
+            helpKey={EDUCATION_HELP_KEYS.portfolioDiversification}
+            data-testid="portfolio-risk-diversification-help"
+          />
+        </h3>
         <Badge variant={statusBadgeVariant(block.status)} size="sm">
           {statusLabel(block.status, text)}
         </Badge>
@@ -464,7 +482,13 @@ const PortfolioRiskMetricsPanel: React.FC<PortfolioRiskMetricsPanelProps> = ({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">{text.title}</h2>
+          <h2 className="inline-flex items-center gap-1 text-sm font-semibold text-foreground">
+            <span>{text.title}</span>
+            <HelpKeyButton
+              helpKey={EDUCATION_HELP_KEYS.portfolioHealth}
+              data-testid="portfolio-risk-health-help"
+            />
+          </h2>
           <p className="mt-0.5 text-xs text-secondary">{text.description}</p>
           {summaryLine ? (
             <p className="mt-1 text-xs text-secondary" data-testid="portfolio-risk-summary">
