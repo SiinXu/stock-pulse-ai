@@ -46,47 +46,105 @@ class _RunMethods:
         Returns:
             AgentResult with parsed dashboard or error.
         """
-        # Opt-in plan→act→observe product path (#199). Default-off via Config.
-        from src.agent.planning.product import try_run_with_planning
+        from datetime import datetime, timezone
 
-        planned = try_run_with_planning(
-            self,
-            task=task,
-            context=context,
-            cancelled_check=cancelled_check,
-        )
-        if planned is not None:
-            if planned.runtime_facts is None:
-                # Keep soul runtime facts even when planning short-circuits.
-                scope_resolution = resolve_stock_scope(task, context)
-                system_prompt, _, _ = self.build_run_messages(
-                    task,
-                    scope_resolution.effective_context,
+        started_at = datetime.now(timezone.utc)
+        episode_config = getattr(self, "config", None)
+        result: Optional[AgentResult] = None
+        try:
+            # Opt-in plan→act→observe product path (#199). Default-off via Config.
+            from src.agent.planning.product import try_run_with_planning
+
+            planned = try_run_with_planning(
+                self,
+                task=task,
+                context=context,
+                cancelled_check=cancelled_check,
+            )
+            if planned is not None:
+                if planned.runtime_facts is None:
+                    # Keep soul runtime facts even when planning short-circuits.
+                    scope_resolution = resolve_stock_scope(task, context)
+                    system_prompt, _, _ = self.build_run_messages(
+                        task,
+                        scope_resolution.effective_context,
+                    )
+                    planned.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
+                result = planned
+                return planned
+
+            scope_resolution = resolve_stock_scope(task, context)
+            system_prompt, user_message, tool_decls = self.build_run_messages(
+                task,
+                scope_resolution.effective_context,
+            )
+
+            # Initialize conversation
+            messages: List[Dict[str, Any]] = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            result = self._run_loop(
+                messages,
+                tool_decls,
+                parse_dashboard=True,
+                stock_scope=scope_resolution.stock_scope,
+                cancelled_check=cancelled_check,
+            )
+            result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
+            return result
+        except Exception as exc:
+            # broad-exception: optional_metadata - failure episode only
+            if getattr(episode_config, "agent_episode_log_enabled", None) is True:
+                # Compact failure episode for evolution store (#1090); never swallow.
+                import logging
+
+                from src.agent.executor import AgentResult as _AgentResult
+                from src.utils.sanitize import log_safe_exception
+
+                log_safe_exception(
+                    logging.getLogger(__name__),
+                    "agent_run_failed_for_episode",
+                    exc,
+                    error_code="agent_run_failed_for_episode",
                 )
-                planned.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
-            return planned
+                if result is None:
+                    result = _AgentResult(
+                        success=False,
+                        error=type(exc).__name__,
+                    )
+            raise
+        finally:
+            # Evolution episode log (#1090): fail-soft; never abort the user path.
+            # Use factory-injected executor.config only (no bare get_config).
+            if (
+                result is not None
+                and getattr(episode_config, "agent_episode_log_enabled", None) is True
+            ):
+                try:
+                    from src.services.agent_episode_service import (
+                        try_record_agent_episode_from_result,
+                    )
 
-        scope_resolution = resolve_stock_scope(task, context)
-        system_prompt, user_message, tool_decls = self.build_run_messages(
-            task,
-            scope_resolution.effective_context,
-        )
+                    try_record_agent_episode_from_result(
+                        result=result,
+                        config=episode_config,
+                        mode="single",
+                        context=context,
+                        started_at=started_at,
+                    )
+                except Exception as exc:  # broad-exception: fallback_recorded - episode logging cannot mask run result
+                    import logging
 
-        # Initialize conversation
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
+                    from src.utils.sanitize import log_safe_exception
 
-        result = self._run_loop(
-            messages,
-            tool_decls,
-            parse_dashboard=True,
-            stock_scope=scope_resolution.stock_scope,
-            cancelled_check=cancelled_check,
-        )
-        result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
-        return result
+                    log_safe_exception(
+                        logging.getLogger(__name__),
+                        "agent_episode_finalizer_failed",
+                        exc,
+                        error_code="agent_episode_finalizer_failed",
+                    )
 
     def build_run_messages(
         self, task: str, context: Optional[Dict[str, Any]] = None
