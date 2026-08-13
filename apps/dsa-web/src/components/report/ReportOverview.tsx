@@ -8,6 +8,15 @@ import type {
 import { Badge, Button, Card, ScoreGauge } from '../common';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
+import {
+  changeColorCssVar,
+  changeSemantics,
+  formatMarketBadge,
+  formatMarketTime,
+  formatPrice,
+  formatSignedChangePercent,
+  resolveMarketIdFromStockCode,
+} from '../../utils/marketFormat';
 import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/marketPhase';
 import { normalizeBoardType } from '../../utils/reportDomain';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
@@ -171,32 +180,41 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   const partialBarLabel = meta.marketPhaseSummary?.isPartialBar === true
     ? getPartialBarLabel(reportLanguage)
     : null;
+  const marketId = resolveMarketIdFromStockCode(meta.stockCode);
+  const marketBadge = formatMarketBadge(marketId);
   const relatedBoards = (Array.isArray(details?.belongBoards) ? details.belongBoards : [])
     .filter((board) => normalizeBoardName(board?.name).length > 0);
   const boardSignals = buildBoardSignalMaps(details);
   const preparedRelatedBoards = buildPreparedRelatedBoards(relatedBoards, boardSignals);
 
   const getPriceChangeStyle = (changePct: number | undefined): React.CSSProperties | undefined => {
-    if (changePct === undefined || changePct === null) {
+    if (changePct === undefined || changePct === null || !Number.isFinite(Number(changePct))) {
       return undefined;
     }
-
-    if (changePct > 0) {
-      return { color: 'var(--home-price-up)' };
+    if (marketId) {
+      const color = changeColorCssVar(changeSemantics(changePct, marketId).color);
+      return color ? { color } : undefined;
     }
-
-    if (changePct < 0) {
-      return { color: 'var(--home-price-down)' };
-    }
-
+    if (changePct > 0) return { color: 'var(--home-price-up)' };
+    if (changePct < 0) return { color: 'var(--home-price-down)' };
     return undefined;
   };
 
   const formatChangePct = (changePct: number | undefined): string => {
     if (changePct === undefined || changePct === null) return '--';
-    const sign = changePct > 0 ? '+' : '';
-    return `${sign}${changePct.toFixed(2)}%`;
+    if (!Number.isFinite(Number(changePct))) return '—';
+    return formatSignedChangePercent(changePct);
   };
+
+  const formattedPrice = marketId && meta.currentPrice != null
+    ? formatPrice(meta.currentPrice, marketId, language)
+    : meta.currentPrice != null && Number.isFinite(Number(meta.currentPrice))
+      ? Number(meta.currentPrice).toFixed(2)
+      : null;
+
+  const reportAsOf = marketId
+    ? (formatMarketTime(meta.createdAt, marketId, language)?.text ?? formatDateTime(meta.createdAt, language))
+    : formatDateTime(meta.createdAt, language);
 
   const getBoardStatusLabel = (status: BoardStatus): string => {
     if (status === 'leading') {
@@ -262,13 +280,26 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   <h2 className="text-xl font-bold leading-tight text-foreground">
                     {meta.stockName || meta.stockCode}
                   </h2>
-                  {/* Price and percentage change */}
-                  {meta.currentPrice != null && (
+                  {/* Price and percentage change (marketFormat contract) */}
+                  {formattedPrice != null && (
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xl font-bold font-mono" style={getPriceChangeStyle(meta.changePct)}>
-                        {meta.currentPrice.toFixed(2)}
+                      <span
+                        className="text-xl font-bold font-mono"
+                        style={getPriceChangeStyle(meta.changePct)}
+                        data-testid="report-overview-price"
+                      >
+                        {formattedPrice}
                       </span>
-                      <span className="text-sm font-semibold font-mono" style={getPriceChangeStyle(meta.changePct)}>
+                      <span
+                        className="text-sm font-semibold font-mono"
+                        style={getPriceChangeStyle(meta.changePct)}
+                        data-testid="report-overview-change"
+                        data-change-color={
+                          marketId
+                            ? changeSemantics(meta.changePct, marketId).color
+                            : undefined
+                        }
+                      >
                         {formatChangePct(meta.changePct)}
                       </span>
                     </div>
@@ -278,6 +309,17 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   <Badge variant="default" size="sm" className="font-mono">
                     {meta.stockCode}
                   </Badge>
+                  {marketBadge ? (
+                    <Badge
+                      variant="info"
+                      size="sm"
+                      className="shrink-0 font-mono shadow-none"
+                      aria-label={t('stocks.workspace.marketBadgeAria', { code: marketBadge })}
+                      data-testid="report-overview-market-badge"
+                    >
+                      {marketBadge}
+                    </Badge>
+                  ) : null}
                   {marketPhaseLabel ? (
                     <Badge variant="info" className="shrink-0 gap-1.5 shadow-none" aria-label={marketPhaseLabel}>
                       {marketPhaseLabel}
@@ -288,11 +330,11 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                       {partialBarLabel}
                     </Badge>
                   ) : null}
-                  <span className="text-xs text-muted-text flex items-center gap-1">
+                  <span className="text-xs text-muted-text flex items-center gap-1" data-testid="report-overview-asof">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    {formatDateTime(meta.createdAt, language)}
+                    {reportAsOf}
                   </span>
                 </div>
               </div>

@@ -74,6 +74,10 @@ class PipelineAnalysisArtifacts:
     metadata: Dict[str, Any]
     portfolio_context: Optional[Dict[str, Any]] = None
     money_flow_data: Optional[Any] = None
+    # Optional non-authoritative alt-data payload (Issues #139 / #1144).
+    # Default-off: omit or pass None so the pack shape stays unchanged.
+    alternative_data: Optional[Dict[str, Any]] = None
+    sentiment_snapshot: Optional[Dict[str, Any]] = None
 
 
 class AnalysisContextBuilder:
@@ -103,6 +107,9 @@ class AnalysisContextBuilder:
             blocks["money_flow"] = money_flow_block
         blocks["fundamentals"] = _build_fundamentals_block(artifacts)
         blocks["news"] = _build_news_block(artifacts)
+        sentiment_block = _build_sentiment_block(artifacts)
+        if sentiment_block is not None:
+            blocks["sentiment"] = sentiment_block
         portfolio_block = _build_portfolio_block(artifacts)
         if portfolio_block is not None:
             blocks["portfolio"] = portfolio_block
@@ -110,13 +117,14 @@ class AnalysisContextBuilder:
         data_quality_warnings.extend(
             code for code in evidence_codes if code not in data_quality_warnings
         )
+        # Core quality is computed before optional alt-data so supporting
+        # non-authoritative blocks never change overall_score / block_scores.
         data_quality = _build_data_quality(
             blocks,
             warnings=data_quality_warnings,
             validation_evidence=evidence,
         )
-
-        return AnalysisContextPack(
+        pack = AnalysisContextPack(
             subject=AnalysisSubject(
                 code=artifacts.code,
                 stock_name=artifacts.stock_name or None,
@@ -127,6 +135,13 @@ class AnalysisContextBuilder:
             data_quality=data_quality,
             metadata=metadata,
         )
+        if artifacts.alternative_data is not None:
+            from src.services.alternative_data_governance import (
+                attach_alternative_data_block,
+            )
+
+            pack = attach_alternative_data_block(pack, artifacts.alternative_data)
+        return pack
 
     @staticmethod
     def build_batch(items: Sequence[PipelineAnalysisArtifacts]) -> List[AnalysisContextPack]:
@@ -597,6 +612,141 @@ def _build_news_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBl
         },
         metadata=metadata,
     )
+
+
+
+
+def _build_sentiment_block(
+    artifacts: PipelineAnalysisArtifacts,
+) -> Optional[AnalysisContextBlock]:
+    """Map a sentiment snapshot into an auxiliary evidence block.
+
+    Sentiment is supporting evidence only. It is never treated as a trading
+    conclusion and does not participate in the core data-quality weighted score.
+    """
+    snapshot = _to_dict(artifacts.sentiment_snapshot)
+    if not snapshot:
+        return None
+
+    raw_status = str(snapshot.get("status") or "").strip().lower()
+    reason_code = str(snapshot.get("reason_code") or "").strip() or None
+    degraded = bool(snapshot.get("degraded"))
+    freshness = str(snapshot.get("freshness") or "unknown").strip().lower()
+
+    if raw_status == "unavailable":
+        status = ContextFieldStatus.MISSING
+        if reason_code == "scoring_failed":
+            status = ContextFieldStatus.FETCH_FAILED
+    elif raw_status == "degraded" or degraded:
+        if freshness == "stale":
+            status = ContextFieldStatus.STALE
+        else:
+            status = ContextFieldStatus.PARTIAL
+    else:
+        status = ContextFieldStatus.AVAILABLE
+        if freshness == "stale":
+            status = ContextFieldStatus.STALE
+
+    warnings: List[str] = []
+    if degraded or raw_status == "degraded":
+        warnings.append("sentiment_degraded")
+    if freshness in {"stale", "unknown"}:
+        warnings.append(f"sentiment_freshness_{freshness}")
+    if reason_code and reason_code != "ok":
+        warnings.append(f"sentiment_reason_{reason_code}")
+    warnings.append("sentiment_is_evidence_not_conclusion")
+
+    timestamp = _safe_iso_timestamp(
+        snapshot.get("freshness_as_of") or snapshot.get("as_of")
+    )
+    source = "sentiment_pipeline:news_lexicon_v1"
+    evidence = snapshot.get("evidence")
+    evidence_count = len(evidence) if isinstance(evidence, list) else 0
+
+    items = {
+        "role": AnalysisContextItem(
+            status=ContextFieldStatus.AVAILABLE,
+            value="evidence",
+            source=source,
+            metadata={"meaning": "supporting_evidence_not_trading_conclusion"},
+        ),
+        "status": AnalysisContextItem(
+            status=status,
+            value=raw_status or status.value,
+            source=source,
+            missing_reason=reason_code if status != ContextFieldStatus.AVAILABLE else None,
+        ),
+        "score": AnalysisContextItem(
+            status=status if snapshot.get("score") is not None else ContextFieldStatus.MISSING,
+            value=snapshot.get("score"),
+            source=source,
+            timestamp=timestamp,
+            missing_reason=None if snapshot.get("score") is not None else "sentiment_score_unavailable",
+        ),
+        "label": AnalysisContextItem(
+            status=status,
+            value=snapshot.get("label"),
+            source=source,
+        ),
+        "confidence": AnalysisContextItem(
+            status=status if snapshot.get("confidence") is not None else ContextFieldStatus.MISSING,
+            value=snapshot.get("confidence"),
+            source=source,
+            missing_reason=(
+                None if snapshot.get("confidence") is not None else "sentiment_confidence_unavailable"
+            ),
+        ),
+        "freshness": AnalysisContextItem(
+            status=status,
+            value=freshness,
+            source=source,
+            timestamp=timestamp,
+        ),
+        "evidence": AnalysisContextItem(
+            status=status if evidence_count > 0 else ContextFieldStatus.MISSING,
+            value=evidence if evidence_count > 0 else None,
+            source=source,
+            missing_reason=None if evidence_count > 0 else "sentiment_evidence_missing",
+            metadata={"evidence_count": evidence_count},
+        ),
+        "snapshot": AnalysisContextItem(
+            status=status,
+            value=snapshot,
+            source=source,
+            timestamp=timestamp,
+            metadata={
+                "schema_version": snapshot.get("schema_version"),
+                "method": snapshot.get("method"),
+                "item_count": snapshot.get("item_count"),
+            },
+        ),
+    }
+
+    return AnalysisContextBlock(
+        status=status,
+        items=items,
+        source=source,
+        timestamp=timestamp,
+        warnings=warnings,
+        metadata={
+            "auxiliary": True,
+            "quality_weighted": False,
+            "role": "evidence",
+            "reason_code": reason_code,
+            "item_count": snapshot.get("item_count"),
+            "window_days": snapshot.get("window_days"),
+            "disclaimer": snapshot.get("disclaimer"),
+        },
+    )
+
+
+def _safe_iso_timestamp(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or "T" not in text:
+        return None
+    return text
 
 
 def _build_portfolio_block(artifacts: PipelineAnalysisArtifacts) -> Optional[AnalysisContextBlock]:

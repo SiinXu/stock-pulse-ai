@@ -257,6 +257,36 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         self.assertNotIn("secret-token", by_channel["wechat"].diagnostics)
         self.assertTrue(by_channel["custom"].success)
 
+        # Queryable caller contract (Issue #1081): channel/ok/error + last result.
+        summaries = {item["channel"]: item for item in result.channel_summaries()}
+        self.assertFalse(summaries["wechat"]["ok"])
+        self.assertEqual(summaries["wechat"]["error"], "exception")
+        self.assertTrue(summaries["custom"]["ok"])
+        self.assertIsNone(summaries["custom"]["error"])
+        public = result.as_dict()
+        self.assertEqual(public["status"], "partial_failed")
+        self.assertTrue(public["success"])
+        self.assertEqual(public["channels"], result.channel_summaries())
+        self.assertIs(service.get_last_dispatch_result(), result)
+        # Result types are defined in contracts and re-exported from the facade.
+        from src.notification_parts.contracts import (
+            ChannelAttemptResult as ContractAttempt,
+            NotificationDispatchResult as ContractDispatch,
+        )
+        from src.notification_contracts import (
+            ChannelAttemptResult as FacadeAttempt,
+            NotificationDispatchResult as FacadeDispatch,
+        )
+
+        self.assertIs(type(result.channel_results[0]), ContractAttempt)
+        self.assertIs(type(result), ContractDispatch)
+        self.assertIs(ContractAttempt, FacadeAttempt)
+        self.assertIs(ContractDispatch, FacadeDispatch)
+        # Historical bool API still reports overall success when any channel ok.
+        with mock.patch.object(service, "send_to_wechat", side_effect=RuntimeError("boom")), \
+             mock.patch.object(service, "send_to_custom", return_value=True):
+            self.assertTrue(service.send("content-again"))
+
     @mock.patch("src.notification.get_config")
     def test_send_with_results_reports_route_no_channel(self, mock_get_config: mock.MagicMock):
         cfg = _make_config(
@@ -1305,6 +1335,63 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertNotIn("bull_trend", markdown)
         self.assertIn("多策略综合", wechat)
         self.assertIn("另有 1 个策略解析失败", wechat)
+
+    @mock.patch("src.notification.get_config")
+    def test_committee_deliberation_renders_through_public_notification_entries(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="AAPL",
+            name="Apple",
+            sentiment_score=50,
+            trend_prediction="Sideways",
+            operation_advice="Hold",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Committee remains split"},
+                "committee_deliberation": {
+                    "schema_version": "committee-deliberation-v1",
+                    "status": "split",
+                    "outcome": "hold",
+                    "conclusion": {
+                        "final_signal": "hold",
+                        "consensus_level": "low",
+                        "conflict_severity": "high",
+                        "confidence": 0.6594,
+                        "conflict_count": 2,
+                    },
+                    "members": [
+                        {
+                            "persona_id": "persona_value_moat",
+                            "display_name": "Value & Moat",
+                            "signal": "buy",
+                            "confidence": 0.8,
+                        },
+                        {
+                            "persona_id": "persona_tail_risk",
+                            "display_name": "Tail Risk",
+                            "signal": "sell",
+                            "confidence": 0.75,
+                        },
+                    ],
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report(
+            [result], report_date="2026-08-13"
+        )
+        wechat = service.generate_wechat_dashboard([result])
+
+        for rendered in (markdown, wechat):
+            self.assertIn("Investment Committee Deliberation", rendered)
+            self.assertIn("Value & Moat", rendered)
+            self.assertIn("Tail Risk", rendered)
+        self.assertIn("Committee Conclusion", markdown)
+        self.assertIn("Final Signal: Hold", markdown)
+        self.assertIn("Consensus: Low", markdown)
 
     @mock.patch("src.notification.get_config")
     def test_strategy_synthesis_uses_english_empty_labels_in_fallback_reports(

@@ -181,6 +181,30 @@ describe('StockScreeningPage', () => {
     window.history.pushState({}, '', APP_ROUTE_PATHS.researchDiscover);
   });
 
+  it('lets users reach bounded AI discovery from the production Research Discover page', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
+
+    const discoveryMode = screen.getByRole('button', { name: 'AI 发现' });
+    expect(discoveryMode).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('heading', { name: 'AI 候选发现（有界）' })).not.toBeInTheDocument();
+
+    fireEvent.click(discoveryMode);
+
+    expect(discoveryMode).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('heading', { name: 'AI 候选发现（有界）' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '运行发现' })).toBeInTheDocument();
+  });
+
   it('offers a primary run action from the never-run empty results state', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({
       enabled: true,

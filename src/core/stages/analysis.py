@@ -53,6 +53,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.search_service import SearchService
+from src.services.sentiment_pipeline_service import SentimentPipelineService
 from src.services.daily_market_context import (
     DailyMarketContext,
     DailyMarketContextService,
