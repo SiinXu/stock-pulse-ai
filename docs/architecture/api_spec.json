@@ -4959,6 +4959,16 @@
               }
             ],
             "title": "Free Form Rules"
+          },
+          "research_stance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchStanceContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -11942,6 +11952,58 @@
         ],
         "title": "ResearchScheduledPayload",
         "description": "Schema-v2 single-symbol research payload."
+      },
+      "ResearchStanceContent": {
+        "properties": {
+          "preset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "rational_analyst",
+                  "risk_guardian",
+                  "long_term_compounder"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Id"
+          },
+          "custom_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Text"
+          },
+          "preferred_lens_skill_ids": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "persona_value_moat",
+                "persona_mental_models",
+                "persona_contrarian_deep_value",
+                "persona_disruptive_growth",
+                "persona_tail_risk"
+              ]
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Preferred Lens Skill Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResearchStanceContent",
+        "description": "Optional research-tone stance on the personal investment framework."
       },
       "ScheduledTaskCreateRequest": {
         "properties": {

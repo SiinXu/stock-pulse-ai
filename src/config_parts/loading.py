@@ -955,6 +955,12 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
             ),
+            agent_research_persona=(
+                (os.getenv('AGENT_RESEARCH_PERSONA') or '').strip().lower()
+            ),
+            agent_research_persona_custom=(
+                (os.getenv('AGENT_RESEARCH_PERSONA_CUSTOM') or '').strip()
+            ),
             skill_opinion_recording_enabled=parse_env_bool(
                 os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
                 False,

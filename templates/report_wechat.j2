@@ -89,6 +89,14 @@
 {% endif %}
 {% endif %}
 
+{% set research_persona = dashboard.get('active_research_persona') if dashboard else none %}
+{% if research_persona and research_persona.get('enabled') %}
+🧭 **{{ labels.active_research_persona_heading }}**
+- {{ research_persona.get('display_name') or research_persona.get('preset_id') or 'persona' }}{% if research_persona.get('source') %} ({{ labels.active_research_persona_source_label }}: {{ research_persona.get('source') }}){% endif %}
+{% if research_persona.get('style_references') %}- {{ labels.active_research_persona_style_label }}: {{ (research_persona.get('style_references') or []) | join(', ') }}
+{% endif %}
+
+{% endif %}
 {% set committee = dashboard.get('committee_deliberation') if dashboard else none %}
 {% if committee and committee.get('members') %}
 🏛 **{{ labels.committee_deliberation_heading }}**

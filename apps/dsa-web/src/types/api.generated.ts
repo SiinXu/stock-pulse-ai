@@ -8596,6 +8596,7 @@ export interface components {
             evaluation_dimensions?: components["schemas"]["InvestmentFrameworkEvaluationDimension"][];
             /** Free Form Rules */
             free_form_rules?: string | null;
+            research_stance?: components["schemas"]["ResearchStanceContent"] | null;
             /** Risk Rules */
             risk_rules?: string[];
             /** Root Node Id */
@@ -13673,6 +13674,18 @@ export interface components {
             notify: boolean;
             /** Stock Code */
             stock_code: string;
+        };
+        /**
+         * ResearchStanceContent
+         * @description Optional research-tone stance on the personal investment framework.
+         */
+        ResearchStanceContent: {
+            /** Custom Text */
+            custom_text?: string | null;
+            /** Preferred Lens Skill Ids */
+            preferred_lens_skill_ids?: ("persona_value_moat" | "persona_mental_models" | "persona_contrarian_deep_value" | "persona_disruptive_growth" | "persona_tail_risk")[];
+            /** Preset Id */
+            preset_id?: ("rational_analyst" | "risk_guardian" | "long_term_compounder") | null;
         };
         /**
          * RollbackSystemConfigRequest
