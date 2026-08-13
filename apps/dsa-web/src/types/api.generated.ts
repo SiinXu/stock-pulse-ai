@@ -2635,6 +2635,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/rebalancing-recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get portfolio rebalancing and position-band recommendations
+         * @description Deterministic risk-band rebalancing suggestions and risk-adjusted position weight bands from the current portfolio snapshot and portfolio risk metrics. Suggestions are for human review only and are never auto-executed. Insufficient history yields an explicit refusal (no invented trades). Never calls market data providers on the hot path.
+         */
+        get: operations["getPortfolioRebalancingRecommendations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/risk": {
         parameters: {
             query?: never;
@@ -12113,6 +12133,44 @@ export interface components {
              */
             force: boolean;
         };
+        /** PortfolioPositionBand */
+        PortfolioPositionBand: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add" | "reduce" | "hold" | "exit";
+            /** Assumptions */
+            assumptions?: string[];
+            /**
+             * Auto Execute
+             * @default false
+             */
+            auto_execute: boolean;
+            /** Current Weight Pct */
+            current_weight_pct: number;
+            /** Effective Cap Pct */
+            effective_cap_pct: number;
+            /**
+             * Is Suggestion Only
+             * @default true
+             */
+            is_suggestion_only: boolean;
+            /** Mode */
+            mode: string;
+            /** Rationale */
+            rationale: string;
+            /** Signal */
+            signal: string;
+            /** Symbol */
+            symbol: string;
+            /** Target Weight Pct High */
+            target_weight_pct_high: number;
+            /** Target Weight Pct Low */
+            target_weight_pct_low: number;
+            /** Target Weight Pct Mid */
+            target_weight_pct_mid: number;
+        };
         /** PortfolioPositionItem */
         PortfolioPositionItem: {
             /** Avg Cost */
@@ -12163,6 +12221,187 @@ export interface components {
             unrealized_pnl_pct?: number | null;
             /** Valuation Currency */
             valuation_currency: string;
+        };
+        /** PortfolioRebalanceAssumptions */
+        PortfolioRebalanceAssumptions: {
+            /** Cross Currency */
+            cross_currency: string;
+            /** Drift Threshold Pct */
+            drift_threshold_pct: number;
+            /** Method */
+            method: string;
+            /** Portfolio Aware Sizing Enabled */
+            portfolio_aware_sizing_enabled: boolean;
+            /** Provider Calls On Hot Path */
+            provider_calls_on_hot_path: boolean;
+            /** Recommendation Honesty */
+            recommendation_honesty: string;
+            /** Risk Metrics Source */
+            risk_metrics_source: string;
+            /** Tax And Transaction Costs */
+            tax_and_transaction_costs: string;
+            /** Uses Risk Metrics */
+            uses_risk_metrics: boolean;
+            /** Weight Basis */
+            weight_basis: string;
+        };
+        /** PortfolioRebalanceBreach */
+        PortfolioRebalanceBreach: {
+            /** Current Pct */
+            current_pct: number;
+            /** Drift Pct */
+            drift_pct: number;
+            /** Kind */
+            kind: string;
+            /** Limit Pct */
+            limit_pct: number;
+            /** Symbol */
+            symbol?: string | null;
+        };
+        /** PortfolioRebalanceCurrent */
+        PortfolioRebalanceCurrent: {
+            /** Diversification Score */
+            diversification_score?: number | null;
+            /** Effective N */
+            effective_n?: number | null;
+            /** Hhi */
+            hhi?: number | null;
+            /**
+             * Portfolio Value
+             * @default 0
+             */
+            portfolio_value: number;
+            /** Risk Status */
+            risk_status?: string | null;
+            /** Var Pct */
+            var_pct?: number | null;
+            /** Weights */
+            weights?: components["schemas"]["PortfolioRebalanceWeightItem"][];
+        };
+        /** PortfolioRebalanceDrift */
+        PortfolioRebalanceDrift: {
+            /** Breaches */
+            breaches?: components["schemas"]["PortfolioRebalanceBreach"][];
+            /**
+             * Max Abs Weight Drift Pct
+             * @default 0
+             */
+            max_abs_weight_drift_pct: number;
+        };
+        /** PortfolioRebalanceRiskSummary */
+        PortfolioRebalanceRiskSummary: {
+            /** Concentration Status */
+            concentration_status?: string | null;
+            /** Correlation Status */
+            correlation_status?: string | null;
+            /** Status */
+            status: string;
+            /** Var Status */
+            var_status?: string | null;
+        };
+        /** PortfolioRebalanceSuggestion */
+        PortfolioRebalanceSuggestion: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "trim" | "add" | "hold";
+            /** Approx Notional */
+            approx_notional: number;
+            /** Assumptions */
+            assumptions?: string[];
+            /**
+             * Auto Execute
+             * @default false
+             */
+            auto_execute: boolean;
+            /** Delta Weight Pct */
+            delta_weight_pct: number;
+            /** From Weight Pct */
+            from_weight_pct: number;
+            /**
+             * Is Suggestion Only
+             * @default true
+             */
+            is_suggestion_only: boolean;
+            /** Rationale */
+            rationale: string;
+            /** Symbol */
+            symbol: string;
+            /** To Weight Pct */
+            to_weight_pct: number;
+        };
+        /** PortfolioRebalanceTargetModel */
+        PortfolioRebalanceTargetModel: {
+            /** Band Max Single Weight Pct */
+            band_max_single_weight_pct: number;
+            /** Description */
+            description: string;
+            /** Max Hhi */
+            max_hhi: number;
+            /** Max Single Weight Pct */
+            max_single_weight_pct: number;
+            /** Min Effective N */
+            min_effective_n: number;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string[];
+            /** Soft Max Single Name Weight */
+            soft_max_single_name_weight: number;
+            /** Target Var Pct Ceiling */
+            target_var_pct_ceiling: number;
+        };
+        /** PortfolioRebalanceWeightItem */
+        PortfolioRebalanceWeightItem: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
+        };
+        /** PortfolioRebalancingResponse */
+        PortfolioRebalancingResponse: {
+            /** Account Id */
+            account_id?: number | null;
+            /** As Of */
+            as_of: string;
+            assumptions: components["schemas"]["PortfolioRebalanceAssumptions"];
+            /**
+             * Auto Execute
+             * @default false
+             */
+            auto_execute: boolean;
+            /** Cost Method */
+            cost_method: string;
+            /** Currency */
+            currency: string;
+            current: components["schemas"]["PortfolioRebalanceCurrent"];
+            /** Disclaimer */
+            disclaimer: string;
+            drift: components["schemas"]["PortfolioRebalanceDrift"];
+            /**
+             * Is Suggestion Only
+             * @default true
+             */
+            is_suggestion_only: boolean;
+            /** Position Bands */
+            position_bands?: components["schemas"]["PortfolioPositionBand"][];
+            risk_metrics_summary: components["schemas"]["PortfolioRebalanceRiskSummary"];
+            /**
+             * Risk Tolerance
+             * @enum {string}
+             */
+            risk_tolerance: "conservative" | "moderate" | "aggressive";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "empty_portfolio" | "insufficient_data" | "refused";
+            /** Status Message */
+            status_message?: string | null;
+            /** Suggestions */
+            suggestions?: components["schemas"]["PortfolioRebalanceSuggestion"][];
+            target_model: components["schemas"]["PortfolioRebalanceTargetModel"];
         };
         /** PortfolioRiskAssumptions */
         PortfolioRiskAssumptions: {
@@ -25258,6 +25497,69 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPortfolioRebalancingRecommendations: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description As-of date; default today */
+                as_of?: string | null;
+                cost_method?: "fifo" | "avg";
+                /** @description Risk preference band used for caps and target position ranges */
+                risk_tolerance?: "conservative" | "moderate" | "aggressive";
+                /** @description Minimum absolute weight drift (percentage points) to emit a suggestion */
+                drift_threshold_pct?: number;
+                /** @description VaR confidence forwarded to risk metrics (exclusive of 0.5 and 1.0) */
+                confidence?: number;
+                /** @description VaR horizon forwarded to risk metrics */
+                horizon_days?: number;
+                /** @description Lookback trading days forwarded to risk metrics */
+                lookback_trading_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRebalancingResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rebalancing recommendation computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
