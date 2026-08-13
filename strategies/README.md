@@ -100,6 +100,25 @@ instructions: |
 | 6 | 量价配合：成交量验证价格运动 |
 | 7 | 强势趋势股放宽：龙头股可适当放宽标准 |
 
+## A-share specialist Skills（默认关闭，Issue #192）
+
+根目录下的三个 A 股特化 Skill 覆盖政策催化、资金流与微观结构规则。它们与 `crypto_market_structure` 一样走**既有 Skill / specialist** 路径（不是等待独立 Persona 运行时），全部声明 `default_active: false` 和 `default_router: false`，留空 `AGENT_SKILLS` 时不影响多市场默认分析。
+
+| Skill id | 视角 | 主要数据依赖（缺失时显式降级） |
+| --- | --- | --- |
+| `ashare_policy_catalyst` | 政策 / 监管 / 事件催化 | `search_comprehensive_intel`, `search_stock_news`, `get_stock_info`, `get_realtime_quote` |
+| `ashare_capital_flow` | 主力资金流 / 量能与筹码上下文 | `get_capital_flow`, `get_chip_distribution`, `get_volume_analysis`, `get_realtime_quote`, `get_sector_rankings` |
+| `ashare_microstructure` | T+1、涨跌停、集合竞价与可交易性 | `get_realtime_quote`, `get_daily_history`, `analyze_trend`, `get_chip_distribution` |
+
+启用示例（建议 `AGENT_ORCHESTRATOR_MODE=specialist` 或 Multi 路径，以便意见进入既有 `strategy_synthesis` / specialist 报告结构；单次最多仍受三个 specialist 上限约束）：
+
+```env
+AGENT_SKILL_ROUTING=manual
+AGENT_SKILLS=ashare_policy_catalyst,ashare_capital_flow,ashare_microstructure
+```
+
+三个 Skill 都声明 `market_scopes: [cn/equity]`：运行时在 specialist 构造、工具访问、模型调用和数量上限计算之前排除港/美/日/韩/台股、crypto、ETF、指数、无效或缺失标的；Skill 内的 `out of scope` 指令只作为纵深防御。资金流/筹码等 specialty feed 不可用时写明 `unavailable`，不得编造北向、龙虎榜或席位数据。稳定 id 预留后续 Persona 宿主迁移位（见 [A-share specialist roles](../docs/ashare-specialist-roles.md)）。
+
 ## 投资委员会 Persona Skills（默认关闭）
 
 完整合同见 [Investor Personas](../docs/investor-personas_EN.md) / [投资者 Persona](../docs/investor-personas.md)（#119/#467）。人物名别名仅为风格参考。
