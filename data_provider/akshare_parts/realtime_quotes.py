@@ -595,6 +595,26 @@ class _RealtimeQuotesMethods:
             
             # Use unified conversion functions in realtime_types.py
             # ETF Quote Data Construction
+            # IOPV / NAV columns vary by AkShare/Eastmoney snapshot version.
+            iopv = None
+            nav = None
+            for key in (
+                "IOPV",
+                "iopv",
+                "估算净值",
+                "净值估算",
+                "实时估值",
+                "基金净值",
+            ):
+                if key in row.index:
+                    iopv = safe_float(row.get(key))
+                    if iopv is not None:
+                        break
+            for key in ("单位净值", "净值", "最新净值", "nav", "NAV"):
+                if key in row.index:
+                    nav = safe_float(row.get(key))
+                    if nav is not None:
+                        break
             quote = UnifiedRealtimeQuote(
                 code=stock_code,
                 name=str(row.get('名称', '')),
@@ -614,6 +634,8 @@ class _RealtimeQuotesMethods:
                 circ_mv=safe_float(row.get('流通市值')),
                 high_52w=safe_float(row.get('52周最高')),
                 low_52w=safe_float(row.get('52周最低')),
+                iopv=iopv,
+                nav=nav,
             )
             
             logger.info(f"[ETF实时行情] {stock_code} {quote.name}: 价格={quote.price}, 涨跌={quote.change_pct}%, "

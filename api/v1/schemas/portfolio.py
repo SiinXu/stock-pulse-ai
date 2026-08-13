@@ -280,6 +280,18 @@ class PortfolioImportTradeItem(BaseModel):
     currency: Optional[str] = None
 
 
+class PortfolioImportFailedRow(BaseModel):
+    """One source row rejected during spreadsheet parse (correctable)."""
+
+    row_number: int = Field(..., description="1-based line number in the source file (header is 1)")
+    reason_code: str = Field(..., description="Stable machine code for the rejection reason")
+    reason: str = Field(..., description="Human-readable rejection reason")
+    source: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Non-empty original cells from the rejected row for download/correction",
+    )
+
+
 class PortfolioImportParseResponse(BaseModel):
     broker: str
     record_count: int
@@ -287,6 +299,10 @@ class PortfolioImportParseResponse(BaseModel):
     error_count: int
     records: List[PortfolioImportTradeItem] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)
+    failed_rows: List[PortfolioImportFailedRow] = Field(
+        default_factory=list,
+        description="Structured rejected rows with original cells for client download",
+    )
 
 
 class PortfolioImportCommitResponse(BaseModel):

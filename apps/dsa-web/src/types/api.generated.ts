@@ -2459,7 +2459,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Parse broker CSV into normalized trade records */
+        /** Parse broker CSV/XLSX into normalized trade records */
         post: operations["parse_csv_import_api_v1_portfolio_imports_csv_parse_post"];
         delete?: never;
         options?: never;
@@ -11087,6 +11087,34 @@ export interface components {
             /** Record Count */
             record_count: number;
         };
+        /**
+         * PortfolioImportFailedRow
+         * @description One source row rejected during spreadsheet parse (correctable).
+         */
+        PortfolioImportFailedRow: {
+            /**
+             * Reason
+             * @description Human-readable rejection reason
+             */
+            reason: string;
+            /**
+             * Reason Code
+             * @description Stable machine code for the rejection reason
+             */
+            reason_code: string;
+            /**
+             * Row Number
+             * @description 1-based line number in the source file (header is 1)
+             */
+            row_number: number;
+            /**
+             * Source
+             * @description Non-empty original cells from the rejected row for download/correction
+             */
+            source?: {
+                [key: string]: string;
+            };
+        };
         /** PortfolioImportParseResponse */
         PortfolioImportParseResponse: {
             /** Broker */
@@ -11095,6 +11123,11 @@ export interface components {
             error_count: number;
             /** Errors */
             errors?: string[];
+            /**
+             * Failed Rows
+             * @description Structured rejected rows with original cells for client download
+             */
+            failed_rows?: components["schemas"]["PortfolioImportFailedRow"][];
             /** Record Count */
             record_count: number;
             /** Records */
