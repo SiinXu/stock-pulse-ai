@@ -137,6 +137,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_MAX_TOKENS` | `1500` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS` | `16` | 是 | 模板中注释 |
 | `AGENT_PLANNING_ON_STEP_FAILURE` | `replan` | 是 | 模板中注释 |
+
+| `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; 即时步骤批评（默认关闭；#1094） |
+| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 运行级轨迹反思（默认关闭） |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 轨迹反思最大 LLM 调用次数 |
+| `AGENT_META_REVIEW_ENABLED` | `false` | 是 | 模板中注释; 跨运行离线 meta-review（默认关闭） |
+| `AGENT_META_REVIEW_MIN_EPISODES` | `30` | 是 | 模板中注释; meta-review 样本阈值 |
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |

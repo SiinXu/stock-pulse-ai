@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.fr,
   ...DR.fr,
   ...CP.fr,
   ...DSC.fr,
+  ...S.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -5136,7 +5138,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "Profil de compression du contexte",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "Tokens déclenchant la compression du contexte",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "Tours de contexte protégés",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent borné",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DEEP_RESEARCH_BUDGET": "Budget de Tokens pour la recherche approfondie",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DEEP_RESEARCH_TIMEOUT": "Délai d’attente de la recherche approfondie",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EVENT_ALERT_RULES_JSON": "Règles d’alerte d’événements",
@@ -5146,8 +5147,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Confirmer les fonctions Agent désactivées",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Méthode de génération des requêtes boursières",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "Mode comité d’investissement",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Préréglage de posture de recherche",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Texte personnalisé de posture de recherche",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Modèle principal de l’agent",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Nombre maximal d’étapes de l’agent",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Mémoire de l’agent",
@@ -5170,7 +5169,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "Indicateur cProfile de performance",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "Mode d’orchestration",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "Délai d’attente de l’agent",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto de l’agent de risque",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_AUTOWEIGHT": "Pondération automatique des stratégies",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_DIR": "Répertoire des stratégies de l’agent",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_ROUTING": "Routage des stratégies",
@@ -6232,10 +6230,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "Utilise toujours DataFetcherManager (repli, cache, circuit, validation) ; le mode parallèle n’est pas un chemin HTTP parallèle.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "Par défaut concurrent=3 et per-provider=1 réduisent le risque de ruée et superposent des capacités indépendantes.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "Désactivez le commutateur pour forcer l’ordre sériel lors du diagnostic des fournisseurs.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "Budget d’extraction parallèle (secondes)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Extraction parallèle des données de marché",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Plafond global d’extraction parallèle",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Plafond par fournisseur d’extraction parallèle",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Score du processus",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Échec fournisseur : data_unavailable jusqu’au délai durable.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "Résolution",

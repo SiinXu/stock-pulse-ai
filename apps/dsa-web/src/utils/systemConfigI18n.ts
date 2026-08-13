@@ -1,6 +1,7 @@
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
+import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
 
 const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
@@ -57,6 +58,7 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
 });
 
 const fieldTitleMapZh = {
+  ...REFLECTION_FIELD_TITLE_MAP_ZH,
   STOCK_LIST: '自选股列表',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API 地址',
@@ -264,7 +266,6 @@ const fieldTitleMapZh = {
   SKILL_OPINION_RECORDING_ENABLED: '技能观点样本记录',
   SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED: '技能观点后验加权',
   DECISION_PROFILE_CALIBRATION_ENABLED: '决策风格后验校准',
-  AGENT_CRITIC_ENABLED: '有界 Multi-Agent Critic',
   AGENT_MULTI_STRATEGY_DELIBERATION: '多策略合议',
   AGENT_RISK_OVERRIDE: '风控 Agent 否决',
   RISK_GATE_PROFILE: '风控经理档位',
@@ -456,6 +457,7 @@ type SystemConfigFieldTitleKey = keyof typeof fieldTitleMapZh;
 // the translation source inventory, while the Settings UI still prefers the
 // live backend schema title when the selected UI language is English.
 const fieldTitleMapEn = {
+  ...REFLECTION_FIELD_TITLE_MAP_EN,
   STOCK_LIST: 'Stock List',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API URL',
@@ -663,7 +665,6 @@ const fieldTitleMapEn = {
   SKILL_OPINION_RECORDING_ENABLED: 'Skill Opinion Recording',
   SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED: 'Skill Opinion Outcome Weights',
   DECISION_PROFILE_CALIBRATION_ENABLED: 'Decision Profile Outcome Calibration',
-  AGENT_CRITIC_ENABLED: 'Bounded Multi-Agent Critic',
   AGENT_MULTI_STRATEGY_DELIBERATION: 'Multi-Strategy Deliberation',
   AGENT_RISK_OVERRIDE: 'Risk Agent Override',
   RISK_GATE_PROFILE: 'Risk Manager Profile',

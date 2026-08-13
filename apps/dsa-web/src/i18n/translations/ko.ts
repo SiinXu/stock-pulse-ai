@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
   ...DR.ko,
   ...CP.ko,
   ...DSC.ko,
+  ...S.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -5136,7 +5138,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "컨텍스트 압축 프로필",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "컨텍스트 압축 시작 토큰 수",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "보호할 대화 턴 수",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "제한된 Multi-Agent Critic",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DEEP_RESEARCH_BUDGET": "심층 연구 토큰 예산",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DEEP_RESEARCH_TIMEOUT": "심층 연구 제한 시간",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EVENT_ALERT_RULES_JSON": "이벤트 알림 규칙",
@@ -5146,8 +5147,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 기능 사용 안 함 확인",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "종목 질의 생성 방식",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "투자위원회 모드",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "연구 관점 프리셋",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "사용자 지정 연구 관점 텍스트",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "에이전트 기본 모델",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "에이전트 최대 단계 수",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "에이전트 메모리",
@@ -5170,7 +5169,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "성능 cProfile 플래그",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "오케스트레이션 모드",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "에이전트 제한 시간",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "위험 에이전트 거부권",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_AUTOWEIGHT": "전략 자동 가중치",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_DIR": "에이전트 전략 디렉터리",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_ROUTING": "전략 라우팅",
@@ -6232,10 +6230,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "여전히 DataFetcherManager(폴백, 캐시, 회로, 검증)를 사용합니다. 병렬 모드는 HTTP 우회 경로가 아닙니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "기본 concurrent=3, per-provider=1은 stampede 위험을 줄이면서 독립 기능을 겹칩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "제공자 진단 시 스위치를 끄면 직렬 수집 순서로 강제됩니다.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "병렬 수집 총 예산(초)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "시장 입력 병렬 수집",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "과정 품질",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "기존 스케줄러로 만료된 예측을 자동 검증합니다. 공급자 실패는 data_unavailable로 유지되며 저장된 대기 시간이 지난 뒤에만 재시도합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "예측 기간 자동 검증",

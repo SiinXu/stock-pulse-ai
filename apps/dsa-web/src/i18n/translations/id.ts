@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
   ...DR.id,
   ...CP.id,
   ...DSC.id,
+  ...S.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -5136,7 +5138,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "Profil kompresi konteks",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "Jumlah token pemicu kompresi konteks",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "Jumlah giliran percakapan yang dilindungi",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent terbatas",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DEEP_RESEARCH_BUDGET": "Anggaran token riset mendalam",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DEEP_RESEARCH_TIMEOUT": "Batas waktu riset mendalam",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EVENT_ALERT_RULES_JSON": "Aturan peringatan peristiwa",
@@ -5146,8 +5147,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Konfirmasi fitur Agent nonaktif",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Metode pembuatan jawaban saham",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "Mode komite investasi",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Preset Sikap Riset",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Teks Sikap Riset Khusus",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Model utama Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Langkah maksimum Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Memori Agen",
@@ -5170,7 +5169,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PERF_PROFILE_ENABLED": "Bendera cProfile Performa",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_MODE": "Mode orkestrasi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_ORCHESTRATOR_TIMEOUT_S": "Batas waktu Agen",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto Agen Risiko",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_AUTOWEIGHT": "Pembobotan strategi otomatis",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_DIR": "Direktori strategi Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_SKILL_ROUTING": "Perutean strategi",
@@ -6232,10 +6230,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "Tetap memakai DataFetcherManager (fallback, cache, circuit, validasi); mode paralel bukan jalur HTTP samping.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "Default concurrent=3 dan per-provider=1 mengurangi risiko stampede sambil menumpuk kemampuan independen.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "Matikan sakelar untuk memaksa urutan serial saat mendiagnosis penyedia.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "Anggaran tarikan paralel (detik)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Tarikan data pasar paralel",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Batas global tarikan paralel",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Batas per-penyedia tarikan paralel",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualitas proses",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Menyelesaikan prediksi yang jatuh tempo secara otomatis melalui penjadwal yang ada; kegagalan penyedia tetap data_unavailable dan hanya dicoba ulang setelah jeda tersimpan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "Penyelesaian horizon prediksi",

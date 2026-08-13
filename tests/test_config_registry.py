@@ -738,9 +738,10 @@ class TestEnvExampleWebSettingsCoverage(unittest.TestCase):
 class TestSettingsFieldTitleContract(unittest.TestCase):
     """The Web field-title catalog must cover the backend registry exactly."""
 
-    _FIELD_TITLE_FILE = (
-        Path(__file__).resolve().parents[1]
-        / "apps/dsa-web/src/utils/systemConfigI18n.ts"
+    _WEB_ROOT = Path(__file__).resolve().parents[1] / "apps/dsa-web/src"
+    _FIELD_TITLE_FILES = (
+        _WEB_ROOT / "utils/systemConfigI18n.ts",
+        _WEB_ROOT / "i18n/reflectionSettingsCopy.ts",
     )
     _FIELD_TITLE_MAP_RE = re.compile(
         r"const fieldTitleMapZh = \{\n(?P<body>.*?)\n\} as const;",
@@ -761,25 +762,29 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
 
     @classmethod
     def _collect_web_field_title_keys(cls) -> set[str]:
-        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
-        match = cls._FIELD_TITLE_MAP_RE.search(content)
-        if match is None:
-            raise AssertionError("Unable to locate fieldTitleMapZh in systemConfigI18n.ts")
-        keys = cls._FIELD_TITLE_KEY_RE.findall(match.group("body"))
+        keys = []
+        for path in cls._FIELD_TITLE_FILES:
+            content = path.read_text(encoding="utf-8")
+            match = cls._FIELD_TITLE_MAP_RE.search(content)
+            if match is None:
+                raise AssertionError(f"Unable to locate fieldTitleMapZh in {path}")
+            keys.extend(cls._FIELD_TITLE_KEY_RE.findall(match.group("body")))
         if len(keys) != len(set(keys)):
-            raise AssertionError("fieldTitleMapZh contains duplicate field keys")
+            raise AssertionError("Web field-title sources contain duplicate field keys")
         return set(keys)
 
     @classmethod
     def _collect_web_english_field_titles(cls) -> dict[str, str]:
-        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
-        match = cls._FIELD_TITLE_EN_MAP_RE.search(content)
-        if match is None:
-            raise AssertionError("Unable to locate fieldTitleMapEn in systemConfigI18n.ts")
-        entries = cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body"))
+        entries = []
+        for path in cls._FIELD_TITLE_FILES:
+            content = path.read_text(encoding="utf-8")
+            match = cls._FIELD_TITLE_EN_MAP_RE.search(content)
+            if match is None:
+                raise AssertionError(f"Unable to locate fieldTitleMapEn in {path}")
+            entries.extend(cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body")))
         titles = dict(entries)
         if len(entries) != len(titles):
-            raise AssertionError("fieldTitleMapEn contains duplicate field keys")
+            raise AssertionError("Web field-title sources contain duplicate field keys")
         return titles
 
     def test_web_field_titles_match_registered_fields(self) -> None:
@@ -826,6 +831,7 @@ class TestSettingsHelpContract(unittest.TestCase):
     _SETTINGS_HELP_FILES = (
         _LOCALE_DIR / "settingsHelp.en.ts",
         _LOCALE_DIR / "settingsHelp.zh.ts",
+        _LOCALE_DIR.parent / "i18n/reflectionSettingsCopy.ts",
     )
 
     @classmethod
