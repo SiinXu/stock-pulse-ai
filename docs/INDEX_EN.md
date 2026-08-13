@@ -85,6 +85,7 @@ This is the entry point for project documentation. The README covers the project
 | [Personal Investment Framework](personal-investment-framework_EN.md) | Minimal Settings editor, versioned API, single-stock read-only injection, and report framework_alignment slot |
 | [Portfolio-Level Multi-Symbol Analysis](portfolio-level-analysis_EN.md) | Basket analysis over a code list: correlation, concentration, shared risk, health/stress reuse, size limit and partial degradation; `POST /api/v1/analysis/portfolio` ([Chinese](portfolio-level-analysis.md)) |
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |
+| [Portfolio Rebalancing & Position Bands](portfolio-rebalancing_EN.md) | Risk-band rebalancing suggestions, position bands, refusal rules; `GET /api/v1/portfolio/rebalancing-recommendations` ([Chinese](portfolio-rebalancing.md)) |
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
 | [Investor Personas](investor-personas_EN.md) | Default-off research stances + investment-lens Skills (#119, #467) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
@@ -133,6 +134,8 @@ This is the entry point for project documentation. The README covers the project
 | [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md) | Declarative-first boundary, `Skill` registration fields, catalog precedence, lifecycle, diagnostics, tests, and trust |
 | [Supply-Chain Maintenance](supply-chain-maintenance.md) | Dependency and GitHub Actions pinning, permissions, updates, exceptions, validation, and rollback policy |
 | [Web UI Foundation Contract](web-ui-foundation.md) | Semantic controls, visible sizes, coarse-pointer targets, guardrails, and migration ownership |
+| [Web PWA (shell-only)](web-pwa.md) | Installable PWA, conservative shell cache boundary, no analysis/market data caching (#234) |
+| [Web responsive breakpoints](web-responsive-breakpoints.md) | Supported 320/768/1024 matrix, page audit gaps, and batch plan (#146 / #234) |
 | [Web Runtime Performance Budgets](web-runtime-performance.md) | List virtualization, Settings isolation, SSE batching soft gate (#883); [中文](web-runtime-performance_CN.md) |
 | [Navigation IA proposal](navigation-ia-proposal.md) | Current-state route/nav audit, legacy redirects, orphan inventory, and **DECISION NEEDED** target options for #368 ([中文](navigation-ia-proposal_zh.md)) |
 | [Multilingual Financial Terminology Guide](financial-terminology-guide.md) | Product semantics and ten-language candidate terminology (guide body in Simplified Chinese) |
