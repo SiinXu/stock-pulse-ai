@@ -957,6 +957,58 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['限制审计存储增长；高特权操作量时可能删除较旧事件。'],
     notes: ['详见 docs/security-audit_zh.md。若必须保留更旧事件，请提高容量或先导出。'],
   },
+  'settings.system.CAPABILITY_WRITE_REGISTRY_PATH': {
+    title: '能力写入注册表路径',
+    summary: '操作员声明式能力登记的持久化路径。',
+    usage: '留空则使用 <DATABASE_PATH 目录>/capability_write_registry.json。',
+    valueNotes: ['仅保存写入侧元数据；运行时清单仍由各 owner 实时探测。'],
+    impact: ['影响能力写入登记、依赖解析与任务感知路由标签。'],
+    notes: ['详见 docs/capability-inventory.md。'],
+  },
+  'settings.system.TASK_ROUTING_ENABLED': {
+    title: '任务感知模型路由',
+    summary: '按任务类型与已登记 LLM 能力标签自动选择模型（默认关闭）。',
+    usage: '保持 false 以沿用现有模型分配。手动钉选始终优先。',
+    valueNotes: ['决策可通过 POST /api/v1/capabilities/route 解释与追溯。'],
+    impact: ['开启且未钉选时，不同任务类可能按策略选择不同模型。'],
+    notes: ['可选 ensemble 不在本开关范围内。'],
+  },
+  'settings.system.TASK_ROUTING_POLICY': {
+    title: '任务路由策略',
+    summary: '自动任务感知模型选择的打分策略。',
+    usage: '可选 quality / cost / local_first。',
+    valueNotes: ['quality 偏好推理质量；cost 偏好低成本；local_first 偏好本地路由。'],
+    impact: ['多个候选匹配时决定胜出模型。'],
+    notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_REPORT': {
+    title: '任务路由钉选（报告）', summary: '报告生成任务的可选显式模型钉选。',
+    usage: '设置后强制 report 任务使用该模型。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_AGENT': {
+    title: '任务路由钉选（Agent）', summary: 'Agent 任务的可选显式模型钉选。',
+    usage: '设置后强制 agent 任务使用该模型。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_VISION': {
+    title: '任务路由钉选（视觉）', summary: '视觉任务的可选显式模型钉选。',
+    usage: '设置后强制 vision 任务使用该模型。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_MARKET_REVIEW': {
+    title: '任务路由钉选（大盘复盘）', summary: '大盘复盘任务的可选显式模型钉选。',
+    usage: '设置后强制 market_review 选择。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CHEAP_SCAN': {
+    title: '任务路由钉选（廉价扫描）', summary: '廉价扫描任务的可选显式模型钉选。',
+    usage: '设置后强制 cheap_scan 选择。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_DEEP_REASONING': {
+    title: '任务路由钉选（深度推理）', summary: '深度推理任务的可选显式模型钉选。',
+    usage: '设置后强制 deep_reasoning 选择。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CODING': {
+    title: '任务路由钉选（编码）', summary: '编码类任务的可选显式模型钉选。',
+    usage: '设置后强制 coding 选择。', valueNotes: [], impact: [], notes: [],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
 
     title: '信任 X-Forwarded-For',
