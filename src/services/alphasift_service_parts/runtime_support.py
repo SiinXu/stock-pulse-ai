@@ -573,11 +573,8 @@ def _normalize_strategy(raw: Any) -> Dict[str, Any]:
 
 
 def _strategy_model(**kwargs: Any) -> Dict[str, Any]:
-    normalized = AlphaSiftStrategyResponse(**kwargs)
-    try:
-        return normalized.model_dump()
-    except AttributeError:
-        return normalized.dict()
+    # AlphaSiftStrategyResponse is a Pydantic v2 model (Issue #549); use model_dump only.
+    return AlphaSiftStrategyResponse(**kwargs).model_dump()
 
 
 def _ensure_supported_strategy(strategy: str) -> None:
