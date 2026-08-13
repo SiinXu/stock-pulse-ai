@@ -13,6 +13,7 @@ import type {
 import { serializeStockListValue } from '../utils/stockList';
 import { getDefaultSubCategory, getSubCategories } from '../components/settings/settingsSubCategories';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { usePriceDirectionSync } from '../contexts/ThemeAppearanceContext';
 import { SETTINGS_PAGE_TEXT } from '../locales/settingsPage';
 
 type ToastState = {
@@ -76,6 +77,7 @@ function normalizeFieldValue(value: string, schema: SystemConfigItem['schema'] |
 
 export function useSystemConfig(initialTab?: { category: string; subCategory: string | null }) {
   const { language, t } = useUiLanguage();
+  const syncPriceDirection = usePriceDirectionSync();
   // Server state
   const [configVersion, setConfigVersion] = useState<string>('');
   const [maskToken, setMaskToken] = useState<string>('******');
@@ -377,16 +379,22 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setValidationIssues([]);
     setSaveError(null);
     setConflictState(null);
-  }, [serverItems]);
+    // Drop session-only CSS preview from abandoned MARKET_REVIEW_COLOR_SCHEME drafts.
+    syncPriceDirection(next.MARKET_REVIEW_COLOR_SCHEME, false);
+  }, [serverItems, syncPriceDirection]);
 
   const resetDraftKeys = useCallback((keys: string[]) => {
     const keySet = new Set(keys.map((key) => key.toUpperCase()));
+    let restoredColorScheme: string | undefined;
     setDraftValues((previous) => {
       const next = { ...previous };
       for (const key of keySet) {
         const item = serverItemByKeyRef.current[key];
         if (item) {
           next[key] = item.value;
+          if (key === 'MARKET_REVIEW_COLOR_SCHEME') {
+            restoredColorScheme = item.value;
+          }
         }
       }
       return next;
@@ -400,7 +408,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       return fields.length > 0 ? { ...previous, fields } : null;
     });
     setSaveError(null);
-  }, []);
+    syncPriceDirection(restoredColorScheme, false);
+  }, [syncPriceDirection]);
 
   const applyPartialUpdate = useCallback((updatedItems: Array<{ key: string; value: string }>) => {
     setDraftValues((prevDraft) => {
@@ -424,7 +433,9 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       ...previous,
       [key]: value,
     }));
-  }, []);
+    // Preview the market convention without persisting an abandoned draft.
+    syncPriceDirection(key === 'MARKET_REVIEW_COLOR_SCHEME' ? value : undefined, false);
+  }, [syncPriceDirection]);
 
   const selectCategory = useCallback((category: string) => {
     const sub = getDefaultSubCategory(category);
@@ -581,6 +592,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         committedValues,
       );
       setConflictState(null);
+      syncPriceDirection(committedValues.MARKET_REVIEW_COLOR_SCHEME);
 
       if (!silent) {
         setToast({
@@ -620,6 +632,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
               committedValues,
             );
             setConflictState(null);
+            syncPriceDirection(committedValues.MARKET_REVIEW_COLOR_SCHEME);
             if (!silent) {
               setToast({
                 type: 'success',
@@ -669,6 +682,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     refreshCommittedSnapshot,
     language,
     t,
+    syncPriceDirection,
   ]);
 
   // Serialize writes: a second save() while one is in flight reuses the pending
@@ -698,27 +712,33 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     }
     if (choice === 'server') {
       setDraftValues((prev) => ({ ...prev, [key]: field.server }));
+      syncPriceDirection(key === 'MARKET_REVIEW_COLOR_SCHEME' ? field.server : undefined, false);
     }
     const remaining = conflictState.fields.filter((entry) => entry.key !== key);
     setConflictState(remaining.length > 0 ? { ...conflictState, fields: remaining } : null);
     if (remaining.length === 0) {
       setSaveError(null);
     }
-  }, [conflictState]);
+  }, [conflictState, syncPriceDirection]);
 
   const resolveAllConflicts = useCallback((choice: 'server' | 'local') => {
     if (choice === 'server' && conflictState) {
+      let restoredColorScheme: string | undefined;
       setDraftValues((prev) => {
         const next = { ...prev };
         for (const field of conflictState.fields) {
           next[field.key] = field.server;
+          if (field.key === 'MARKET_REVIEW_COLOR_SCHEME') {
+            restoredColorScheme = field.server;
+          }
         }
         return next;
       });
+      syncPriceDirection(restoredColorScheme, false);
     }
     setConflictState(null);
     setSaveError(null);
-  }, [conflictState]);
+  }, [conflictState, syncPriceDirection]);
 
   const dismissConflicts = useCallback(() => {
     setConflictState(null);

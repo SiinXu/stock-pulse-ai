@@ -309,6 +309,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `GENERATION_FALLBACK_BACKEND` | `litellm` | 是 | Backend-level fallback; Local .env empty values disable backend-level fallback, litellm -> litellm will be parsed as ... |
 | `GOTIFY_TOKEN` | `空` | 是 | 模板中注释; Gotify application token |
 | `GOTIFY_URL` | `空` | 是 | 模板中注释; Gotify Configuration GOTIFY_URL is the Gotify server base URL, without /message; the system will append /message and ... |
+| `HIGH_DISAGREEMENT_ALERTS_ENABLED` | `true` | 是 | 模板中注释; High-disagreement alerts for multi-agent analyses (#134) |
+| `HIGH_DISAGREEMENT_THRESHOLD` | `0.6` | 是 | 模板中注释 |
 | `HTTP_PROXY` | `http://127.0.0.1:10809` | 是 | 模板中注释; Standard HTTP(S) proxy URL for outbound requests (data sources, LLM, search, notifications) |
 | `INDICATOR_MACD_FAST` | `12` | 是 | 模板中注释 |
 | `INDICATOR_MACD_SIGNAL` | `9` | 是 | 模板中注释 |
@@ -325,6 +327,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL` | `200` | 是 | 模板中注释 |
 | `LAYERED_MEMORY_RETENTION_DAYS` | `90` | 是 | 模板中注释 |
 | `LAYERED_MEMORY_VECTOR_ENABLED` | `false` | 是 | 模板中注释 |
+| `AGENT_ERROR_PATTERN_ENABLED` | `false` | 是 | 模板中注释; 错误模式百科分析注入总开关 (Issue #1138) |
+| `AGENT_ERROR_PATTERN_INJECT_TOP_K` | `3` | 是 | 模板中注释; 注入卡片 top-K 上限；0 表示不注入 |
+| `AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET` | `2000` | 是 | 模板中注释; 清单字符预算；0 表示不注入 |
 | `LITELLM_CONFIG` | `./litellm_config.yaml` | 是 | 模板中注释; Advanced: Model Routing YAML Configuration (optional, see docs/examples/litellm_config.example.yaml) |
 | `LITELLM_FALLBACK_MODELS` | `空` | 是 | 模板中注释; First-run readiness: GET /api/v1/onboarding/first-run (read-only; never writes .env) |
 | `LITELLM_LOG_LEVEL` | `WARNING` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -476,6 +481,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `MINIMAX_API_KEYS` | `your_minimax_key_here` | 是 | 模板中注释; MiniMax API Key(Coding Plan Web Search, Supports multiple, Comma-separated) Get: https://platform.minimax.io/ |
 | `MULTIMODAL_AGENT_TOOLS_ENABLED` | `false` | 是 | Optional multimodal PDF/chart/transcript Agent Tools (issue #253) |
 | `MULTIMODAL_FILE_ROOT` | `/absolute/path/to/multimodal-uploads` | 是 | 模板中注释 |
+| `CHART_READ_TIMEOUT_SECONDS` | `30` | 是 | `read_price_chart` 视觉调用超时（钳制 1-120 秒） |
 | `NEWSNOW_BASE_URL` | `https://newsnow.busiyi.world` | 是 | 模板中注释; NewsNow HTTP API base address – external dependency configuration - Official project and deployment guide: https://gi... |
 | `NEWS_INTEL_AUTO_FETCH_ENABLED` | `false` | 是 | 模板中注释; When enabled, automatically initialize built-in news sources and pull them into use before reading local news pools i... |
 | `NEWS_INTEL_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; RSS/Atom feed source pull timeout (seconds) |
@@ -536,6 +542,17 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT` | `10.0` | 是 | 模板中注释 |
 | `PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO` | `0.8` | 是 | 模板中注释 |
 | `PORTFOLIO_STRESS_SCENARIOS_PATH` | `空` | 是 | 模板中注释; Optional YAML path (maximum 1,024 characters) that adds/overrides bounded portfolio stress scenarios by id |
+| `PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_ENABLED` | `false` | 是 | 模板中注释; Prediction horizon resolver (Issues #1102 / #1116, Epic #1107; default off) Existing process scheduler runs Predictio... |
+| `PREDICTION_RESOLVE_FETCH_CONCURRENCY` | `4` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS` | `60` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_RETRY_JITTER_RATIO` | `0.1` | 是 | 模板中注释 |
 | `PREFETCH_REALTIME_QUOTES` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |

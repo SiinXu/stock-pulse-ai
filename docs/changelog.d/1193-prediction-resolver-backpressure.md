@@ -1,0 +1,1 @@
+- [Fixed] Bound prediction resolution concurrency, coalesce identical actuals windows, and slow provider-error spikes without unbounded postmortem work (Refs #1104).

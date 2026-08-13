@@ -80,6 +80,7 @@ This is the entry point for project documentation. The README covers the project
 | [Scheduled Tasks](scheduled-tasks.md) | Versioned daily analysis/research tasks, a read-only today view, trading-day policy, durable run records, bounded retry, and local/Docker/API ownership |
 | [Daily Brief (personal morning + accuracy)](daily-brief_EN.md) | Holdings, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, honesty-first accuracy ([Chinese](daily-brief.md)) |
 | [Event Research Brief](event-research-brief_EN.md) | Earnings EventBrief (metrics, surprise criteria, post-event checklist) ([Chinese](event-research-brief.md)) |
+| [Prediction Horizon Resolver](prediction-resolver_EN.md) | System-driven due prediction resolve via existing scheduler / CLI cron; provider failure → data_unavailable ([Chinese](prediction-resolver.md)) |
 | [Research Timeline](research-timeline.md) | Per-symbol research activity timeline (runs, chat, signals; hypothesis optional) |
 | [DecisionSignal Topic](decision-signals.md) <sub><sub>![P7 Badge](https://img.shields.io/badge/P7-orange?style=flat)</sub></sub> (Chinese-only) | AI signal fields, API, Web display, alert/notification/portfolio-risk linkage, outcome evaluation, redaction, migration, and rollback |
 | [Prediction resolve_after calendar policy](prediction-resolve-after_EN.md) | Horizon → UTC `resolve_after` via exchange sessions for CN/HK/US; holidays, half-days, cross-market rules; no natural-day approximation ([中文](prediction-resolve-after.md)) |
@@ -88,6 +89,7 @@ This is the entry point for project documentation. The README covers the project
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |
 | [Portfolio Rebalancing & Position Bands](portfolio-rebalancing_EN.md) | Risk-band rebalancing suggestions, position bands, refusal rules; `GET /api/v1/portfolio/rebalancing-recommendations` ([Chinese](portfolio-rebalancing.md)) |
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
+| [Report Sensitivity Scenario Library](report-scenario-library_EN.md) | Versioned rate/FX/industry presets + custom save/reuse via Chat what-if channel; hypothetical risk framing for report sensitivity (#1136) ([Chinese](report-scenario-library.md)) |
 | [Investor Personas](investor-personas_EN.md) | Default-off research stances + investment-lens Skills (#119, #467) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
 | [A-share Specialist Roles](ashare-specialist-roles.md) | Default-off policy / capital-flow / microstructure Skills with fail-soft data deps (#192) |

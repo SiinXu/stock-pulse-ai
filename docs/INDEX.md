@@ -73,6 +73,7 @@
 | [定时任务 API 与执行契约（英文）](scheduled-tasks.md) | 版本化每日分析/研究任务、今日只读视图、交易日策略、运行记录、重试与 local/Docker/API 调度所有权边界 |
 | [每日简报（个人晨报 + 准确率）](daily-brief.md) | 持仓、隔夜要点、近期财报事件上下文、昨日分析、自选与诚实准确率（[英文](daily-brief_EN.md)） |
 | [事件研究简报](event-research-brief.md) | 财报 EventBrief（指标、超预期定义、事后清单）（[英文](event-research-brief_EN.md)） |
+| [预测到期解析器](prediction-resolver.md) | 系统驱动到期解析：既有调度器 / CLI cron；Provider 失败 → data_unavailable（[英文](prediction-resolver_EN.md)） |
 | [研究时间线](research-timeline_CN.md) / [EN](research-timeline.md) | 按标的聚合分析运行、对话、信号（假设可选） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [预测 resolve_after 交易日历策略](prediction-resolve-after.md) | horizon → UTC `resolve_after`（A/HK/US 交易 session、节假日/半日市/跨市场）；禁止自然日近似（[EN](prediction-resolve-after_EN.md)） |
@@ -82,6 +83,7 @@
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [组合再平衡与风险调整仓位](portfolio-rebalancing.md) | 风险带再平衡建议、仓位区间、拒绝条件；`GET /api/v1/portfolio/rebalancing-recommendations`（[英文](portfolio-rebalancing_EN.md)） |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
+| [报告敏感性情景库](report-scenario-library.md) | 版本化利率/汇率/行业预置 + 自定义保存复用，复用 Chat what-if 通道；假设风险表述用于报告敏感性（#1136）（[英文](report-scenario-library_EN.md)） |
 | [投资者 Persona](investor-personas.md) | 默认关闭的研究立场与投资视角 Skills（#119, #467） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
 | [A 股特化角色](ashare-specialist-roles.md) | 默认关闭的政策 / 资金流 / 微观结构 Skill，缺数据显式降级（#192） |

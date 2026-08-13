@@ -1602,6 +1602,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     title: 'Agent episode 最大行数',
     summary: 'episode 行数上限；优先删除最旧行。',
   },
+  'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
+    title: '错误模式百科',
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent 规划循环',
     summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',
@@ -1752,6 +1755,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响后台告警检测频率和通知推送时机。'],
     notes: ['需要配合告警规则使用。'],
   },
+  'settings.agent.prediction_resolve': {
+    title: '预测到期解析',
+    summary: '自动核验到期预测；数据源失败保持 data_unavailable，直至持久化退避到期。',
+  },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: '事件告警规则（Legacy JSON）',
     summary: '通过 JSON 数组配置基础价格和成交量告警规则。',
@@ -1787,6 +1794,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
+  },
+  'settings.agent.CHART_READ_TIMEOUT_SECONDS': {
+    title: '图表阅读超时（秒）',
+    summary: 'read_price_chart 视觉调用的 1–120 秒硬超时；默认 30。',
   },
   'settings.agent.OCR_AGENT_TOOL_ENABLED': {
     title: '启用离线 OCR Agent 工具',
@@ -2225,6 +2236,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage:
       '留空（自动）表示仅在配置了 NOTIFICATION_SYSTEM_ERROR_CHANNELS 时发送；true 强制开启；false 强制关闭。',
     impact: ['影响失败的每日/Actions 运行是否尝试推送失败通知。'],
+  },
+  'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
+    title: '高分歧告警',
+    summary: '默认开启；发送高分歧告警并遵守免打扰。',
+  },
+  'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
+    title: '高分歧告警阈值',
+    summary: '告警阈值（0–1，默认 0.6）。',
   },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: '纸面组合初始资金',

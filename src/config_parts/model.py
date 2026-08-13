@@ -108,9 +108,10 @@ class Config:
     kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
     kronos_weights_dir: Optional[str] = None
 
-    # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
+    # === Optional multimodal PDF/chart Agent Tools (issue #253) ===
     multimodal_agent_tools_enabled: bool = False
     multimodal_file_root: Optional[str] = None
+    chart_read_timeout_seconds: int = 30
     # === Optional offline OCR Agent Tool (issue #196) ===
     ocr_agent_tool_enabled: bool = False
     ocr_file_root: Optional[str] = None
@@ -365,6 +366,10 @@ class Config:
     agent_episode_log_enabled: bool = False
     agent_episode_retention_days: int = 90
     agent_episode_max_rows: int = 50_000
+    # Error-pattern encyclopedia from lessons (Issue #1138); default off
+    agent_error_pattern_enabled: bool = False
+    agent_error_pattern_inject_top_k: int = 3
+    agent_error_pattern_inject_char_budget: int = 2000
     # Opt-in plan→act→observe production path on AgentExecutor.run (#199). Default off.
     agent_planning_enabled: bool = False
     agent_planning_strategy: str = "template"  # template | llm
@@ -399,6 +404,19 @@ class Config:
     event_trigger_default_pipeline: str = "standard"
     event_trigger_max_per_hour: int = 5
     event_trigger_max_per_day: int = 20
+
+    # === Prediction horizon resolver (Issues #1102 / #1116, Epic #1107; default off) ===
+    prediction_resolve_enabled: bool = False
+    prediction_resolve_interval_seconds: int = 60
+    prediction_resolve_max_per_tick: int = 50
+    prediction_resolve_lease_seconds: int = 120
+    prediction_resolve_max_attempts: int = 5
+    prediction_resolve_fetch_concurrency: int = 4
+    prediction_resolve_postmortem_max_per_tick: int = 10
+    prediction_resolve_provider_error_circuit_threshold: int = 5
+    prediction_resolve_provider_error_circuit_cooldown_seconds: int = 60
+    prediction_resolve_circuit_open_max_per_tick: int = 5
+    prediction_resolve_retry_jitter_ratio: float = 0.1
 
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)

@@ -20,6 +20,9 @@ import { RouteFocusCoordinator } from '../../components/routing';
 import { DeepLinkGuard } from '../../components/routing/DeepLinkGuard';
 import { SessionContinuityGuard } from '../../components/routing/SessionContinuityGuard';
 import { ThemeToggle } from '../../components/theme/ThemeToggle';
+import { ThemeAppearanceProvider } from '../../components/theme/ThemeAppearanceProvider';
+import { ThemePackSelect } from '../../components/theme/ThemePackSelect';
+import { PriceDirectionSync } from '../../components/theme/PriceDirectionSync';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
@@ -84,6 +87,37 @@ const ThemeToggleStory = () => (
     <ThemeToggle />
   </div>
 );
+
+const ThemeAppearanceProviderStory = () => {
+  const text = useSamples();
+  return (
+    <ThemeAppearanceProvider>
+      <div className="flex min-h-48 items-start justify-center rounded-lg border border-border bg-card p-6">
+        <span className="text-sm text-secondary-text">{text.preview}</span>
+      </div>
+    </ThemeAppearanceProvider>
+  );
+};
+
+const ThemePackSelectStory = () => (
+  <ThemeAppearanceProvider>
+    <div className="w-56 rounded-lg border border-border bg-card p-2">
+      <ThemePackSelect />
+    </div>
+  </ThemeAppearanceProvider>
+);
+
+const PriceDirectionSyncStory = () => {
+  const text = useSamples();
+  return (
+    <ThemeAppearanceProvider>
+      <PriceDirectionSync />
+      <div className="rounded-lg border border-border bg-card p-6 text-sm text-secondary-text">
+        {text.preview}
+      </div>
+    </ThemeAppearanceProvider>
+  );
+};
 
 const UiLanguageToggleStory = () => (
   <div className="flex min-h-48 items-start justify-center rounded-lg border border-border bg-card p-6">
@@ -192,6 +226,9 @@ export const LAYOUT_DASHBOARD_SCENARIOS: Record<string, PlaygroundScenarioRender
   'session-continuity-guard': SessionContinuityGuardStory,
   'route-focus-coordinator': RouteFocusCoordinatorStory,
   'theme-toggle': ThemeToggleStory,
+  'theme-appearance-provider': ThemeAppearanceProviderStory,
+  'theme-pack-select': ThemePackSelectStory,
+  'price-direction-sync': PriceDirectionSyncStory,
   'ui-language-toggle': UiLanguageToggleStory,
   'dashboard-panel-header': DashboardPanelHeaderStory,
   'dashboard-state-block': DashboardStateBlockStory,

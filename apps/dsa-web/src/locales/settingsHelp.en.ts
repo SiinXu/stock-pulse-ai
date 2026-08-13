@@ -1555,6 +1555,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'Agent Episode Max Rows',
     summary: 'Episode row cap; oldest rows are removed first.',
   },
+  'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
+    title: 'Error Pattern Encyclopedia',
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent Planning Loop',
     summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',
@@ -1705,6 +1708,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects background alert detection frequency and notification timing.'],
     notes: ['Must be used with alert rules.'],
   },
+  'settings.agent.prediction_resolve': {
+    title: 'Prediction Horizon Resolver',
+    summary: 'Resolves due predictions; provider failures stay data_unavailable until durable backoff expires.',
+  },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: 'Event Alert Rules (Legacy JSON)',
     summary: 'Configures basic price and volume alert rules via a JSON array.',
@@ -1740,6 +1747,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
     notes: ['Example: /var/stockpulse/multimodal-uploads'],
+  },
+  'settings.agent.CHART_READ_TIMEOUT_SECONDS': {
+    title: 'Chart Read Timeout Seconds',
+    summary: 'Hard 1–120 second wall-clock limit for read_price_chart vision calls; default 30.',
   },
   'settings.agent.OCR_AGENT_TOOL_ENABLED': {
     title: 'Enable Offline OCR Agent Tool',
@@ -2178,6 +2189,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage:
       'Leave empty (auto) to notify only when NOTIFICATION_SYSTEM_ERROR_CHANNELS is configured. Set true to force on, false to force off.',
     impact: ['Affects whether failed daily/Actions runs attempt failure push notifications.'],
+  },
+  'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
+    title: 'High Disagreement Alerts',
+    summary: 'On by default; routes disagreement alerts and honors no-notify.',
+  },
+  'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
+    title: 'High Disagreement Alert Threshold',
+    summary: 'Alert threshold (0–1); default 0.6.',
   },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: 'Paper Portfolio Initial Cash',
