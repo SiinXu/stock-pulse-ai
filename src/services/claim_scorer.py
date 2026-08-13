@@ -614,7 +614,10 @@ class ClaimScorer:
                 equal = actual_n == expected_n
             return (equal if operator == "eq" else not equal), False
 
-        # Numeric comparison operators.
+        # Numeric comparison operators. String machine tokens must not be
+        # coerced through float(); they are eq/ne labels, not numeric actuals.
+        if isinstance(actual, str) or isinstance(expected, str):
+            raise ValueError(f"operator {operator} requires finite numeric operands")
         actual_n = ClaimScorer._finite_number(actual)
         expected_n = ClaimScorer._finite_number(expected)
         if actual_n is None or expected_n is None:
