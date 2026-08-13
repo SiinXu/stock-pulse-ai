@@ -11,6 +11,7 @@ import {
 } from '@playwright/test';
 import { encodeModelRef } from '../src/utils/modelRef';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
+import { SOURCE_CANDIDATE_DISCOVERY_TEXT } from '../src/locales/candidateDiscoveryText';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
 import { formatUiText, UI_TEXT } from '../src/i18n/uiText';
@@ -931,7 +932,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     }).click();
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchAnalysis, UI_TEXT.en['analysisWorkbench.title'], UI_TEXT.en['analysisWorkbench.documentTitle']);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
+    await assertRouteChrome(
+      page,
+      APP_ROUTE_PATHS.researchDiscover,
+      SOURCE_CANDIDATE_DISCOVERY_TEXT.en.pageTitle,
+      SOURCE_CANDIDATE_DISCOVERY_TEXT.en.documentTitle,
+    );
     await assertRouteChrome(page, APP_ROUTE_PATHS.portfolio, PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.signals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
     const homeParent = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.home'] });
@@ -1722,7 +1728,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('数量').fill('2');
     await dialog.getByLabel('成交价').fill('210');
     await dialog.getByRole('button', { name: '提交交易' }).click();
-    await expect(page.locator('[data-toast-tone="danger"]').getByText('请求失败', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-toast-tone="warning"]').getByText('请求失败', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: '提交交易' }).click();
     await expect(dialog).toBeHidden();
     expect(operationIds).toHaveLength(2);
@@ -2310,16 +2316,18 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await page.goto(APP_ROUTE_PATHS.researchMarket);
-    const marketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true }).first();
-    await marketReviewButton.click();
+    const headerMarketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true }).first();
+    await headerMarketReviewButton.click();
     await expect.poll(() => submissions).toBe(1);
     await oldPollStarted.promise;
     // A second invocation can originate outside this page (for example from a
     // recovered task action). Trigger the same React action while the first
     // poll is in flight so the generation guard, not unmount cleanup, is what
     // rejects the old response.
-    await expect(marketReviewButton).toBeEnabled();
-    await marketReviewButton.click();
+    await expect(headerMarketReviewButton).toBeDisabled();
+    const recoveredTaskAction = page.getByRole('button', { name: '大盘复盘', exact: true }).last();
+    await expect(recoveredTaskAction).toBeEnabled();
+    await recoveredTaskAction.click();
     await expect.poll(() => submissions).toBe(2);
     const persistedReport = page.getByTestId('market-review-report');
     await expect(persistedReport.getByText('NEW_GENERATION_PERSISTED', { exact: true })).toBeVisible();
