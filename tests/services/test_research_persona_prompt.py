@@ -268,6 +268,23 @@ def test_research_stance_rejects_unknown_lens_skill() -> None:
         )
 
 
+def test_research_stance_deduplicates_lens_skills_preserving_order() -> None:
+    stance = ResearchStanceContent.model_validate(
+        {
+            "preferred_lens_skill_ids": [
+                "persona_tail_risk",
+                "persona_value_moat",
+                "persona_tail_risk",
+            ]
+        }
+    )
+
+    assert stance.preferred_lens_skill_ids == [
+        "persona_tail_risk",
+        "persona_value_moat",
+    ]
+
+
 def test_framework_content_accepts_research_stance_only() -> None:
     content = InvestmentFrameworkContent.model_validate(
         {

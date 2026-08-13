@@ -79,7 +79,7 @@ class ResearchStanceContent(BaseModel):
             ):
                 raise ValueError("research_stance custom_text contains control characters")
         seen: set[str] = set()
-        ordered: list[str] = []
+        ordered: list[InvestorPersonaSkillId] = []
         for skill_id in self.preferred_lens_skill_ids:
             if skill_id in seen:
                 continue
