@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { BellRing, CalendarDays } from 'lucide-react';
 import { eventCalendarApi } from '../../api/eventCalendar';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
@@ -56,7 +56,6 @@ function isCancelled(error: unknown): boolean {
 }
 
 const EventCalendarWorkspace: React.FC = () => {
-  const navigate = useNavigate();
   const { language } = useUiLanguage();
   const text = EVENT_CALENDAR_TEXT[language];
   const alertsText = EVENT_ALERT_PAGE_TEXT[language];
@@ -164,15 +163,15 @@ const EventCalendarWorkspace: React.FC = () => {
         description={text.description}
         actions={(
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              data-testid="event-calendar-open-alerts"
-              onClick={() => navigate(APP_ROUTE_PATHS.eventAlerts)}
+            <Link
+              to={APP_ROUTE_PATHS.eventAlerts}
+              data-testid="event-calendar-open-event-alerts"
+              data-control="navigation-link"
+              className="control-hit-target inline-flex min-h-7 items-center gap-2 rounded-md border border-border bg-hover px-2.5 text-sm font-medium text-foreground shadow-soft-card hover:bg-subtle-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-border dark:hover:bg-subtle-active"
             >
               <BellRing className="h-4 w-4" aria-hidden="true" />
-              {alertsText.title}
-            </Button>
+              <span data-testid="event-calendar-open-alerts">{alertsText.title}</span>
+            </Link>
             <Button type="button" variant="secondary" onClick={() => void load()}>
               {text.refresh}
             </Button>
