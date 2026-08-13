@@ -3,18 +3,10 @@
 import {
   Activity,
   BarChart3,
-  BellRing,
   BriefcaseBusiness,
-  Calculator,
   ClipboardCheck,
   FileText,
-  FlaskConical,
-  Gauge,
-  Home,
   LineChart,
-  MessageSquareQuote,
-  Search,
-  Settings2,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
@@ -41,6 +33,7 @@ import {
 } from '../../routing/routes';
 import { cn } from '../../utils/cn';
 import { formatDateTime, formatReportType } from '../../utils/format';
+import { listCommandPalettePages } from '../layout/navigation';
 import { Modal } from '../common/Modal';
 import { SearchInput } from '../common/SearchInput';
 import { Spinner } from '../common/Spinner';
@@ -96,21 +89,16 @@ export function CommandPalette({
   const [activeIndex, setActiveIndex] = useState(-1);
   const search = useCommandPaletteSearch(query, isOpen);
 
-  const pages = useMemo<CommandItem[]>(() => [
-    { id: 'home', labelKey: 'layout.nav.home', href: APP_ROUTE_PATHS.home, icon: Home },
-    { id: 'signals', labelKey: 'layout.nav.decisionSignals', href: APP_ROUTE_PATHS.signals, icon: BellRing },
-    { id: 'research', labelKey: 'layout.nav.research', href: APP_ROUTE_PATHS.research, icon: Search },
-    { id: 'market', labelKey: 'layout.nav.marketReview', href: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
-    { id: 'discover', labelKey: 'layout.nav.discover', href: APP_ROUTE_PATHS.researchDiscover, icon: Search },
-    { id: 'analysis', labelKey: 'layout.nav.analysis', href: analysisHref, icon: FlaskConical },
-    { id: 'backtest', labelKey: 'layout.nav.backtest', href: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
-    { id: 'calculators', labelKey: 'layout.nav.calculators', href: APP_ROUTE_PATHS.calculators, icon: Calculator },
-    { id: 'skill-outcomes', labelKey: 'layout.nav.skillOutcomes', href: APP_ROUTE_PATHS.researchSkillOutcomes, icon: Gauge },
-    { id: 'portfolio', labelKey: 'layout.nav.portfolio', href: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
-    { id: 'agent', labelKey: 'layout.nav.agent', href: APP_ROUTE_PATHS.agent, icon: MessageSquareQuote },
-    { id: 'approvals', labelKey: 'layout.nav.approvals', href: APP_ROUTE_PATHS.approvals, icon: ClipboardCheck },
-    { id: 'settings', labelKey: 'layout.nav.settings', href: APP_ROUTE_PATHS.settings, icon: Settings2 },
-  ], [analysisHref]);
+  // Pages come from the shared navigation graph (sidebar + secondary palette-only).
+  const pages = useMemo<CommandItem[]>(
+    () => listCommandPalettePages({ analysisHref }).map((page) => ({
+      id: page.id,
+      labelKey: page.labelKey,
+      href: page.href,
+      icon: page.icon,
+    })),
+    [analysisHref],
+  );
   const actions = useMemo<CommandItem[]>(() => [
     { id: 'run-analysis', labelKey: 'home.startAnalysisTitle', href: analysisHref, icon: Sparkles },
     { id: 'create-rule', labelKey: 'decisionSignals.createFirstRule', href: buildSignalCenterHref({ createRule: true }), icon: ShieldCheck },
