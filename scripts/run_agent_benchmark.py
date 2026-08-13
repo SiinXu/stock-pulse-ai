@@ -112,7 +112,15 @@ def main(argv: list[str] | None = None) -> int:
         candidate_agent_version=args.candidate_agent_version,
         candidate_config_version=args.candidate_config_version,
     )
-    outputs = build_full_outputs(report, with_baseline=not args.write_baseline)
+    try:
+        outputs = build_full_outputs(report, with_baseline=not args.write_baseline)
+    except FileNotFoundError as exc:
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification baseline "
+            f"missing ({exc})",
+            file=sys.stderr,
+        )
+        return 2
     score_view = outputs["score_view"]
     comparison = outputs["comparison"]
     markdown = outputs["markdown"]
@@ -120,7 +128,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.write_baseline:
         path = write_baseline(report)
         print(f"[agent-eval-benchmark] wrote baseline {path}", file=sys.stderr)
-        outputs = build_full_outputs(report, with_baseline=True)
+        try:
+            outputs = build_full_outputs(report, with_baseline=True)
+        except FileNotFoundError as exc:
+            print(
+                "[agent-eval-benchmark] FAIL: prediction-verification baseline "
+                f"missing ({exc})",
+                file=sys.stderr,
+            )
+            return 2
         comparison = outputs["comparison"]
         markdown = outputs["markdown"]
 
@@ -159,6 +175,34 @@ def main(argv: list[str] | None = None) -> int:
     if args.strict_baseline and output_comparison.get("regressed"):
         print(
             "[agent-eval-benchmark] FAIL: output-quality regression vs frozen baseline",
+            file=sys.stderr,
+        )
+        return 2
+    prediction_comparison = outputs.get("prediction_comparison")
+    if args.strict_baseline and prediction_comparison is None:
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification baseline "
+            "missing; cannot freeze the acceptance table",
+            file=sys.stderr,
+        )
+        return 2
+    if args.strict_baseline and prediction_comparison.get("regressed"):
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification regression "
+            f"(delta={float(prediction_comparison.get('delta') or 0.0):+.4f}, "
+            f"drop_count={prediction_comparison.get('drop_count')}, "
+            "threshold=0.0 fixed)",
+            file=sys.stderr,
+        )
+        return 2
+    pred_report = report.get("prediction_verification_evaluation") or {}
+    pred_agg = pred_report.get("aggregate") or {}
+    if args.strict_baseline and int(pred_agg.get("checks_passed") or 0) < int(
+        pred_agg.get("checks_total") or 0
+    ):
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification checks incomplete "
+            f"({pred_agg.get('checks_passed')}/{pred_agg.get('checks_total')})",
             file=sys.stderr,
         )
         return 2

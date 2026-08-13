@@ -1,0 +1,43 @@
+{
+  "id": "pred-seeded-miss-lesson",
+  "profile": "seeded_failure",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "type": "direction",
+      "confidence": 0.9,
+      "payload": {"direction": "up"}
+    }
+  ],
+  "actuals": {
+    "start_price": 100.0,
+    "end_price": 90.0
+  },
+  "resolution": {
+    "outcome": "miss",
+    "scorer_outcome": "miss",
+    "reason": "direction_opposite"
+  },
+  "expected": {
+    "outcome": "miss",
+    "require_lessons": true,
+    "forbid_soul_mutation_claim": true
+  },
+  "lessons": [
+    {
+      "kind": "overconfidence",
+      "severity": "medium",
+      "claim_ref": "c1",
+      "remedy": "Lower confidence when trend evidence is single-source."
+    }
+  ],
+  "episode": {
+    "run_id": "run-pred-miss-1",
+    "symbol": "AAPL",
+    "market": "us",
+    "success": true,
+    "soul_version": "v1",
+    "soul_hash": "abcdef0123456789",
+    "trajectory_summary": []
+  }
+}

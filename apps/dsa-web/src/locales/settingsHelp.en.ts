@@ -1554,6 +1554,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects Agent confidence calibration and long-term analysis quality.'],
     notes: ['Works best when combined with the backtest feature.'],
   },
+  'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
+    title: 'Agent Episode Log',
+    summary: 'Store compact Agent trajectories, lessons, and optional outcomes.',
+  },
+  'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
+    title: 'Agent Episode Retention Days',
+    summary: 'Maximum episode age before retention cleanup.',
+  },
+  'settings.agent.AGENT_EPISODE_MAX_ROWS': {
+    title: 'Agent Episode Max Rows',
+    summary: 'Episode row cap; oldest rows are removed first.',
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent Planning Loop',
     summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',
