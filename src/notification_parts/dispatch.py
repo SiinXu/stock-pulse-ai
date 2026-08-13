@@ -1574,6 +1574,12 @@ class _DispatchMethods:
         delivery so single-send and report paths keep one result contract.
         """
 
+        # Sandbox fence: never dispatch real notifications during simulation.
+        from src.agent.sandbox.context import require_sandbox_inactive_for_production_write
+        from src.agent.sandbox.effects import EFFECT_NOTIFICATION
+
+        require_sandbox_inactive_for_production_write(EFFECT_NOTIFICATION)
+
         application_services, _registry = _ensure_notification_runtime(self)
         with application_services.notification_dispatch():
             return self._send_with_results_under_lease(
