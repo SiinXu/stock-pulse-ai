@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "銘柄相場",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "出来高",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "ウォッチリストに追加",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "市場 {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "追加済み",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "すべての歴史",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "平均 {score}",

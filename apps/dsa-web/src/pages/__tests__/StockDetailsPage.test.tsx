@@ -146,6 +146,7 @@ describe('StockDetailsPage', () => {
     expect(screen.getByText(/Latest available quote/)).toBeTruthy();
     // CN market: currency code + 2dp from marketFormat
     expect(screen.getByText('CNY 1,700.00')).toBeTruthy();
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('CN');
     // CN convention red_up: positive change uses red paint token
     const changeNode = screen.getByText(/\+20\.00/);
     expect(changeNode.getAttribute('data-change-color')).toBe('red');
@@ -191,9 +192,39 @@ describe('StockDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('Apple')).toBeTruthy());
     expect(screen.getAllByText('USD 189.10').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('US');
     const changeNode = screen.getByText(/\+1\.25/);
     expect(changeNode.getAttribute('data-change-color')).toBe('green');
     expect(changeNode.getAttribute('data-change-pref')).toBe('green_up');
+  });
+
+  it('formats crypto:BTC with USD, CRYPTO badge, and green_up convention', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote({
+      stockCode: 'CRYPTO:BTC',
+      stockName: 'Bitcoin',
+      currentPrice: 67890.12,
+      change: 1200.5,
+      changePercent: 1.8,
+      updateTime: '2026-03-19T13:30:00.000Z',
+    }));
+    getHistoryMock.mockResolvedValue({
+      stockCode: 'CRYPTO:BTC',
+      stockName: 'Bitcoin',
+      period: 'daily',
+      data: [
+        { date: '2026-03-18', open: 66000, high: 68000, low: 65000, close: 67890.12, volume: 100, changePercent: 1.8 },
+      ],
+    });
+
+    renderPage('crypto%3ABTC');
+
+    await waitFor(() => expect(screen.getByText('Bitcoin')).toBeTruthy());
+    expect(screen.getAllByText('USD 67,890.12').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('CRYPTO');
+    const changeNode = screen.getByText(/\+1,200\.50/);
+    expect(changeNode.getAttribute('data-change-color')).toBe('green');
+    expect(changeNode.getAttribute('data-change-pref')).toBe('green_up');
+    expect(screen.getByText(/UTC|GMT/i)).toBeTruthy();
   });
 
   it('formats HK quotes with HKD 3dp and red_up convention', async () => {
@@ -217,6 +248,7 @@ describe('StockDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('Tencent')).toBeTruthy());
     expect(screen.getAllByText('HKD 321.123').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('HK');
     const changeNode = screen.getByText(/-1\.500/);
     expect(changeNode.getAttribute('data-change-color')).toBe('green');
     expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
