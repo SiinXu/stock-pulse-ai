@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 248197,
-      "measuredGzipBytes": 247797,
-      "note": "Local production-build remasure after merging origin/main; measured 247797 B + 400 B retained headroom."
+      "maxGzipBytes": 248056,
+      "measuredGzipBytes": 247656,
+      "note": "Local production-build remasure after merging origin/main; measured 247656 B + 400 B retained headroom."
     },
     {
       "id": "js-entry",

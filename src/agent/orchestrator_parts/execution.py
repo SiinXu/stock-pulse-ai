@@ -6,7 +6,6 @@ from __future__ import annotations
 import contextvars
 import copy
 import inspect
-import json
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import fields as dataclass_fields
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
@@ -20,6 +19,7 @@ from src.agent.protocols import (
 )
 from src.agent.public_contract import AGENT_EXECUTION_FAILURE_MESSAGE
 from src.agent.runtime_facts import build_agent_runtime_facts
+from src.agent.orchestrator_parts.dashboard import _dashboard_content_json
 from src.config import AGENT_MAX_STEPS_DEFAULT
 
 if TYPE_CHECKING:
@@ -106,7 +106,7 @@ class _ExecutionMethods:
                     note="多 Agent 超时，以下结论基于已完成阶段自动降级生成。",
                 )
                 ctx.set_data("final_dashboard", dashboard)
-                content = json.dumps(dashboard, ensure_ascii=False, indent=2)
+                content = _dashboard_content_json(dashboard)
 
         return self._with_budget_snapshot(
             OrchestratorResult(
@@ -153,7 +153,7 @@ class _ExecutionMethods:
                     note="多 Agent 预算不足，以下结论基于已完成阶段自动降级生成。",
                 )
                 ctx.set_data("final_dashboard", dashboard)
-                content = json.dumps(dashboard, ensure_ascii=False, indent=2)
+                content = _dashboard_content_json(dashboard)
 
         return self._with_budget_snapshot(
             OrchestratorResult(
