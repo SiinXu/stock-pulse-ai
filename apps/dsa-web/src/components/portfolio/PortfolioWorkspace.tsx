@@ -928,6 +928,14 @@ const PortfolioWorkspace: React.FC = () => {
               {isPaperAccountSelected ? (
                 <Badge variant="info">{text.paperAccount}</Badge>
               ) : null}
+              {isPaperAccountSelected ? (
+                <Link
+                  to={APP_ROUTE_PATHS.portfolioPerformance}
+                  className="inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline"
+                >
+                  {text.processQualityLink}
+                </Link>
+              ) : null}
             </div>
           )}
         />

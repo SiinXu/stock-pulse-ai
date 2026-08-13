@@ -6215,4 +6215,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Extraction parallèle des données de marché",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Plafond global d’extraction parallèle",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Plafond par fournisseur d’extraction parallèle",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Score du processus",
 } as const;

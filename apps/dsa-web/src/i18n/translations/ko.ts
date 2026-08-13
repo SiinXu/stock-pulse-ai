@@ -6215,4 +6215,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "시장 입력 병렬 수집",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "과정 품질",
 } as const;
