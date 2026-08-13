@@ -106,10 +106,16 @@ describe('useMarketReviewRunner', () => {
     expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     expect(analysisApi.getStatus).toHaveBeenCalledTimes(1);
     expect(result.current.notice?.title).toBe('大盘复盘进行中');
+    // Progress uses formatTaskMessage (no raw status enum) plus localized regions.
+    expect(result.current.notice?.message).toMatch(/任务执行中|Analysis in progress/);
+    expect(result.current.notice?.message).toContain('60%');
     expect(result.current.notice?.message).toContain('A 股');
     expect(result.current.notice?.message).toContain('港股');
     expect(result.current.notice?.message).toContain('美股');
     expect(result.current.notice?.message).not.toMatch(/\bcn,hk,us\b/);
+    expect(result.current.notice?.message).not.toMatch(/\bprocessing\b/);
+    expect(result.current.activeTaskId).toBe('market-task');
+    expect(result.current.isLaunchBlocked).toBe(true);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(MARKET_REVIEW_POLL_INTERVAL_MS);
@@ -281,6 +287,72 @@ describe('useMarketReviewRunner', () => {
     });
     expect(result.current.notice).toBeNull();
     expect(analysisApi.getStatus).not.toHaveBeenCalled();
+  });
+
+  it('blocks relaunch on duplicate_market_review until the busy alert is dismissed', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          error: 'duplicate_market_review',
+          message: '大盘复盘正在执行中，请稍后再试',
+        },
+      },
+    });
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: true,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+    });
+
+    expect(result.current.error).toMatchObject({
+      code: 'duplicate_market_review',
+      status: 409,
+    });
+    expect(result.current.isLaunchBlocked).toBe(true);
+    expect(result.current.activeTaskId).toBeNull();
+    expect(analysisApi.getStatus).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.dismissError();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.isLaunchBlocked).toBe(false);
+  });
+
+  it('treats cancelled and interrupted statuses as terminal without unknown-status fallback', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      region: 'cn',
+      sendNotification: false,
+      message: 'Accepted',
+      taskId: 'market-task',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'market-task',
+      status: 'interrupted',
+      messageCode: 'task.interrupted.process_restart',
+    });
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: false,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+      await Promise.resolve();
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.activeTaskId).toBeNull();
+    expect(result.current.notice?.variant).toBe('warning');
+    expect(result.current.notice?.message).not.toMatch(/unknown/i);
+    expect(result.current.isLaunchBlocked).toBe(false);
   });
 
   it('ignores a superseded poll result after a newer run completes', async () => {

@@ -33,6 +33,7 @@ FRAMEWORK_SCHEMAS = (
     "InvestmentFrameworkHistoryResponse",
     "InvestmentFrameworkResponse",
     "InvestmentFrameworkUpdateRequest",
+    "ResearchStanceContent",
 )
 
 

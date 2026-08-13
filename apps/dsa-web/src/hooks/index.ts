@@ -6,6 +6,12 @@ export {
 } from './useBeginnerMode';
 export type { UseBeginnerModeResult, SettingsDisplayMode } from './useBeginnerMode';
 export { useDashboardLifecycle } from './useDashboardLifecycle';
+export {
+  DASHBOARD_DATA_REFRESH_INTERVAL_MS,
+  DASHBOARD_DATA_REFRESH_QUERY_KEY,
+  useDashboardDataRefreshQuery,
+} from './useDashboardDataRefreshQuery';
+export type { DashboardDataRefreshQueryResult } from './useDashboardDataRefreshQuery';
 export { useAnalysisWorkbenchState } from './useAnalysisWorkbenchState';
 export { useHomeUrlState } from './useHomeUrlState';
 export { useMarketReviewRunner } from './useMarketReviewRunner';

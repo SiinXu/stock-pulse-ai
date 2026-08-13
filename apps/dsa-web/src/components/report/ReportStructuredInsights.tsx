@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import type {
+  ReportCommitteeDeliberation,
+  ReportCommitteeMember,
+  ReportCommitteeOpinion,
   ReportLanguage,
   ReportPhaseDecision,
   ReportSignalAttribution,
@@ -350,6 +353,166 @@ const StrategySynthesisCard: React.FC<{
   );
 };
 
+
+const CommitteeOpinionList: React.FC<{
+  title: string;
+  items?: ReportCommitteeOpinion[] | ReportCommitteeMember[];
+  signalLabels: Record<string, string>;
+  invalidLabel: string;
+  testId: string;
+}> = ({ title, items, signalLabels, invalidLabel, testId }) => {
+  if (!items?.length) {
+    return null;
+  }
+  return (
+    <section data-testid={testId}>
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
+        {title}
+      </h4>
+      <div className="space-y-2">
+        {items.map((item, index) => {
+          const name = item.displayName || item.personaId || item.agentName || `#${index + 1}`;
+          const confidence = confidencePercent(item.confidence);
+          const invalid = 'invalid' in item ? Boolean(item.invalid) : false;
+          const reasoning =
+            'reasoningExcerpt' in item ? item.reasoningExcerpt : undefined;
+          return (
+            <div
+              key={`${name}-${index}`}
+              className="rounded-lg border border-border/55 bg-elevated/40 px-3 py-2"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-foreground">{name}</span>
+                {item.signal ? (
+                  <Badge variant={invalid ? 'warning' : 'default'}>
+                    {localizedValue(item.signal, signalLabels)}
+                  </Badge>
+                ) : null}
+                {confidence !== undefined ? (
+                  <span className="text-xs tabular-nums text-muted-text">{confidence}%</span>
+                ) : null}
+                {invalid ? <Badge variant="warning">{invalidLabel}</Badge> : null}
+              </div>
+              {reasoning ? (
+                <p className="mt-1 text-xs leading-5 text-secondary-text">{reasoning}</p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+const CommitteeDeliberationCard: React.FC<{
+  deliberation: ReportCommitteeDeliberation;
+  language: ReportLanguage;
+}> = ({ deliberation, language }) => {
+  const text = REPORT_STRUCTURED_INSIGHTS_TEXT[language];
+  const conclusion = deliberation.conclusion;
+  const finalSignal = localizedValue(conclusion?.finalSignal, text.signalLabels);
+  const consensus = localizedValue(conclusion?.consensusLevel, text.consensusLabels);
+  const conflictSeverity = localizedValue(
+    conclusion?.conflictSeverity,
+    text.severityLabels,
+  );
+  const confidence = confidencePercent(conclusion?.confidence);
+  const status = deliberation.status
+    ? readableFallback(deliberation.status)
+    : undefined;
+  const divergences = deliberation.divergencePoints ?? [];
+
+  return (
+    <Card
+      variant="bordered"
+      padding="md"
+      className="text-left md:col-span-2"
+      data-testid="report-committee-deliberation"
+    >
+      <DashboardPanelHeader
+        eyebrow={text.committeeEyebrow}
+        title={text.committeeTitle}
+        actions={
+          finalSignal ? <Badge variant="info" size="md">{finalSignal}</Badge> : undefined
+        }
+      />
+      {conclusion ? (
+        <section className="mb-4" data-testid="report-committee-conclusion">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
+            {text.committeeConclusion}
+          </h4>
+          <dl className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailLine label={text.finalSignal} value={finalSignal} />
+            <DetailLine label={text.consensus} value={consensus} />
+            <DetailLine
+              label={text.confidence}
+              value={confidence === undefined ? undefined : `${confidence}%`}
+            />
+            <DetailLine label={text.conflictSeverity} value={conflictSeverity} />
+            <DetailLine label={text.committeeStatus} value={status} />
+            <DetailLine
+              label={text.conflicts}
+              value={
+                conclusion.conflictCount === undefined
+                  ? undefined
+                  : String(conclusion.conflictCount)
+              }
+            />
+          </dl>
+        </section>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <CommitteeOpinionList
+          title={text.committeeMembers}
+          items={deliberation.members}
+          signalLabels={text.signalLabels}
+          invalidLabel={text.committeeInvalid}
+          testId="report-committee-members"
+        />
+        <CommitteeOpinionList
+          title={text.committeeDissent}
+          items={deliberation.dissentingOpinions}
+          signalLabels={text.signalLabels}
+          invalidLabel={text.committeeInvalid}
+          testId="report-committee-dissent"
+        />
+      </div>
+
+      {divergences.length > 0 ? (
+        <section className="mt-4" data-testid="report-committee-divergence">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
+            {text.committeeDivergence}
+          </h4>
+          <ul className="space-y-2">
+            {divergences.map((point, index) => {
+              const label = localizedValue(point.conflictType, text.conflictLabels)
+                ?? point.descriptionKey
+                ?? `#${index + 1}`;
+              const severity = localizedValue(point.severity, text.severityLabels);
+              return (
+                <li
+                  key={`${point.conflictType ?? 'divergence'}-${index}`}
+                  className="rounded-lg border border-warning/25 bg-warning/5 px-3 py-2 text-sm"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">{label}</span>
+                    {severity ? <Badge variant="warning">{severity}</Badge> : null}
+                  </div>
+                  <p className="mt-1 text-xs text-secondary-text">
+                    {text.participants}:{' '}
+                    {point.participants?.join(', ') || text.noParticipants}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+    </Card>
+  );
+};
+
 export const ReportStructuredInsights: React.FC<ReportStructuredInsightsProps> = ({
   insights,
   language = 'zh',
@@ -380,6 +543,12 @@ export const ReportStructuredInsights: React.FC<ReportStructuredInsightsProps> =
       {normalized.strategySynthesis ? (
         <StrategySynthesisCard
           synthesis={normalized.strategySynthesis}
+          language={reportLanguage}
+        />
+      ) : null}
+      {normalized.committeeDeliberation ? (
+        <CommitteeDeliberationCard
+          deliberation={normalized.committeeDeliberation}
           language={reportLanguage}
         />
       ) : null}
