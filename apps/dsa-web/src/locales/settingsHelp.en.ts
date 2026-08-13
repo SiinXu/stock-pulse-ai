@@ -1404,6 +1404,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the maximum wait time for Agent analysis.'],
     notes: ['Timeout does not affect other stocks in the analysis pipeline.'],
   },
+  'settings.agent.PREDICTION_EXTRACT_ENABLED': {
+    title: 'Prediction Extraction',
+    summary: 'Create draft records from typed decisions.',
+    usage: 'Research only; prose is not a claim.',
+    valueNotes: [
+      'Off by default.',
+      'Drafts stay in memory.',
+      'Prose returns status=no_verifiable_claim.',
+    ],
+    impact: ['Does not change advice.'],
+    notes: ['Failures do not stop analysis; no returns guarantee.'],
+  },
   'settings.agent.SKILL_OPINION_RECORDING_ENABLED': {
     title: 'Skill Opinion Recording',
     summary: 'Record individual skill opinions into the offline outcome-evaluation store.',
