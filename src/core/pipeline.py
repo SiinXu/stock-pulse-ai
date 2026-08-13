@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
-"""
-===================================
-A股自选股智能分析系统 - 核心分析流水线
-===================================
+"""Stock analysis pipeline orchestration facade.
 
-职责：
-1. 管理整个分析流程
-2. 协调数据获取、存储、搜索、分析、通知等模块
-3. 实现并发控制和异常处理
-4. 提供股票分析的核心功能
+This module is orchestration-only (Issue #1083):
+
+- Wire request-scoped services and bind stage mixins.
+- Own construction of ``StockAnalysisPipeline`` and compatibility re-exports.
+- Do **not** add product business rules, data-source fallback logic, report
+  formatting, or notification policy here.
+
+Business logic lives in ``src/core/stages/*`` and services. Stage IO contracts
+live in ``src/core/contracts`` (Issue #1072). Reviewer checklist: reject new
+business branches landed directly in this file; prefer stage contract types
+over ad-hoc dict keys when touching stages.
 """
 
 import logging
@@ -105,6 +108,22 @@ from src.core.trading_calendar import (
     get_market_now,
     is_market_open,
 )
+from src.core.contracts import (
+    AnalyzeStageInput,
+    AnalyzeStageOutput,
+    FetchDailyDataOutput,
+    FetchMarketInputsOutput,
+    FetchStageInput,
+    RenderStageInput,
+    RenderStageOutput,
+    RunContext,
+    StageDegradedError,
+    StageError,
+    StageFailedError,
+    StageSkippedError,
+    build_run_context,
+    stage_result_from_error,
+)
 from src.core.pipeline_stage_results import (
     PipelinePersistValue,
     PipelineStageName,
@@ -132,14 +151,19 @@ from data_provider.us_index_mapping import is_us_stock_code
 logger = logging.getLogger(__name__)
 
 # Keep legacy module exports alive while concrete stages move behind the facade.
+# Contract types are re-exported for discoverability; stages import them from
+# ``src.core.contracts`` directly (Issue #1072).
 _PIPELINE_COMPAT_EXPORTS = (
     activate_run_diagnostic_context,
     AnalysisContextBuilder,
+    AnalyzeStageInput,
+    AnalyzeStageOutput,
     AnalysisResult,
     apply_daily_market_context_guardrail,
     apply_phase_decision_guardrails,
     as_completed,
     build_market_phase_context,
+    build_run_context,
     ChipDistribution,
     current_diagnostic_snapshot,
     DailyMarketContext,
@@ -149,6 +173,9 @@ _PIPELINE_COMPAT_EXPORTS = (
     defaultdict,
     ExitStack,
     extract_and_persist_from_analysis_result,
+    FetchDailyDataOutput,
+    FetchMarketInputsOutput,
+    FetchStageInput,
     fill_price_position_if_needed,
     format_daily_market_context_prompt_section,
     format_analysis_context_pack_prompt_section,
@@ -188,12 +215,20 @@ _PIPELINE_COMPAT_EXPORTS = (
     record_missing_pipeline_stages_as_skipped,
     record_notification_run,
     record_pipeline_stage,
+    RenderStageInput,
+    RenderStageOutput,
     render_analysis_context_pack_overview,
     render_market_phase_summary,
     ReportType,
     reset_run_diagnostic_context,
+    RunContext,
     sanitize_diagnostic_text,
     SimpleNamespace,
+    StageDegradedError,
+    StageError,
+    StageFailedError,
+    StageSkippedError,
+    stage_result_from_error,
     stabilize_decision_with_structure,
     summarize_decision_signal,
     ThreadPoolExecutor,

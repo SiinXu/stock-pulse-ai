@@ -4,9 +4,11 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { EmptyState, Surface } from '../common';
 import { DataTable, type DataTableColumn } from '../common/DataTable';
+import { HelpKeyButton } from '../help';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { CHARTS_TEXT } from '../../locales/charts';
+import { EDUCATION_HELP_KEYS, riskScoreLevelHelpKey } from '../../locales/educationHelpKeys';
 import { cn } from '../../utils/cn';
 import {
   MAX_RISK_HEATMAP_CELLS,
@@ -140,7 +142,13 @@ export const RiskHeatmap: React.FC<RiskHeatmapProps> = ({
   return (
     <div className={className} data-testid={testId}>
       <Surface level="section" padding="sm" className="flex flex-col gap-3" data-testid={`${testId}-surface`}>
-      <p className="text-xs text-muted-text" data-testid={`${testId}-legend`}>{text.riskLegend}</p>
+      <div className="flex flex-wrap items-start gap-1">
+        <p className="text-xs text-muted-text" data-testid={`${testId}-legend`}>{text.riskLegend}</p>
+        <HelpKeyButton
+          helpKey={EDUCATION_HELP_KEYS.portfolioHealth}
+          data-testid={`${testId}-portfolio-health-help`}
+        />
+      </div>
       <div data-testid={`${testId}-grid`}>
         <DataTable
           caption={ariaLabel}
@@ -155,13 +163,20 @@ export const RiskHeatmap: React.FC<RiskHeatmapProps> = ({
           minWidth="container"
         />
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-label text-muted-text" aria-hidden="true">
+      <div className="flex flex-wrap items-center gap-2 text-label text-muted-text">
         {([['low', 12, text.riskLevelLow], ['medium', 40, text.riskLevelMedium], ['high', 65, text.riskLevelHigh], ['critical', 90, text.riskLevelCritical]] as const).map(([level, sample, label]) => {
           const fill = riskScoreFill(sample);
+          const levelHelpKey = riskScoreLevelHelpKey(level);
           return (
             <span key={level} className="inline-flex items-center gap-1">
-              <span className="inline-block h-3 w-3 rounded-sm border border-border/50" style={{ background: fill.background }} />
-              {label}
+              <span className="inline-block h-3 w-3 rounded-sm border border-border/50" style={{ background: fill.background }} aria-hidden="true" />
+              <span>{label}</span>
+              {levelHelpKey ? (
+                <HelpKeyButton
+                  helpKey={levelHelpKey}
+                  data-testid={`${testId}-level-help-${level}`}
+                />
+              ) : null}
             </span>
           );
         })}

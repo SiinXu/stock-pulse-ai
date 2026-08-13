@@ -52,6 +52,9 @@ def test_pack_defaults_and_json_serialization_are_stable() -> None:
     }
     assert dumped["metadata"] == {}
     assert dumped["created_at"] == "2026-05-24T09:30:00Z"
+    assert isinstance(dumped["snapshot_id"], str) and dumped["snapshot_id"]
+    assert dumped["snapshot_revision"] == 1
+    assert dumped["as_of"] is None
 
 
 def test_pack_version_is_fixed_to_p1_contract() -> None:
@@ -334,3 +337,27 @@ def test_pack_safe_dict_redacts_sensitive_metadata_but_keeps_business_fields() -
     price_metadata = safe["blocks"]["quote"]["items"]["price"]["metadata"]
     assert price_metadata["access_token"] == "[REDACTED]"
     assert price_metadata["data_api"] == "kept"
+
+
+def test_snapshot_identity_fields_and_audit_metadata() -> None:
+    pack = AnalysisContextPack(
+        subject=_subject(),
+        snapshot_id="snap-fixed",
+        snapshot_revision=2,
+        as_of="2026-05-24T09:30:00+08:00",
+        created_at=datetime(2026, 5, 24, 1, 30, tzinfo=timezone.utc),
+        metadata={"content_digest": "abc"},
+    )
+    identity = pack.audit_identity()
+    assert identity["snapshot_id"] == "snap-fixed"
+    assert identity["snapshot_revision"] == 2
+    assert identity["as_of"] == "2026-05-24T09:30:00+08:00"
+    assert identity["content_digest"] == "abc"
+    assert identity["pack_version"] == PACK_VERSION
+
+    with pytest.raises(ValidationError):
+        AnalysisContextPack(subject=_subject(), snapshot_id="")
+    with pytest.raises(ValidationError):
+        AnalysisContextPack(subject=_subject(), snapshot_revision=0)
+    with pytest.raises(ValidationError):
+        AnalysisContextPack(subject=_subject(), as_of="2026-05-24")
