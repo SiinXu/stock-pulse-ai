@@ -55,7 +55,13 @@ _BLOCKED_DEEP_KEYS = frozenset(
 
 
 class AgentEventType(str, Enum):
-    """Stable agent observability event types for L0."""
+    """Stable agent observability event types for L0.
+
+    Planning-loop taxonomy (``plan`` / ``action`` / ``observation`` /
+    ``replan`` / ``terminate``) aligns with the unified run-trace contract
+    drafted in issue #1125. ``reflect`` and evolution-side kinds are reserved
+    there and are not emitted by the planning loop.
+    """
 
     PHASE_START = "agent.phase_start"
     PHASE_END = "agent.phase_end"
@@ -65,6 +71,12 @@ class AgentEventType(str, Enum):
     MODEL_END = "agent.model_end"
     DECISION = "agent.decision"
     ERROR = "agent.error"
+    # Planning-loop structured trace events (#1078; taxonomy shared with #1125).
+    PLAN = "agent.plan"
+    ACTION = "agent.action"
+    OBSERVATION = "agent.observation"
+    REPLAN = "agent.replan"
+    TERMINATE = "agent.terminate"
 
 
 @dataclass(frozen=True)
