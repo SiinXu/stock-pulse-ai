@@ -122,4 +122,4 @@ def test_baseline_hard_ceiling_matches_introduction_inventory() -> None:
     """Hard ceiling pins introduction debt; never raise it to green CI."""
 
     payload_edges = load_baseline(BASELINE)
-    assert len(payload_edges) == 12
+    assert len(payload_edges) <= 12
