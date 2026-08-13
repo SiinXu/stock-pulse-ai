@@ -914,6 +914,58 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Bounds audit storage growth and may delete older events under high privileged-operation volume.'],
     notes: ['See docs/security-audit.md. Raise capacity or export before long high-volume runs if older rows must be kept.'],
   },
+  'settings.system.CAPABILITY_WRITE_REGISTRY_PATH': {
+    title: 'Capability Write Registry Path',
+    summary: 'Durable path for operator-declared capability registrations.',
+    usage: 'Leave empty to use <dir-of-DATABASE_PATH>/capability_write_registry.json.',
+    valueNotes: ['Stores register/update/retire metadata only; live inventory still comes from runtime owners.'],
+    impact: ['Affects write-side capability registration, dependency resolution, and task-aware routing tags.'],
+    notes: ['See docs/capability-inventory.md.'],
+  },
+  'settings.system.TASK_ROUTING_ENABLED': {
+    title: 'Task-Aware Model Routing',
+    summary: 'Opt-in automatic model selection by task class using registered LLM capability tags.',
+    usage: 'Keep false to preserve existing model assignment. Manual pins always win.',
+    valueNotes: ['Decisions are explainable via POST /api/v1/capabilities/route.'],
+    impact: ['When enabled, unpinned task classes may select different models under TASK_ROUTING_POLICY.'],
+    notes: ['Optional ensemble is not included in this control.'],
+  },
+  'settings.system.TASK_ROUTING_POLICY': {
+    title: 'Task Routing Policy',
+    summary: 'Scoring policy for automatic task-aware model selection.',
+    usage: 'Choose quality, cost, or local_first when TASK_ROUTING_ENABLED=true.',
+    valueNotes: ['quality prefers reasoning/quality:high; cost prefers cost:low; local_first prefers ollama/local routes.'],
+    impact: ['Changes which registered LLM capability wins when multiple candidates match.'],
+    notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_REPORT': {
+    title: 'Task Route Pin (Report)', summary: 'Optional explicit model pin for report generation.',
+    usage: 'Forces report task selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_AGENT': {
+    title: 'Task Route Pin (Agent)', summary: 'Optional explicit model pin for Agent tasks.',
+    usage: 'Forces agent task selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_VISION': {
+    title: 'Task Route Pin (Vision)', summary: 'Optional explicit model pin for vision tasks.',
+    usage: 'Forces vision task selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_MARKET_REVIEW': {
+    title: 'Task Route Pin (Market Review)', summary: 'Optional explicit model pin for market-review tasks.',
+    usage: 'Forces market-review selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CHEAP_SCAN': {
+    title: 'Task Route Pin (Cheap Scan)', summary: 'Optional explicit model pin for cheap-scan tasks.',
+    usage: 'Forces cheap-scan selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_DEEP_REASONING': {
+    title: 'Task Route Pin (Deep Reasoning)', summary: 'Optional explicit model pin for deep-reasoning tasks.',
+    usage: 'Forces deep-reasoning selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CODING': {
+    title: 'Task Route Pin (Coding)', summary: 'Optional explicit model pin for coding-oriented tasks.',
+    usage: 'Forces coding selection when set.', valueNotes: [], impact: [], notes: [],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
 
     title: 'Trust X-Forwarded-For',
