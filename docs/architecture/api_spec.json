@@ -9521,6 +9521,16 @@
             "description": "公开摘要来源：alert_trigger_market_context / analysis_history_snapshot / evaluator_snapshot / legacy_text / null",
             "title": "Analysis Visibility Source"
           },
+          "auto_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertAutoAnalysisStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "data_source": {
             "anyOf": [
               {
@@ -9662,6 +9672,16 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "suggested_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertSuggestedAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "target": {
             "title": "Target",
@@ -13729,6 +13749,16 @@
             ],
             "title": "Source Url"
           },
+          "suggested_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertSuggestedAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "what_happened": {
             "anyOf": [
               {
@@ -13798,6 +13828,131 @@
           "provenance"
         ],
         "title": "AlertImpactResult",
+        "type": "object"
+      },
+      "AlertAutoAnalysisStatus": {
+        "properties": {
+          "pipeline": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "maxLength": 64,
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "submitted": {
+            "default": false,
+            "title": "Submitted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "AlertAutoAnalysisStatus",
+        "type": "object"
+      },
+      "AlertSuggestedAction": {
+        "properties": {
+          "action_code": {
+            "maxLength": 64,
+            "title": "Action Code",
+            "type": "string"
+          },
+          "auto_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertAutoAnalysisStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deep_links": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deep Links"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "relevance": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Relevance",
+            "type": "array"
+          }
+        },
+        "required": [
+          "action_code"
+        ],
+        "title": "AlertSuggestedAction",
         "type": "object"
       },
       "ReportStructuredCommitteeConclusion": {

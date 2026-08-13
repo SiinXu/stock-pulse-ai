@@ -57,6 +57,13 @@ export function toEventAlertDisplayItem(trigger: AlertTriggerItem): EventAlertDi
     matchedCount: impactContext?.matchedCount ?? eventContext?.matchedCount ?? null,
     impactContext,
     eventContext,
+    suggestedActionLabel: trigger.suggestedAction?.label ?? null,
+    suggestedActionRationale: trigger.suggestedAction?.rationale ?? null,
+    suggestedActionLinks: trigger.suggestedAction?.deepLinks ?? null,
+    autoAnalysisStatus:
+      trigger.suggestedAction?.autoAnalysis?.status
+      ?? trigger.autoAnalysis?.status
+      ?? null,
   };
 }
 

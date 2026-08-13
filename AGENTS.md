@@ -313,3 +313,15 @@ CI passing only indicates automated checks passed; it cannot replace manual sema
 - Automatic tagging does not trigger version updates unless the commit title contains `#patch`, `#minor`, or `#major`.
 - Manual tag creation must use annotated tags.
 - User-visible changes are prioritized through PR merges and require complete label and validation documentation.
+
+## Cursor Cloud specific instructions
+
+The startup update script already installs backend deps (`.github/requirements-ci.txt`, which pulls in `requirements.txt` plus flake8/mypy/pytest tooling) and web deps (`npm ci` in `apps/dsa-web`). Standard lint/test/build/run commands live in §4 and §6 above; the notes below only cover non-obvious caveats.
+
+- Python entry-point scripts (`flake8`, `mypy`, `pytest`, `uvicorn`, …) install to `~/.local/bin`, which is not on `PATH`. Invoke tools via `python3 -m <tool>` (there is no `python` alias, only `python3`).
+- Desktop client (`apps/dsa-desktop`) deps are NOT installed by the update script (heavy Electron download, optional). Run `npm install` there yourself only when working on the desktop app.
+- Runs fully offline with no API keys or external services. Persistence is a local SQLite file auto-created at `./data/stock_analysis.db` — there is no Postgres/Redis/broker to start. Use `python3 main.py --dry-run` for a data-only pipeline run (LLM analysis needs a provider key or local Ollama).
+- The backend binds loopback only and fails closed on public binds unless `ADMIN_AUTH_ENABLED=true`. Keep `--host 127.0.0.1` in this VM.
+- Two dev services for the full web workbench: backend `python3 -m uvicorn server:app --host 127.0.0.1 --port 8000`, and Vite `npm run dev` (in `apps/dsa-web`, serves `:5173` and proxies `/api` → `127.0.0.1:8000`). Alternatively, `npm run build` emits the SPA to `/workspace/static`, which the backend serves directly at `:8000`, so the API server alone is enough for an end-to-end smoke without Vite.
+- Live market data (AkShare/YFinance) usually works; free news/search providers (e.g. SearXNG) are frequently rate-limited (HTTP 429/418/403) and degrade gracefully — these warnings are expected and do not fail the run.
+- The full offline suite (`./scripts/ci_gate.sh offline-tests`) enforces a coverage floor and is slow; for a quick backend smoke run the subset in `python-min-smoke` (`tests/test_ci_workflow.py`, `tests/test_api_schema_pydantic.py`, `tests/test_error_envelope_contract.py`). Point `DATABASE_PATH` at a temp file when running pytest to avoid touching `./data`.
