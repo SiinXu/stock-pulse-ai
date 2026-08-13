@@ -125,11 +125,20 @@ def test_audit_json_export_has_artifact_parity_and_audit_completion() -> None:
     assert audit.completions[0]["target_id"] == "42"
 
 
-def test_export_requires_admin_authentication() -> None:
+@pytest.mark.parametrize(
+    "path,error_code",
+    [
+        ("/api/v1/history/42/evidence-pack", "audit_export_auth_required"),
+        ("/api/v1/history/42/evidence-chain", "evidence_chain_auth_required"),
+        ("/api/v1/analysis/42/evidence-pack", "audit_export_auth_required"),
+        ("/api/v1/analysis/42/evidence-chain", "evidence_chain_auth_required"),
+    ],
+)
+def test_export_requires_admin_authentication(path: str, error_code: str) -> None:
     with _patch_config(), patch.object(endpoint, "is_auth_enabled", return_value=False):
-        response = _client().get("/api/v1/history/42/evidence-pack")
+        response = _client().get(path)
     assert response.status_code == 403
-    assert response.json()["error"] == "audit_export_auth_required"
+    assert response.json()["error"] == error_code
 
 
 def test_disabled_export_fails_before_history_access() -> None:

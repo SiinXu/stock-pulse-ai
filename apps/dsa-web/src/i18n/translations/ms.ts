@@ -130,6 +130,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title": "Eksport pakej audit memerlukan pengesahan pentadbir",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message": "Dayakan Eksport Pakej Audit (AUDIT_EXPORT_ENABLED) di Tetapan → Tingkah laku Agent → Pelaksanaan, simpan, kemudian cuba lagi.",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title": "Eksport pakej audit dilumpuhkan",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message": "Eksport ditolak apabila pengesahan pentadbir dilumpuhkan (HTTP 403). Dayakan pengesahan dan log masuk.",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title": "Eksport rantaian bukti memerlukan pengesahan pentadbir",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message": "Dayakan Rantaian Bukti (EVIDENCE_CHAIN_ENABLED) di Tetapan → Tingkah laku Agent → Pelaksanaan, simpan, kemudian cuba lagi.",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title": "Rantaian bukti dilumpuhkan",
   "locales.evidencePackExport.EVIDENCE_PACK_EXPORT_TEXT.exportAuditPackageZip": "Eksport pakej audit (ZIP)",

@@ -130,6 +130,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title": "Der Export des Audit-Pakets erfordert eine Administratorauthentifizierung",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message": "Aktivieren Sie unter Einstellungen → Agentenverhalten → Ausführung den Audit-Paket-Export (AUDIT_EXPORT_ENABLED), speichern Sie und versuchen Sie es erneut.",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title": "Der Audit-Paket-Export ist deaktiviert",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message": "Bei deaktivierter Administratorauthentifizierung ist der Export nicht möglich (HTTP 403). Authentifizierung aktivieren und anmelden.",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title": "Der Export der Beweiskette erfordert eine Administratorauthentifizierung",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message": "Aktivieren Sie unter Einstellungen → Agentenverhalten → Ausführung die Beweiskette (EVIDENCE_CHAIN_ENABLED), speichern Sie und versuchen Sie es erneut.",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title": "Die Beweiskette ist deaktiviert",
   "locales.evidencePackExport.EVIDENCE_PACK_EXPORT_TEXT.exportAuditPackageZip": "Audit-Paket exportieren (ZIP)",

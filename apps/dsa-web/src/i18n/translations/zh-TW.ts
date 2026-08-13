@@ -130,6 +130,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title": "可稽核報告包匯出需要管理員認證",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message": "請在設定 → Agent 行為 → 執行中開啟「可稽核報告包匯出」（AUDIT_EXPORT_ENABLED），儲存後重試。",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title": "可稽核報告包匯出未啟用",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message": "管理員認證未啟用時無法匯出證據鏈（HTTP 403）。請先啟用認證並登入。",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title": "證據鏈匯出需要管理員認證",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message": "請在設定 → Agent 行為 → 執行中開啟「證據鏈」（EVIDENCE_CHAIN_ENABLED），儲存後重試。",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title": "證據鏈未啟用",
   "locales.evidencePackExport.EVIDENCE_PACK_EXPORT_TEXT.exportAuditPackageZip": "匯出可稽核報告包 (ZIP)",

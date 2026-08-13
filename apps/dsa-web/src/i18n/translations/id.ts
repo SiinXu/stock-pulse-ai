@@ -130,6 +130,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title": "Ekspor paket audit memerlukan autentikasi administrator",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message": "Aktifkan Ekspor Paket Audit (AUDIT_EXPORT_ENABLED) di Pengaturan → Perilaku Agent → Eksekusi, simpan, lalu coba lagi.",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title": "Ekspor paket audit dinonaktifkan",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message": "Ekspor ditolak saat autentikasi administrator nonaktif (HTTP 403). Aktifkan autentikasi dan masuk.",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title": "Ekspor rantai bukti memerlukan autentikasi administrator",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message": "Aktifkan Rantai Bukti (EVIDENCE_CHAIN_ENABLED) di Pengaturan → Perilaku Agent → Eksekusi, simpan, lalu coba lagi.",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title": "Rantai bukti dinonaktifkan",
   "locales.evidencePackExport.EVIDENCE_PACK_EXPORT_TEXT.exportAuditPackageZip": "Ekspor paket audit (ZIP)",

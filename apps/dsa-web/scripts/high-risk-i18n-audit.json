@@ -148,9 +148,9 @@
   },
   "keyInventory": {
     "path": "apps/dsa-web/scripts/high-risk-i18n-keys.json",
-    "count": 353,
-    "sha256": "a8f3472ea9ab2f3ea388ae537eb7c11dace7d6cd6a937c31a3394720d5d75763",
-    "keySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe",
+    "count": 361,
+    "sha256": "7d53bce96e1c1ab67efcf7c8e5ff054df48376a8989ad236a8e95a5831e55631",
+    "keySetSha256": "3a0db998104bc840b2a0b419dfd07a825e4b7f90ec83179a2cba270353147be0",
     "decisionLinkedCount": 95
   },
   "reviewPasses": [
@@ -160,9 +160,9 @@
       "reviewer": "issue-882-worker@stock-pulse-ai",
       "reviewedAt": "2026-08-12",
       "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
-      "summary": "353 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "summary": "361 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording, including evidence-chain and audit-package export error copy. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
       "claimsNativeApproval": false,
-      "keyCount": 353,
+      "keyCount": 361,
       "categoryConclusions": [
         {
           "category": "trading_action",
@@ -195,7 +195,7 @@
           "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
         }
       ],
-      "inventoryKeySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe"
+      "inventoryKeySetSha256": "3a0db998104bc840b2a0b419dfd07a825e4b7f90ec83179a2cba270353147be0"
     }
   ],
   "languageReview": {
@@ -574,19 +574,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 150,
-        "keySetSha256": "bfd2bb4dd41363a477d86d9acc49afa89e2538c39870a068a6fa66d6072d6974",
+        "keyCount": 152,
+        "keySetSha256": "03c38f69eae7157314ebc70a15c7f6a916b2d96aefb4f683dd44e0817e353243",
         "bundleSha256": {
-          "zh": "d0a5ca80e3eba46da02fb143dac3f652401f4fa2c069b3f5a2bf4f930e8a67e6",
-          "zh-TW": "9397f2544698b7739703c442c1fd8876931767ab838d8c57e1931dd8d3367f5e",
-          "en": "d7bbd7c6064062912702744f24ee43ce62d31031d5a7ce7e95433a3b99839793",
-          "ja": "371dbbc4c5da551e63848a95ca3ce391a0763eae2308e671fa5618ebf3601223",
-          "ko": "1ec4168664b9cbd25a9a47eebbed604eade3eff2922002dd1b585c1b0a3182ba",
-          "de": "45923f9d1d1b25dc6124103d32ae75d857fff6442e6101c2f11bd5437439f431",
-          "es": "70a397c385f9590558387db9ac4ea9cd76be21d264badf5f790c3bd1e79589d0",
-          "ms": "56c26d0aba3115c71756fc0a16312b701f55e944156b3f5a550b866c1a339bee",
-          "fr": "1b3dc02b9fd31fc038f72112b3464f922e4fc247f6f818bd91c6639f55839bf7",
-          "id": "2ac6f157d4ac1ce346f0a66fb7e6ed13a0fda59f955b9765ff2435f763cab3d1"
+          "zh": "92fe8587d93c39ba261d632bb6057cd7ce0c41b3cdbd3833a3e23bffa3ce2108",
+          "zh-TW": "7152e6fdfede999d346f3dbfbecebf460e8e22bd393a6523c7413f512e943c75",
+          "en": "18ca88eb3b3ce7f7491dc2104795db7ccc39bfccbd244c6399ea358bf92c0cbc",
+          "ja": "fd75e0732cf8cb51ae9c865bece4ca29c33501a38cde8e93dc19523cada690ec",
+          "ko": "a9faebdf31780c0e5971932e2f1fccebd50308c6ff7c633ebe30f83383e61443",
+          "de": "1923ebe3d935af63079503cb3ca84d896d1960ba31eeed60f8b5ee8872c3bee4",
+          "es": "38288825ebf8ebff0b729906589fb00019c0c9b3f598a0f52aea7b24a2498e31",
+          "ms": "3356f40174e95c64ae1c313bd9ccdec18a22a85865816c2c6957bc1b4610d018",
+          "fr": "83f559af5be5a65116d7b75033ebd183bd554439347231cdad2a3f90b19729eb",
+          "id": "e5588ab94245d8808838fd6045add801bd4aee27e571925f0ec666e796b78038"
         }
       }
     },
@@ -721,6 +721,7 @@
         "duplicate_task",
         "empty_stock_code",
         "env_backup_access_denied",
+        "evidence_chain_auth_required",
         "evidence_chain_disabled",
         "file_too_large",
         "idempotency_conflict",
@@ -856,6 +857,10 @@
         "env_backup_access_denied": [
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title",
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"
+        ],
+        "evidence_chain_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message"
         ],
         "evidence_chain_disabled": [
           "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title",

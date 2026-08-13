@@ -130,6 +130,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title": "監査パッケージのエクスポートには管理者認証が必要です",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message": "設定 → Agent 動作 → 実行で「監査パッケージのエクスポート」（AUDIT_EXPORT_ENABLED）を有効にし、保存してから再試行してください。",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title": "監査パッケージのエクスポートは無効です",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message": "管理者認証が無効のときは証拠チェーンをエクスポートできません（HTTP 403）。認証を有効にしてログインしてください。",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title": "証拠チェーンのエクスポートには管理者認証が必要です",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message": "設定 → Agent 動作 → 実行で「証拠チェーン」（EVIDENCE_CHAIN_ENABLED）を有効にし、保存してから再試行してください。",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title": "証拠チェーンは無効です",
   "locales.evidencePackExport.EVIDENCE_PACK_EXPORT_TEXT.exportAuditPackageZip": "監査パッケージをエクスポート (ZIP)",

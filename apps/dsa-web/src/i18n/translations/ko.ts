@@ -130,6 +130,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title": "감사 패키지 내보내기에는 관리자 인증이 필요합니다",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message": "설정 → Agent 동작 → 실행에서 감사 패키지 내보내기(AUDIT_EXPORT_ENABLED)를 켜고 저장한 뒤 다시 시도하세요.",
   "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title": "감사 패키지 내보내기가 비활성화되어 있습니다",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message": "관리자 인증이 꺼져 있으면 증거 체인을 내보낼 수 없습니다(HTTP 403). 인증을 켠 뒤 로그인하세요.",
+  "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title": "증거 체인 내보내기에는 관리자 인증이 필요합니다",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message": "설정 → Agent 동작 → 실행에서 증거 체인(EVIDENCE_CHAIN_ENABLED)을 켜고 저장한 뒤 다시 시도하세요.",
   "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title": "증거 체인이 비활성화되어 있습니다",
   "locales.evidencePackExport.EVIDENCE_PACK_EXPORT_TEXT.exportAuditPackageZip": "감사 패키지 내보내기 (ZIP)",

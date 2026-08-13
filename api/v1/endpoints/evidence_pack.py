@@ -67,10 +67,9 @@ def _audit_target_id(record_id: str) -> str:
     return f"sha256:{hashlib.sha256(record_id.encode('utf-8')).hexdigest()[:24]}"
 
 
-def _require_export_access(request: Request) -> None:
+def _require_export_access(request: Request, *, auth_required_code: str, auth_required_message: str) -> None:
     if not is_auth_enabled():
-        raise api_error(403, "audit_export_auth_required",
-                        "Audit package export requires enabled administrator authentication")
+        raise api_error(403, auth_required_code, auth_required_message)
     session_cookie = request.cookies.get(COOKIE_NAME)
     if not session_cookie or not verify_session(session_cookie):
         raise api_error(401, "unauthorized", "Administrator authentication required")
@@ -128,7 +127,11 @@ def export_evidence_chain(
     config = get_application_services().config
     if not is_evidence_chain_enabled(config):
         raise api_error(404, "evidence_chain_disabled", "Evidence chain is not enabled")
-    _require_export_access(request)
+    _require_export_access(
+        request,
+        auth_required_code="evidence_chain_auth_required",
+        auth_required_message="Evidence chain export requires enabled administrator authentication",
+    )
     correlation_id = SecurityAuditService.new_correlation_id()
     action = "evidence_chain.export"
     _record_export_audit(security_audit, phase="attempt", correlation_id=correlation_id,
@@ -201,7 +204,11 @@ def export_audit_package(
     config = get_application_services().config
     if not is_audit_export_enabled(config):
         raise api_error(404, "audit_export_disabled", "Audit package export is not enabled")
-    _require_export_access(request)
+    _require_export_access(
+        request,
+        auth_required_code="audit_export_auth_required",
+        auth_required_message="Audit package export requires enabled administrator authentication",
+    )
     correlation_id = SecurityAuditService.new_correlation_id()
     action = "audit_package.export"
     _record_export_audit(security_audit, phase="attempt", correlation_id=correlation_id,

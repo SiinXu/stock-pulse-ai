@@ -70,6 +70,16 @@ export const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '证据链未启用', message: '请在设置 → Agent 行为 → 执行中开启「证据链」（EVIDENCE_CHAIN_ENABLED），保存后重试。' },
     en: { title: 'Evidence chain is disabled', message: 'Enable Evidence Chain (EVIDENCE_CHAIN_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.' },
   }),
+  evidence_chain_auth_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required", {
+    zh: {
+      title: '证据链导出需要管理员认证',
+      message: '管理员认证未启用时无法导出证据链（HTTP 403）。请先启用认证并登录。',
+    },
+    en: {
+      title: 'Evidence chain export requires administrator authentication',
+      message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.',
+    },
+  }),
   audit_export_auth_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.audit_export_auth_required", {
     zh: { title: '可审计报告包导出需要管理员认证', message: '管理员认证未启用时无法导出可审计报告包（HTTP 403）。请先启用认证并登录。' },
     en: { title: 'Audit package export requires administrator authentication', message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.' },
