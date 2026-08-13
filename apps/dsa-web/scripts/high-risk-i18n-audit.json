@@ -148,9 +148,9 @@
   },
   "keyInventory": {
     "path": "apps/dsa-web/scripts/high-risk-i18n-keys.json",
-    "count": 353,
-    "sha256": "a8f3472ea9ab2f3ea388ae537eb7c11dace7d6cd6a937c31a3394720d5d75763",
-    "keySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe",
+    "count": 359,
+    "sha256": "27b27520ae82fa614a844836bad550d30f03a14335cc34f7009009819c2e9160",
+    "keySetSha256": "a7e8cb353bb8949f95b8f813b26bcdde3c813bbc7c8810853a9120f9b8b709e8",
     "decisionLinkedCount": 95
   },
   "reviewPasses": [
@@ -160,9 +160,9 @@
       "reviewer": "issue-882-worker@stock-pulse-ai",
       "reviewedAt": "2026-08-12",
       "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
-      "summary": "353 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "summary": "359 high-risk keys annotated. The six added research-pack error title/message keys accurately preserve fail-closed administrator-authentication, feature-gate, and archive-size-limit behavior. 95 keys remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. The PR's existing identical-to-English baseline entries remain explicit; this merge-resolution pass did not expand them.",
       "claimsNativeApproval": false,
-      "keyCount": 353,
+      "keyCount": 359,
       "categoryConclusions": [
         {
           "category": "trading_action",
@@ -187,7 +187,7 @@
         {
           "category": "error",
           "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
-          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained; locale naturalness remains PENDING_NATIVE_REVIEW."
+          "notes": "Stable error title/message pairs keep internal codes separate from display copy. The six research-pack pairs explicitly explain disabled authentication, a disabled export gate, and the configured size limit without implying success or silently bypassing refusal. Product source retained; locale naturalness remains PENDING_NATIVE_REVIEW."
         },
         {
           "category": "disclaimer",
@@ -195,7 +195,7 @@
           "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
         }
       ],
-      "inventoryKeySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe"
+      "inventoryKeySetSha256": "a7e8cb353bb8949f95b8f813b26bcdde3c813bbc7c8810853a9120f9b8b709e8"
     }
   ],
   "languageReview": {
@@ -574,19 +574,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 144,
-        "keySetSha256": "c74f46787bcd2c9a81c3ffd6bdfae37d394d1f64354ada0a08521e3b71bd58e6",
+        "keyCount": 150,
+        "keySetSha256": "8a7dfcfa4c3333574764cd1c10a899df42dc5a2f97d684c19348f29c29ee4caa",
         "bundleSha256": {
-          "zh": "5c8724b9086c3c96d8fc7f0cf8101c06a795c49b3c9072580daa0ff93e751b1a",
-          "zh-TW": "45554a100c380a9317b1b891d7e39c54b4fb455e5571bbf57c42e38f64ac0d5a",
-          "en": "7a6c37b92c2f31a758cae274d04d8f3a28216abe42c7b8fd47669d339b298b25",
-          "ja": "833779af9a006c1d707139f7648abf99bf8c7d5233d8220a2b750117f4c84e39",
-          "ko": "c9a43f1f64f541e291e56288fec3eeaa1c242d6bdc48b879c21bdee39c2a4b2a",
-          "de": "61656d9d7715fb2677f5fef5107b86de0b54ad49f1e779e146ff44afc952cfe6",
-          "es": "cf61cba12a7e7ec6e3f90520b187b7202c49274dd7206bb942555e4ad6441ecb",
-          "ms": "151c0303a6191efdf76f038bbfdc245c1dab959f1bebeb5156cffe6c2104f506",
-          "fr": "e580b2021d2651bbb119d0720ffea029b81483d1459e35e2317e09c8f628a9d3",
-          "id": "ae147ede7a1d250bdf7f04194cd6f29ec695d05265a650c25013ecc32b155155"
+          "zh": "c21c55793753b4ef8f5bd8f9f403f5efd034b5bc3a23ea9564538c1c6fa3cf1e",
+          "zh-TW": "2107abfcef8822a2d07760ad537fbd3d618767e76f963b5cb1f68f5196095f4b",
+          "en": "68bfe7daeabc1d799b96d028cc605a89615360606ba27a32d501981ed3756476",
+          "ja": "36d41252f2d4273cdba665c867e87bbefa302fa5f1cc0ead79df9be1f70aab1f",
+          "ko": "34cd6440d76863751daa184962303cac8ed514c169e6b896df4a34cb0ae50d1b",
+          "de": "7aa8d8437fe34e563b78b753143ef90ec15b4017e263d0964a11de00fde4df05",
+          "es": "64268609cff8bc4724fa6b6149ea460a6b458febc794948957a613f90de713c9",
+          "ms": "a7abe3e2719acf3866c69c20e4bb684e655e6257eed75fac11a198aa015a85bd",
+          "fr": "73c4abb3451eef358db9874a94c1ad739dbcd11d803b52495675a6c53f67f2a7",
+          "id": "2b77ddbbdd9138fc68d75242d80499b86d28176047eb3f32955f6a9c41505267"
         }
       }
     },
@@ -743,6 +743,9 @@
         "rate_limited",
         "reasoning_trace_auth_required",
         "reasoning_trace_export_disabled",
+        "research_pack_auth_required",
+        "research_pack_export_disabled",
+        "research_pack_limit_exceeded",
         "rollback_unavailable",
         "scheduler_busy",
         "security_audit_auth_required",
@@ -941,6 +944,18 @@
         "reasoning_trace_export_disabled": [
           "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.title",
           "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.message"
+        ],
+        "research_pack_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.message"
+        ],
+        "research_pack_export_disabled": [
+          "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message"
+        ],
+        "research_pack_limit_exceeded": [
+          "api.error.STABLE_ERROR_TEXT.research_pack_limit_exceeded.title",
+          "api.error.STABLE_ERROR_TEXT.research_pack_limit_exceeded.message"
         ],
         "rollback_unavailable": [
           "api.error.STABLE_ERROR_TEXT.rollback_unavailable.title",

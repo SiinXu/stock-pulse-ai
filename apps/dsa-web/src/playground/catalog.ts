@@ -162,6 +162,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'market-review-report-view', 'MarketReviewReportView', 'components/report/MarketReviewReportView.tsx', ['default', 'loading', 'error']),
   entry('reports', 'market-structure-card', 'MarketStructureCard', 'components/report/MarketStructureCard.tsx', ['default', 'empty']),
   entry('reports', 'reasoning-trace-export-controls', 'ReasoningTraceExportControls', 'components/report/ReasoningTraceExportControls.tsx', ['default', 'states']),
+  entry('reports', 'research-pack-export-controls', 'ResearchPackExportControls', 'components/report/ResearchPackExportControls.tsx', ['default', 'states']),
   entry('reports', 'report-decision-card', 'ReportDecisionCard', 'components/report/ReportDecisionCard.tsx', ['default', 'empty']),
   entry('reports', 'report-risk-gate-banner', 'ReportRiskGateBanner', 'components/report/ReportRiskGateBanner.tsx', ['default', 'empty']),
   entry('reports', 'report-details', 'ReportDetails', 'components/report/ReportDetails.tsx', ['interactive', 'empty']),

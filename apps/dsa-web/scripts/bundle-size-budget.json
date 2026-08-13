@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 242114,
-      "measuredGzipBytes": 241714,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution inventory changes, with 400 B headroom."
+      "maxGzipBytes": 242812,
+      "measuredGzipBytes": 242412,
+      "note": "Combined local production-build measurement after current main API/UI additions and research asset pack (PR #1262), with 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 157947,
-      "measuredGzipBytes": 157247,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 159523,
+      "measuredGzipBytes": 158823,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151228,
-      "measuredGzipBytes": 150528,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 152707,
+      "measuredGzipBytes": 152007,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151114,
-      "measuredGzipBytes": 150414,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 152666,
+      "measuredGzipBytes": 151966,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 150955,
-      "measuredGzipBytes": 150355,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 600 B headroom."
+      "maxGzipBytes": 152483,
+      "measuredGzipBytes": 151783,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 146787,
-      "measuredGzipBytes": 146087,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 148286,
+      "measuredGzipBytes": 147586,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 143593,
-      "measuredGzipBytes": 142893,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 145202,
+      "measuredGzipBytes": 144502,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 136900,
-      "measuredGzipBytes": 136200,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 138385,
+      "measuredGzipBytes": 137685,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 136987,
-      "measuredGzipBytes": 136287,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 138464,
+      "measuredGzipBytes": 137764,
+      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
     },
     {
       "id": "vendor-charts",
