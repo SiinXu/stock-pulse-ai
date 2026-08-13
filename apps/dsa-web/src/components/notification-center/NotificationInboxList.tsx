@@ -1,6 +1,15 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Activity, Bell, CheckCheck, FlaskConical, TriangleAlert } from 'lucide-react';
+import {
+  Activity,
+  Bell,
+  CheckCheck,
+  FlaskConical,
+  HeartPulse,
+  Newspaper,
+  Split,
+  TriangleAlert,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import {
@@ -16,6 +25,9 @@ function kindIcon(kind: NotificationInboxItem['kind']) {
   if (kind === 'alert_triggered') return TriangleAlert;
   if (kind === 'decision_signal') return Activity;
   if (kind === 'analysis_complete') return FlaskConical;
+  if (kind === 'daily_brief') return Newspaper;
+  if (kind === 'high_disagreement') return Split;
+  if (kind === 'portfolio_health') return HeartPulse;
   return Bell;
 }
 

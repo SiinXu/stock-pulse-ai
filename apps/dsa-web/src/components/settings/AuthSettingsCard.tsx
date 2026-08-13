@@ -114,7 +114,7 @@ export const AuthSettingsCard: React.FC = () => {
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
-        <div className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface-hover)]">
+        <div className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] density-surface-pad-sm transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface-hover)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">{t('settings.authStatus')}</p>
@@ -125,7 +125,7 @@ export const AuthSettingsCard: React.FC = () => {
               disabled={isSubmitting}
               label={desiredEnabled ? t('common.enabled') : t('common.disabled')}
               onChange={(event) => setDesiredEnabled(event.target.checked)}
-              containerClassName="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-3 py-1.5 shadow-soft-card transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface)]"
+              containerClassName="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-3 py-1.5 transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface)]"
             />
           </div>
         </div>

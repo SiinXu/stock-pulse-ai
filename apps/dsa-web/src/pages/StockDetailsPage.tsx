@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
 import { BellPlus, GitCompareArrows, LineChart as LineChartIcon, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { stocksApi } from '../api/stocks';
 import { systemConfigApi } from '../api/systemConfig';
@@ -9,6 +10,7 @@ import { KlineChart } from '../components/charts';
 import {
   ApiErrorAlert,
   AppPage,
+  Badge,
   Button,
   Card,
   DataTable,
@@ -21,7 +23,7 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
-import { DcfSensitivityPanel } from '../components/valuation';
+import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
 import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -39,6 +41,7 @@ import type {
 } from '../types/stocks';
 import { aggregateCandles, summarizeCandles } from '../utils/klineAggregate';
 import {
+  APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
   buildReportVersionCompareHref,
@@ -48,6 +51,7 @@ import { normalizeStockCode } from '../utils/stockCode';
 import {
   changeColorCssVar,
   changeSemantics,
+  formatMarketBadge,
   formatMarketTime,
   formatPrice,
   formatSignedChangeAmount,
@@ -113,6 +117,12 @@ const StockDetailsPage: React.FC = () => {
   const { stockCode: rawParam = '' } = useParams<{ stockCode: string }>();
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.stockDetails,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
 
   const decodedParam = useMemo(() => {
     try {
@@ -318,7 +328,11 @@ const StockDetailsPage: React.FC = () => {
   if (!canonicalCode) {
     return (
       <AppPage>
-        <PageHeader title={t('stocks.workspace.title')} description={t('stocks.workspace.description')} />
+        <PageHeader
+          ref={pageHeadingRef}
+          title={t('stocks.workspace.title')}
+          description={t('stocks.workspace.description')}
+        />
         <EmptyState
           title={t('stocks.workspace.invalidTitle')}
           description={t('stocks.workspace.invalidDescription')}
@@ -329,6 +343,7 @@ const StockDetailsPage: React.FC = () => {
   }
 
   const quoteName = quote?.stockName?.trim();
+  const marketBadge = formatMarketBadge(marketId);
 
   const quoteChangeSemantics = marketId
     ? changeSemantics(quote?.change, marketId, changeColorPref)
@@ -361,6 +376,7 @@ const StockDetailsPage: React.FC = () => {
     <AppPage className="max-w-none">
       <div className="space-y-5">
         <PageHeader
+          ref={pageHeadingRef}
           eyebrow={quoteName ? canonicalCode : undefined}
           title={quoteName || canonicalCode}
           description={t('stocks.workspace.description')}
@@ -426,6 +442,17 @@ const StockDetailsPage: React.FC = () => {
             <Loading />
           ) : quote ? (
             <div className="space-y-3">
+              {marketBadge ? (
+                <Badge
+                  variant="info"
+                  size="sm"
+                  className="font-mono shadow-none"
+                  aria-label={t('stocks.workspace.marketBadgeAria', { code: marketBadge })}
+                  data-testid="stock-details-market-badge"
+                >
+                  {marketBadge}
+                </Badge>
+              ) : null}
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="text-3xl font-semibold text-foreground">
                   {formatPriceCell(quote.currentPrice, marketId, language)}
@@ -563,6 +590,10 @@ const StockDetailsPage: React.FC = () => {
 
         <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
           <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
+        </section>
+
+        <section aria-label={valuationText.peerTitle} data-testid="stock-details-peer-canvas-section">
+          <PeerValuationCanvas key={`peer-${canonicalCode}`} stockCode={canonicalCode} />
         </section>
       </div>
     </AppPage>

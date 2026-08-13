@@ -1,8 +1,13 @@
+---
+name: run-verification
+description: Select and execute this repository's verification matrix by change scope, with red-test baseline attribution against origin/main.
+---
+
 # Run Verification
 
 Select and execute this repository's verification matrix based on change scope, and output a structured verification report (executed / not executed / pre-existing failures / new failures). This is the executable form of `AGENTS.md` §6.
 
-**Source of truth**: repository root `AGENTS.md`. If the matrix here drifts, `AGENTS.md` and the actual CI workflows win.
+**Source of truth**: repository root `AGENTS.md`. If the matrix here drifts, `AGENTS.md` and the actual CI workflows win. Recipes: `.claude/skills/references/test-command-recipes.md`. Config guard: `.claude/skills/references/hard-rules.md` §2.
 
 ## Usage
 
@@ -39,6 +44,16 @@ git diff --name-only origin/main...HEAD
 python -m py_compile <changed_python_files>
 python -m pytest -m "not network" <relevant test paths>
 ```
+
+When the diff touches `.env.example`, `src/core/config_registry*`, Settings help, or documented env keys, **also** run:
+
+```bash
+python scripts/check_config_doc_consistency.py
+python -m pytest tests/core/test_env_example_config_registry_guard.py -q
+```
+
+Never expand the unregistered-debt baseline / ceiling to green CI — register the key instead (hard-rules §2).
+
 
 **web**:
 
@@ -117,7 +132,9 @@ Worktree tip: symlink `node_modules` into the worktree (`ln -s <repo>/apps/dsa-w
 
 ## Division of labor vs existing skills
 
-- This skill owns only "how to run verification and attribute results". The development flow lives in `develop-feature`; PR review lives in `analyze-pr` (both reference this skill for their verification step instead of keeping matrix copies).
+- This skill owns only "how to run verification and attribute results".
+- `test-change` is the issue #890 entry name and pre-PR evidence checklist; it **delegates** execution here.
+- Development flow: `develop-feature` / `fix-issue`. Review: `review-pr` / `analyze-pr`.
 
 ## Allowed Auto-Actions (No Confirmation Needed)
 

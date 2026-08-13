@@ -223,6 +223,34 @@
   /* Shadows (using HSL format) */
   --shadow-soft-card: 0 1px 2px hsl(var(--neutral-black) / 0.04);
   --shadow-soft-card-strong: 0 2px 6px hsl(var(--neutral-black) / 0.06);
+  /* Elevation roles (#878): overlays/poppers share semantic soft elevation only. */
+  --shadow-elevation-overlay: var(--shadow-soft-card-strong);
+  --shadow-elevation-popper: var(--shadow-soft-card-strong);
+
+  /*
+   * Density scale (#877 D5): product-wide spacing tokens.
+   * comfortable is the default; [data-density="compact"] tightens structural gaps.
+   * Do not invent page-local spacing scales for section/stack/tool chrome.
+   */
+  --density-space-1: 0.25rem;
+  --density-space-2: 0.5rem;
+  --density-space-3: 0.75rem;
+  --density-space-4: 1rem;
+  --density-space-5: 1.25rem;
+  --density-space-6: 1.5rem;
+  --density-space-8: 2rem;
+  --density-tool-gap: var(--density-space-2);
+  --density-inline-gap: var(--density-space-2);
+  --density-stack-gap: var(--density-space-4);
+  --density-header-gap: var(--density-space-4);
+  --density-section-gap: var(--density-space-6);
+  --density-page-gap: var(--density-space-6);
+  --density-surface-pad-sm: var(--density-space-4);
+  --density-surface-pad-md: var(--density-space-5);
+  --density-surface-pad-lg: var(--density-space-6);
+  --density-overlay-pad-x: var(--density-space-5);
+  --density-overlay-pad-y: var(--density-space-4);
+
   --settings-surface: hsl(var(--neutral-white) / 0.97);
   --settings-surface-hover: hsl(80 7% 95% / 0.99);
   --settings-surface-strong: hsl(var(--neutral-white) / 0.99);
@@ -298,6 +326,17 @@
   --login-hint-text: hsl(74 4% 45% / 0.9);
   --login-input-icon: hsl(74 5% 42% / 0.86);
   --login-input-toggle-ring: hsl(var(--primary) / 0.22);
+}
+
+/* Compact density override (opt-in via data-density on a region or document). */
+[data-density="compact"] {
+  --density-space-1: 0.125rem;
+  --density-space-2: 0.375rem;
+  --density-space-3: 0.5rem;
+  --density-space-4: 0.75rem;
+  --density-space-5: 1rem;
+  --density-space-6: 1.25rem;
+  --density-space-8: 1.5rem;
 }
 
 .dark {
@@ -470,6 +509,8 @@
   /* Shadows (Dark theme) */
   --shadow-soft-card: 0 1px 2px hsl(var(--neutral-black) / 0.25);
   --shadow-soft-card-strong: 0 2px 8px hsl(var(--neutral-black) / 0.35);
+  --shadow-elevation-overlay: var(--shadow-soft-card-strong);
+  --shadow-elevation-popper: var(--shadow-soft-card-strong);
   --settings-surface: hsl(var(--neutral-white) / 0.02);
   --settings-surface-hover: hsl(var(--neutral-white) / 0.05);
   --settings-surface-strong: hsl(var(--card) / 0.92);
@@ -1201,8 +1242,8 @@ a {
     transition: opacity 0.15s ease;
   }
 
-  .group\/message:hover .chat-message-actions,
-  .group\/message:focus-within .chat-message-actions {
+  .chat-message:hover .chat-message-actions,
+  .chat-message:focus-within .chat-message-actions {
     pointer-events: auto;
     opacity: 1;
   }
@@ -1318,9 +1359,8 @@ a {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  border-radius: 0.75rem;
-  border: 1px solid transparent;
-  padding: 0.42rem 0.6rem;
+  border: 0;
+  padding: 0.25rem 0;
   font-size: 0.75rem;
   line-height: 1.45;
   transition:
@@ -1350,8 +1390,7 @@ a {
 .chat-progress-item-thinking,
 .chat-progress-item-tool,
 .chat-progress-item-generating {
-  border-color: hsl(var(--primary) / 0.12);
-  background: hsl(var(--primary) / 0.05);
+  background: transparent;
   color: hsl(var(--secondary-text));
 }
 
@@ -1363,8 +1402,7 @@ a {
 }
 
 .chat-progress-item-success {
-  border-color: hsl(var(--success) / 0.18);
-  background: hsl(var(--success) / 0.08);
+  background: transparent;
   color: hsl(var(--success));
 }
 
@@ -1374,8 +1412,7 @@ a {
 }
 
 .chat-progress-item-danger {
-  border-color: hsl(var(--destructive) / 0.18);
-  background: hsl(var(--destructive) / 0.08);
+  background: transparent;
   color: hsl(var(--destructive));
 }
 
@@ -1791,6 +1828,65 @@ a {
   box-shadow: var(--shadow-soft-card-strong);
 }
 
+.shadow-elevation-overlay {
+  box-shadow: var(--shadow-elevation-overlay);
+}
+
+.shadow-elevation-popper {
+  box-shadow: var(--shadow-elevation-popper);
+}
+
+/* Density structural utilities (#877) — prefer these over inventing page-local scales. */
+.density-surface-pad-sm {
+  padding: var(--density-surface-pad-sm);
+}
+
+.density-surface-pad-md {
+  padding: var(--density-surface-pad-md);
+}
+
+.density-surface-pad-lg {
+  padding: var(--density-surface-pad-lg);
+}
+
+.density-gap-tools {
+  gap: var(--density-tool-gap);
+}
+
+.density-gap-inline {
+  gap: var(--density-inline-gap);
+}
+
+.density-gap-stack {
+  gap: var(--density-stack-gap);
+}
+
+.density-gap-header {
+  gap: var(--density-header-gap);
+}
+
+.density-gap-section {
+  gap: var(--density-section-gap);
+}
+
+.density-gap-page {
+  gap: var(--density-page-gap);
+}
+
+.density-overlay-pad {
+  padding: var(--density-overlay-pad-y) var(--density-overlay-pad-x);
+}
+
+.density-overlay-pad-x {
+  padding-left: var(--density-overlay-pad-x);
+  padding-right: var(--density-overlay-pad-x);
+}
+
+.density-overlay-pad-y {
+  padding-top: var(--density-overlay-pad-y);
+  padding-bottom: var(--density-overlay-pad-y);
+}
+
 .settings-surface {
   background: var(--settings-surface);
 }
@@ -2156,7 +2252,7 @@ a {
 .chat-bubble-ai {
   background-color: var(--chat-bubble-ai-bg);
   color: hsl(var(--secondary-text) / 0.94);
-  border: 1px solid var(--chat-bubble-ai-border);
+  border: 0;
   border-radius: 1rem;
   border-top-left-radius: 0.125rem;
 }
@@ -2286,32 +2382,6 @@ a {
 .quick-question-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-/* Skill description tooltip */
-.skill-desc-tooltip {
-  position: absolute;
-  left: 0;
-  bottom: 100%;
-  margin-bottom: 0.5rem;
-  z-index: 50;
-  width: 16rem;
-  padding: 0.625rem;
-  border-radius: 0.5rem;
-  background: hsl(var(--elevated));
-  border: 1px solid var(--border);
-  box-shadow: 0 18px 48px hsl(var(--neutral-black) / 0.22);
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--text-secondary-text);
-  pointer-events: none;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.skill-desc-tooltip .skill-title {
-  font-weight: 500;
-  color: hsl(var(--foreground));
-  margin-bottom: 0.25rem;
 }
 
 /* Session item styles */

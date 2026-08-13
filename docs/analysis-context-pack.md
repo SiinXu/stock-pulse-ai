@@ -60,6 +60,7 @@ P1 Block Catalog：
 | `technical` | 技术指标、量价结构和形态 | P1 不生成指标。 |
 | `fundamentals` | 估值、成长、盈利、财报和股东回报 | P1 不新增基本面 fetcher。 |
 | `news` | 新闻、公告、舆情和催化事件输入 | P1 不改变新闻搜索。 |
+| `sentiment` | 基于已接入新闻/事件源的情绪评分证据（#179） | 辅助 block：`role=evidence`，不进入核心 data_quality 加权；不新增外部源。详见 [情绪分析管线](sentiment-analysis-pipeline.md)。 |
 | `portfolio` | 是否持仓、账户摘要、成本、数量、仓位和 stale 摘要 | P1 不纳入交易流水、现金流水或完整账户隐私数据。 |
 | `chip` / `capital_flow` | 筹码、资金流和主力行为 | 后续扩展键，P1 只允许契约表达。 |
 | `events` / `market_context` | 风险事件、市场宽度、指数、板块和热点环境 | 后续扩展键，不把 `market_review` / `market_light` 作为首版单股 pack。 |

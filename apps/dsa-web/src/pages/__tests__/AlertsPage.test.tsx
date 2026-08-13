@@ -3,6 +3,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import type { ReactElement, ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import AlertsPage from '../AlertsPage';
 import { createDeferred, chooseOption } from '../../test-utils';
 import { createParsedApiError, createApiError } from '../../api/error';
@@ -23,12 +27,19 @@ function wrapWithQueryClient(ui: ReactElement): ReactElement {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 function renderAlertsPage(ui: ReactNode = <AlertsPage />, initialPath = '/alerts') {
   window.history.pushState({}, '', initialPath);
   return render(wrapWithQueryClient(
-    <BrowserRouter>
-      {ui}
-    </BrowserRouter>,
+    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+      <BrowserRouter>
+        {ui}
+      </BrowserRouter>
+    </RouteFocusRegistrationContext.Provider>,
   ));
 }
 
