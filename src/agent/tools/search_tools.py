@@ -148,6 +148,7 @@ search_stock_news_tool = ToolDefinition(
     handler=_handle_search_stock_news,
     category="search",
     policy=_NEWS_READ_POLICY,
+    enforce_contract=True,
 )
 
 
@@ -223,6 +224,7 @@ search_comprehensive_intel_tool = ToolDefinition(
     handler=_handle_search_comprehensive_intel,
     category="search",
     policy=_INTEL_READ_POLICY,
+    enforce_contract=True,
 )
 
 
@@ -230,3 +232,13 @@ ALL_SEARCH_TOOLS = [
     search_stock_news_tool,
     search_comprehensive_intel_tool,
 ]
+
+
+def build_search_tools() -> list:
+    """Return the always-on Agent Web Search tool definitions.
+
+    Tool implementations stay in this module; registration ownership moves to
+    the ``builtin.web_search`` agent_tool plugin (issue #432).
+    """
+
+    return list(ALL_SEARCH_TOOLS)

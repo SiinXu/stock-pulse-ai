@@ -443,6 +443,8 @@ AGENT_CONTEXT_PROTECTED_TURNS=
 
 P0a usage telemetry 会为实际发送的 message 生成 HMAC-SHA256 指纹，用于后续判断相同 prompt/message 前缀是否稳定。该能力只写入本地 `llm_usage` 记录，不改变 prompt、provider 参数、cache hint、模型输出或 fallback 顺序。
 
+成本归因与路由质量遥测（`LLM_USAGE_ATTRIBUTION_ENABLED`，默认开启）在同一 `llm_usage` 行上追加 run/stage/mode 成本估算与 `route_outcome`；与 #1213 每模式预算共用 `src/llm/cost.py` 计量。详见 [LLM 成本归因与路由遥测](llm-cost-attribution.md)。
+
 Usage 来源按三层读取：
 
 - 优先读取 provider / LiteLLM 公开响应字段 `usage`。
