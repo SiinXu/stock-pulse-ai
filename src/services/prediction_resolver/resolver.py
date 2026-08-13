@@ -48,6 +48,21 @@ def _require_int(name: str, value: Any, *, minimum: int, maximum: int) -> int:
     return value
 
 
+def _canonical_worker_id(value: Optional[str]) -> str:
+    canonical = (
+        f"{socket.gethostname()}:{uuid.uuid4().hex[:8]}"
+        if value is None
+        else str(value).strip()
+    )
+    if not canonical:
+        raise ValueError("worker_id must not be empty")
+    if len(canonical) > 128:
+        raise ValueError("worker_id must not exceed 128 characters")
+    if any(ord(character) < 32 or ord(character) == 127 for character in canonical):
+        raise ValueError("worker_id must not contain control characters")
+    return canonical
+
+
 def _utc_naive_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -305,7 +320,7 @@ class PredictionResolver:
         self._store = store
         self._actuals = actuals_fetcher
         self._scorer = claim_scorer
-        self._worker_id = worker_id or f"{socket.gethostname()}:{uuid.uuid4().hex[:8]}"
+        self._worker_id = _canonical_worker_id(worker_id)
         self._lease_seconds = int(lease_seconds)
         self._max_per_tick = int(max_per_tick)
         self._max_attempts = int(max_attempts)
@@ -334,7 +349,12 @@ class PredictionResolver:
             return summary
         try:
             as_of = _as_utc_naive(now if now is not None else self._clock())
-            claim_limit = self._max_per_tick if limit is None else max(0, int(limit))
+            requested_limit = (
+                self._max_per_tick
+                if limit is None
+                else _require_int("limit", limit, minimum=0, maximum=10_000)
+            )
+            claim_limit = min(self._max_per_tick, requested_limit)
             if claim_limit == 0:
                 return summary
             self._requeue_ready_retries(as_of=as_of)
@@ -348,6 +368,9 @@ class PredictionResolver:
                 summary.items.append(item)
                 if item.disposition == "claimed_failed":
                     summary.skipped += 1
+                    continue
+                if item.disposition == "error" and item.reason == "claim_failed":
+                    summary.errors += 1
                     continue
                 summary.claimed += 1
                 if item.disposition == "resolved":
@@ -472,10 +495,8 @@ class PredictionResolver:
                 as_of=as_of,
                 attempts=attempts,
             )
-            return TickItemResult(
+            return self._data_unavailable_result(
                 prediction_id=prediction_id,
-                disposition="data_unavailable",
-                label=OUTCOME_DATA_UNAVAILABLE,
                 reason="max_attempts_exhausted",
                 applied=applied,
             )
@@ -517,13 +538,30 @@ class PredictionResolver:
                     disposition="error",
                     reason="data_unavailable_write_failed",
                 )
-            return TickItemResult(
+            return self._data_unavailable_result(
                 prediction_id=prediction_id,
-                disposition="data_unavailable",
-                label=OUTCOME_DATA_UNAVAILABLE,
                 reason="resolver_exception",
                 applied=applied,
             )
+
+    @staticmethod
+    def _data_unavailable_result(
+        *, prediction_id: str, reason: str, applied: bool
+    ) -> TickItemResult:
+        if not applied:
+            return TickItemResult(
+                prediction_id=prediction_id,
+                disposition="skipped",
+                reason="data_unavailable_not_applied",
+                applied=False,
+            )
+        return TickItemResult(
+            prediction_id=prediction_id,
+            disposition="data_unavailable",
+            label=OUTCOME_DATA_UNAVAILABLE,
+            reason=reason,
+            applied=True,
+        )
 
     def _mark_unavailable(
         self,
@@ -588,10 +626,8 @@ class PredictionResolver:
                 as_of=as_of,
                 attempts=attempts,
             )
-            return TickItemResult(
+            return self._data_unavailable_result(
                 prediction_id=prediction_id,
-                disposition="data_unavailable",
-                label=OUTCOME_DATA_UNAVAILABLE,
                 reason="invalid_prediction_fields",
                 applied=applied,
             )
@@ -624,10 +660,8 @@ class PredictionResolver:
                     "market": market,
                 },
             )
-            return TickItemResult(
+            return self._data_unavailable_result(
                 prediction_id=prediction_id,
-                disposition="data_unavailable",
-                label=OUTCOME_DATA_UNAVAILABLE,
                 reason=reason,
                 applied=applied,
             )
@@ -643,10 +677,8 @@ class PredictionResolver:
                 attempts=attempts,
                 extra={"actuals": _mapping(snapshot)},
             )
-            return TickItemResult(
+            return self._data_unavailable_result(
                 prediction_id=prediction_id,
-                disposition="data_unavailable",
-                label=OUTCOME_DATA_UNAVAILABLE,
                 reason=reason,
                 applied=applied,
             )
@@ -668,10 +700,8 @@ class PredictionResolver:
                     "actuals": _mapping(snapshot),
                 },
             )
-            return TickItemResult(
+            return self._data_unavailable_result(
                 prediction_id=prediction_id,
-                disposition="data_unavailable",
-                label=OUTCOME_DATA_UNAVAILABLE,
                 reason=reason,
                 applied=applied,
             )

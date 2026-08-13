@@ -75,13 +75,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         return 2
 
-    resolver = build_prediction_resolver(
-        worker_id=args.worker_id,
-        lease_seconds=lease_seconds,
-        max_per_tick=max_per_tick,
-        max_attempts=max_attempts,
-        require_persistence=True,
-    )
+    try:
+        resolver = build_prediction_resolver(
+            worker_id=args.worker_id,
+            lease_seconds=lease_seconds,
+            max_per_tick=max_per_tick,
+            max_attempts=max_attempts,
+            require_persistence=True,
+        )
+    except (TypeError, ValueError) as exc:
+        log_safe_exception(
+            logger,
+            "PredictionResolver configuration validation failed",
+            exc,
+            error_code="prediction_resolver_config_validation_failed",
+        )
+        return 2
     if resolver is None:
         logger.error(
             "PredictionResolver unavailable: need A3 store + A4 ActualsFetcher + A5 ClaimScorer"
@@ -91,7 +100,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         summary = resolver.tick(limit=args.limit)
     except Exception as exc:  # broad-exception: fallback_recorded - CLI returns exit 2 on tick failure
-        logger.exception("PredictionResolver.tick failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "PredictionResolver.tick failed",
+            exc,
+            error_code="prediction_resolver_tick_failed",
+        )
         return 2
 
     if args.json:

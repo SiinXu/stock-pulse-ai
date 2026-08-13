@@ -9978,7 +9978,7 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.OCR_LANGS.title": "OCR Languages",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.OCR_TIMEOUT_SECONDS.summary": "Hard 1–120 second wall-clock limit; timed-out OCR workers and descendants are terminated and reaped.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.OCR_TIMEOUT_SECONDS.title": "OCR Timeout Seconds",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Automatically resolves due predictions through the existing scheduler; provider failures remain data_unavailable and retry only after durable backoff.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.summary": "Resolves due predictions; provider failures stay data_unavailable until durable backoff expires.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.prediction_resolve.title": "Prediction Horizon Resolver",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.impact.0": "Gates GET /api/v1/reasoning-trace/{record_id} and related export service behavior.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.reasoning_trace_export.notes.0": "See docs/reasoning-trace-export_EN.md for the contract and rollback steps.",

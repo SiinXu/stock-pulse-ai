@@ -1572,7 +1572,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.agent.prediction_resolve': {
     title: 'Prediction Horizon Resolver',
-    summary: 'Automatically resolves due predictions through the existing scheduler; provider failures remain data_unavailable and retry only after durable backoff.',
+    summary: 'Resolves due predictions; provider failures stay data_unavailable until durable backoff expires.',
   },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: 'Event Alert Rules (Legacy JSON)',

@@ -1601,7 +1601,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.prediction_resolve': {
     title: '预测到期解析',
-    summary: '通过既有调度器自动核验已到期预测；数据源失败保持 data_unavailable，且仅在持久化退避时间到期后重试。',
+    summary: '自动核验到期预测；数据源失败保持 data_unavailable，直至持久化退避到期。',
   },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: '事件告警规则（Legacy JSON）',

@@ -330,6 +330,118 @@ def test_tick_provider_failure_never_fabricates_hit() -> None:
     assert row.outcome.get("reason") == "provider_failure"
 
 
+def test_data_unavailable_cas_loss_is_counted_as_skipped() -> None:
+    class _LostLeaseStore(InMemoryPredictionStore):
+        def mark_data_unavailable(self, **kwargs: Any):
+            return False, self.get(kwargs["prediction_id"])
+
+    store = _LostLeaseStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="provider_down", reason="provider_failure", retryable=True)
+        ),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+
+    summary = resolver.tick()
+
+    assert summary.claimed == 1
+    assert summary.data_unavailable == 0
+    assert summary.skipped == 1
+    assert summary.items[0].disposition == "skipped"
+    assert summary.items[0].reason == "data_unavailable_not_applied"
+    assert summary.items[0].applied is False
+
+
+def test_claim_failure_is_not_counted_as_claimed() -> None:
+    class _ClaimFailureStore(InMemoryPredictionStore):
+        def claim_for_resolve(self, **kwargs: Any):
+            raise RuntimeError("claim failed")
+
+    store = _ClaimFailureStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(_Snapshot()),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+
+    summary = resolver.tick()
+
+    assert summary.claimed == 0
+    assert summary.errors == 1
+    assert summary.items[0].reason == "claim_failed"
+
+
+def test_explicit_limit_can_only_narrow_configured_batch_cap() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store, prediction_id="pred-1")
+    _seed(store, prediction_id="pred-2")
+    fetcher = _FakeFetcher(
+        _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(101.0))
+    )
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=fetcher,
+        claim_scorer=_FakeScorer(),
+        max_per_tick=1,
+        clock=_now,
+    )
+
+    summary = resolver.tick(limit=10)
+
+    assert summary.claimed == 1
+    assert len(fetcher.calls) == 1
+
+
+def test_explicit_limit_cannot_reenable_zero_batch_cap() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    _seed(store)
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(101.0))
+        ),
+        claim_scorer=_FakeScorer(),
+        max_per_tick=0,
+        clock=_now,
+    )
+
+    assert resolver.tick(limit=1).claimed == 0
+
+
+@pytest.mark.parametrize("limit", [True, -1, 10_001, 1.5])
+def test_explicit_limit_rejects_invalid_values(limit: Any) -> None:
+    resolver = PredictionResolver(
+        store=InMemoryPredictionStore(),
+        actuals_fetcher=_FakeFetcher(_Snapshot()),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+    )
+
+    with pytest.raises(ValueError):
+        resolver.tick(limit=limit)
+
+
+@pytest.mark.parametrize("worker_id", ["", "   ", "x" * 129, "worker\nforged"])
+def test_worker_id_rejects_store_and_log_unsafe_values(worker_id: str) -> None:
+    with pytest.raises(ValueError):
+        PredictionResolver(
+            store=InMemoryPredictionStore(),
+            actuals_fetcher=_FakeFetcher(_Snapshot()),
+            claim_scorer=_FakeScorer(),
+            worker_id=worker_id,
+        )
+
+
 def test_non_retryable_provider_outcome_is_not_requeued() -> None:
     store = InMemoryPredictionStore()
     store._clock = _now
@@ -524,6 +636,45 @@ def test_cli_config_failure_does_not_run_with_defaults() -> None:
         assert main([]) == 2
 
     build_resolver.assert_not_called()
+
+
+def test_cli_invalid_resolver_configuration_returns_failure() -> None:
+    from src.services.prediction_resolver.__main__ import main
+
+    config = SimpleNamespace(
+        prediction_resolve_lease_seconds=120,
+        prediction_resolve_max_per_tick=50,
+        prediction_resolve_max_attempts=5,
+    )
+    with patch(
+        "src.application_services.get_application_services",
+        return_value=SimpleNamespace(config=config),
+    ), patch(
+        "src.services.prediction_resolver.__main__.build_prediction_resolver",
+        side_effect=ValueError("invalid worker id"),
+    ):
+        assert main(["--worker-id", "invalid"]) == 2
+
+
+def test_cli_tick_failure_returns_failure() -> None:
+    from src.services.prediction_resolver.__main__ import main
+
+    config = SimpleNamespace(
+        prediction_resolve_lease_seconds=120,
+        prediction_resolve_max_per_tick=50,
+        prediction_resolve_max_attempts=5,
+    )
+    resolver = SimpleNamespace(
+        tick=lambda **kwargs: (_ for _ in ()).throw(RuntimeError("tick failed"))
+    )
+    with patch(
+        "src.application_services.get_application_services",
+        return_value=SimpleNamespace(config=config),
+    ), patch(
+        "src.services.prediction_resolver.__main__.build_prediction_resolver",
+        return_value=resolver,
+    ):
+        assert main([]) == 2
 
 
 def test_runtime_scheduler_registers_prediction_resolver_task() -> None:

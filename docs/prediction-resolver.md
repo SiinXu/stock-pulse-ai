@@ -21,7 +21,7 @@
 | `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | 轮询间隔（下限 30s） |
 | `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | 每次 tick 最多认领 |
 | `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | resolving 租约 TTL |
-| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 诊断用尝试计数 |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 硬性尝试次数上限 |
 
 ## 单进程部署
 
@@ -38,10 +38,12 @@
 * * * * * cd /app && python -m src.services.prediction_resolver --json >> /var/log/prediction-resolver.log 2>&1
 ```
 
+`--limit` 只能收窄 `PREDICTION_RESOLVE_MAX_PER_TICK`，不能超过或重新启用已配置的硬上限。
+
 ## 重叠保护与重试
 
 - 进程内非阻塞锁跳过重叠 tick。
-- 存储层租约 + 条件写回防止跨进程双写。
+- 存储层租约 + 条件写回防止重复 outcome；租约过期后工作可能重试，但只有一个 outcome 能成功落库。
 - **过期的 `resolving` 租约**会在下一次 tick 重新进入 due 扫描（崩溃恢复）。
 - `data_unavailable` 使用有界指数退避（outcome 中的 `next_attempt_at`），并在达到 `PREDICTION_RESOLVE_MAX_ATTEMPTS` 后标记 `retry_exhausted` 停止重试。
 - 重试信息持久化在 A3 outcome 中；每次 tick 只会重新排队已到 `next_attempt_at` 的可重试记录，停牌/退市及已耗尽尝试的记录保持 `data_unavailable`。

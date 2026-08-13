@@ -21,7 +21,7 @@ When `resolve_after` is reached, the **system** claims the prediction, pulls act
 | `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | Background poll interval (floor 30s) |
 | `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | Max claims per tick |
 | `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | Resolving lease TTL |
-| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | Attempt counter for diagnostics |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | Hard attempt ceiling |
 
 ## Single-process deploy
 
@@ -42,12 +42,14 @@ Keep the flag off on app workers and run one job:
 python -m src.services.prediction_resolver --limit 20 --worker-id cron-1 --json
 ```
 
+`--limit` can only narrow `PREDICTION_RESOLVE_MAX_PER_TICK`; it cannot exceed or re-enable the configured hard cap.
+
 Exit codes: `0` ok (including empty/overlap), `1` deps missing, `2` unexpected failure.
 
 ## Overlap protection and retry
 
 - Process-local non-blocking lock skips concurrent ticks.
-- Store leases + conditional resolve prevent cross-process double-scoring.
+- Store leases + conditional writes prevent duplicate outcomes. Work may be retried after lease expiry, but only one outcome can be applied.
 - **Expired `resolving` leases are re-scanned** on the next tick (crash recovery).
 - `data_unavailable` uses bounded exponential backoff (`next_attempt_at` in outcome) and stops after `PREDICTION_RESOLVE_MAX_ATTEMPTS` (`retry_exhausted`).
 - Retry metadata is durable in the A3 outcome. Each tick requeues only retryable rows whose `next_attempt_at` has elapsed; halted/delisted and exhausted rows remain `data_unavailable`.
