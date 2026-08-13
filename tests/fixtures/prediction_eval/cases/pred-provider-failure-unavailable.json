@@ -1,0 +1,34 @@
+{
+  "id": "pred-provider-failure-unavailable",
+  "profile": "provider_failure",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "type": "direction",
+      "confidence": 0.7,
+      "payload": {"direction": "up"}
+    }
+  ],
+  "actuals": {
+    "provider_failed": true,
+    "unavailable": true,
+    "unavailable_reason": "provider_timeout"
+  },
+  "resolution": {
+    "outcome": "data_unavailable",
+    "reason": "provider_timeout"
+  },
+  "expected": {
+    "outcome": "data_unavailable",
+    "scorer_outcome": "data_unavailable"
+  },
+  "episode": {
+    "run_id": "run-pred-unavail-1",
+    "symbol": "600519",
+    "market": "cn",
+    "success": true,
+    "soul_version": "v1",
+    "soul_hash": "abcdef0123456789",
+    "trajectory_summary": []
+  }
+}
