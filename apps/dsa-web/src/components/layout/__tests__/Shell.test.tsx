@@ -25,19 +25,15 @@ vi.mock('../../../stores/agentChatStore', () => ({
 
 vi.mock('../../../hooks/useUnreadNotifications', () => ({
   useUnreadNotifications: () => ({
-    signalItems: [],
-    alertItems: [],
-    unreadSignalCount: 0,
-    unreadAlertCount: 0,
+    items: [],
     unreadCount: 0,
     isLoading: false,
     hasError: false,
     hasPartialError: false,
-    signalsFailed: false,
-    alertsFailed: false,
-    signalLastSeenAt: 0,
-    alertLastSeenAt: 0,
-    markAllSeen: () => undefined,
+    listFailed: false,
+    countFailed: false,
+    markFailed: false,
+    markAllSeen: async () => undefined,
     refresh: () => undefined,
   }),
 }));

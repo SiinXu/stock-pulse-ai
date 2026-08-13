@@ -13,7 +13,6 @@
 
 import logging
 from typing import Optional
-import re
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, Depends
 
@@ -28,6 +27,7 @@ from api.v1.schemas.stocks import (
 )
 from api.v1.schemas.history import WatchlistRequest, WatchlistResponse
 from api.v1.schemas.common import ErrorResponse
+from api.v1.errors import api_error
 from src.services.image_stock_extractor import (
     ALLOWED_MIME,
     MAX_SIZE_BYTES,
@@ -41,7 +41,7 @@ from src.services.import_parser import (
 from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
-from data_provider.base import normalize_stock_code
+from src.services.stock_code_utils import canonicalize_analysis_stock_code
 from data_provider.daily_cache import LocalDataMissingError
 from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
@@ -82,20 +82,6 @@ def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
     )
 
 
-# Stock code validation patterns (aligned with frontend validateStockCode)
-_STOCK_CODE_RE = re.compile(
-    r"^(?:\d{6}"                              # A-share 6-digit
-    r"|(?:SH|SZ|BJ)\d{6}"                     # exchange-prefixed A-share
-    r"|\d{6}\.(?:SH|SZ|SS|BJ)"                # exchange-suffixed A-share
-    r"|\d{1,5}\.HK"                           # HK suffix format
-    r"|HK\d{1,5}"                             # HK prefix format
-    r"|\d{5}"                                 # bare 5-digit HK code
-    r"|[A-Z]{1,5}(?:\.(?:US|[A-Z]))?"         # US ticker
-    r")$",
-    re.IGNORECASE,
-)
-
-
 def _validate_and_normalize_stock_code(code: str) -> str:
     """Validate stock code format and return canonical form.
 
@@ -103,19 +89,16 @@ def _validate_and_normalize_stock_code(code: str) -> str:
     """
     stripped = code.strip()
     if not stripped:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "invalid_stock_code", "message": "股票代码不能为空"},
+        raise api_error(400, "empty_stock_code", "股票代码不能为空")
+    normalized = canonicalize_analysis_stock_code(stripped)
+    if normalized is None:
+        raise api_error(
+            400,
+            "invalid_stock_code",
+            f"'{stripped}' 不是合法的股票代码格式",
+            params={"stock_code": stripped},
         )
-    if not _STOCK_CODE_RE.match(stripped):
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "invalid_stock_code",
-                "message": f"'{stripped}' 不是合法的股票代码格式",
-            },
-        )
-    return normalize_stock_code(stripped)
+    return normalized
 
 
 def _watchlist_match_key(code: str) -> str:
@@ -144,31 +127,32 @@ def extract_from_image(
     表单字段请使用 file 上传图片。优先级：Gemini / Anthropic / OpenAI（首个可用）。
     """
     if not file or not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "bad_request", "message": "未提供文件，请使用表单字段 file 上传图片"},
+        raise api_error(
+            400,
+            "missing_upload_file",
+            "未提供文件，请使用表单字段 file 上传图片",
+            params={"field": "file"},
         )
 
     content_type = (file.content_type or "").split(";")[0].strip().lower()
     if content_type not in ALLOWED_MIME:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "unsupported_type",
-                "message": f"不支持的类型: {content_type}。允许: {ALLOWED_MIME_STR}",
-            },
+        raise api_error(
+            400,
+            "unsupported_type",
+            f"不支持的类型: {content_type}。允许: {ALLOWED_MIME_STR}",
+            params={"content_type": content_type, "allowed": ALLOWED_MIME_STR},
         )
 
     try:
         # Read limited size, then check if there is still remaining (semantic clarity: reject if exceeded)
+        limit_mb = MAX_SIZE_BYTES // (1024 * 1024)
         data = file.file.read(MAX_SIZE_BYTES)
         if file.file.read(1):
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "file_too_large",
-                    "message": f"图片超过 {MAX_SIZE_BYTES // (1024 * 1024)}MB 限制",
-                },
+            raise api_error(
+                400,
+                "file_too_large",
+                f"图片超过 {limit_mb}MB 限制",
+                params={"limit_mb": limit_mb, "kind": "image"},
             )
     except HTTPException:
         raise
@@ -251,9 +235,11 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
             )
         text = body.get("text") if isinstance(body, dict) else None
         if not text or not isinstance(text, str):
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "bad_request", "message": "未提供 text，请使用 {\"text\": \"...\"}"},
+            raise api_error(
+                400,
+                "missing_import_text",
+                "未提供 text，请使用 {\"text\": \"...\"}",
+                params={"field": "text"},
             )
         try:
             items = parse_import_from_text(text)
@@ -272,28 +258,29 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
         form = await request.form()
         file = form.get("file")
         if not file or not hasattr(file, "read"):
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "bad_request", "message": "未提供文件，请使用表单字段 file"},
+            raise api_error(
+                400,
+                "missing_upload_file",
+                "未提供文件，请使用表单字段 file",
+                params={"field": "file"},
             )
+        limit_mb = MAX_FILE_BYTES // (1024 * 1024)
         file_size = getattr(file, "size", None)
         if isinstance(file_size, int) and file_size > MAX_FILE_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "file_too_large",
-                    "message": f"文件超过 {MAX_FILE_BYTES // (1024 * 1024)}MB 限制",
-                },
+            raise api_error(
+                400,
+                "file_too_large",
+                f"文件超过 {limit_mb}MB 限制",
+                params={"limit_mb": limit_mb, "kind": "file"},
             )
         try:
             data = file.file.read(MAX_FILE_BYTES)
             if file.file.read(1):
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": "file_too_large",
-                        "message": f"文件超过 {MAX_FILE_BYTES // (1024 * 1024)}MB 限制",
-                    },
+                raise api_error(
+                    400,
+                    "file_too_large",
+                    f"文件超过 {limit_mb}MB 限制",
+                    params={"limit_mb": limit_mb, "kind": "file"},
                 )
         except HTTPException:
             raise
@@ -327,12 +314,11 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
             )
             raise HTTPException(status_code=400, detail={"error": "parse_failed", "message": str(e)})
     else:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "bad_request",
-                "message": "请使用 multipart/form-data 上传文件，或 application/json 提交 {\"text\": \"...\"}",
-            },
+        raise api_error(
+            400,
+            "unsupported_content_type",
+            "请使用 multipart/form-data 上传文件，或 application/json 提交 {\"text\": \"...\"}",
+            params={"content_type": content_type},
         )
 
     extract_items = [
@@ -391,7 +377,7 @@ def add_to_watchlist(
         validated = _validate_and_normalize_stock_code(request.stock_code)
         codes = _read_watchlist_codes(service)
         existing_keys = [_watchlist_match_key(c) for c in codes]
-        display_code = request.stock_code.strip()
+        display_code = validated
         if _watchlist_match_key(validated) not in existing_keys:
             codes.append(display_code)
             _write_watchlist_codes(service, codes)

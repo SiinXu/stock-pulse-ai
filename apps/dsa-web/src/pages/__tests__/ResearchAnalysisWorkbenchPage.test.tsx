@@ -300,7 +300,13 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(stockSearch.closest('.grid')).toHaveClass('rounded-xl', 'border');
     expect(document.title).toBe('分析工作台 - StockPulse');
     const workbenchTabs = screen.getByRole('tablist', { name: '分析工作台分段' });
-    expect(workbenchTabs).toHaveClass('segmented-control');
+    expect(workbenchTabs).toHaveClass(
+      'segmented-control',
+      'dark:!bg-foreground/10',
+      'dark:[&_.segmented-control-tab]:!text-foreground',
+      'dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground',
+      'dark:[&_.segmented-control-tab[aria-selected=true]]:!text-background',
+    );
     expect(workbenchTabs).not.toHaveClass('border-b', 'border-border');
     expect(within(workbenchTabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       '发起与批量',
@@ -404,6 +410,69 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
       .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.history);
     expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId)).toBe('12');
+  });
+
+  it('opens history in an overlay and keeps report controls on one line', async () => {
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    expect(document.getElementById('analysis-workbench-reanalysis-phase-hint')).toBeNull();
+    expect(screen.getByRole('button', { name: '分析阶段 · 查看详情' })).toBeInTheDocument();
+
+    const historyTrigger = screen.getByRole('button', { name: '历史与对比' });
+    historyTrigger.focus();
+    fireEvent.click(historyTrigger);
+
+    const historyPopover = await screen.findByTestId('analysis-history-popover');
+    expect(historyPopover.parentElement).toHaveClass(
+      'w-80',
+      'rounded-2xl',
+      'shadow-elevation-popper',
+    );
+    expect(historyPopover.parentElement).toHaveAttribute('role', 'dialog');
+    const closeHistoryButton = within(historyPopover).getByRole('button', { name: '关闭' });
+    await waitFor(() => expect(closeHistoryButton).toHaveFocus());
+    fireEvent.mouseEnter(closeHistoryButton);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    const historyViewport = within(historyPopover).getByTestId('home-history-list-scroll');
+    expect(historyViewport.closest('aside')?.parentElement).toHaveClass(
+      '[&>aside]:max-h-[min(22rem,calc(100dvh-14rem))]',
+      '[&>aside]:border-0',
+      '[&_[data-testid=home-history-list-scroll]_.text-center.py-5]:hidden',
+      '[&_[data-testid=history-card-meta]]:flex-nowrap',
+      '[&_[data-testid=history-card-meta]>span]:whitespace-nowrap',
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByTestId('analysis-history-popover')).not.toBeInTheDocument());
+    expect(historyTrigger).toHaveFocus();
+
+    fireEvent.click(historyTrigger);
+    const reopenedHistoryPopover = await screen.findByTestId('analysis-history-popover');
+    fireEvent.click(within(reopenedHistoryPopover).getByRole('button', { name: /Apple AAPL/u }));
+    await waitFor(() => expect(screen.queryByTestId('analysis-history-popover')).not.toBeInTheDocument());
+  });
+
+  it('keeps the history selector reachable while the selected report is loading', async () => {
+    const pendingReport = createDeferred<AnalysisReport>();
+    vi.mocked(historyApi.getDetail).mockReturnValueOnce(pendingReport.promise);
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
+
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('12');
+    });
+    fireEvent.click(screen.getByRole('button', { name: '历史与对比' }));
+
+    const historyPopover = await screen.findByTestId('analysis-history-popover');
+    expect(within(historyPopover).getByRole('button', { name: /Apple AAPL/u }))
+      .toBeInTheDocument();
+
+    await act(async () => pendingReport.resolve(report));
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    expect(historyApi.getDetail).toHaveBeenCalledWith(12);
   });
 
   it('reuses the history trend comparison and returns to the selected report', async () => {
@@ -522,6 +591,33 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       section: SETTINGS_SECTION_IDS.aiModels,
       view: SETTINGS_VIEW_IDS.aiModels.connections,
     }));
+  });
+
+  it('shows generic analysis submission failures only in the top toast', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(
+      createApiError(createParsedApiError({
+        title: '服务器处理失败',
+        message: '请稍后重试，并在问题持续时提供诊断编号。',
+        code: 'internal_error',
+        status: 500,
+        traceId: 'trace-analysis-500',
+      })),
+    );
+    useStockPoolStore.setState({ query: 'NVTS', selectionSource: 'manual' });
+    renderWorkbench();
+
+    const stockSearch = await screen.findByRole('combobox', { name: '股票搜索' });
+    const launchPanel = stockSearch.closest<HTMLElement>('[role="tabpanel"]')!;
+    const analyzeButton = within(launchPanel).getByRole('button', { name: '分析' });
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    fireEvent.click(analyzeButton);
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1));
+    const toast = await screen.findByRole('alert');
+    expect(toast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(toast).toHaveTextContent('服务器处理失败');
+    expect(toast).toHaveTextContent('trace-analysis-500');
+    expect(screen.queryByTestId('actionable-api-error-inline')).toBeNull();
   });
 
   it('retries a failed launch with the exact captured request instead of clearing it', async () => {
@@ -680,12 +776,14 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
 
-    const checkboxes = await screen.findAllByRole('checkbox', {
+    fireEvent.click(await screen.findByRole('button', { name: '历史与对比' }));
+    const historyPopover = await screen.findByTestId('analysis-history-popover');
+    const checkboxes = within(historyPopover).getAllByRole('checkbox', {
       name: '选择 Apple 历史记录',
     });
     fireEvent.click(checkboxes[0]);
     fireEvent.click(checkboxes[1]);
-    fireEvent.click(await screen.findByTestId('history-compare-selected'));
+    fireEvent.click(within(historyPopover).getByTestId('history-compare-selected'));
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       buildReportVersionCompareHref({
@@ -741,8 +839,10 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
     expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
     const detailCallCount = vi.mocked(historyApi.getDetail).mock.calls.length;
-    fireEvent.click(screen.getByRole('checkbox', { name: '选择 Apple 历史记录' }));
-    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    fireEvent.click(screen.getByRole('button', { name: '历史与对比' }));
+    const historyPopover = await screen.findByTestId('analysis-history-popover');
+    fireEvent.click(within(historyPopover).getByRole('checkbox', { name: '选择 Apple 历史记录' }));
+    fireEvent.click(within(historyPopover).getByRole('button', { name: '删除' }));
     const deleteDialog = screen.getByRole('dialog', { name: '删除历史记录' });
     expect(deleteDialog).toHaveTextContent('确定删除已选 1 项的全部分析历史吗？此操作不可恢复。');
     fireEvent.click(within(deleteDialog).getByRole('button', { name: '删除' }));
@@ -763,8 +863,10 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
 
     expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
-    fireEvent.click(screen.getByRole('checkbox', { name: '选择 Apple 历史记录' }));
-    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    fireEvent.click(screen.getByRole('button', { name: '历史与对比' }));
+    const historyPopover = await screen.findByTestId('analysis-history-popover');
+    fireEvent.click(within(historyPopover).getByRole('checkbox', { name: '选择 Apple 历史记录' }));
+    fireEvent.click(within(historyPopover).getByRole('button', { name: '删除' }));
     const dialog = screen.getByRole('dialog', { name: '删除历史记录' });
     fireEvent.click(within(dialog).getByRole('button', { name: '删除' }));
 

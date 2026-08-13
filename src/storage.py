@@ -40,6 +40,7 @@ from sqlalchemy import (
     select,
     and_,
     or_,
+    case as _case,
     delete,
     desc,
     event,
@@ -57,6 +58,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 
 from src.agent.provider_trace import PROVIDER_TRACE_RETENTION_LIMIT
 from src.agent.public_contract import (
+    agent_history_public_params,
     agent_history_public_fields,
     sanitize_agent_history_content,
 )
@@ -116,6 +118,7 @@ _STORAGE_FACADE_COMPAT_GLOBALS = (
     IntegrityError,
     OperationalError,
     PROVIDER_TRACE_RETENTION_LIMIT,
+    agent_history_public_params,
     agent_history_public_fields,
     sanitize_agent_history_content,
     get_config,
@@ -240,26 +243,54 @@ def persist_llm_usage(
     model: str,
     call_type: str,
     stock_code: Optional[str] = None,
+    **attribution: Any,
 ) -> None:
     """Fire-and-forget: write one LLM call record to llm_usage. Never raises."""
     try:
         if usage is None:
             usage = {}
+        from src.llm.attribution import resolve_attribution
+        from src.llm.cost import enrich_usage_with_cost, is_usage_attribution_enabled
+
+        # Capture before enrich_usage_with_cost shallow-copies to a plain dict
+        # (which would drop setattr-based telemetry flags).
         prompt_cache_telemetry_disabled = bool(
             getattr(usage, _LLM_PROMPT_CACHE_TELEMETRY_DISABLED_ATTR, False)
         )
+
+        attribution_enabled = is_usage_attribution_enabled()
+        if attribution_enabled:
+            usage = enrich_usage_with_cost(usage, model, enabled=True)
+            resolved = resolve_attribution(**attribution)
+            for key, value in resolved.to_telemetry_fields().items():
+                if value is not None and key not in usage:
+                    usage[key] = value
+            for key, value in attribution.items():
+                if value is not None:
+                    usage[key] = value
         prompt_tokens = _coerce_llm_usage_non_negative_int(usage.get("prompt_tokens")) or 0
         completion_tokens = _coerce_llm_usage_non_negative_int(usage.get("completion_tokens")) or 0
         total_tokens = _coerce_llm_usage_non_negative_int(usage.get("total_tokens")) or 0
-        telemetry = {
-            column: usage.get(column)
-            for column in _LLM_USAGE_TELEMETRY_COLUMN_SQL
-        }
+        telemetry = {column: usage.get(column) for column in _LLM_USAGE_TELEMETRY_COLUMN_SQL}
+        if not attribution_enabled:
+            for column in (
+                "run_id", "stage", "agent_mode", "estimated_cost_usd", "cost_status",
+                "route_outcome", "route_attempt", "primary_model", "latency_ms", "call_success",
+            ):
+                telemetry[column] = None
         if prompt_cache_telemetry_disabled:
             for column in _LLM_PROMPT_CACHE_TELEMETRY_COLUMNS:
                 telemetry[column] = None
         for column in _LLM_USAGE_INTEGER_TELEMETRY_COLUMNS:
             telemetry[column] = _coerce_llm_usage_non_negative_int(telemetry.get(column))
+        raw_success = usage.get("call_success")
+        if isinstance(raw_success, bool):
+            telemetry["call_success"] = 1 if raw_success else 0
+        else:
+            telemetry["call_success"] = _coerce_llm_usage_non_negative_int(raw_success)
+        telemetry["estimated_cost_usd"] = _coerce_llm_usage_non_negative_float(
+            telemetry.get("estimated_cost_usd")
+        )
         telemetry["normalized_prompt_tokens"] = (
             telemetry.get("normalized_prompt_tokens")
             if telemetry.get("normalized_prompt_tokens") is not None
@@ -278,12 +309,8 @@ def persist_llm_usage(
         has_usage_payload = bool(usage.get("provider_usage_json")) or any(
             key in usage
             for key in (
-                "prompt_tokens",
-                "completion_tokens",
-                "total_tokens",
-                "normalized_prompt_tokens",
-                "normalized_completion_tokens",
-                "normalized_total_tokens",
+                "prompt_tokens", "completion_tokens", "total_tokens",
+                "normalized_prompt_tokens", "normalized_completion_tokens", "normalized_total_tokens",
             )
         )
         if not prompt_cache_telemetry_disabled:
@@ -292,6 +319,7 @@ def persist_llm_usage(
             telemetry["cache_observation"] = usage.get("cache_observation") or (
                 "no_usage" if not has_usage_payload else "unknown"
             )
+        resolved_stock = stock_code if stock_code is not None else usage.get("stock_code")
         db = DatabaseManager.get_instance()
         db.record_llm_usage(
             call_type=call_type,
@@ -299,10 +327,10 @@ def persist_llm_usage(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
-            stock_code=stock_code,
+            stock_code=resolved_stock,
             **telemetry,
         )
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - usage persistence is fire-and-forget
         log_safe_exception(
             logger,
             "LLM usage record persistence failed",
@@ -310,6 +338,19 @@ def persist_llm_usage(
             error_code="storage_llm_usage_persistence_failed",
             level=logging.WARNING,
         )
+
+
+def _coerce_llm_usage_non_negative_float(value: Any) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number < 0 or number != number or number == float("inf"):
+        return None
+    return number
+
 
 
 def _coerce_llm_usage_non_negative_int(value: Any) -> Optional[int]:

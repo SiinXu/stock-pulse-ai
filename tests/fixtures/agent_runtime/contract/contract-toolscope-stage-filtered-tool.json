@@ -90,7 +90,8 @@
         },
         "success": false,
         "result_length": 98,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"error\": \"Tool is not in the session allowlist.\", \"code\": \"tool_not_allowed\", \"retriable\": false}"
       }
     ],
     "total_steps": 3,

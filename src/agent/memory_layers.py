@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 """Strict types for an explicit, principal-scoped memory projection.
 
+Layers in this foundation (honest naming):
+
+- **Episodic**: recent, point-in-time analysis observations for one stock.
+- **Outcome-pattern**: structured aggregates of provenance-linked *correct*
+  outcomes, keyed by ``(signal, horizon)``. This is **not** free-text knowledge
+  or embedding-store "semantic memory"; the type name and payload key are
+  ``outcome_pattern`` / ``outcome_patterns`` so the contract matches the
+  implementation.
+
 Every field that can reach a projected payload is structurally constrained
 here: identifiers match a fixed alphabet, timestamps are validated bounded UTC
 instants, and outcome provenance is strictly typed. Free-form stored prose
@@ -17,13 +26,14 @@ from typing import Any, Dict, List, Optional
 
 MAX_AUTHORIZED_RECORDS = 200
 MAX_EPISODIC_INJECTION = 3
-MAX_SEMANTIC_INJECTION = 3
-MIN_SEMANTIC_EVIDENCE = 3
+MAX_OUTCOME_PATTERN_INJECTION = 3
+MAX_SEMANTIC_INJECTION = MAX_OUTCOME_PATTERN_INJECTION
+MIN_OUTCOME_PATTERN_EVIDENCE = 3
+MIN_SEMANTIC_EVIDENCE = MIN_OUTCOME_PATTERN_EVIDENCE
 SIGNALS = frozenset({"buy", "hold", "sell"})
 OUTCOME_HORIZON_DAYS = frozenset({5, 20})
 MAX_RECORD_ID = 2 ** 63 - 1
 
-# Canonical UTC instant: YYYY-MM-DDTHH:MM:SS[.ffffff]Z, nothing else.
 _INSTANT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$")
 _PRINCIPAL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$")
 _STOCK_CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
@@ -32,19 +42,14 @@ _MAX_INSTANT = datetime(2100, 1, 1, tzinfo=timezone.utc)
 
 
 def parse_instant(name: str, value: Any) -> datetime:
-    """Parse a bounded UTC instant, rejecting malformed or unbounded text.
-
-    Lexicographic comparison of unvalidated strings is not a temporal contract:
-    ``2026-8-01T00:00:00Z`` sorts after ``2026-08-09T00:00:00Z`` while denoting
-    an earlier instant. Callers must compare the parsed values returned here.
-    """
+    """Parse a bounded UTC instant, rejecting malformed or unbounded text."""
     if type(value) is not str or not _INSTANT_RE.match(value):
         raise ValueError(
             f"{name} must be a canonical UTC instant such as 2026-08-09T00:00:00Z"
         )
     try:
         parsed = datetime.strptime(value.split(".")[0].rstrip("Z"), "%Y-%m-%dT%H:%M:%S")
-    except ValueError as exc:  # e.g. 2026-02-31T00:00:00Z
+    except ValueError as exc:
         raise ValueError(f"{name} is not a valid calendar instant") from exc
     parsed = parsed.replace(tzinfo=timezone.utc)
     if not _MIN_INSTANT <= parsed < _MAX_INSTANT:
@@ -53,14 +58,12 @@ def parse_instant(name: str, value: Any) -> datetime:
 
 
 def validate_principal_id(value: Any) -> str:
-    """Validate a bounded principal identifier with a fixed safe alphabet."""
     if type(value) is not str or not _PRINCIPAL_RE.match(value):
         raise ValueError("principal_id must be a bounded identifier")
     return value
 
 
 def validate_stock_code(value: Any) -> str:
-    """Validate a bounded symbol identifier with a fixed safe alphabet."""
     if type(value) is not str or not _STOCK_CODE_RE.match(value):
         raise ValueError("stock_code must be a bounded symbol identifier")
     return value
@@ -135,8 +138,6 @@ class EpisodicMemoryEntry:
     outcome_horizon_days: Optional[int]
     evaluated_at: Optional[str]
     was_correct: Optional[bool]
-    # True when the record carries an evaluation that had not happened yet at
-    # ``as_of``; the outcome fields above are then withheld from the projection.
     outcome_pending_as_of: bool = False
     source: str = "structured"
     score: float = 0.0
@@ -146,7 +147,9 @@ class EpisodicMemoryEntry:
 
 
 @dataclass(frozen=True)
-class SemanticMemoryEntry:
+class OutcomePatternEntry:
+    """Structured outcome-pattern evidence for one (signal, horizon) group."""
+
     principal_id: str
     pattern_id: str
     stock_code: str
@@ -154,9 +157,6 @@ class SemanticMemoryEntry:
     evidence_count: int
     source_history_ids: List[int]
     source_outcome_ids: List[int]
-    # A pattern owns exactly one evaluation horizon. Outcomes measured over
-    # different horizons are not comparable and must never be pooled into one
-    # sufficiency count.
     horizon_days: int
     evaluated_through: str
     sufficient_evidence: bool
@@ -167,17 +167,28 @@ class SemanticMemoryEntry:
         return asdict(self)
 
 
+SemanticMemoryEntry = OutcomePatternEntry
+
+
 @dataclass
 class LayeredMemoryBundle:
     principal_id: str
     as_of: str
     episodic: List[EpisodicMemoryEntry] = field(default_factory=list)
-    semantic: List[SemanticMemoryEntry] = field(default_factory=list)
+    outcome_patterns: List[OutcomePatternEntry] = field(default_factory=list)
     vector_used: bool = False
     truncated: bool = False
 
     @property
+    def semantic(self) -> List[OutcomePatternEntry]:
+        return self.outcome_patterns
+
+    @semantic.setter
+    def semantic(self, value: List[OutcomePatternEntry]) -> None:
+        self.outcome_patterns = value
+
+    @property
     def source_history_ids(self) -> List[int]:
         return sorted({entry.analysis_history_id for entry in self.episodic} | {
-            source_id for entry in self.semantic for source_id in entry.source_history_ids
+            source_id for entry in self.outcome_patterns for source_id in entry.source_history_ids
         })

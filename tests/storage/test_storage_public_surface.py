@@ -35,9 +35,10 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     PortfolioCorporateAction PortfolioDailySnapshot PortfolioFxRate
     PortfolioIdempotencyRecord PortfolioPosition PortfolioPositionLot
     PortfolioTrade ScheduledTaskRecord ScheduledTaskRunRecord Session StockDaily
-    TaskQueueInflightRecord
+    TaskQueueInflightRecord NotificationInboxReadStateRecord
     String T TYPE_CHECKING Text Tuple
-    TypeVar Union UniqueConstraint agent_history_public_fields and_
+    TypeVar Union UniqueConstraint agent_history_public_fields
+    agent_history_public_params and_
     apply_pending_within_transaction atexit contextmanager
     create_database_engine create_engine date datetime declarative_base delete
     desc event extract_sniper_points func get_config get_db hashlib inspect json
@@ -96,9 +97,10 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
     "TaskQueueInflightRecord",
+    "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "ef3bda9447c18cfbd202edee46c81c37fd411cb7ca40a8843fab6271bbcf9fdd"
+    "4310d640ecc98572e1bba4f56abeee286bd394dc1db07a8d6bc4912238c7ef3a"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -141,6 +143,7 @@ EXPECTED_SCHEMA_MODELS = (
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
     "TaskQueueInflightRecord",
+    "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -183,6 +186,7 @@ EXPECTED_SCHEMA_TABLES = (
     "investment_frameworks",
     "investment_framework_versions",
     "task_queue_inflight",
+    "notification_inbox_read_state",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -223,6 +227,7 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("task_queue_inflight", "created_at", "default"),
     ("task_queue_inflight", "updated_at", "default"),
     ("task_queue_inflight", "updated_at", "onupdate"),
+    ("notification_inbox_read_state", "read_at", "default"),
 )
 
 EXPECTED_GROUPS = (
@@ -318,7 +323,7 @@ EXPECTED_GROUPS = (
             "get_conversation_messages",
             "delete_conversation_session",
         ),
-        "b11e857f79dc5f3a3026e86bf426ecb7a3df8ebb389be3e5304fdcca787bdefb",
+        "1136cdcd9d110ae9a87206a5fdb4a54faff9937bf974daa917d9db33184b8823",
     ),
     (
         "_UsageMethods",
@@ -328,7 +333,7 @@ EXPECTED_GROUPS = (
             "get_llm_usage_summary",
             "get_llm_usage_records",
         ),
-        "09f5b539c64af212918a0222fa0086fabc891a5161f56492190f1906b4dce072",
+        "dbaf76e36abb6b32ba5244f044d0f0d8200afbc14b0a302cfc0cf96f71ddd6c0",
     ),
 )
 

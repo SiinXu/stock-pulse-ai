@@ -85,11 +85,12 @@ test('Provider secret reveal, native copy, and clear stay out of diagnostics', a
   expect(testInfo.project.use.trace, 'credential-bearing acceptance must not create browser traces').toBe('off');
   await loginAsE2eAdmin(page);
   await page.goto(modelConnectionsHref);
-  await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: /添加模型来源/ }).first().click();
+  await page.getByTestId('source-type-cloud').click();
+  const dialog = page.getByRole('region', { name: '添加模型服务' });
   await dialog.getByLabel('选择模型服务商').click();
-  await dialog.locator('[role="option"][data-value="openai"]').click();
+  await page.locator('[role="option"][data-value="openai"]').click();
   await dialog.getByRole('button', { name: '下一步' }).click();
 
   const providerCredential = dialog.getByLabel('API 密钥');

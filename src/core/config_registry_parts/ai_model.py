@@ -451,6 +451,60 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "LLM_TIMEOUT_SEC": {
+        "title": "LLM Request Timeout (Seconds)",
+        "description": (
+            "Per-request LLM timeout in seconds. AlphaSift stock-selection reordering reuses this "
+            "DSA setting and falls back to non-LLM ranking after timeout. Default 60."
+        ),
+        "category": "ai_model",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "60",
+        "options": [],
+        "validation": {"min": 1, "max": 3600},
+        # Unique order among ai_model fields (7/8 already used by legacy/cache keys).
+        "display_order": 12,
+        "help_key": "settings.ai_model.LLM_TIMEOUT_SEC",
+        "examples": ["LLM_TIMEOUT_SEC=60", "LLM_TIMEOUT_SEC=120"],
+        "docs": [
+            {
+                "label": "AlphaSift integration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alphasift-integration.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "LLM_MAX_TOKENS": {
+        "title": "LLM Max Output Tokens",
+        "description": (
+            "Output token cap for AlphaSift LLM reordering requests. Does not replace per-provider "
+            "max-token keys used by main analysis channels. Default 2048."
+        ),
+        "category": "ai_model",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "2048",
+        "options": [],
+        "validation": {"min": 1, "max": 200000},
+        # Unique order among ai_model fields (7/8 already used by legacy/cache keys).
+        "display_order": 13,
+        "help_key": "settings.ai_model.LLM_MAX_TOKENS",
+        "examples": ["LLM_MAX_TOKENS=2048", "LLM_MAX_TOKENS=4096"],
+        "docs": [
+            {
+                "label": "AlphaSift integration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alphasift-integration.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "LLM_PROMPT_CACHE_TELEMETRY_ENABLED": {
         "title": "Prompt Cache Telemetry",
         "description": "Records provider prompt-cache usage telemetry and normalized cache diagnostics when providers return cache usage fields. This does not enable or disable provider implicit cache.",
@@ -475,6 +529,28 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/LLM_CONFIG_GUIDE.md",
             },
         ],
+        "warning_codes": [],
+    },
+    "LLM_USAGE_ATTRIBUTION_ENABLED": {
+        "title": "Usage Cost Attribution",
+        "description": "Attach run/stage/mode cost estimates and model-routing quality fields to llm_usage rows. Shares metering with per-mode budgets.",
+        "category": "ai_model", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "true", "options": [], "validation": {}, "display_order": 7,
+        "help_key": "settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED",
+        "examples": ["LLM_USAGE_ATTRIBUTION_ENABLED=true", "LLM_USAGE_ATTRIBUTION_ENABLED=false"],
+        "docs": [{"label": "LLM cost attribution", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/llm-cost-attribution.md"}],
+        "warning_codes": [],
+    },
+    "LLM_COST_PRICING_PATH": {
+        "title": "LLM Cost Pricing Table Path",
+        "description": "Optional JSON path of per-model token rates for estimated_cost_usd. When unset, LiteLLM model_cost is used.",
+        "category": "ai_model", "data_type": "string", "ui_control": "text",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "", "options": [], "validation": {}, "display_order": 8,
+        "help_key": "settings.ai_model.LLM_COST_PRICING_PATH",
+        "examples": ["LLM_COST_PRICING_PATH=/path/to/pricing.json"],
+        "docs": [{"label": "LLM cost attribution", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/llm-cost-attribution.md"}],
         "warning_codes": [],
     },
     "LLM_PROMPT_CACHE_HINTS_ENABLED": {

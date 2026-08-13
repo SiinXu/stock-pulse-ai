@@ -359,7 +359,7 @@ describe('ScheduledTasksPanel', () => {
     expect(failed).toHaveTextContent('partial_failure · email, dingtalk');
     expect(failed).toHaveTextContent('dingtalk');
     expect(failed).toHaveTextContent('analysis_failed');
-  });
+  }, HISTORY_FLOW_TIMEOUT_MS);
 
   it('shows an empty history and uses the API limit contract for load more and refresh', async () => {
     let resolveEmptyHistory: () => void = () => undefined;

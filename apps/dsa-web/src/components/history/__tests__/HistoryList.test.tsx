@@ -50,6 +50,32 @@ const longChineseNameItem: HistoryItem = {
 };
 
 describe('HistoryList', () => {
+  it('renders a 60-point market review with the green market-light color', () => {
+    render(
+      <HistoryList
+        {...baseProps}
+        items={[
+          {
+            ...items[0],
+            stockCode: 'MARKET',
+            stockName: '大盘复盘',
+            reportType: 'market_review',
+            operationAdvice: '查看复盘',
+            sentimentScore: 60,
+          },
+        ]}
+      />,
+    );
+
+    const historyItem = screen.getByRole('button', { name: /大盘复盘 MARKET/ });
+    expect(historyItem.querySelector('.h-2.w-2.rounded-full')).toHaveStyle({
+      backgroundColor: '#22c55e',
+    });
+    expect(within(screen.getByTestId('history-card-actions')).getByText(/60/)).toHaveStyle({
+      color: '#22c55e',
+    });
+  });
+
   it('shows the empty state copy when no history exists', () => {
     const { container } = render(<HistoryList {...baseProps} items={[]} />);
 

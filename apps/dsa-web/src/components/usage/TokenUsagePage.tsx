@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useRouteFocusTarget } from '../routing';
 import {
   usageApi,
   type UsageCallRecord,
@@ -24,13 +25,33 @@ import {
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../../i18n/uiText';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
 import { getUiLocale } from '../../utils/uiLocale';
+import {
+  defineUrlStateSchema,
+  enumParam,
+  readParams,
+  writeParams,
+} from '../../utils/urlState';
 
 type Translate = (key: UiTextKey, params?: UiTextParams) => string;
 type UsageDashboardSnapshot = { period: UsagePeriod; dashboard: UsageDashboard };
 
 const PERIOD_OPTIONS: UsagePeriod[] = ['today', 'month', 'all'];
+const DEFAULT_USAGE_PERIOD: UsagePeriod = 'month';
+
+/**
+ * Shareable Token Usage view state (UI-03A / #879 A1).
+ * Period is a filter → replace history. Unknown keys (Settings section/view) are preserved.
+ */
+const tokenUsageUrlSchema = defineUrlStateSchema({
+  period: enumParam({
+    name: 'period',
+    values: PERIOD_OPTIONS,
+    default: DEFAULT_USAGE_PERIOD,
+    history: 'replace',
+  }),
+});
 
 const PERIOD_LABEL_KEYS: Record<UsagePeriod, UiTextKey> = {
   today: 'usage.period.today',
@@ -46,6 +67,14 @@ const CALL_TYPE_LABEL_KEYS: Record<string, UiTextKey> = {
 
 function formatNumber(value: number | null | undefined, language: UiLanguage): string {
   return new Intl.NumberFormat(getUiLocale(language)).format(value ?? 0);
+}
+function formatUsd(value: number | null | undefined, language: UiLanguage): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat(getUiLocale(language), { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value);
+}
+function formatPercent(value: number | null | undefined, language: UiLanguage): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat(getUiLocale(language), { style: 'percent', maximumFractionDigits: 1 }).format(value);
 }
 
 function formatDateTime(value: string, language: UiLanguage): string {
@@ -128,12 +157,28 @@ type TokenUsagePageProps = {
 
 const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => {
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Standalone/legacy usage entry owns focus; Settings embed defers to Settings H1.
+  useRouteFocusTarget({
+    routeId: LEGACY_ROUTE_PATHS.usage,
+    headingRef: pageHeadingRef,
+    ready: !embedded,
+  });
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (embedded) return;
     document.title = t('usage.documentTitle');
   }, [embedded, t]);
-  const [period, setPeriod] = useState<UsagePeriod>('month');
+
+  // Period is owned by the URL so refresh/share keep the selected time range
+  // (including when embedded under Settings next to section/view params).
+  const urlState = useMemo(
+    () => readParams(tokenUsageUrlSchema, searchParams),
+    [searchParams],
+  );
+  const period = urlState.period;
+
   const [snapshot, setSnapshot] = useState<UsageDashboardSnapshot | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [loading, setLoading] = useState(true);
@@ -174,8 +219,13 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
     if (nextPeriod === period) return;
     setError(null);
     setLoading(true);
-    setPeriod(nextPeriod);
-  }, [period]);
+    const next = writeParams(
+      tokenUsageUrlSchema,
+      { period: nextPeriod },
+      { search: searchParams },
+    );
+    setSearchParams(next.params, { replace: next.history === 'replace' });
+  }, [period, searchParams, setSearchParams]);
 
   const largestCallTypeTotal = useMemo(() => {
     return Math.max(...(dashboard?.byCallType.map((item) => item.totalTokens) ?? [0]), 1);
@@ -229,6 +279,19 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
       align: 'end',
       nowrap: true,
       cell: (item) => <span className="font-medium text-foreground">{formatNumber(item.totalTokens, language)}</span>,
+    },
+    {
+      id: 'cost',
+      header: t('usage.table.cost'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => formatUsd(item.estimatedCostUsd, language),
+    },
+    {
+      id: 'route',
+      header: t('usage.table.routeOutcome'),
+      nowrap: true,
+      cell: (item) => item.routeOutcome || '—',
     },
   ], [language, t]);
 
@@ -313,6 +376,12 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
               <StatCard label={t('usage.totalCalls')} value={formatNumber(dashboard.totalCalls, language)} hint={t('usage.totalCallsHint')} icon={<Activity className="h-5 w-5" />} />
               <StatCard label={t('usage.promptTokens')} value={formatNumber(dashboard.totalPromptTokens, language)} hint={t('usage.promptTokensHint')} icon={<Cpu className="h-5 w-5" />} />
               <StatCard label={t('usage.completionTokens')} value={formatNumber(dashboard.totalCompletionTokens, language)} hint={t('usage.completionTokensHint')} icon={<Gauge className="h-5 w-5" />} />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard label={t('usage.estimatedCost')} value={formatUsd(dashboard.totalEstimatedCostUsd, language)} hint={t('usage.estimatedCostHint', { priced: formatNumber(dashboard.pricedCalls, language), unpriced: formatNumber(dashboard.unpricedCalls, language) })} icon={<Database className="h-5 w-5" />} />
+              <StatCard label={t('usage.routingSuccessRate')} value={formatPercent(dashboard.routingSuccessRate, language)} hint={t('usage.routingSuccessHint', { primary: formatNumber(dashboard.routingPrimarySuccess, language), fallback: formatNumber(dashboard.routingFallbackSuccess, language), failed: formatNumber(dashboard.routingFailed, language) })} icon={<Activity className="h-5 w-5" />} />
+              <StatCard label={t('usage.routingFallbackRate')} value={formatPercent(dashboard.routingFallbackRate, language)} hint={t('usage.routingFallbackHint')} icon={<Gauge className="h-5 w-5" />} />
+              <StatCard label={t('usage.stageCount')} value={formatNumber(dashboard.byStage?.length ?? 0, language)} hint={t('usage.stageCountHint')} icon={<Cpu className="h-5 w-5" />} />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
@@ -401,6 +470,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
   ) : (
     <div className="space-y-5">
       <PageHeader
+        ref={pageHeadingRef}
         eyebrow={t('usage.eyebrow')}
         title={t('usage.title')}
         description={t('usage.description')}

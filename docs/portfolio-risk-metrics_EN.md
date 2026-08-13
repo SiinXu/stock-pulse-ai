@@ -45,7 +45,11 @@ Auth matches neighboring `/api/v1/portfolio/*` routes (global admin session when
 2. **Daily closes** — `StockRepository.get_range` over already-stored `stock_daily` rows.
 
 Cash is excluded from weights. Weights are market-value shares of equity positions
-(`market_value_base`), rebased to sum to 1.0.
+in the **response base currency**: each position `market_value_base` (account base)
+is converted via `PortfolioService.convert_amount_with_provenance` into the snapshot
+`currency` (default CNY) before aggregation and rebased to sum to 1.0.
+**Never** sum mixed account-base currency units. Stale FX sets `fx_stale=true` and
+may mark overall status `partial`.
 
 ## Formulas and assumptions
 
@@ -153,9 +157,27 @@ horizon scaling, cash exclusion, and `provider_calls_on_hot_path: false`.
 | Schemas | `api/v1/schemas/portfolio_risk_metrics.py` |
 | Service tests | `tests/services/test_portfolio_risk_metrics_service.py` |
 | API tests | `tests/api/test_portfolio_risk_metrics_api.py` |
+| Web client | `apps/dsa-web/src/api/portfolioRiskMetrics.ts` |
+| Web panel | `apps/dsa-web/src/components/portfolio-risk/PortfolioRiskMetricsPanel.tsx` |
 
-## Follow-ups (not V0)
+## Web V1 surface
 
-- Web Portfolio page visualization (comment on #239; blocked by PortfolioPage ownership).
+The Portfolio page mounts a risk-metrics panel that consumes this endpoint only:
+
+- Historical VaR card (null when block status is not `ok`)
+- Correlation matrix with explicit missing cells
+- Concentration / diversification card (HHI, effective N, score, top weights)
+- Always-visible `assumptions` block
+- Honest top-level `empty_portfolio` / `insufficient_history` / `partial` banners
+- Account changes are isolated by TanStack Query key, so a late response for an old account cannot overwrite the active scope
+- The panel has an accessible region name; loading and error states use live regions, and the correlation table retains its caption and keyboard-scrollable region
+
+Report embedding, parametric VaR, and stress-test integration remain out of scope.
+
+The panel is loaded via TanStack Query inside the existing Portfolio workspace QueryProvider tree.
+
+## Follow-ups (not V0 / not Web V1)
+
 - Parametric VaR, risk contribution, sector breakdown.
 - Integration with stress testing (#210) and allocation (#237).
+- Report and notification surfaces for risk metrics.

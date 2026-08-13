@@ -7,6 +7,7 @@ import {
   buildAnalysisWorkbenchHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
+import { openAnalysisHistoryPopover } from './workbench-fixture';
 
 const buttonHeights: Record<string, number> = {
   compact: 20,
@@ -156,7 +157,8 @@ test.describe('touch-capable foundation controls', () => {
     await page.goto(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
-    const historySelection = page.getByRole('checkbox', {
+    const historyPopover = await openAnalysisHistoryPopover(page);
+    const historySelection = historyPopover.getByRole('checkbox', {
       name: /选择 .*历史记录|Select .* history record/,
     }).first();
     await expect(historySelection).toBeVisible();
@@ -171,7 +173,7 @@ test.describe('touch-capable foundation controls', () => {
     );
     await historySelection.check();
 
-    const historyDelete = page.getByRole('button', { name: /删除|Delete/, exact: true }).first();
+    const historyDelete = historyPopover.getByRole('button', { name: /删除|Delete/, exact: true }).first();
     await expect(historyDelete).toBeVisible();
     await expectVisibleHeights(historyDelete, iconButtonHeights);
     await expectCoarseHitTarget(historyDelete, 'history delete action');

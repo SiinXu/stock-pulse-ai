@@ -118,6 +118,7 @@ class _PersistenceStageMixin:
         news_result_count: Optional[int] = None,
         analysis_context_pack_overview: Optional[Dict[str, Any]] = None,
         market_phase_summary: Optional[Dict[str, Any]] = None,
+        sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         构建分析上下文快照
@@ -139,11 +140,35 @@ class _PersistenceStageMixin:
             snapshot["analysis_context_pack_overview"] = analysis_context_pack_overview
         if market_phase_summary is not None:
             snapshot[MARKET_PHASE_SUMMARY_KEY] = market_phase_summary
+        if isinstance(sentiment_snapshot, dict) and sentiment_snapshot:
+            # Evidence-only package for auditability; not a trading conclusion.
+            snapshot["sentiment_snapshot"] = dict(sentiment_snapshot)
         diagnostic_snapshot = current_diagnostic_snapshot()
         if diagnostic_snapshot is not None:
             snapshot["diagnostics"] = diagnostic_snapshot
         if self.analysis_skills is not None:
             snapshot["skills"] = list(self.analysis_skills)
+        from src.services.analysis_stage_checkpoint import current_checkpoint_session
+
+        checkpoint_session = current_checkpoint_session()
+        if checkpoint_session is not None:
+            try:
+                metadata = checkpoint_session.metadata_for_snapshot()
+                if isinstance(metadata, dict):
+                    if metadata.get("checkpoint"):
+                        snapshot["analysis_checkpoint"] = metadata["checkpoint"]
+                    if metadata.get("run_configuration"):
+                        snapshot["run_configuration"] = metadata["run_configuration"]
+                    if metadata.get("repro_status"):
+                        snapshot["repro_status"] = metadata["repro_status"]
+            except Exception as exc:  # broad-exception: optional_metadata - Checkpoint audit metadata is optional and failures are recorded without changing analysis persistence.
+                log_safe_exception(
+                    logger,
+                    "Failed to attach analysis checkpoint metadata to context snapshot",
+                    exc,
+                    error_code="analysis_checkpoint_snapshot_attach_failed",
+                    level=logging.DEBUG,
+                )
         return snapshot
 
     def _persist_analysis_history_stage(
@@ -646,6 +671,8 @@ class _PersistenceStageMixin:
         news_result_count: Optional[int],
         query_id: str,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        money_flow_data: Optional[Any] = None,
+        sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> PipelineAnalysisArtifacts:
         return PipelineAnalysisArtifacts(
             code=code,
@@ -663,8 +690,15 @@ class _PersistenceStageMixin:
             metadata={
                 "query_id": query_id,
                 "trigger_source": self.query_source,
+                **(
+                    {"smartmoney_enabled": True}
+                    if getattr(self.config, "smartmoney_enabled", False)
+                    else {}
+                ),
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
+            money_flow_data=money_flow_data,
+            sentiment_snapshot=dict(sentiment_snapshot) if isinstance(sentiment_snapshot, dict) else None,
         )
 
     def _build_agent_analysis_artifacts(
@@ -679,6 +713,7 @@ class _PersistenceStageMixin:
         query_id: str,
         base_context: Optional[Dict[str, Any]] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> PipelineAnalysisArtifacts:
         context_candidate = base_context
         if not isinstance(context_candidate, dict):
@@ -715,6 +750,7 @@ class _PersistenceStageMixin:
                 "trigger_source": self.query_source,
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
+            sentiment_snapshot=dict(sentiment_snapshot) if isinstance(sentiment_snapshot, dict) else None,
         )
 
     def _build_analysis_context_pack_outputs(

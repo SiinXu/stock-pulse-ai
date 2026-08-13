@@ -10,6 +10,7 @@ import { toCamelCase } from './utils';
 import type {
   AvailableModelsResponse,
   ConfigValidationIssue,
+  DataProviderRuntimeStatusResponse,
   DiscoverLLMChannelModelsRequest,
   DiscoverLLMChannelModelsResponse,
   ExportSystemConfigResponse,
@@ -200,7 +201,14 @@ const availableModelsResponseSchema = z.object({ models: z.array(availableModelE
 const schedulerStatusResponseSchema = z.object({
   enabled: z.boolean(), running: z.boolean(), scheduleTimes: z.array(z.string()),
   track: z.literal('legacy_day_batch').optional(), attached: z.boolean().optional(),
-  processMode: z.enum(['serve', 'desktop', 'not_attached']).optional(),
+  // Design four-state vocabulary (#869). Legacy "serve" accepted for rolling upgrades.
+  processMode: z.enum([
+    'serve+schedule',
+    'desktop',
+    'cli-schedule',
+    'not_attached',
+    'serve',
+  ]).optional(),
   scheduleTimezone: z.string().optional(), runNowAvailable: z.boolean().optional(),
   runNowBlockReason: z.string().nullable().optional(),
   nextRunAt: z.string().nullable().optional(), lastRunAt: z.string().nullable().optional(),
@@ -266,6 +274,39 @@ const kronosStatusResponseSchema = z.object({
   tokenizerDir: z.string().nullable().optional(), weightsDirConfigured: z.string().nullable().optional(),
   weightsDirResolved: z.string().nullable().optional(), weightsModifiedAt: z.string().nullable().optional(),
   weightsTotalBytes: z.number().nullable().optional(),
+}).passthrough();
+const dataProviderRuntimeMarketChainSchema = z.object({
+  market: z.string(), dataType: z.string(),
+  orderedProviderIds: z.array(z.string()).optional(),
+  primaryProviderId: z.string().nullable().optional(),
+  fallbackProviderIds: z.array(z.string()).optional(),
+  primarySelection: z.string().nullable().optional(),
+  quality: z.string(), asOf: z.string().nullable().optional(),
+}).passthrough();
+const dataProviderRuntimeProviderStatusSchema = z.object({
+  providerId: z.string(), displayName: z.string(), role: z.string(),
+  markets: z.array(z.string()).optional(), capabilities: z.array(z.string()).optional(),
+  configured: z.boolean().nullable().optional(), available: z.boolean(),
+  healthStatus: z.string(), healthScore: z.number().nullable().optional(),
+  circuitState: z.string().nullable().optional(), sampleCount: z.number().optional(),
+  staticPriority: z.number().nullable().optional(),
+  lastSuccessAt: z.string().nullable().optional(), lastFailureAt: z.string().nullable().optional(),
+  failureReason: z.string().nullable().optional(),
+  isPrimaryFor: z.array(z.string()).optional(), isFallbackFor: z.array(z.string()).optional(),
+  configDirectory: z.boolean().optional(),
+}).passthrough();
+const dataProviderRuntimeCacheStatusSchema = z.object({
+  enabled: z.boolean().nullable().optional(), fetchMode: z.string().nullable().optional(),
+  hits: z.number().nullable().optional(), misses: z.number().nullable().optional(),
+  staleHits: z.number().nullable().optional(), writes: z.number().nullable().optional(),
+  quality: z.string(), note: z.string().nullable().optional(),
+}).passthrough();
+const dataProviderRuntimeStatusResponseSchema = z.object({
+  schemaVersion: z.string(), asOf: z.string(), partial: z.boolean(), sourceState: z.string(),
+  errorCode: z.string().nullable().optional(), errorMessage: z.string().nullable().optional(),
+  markets: z.array(dataProviderRuntimeMarketChainSchema).optional(),
+  providers: z.array(dataProviderRuntimeProviderStatusSchema).optional(),
+  cache: dataProviderRuntimeCacheStatusSchema.nullable().optional(),
 }).passthrough();
 
 function parseCamelCasePayload<T>(data: unknown, schema: z.ZodTypeAny, label: string): T {
@@ -362,6 +403,7 @@ function toSnakeTestChannelPayload(payload: TestLLMChannelRequest): Record<strin
     base_url: payload.baseUrl ?? '',
     api_key: payload.apiKey ?? '',
     models: payload.models,
+    model_id_mode: payload.modelIdMode ?? 'route',
     enabled: payload.enabled ?? true,
     timeout_seconds: payload.timeoutSeconds ?? 20,
     use_saved_secret: payload.useSavedSecret ?? false,
@@ -468,6 +510,17 @@ export const systemConfigApi = {
       '/api/v1/system/config/kronos/status',
     );
     return parseCamelCasePayload<KronosStatusResponse>(response.data, kronosStatusResponseSchema, 'KronosStatusResponse');
+  },
+
+  async getDataProviderRuntimeStatus(): Promise<DataProviderRuntimeStatusResponse> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      '/api/v1/system/config/data-providers/runtime-status',
+    );
+    return parseCamelCasePayload<DataProviderRuntimeStatusResponse>(
+      response.data,
+      dataProviderRuntimeStatusResponseSchema,
+      'DataProviderRuntimeStatusResponse',
+    );
   },
 
   async getLlmConfigModeStatus(): Promise<LLMConfigModeStatus> {

@@ -18,6 +18,7 @@ from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
+    build_agent_tool_history_context,
     sanitize_agent_diagnostic,
 )
 from src.agent.runtime.contract import ExecutionState
@@ -98,6 +99,31 @@ class _ChatMethods:
             skills_section=skills_section,
             language_section=_build_language_section(report_language, chat_mode=True),
         )
+        try:
+            from src.services.research_persona_prompt import (
+                append_research_persona_to_system_prompt,
+                inject_research_persona_into_analysis_context,
+            )
+
+            persona_context = dict(context or {})
+            inject_research_persona_into_analysis_context(
+                persona_context,
+                config=getattr(self, "config", None)
+                or getattr(getattr(self, "llm_adapter", None), "_config", None),
+                report_language=report_language,
+            )
+            system_prompt = append_research_persona_to_system_prompt(
+                system_prompt,
+                context=persona_context,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional persona failures are logged and leave the canonical prompt unchanged.
+            log_safe_exception(
+                logger,
+                "Agent chat research persona assembly failed",
+                exc,
+                error_code="agent_chat_research_persona_failed",
+                level=logging.WARNING,
+            )
         system_prompt = _compose_agent_soul_prompt(system_prompt)
         soul_runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
 
@@ -238,7 +264,17 @@ class _ChatMethods:
         # message and no late partial trace behind.
         terminal_state = classify_result_terminal_state(result)
         if terminal_state is ExecutionState.SUCCEEDED:
-            assistant_message_id = conversation_manager.add_message(session_id, "assistant", result.content)
+            history_context = build_agent_tool_history_context(result.tool_calls_log)
+            assistant_message_id = (
+                conversation_manager.add_message(
+                    session_id,
+                    "assistant",
+                    result.content,
+                    context=history_context,
+                )
+                if history_context
+                else conversation_manager.add_message(session_id, "assistant", result.content)
+            )
             self._persist_provider_trace(
                 session_id=session_id,
                 run_id=run_id,

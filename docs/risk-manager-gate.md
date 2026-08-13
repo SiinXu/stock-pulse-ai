@@ -63,6 +63,16 @@ override 计划，但关闭它不能绕过最终动作裁决。
 `/approvals` 仍提供可选的一次性旁路。授权被消费后保留原始动作，在结构化结果
 中记录审批 ID，并明确显示“经授权保留原始动作”，不能误称“已下调”。
 
+
+
+## Web 报告呈现
+
+Web 决策卡顶部始终渲染风险管理员结论（`ReportRiskGateBanner`）。裁决为
+`pass` / `downgrade` / `reject`。当 `summary.riskManager` 或
+`rawResult.riskGateResult` 缺失、或不是规范的 `risk-manager-result/v1` 结构时，
+界面显示 **未评估**，绝不能默认显示为通过。拒绝态使用醒目的 danger alert。
+DecisionSignal 卡片与详情从 `metadata.riskManager` 投影同一 payload，前端不重算风险。
+
 ## 回滚
 
 回退对应变更即可。新增持久化内容均为附加 JSON metadata，无数据库迁移。

@@ -54,12 +54,20 @@ export interface Message {
 }
 
 function fromSessionMessage(message: ChatSessionMessage): Message {
+  const thinkingSteps = Array.isArray(message.params?.thinking_steps)
+    ? message.params.thinking_steps.filter(
+        (step): step is ProgressStep => Boolean(
+          step && typeof step === 'object' && typeof (step as { type?: unknown }).type === 'string',
+        ),
+      )
+    : undefined;
   return {
     id: message.id,
     role: message.role,
     content: message.content,
     ...(message.error ? { error: message.error } : {}),
     ...(message.params ? { params: message.params } : {}),
+    ...(thinkingSteps?.length ? { thinkingSteps } : {}),
     ...(message.turn_id ? { turnId: message.turn_id } : {}),
   };
 }
@@ -189,7 +197,7 @@ interface AgentChatActions {
   clearCompletionBadge: () => void;
   loadSessions: () => Promise<void>;
   loadInitialSession: (preferredSessionId?: string) => Promise<void>;
-  switchSession: (targetSessionId: string) => Promise<boolean>;
+  switchSession: (targetSessionId: string, forceReload?: boolean) => Promise<boolean>;
   startNewChat: () => string;
   startStream: (
     payload: ChatStreamRequest,
@@ -318,9 +326,9 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     }
   },
 
-  switchSession: async (targetSessionId) => {
+  switchSession: async (targetSessionId, forceReload = false) => {
     const { sessionId, messages, abortController } = get();
-    if (targetSessionId === sessionId && messages.length > 0) return true;
+    if (!forceReload && targetSessionId === sessionId && messages.length > 0) return true;
 
     const generation = ++sessionHistoryGeneration;
     abortController?.abort();
@@ -363,6 +371,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     // User-initiated stop of an in-flight generation. Aborting rejects the
     // reader with AbortError (handled silently). Keep the mutex and controller
     // owned by startStream until its reconciliation and finally block settle.
+    // Clearing progressSteps here also drops any in-flight rAF batch for this turn.
     const { abortController } = get();
     if (!abortController) return;
     abortController.abort();
@@ -470,6 +479,45 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     // Outcome is local to this invocation so a superseded stream cannot pollute a newer one.
     let terminal: StreamTerminalState = 'completed';
     let turnAcknowledged = false;
+    // Batch progress UI commits to animation frames so multi-event SSE chunks
+    // do not force one React commit per line (keeps Stop responsive).
+    const pendingProgressEvents: ProgressStep[] = [];
+    let progressFlushHandle: number | null = null;
+    const canPublishProgress = () => (
+      get().sessionId === streamSessionId
+      && get().abortController === ac
+      && !ac.signal.aborted
+    );
+    const flushProgressEvents = () => {
+      progressFlushHandle = null;
+      if (pendingProgressEvents.length === 0 || !canPublishProgress()) {
+        pendingProgressEvents.length = 0;
+        return;
+      }
+      const batch = pendingProgressEvents.splice(0, pendingProgressEvents.length);
+      set((s) => ({ progressSteps: [...s.progressSteps, ...batch] }));
+    };
+    const scheduleProgressFlush = () => {
+      if (progressFlushHandle !== null) {
+        return;
+      }
+      if (typeof requestAnimationFrame === 'function') {
+        progressFlushHandle = requestAnimationFrame(flushProgressEvents);
+        return;
+      }
+      progressFlushHandle = setTimeout(flushProgressEvents, 0) as unknown as number;
+    };
+    const cancelProgressFlush = () => {
+      if (progressFlushHandle === null) {
+        return;
+      }
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(progressFlushHandle);
+      } else {
+        clearTimeout(progressFlushHandle);
+      }
+      progressFlushHandle = null;
+    };
     try {
       const response = await agentApi.chatStream(identifiedPayload, { signal: ac.signal });
       const reader = response.body!.getReader();
@@ -488,6 +536,10 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         }
         if (event.type === 'done') {
           receivedDoneEvent = true;
+          // Publish any buffered progress before terminal content so the UI
+          // still saw intermediate steps when the burst ends in the same chunk.
+          cancelProgressFlush();
+          flushProgressEvents();
           const doneEvent = event as unknown as StreamFailureEvent;
           if (doneEvent.success === false) {
             throw getStreamFailureError(doneEvent, '大模型调用出错，请检查 API Key 配置');
@@ -497,16 +549,15 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         }
 
         if (event.type === 'error') {
+          cancelProgressFlush();
+          flushProgressEvents();
           throw getStreamFailureError(event as unknown as StreamFailureEvent, '分析出错');
         }
 
         currentProgressSteps.push(event);
-        if (
-          get().sessionId === streamSessionId
-          && get().abortController === ac
-          && !ac.signal.aborted
-        ) {
-          set((s) => ({ progressSteps: [...s.progressSteps, event] }));
+        if (canPublishProgress()) {
+          pendingProgressEvents.push(event);
+          scheduleProgressFlush();
         }
       };
 
@@ -586,6 +637,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         set({ completionBadge: true });
       }
     } catch (error: unknown) {
+      cancelProgressFlush();
+      pendingProgressEvents.length = 0;
       if (error instanceof Error && error.name === 'AbortError') {
         // User-initiated abort: silent, no badge, no retry entry.
         // lastFailedRequest stays null so retryLastStream remains inert after Stop.
@@ -609,6 +662,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         terminal = 'failed';
       }
     } finally {
+      cancelProgressFlush();
+      pendingProgressEvents.length = 0;
       void get().loadSessions();
     }
     const persistence: TurnPersistenceState = turnAcknowledged

@@ -56,7 +56,8 @@
         "arguments": {},
         "success": false,
         "result_length": 78,
-        "cached": false
+        "cached": false,
+        "result_preview": "{\"error\": \"Tool handler failed.\", \"code\": \"handler_error\", \"retriable\": false}"
       }
     ],
     "total_steps": 2,

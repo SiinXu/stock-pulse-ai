@@ -4,7 +4,7 @@
 """Opt-in reasoning-trace export endpoint (Issue #135 / T03).
 
 Default-off. When enabled, exports a redacted ``reasoning-trace-v1`` package
-built from persisted analysis history diagnostics. No Web UI.
+built from persisted analysis history diagnostics. Web report and run-diagnostics surfaces call this endpoint for product download.
 """
 
 from __future__ import annotations

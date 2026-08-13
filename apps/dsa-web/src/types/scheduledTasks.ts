@@ -39,6 +39,8 @@ export interface ScheduledTaskDefinitionSummary {
   nextRunAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Present on OpenAPI ScheduledTaskItem (supported); omitted for unsupported_schema. */
+  maxAttempts?: number;
 }
 
 export interface ScheduledTaskListResponse {

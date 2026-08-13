@@ -20,11 +20,55 @@ describe('stock code validation', () => {
     expect(isObviouslyInvalidStockQuery(input)).toBe(false);
   });
 
-  test.each(['7203', '005930.K', '035900.KRX'])(
+  test.each([
+    ['2330.TW', '2330.TW'],
+    ['6505.two', '6505.TWO'],
+  ])('accepts Taiwan Yahoo suffix code %s', (input, normalized) => {
+    expect(validateStockCode(input)).toEqual({ valid: true, normalized });
+  });
+
+  test.each(['005930.K', '035900.KRX'])(
     'does not treat ambiguous JP/KR-like query %s as a valid suffix code',
     (input) => {
       const result = validateStockCode(input);
       expect(result.valid).toBe(false);
     }
   );
+
+  test('bare 4-digit 7203 is a valid HK code, not a JP suffix code', () => {
+    expect(looksLikeStockCode('7203')).toBe(true);
+    expect(validateStockCode('7203')).toEqual({
+      valid: true,
+      normalized: 'HK07203',
+    });
+  });
+
+  test.each([
+    ['0001', 'HK00001'],
+    ['0941', 'HK00941'],
+    ['1810', 'HK01810'],
+  ])('accepts bare 4-digit HK code %s and rewrites to %s', (input, canonical) => {
+    expect(looksLikeStockCode(input)).toBe(true);
+    expect(validateStockCode(input)).toEqual({
+      valid: true,
+      normalized: canonical,
+    });
+    expect(isObviouslyInvalidStockQuery(input)).toBe(false);
+  });
+
+  test.each([
+    ['crypto:BTC', 'CRYPTO:BTC'],
+    ['CRYPTO:ETH', 'CRYPTO:ETH'],
+    ['crypto:sol', 'CRYPTO:SOL'],
+  ])('accepts explicit crypto identity %s', (input, normalized) => {
+    expect(looksLikeStockCode(input)).toBe(true);
+    expect(validateStockCode(input)).toEqual({ valid: true, normalized });
+    expect(isObviouslyInvalidStockQuery(input)).toBe(false);
+  });
+
+  test('rejects incomplete crypto namespace and keeps bare BTC as US-shaped', () => {
+    expect(validateStockCode('BTC')).toEqual({ valid: true, normalized: 'BTC' });
+    expect(looksLikeStockCode('crypto:')).toBe(false);
+    expect(validateStockCode('crypto:').valid).toBe(false);
+  });
 });

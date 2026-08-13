@@ -81,6 +81,7 @@ class _AnalysisContextStageMixin:
         fundamental_context: Optional[Dict[str, Any]] = None,
         market_phase_context: Optional[Dict[str, Any]] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        money_flow_data: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         增强分析上下文
@@ -131,6 +132,9 @@ class _AnalysisContextStageMixin:
                 'total_mv': getattr(realtime_quote, 'total_mv', None),
                 'circ_mv': getattr(realtime_quote, 'circ_mv', None),
                 'change_60d': getattr(realtime_quote, 'change_60d', None),
+                # ETF premium path (Issue #173): optional IOPV / NAV when the provider supplies them.
+                'iopv': getattr(realtime_quote, 'iopv', None),
+                'nav': getattr(realtime_quote, 'nav', None),
                 'source': quote_source_name,
                 'fetched_at': getattr(realtime_quote, 'fetched_at', None),
                 'provider_timestamp': getattr(realtime_quote, 'provider_timestamp', None),
@@ -141,7 +145,7 @@ class _AnalysisContextStageMixin:
             # Remove None values to reduce context size
             enhanced['realtime'] = {k: v for k, v in enhanced['realtime'].items() if v is not None}
 
-        # Add chip-distribution data.
+        # Add chip-distribution data (equity-only; ETF/index path marks chip not_applicable).
         if chip_data:
             current_price = getattr(realtime_quote, 'price', 0) if realtime_quote else 0
             enhanced['chip'] = {
@@ -151,6 +155,23 @@ class _AnalysisContextStageMixin:
                 'concentration_70': chip_data.concentration_70,
                 'chip_status': chip_data.get_chip_status(current_price or 0),
             }
+
+        # Optional SmartMoney money-flow context (fail-open; only when fetched).
+        if money_flow_data is not None:
+            try:
+                from src.services.smartmoney_flow_service import money_flow_to_context
+
+                money_flow_context = money_flow_to_context(money_flow_data)
+                if money_flow_context:
+                    enhanced["money_flow"] = money_flow_context
+            except Exception as exc:  # broad-exception: fallback_recorded - optional money-flow inject
+                log_safe_exception(
+                    logger,
+                    "SmartMoney money-flow context inject failed",
+                    exc,
+                    error_code="pipeline_money_flow_context_inject_failed",
+                    level=logging.DEBUG,
+                )
 
         # Add trend analysis results
         if trend_result:
@@ -320,6 +341,40 @@ class _AnalysisContextStageMixin:
         enhanced['is_index_etf'] = SearchService.is_index_or_etf(
             context.get('code', ''), enhanced.get('stock_name', stock_name)
         )
+
+        # ETF/index analysis semantics (Issue #173): tracking, premium, N/A equity metrics
+        try:
+            from src.services.etf_analysis import build_etf_analysis_context
+
+            etf_analysis_context = build_etf_analysis_context(
+                context.get("code", ""),
+                enhanced.get("stock_name", stock_name),
+                realtime=enhanced.get("realtime")
+                if isinstance(enhanced.get("realtime"), dict)
+                else None,
+                is_index_etf=bool(enhanced.get("is_index_etf")),
+            )
+            enhanced["etf_analysis_context"] = etf_analysis_context
+            if isinstance(etf_analysis_context, dict):
+                instrument_type = str(etf_analysis_context.get("instrument_type") or "").strip()
+                if instrument_type in {"etf", "index"}:
+                    enhanced["instrument_type"] = instrument_type
+                    enhanced["is_index_etf"] = True
+                    # Equity chip distribution does not apply; drop if a provider still returned it.
+                    enhanced.pop("chip", None)
+                else:
+                    enhanced.setdefault("instrument_type", "equity")
+            else:
+                enhanced.setdefault("instrument_type", "equity")
+        except Exception as exc:  # broad-exception: fallback_recorded - ETF semantics fail-open
+            log_safe_exception(
+                logger,
+                "ETF analysis context build failed",
+                exc,
+                error_code="pipeline_etf_analysis_context_failed",
+                level=logging.DEBUG,
+            )
+            enhanced.setdefault("instrument_type", "equity")
 
         # P0: append unified fundamental block; keep as additional context only
         enhanced["fundamental_context"] = (

@@ -30,7 +30,10 @@ from src.services.run_diagnostics import (
     record_history_run,
     record_notification_run,
 )
-from src.schemas.market_light import MARKET_LIGHT_REGIONS
+from src.schemas.market_light import (
+    MARKET_LIGHT_REGIONS,
+    resolve_market_light_sentiment_score,
+)
 from src.plugins.event_hooks import dispatch_market_review_event
 from src.utils.sanitize import log_safe_exception
 
@@ -75,7 +78,7 @@ def _refresh_market_review_history_diagnostics(*, query_id: str) -> None:
                 code=MARKET_REVIEW_HISTORY_CODE,
                 diagnostics=diagnostic_snapshot,
             )
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - persistence diagnostics are recorded while report delivery continues
         log_safe_exception(
             logger,
             "Market review run diagnostic update failed open",
@@ -851,7 +854,7 @@ def _persist_market_review_history(
         result = AnalysisResult(
             code=MARKET_REVIEW_HISTORY_CODE,
             name=stock_name,
-            sentiment_score=50,
+            sentiment_score=resolve_market_light_sentiment_score(market_light_snapshots),
             trend_prediction=trend_prediction,
             operation_advice=operation_advice,
             analysis_summary=summary,
@@ -909,7 +912,7 @@ def _persist_market_review_history(
         else:
             logger.warning("大盘复盘历史记录保存失败: query_id=%s", history_query_id)
         return saved_history_id
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - persistence diagnostics are recorded while report delivery continues
         record_history_run(
             report_saved=False,
             metadata_saved=False,

@@ -8,7 +8,7 @@ from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-CapabilityDomain = Literal["data", "tool", "extension"]
+CapabilityDomain = Literal["data", "tool", "extension", "skill", "pipeline"]
 SourceState = Literal["ok", "error", "generation_drift", "not_initialized"]
 BoundedToken = Annotated[str, Field(min_length=1, max_length=128)]
 
@@ -89,8 +89,28 @@ class ExtensionCapabilityItem(CapabilityItemBase):
     type: Literal["plugin_lifecycle", "extension_registration"]
 
 
+class SkillCapabilityItem(CapabilityItemBase):
+    """Live analysis-skill observation from plugin or declarative owners."""
+
+    domain: Literal["skill"]
+    type: Literal["analysis_skill"]
+
+
+class PipelineCapabilityItem(CapabilityItemBase):
+    """Live pipeline-stage observation from the shared execution contract."""
+
+    domain: Literal["pipeline"]
+    type: Literal["pipeline_stage"]
+
+
 CapabilityItem = Annotated[
-    Union[DataCapabilityItem, ToolCapabilityItem, ExtensionCapabilityItem],
+    Union[
+        DataCapabilityItem,
+        ToolCapabilityItem,
+        ExtensionCapabilityItem,
+        SkillCapabilityItem,
+        PipelineCapabilityItem,
+    ],
     Field(discriminator="domain"),
 ]
 
@@ -102,7 +122,7 @@ class CapabilityListResponse(BaseModel):
 
     schema_version: Literal["capability-inventory/v1"]
     partial: bool
-    sources: List[CapabilitySourceStatus] = Field(default_factory=list, max_length=3)
+    sources: List[CapabilitySourceStatus] = Field(default_factory=list, max_length=5)
     items: List[CapabilityItem] = Field(default_factory=list, max_length=4096)
     total: int = Field(..., ge=0)
     executable_count: int = Field(..., ge=0)

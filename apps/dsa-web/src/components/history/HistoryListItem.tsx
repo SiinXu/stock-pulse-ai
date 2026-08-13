@@ -1,4 +1,4 @@
-import type React from 'react';
+import { memo } from 'react';
 import { Badge, Checkbox } from '../common';
 import { Pressable } from '../common/Pressable';
 import type { HistoryItem } from '../../types/analysis';
@@ -6,6 +6,7 @@ import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../../utils/marketPhase';
+import { getMarketLightColor } from '../../utils/marketReview';
 import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -18,16 +19,20 @@ interface HistoryListItemProps {
   onClick: (recordId: number) => void;
 }
 
-export const HistoryListItem: React.FC<HistoryListItemProps> = ({
+function HistoryListItemComponent({
   item,
   isViewing,
   isChecked,
   isDeleting,
   onToggleChecked,
   onClick,
-}) => {
+}: HistoryListItemProps) {
   const { language, t } = useUiLanguage();
-  const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
+  const isMarketReview = item.reportType === 'market_review'
+    || item.stockCode.trim().toUpperCase() === 'MARKET';
+  const sentimentColor = item.sentimentScore !== undefined
+    ? (isMarketReview ? getMarketLightColor(item.sentimentScore) : getSentimentColor(item.sentimentScore))
+    : null;
   const stockName = item.stockName || item.stockCode;
   const actionLabels = buildDecisionActionLabelMap(t);
   const operationLabel = getDecisionActionLabel(
@@ -42,7 +47,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
   );
 
   return (
-    <div className="flex items-start gap-2 group">
+    <div className="flex items-start gap-2 group" data-history-list-item={item.id}>
       <Checkbox
         checked={isChecked}
         onChange={() => onToggleChecked(item.id)}
@@ -113,4 +118,6 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
       </Pressable>
     </div>
   );
-};
+}
+
+export const HistoryListItem = memo(HistoryListItemComponent);

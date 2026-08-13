@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple
 import pandas as pd
 
 from src.services.name_to_code_resolver import resolve_name_to_code
-from src.services.stock_code_utils import is_code_like, normalize_code
+from src.services.stock_code_utils import canonicalize_analysis_stock_code, is_code_like
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -107,18 +107,21 @@ def _parse_dataframe(df: pd.DataFrame) -> List[Tuple[Optional[str], Optional[str
 
         code = None
         if code_val:
-            code = normalize_code(code_val)
+            code = canonicalize_analysis_stock_code(code_val)
             # If code_val is not a valid code, treat as name only when name_val is empty
             # Do not overwrite a valid name with a dirty code value such as `INVALID,贵州茅台`.
             if not code and not is_code_like(code_val):
                 if name_val:
-                    code = resolve_name_to_code(name_val)
+                    resolved = resolve_name_to_code(name_val)
+                    code = canonicalize_analysis_stock_code(resolved or "")
                     # Keep name_val; do not overwrite with code_val
                 else:
-                    code = resolve_name_to_code(code_val)
+                    resolved = resolve_name_to_code(code_val)
+                    code = canonicalize_analysis_stock_code(resolved or "")
                     name_val = code_val
         if not code and name_val:
-            code = resolve_name_to_code(name_val)
+            resolved = resolve_name_to_code(name_val)
+            code = canonicalize_analysis_stock_code(resolved or "")
             if not code:
                 logger.debug(f"[ImportParser] 名称解析失败: {name_val}")
 

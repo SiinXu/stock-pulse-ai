@@ -19,10 +19,12 @@ LOCAL_CLI_GENERATION_BACKEND_IDS = frozenset({
     CLAUDE_CODE_CLI_BACKEND_ID,
     OPENCODE_CLI_BACKEND_ID,
 })
-AGENT_CAPABLE_BACKEND_IDS = frozenset({LITELLM_BACKEND_ID})
-# Phase 4 local CLI backends are generation-only today. Keep this derived so a
-# future agent-capable local backend does not remain classified as generation-only.
-GENERATION_ONLY_BACKEND_IDS = LOCAL_CLI_GENERATION_BACKEND_IDS - AGENT_CAPABLE_BACKEND_IDS
+AGENT_BRIDGED_BACKEND_IDS = LOCAL_CLI_GENERATION_BACKEND_IDS
+AGENT_CAPABLE_BACKEND_IDS = frozenset({
+    LITELLM_BACKEND_ID,
+    *AGENT_BRIDGED_BACKEND_IDS,
+})
+GENERATION_ONLY_BACKEND_IDS = LOCAL_CLI_GENERATION_BACKEND_IDS - AGENT_BRIDGED_BACKEND_IDS
 
 SUPPORTED_GENERATION_BACKENDS = frozenset({
     LITELLM_BACKEND_ID,
@@ -120,9 +122,9 @@ def resolve_generation_fallback_backend_id(config: Any) -> Optional[str]:
 def resolve_agent_generation_backend_id(config: Any) -> str:
     """Return the Agent tool-calling backend id.
 
-    Phase 4 keeps Agent tool-calling on LiteLLM for auto. Explicit local
-    backends are returned so the Agent adapter can reject or fallback
-    explicitly instead of treating text-only output as successful tool use.
+    Local CLI backends use the application's structured tool bridge. ``auto``
+    follows the configured analysis backend so CLI-only installations do not
+    silently fall back to an unavailable LiteLLM route.
     """
     backend_id = normalize_backend_id(
         _read_backend_config_value(
@@ -135,5 +137,8 @@ def resolve_agent_generation_backend_id(config: Any) -> str:
     if backend_id not in SUPPORTED_AGENT_GENERATION_BACKENDS:
         raise _unsupported_backend_error(backend_id, field="AGENT_GENERATION_BACKEND")
     if backend_id == AUTO_AGENT_BACKEND_ID:
+        generation_backend_id = resolve_generation_backend_id(config)
+        if generation_backend_id in AGENT_CAPABLE_BACKEND_IDS:
+            return generation_backend_id
         return LITELLM_BACKEND_ID
     return backend_id

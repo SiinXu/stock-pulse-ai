@@ -507,10 +507,13 @@ class SystemConfigApiTestCase(unittest.TestCase):
             {"min": 1, "max": 4},
         )
         agent_schema = item_map["AGENT_GENERATION_BACKEND"]["schema"]
-        self.assertEqual(agent_schema["validation"]["enum"], ["auto", "litellm"])
-        self.assertNotIn("codex_cli", {option["value"] for option in agent_schema["options"]})
-        self.assertNotIn("claude_code_cli", {option["value"] for option in agent_schema["options"]})
-        self.assertNotIn("opencode_cli", {option["value"] for option in agent_schema["options"]})
+        self.assertEqual(
+            agent_schema["validation"]["enum"],
+            ["auto", "litellm", "codex_cli", "claude_code_cli", "opencode_cli"],
+        )
+        self.assertIn("codex_cli", {option["value"] for option in agent_schema["options"]})
+        self.assertIn("claude_code_cli", {option["value"] for option in agent_schema["options"]})
+        self.assertIn("opencode_cli", {option["value"] for option in agent_schema["options"]})
         generation_schema = item_map["GENERATION_BACKEND"]["schema"]
         self.assertIn("claude_code_cli", generation_schema["validation"]["enum"])
         self.assertIn("opencode_cli", generation_schema["validation"]["enum"])
@@ -620,9 +623,17 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(fields["LLM_CHANNELS"]["ui_placement"], "model_access")
         self.assertEqual(fields["LITELLM_MODEL"]["ui_placement"], "task_routing")
         self.assertEqual(fields["VISION_MODEL"]["ui_placement"], "task_routing")
-        self.assertEqual(fields["GENERATION_BACKEND"]["ui_placement"], "developer_diagnostics")
+        self.assertEqual(fields["GENERATION_BACKEND"]["ui_placement"], "task_routing")
         self.assertEqual(fields["OPENAI_API_KEY"]["ui_placement"], "hidden_legacy")
         self.assertIsNone(fields["STOCK_LIST"]["ui_placement"])
+        fake_ip_field = fields["OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP"]
+        self.assertEqual(fake_ip_field["data_type"], "boolean")
+        self.assertEqual(fake_ip_field["ui_control"], "switch")
+        self.assertEqual(fake_ip_field["default_value"], "false")
+        self.assertEqual(
+            fake_ip_field["help_key"],
+            "settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP",
+        )
         self.assertEqual(
             fields["OPENCODE_CLI_MODEL"]["contract"],
             {

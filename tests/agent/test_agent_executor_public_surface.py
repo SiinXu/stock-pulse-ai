@@ -25,7 +25,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     LLMToolAdapter List Optional StockScope ToolRegistry Tuple
     build_agent_chat_chip_instruction build_agent_chat_context_bundle
     build_agent_chat_market_context build_agent_chat_tool_registry
-    classify_result_terminal_state dataclass extract_provider_trace_turns field
+    build_agent_tool_history_context
+    classify_result_terminal_state create_mode_budget_account dataclass extract_provider_trace_turns field
     format_daily_market_context_prompt_section format_market_phase_prompt_section
     format_market_structure_prompt_section get_config get_db
     get_market_guidelines get_market_role json log_safe_exception logger logging
@@ -50,9 +51,9 @@ EXPECTED_LOOP_METHODS = (
 )
 
 EXPECTED_AST_HASHES = {
-    "_RunMethods": "e8ef83028539b5298d24ed9fa7ee2e681a21c6b70e5f85e4e985d5750f6bfa30",
-    "_ChatMethods": "2dbfcf8f05e29ba0ba395bc428ca5e76f9c14a91c1e3a148d996cb0542844c1a",
-    "_LoopMethods": "a7762e27d59da99d7cf482b3da73b78244dd3b8c61084f84c2fee7477b9d4720",
+    "_RunMethods": "8a76962992c9795b7e7c75603c897b129db517ce13decd1e5809aee2d806131a",
+    "_ChatMethods": "251e864cddab46b625bfa95d33f32d998150c515eeb91519c3ff6039616336e5",
+    "_LoopMethods": "ae0817f7c382325c8842966e51e0d79639e52814ebdbbaa5e4dd39d1ba4236e2",
 }
 
 

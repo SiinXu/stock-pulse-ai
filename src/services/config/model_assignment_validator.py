@@ -17,6 +17,11 @@ from src.config import (
     _uses_direct_env_provider,
     normalize_agent_litellm_model,
 )
+from src.llm.backend_registry import (
+    LITELLM_BACKEND_ID,
+    resolve_agent_generation_backend_id,
+)
+from src.llm.generation_backend import GenerationError
 from src.services.config.llm_channel_map import (
     collect_hermes_channel_models_from_map,
     collect_llm_channel_models_from_map,
@@ -30,6 +35,19 @@ from src.services.config.llm_channel_map import (
 
 def _split_csv(value: str) -> List[str]:
     return [item.strip() for item in (value or "").split(",") if item.strip()]
+
+
+def _agent_uses_litellm(effective_map: Dict[str, str]) -> bool:
+    """Return whether Agent model assignments are active for this config."""
+    try:
+        return resolve_agent_generation_backend_id({
+            "agent_generation_backend": effective_map.get("AGENT_GENERATION_BACKEND"),
+            "generation_backend": effective_map.get("GENERATION_BACKEND"),
+        }) == LITELLM_BACKEND_ID
+    except GenerationError:
+        # Invalid backend values are reported by the backend field validator.
+        # Keep legacy assignment checks active until that value is corrected.
+        return True
 
 
 class ModelAssignmentValidator:
@@ -55,7 +73,11 @@ class ModelAssignmentValidator:
                 route_references.append(entry)
 
         add(effective_map.get("LITELLM_MODEL", ""), "report", "LITELLM_MODEL")
-        raw_agent_model = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
+        raw_agent_model = (
+            (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
+            if _agent_uses_litellm(effective_map)
+            else ""
+        )
         if raw_agent_model:
             add(
                 normalize_agent_litellm_model(
@@ -126,15 +148,18 @@ class ModelAssignmentValidator:
         known_routes = set(owners)
         assignments: List[Tuple[str, str]] = [
             ("LITELLM_MODEL", (effective_map.get("LITELLM_MODEL") or "").strip()),
-            (
-                "AGENT_LITELLM_MODEL",
-                normalize_agent_litellm_model(
-                    (effective_map.get("AGENT_LITELLM_MODEL") or "").strip(),
-                    configured_models=known_routes,
-                ),
-            ),
             ("VISION_MODEL", (effective_map.get("VISION_MODEL") or "").strip()),
         ]
+        if _agent_uses_litellm(effective_map):
+            assignments.append(
+                (
+                    "AGENT_LITELLM_MODEL",
+                    normalize_agent_litellm_model(
+                        (effective_map.get("AGENT_LITELLM_MODEL") or "").strip(),
+                        configured_models=known_routes,
+                    ),
+                )
+            )
         assignments.extend(
             ("LITELLM_FALLBACK_MODELS", value)
             for value in _split_csv(
@@ -416,7 +441,11 @@ class ModelAssignmentValidator:
             if not raw_channels:
                 return issues
 
-            configured_agent_model_raw = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
+            configured_agent_model_raw = (
+                (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
+                if _agent_uses_litellm(effective_map)
+                else ""
+            )
             configured_agent_model = normalize_agent_litellm_model(
                 configured_agent_model_raw,
                 configured_models=available_model_set,
@@ -582,7 +611,11 @@ class ModelAssignmentValidator:
                 }
             )
 
-        configured_agent_model_raw = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
+        configured_agent_model_raw = (
+            (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
+            if _agent_uses_litellm(effective_map)
+            else ""
+        )
         configured_agent_model = normalize_agent_litellm_model(
             configured_agent_model_raw,
             configured_models=available_model_set,

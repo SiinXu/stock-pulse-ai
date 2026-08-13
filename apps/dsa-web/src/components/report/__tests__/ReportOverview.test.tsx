@@ -20,6 +20,28 @@ const baseSummary = {
 };
 
 describe('ReportOverview', () => {
+  it('uses compact typography for the report title and summary', () => {
+    render(<ReportOverview meta={baseMeta} summary={baseSummary} />);
+
+    expect(screen.getByRole('heading', { name: '贵州茅台' })).toHaveClass('text-xl');
+    const summaryText = screen.getAllByText('趋势维持强势').find(
+      (element) => element.classList.contains('whitespace-pre-wrap'),
+    );
+    expect(summaryText).toHaveClass('text-sm', 'leading-6');
+  });
+
+  it('shows the overview share action as an icon-only button', () => {
+    render(<ReportOverview meta={{ ...baseMeta, id: 1 }} summary={baseSummary} />);
+
+    const shareButton = screen.getByRole('button', { name: '分享' });
+    expect(shareButton.parentElement?.parentElement?.parentElement).toHaveClass(
+      '[&_.home-surface-button]:w-10',
+      '[&_.home-surface-button]:gap-0',
+      '[&_.home-surface-button]:px-0',
+      '[&_.home-surface-button>span]:hidden',
+    );
+  });
+
   it('uses canonical action instead of conflicting report advice', () => {
     render(
       <ReportOverview
@@ -357,4 +379,97 @@ describe('ReportOverview', () => {
     expect(screen.getByText('领跌')).toBeInTheDocument();
     expect(screen.getByText('-2.50%')).toBeInTheDocument();
   });
+
+  it('adopts marketFormat currency, badge, and CN red-up color for A-share reports', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ReportOverview
+          meta={{
+            ...baseMeta,
+            reportLanguage: 'en',
+            stockCode: '600519',
+            stockName: 'Kweichow Moutai',
+            currentPrice: 1680.5,
+            changePct: 1.25,
+            createdAt: '2026-03-19T13:30:00.000Z',
+          }}
+          summary={baseSummary}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByTestId('report-overview-price')).toHaveTextContent('CNY 1,680.50');
+    expect(screen.getByTestId('report-overview-change')).toHaveTextContent('+1.25%');
+    expect(screen.getByTestId('report-overview-change').getAttribute('data-change-color')).toBe('red');
+    expect(screen.getByTestId('report-overview-market-badge')).toHaveTextContent('CN');
+    expect(screen.getByTestId('report-overview-asof').textContent).toMatch(/GMT\+8|UTC\+8|CST/i);
+  });
+
+  it('adopts marketFormat USD, badge, and green_up color for US reports', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ReportOverview
+          meta={{
+            ...baseMeta,
+            reportLanguage: 'en',
+            stockCode: 'AAPL',
+            stockName: 'Apple',
+            currentPrice: 189.1,
+            changePct: 0.66,
+          }}
+          summary={baseSummary}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByTestId('report-overview-price')).toHaveTextContent('USD 189.10');
+    expect(screen.getByTestId('report-overview-change').getAttribute('data-change-color')).toBe('green');
+    expect(screen.getByTestId('report-overview-market-badge')).toHaveTextContent('US');
+  });
+
+  it('adopts marketFormat crypto identity (USD, CRYPTO badge, green_up, UTC as-of)', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ReportOverview
+          meta={{
+            ...baseMeta,
+            reportLanguage: 'en',
+            stockCode: 'crypto:BTC',
+            stockName: 'Bitcoin',
+            currentPrice: 67890.12,
+            changePct: 2.5,
+            createdAt: '2026-03-19T13:30:00.000Z',
+          }}
+          summary={baseSummary}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByTestId('report-overview-price')).toHaveTextContent('USD 67,890.12');
+    expect(screen.getByTestId('report-overview-change').getAttribute('data-change-color')).toBe('green');
+    expect(screen.getByTestId('report-overview-market-badge')).toHaveTextContent('CRYPTO');
+    expect(screen.getByTestId('report-overview-asof').textContent).toMatch(/UTC|GMT/i);
+  });
+
+  it('does not invent a market badge for unsupported suffix markets', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ReportOverview
+          meta={{
+            ...baseMeta,
+            reportLanguage: 'en',
+            stockCode: '7203.T',
+            stockName: 'Toyota',
+            currentPrice: 2500,
+            changePct: 1,
+          }}
+          summary={baseSummary}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.queryByTestId('report-overview-market-badge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-overview-price')).toHaveTextContent('2500.00');
+  });
+
 });

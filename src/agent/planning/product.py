@@ -1,0 +1,390 @@
+# -*- coding: utf-8 -*-
+"""Production wiring: plan → act → observe → replan on the Agent RUN path.
+
+Default-off. When ``Config.agent_planning_enabled`` is true, ``AgentExecutor.run``
+invokes this module so the planning loop participates in the real analysis
+orchestration path. Tools dispatch through ``BoundToolSession`` (same authority
+as the native runner). Failures terminate with explicit reasons; nothing here
+claims success after a failed plan step or exhausted budget.
+
+Config is constructor/parameter injected (or resolved via the composition root).
+This module does not call bare ``get_config()``.
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+import uuid
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+from src.agent.planning.config import (
+    MAX_EXECUTION_TIMEOUT_SECONDS,
+    MAX_OBSERVATION_REPLANS,
+    MAX_PLAN_STEPS,
+    MAX_PLANNER_TIMEOUT_SECONDS,
+    MAX_PLANNER_TOKENS,
+    MAX_REPLANS,
+    MAX_TOTAL_TOOL_CALLS,
+    FAILURE_POLICIES,
+    PlanExecutionSettings,
+    PlanningSettings,
+)
+from src.agent.planning.engine import PlanningEngine
+from src.agent.planning.loop import execute_plan_loop
+from src.agent.planning.observations import compact_observation_summary
+from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.stock_scope import resolve_stock_scope
+from src.services.security_audit_service import get_security_audit_service
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger(__name__)
+
+CancelledCheck = Callable[[], bool]
+
+
+def _resolve_config(config: Any = None) -> Any:
+    """Prefer injected Config; fall back to composition-root access."""
+    if config is not None:
+        return config
+    from src.application_services import get_application_services
+
+    return get_application_services().config
+
+
+def is_agent_planning_enabled(config: Any = None) -> bool:
+    """Return whether the production planning path is opted in."""
+    cfg = _resolve_config(config)
+    return bool(getattr(cfg, "agent_planning_enabled", False))
+
+
+def resolve_planning_settings(
+    config: Any = None,
+) -> Tuple[PlanningSettings, PlanExecutionSettings]:
+    """Build finite planning/execution settings from shared Config.
+
+    Values are taken from Config (already env-parsed with finite clamps).
+    ``PlanningSettings`` / ``PlanExecutionSettings`` re-validate and reject
+    non-finite or out-of-range numbers.
+    """
+    cfg = _resolve_config(config)
+    strategy = str(getattr(cfg, "agent_planning_strategy", "template") or "template").strip().lower()
+    if strategy not in {"template", "llm"}:
+        strategy = "template"
+    on_failure = str(
+        getattr(cfg, "agent_planning_on_step_failure", "replan") or "replan"
+    ).strip().lower()
+    if on_failure not in FAILURE_POLICIES:
+        on_failure = "replan"
+
+    planning = PlanningSettings(
+        enabled=True,
+        strategy=strategy,
+        max_plan_steps=int(getattr(cfg, "agent_planning_max_plan_steps", 8) or 8),
+        max_replans=int(getattr(cfg, "agent_planning_max_replans", 1) or 0),
+        max_tokens=int(getattr(cfg, "agent_planning_max_tokens", 1500) or 1500),
+        timeout_seconds=float(
+            getattr(cfg, "agent_planning_proposal_timeout_seconds", 30.0) or 30.0
+        ),
+    )
+    execution = PlanExecutionSettings(
+        max_total_tool_calls=int(
+            getattr(cfg, "agent_planning_max_total_tool_calls", 16) or 16
+        ),
+        max_observation_replans=int(
+            getattr(cfg, "agent_planning_max_observation_replans", 1) or 0
+        ),
+        timeout_seconds=float(
+            getattr(cfg, "agent_planning_exec_timeout_seconds", 60.0) or 60.0
+        ),
+        on_step_failure=on_failure,
+    )
+    return planning, execution
+
+
+def try_run_with_planning(
+    executor: Any,
+    *,
+    task: str,
+    context: Optional[Dict[str, Any]] = None,
+    cancelled_check: Optional[CancelledCheck] = None,
+    config: Any = None,
+) -> Optional[Any]:
+    """Run the production planning path or return ``None`` when disabled.
+
+    When enabled, always returns an ``AgentResult`` (success or explicit failure).
+    When disabled, returns ``None`` so the caller continues the classic ReAct path.
+    """
+    cfg = _resolve_config(config)
+    if not is_agent_planning_enabled(cfg):
+        return None
+    return run_with_planning(
+        executor,
+        task=task,
+        context=context,
+        cancelled_check=cancelled_check,
+        config=cfg,
+    )
+
+
+def run_with_planning(
+    executor: Any,
+    *,
+    task: str,
+    context: Optional[Dict[str, Any]] = None,
+    cancelled_check: Optional[CancelledCheck] = None,
+    config: Any = None,
+) -> Any:
+    """Plan, execute tools under BoundToolSession, then synthesize the dashboard.
+
+    Returns an ``AgentResult``. Planning/execution failures set ``success=False``
+    with an explicit error; they never fail-open as a successful analysis.
+    """
+    # Local import keeps the optional product path off the module import graph
+    # for pure library consumers of ``src.agent.planning``.
+    from src.agent.executor import AgentResult
+
+    cfg = _resolve_config(config)
+    started = time.perf_counter()
+    scope_resolution = resolve_stock_scope(task, context)
+    effective_context = dict(scope_resolution.effective_context or {})
+    available_tools = list(executor.tool_registry.list_names())
+
+    try:
+        planning_settings, execution_settings = resolve_planning_settings(cfg)
+    except ValueError as exc:
+        log_safe_exception(
+            logger,
+            "Invalid agent planning configuration",
+            exc,
+            error_code="agent_planning_invalid_config",
+            level=logging.ERROR,
+        )
+        return AgentResult(
+            success=False,
+            error=f"Planning configuration invalid: {exc}",
+            planning_metadata={
+                "enabled": True,
+                "applied": False,
+                "fallback_reason": "invalid_config",
+                "error_code": "invalid_config",
+            },
+        )
+
+    llm_for_planner = (
+        executor.llm_adapter if planning_settings.strategy == "llm" else None
+    )
+    engine = PlanningEngine(planning_settings, llm_adapter=llm_for_planner)
+    proposal = engine.plan(
+        task,
+        available_tools=available_tools,
+        context=effective_context,
+        cancelled_check=cancelled_check,
+    )
+    proposal_meta = proposal.to_metadata()
+    if not proposal.applied or proposal.plan is None:
+        reason = proposal.fallback_reason or proposal.error_code or "planning_failed"
+        return AgentResult(
+            success=False,
+            error=f"Planning failed: {reason}",
+            cancelled=reason == "cancelled",
+            total_tokens=int(proposal.planning_tokens or 0),
+            planning_metadata={
+                **proposal_meta,
+                "product_path": "agent_executor_run",
+                "phase": "proposal",
+            },
+        )
+
+    session: Optional[BoundToolSession] = None
+    try:
+        session = _open_plan_tool_session(
+            executor,
+            available_tools=available_tools,
+            stock_scope=scope_resolution.stock_scope,
+            cancelled_check=cancelled_check,
+            deadline_seconds=execution_settings.timeout_seconds,
+        )
+
+        def invoker(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+            assert session is not None
+            return session.execute(name, arguments)
+
+        exec_result = execute_plan_loop(
+            plan=proposal.plan,
+            tool_invoker=invoker,
+            available_tools=available_tools,
+            task=task,
+            context=effective_context,
+            settings=execution_settings,
+            planning_settings=planning_settings,
+            planner=engine,
+            cancelled_check=cancelled_check,
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - never fake success
+        log_safe_exception(
+            logger,
+            "Production planning path failed unexpectedly",
+            exc,
+            error_code="agent_planning_product_path_failed",
+            level=logging.ERROR,
+        )
+        return AgentResult(
+            success=False,
+            error="Plan execution failed unexpectedly",
+            planning_metadata={
+                **proposal_meta,
+                "product_path": "agent_executor_run",
+                "phase": "execution",
+                "success": False,
+                "status": "failed",
+                "reason": "loop_error",
+                "error_code": "loop_error",
+            },
+        )
+    finally:
+        if session is not None:
+            try:
+                session.close()
+            except Exception as close_exc:  # broad-exception: fallback_recorded - session close best-effort
+                log_safe_exception(
+                    logger,
+                    "Plan tool session close failed",
+                    close_exc,
+                    error_code="agent_planning_session_close_failed",
+                    level=logging.WARNING,
+                )
+
+    exec_meta = exec_result.to_metadata()
+    planning_metadata: Dict[str, Any] = {
+        **proposal_meta,
+        **exec_meta,
+        "product_path": "agent_executor_run",
+        "phase": "execution",
+        "proposal_applied": True,
+    }
+    plan_tool_log = _tool_calls_log_from_execution(exec_result)
+
+    if not exec_result.success:
+        reason = exec_result.reason or exec_result.status or "plan_execution_failed"
+        return AgentResult(
+            success=False,
+            error=f"Plan execution terminated: {reason}",
+            tool_calls_log=plan_tool_log,
+            total_steps=len(exec_result.step_observations),
+            total_tokens=int(exec_result.planning_tokens or 0)
+            + int(proposal.planning_tokens or 0),
+            cancelled=bool(exec_result.cancelled),
+            timed_out=bool(exec_result.timed_out),
+            planning_metadata=planning_metadata,
+        )
+
+    # Successful plan: inject observation evidence and run LLM synthesis.
+    evidence = compact_observation_summary(exec_result.step_observations)
+    synthesis_context = dict(effective_context)
+    # Keep full trace_events on AgentResult.planning_metadata; omit the dense list
+    # from synthesis context (not prompt keys today, avoids accidental growth).
+    synthesis_context["planning_execution_metadata"] = {
+        key: value
+        for key, value in planning_metadata.items()
+        if key != "trace_events"
+    }
+    if evidence:
+        synthesis_context["plan_execution_evidence"] = evidence
+
+    system_prompt, user_message, tool_decls = executor.build_run_messages(
+        task,
+        synthesis_context,
+    )
+    if evidence:
+        user_message = (
+            f"{user_message}\n\n"
+            "[Plan execution evidence — already gathered under planning budgets; "
+            "prefer these results and call tools only for remaining gaps]\n"
+            f"{evidence}"
+        )
+    messages: List[Dict[str, Any]] = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
+    ]
+    result = executor._run_loop(
+        messages,
+        tool_decls,
+        parse_dashboard=True,
+        stock_scope=scope_resolution.stock_scope,
+        cancelled_check=cancelled_check,
+    )
+    # Prepend plan-loop tool audit trail so diagnostics see real tool work.
+    result.tool_calls_log = list(plan_tool_log) + list(result.tool_calls_log or [])
+    result.total_tokens = int(result.total_tokens or 0) + int(
+        exec_result.planning_tokens or 0
+    ) + int(proposal.planning_tokens or 0)
+    result.planning_metadata = {
+        **planning_metadata,
+        "synthesis_success": bool(result.success),
+        "product_duration_ms": max(0, int((time.perf_counter() - started) * 1000)),
+    }
+    return result
+
+
+def _open_plan_tool_session(
+    executor: Any,
+    *,
+    available_tools: Sequence[str],
+    stock_scope: Any,
+    cancelled_check: Optional[CancelledCheck],
+    deadline_seconds: float,
+) -> BoundToolSession:
+    """Open a BoundToolSession matching the native runner's security contract."""
+    deadline_monotonic = time.monotonic() + float(deadline_seconds)
+    return BoundToolSession(
+        executor.tool_registry,
+        execution_id=str(uuid.uuid4()),
+        allowed_tools=list(available_tools),
+        derive_granted_permissions=True,
+        stock_scope=stock_scope,
+        call_timeout_seconds=(
+            float(executor.timeout_seconds)
+            if getattr(executor, "timeout_seconds", None) is not None
+            and float(executor.timeout_seconds) > 0
+            else None
+        ),
+        deadline_monotonic=deadline_monotonic,
+        cancelled_check=cancelled_check,
+        backend="plan-loop",
+        principal="plan-execution-runtime",
+        stage="plan_execution",
+        audit_context={"source": "agent_planning_product"},
+        security_audit=get_security_audit_service(),
+    )
+
+
+def _tool_calls_log_from_execution(exec_result: Any) -> List[Dict[str, Any]]:
+    """Flatten step observations into the AgentResult tool_calls_log shape."""
+    rows: List[Dict[str, Any]] = []
+    for obs in getattr(exec_result, "step_observations", None) or []:
+        for call in getattr(obs, "tool_calls", None) or ():
+            rows.append(
+                {
+                    "tool": getattr(call, "tool_name", "unknown"),
+                    "ok": bool(getattr(call, "ok", False)),
+                    "error_code": getattr(call, "error_code", None),
+                    "summary": getattr(call, "summary", "") or "",
+                    "duration_ms": getattr(call, "duration_ms", None),
+                    "step_id": getattr(obs, "step_id", None),
+                    "source": "plan_loop",
+                }
+            )
+    return rows
+
+
+# Re-export absolute maxima for config loading without circular imports.
+PLANNING_CONFIG_BOUNDS = {
+    "max_plan_steps": (1, MAX_PLAN_STEPS),
+    "max_replans": (0, MAX_REPLANS),
+    "max_tokens": (1, MAX_PLANNER_TOKENS),
+    "proposal_timeout_seconds": (0.1, MAX_PLANNER_TIMEOUT_SECONDS),
+    "max_total_tool_calls": (1, MAX_TOTAL_TOOL_CALLS),
+    "max_observation_replans": (0, MAX_OBSERVATION_REPLANS),
+    "exec_timeout_seconds": (0.1, MAX_EXECUTION_TIMEOUT_SECONDS),
+}

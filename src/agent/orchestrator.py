@@ -60,6 +60,7 @@ from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
     AGENT_EXECUTION_FAILURE_MESSAGE,
+    build_agent_tool_history_context,
     sanitize_agent_diagnostic,
 )
 from src.agent.committee_mode import META_COMMITTEE_MODE as _META_COMMITTEE_MODE
@@ -142,6 +143,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     _build_approved_risk_application_from_gate,
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
+    build_agent_tool_history_context,
     build_agent_disagreement_summary,
     build_agent_runtime_facts,
     _build_approved_risk_bypass_application,
@@ -223,6 +225,8 @@ class OrchestratorResult:
     runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
+    budget_snapshot: Optional[Dict[str, Any]] = None
+    failure_reason: Optional[str] = None
 
 
 class _StageProgressFence:
@@ -289,6 +293,11 @@ class AgentOrchestrator:
         )
         self.runtime_guard_policy = (
             runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)
+        )
+        from src.agent.runtime.mode_budget import resolve_mode_budget_limits
+
+        self.mode_budget_limits = resolve_mode_budget_limits(
+            config, mode=self.mode
         )
 
 _EXECUTION_METHOD_NAMES = _bind_facade_methods(

@@ -1,29 +1,16 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import {
-  BellPlus,
-  GitCompareArrows,
-  LineChart as LineChartIcon,
-  PlusCircle,
-  RefreshCw,
-  Sparkles,
-} from 'lucide-react';
+import { useRouteFocusTarget } from '../components/routing';
+import { BellPlus, GitCompareArrows, LineChart as LineChartIcon, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { stocksApi } from '../api/stocks';
 import { systemConfigApi } from '../api/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
+import { KlineChart } from '../components/charts';
 import {
   ApiErrorAlert,
   AppPage,
+  Badge,
   Button,
   Card,
   DataTable,
@@ -36,6 +23,8 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
+import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
+import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   buildStockDetailsHistoryQueryKey,
@@ -52,6 +41,7 @@ import type {
 } from '../types/stocks';
 import { aggregateCandles, summarizeCandles } from '../utils/klineAggregate';
 import {
+  APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
   buildReportVersionCompareHref,
@@ -61,6 +51,7 @@ import { normalizeStockCode } from '../utils/stockCode';
 import {
   changeColorCssVar,
   changeSemantics,
+  formatMarketBadge,
   formatMarketTime,
   formatPrice,
   formatSignedChangeAmount,
@@ -126,6 +117,12 @@ const StockDetailsPage: React.FC = () => {
   const { stockCode: rawParam = '' } = useParams<{ stockCode: string }>();
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.stockDetails,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
 
   const decodedParam = useMemo(() => {
     try {
@@ -331,7 +328,11 @@ const StockDetailsPage: React.FC = () => {
   if (!canonicalCode) {
     return (
       <AppPage>
-        <PageHeader title={t('stocks.workspace.title')} description={t('stocks.workspace.description')} />
+        <PageHeader
+          ref={pageHeadingRef}
+          title={t('stocks.workspace.title')}
+          description={t('stocks.workspace.description')}
+        />
         <EmptyState
           title={t('stocks.workspace.invalidTitle')}
           description={t('stocks.workspace.invalidDescription')}
@@ -342,6 +343,7 @@ const StockDetailsPage: React.FC = () => {
   }
 
   const quoteName = quote?.stockName?.trim();
+  const marketBadge = formatMarketBadge(marketId);
 
   const quoteChangeSemantics = marketId
     ? changeSemantics(quote?.change, marketId, changeColorPref)
@@ -368,10 +370,13 @@ const StockDetailsPage: React.FC = () => {
     { id: 'volume', header: t('stocks.workspace.volume'), cell: (candle) => formatQuantity(candle.volume, language) },
   ];
 
+  const valuationText = VALUATION_TEXT[language] ?? VALUATION_TEXT.en;
+
   return (
     <AppPage className="max-w-none">
       <div className="space-y-5">
         <PageHeader
+          ref={pageHeadingRef}
           eyebrow={quoteName ? canonicalCode : undefined}
           title={quoteName || canonicalCode}
           description={t('stocks.workspace.description')}
@@ -437,6 +442,17 @@ const StockDetailsPage: React.FC = () => {
             <Loading />
           ) : quote ? (
             <div className="space-y-3">
+              {marketBadge ? (
+                <Badge
+                  variant="info"
+                  size="sm"
+                  className="font-mono shadow-none"
+                  aria-label={t('stocks.workspace.marketBadgeAria', { code: marketBadge })}
+                  data-testid="stock-details-market-badge"
+                >
+                  {marketBadge}
+                </Badge>
+              ) : null}
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="text-3xl font-semibold text-foreground">
                   {formatPriceCell(quote.currentPrice, marketId, language)}
@@ -533,16 +549,18 @@ const StockDetailsPage: React.FC = () => {
                   change: formatSignedChangePercent(summary.changePercent).replace(/%$/, ''),
                 })}
               </p>
-              <div className="h-64 w-full" role="img" aria-label={t('stocks.workspace.chartLabel', { code: canonicalCode })}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={displayCandles} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} width={56} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="close" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div
+                aria-label={t('stocks.workspace.chartLabel', { code: canonicalCode })}
+                data-testid="stock-details-kline"
+              >
+                <KlineChart
+                  candles={displayCandles}
+                  market={marketId ?? 'cn'}
+                  colorPreference={changeColorPref}
+                  height={320}
+                  showVolume
+                  data-testid="stock-details-kline-chart"
+                />
               </div>
               <div className="max-h-72 overflow-y-auto">
                 <DataTable<StockHistoryCandle>
@@ -569,6 +587,14 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
+          <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
+        </section>
+
+        <section aria-label={valuationText.peerTitle} data-testid="stock-details-peer-canvas-section">
+          <PeerValuationCanvas key={`peer-${canonicalCode}`} stockCode={canonicalCode} />
+        </section>
       </div>
     </AppPage>
   );
