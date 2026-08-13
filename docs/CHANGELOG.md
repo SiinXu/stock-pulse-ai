@@ -8,11 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after multi-model consensus Settings help/title inventory (Refs #154).
-- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
-- [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
-- [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
-- [Added] Optional multi-model consensus comparison on the legacy analysis path: shared snapshot, analyzer-safe sequential runs, structured non-averaged disagreement output, high-disagreement confidence dampening, finite-only metrics and budget, explicit not-evaluated output when fewer than two conclusions are usable, mode-aware report/notification/history blocks, and model identity/version trace (Refs #154; disagreement point contract aligned with #1205/#246/#193).
 - [Added] Personal daily morning brief aggregates portfolio membership, overnight Today's Focus highlights, and observed earnings-event context with optional quiet notify; event research briefs ship bounded metrics and post-event checklists through the shared report notification route (Refs #149, #1131).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after observed-event Daily Brief and Event Research settings help (Refs #149, #1131).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
