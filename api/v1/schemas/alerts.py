@@ -117,10 +117,28 @@ class AlertEventContext(BaseModel):
     source_url: Optional[str] = Field(None, max_length=2048)
 
 
+class AlertAutoAnalysisStatus(BaseModel):
+    status: str = Field(..., max_length=64)
+    submitted: bool = False
+    stock_code: Optional[str] = Field(None, max_length=64)
+    pipeline: Optional[str] = Field(None, max_length=32)
+    reason: Optional[str] = Field(None, max_length=512)
+
+
+class AlertSuggestedAction(BaseModel):
+    action_code: str = Field(..., max_length=64)
+    label: Optional[str] = Field(None, max_length=128)
+    rationale: Optional[str] = Field(None, max_length=512)
+    deep_links: Optional[Dict[str, str]] = None
+    relevance: List[str] = Field(default_factory=list, max_length=5)
+    auto_analysis: Optional[AlertAutoAnalysisStatus] = None
+
+
 class AlertImpactContext(AlertEventContext):
     degraded: bool = False
     affected: Optional[AlertEventAffectedContext] = None
     related_analysis: Optional[str] = Field(None, max_length=512)
+    suggested_action: Optional[AlertSuggestedAction] = None
 
 
 class AlertImpactResult(BaseModel):
@@ -133,8 +151,8 @@ class AlertTriggerItem(BaseModel):
     id: int
     rule_id: Optional[int] = None
     target: str
-    observed_value: Optional[float] = None
-    threshold: Optional[float] = None
+    observed_value: Optional[float] = Field(None, allow_inf_nan=False)
+    threshold: Optional[float] = Field(None, allow_inf_nan=False)
     reason: Optional[str] = None
     data_source: Optional[str] = None
     data_timestamp: Optional[str] = None
@@ -155,7 +173,29 @@ class AlertTriggerItem(BaseModel):
     decision_signal_summary: Optional[Dict[str, Any]] = None
     impact_context: Optional[AlertImpactContext] = None
     event_context: Optional[AlertEventContext] = None
+    suggested_action: Optional[AlertSuggestedAction] = None
+    auto_analysis: Optional[AlertAutoAnalysisStatus] = None
     impact_result: Optional[AlertImpactResult] = None
+
+
+class AlertRuleNlCompileRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=500)
+    default_severity: SeverityValue = "warning"
+    default_enabled: bool = True
+    auto_analysis: Optional[bool] = Field(
+        None,
+        description="When true, attach notification_policy.auto_analysis=true to a successful compile.",
+    )
+
+
+class AlertRuleNlCompileResponse(BaseModel):
+    outcome: Literal["success", "need_clarification", "rejected"]
+    message: str = ""
+    matched_metric: Optional[str] = None
+    matched_symbols: List[str] = Field(default_factory=list)
+    clarifications: List[str] = Field(default_factory=list)
+    rejected_reason: Optional[str] = None
+    rule: Optional[Dict[str, Any]] = None
 
 
 class AlertTriggerListResponse(BaseModel):
