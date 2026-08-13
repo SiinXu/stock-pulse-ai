@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { configProfilesApi } from '../configProfiles';
+import { getParsedApiError, isApiRequestError } from '../error';
 import apiClient from '../index';
 
 vi.mock('../index', () => ({
@@ -103,5 +104,64 @@ describe('configProfilesApi', () => {
     const exported = await configProfilesApi.exportProfile();
     expect(exported.keysRedacted).toBe(3);
     expect(exported.content).not.toContain('API_KEY');
+  });
+
+  it('preserves unexpected extra keys on valid list payloads (pass-through)', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        recommended_preset_id: null,
+        detection: {
+          ollama_healthy: false,
+          model_pack_present: false,
+          cli_detected: [],
+          cloud_ready: false,
+        },
+        presets: [],
+        unexpected_server_field: 'keep-me',
+      },
+    });
+    const result = await configProfilesApi.listPresets();
+    expect((result as { unexpectedServerField?: string }).unexpectedServerField).toBe('keep-me');
+  });
+
+  it('surfaces list shape mismatches through ParsedApiError', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        presets: [{ id: 'broken' }],
+      },
+    });
+    await expect(configProfilesApi.listPresets()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('ConfigPresetListResponse');
+      return true;
+    });
+  });
+
+  it('rejects non-finite scores on list payloads', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        recommended_preset_id: 'local-first',
+        detection: {
+          ollama_healthy: true,
+          model_pack_present: false,
+          cli_detected: [],
+          cloud_ready: false,
+        },
+        presets: [
+          {
+            id: 'local-first',
+            display_name: 'Local-first',
+            description: 'desc',
+            score: Number.NaN,
+          },
+        ],
+      },
+    });
+    await expect(configProfilesApi.listPresets()).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
   });
 });
