@@ -1,0 +1,1 @@
+- [Added] Extract typed prediction drafts from structured decision outputs without treating prose as verifiable claims. (Refs #1108).

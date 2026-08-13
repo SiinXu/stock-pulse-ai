@@ -326,6 +326,7 @@ class GeminiAnalyzer:
                 key_points=data.get('key_points', ''),
                 risk_warning=data.get('risk_warning', ''),
                 buy_reason=data.get('buy_reason', ''),
+                prediction_source=dict(data),
                 # Metadata
                 search_performed=data.get('search_performed', False),
                 data_sources=data.get('data_sources', _localized_text(

@@ -606,6 +606,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | `false` | 是 | 模板中注释; Public signal scorecard (Issue #379; default off so self-hosted stays private) Exposes an aggregated, non-sensitive n... |
 | `SINGLE_STOCK_NOTIFY` | `false` | 是 | 模板中注释; =================================== (Optional) Single stock push configuration =================================== Si... |
 | `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` | `false` | 是 | 模板中注释; Default-off Bayesian outcome weights for skill aggregation (issue #714) |
+| `PREDICTION_EXTRACT_ENABLED` | `false` | 是 | commented template; Extract PredictionRecord drafts from structured decisions after finalize (default off; Refs #1108) |
 | `SKILL_OPINION_RECORDING_ENABLED` | `false` | 是 | 模板中注释; Record individual skill opinions into the offline outcome-evaluation store (default off) |
 | `SLACK_BOT_TOKEN` | `xoxb-...` | 是 | 模板中注释; Method Nine: Slack Configuration Supports two methods: Bot API (recommended) and Incoming Webhook |
 | `SLACK_CHANNEL_ID` | `C01234567` | 是 | 模板中注释 |
