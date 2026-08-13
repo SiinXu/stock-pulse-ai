@@ -100,9 +100,12 @@ def parse_reflection_output(raw_text: str) -> ReflectionResult:
         strategy_note = parsed.get("strategy_note")
         if strategy_note is not None and not isinstance(strategy_note, str):
             raise ValueError("strategy_note must be a string")
+        revised = parsed.get("revised", False)
+        if type(revised) is not bool:
+            raise ValueError("revised must be a boolean")
         return ReflectionResult(
             lessons=lessons,
-            revised=bool(parsed.get("revised", False)),
+            revised=revised,
             terminate_reason="ok",
             status="completed",
             strategy_note=strategy_note,
