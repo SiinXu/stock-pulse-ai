@@ -2102,11 +2102,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
     title: '高分歧告警',
-    summary: '默认开启；经告警渠道发送结构化高分歧，并遵守免打扰。',
+    summary: '默认开启；发送高分歧告警并遵守免打扰。',
   },
   'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
     title: '高分歧告警阈值',
-    summary: '告警分数阈值（0–1，默认 0.6）。',
+    summary: '告警阈值（0–1，默认 0.6）。',
   },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: '纸面组合初始资金',
