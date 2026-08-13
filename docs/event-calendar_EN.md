@@ -44,6 +44,11 @@ can display their impact summary, affected watchlist/portfolio flags, status,
 and source. It does not implement the future-event provider catalog or the
 agent-generated bull/bear/watch preview still remaining in issue #153.
 
+
+## Production discovery
+
+The Event Calendar page header links to the corporate event alerts view (`/event-alerts`) so operators can open the alert list without typing the URL. Research navigation to `/events` is tracked separately.
+
 ## Rollback
 
 Remove the `/events` route and its lazy page, or revert this change. The alerts

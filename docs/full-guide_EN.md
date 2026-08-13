@@ -131,6 +131,7 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `REPORT_TYPE` | Report type: `simple` (concise), `full` (complete), `brief` (3-5 sentences), Docker recommended: `full` | Optional |
 | `REPORT_LANGUAGE` | Default output language for reports and Agent Chat: `zh` (default Chinese) / `en` (English) / `ko` (Korean); also updates prompt instructions, templates, notification fallbacks, fixed copy in the Web report view, and Agent Chat replies that do not set `context.report_language`. `ko` reuses the English structural scaffolding and constrains the model to Korean output via an output-language directive; notifications render localized labels by report language. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
 | `REPORT_MODE` | Jinja report presentation mode (`brief` / `standard` / `research`, default `standard`). `brief` keeps Decision Card + key risk; `standard` is Decision Card + main analysis; `research` is full detail with expanded strata limits. Hard limits apply; Decision Card is never dropped. Per-request override: `extra_context.report_mode`. Presentation only when `REPORT_RENDERER_ENABLED=true`. | Optional |
+| `RESEARCH_PRESENTATION_PROFILE` | Research framing profile (`conservative` / `balanced` / `aggressive`, default `balanced`). Reorders emphasis only: conservative leads with risk, aggressive leads with catalysts; **same underlying evidence**, equal risk-disclosure completeness across profiles, and no change to facts, scores, or actions. Orthogonal to `REPORT_MODE` hard limits and `RISK_GATE_PROFILE` action thresholds. Per-request override: `extra_context.research_presentation_profile`. Only when `REPORT_RENDERER_ENABLED=true`. | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
 | `NOTIFICATION_DELTA_FIRST` | Prepend a compact, deterministic “changes since previous analysis” section to outbound stock notifications. Defaults to `false`; first analysis, no material change, and unavailable comparison remain distinct. Uses persisted history only and makes no extra model call. Local saved reports are unchanged. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
@@ -427,8 +428,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `MAX_WORKERS` | Concurrent threads | `3` |
 | `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | Inject the daily market context into stock-analysis prompts and soften aggressive buy advice in high-risk/risk-off markets; enabled by default, and market review can still run when this is set to `false` | `true` |
-| `DECISION_MEMORY_ENABLED` | Inject a Historical Decision Reflection (the stock's past signal hit-rate plus pattern-level calibration) into analysis prompts and single-stock reports; calibrates confidence only and never flips direction; zero overhead when disabled or without history. Override per request with `use_memory` | `true` |
-| `DECISION_MEMORY_LOOKBACK` | Maximum number of the stock's most recent signals that already have outcomes to include in the reflection | `5` |
+| `DECISION_MEMORY_ENABLED` | Inject a Historical Decision Reflection (the stock's past signal hit-rate plus pattern-level calibration) into analysis prompts and single-stock reports; calibrates confidence only and never flips direction; admitted structured outcomes only with `signal_id` provenance, wrapped as untrusted memory data; zero overhead when disabled or without history. Override per request with `use_memory` | `true` |
+| `DECISION_MEMORY_LOOKBACK` | Maximum admitted evaluated signals per stock to inject into the reflection (hard cap 40) | `5` |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | Only reflect on signals created at least this many days ago (so their outcomes have settled) | `3` |
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
@@ -947,6 +948,18 @@ Layer order (Jinja, `REPORT_RENDERER_ENABLED=true`): within each stock block the
 
 The existing Decision Card template continues to use dashboard/result fields, and missing fields omit their rows. Hard limits never drop the Decision Card block; omitted lower-priority items are annotated. Unconfigured `REPORT_MODE` keeps `standard` on every report platform (except the brief report-type path above). The hard-coded notification fallback path (`REPORT_RENDERER_ENABLED=false`) is unchanged.
 
+### Research Presentation Profiles (Issue #205)
+
+When `REPORT_RENDERER_ENABLED=true`, Jinja stock reports also support research presentation profiles via `RESEARCH_PRESENTATION_PROFILE` (or per-request `extra_context.research_presentation_profile`):
+
+| Profile | Emphasis | Risk disclosure |
+|---------|----------|-----------------|
+| `conservative` | Risks and monitoring posture first | Full (same completeness as other profiles) |
+| `balanced` (default) | Historical default section order | Full |
+| `aggressive` | Catalysts / opportunities first | Full (risks still complete, just later) |
+
+This axis is **orthogonal** to `REPORT_MODE` (depth/limits) and to `RISK_GATE_PROFILE` (final-action thresholds). Profiles must not change facts, scores, actions, or risk-disclosure completeness; they only reorder presentation emphasis and show an explicit research-framing banner on non-brief surfaces. **v1 scope** is Jinja stock reports plus Settings (`RESEARCH_PRESENTATION_PROFILE`); Agent chat conversation presentation is out of scope for this issue. `REPORT_MODE=brief` / the brief push template omit the long framing banner to protect push length budgets. Compact evidence strata intentionally include risk counter-evidence lines when present so disclosure stays equal across profiles.
+
 ### Signal Attribution Analysis (Issue #1742)
 
 Issue #1742 adds a signal attribution analysis block under `dashboard.signal_attribution` for individual stock analysis reports: `technical_indicators`, `news_sentiment`, `fundamentals`, `market_conditions` (four contribution values; valid non-zero values are normalized to 100; all-zero means no effective signal), `strongest_bullish_signal`, and `strongest_bearish_signal`. This field explains the composition of recommendation reasons, helping users understand the attribution weights of AI decisions.
@@ -1301,6 +1314,16 @@ System defaults to AkShare (free), also supports other data sources:
 - Optional knobs: `LONGBRIDGE_STATIC_INFO_TTL_SECONDS` (default `86400`) and `LONGBRIDGE_CONNECTION_COOLDOWN_SECONDS` (default `15`)
 - If credentials are absent, the optional Longbridge fetcher is not instantiated
 - When runtime errors such as `client is closed`, `context closed`, or `connection closed` occur, Longbridge enters a short cooldown window and US/HK daily or realtime requests automatically fall back to YFinance / AkShare instead of reconnecting on every request
+
+### Alternative data plugins (default off)
+
+Corporate events, holdings, supply-chain tags, and quantified sentiment are **not** built-in primary market sources. They use the ToolSurface capability `alt_data:read` and stay **non-authoritative supporting evidence** only.
+
+- **Default off:** keep `PLUGINS_DIR` unset. The corporate-events factory is not in the default Agent tool catalog.
+- **Reference package:** `examples/plugins/example-alternative-data` (deterministic fixture; declare `alt_data:read` in the manifest).
+- **Enable:** point `PLUGINS_DIR` at a reviewed parent directory (for example `examples/plugins`), restart the process, and grant sessions `alt_data:read` only when intended.
+- **Governance:** invalid / missing payloads become gaps with `confidence=null`; attaching alt-data does not change core `AnalysisContextPack` quality scores or project into `verified_fact` / `decision` strata.
+- **Contract:** [alternative-data-plugin-contract.md](alternative-data-plugin-contract.md)
 
 ---
 

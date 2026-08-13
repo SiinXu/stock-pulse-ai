@@ -43,24 +43,60 @@ def sanitize_untrusted_memory_text(text: str, *, max_chars: int = _MAX_FREEFORM_
     return cleaned.strip()
 
 
+def isolate_untrusted_memory_body(
+    body: str,
+    *,
+    max_chars: int = _MAX_FREEFORM_CHARS,
+    already_tagged: bool = False,
+) -> str:
+    """Wrap any memory-derived text as an untrusted prompt-data block.
+
+    Shared by layered-memory export and Decision Memory reflection injection
+    (#118) so every prompt path uses the same isolation contract.
+    """
+    if type(body) is not str:
+        raise ValueError("memory body must be a string")
+    cleaned = sanitize_untrusted_memory_text(body, max_chars=max_chars)
+    if already_tagged:
+        payload = cleaned
+    else:
+        payload = (
+            f"[NON_AUTHORITATIVE_MEMORY_DATA]\n"
+            f"{cleaned}\n"
+            f"[/NON_AUTHORITATIVE_MEMORY_DATA]"
+        )
+    return f"{_BEGIN}\n{_DIRECTIVE}\n{payload}\n{_END}"
+
+
 def isolate_layered_memory_for_prompt(bundle: LayeredMemoryBundle) -> str:
     if not isinstance(bundle, LayeredMemoryBundle):
         raise TypeError("bundle must be a LayeredMemoryBundle")
+    # format_layered_data already embeds the NON_AUTHORITATIVE data tags.
     payload = format_layered_data(bundle)
-    payload = sanitize_untrusted_memory_text(payload, max_chars=25_000)
-    return f"{_BEGIN}\n{_DIRECTIVE}\n{payload}\n{_END}"
+    return isolate_untrusted_memory_body(
+        payload, max_chars=25_000, already_tagged=True
+    )
 
 
 def assert_untrusted_isolation(rendered: str) -> None:
     if type(rendered) is not str or not rendered:
         raise ValueError("rendered memory isolation block is empty")
-    if not rendered.startswith(_BEGIN):
+    # Allow the isolation block to sit inside a larger prompt section (title +
+    # guardrail outside the envelope) while still requiring the full contract.
+    begin_at = rendered.find(_BEGIN)
+    end_at = rendered.rfind(_END)
+    if begin_at < 0:
         raise ValueError("memory isolation block missing BEGIN marker")
-    if not rendered.rstrip().endswith(_END):
+    if end_at < 0 or end_at < begin_at:
         raise ValueError("memory isolation block missing END marker")
-    if "[NON_AUTHORITATIVE_MEMORY_DATA]" not in rendered:
+    block = rendered[begin_at : end_at + len(_END)]
+    if not block.startswith(_BEGIN):
+        raise ValueError("memory isolation block missing BEGIN marker")
+    if not block.rstrip().endswith(_END):
+        raise ValueError("memory isolation block missing END marker")
+    if "[NON_AUTHORITATIVE_MEMORY_DATA]" not in block:
         raise ValueError("memory isolation block missing data tag")
-    if "untrusted DATA only" not in rendered:
+    if "untrusted DATA only" not in block:
         raise ValueError("memory isolation block missing data-only directive")
 
 

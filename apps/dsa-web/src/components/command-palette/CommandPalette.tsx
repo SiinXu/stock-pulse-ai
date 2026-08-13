@@ -3,20 +3,15 @@
 import {
   Activity,
   BarChart3,
-  BellRing,
   BriefcaseBusiness,
-  Calculator,
   ClipboardCheck,
   FileText,
-  FlaskConical,
-  Gauge,
-  Home,
+  GitBranch,
   LineChart,
-  MessageSquareQuote,
-  Search,
   Settings2,
   ShieldCheck,
   Sparkles,
+  Wand2,
 } from 'lucide-react';
 import {
   useEffect,
@@ -41,9 +36,15 @@ import {
 } from '../../routing/routes';
 import { cn } from '../../utils/cn';
 import { formatDateTime, formatReportType } from '../../utils/format';
+import { listCommandPalettePages } from '../layout/navigation';
 import { Modal } from '../common/Modal';
 import { SearchInput } from '../common/SearchInput';
 import { Spinner } from '../common/Spinner';
+import {
+  buildPipelineEntities,
+  buildSettingsEntities,
+  buildSkillEntities,
+} from './commandPaletteEntities';
 import { useCommandPaletteSearch } from './useCommandPaletteSearch';
 import type { LucideIcon } from 'lucide-react';
 
@@ -96,21 +97,16 @@ export function CommandPalette({
   const [activeIndex, setActiveIndex] = useState(-1);
   const search = useCommandPaletteSearch(query, isOpen);
 
-  const pages = useMemo<CommandItem[]>(() => [
-    { id: 'home', labelKey: 'layout.nav.home', href: APP_ROUTE_PATHS.home, icon: Home },
-    { id: 'signals', labelKey: 'layout.nav.decisionSignals', href: APP_ROUTE_PATHS.signals, icon: BellRing },
-    { id: 'research', labelKey: 'layout.nav.research', href: APP_ROUTE_PATHS.research, icon: Search },
-    { id: 'market', labelKey: 'layout.nav.marketReview', href: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
-    { id: 'discover', labelKey: 'layout.nav.discover', href: APP_ROUTE_PATHS.researchDiscover, icon: Search },
-    { id: 'analysis', labelKey: 'layout.nav.analysis', href: analysisHref, icon: FlaskConical },
-    { id: 'backtest', labelKey: 'layout.nav.backtest', href: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
-    { id: 'calculators', labelKey: 'layout.nav.calculators', href: APP_ROUTE_PATHS.calculators, icon: Calculator },
-    { id: 'skill-outcomes', labelKey: 'layout.nav.skillOutcomes', href: APP_ROUTE_PATHS.researchSkillOutcomes, icon: Gauge },
-    { id: 'portfolio', labelKey: 'layout.nav.portfolio', href: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
-    { id: 'agent', labelKey: 'layout.nav.agent', href: APP_ROUTE_PATHS.agent, icon: MessageSquareQuote },
-    { id: 'approvals', labelKey: 'layout.nav.approvals', href: APP_ROUTE_PATHS.approvals, icon: ClipboardCheck },
-    { id: 'settings', labelKey: 'layout.nav.settings', href: APP_ROUTE_PATHS.settings, icon: Settings2 },
-  ], [analysisHref]);
+  // Pages come from the shared navigation graph (sidebar + secondary palette-only).
+  const pages = useMemo<CommandItem[]>(
+    () => listCommandPalettePages({ analysisHref }).map((page) => ({
+      id: page.id,
+      labelKey: page.labelKey,
+      href: page.href,
+      icon: page.icon,
+    })),
+    [analysisHref],
+  );
   const actions = useMemo<CommandItem[]>(() => [
     { id: 'run-analysis', labelKey: 'home.startAnalysisTitle', href: analysisHref, icon: Sparkles },
     { id: 'create-rule', labelKey: 'decisionSignals.createFirstRule', href: buildSignalCenterHref({ createRule: true }), icon: ShieldCheck },
@@ -167,9 +163,45 @@ export function CommandPalette({
     description: report.summary ?? formatReportType(report.reportType, language),
     meta: `${formatReportType(report.reportType, language)} · ${formatDateTime(report.createdAt, language)}`,
   }));
+  const skillResults = useMemo(
+    () => buildSkillEntities(search.skills, language, query).map<PaletteResult>((item) => ({
+      id: item.id,
+      href: item.href,
+      icon: Wand2,
+      label: item.label,
+      description: item.description,
+      meta: item.meta,
+    })),
+    [language, query, search.skills],
+  );
+  const pipelineResults = useMemo(
+    () => buildPipelineEntities(language, query).map<PaletteResult>((item) => ({
+      id: item.id,
+      href: item.href,
+      icon: GitBranch,
+      label: item.label,
+      description: item.description,
+      meta: item.meta,
+    })),
+    [language, query],
+  );
+  const settingsResults = useMemo(
+    () => buildSettingsEntities(language, query).map<PaletteResult>((item) => ({
+      id: item.id,
+      href: item.href,
+      icon: Settings2,
+      label: item.label,
+      description: item.description,
+      meta: item.meta,
+    })),
+    [language, query],
+  );
   const groups: PaletteGroup[] = [
     { id: 'stocks', label: text.stocksGroup, items: stockResults },
     { id: 'reports', label: text.reportsGroup, items: reportResults },
+    { id: 'skills', label: text.skillsGroup, items: skillResults },
+    { id: 'pipelines', label: text.pipelinesGroup, items: pipelineResults },
+    { id: 'settings', label: text.settingsGroup, items: settingsResults },
     {
       id: 'pages',
       label: text.pagesGroup,
@@ -318,6 +350,11 @@ export function CommandPalette({
           {search.hasError ? (
             <p role="alert" className="px-2 py-3 text-center text-sm text-danger">
               {text.searchUnavailable}
+            </p>
+          ) : null}
+          {search.skillSearchError ? (
+            <p role="alert" className="px-2 py-3 text-center text-sm text-danger">
+              {text.skillSearchUnavailable}
             </p>
           ) : null}
           {normalizedQuery.length > 0

@@ -951,6 +951,36 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            agent_reflection_enabled=parse_env_bool(
+                os.getenv('AGENT_REFLECTION_ENABLED'),
+                False,
+            ),
+            agent_reflection_llm_budget=parse_env_int(
+                os.getenv('AGENT_REFLECTION_LLM_BUDGET'),
+                1,
+                field_name='AGENT_REFLECTION_LLM_BUDGET',
+                minimum=0,
+            ),
+            agent_reflection_max_revise=parse_env_int(
+                os.getenv('AGENT_REFLECTION_MAX_REVISE'),
+                1,
+                field_name='AGENT_REFLECTION_MAX_REVISE',
+                minimum=0,
+            ),
+            agent_postmortem_enabled=parse_env_bool(
+                os.getenv('AGENT_POSTMORTEM_ENABLED'),
+                False,
+            ),
+            agent_postmortem_llm_budget=parse_env_int(
+                os.getenv('AGENT_POSTMORTEM_LLM_BUDGET'),
+                8,
+                field_name='AGENT_POSTMORTEM_LLM_BUDGET',
+                minimum=0,
+            ),
+            agent_postmortem_skip_clean_hits=parse_env_bool(
+                os.getenv('AGENT_POSTMORTEM_SKIP_CLEAN_HITS'),
+                True,
+            ),
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
@@ -971,6 +1001,10 @@ class _ConfigLoadingMethods:
             ),
             decision_profile_calibration_enabled=parse_env_bool(
                 os.getenv('DECISION_PROFILE_CALIBRATION_ENABLED'),
+                False,
+            ),
+            prediction_extract_enabled=parse_env_bool(
+                os.getenv('PREDICTION_EXTRACT_ENABLED'),
                 False,
             ),
             agent_technical_agent_timeout_s=parse_env_float(
@@ -1216,6 +1250,9 @@ class _ConfigLoadingMethods:
             report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_language=cls._parse_report_language(report_language_raw),
             report_mode=cls._parse_report_mode(os.getenv('REPORT_MODE', 'standard')),
+            research_presentation_profile=cls._parse_research_presentation_profile(
+                os.getenv('RESEARCH_PRESENTATION_PROFILE', 'balanced')
+            ),
             report_export_pdf_font_path=(
                 os.getenv('REPORT_EXPORT_PDF_FONT_PATH') or ''
             ).strip() or None,
@@ -1601,7 +1638,11 @@ class _ConfigLoadingMethods:
             ),
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
-                os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
+                os.getenv('DECISION_MEMORY_LOOKBACK'),
+                5,
+                field_name='DECISION_MEMORY_LOOKBACK',
+                minimum=0,
+                maximum=40,
             ),
             decision_memory_min_age_days=parse_env_int(
                 os.getenv('DECISION_MEMORY_MIN_AGE_DAYS'), 3, field_name='DECISION_MEMORY_MIN_AGE_DAYS', minimum=0
@@ -1649,6 +1690,23 @@ class _ConfigLoadingMethods:
                 minimum=100,
                 maximum=1_000_000,
             ),
+            capability_write_registry_path=(
+                os.getenv('CAPABILITY_WRITE_REGISTRY_PATH', '').strip()
+            ),
+            task_routing_enabled=parse_env_bool(
+                os.getenv('TASK_ROUTING_ENABLED'), default=False
+            ),
+            task_routing_policy=(
+                os.getenv('TASK_ROUTING_POLICY', 'quality').strip().lower()
+                or 'quality'
+            ),
+            task_routing_pin_report=os.getenv('TASK_ROUTING_PIN_REPORT', '').strip(),
+            task_routing_pin_agent=os.getenv('TASK_ROUTING_PIN_AGENT', '').strip(),
+            task_routing_pin_vision=os.getenv('TASK_ROUTING_PIN_VISION', '').strip(),
+            task_routing_pin_market_review=os.getenv('TASK_ROUTING_PIN_MARKET_REVIEW', '').strip(),
+            task_routing_pin_cheap_scan=os.getenv('TASK_ROUTING_PIN_CHEAP_SCAN', '').strip(),
+            task_routing_pin_deep_reasoning=os.getenv('TASK_ROUTING_PIN_DEEP_REASONING', '').strip(),
+            task_routing_pin_coding=os.getenv('TASK_ROUTING_PIN_CODING', '').strip(),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False
             ),
@@ -1776,6 +1834,15 @@ class _ConfigLoadingMethods:
         from src.services.report_mode import normalize_report_mode
 
         return normalize_report_mode(value, default="standard")
+
+    @classmethod
+    def _parse_research_presentation_profile(cls, value: Optional[str]) -> str:
+        """Parse RESEARCH_PRESENTATION_PROFILE; invalid values fall back to balanced."""
+        from src.services.research_presentation_profile import (
+            normalize_research_presentation_profile,
+        )
+
+        return normalize_research_presentation_profile(value, default="balanced")
 
     @classmethod
     def _get_env_file_value(cls, key: str) -> Optional[str]:

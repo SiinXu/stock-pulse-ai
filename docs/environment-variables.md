@@ -101,6 +101,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
+| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内反思循环（类型化教训；默认 false） |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限 |
+| `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释; 反思后运行内修订次数上限 |
+| `AGENT_POSTMORTEM_ENABLED` | `false` | 是 | 模板中注释; 可选已解析预测后验复盘（默认 false） |
+| `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 是 | 模板中注释; 单批后验 LLM 调用上限 |
+| `AGENT_POSTMORTEM_SKIP_CLEAN_HITS` | `true` | 是 | 模板中注释; 干净命中跳过后验 LLM |
 | `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep-research tool token budget and timeout (seconds) for Agent analysis paths that enable deep research. |
 | `AGENT_DEEP_RESEARCH_TIMEOUT` | `180` | 是 | 模板中注释 |
@@ -196,6 +202,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `BIAS_THRESHOLD` | `5.0` | 是 | 模板中注释; Bias-ratio threshold (%); when deviation from MA5 exceeds this value, strong-trend stocks use a 1.5x threshold before... |
 | `BOCHA_API_KEYS` | `your_bocha_key_here` | 是 | 模板中注释; =================================== Search engine configuration (for fetching stock news) |
 | `BRAVE_API_KEYS` | `空` | 是 | Brave Search API Keys(Supports multiple, Comma-separated) Get: https://brave.com/search/api/ |
+| `CAPABILITY_WRITE_REGISTRY_PATH` | `./data/capability_write_registry.json` | 是 | 模板中注释; =========================================== Capability write registry + task-aware routing (Issues #221, #204) ======... |
 | `COINGECKO_API_BASE` | `空` | 是 | 模板中注释; Optional custom HTTPS base for keyless mode only; credentials are never sent to it. |
 | `COINGECKO_API_KEY` | `空` | 是 | 模板中注释; Optional CoinGecko key; leave empty in keyless mode. |
 | `COINGECKO_API_PLAN` | `keyless` | 是 | 模板中注释; Authentication mode: keyless, demo, or pro |
@@ -224,7 +231,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | 是 | 模板中注释; Separate final aggregated-fundamental policy: warn or reject |
 | `DEBUG` | `false` | 是 | Enable debugging logs |
 | `DECISION_MEMORY_ENABLED` | `true` | 是 | 模板中注释; Historical decision memory & reflection (Issue #118; default on, no config needed) Injects a "Historical Decision Ref... |
-| `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max recent evaluated signals per stock to reflect on |
+| `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max admitted evaluated signals per stock to inject (rate and list use this set; hard cap 40) |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | `3` | 是 | 模板中注释; Only reflect on signals at least this many days old (so outcomes exist) |
 | `DECISION_MEMORY_MIN_SAMPLES` | `5` | 是 | 模板中注释; Min decided outcomes (hit+miss) before a hit-rate is shown; smaller buckets are noise |
 | `DECISION_PROFILE_CALIBRATION_ENABLED` | `false` | 是 | 模板中注释 |
@@ -497,10 +504,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PAPER_PORTFOLIO_INITIAL_CASH` | `1000000` | 是 | 模板中注释; Paper trading portfolio (Issue #370; forward simulation with persistent positions) Initial paper cash seeded as a dep... |
 | `PERF_COLLECTION_ENABLED` | `false` | 是 | 模板中注释; Performance baseline collection / offline profiling (Issue #227) |
 | `PERF_PROFILE_ENABLED` | `false` | 是 | 模板中注释; PERF_PROFILE_ENABLED only documents intent for offline tooling; production request paths are never auto-wrapped in cP... |
-| `PLUGINS_DIR` | `/absolute/path/to/reviewed/plugins` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PLUGINS_DIR` | `/absolute/path/to/reviewed/plugins` | 否 | 模板中注释; 受信外部插件（默认关闭）。另类数据示例：`examples/plugins/example-alternative-data` 需要 `alt_data:read`（见 alternative-data-plugin-contract_zh.md；Issues #139/#1144） |
 | `PLUGIN_DATA_PROVIDER_AUTO_BIND` | `false` | 是 | 模板中注释; Opt-in Data Provider auto-bind (default off) |
 | `PLUGIN_STATE_PATH` | `./data/plugin_lifecycle_state.json` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PORTFOLIO_FX_UPDATE_ENABLED` | `true` | 是 | 模板中注释 |
+| `PORTFOLIO_AWARE_SIZING_ENABLED` | `true` | 是 | 模板中注释；启用组合感知仓位区间 |
+| `PORTFOLIO_MAX_SINGLE_NAME_WEIGHT` | `0.15` | 是 | 模板中注释；单一标的软上限（小数） |
 | `PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT` | `50.0` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT` | `2.0` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT` | `35.0` | 是 | 模板中注释; Optional finite insight thresholds (cash low must be strictly below cash high): |
@@ -565,6 +574,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPRO_MODE_ENABLED` | `false` | 是 | 模板中注释; Request-scoped temperature=0 plus provider seed forwarding where supported. |
 | `REPRO_RECORD_CONFIG` | `true` | 是 | 模板中注释 |
 | `REPRO_SEED` | `0` | 是 | 模板中注释 |
+| `RESEARCH_PRESENTATION_PROFILE` | `balanced` | 是 | 模板中注释; Research presentation profile (emphasis/order only; same evidence, full risk disclosure): conservative = risks first ... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |
@@ -591,6 +601,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | `false` | 是 | 模板中注释; Public signal scorecard (Issue #379; default off so self-hosted stays private) Exposes an aggregated, non-sensitive n... |
 | `SINGLE_STOCK_NOTIFY` | `false` | 是 | 模板中注释; =================================== (Optional) Single stock push configuration =================================== Si... |
 | `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` | `false` | 是 | 模板中注释; Default-off Bayesian outcome weights for skill aggregation (issue #714) |
+| `PREDICTION_EXTRACT_ENABLED` | `false` | 是 | commented template; Extract PredictionRecord drafts from structured decisions after finalize (default off; Refs #1108) |
 | `SKILL_OPINION_RECORDING_ENABLED` | `false` | 是 | 模板中注释; Record individual skill opinions into the offline outcome-evaluation store (default off) |
 | `SLACK_BOT_TOKEN` | `xoxb-...` | 是 | 模板中注释; Method Nine: Slack Configuration Supports two methods: Bot API (recommended) and Incoming Webhook |
 | `SLACK_CHANNEL_ID` | `C01234567` | 是 | 模板中注释 |
@@ -607,6 +618,15 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `STOCK_GROUP_2` | `002594,AAPL` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `STOCK_INDEX_REMOTE_UPDATE_ENABLED` | `true` | 是 | Stock Auto-completion Index Remote Update (default enabled; falls back to local built-in index if GitHub is inaccessi... |
 | `STOCK_LIST` | `600519,300750,002594` | 是 | Watchlist stocks list (comma-separated, supports Shanghai and Shenzhen stock codes) Shanghai stocks: 600xxx, 601xxx, ... |
+| `TASK_ROUTING_ENABLED` | `false` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_AGENT` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_CHEAP_SCAN` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_CODING` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_DEEP_REASONING` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_MARKET_REVIEW` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_REPORT` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_VISION` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_POLICY` | `quality` | 是 | 模板中注释 |
 | `TAVILY_API_KEYS` | `空` | 是 | Tavily API Keys (supports multiple, comma-separated) |
 | `TELEGRAM_BOT_TOKEN` | `123456789:ABCdefGHIjklMNOpqrsTUVwxyz` | 是 | 模板中注释; Method Three: Telegram Robot (Requires configuring both items simultaneously) 1 |
 | `TELEGRAM_CHAT_ID` | `123456789` | 是 | 模板中注释 |

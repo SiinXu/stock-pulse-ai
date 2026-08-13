@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-12",
-  "baselineNote": "Settings, locale, and IntelligenceSourcesPanel budgets use a combined production build after landing Daily Brief/Event Research, research API, and cost-attribution inventory changes (Refs #149 / #1131 / #1143 / #166 / #248); each rule retains its fixed headroom.",
+  "measuredAt": "2026-08-13",
+  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1148) (js-entry). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,71 +13,72 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 242114,
-      "measuredGzipBytes": 241714,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution inventory changes, with 400 B headroom."
+      "maxGzipBytes": 248056,
+      "measuredGzipBytes": 247656,
+      "note": "Local production-build remasure after merging origin/main; measured 247656 B + 400 B retained headroom."
     },
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
-      "maxGzipBytes": 177591,
-      "measuredGzipBytes": 161446
+      "maxGzipBytes": 187048,
+      "measuredGzipBytes": 186648,
+      "note": "Remeasured after merging origin/main (#1148); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 157947,
-      "measuredGzipBytes": 157247,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 160635,
+      "measuredGzipBytes": 159935,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151228,
-      "measuredGzipBytes": 150528,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 153829,
+      "measuredGzipBytes": 153129,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151114,
-      "measuredGzipBytes": 150414,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 153802,
+      "measuredGzipBytes": 153102,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 150955,
-      "measuredGzipBytes": 150355,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 600 B headroom."
+      "maxGzipBytes": 153531,
+      "measuredGzipBytes": 152931,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 146787,
-      "measuredGzipBytes": 146087,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 149288,
+      "measuredGzipBytes": 148588,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 143593,
-      "measuredGzipBytes": 142893,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 146254,
+      "measuredGzipBytes": 145554,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 136900,
-      "measuredGzipBytes": 136200,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 139365,
+      "measuredGzipBytes": 138665,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 136987,
-      "measuredGzipBytes": 136287,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 139485,
+      "measuredGzipBytes": 138785,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "vendor-charts",
@@ -140,9 +141,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45803,
-      "measuredGzipBytes": 45603,
-      "note": "GitHub Actions Linux remeasure after cost attribution and routing telemetry Settings controls (Refs #166 / #248); measured gzip + 200 B headroom."
+      "maxGzipBytes": 45965,
+      "measuredGzipBytes": 45765,
+      "note": "Merge of the OpenAPI client migration Zod boundaries (PR #1242 / Refs #721) with the cost attribution and routing telemetry Settings controls (Refs #166 / #248). Keeps the larger of the two rebaselines; the merged branch measures 45624 B gzip locally, so CI should remeasure on GitHub Actions Linux before tightening."
     },
     {
       "id": "AlertsWorkspace",

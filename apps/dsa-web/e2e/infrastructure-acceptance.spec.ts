@@ -11,6 +11,7 @@ import {
 } from '@playwright/test';
 import { encodeModelRef } from '../src/utils/modelRef';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
+import { SOURCE_CANDIDATE_DISCOVERY_TEXT } from '../src/locales/candidateDiscoveryText';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
 import { formatUiText, UI_TEXT } from '../src/i18n/uiText';
@@ -870,10 +871,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect(await page.evaluate((key) => localStorage.getItem(key), uiLanguageStorageKey)).toBe('en');
     await page.reload();
-    await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();
-    await page.getByRole('link', { name: 'Agent' }).click();
+    await expect(page.getByRole('link', { name: 'Today' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Signal Center' })).toBeVisible();
+    await page.goto('/chat');
+    await expect(page.getByText('Ask Stock', { exact: true }).first()).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Today' })).toBeVisible();
     await page.goForward();
     await expect(page.getByText('Ask Stock', { exact: true }).first()).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -931,14 +934,22 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     }).click();
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchAnalysis, UI_TEXT.en['analysisWorkbench.title'], UI_TEXT.en['analysisWorkbench.documentTitle']);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
+    await assertRouteChrome(
+      page,
+      APP_ROUTE_PATHS.researchDiscover,
+      SOURCE_CANDIDATE_DISCOVERY_TEXT.en.pageTitle,
+      SOURCE_CANDIDATE_DISCOVERY_TEXT.en.documentTitle,
+    );
     await assertRouteChrome(page, APP_ROUTE_PATHS.portfolio, PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.signals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
     const homeParent = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.home'] });
     const signalChild = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
     const homeToggle = navigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] });
     await expect(homeParent).not.toHaveAttribute('aria-current', 'page');
-    await expect(signalChild).toHaveCount(0);
+    // #873: Signals is first-class primary chrome (not a Home child).
+    await expect(signalChild).toBeVisible();
+    await expect(signalChild).toHaveAttribute('href', APP_ROUTE_PATHS.signals);
+    await expect(signalChild).toHaveAttribute('aria-current', 'page');
     await expect(homeToggle).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -948,7 +959,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const drawerHome = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.home'] });
     const drawerSignal = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
     await expect(drawerHome).not.toHaveAttribute('aria-current', 'page');
-    await expect(drawerSignal).toHaveCount(0);
+    await expect(drawerSignal).toBeVisible();
+    await expect(drawerSignal).toHaveAttribute('aria-current', 'page');
     await expect(drawerNavigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] })).toHaveCount(0);
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -1292,7 +1304,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       ]));
     }).toEqual({ stock: 'AAPL', name: 'Apple', recordId: '1', context: 'active' });
 
-    const homeLink = page.getByRole('link', { name: '首页' });
+    const homeLink = page.getByRole('link', { name: '今日' });
     await expect(homeLink).toHaveAttribute('href', APP_ROUTE_PATHS.home);
     await homeLink.click();
     await expect.poll(() => {
@@ -1722,7 +1734,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await dialog.getByLabel('数量').fill('2');
     await dialog.getByLabel('成交价').fill('210');
     await dialog.getByRole('button', { name: '提交交易' }).click();
-    await expect(page.locator('[data-toast-tone="danger"]').getByText('请求失败', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-toast-tone="warning"]').getByText('请求失败', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: '提交交易' }).click();
     await expect(dialog).toBeHidden();
     expect(operationIds).toHaveLength(2);
@@ -1983,7 +1995,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await editConnectionAddModel(page, 'alpha_conn', 'local-retry-model');
     await expect(page.getByText(/AI 模型: 自动保存失败/)).toBeVisible();
     await expect(page.getByTestId('connection-card-alpha_conn')).toContainText('local-retry-model');
-    await page.getByRole('link', { name: '首页' }).click();
+    await page.getByRole('link', { name: '今日' }).click();
     const leaveDialog = page.getByRole('dialog', { name: '离开设置页？' });
     await expect(leaveDialog).toBeVisible();
     await leaveDialog.getByRole('button', { name: '取消' }).click();
@@ -2310,16 +2322,18 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await page.goto(APP_ROUTE_PATHS.researchMarket);
-    const marketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true }).first();
-    await marketReviewButton.click();
+    const headerMarketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true }).first();
+    await headerMarketReviewButton.click();
     await expect.poll(() => submissions).toBe(1);
     await oldPollStarted.promise;
     // A second invocation can originate outside this page (for example from a
     // recovered task action). Trigger the same React action while the first
     // poll is in flight so the generation guard, not unmount cleanup, is what
     // rejects the old response.
-    await expect(marketReviewButton).toBeEnabled();
-    await marketReviewButton.click();
+    await expect(headerMarketReviewButton).toBeDisabled();
+    const recoveredTaskAction = page.getByRole('button', { name: '大盘复盘', exact: true }).last();
+    await expect(recoveredTaskAction).toBeEnabled();
+    await recoveredTaskAction.click();
     await expect.poll(() => submissions).toBe(2);
     const persistedReport = page.getByTestId('market-review-report');
     await expect(persistedReport.getByText('NEW_GENERATION_PERSISTED', { exact: true })).toBeVisible();

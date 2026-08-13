@@ -137,7 +137,30 @@ class _PersistenceStageMixin:
         if news_result_count is not None:
             snapshot["news_result_count"] = news_result_count
         if analysis_context_pack_overview is not None:
-            snapshot["analysis_context_pack_overview"] = analysis_context_pack_overview
+            overview = dict(analysis_context_pack_overview)
+            overview.pop("_pack_audit", None)
+            snapshot["analysis_context_pack_overview"] = overview
+            analysis_context_pack_overview = overview
+            # Issue #182: surface low-sensitivity snapshot identity at the
+            # context_snapshot top level for audit/diagnostics consumers.
+            snapshot_identity = {
+                key: analysis_context_pack_overview.get(key)
+                for key in (
+                    "snapshot_id",
+                    "snapshot_revision",
+                    "as_of",
+                    "pack_version",
+                    "created_at",
+                )
+                if analysis_context_pack_overview.get(key) is not None
+            }
+            overview_meta = analysis_context_pack_overview.get("metadata")
+            if isinstance(overview_meta, dict):
+                digest = overview_meta.get("content_digest")
+                if digest:
+                    snapshot_identity["content_digest"] = digest
+            if snapshot_identity:
+                snapshot["analysis_context_snapshot"] = snapshot_identity
         if market_phase_summary is not None:
             snapshot[MARKET_PHASE_SUMMARY_KEY] = market_phase_summary
         if isinstance(sentiment_snapshot, dict) and sentiment_snapshot:
@@ -183,6 +206,7 @@ class _PersistenceStageMixin:
         failure_reason: str,
         failure_message: str,
         failure_error_code: str,
+        prediction_mode: str = "analysis",
     ) -> PipelineStageResult[PipelinePersistValue]:
         """Persist one analysis once for a stable query and return its stage result."""
 
@@ -215,6 +239,12 @@ class _PersistenceStageMixin:
                         context_snapshot=context_snapshot,
                         portfolio_context=portfolio_context,
                     )
+                    self._extract_prediction_after_history_save(
+                        result=result,
+                        query_id=query_id,
+                        source_report_id=saved_history_id,
+                        mode=prediction_mode,
+                    )
                     # Config-gated skill-opinion sample materialization from the
                     # just-saved report (samples require analysis_history_id FK).
                     try:
@@ -236,6 +266,8 @@ class _PersistenceStageMixin:
                             context={"analysis_history_id": saved_history_id},
                         )
             except Exception as exc:  # broad-exception: fallback_recorded - History failure remains isolated after the side-effect fence records whether a write committed.
+                from src.agent.sandbox.effects import SandboxExternalEffectBlocked
+
                 persistence_error = exc
                 valid_saved_history_id = False
                 record_history_run(
@@ -243,14 +275,30 @@ class _PersistenceStageMixin:
                     metadata_saved=False,
                     error_message=exc,
                 )
-                log_safe_exception(
-                    logger,
-                    failure_message,
-                    exc,
-                    error_code=failure_error_code,
-                    level=logging.WARNING,
-                    context={"stock_code": getattr(result, "code", None)},
-                )
+                # Preserve sandbox semantics: do not mislabel a refused simulation
+                # write as a generic history storage failure.
+                if isinstance(exc, SandboxExternalEffectBlocked):
+                    log_safe_exception(
+                        logger,
+                        "Sandbox refused production analysis-history write",
+                        exc,
+                        error_code="sandbox_analysis_history_write_blocked",
+                        level=logging.WARNING,
+                        context={
+                            "stock_code": getattr(result, "code", None),
+                            "effect": getattr(exc, "effect", None),
+                            "sandbox_run_id": getattr(exc, "sandbox_run_id", None),
+                        },
+                    )
+                else:
+                    log_safe_exception(
+                        logger,
+                        failure_message,
+                        exc,
+                        error_code=failure_error_code,
+                        level=logging.WARNING,
+                        context={"stock_code": getattr(result, "code", None)},
+                    )
 
             persistence_succeeded = bool(saved_history_id)
             value = PipelinePersistValue(
@@ -349,6 +397,62 @@ class _PersistenceStageMixin:
                 "Decision signal extraction failed after history save",
                 exc,
                 error_code="pipeline_decision_signal_extraction_failed",
+                level=logging.WARNING,
+                context={
+                    "query_id": query_id,
+                    "stock_code": getattr(result, "code", None),
+                },
+            )
+
+
+    def _extract_prediction_after_history_save(
+        self,
+        *,
+        result: AnalysisResult,
+        query_id: str,
+        source_report_id: int,
+        mode: str = "analysis",
+    ) -> None:
+        """Best-effort PredictionRecord extraction after analysis history is saved.
+
+        Default-off via ``PREDICTION_EXTRACT_ENABLED``. Drafts are attached to the
+        in-memory result only; durable persistence is owned by later issues.
+        Failures never block history persistence or user-visible analysis.
+        """
+        try:
+            from src.services.prediction_extractor import (
+                PRESENTATION_CONFIDENCE_FLAG,
+                drop_presentation_confidence,
+                maybe_extract_prediction_on_finalize,
+            )
+
+            structured_source = getattr(result, "prediction_source", None)
+            source = dict(structured_source) if isinstance(structured_source, dict) else {}
+            source.setdefault("code", getattr(result, "code", None))
+            source.setdefault("stock_name", getattr(result, "name", None))
+            dashboard = getattr(result, "dashboard", None)
+            if isinstance(dashboard, dict):
+                source.setdefault("dashboard", dict(dashboard))
+            if source.pop(PRESENTATION_CONFIDENCE_FLAG, False):
+                source = drop_presentation_confidence(source)
+
+            extraction = maybe_extract_prediction_on_finalize(
+                source,
+                config=getattr(self, "config", None),
+                run_id=str(query_id or ""),
+                source_decision_id=str(source_report_id),
+                mode=mode,
+                model_id=getattr(result, "model_used", None),
+            )
+            if extraction is None:
+                return
+            setattr(result, "prediction_extraction", extraction.to_dict())
+        except Exception as exc:  # broad-exception: fallback_recorded - Prediction extraction must never fail history persistence.
+            log_safe_exception(
+                logger,
+                "Prediction extraction failed after history save",
+                exc,
+                error_code="pipeline_prediction_extraction_failed",
                 level=logging.WARNING,
                 context={
                     "query_id": query_id,
@@ -787,6 +891,37 @@ class _PersistenceStageMixin:
                 pack,
                 report_language=report_language,
             )
+            # Issue #182: attach value-stripped pack audit for multi-agent reseal
+            # under the same snapshot identity (not public overview fields).
+            try:
+                from src.analysis_context_pack.snapshot import strip_pack_item_values
+                from src.services.run_diagnostics import get_current_diagnostic_context
+
+                identity = pack.audit_identity()
+                if isinstance(overview, dict):
+                    overview_meta = overview.get("metadata")
+                    if not isinstance(overview_meta, dict):
+                        overview_meta = {}
+                        overview["metadata"] = overview_meta
+                    # Keep digest on public metadata; pack audit is internal only.
+                    if identity.get("content_digest") and not overview_meta.get("content_digest"):
+                        overview_meta["content_digest"] = identity["content_digest"]
+                    overview["_pack_audit"] = strip_pack_item_values(pack.model_dump(mode="json"))
+                diag = get_current_diagnostic_context()
+                if diag is not None:
+                    diag.record_agent_event(
+                        {
+                            "type": "analysis_context_snapshot",
+                            "stage": "context",
+                            **{
+                                key: value
+                                for key, value in identity.items()
+                                if value is not None
+                            },
+                        }
+                    )
+            except Exception:  # broad-exception: optional_metadata - audit identity is best-effort
+                pass
             return summary, overview
         except Exception as exc:  # broad-exception: fallback_recorded - Context-pack failures are logged and fall back to empty optional context.
             log_safe_exception(

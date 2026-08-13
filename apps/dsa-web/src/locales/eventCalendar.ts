@@ -9,6 +9,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "按日期查看企业事件告警及其影响摘要。此页面只读使用告警触发记录，不会额外抓取行情或事件数据。",
     refresh: "刷新",
+    openEventAlerts: "打开企业事件告警",
     loading: "正在加载企业事件…",
     emptyTitle: "此日期范围内没有企业事件",
     emptyDescription: "告警事件源在所选日期内没有返回触发记录。",
@@ -55,6 +56,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "Browse corporate-event alerts by date with their impact summaries. This read-only view uses alert trigger history and performs no extra market or event fetches.",
     refresh: "Refresh",
+    openEventAlerts: "Open event alerts",
     loading: "Loading corporate events…",
     emptyTitle: "No corporate events in this date range",
     emptyDescription:
@@ -105,6 +107,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "Unternehmensereignis-Alarme nach Datum mit ihren Auswirkungszusammenfassungen anzeigen. Diese schreibgeschützte Ansicht nutzt den Alarmverlauf und ruft keine zusätzlichen Markt- oder Ereignisdaten ab.",
     refresh: "Aktualisieren",
+    openEventAlerts: "Ereignisalarme öffnen",
     loading: "Unternehmensereignisse werden geladen…",
     emptyTitle: "Keine Unternehmensereignisse in diesem Zeitraum",
     emptyDescription:
@@ -155,6 +158,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "Consulta por fecha las alertas de eventos corporativos y sus resúmenes de impacto. Esta vista de solo lectura usa el historial de alertas y no obtiene datos adicionales de mercado ni de eventos.",
     refresh: "Actualizar",
+    openEventAlerts: "Abrir alertas de eventos",
     loading: "Cargando eventos corporativos…",
     emptyTitle: "No hay eventos corporativos en este intervalo",
     emptyDescription:
@@ -205,6 +209,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "Consultez par date les alertes d’événements d’entreprise et leur synthèse d’impact. Cette vue en lecture seule utilise l’historique des alertes sans récupérer d’autres données de marché ou d’événement.",
     refresh: "Actualiser",
+    openEventAlerts: "Ouvrir les alertes d’événements",
     loading: "Chargement des événements d’entreprise…",
     emptyTitle: "Aucun événement d’entreprise sur cette période",
     emptyDescription:
@@ -255,6 +260,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "Telusuri peringatan peristiwa perusahaan berdasarkan tanggal beserta ringkasan dampaknya. Tampilan hanya-baca ini memakai riwayat pemicu peringatan tanpa mengambil data pasar atau peristiwa tambahan.",
     refresh: "Segarkan",
+    openEventAlerts: "Buka peringatan peristiwa",
     loading: "Memuat peristiwa perusahaan…",
     emptyTitle: "Tidak ada peristiwa perusahaan dalam rentang ini",
     emptyDescription:
@@ -305,6 +311,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "企業イベントのアラートと影響概要を日付別に確認します。この読み取り専用画面はアラート履歴のみを使用し、市場データやイベントデータを追加取得しません。",
     refresh: "更新",
+    openEventAlerts: "イベントアラートを開く",
     loading: "企業イベントを読み込み中…",
     emptyTitle: "この期間に企業イベントはありません",
     emptyDescription: "選択した期間に企業イベントのアラート記録はありません。",
@@ -354,6 +361,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "기업 이벤트 알림과 영향 요약을 날짜별로 확인합니다. 이 읽기 전용 화면은 알림 이력만 사용하며 시장 또는 이벤트 데이터를 추가로 가져오지 않습니다.",
     refresh: "새로고침",
+    openEventAlerts: "이벤트 알림 열기",
     loading: "기업 이벤트 불러오는 중…",
     emptyTitle: "이 기간에 기업 이벤트가 없습니다",
     emptyDescription: "선택한 날짜 범위에 기업 이벤트 알림 기록이 없습니다.",
@@ -402,6 +410,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "Lihat amaran peristiwa korporat mengikut tarikh bersama ringkasan impaknya. Paparan baca sahaja ini menggunakan sejarah amaran tanpa mengambil data pasaran atau peristiwa tambahan.",
     refresh: "Muat semula",
+    openEventAlerts: "Buka amaran peristiwa",
     loading: "Memuatkan peristiwa korporat…",
     emptyTitle: "Tiada peristiwa korporat dalam julat ini",
     emptyDescription:
@@ -452,6 +461,7 @@ export const EVENT_CALENDAR_TEXT = {
     description:
       "按日期查看企業事件告警及其影響摘要。此唯讀頁面使用告警觸發紀錄，不會額外擷取市場或事件資料。",
     refresh: "重新整理",
+    openEventAlerts: "開啟企業事件告警",
     loading: "正在載入企業事件…",
     emptyTitle: "此日期範圍內沒有企業事件",
     emptyDescription: "告警事件來源在所選日期內沒有傳回觸發紀錄。",

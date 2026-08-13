@@ -12,6 +12,7 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { stocksApi } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
 import { estimateStockValuation } from '../../api/valuation';
+import { getStockMoneyFlow } from '../../api/moneyFlow';
 import {
   APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
@@ -35,10 +36,15 @@ vi.mock('../../api/valuation', () => ({
   estimateStockValuation: vi.fn(),
 }));
 
+vi.mock('../../api/moneyFlow', () => ({
+  getStockMoneyFlow: vi.fn(),
+}));
+
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
 const getHistoryMock = vi.mocked(stocksApi.getDailyHistory);
 const addWatchlistMock = vi.mocked(systemConfigApi.addToWatchlist);
 const estimateStockValuationMock = vi.mocked(estimateStockValuation);
+const getStockMoneyFlowMock = vi.mocked(getStockMoneyFlow);
 
 function SignalLocationProbe() {
   const location = useLocation();
@@ -134,6 +140,18 @@ describe('StockDetailsPage', () => {
     getHistoryMock.mockReset();
     addWatchlistMock.mockReset();
     estimateStockValuationMock.mockReset();
+    getStockMoneyFlowMock.mockReset();
+    getStockMoneyFlowMock.mockResolvedValue({
+      schemaVersion: 'money_flow_view/1.0',
+      stockCode: '600519',
+      enabled: false,
+      status: 'disabled',
+      requestedDays: 5,
+      disclaimer: 'Research evidence only.',
+      message: 'SmartMoney money-flow is disabled.',
+      warnings: [],
+      sourceChain: [],
+    });
   });
 
   it('renders the quote, K-line chart, and accessible history table', async () => {
@@ -159,6 +177,10 @@ describe('StockDetailsPage', () => {
     expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('2026-01-06').length).toBeGreaterThanOrEqual(1);
     expect(getHistoryMock).toHaveBeenCalledWith('600519', 90);
+    // Smart Money footprint section is reachable on the stock details surface.
+    expect(screen.getByTestId('stock-details-money-flow-section')).toBeTruthy();
+    expect(screen.getByTestId('money-flow-panel')).toBeTruthy();
+    await waitFor(() => expect(getStockMoneyFlowMock).toHaveBeenCalled());
   });
 
   it('keeps history loading and error states without painting a false chart', async () => {
@@ -390,6 +412,7 @@ describe('StockDetailsPage', () => {
     getQuoteMock.mockResolvedValue(makeQuote());
     getHistoryMock.mockResolvedValue(makeHistory());
     vi.mocked(estimateStockValuation).mockResolvedValue({
+      schemaVersion: 'valuation-estimate-v1',
       status: 'ok',
       stockCode: '600519',
       dcf: {
@@ -426,6 +449,7 @@ describe('StockDetailsPage', () => {
       stockCode,
     }));
     estimateStockValuationMock.mockResolvedValue({
+      schemaVersion: 'valuation-estimate-v1',
       status: 'ok',
       stockCode: 'AAPL',
       dcf: {

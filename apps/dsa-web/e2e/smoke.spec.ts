@@ -213,8 +213,8 @@ test.describe('web smoke', () => {
 
     expect((await focusResponse).status()).toBe(200);
 
-    await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '今日' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '信号中心' })).toBeVisible();
     const core = page.getByTestId('home-core-blocks');
     await expect(core.getByRole('heading', { name: '今日焦点', exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(core.getByRole('heading', { name: '待办', exact: true })).toBeVisible();
@@ -250,8 +250,8 @@ test.describe('web smoke', () => {
   test('chat page reconciles a request rejected before turn persistence', async ({ page }) => {
     await login(page);
 
-    // Navigate to chat page by clicking the link
-    await page.getByRole('link', { name: 'Agent' }).click();
+    // Agent is demoted from primary nav (#873); open chat via canonical path.
+    await page.goto('/chat');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1000);
 
@@ -261,7 +261,9 @@ test.describe('web smoke', () => {
 
     const input = page.getByPlaceholder(/分析 600519/);
     await expect(input).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('button', { name: '展开策略选择' })).toBeVisible();
+    const skillPicker = page.getByRole('button', { name: '展开策略选择' });
+    await expect(skillPicker).toBeVisible();
+    await expect(skillPicker).toHaveAttribute('aria-expanded', 'false');
 
     const prompt = '请简要分析 600519';
     await input.fill(prompt);
@@ -280,7 +282,7 @@ test.describe('web smoke', () => {
   test('chat page uses accessible labels instead of native title attributes for key actions', async ({ page }) => {
     await login(page);
 
-    await page.getByRole('link', { name: 'Agent' }).click();
+    await page.goto('/chat');
     await page.waitForLoadState('domcontentloaded');
 
     const sendButton = page.getByRole('button', { name: '发送' });
@@ -331,13 +333,13 @@ test.describe('web smoke', () => {
     const languageSelector = uiLanguageSelector(page);
     await expect(languageSelector).toBeVisible();
     await expect(page.getByRole('link', { name: '设置' })).toBeVisible();
-    await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '今日' })).toBeVisible();
 
     await selectUiLanguage(page, 'en');
 
     await expect(languageSelector).toHaveAttribute('data-value', 'en');
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Today' })).toBeVisible();
 
     expect(await page.evaluate(() => localStorage.getItem('dsa.uiLanguage'))).toBe('en');
 
@@ -347,7 +349,7 @@ test.describe('web smoke', () => {
     await openProfileMenu(page);
     await expect(uiLanguageSelector(page)).toHaveAttribute('data-value', 'en');
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Today' })).toBeVisible();
     await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
 
     await page.getByRole('link', { name: 'Settings' }).click();

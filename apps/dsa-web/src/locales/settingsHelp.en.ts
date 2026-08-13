@@ -914,6 +914,58 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Bounds audit storage growth and may delete older events under high privileged-operation volume.'],
     notes: ['See docs/security-audit.md. Raise capacity or export before long high-volume runs if older rows must be kept.'],
   },
+  'settings.system.CAPABILITY_WRITE_REGISTRY_PATH': {
+    title: 'Capability Write Registry Path',
+    summary: 'Durable path for operator-declared capability registrations.',
+    usage: 'Leave empty to use <dir-of-DATABASE_PATH>/capability_write_registry.json.',
+    valueNotes: ['Stores register/update/retire metadata only; live inventory still comes from runtime owners.'],
+    impact: ['Affects write-side capability registration, dependency resolution, and task-aware routing tags.'],
+    notes: ['See docs/capability-inventory.md.'],
+  },
+  'settings.system.TASK_ROUTING_ENABLED': {
+    title: 'Task-Aware Model Routing',
+    summary: 'Opt-in automatic model selection by task class using registered LLM capability tags.',
+    usage: 'Keep false to preserve existing model assignment. Manual pins always win.',
+    valueNotes: ['Decisions are explainable via POST /api/v1/capabilities/route.'],
+    impact: ['When enabled, unpinned task classes may select different models under TASK_ROUTING_POLICY.'],
+    notes: ['Optional ensemble is not included in this control.'],
+  },
+  'settings.system.TASK_ROUTING_POLICY': {
+    title: 'Task Routing Policy',
+    summary: 'Scoring policy for automatic task-aware model selection.',
+    usage: 'Choose quality, cost, or local_first when TASK_ROUTING_ENABLED=true.',
+    valueNotes: ['quality prefers reasoning/quality:high; cost prefers cost:low; local_first prefers ollama/local routes.'],
+    impact: ['Changes which registered LLM capability wins when multiple candidates match.'],
+    notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_REPORT': {
+    title: 'Task Route Pin (Report)', summary: 'Optional explicit model pin for report generation.',
+    usage: 'Forces report task selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_AGENT': {
+    title: 'Task Route Pin (Agent)', summary: 'Optional explicit model pin for Agent tasks.',
+    usage: 'Forces agent task selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_VISION': {
+    title: 'Task Route Pin (Vision)', summary: 'Optional explicit model pin for vision tasks.',
+    usage: 'Forces vision task selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_MARKET_REVIEW': {
+    title: 'Task Route Pin (Market Review)', summary: 'Optional explicit model pin for market-review tasks.',
+    usage: 'Forces market-review selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CHEAP_SCAN': {
+    title: 'Task Route Pin (Cheap Scan)', summary: 'Optional explicit model pin for cheap-scan tasks.',
+    usage: 'Forces cheap-scan selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_DEEP_REASONING': {
+    title: 'Task Route Pin (Deep Reasoning)', summary: 'Optional explicit model pin for deep-reasoning tasks.',
+    usage: 'Forces deep-reasoning selection when set.', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CODING': {
+    title: 'Task Route Pin (Coding)', summary: 'Optional explicit model pin for coding-oriented tasks.',
+    usage: 'Forces coding selection when set.', valueNotes: [], impact: [], notes: [],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
 
     title: 'Trust X-Forwarded-For',
@@ -1352,6 +1404,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the maximum wait time for Agent analysis.'],
     notes: ['Timeout does not affect other stocks in the analysis pipeline.'],
   },
+  'settings.agent.PREDICTION_EXTRACT_ENABLED': {
+    title: 'Prediction Extraction',
+    summary: 'Create draft records from typed decisions.',
+    usage: 'Research only; prose is not a claim.',
+    valueNotes: [
+      'Off by default.',
+      'Drafts stay in memory.',
+      'Prose returns status=no_verifiable_claim.',
+    ],
+    impact: ['Does not change advice.'],
+    notes: ['Failures do not stop analysis; no returns guarantee.'],
+  },
   'settings.agent.SKILL_OPINION_RECORDING_ENABLED': {
     title: 'Skill Opinion Recording',
     summary: 'Record individual skill opinions into the offline outcome-evaluation store.',
@@ -1431,6 +1495,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
+  },
+  'settings.agent.REFLECTION_POSTMORTEM': {
+    title: 'Reflection and Forecast Post-mortem',
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
@@ -1796,6 +1863,23 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'The hard-coded notification fallback path is unchanged when the renderer is off.',
     ],
   },
+  'settings.report.RESEARCH_PRESENTATION_PROFILE': {
+    title: 'Research Presentation Profile',
+    summary: 'Evidence stays unchanged.',
+    usage: 'Choose a profile.',
+    valueNotes: [
+      'conservative: risks first.',
+      'balanced: default order.',
+      'aggressive: opportunity first.',
+      'Equal risk disclosure.',
+      'Facts and decisions do not change.',
+    ],
+    impact: ['Only order and emphasis.'],
+    notes: [
+      'Requires REPORT_RENDERER_ENABLED=true.',
+      'Not investment advice.',
+    ],
+  },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: 'Report Rendering Engine',
     summary: 'Enable the Jinja2 template rendering engine for report output.',
@@ -2040,6 +2124,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage:
       'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT, PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT, and PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT are percentages. PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO is a fraction of the stop-loss threshold (0–1). PORTFOLIO_RISK_LOOKBACK_DAYS sets the trading-day lookback (default 180).',
     impact: ['Affects portfolio risk alerts and agent risk snapshots.'],
+  },
+  'settings.system.portfolio_aware_sizing': {
+    title: 'Portfolio-aware Position Sizing',
+    summary: 'Controls deterministic position bands using current portfolio weights.',
+    usage: 'Keep enabled for portfolio-aware bands. The maximum single-name weight is a fraction from 0 to 1 and defaults to 0.15.',
+    notes: ['Without portfolio data, sizing remains available in explicit stock-only fallback mode.'],
   },
   'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
     title: 'Portfolio FX Update Enabled',

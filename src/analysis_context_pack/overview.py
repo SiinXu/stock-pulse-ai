@@ -21,7 +21,15 @@ from src.utils.sanitize import log_safe_exception
 
 ANALYSIS_CONTEXT_PACK_OVERVIEW_KEY = "analysis_context_pack_overview"
 _ALL_STATUSES = tuple(status.value for status in ContextFieldStatus)
-_DATA_QUALITY_BLOCK_KEYS = {"quote", "daily_bars", "technical", "news", "fundamentals", "chip"}
+_DATA_QUALITY_BLOCK_KEYS = {
+    "quote",
+    "daily_bars",
+    "technical",
+    "news",
+    "fundamentals",
+    "chip",
+    "money_flow",
+}
 logger = logging.getLogger(__name__)
 
 
@@ -71,6 +79,9 @@ def render_analysis_context_pack_overview(
         metadata = payload.get("metadata") if isinstance(payload.get("metadata"), Mapping) else {}
         return {
             "pack_version": _safe_text(payload.get("pack_version")) or "1.0",
+            "snapshot_id": _safe_text(payload.get("snapshot_id")) or None,
+            "snapshot_revision": _safe_int(payload.get("snapshot_revision")),
+            "as_of": _safe_text(payload.get("as_of")) or None,
             "created_at": _safe_text(payload.get("created_at")) or None,
             "subject": {
                 "code": _safe_text(subject.get("code")),
@@ -84,6 +95,10 @@ def render_analysis_context_pack_overview(
             "metadata": {
                 "trigger_source": _safe_text(metadata.get("trigger_source")) or None,
                 "news_result_count": _safe_int(metadata.get("news_result_count")),
+                "content_digest": _safe_text(metadata.get("content_digest")) or None,
+                "snapshot_sealed": bool(metadata.get("snapshot_sealed"))
+                if "snapshot_sealed" in metadata
+                else None,
             },
         }
     except Exception as exc:  # broad-exception: fallback_recorded - rendering failure is logged before fallback
@@ -178,6 +193,9 @@ def _sanitize_persisted_overview(overview: Mapping[str, Any]) -> Optional[Dict[s
     metadata = overview.get("metadata") if isinstance(overview.get("metadata"), Mapping) else {}
     sanitized = {
         "pack_version": _safe_text(overview.get("pack_version")) or "1.0",
+        "snapshot_id": _safe_text(overview.get("snapshot_id")) or None,
+        "snapshot_revision": _safe_int(overview.get("snapshot_revision")),
+        "as_of": _safe_text(overview.get("as_of")) or None,
         "created_at": _safe_text(overview.get("created_at")) or None,
         "subject": {
             "code": subject_code,
@@ -190,6 +208,10 @@ def _sanitize_persisted_overview(overview: Mapping[str, Any]) -> Optional[Dict[s
         "metadata": {
             "trigger_source": _safe_text(metadata.get("trigger_source")) or None,
             "news_result_count": _safe_int(metadata.get("news_result_count")),
+            "content_digest": _safe_text(metadata.get("content_digest")) or None,
+            "snapshot_sealed": bool(metadata.get("snapshot_sealed"))
+            if "snapshot_sealed" in metadata
+            else None,
         },
     }
     if "data_quality" in overview:

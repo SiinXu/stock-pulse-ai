@@ -142,6 +142,18 @@ class Config:
     security_audit_retention_days: int = 90
     security_audit_max_events: int = 10_000
 
+    # === Capability write registry + task-aware routing (Issues #221, #204) ===
+    capability_write_registry_path: str = ""
+    task_routing_enabled: bool = False
+    task_routing_policy: str = "quality"
+    task_routing_pin_report: str = ""
+    task_routing_pin_agent: str = ""
+    task_routing_pin_vision: str = ""
+    task_routing_pin_market_review: str = ""
+    task_routing_pin_cheap_scan: str = ""
+    task_routing_pin_deep_reasoning: str = ""
+    task_routing_pin_coding: str = ""
+
     # === Daily brief: personal morning + accuracy review (#149 / #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
@@ -317,12 +329,20 @@ class Config:
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    # Run-local reflection + resolved-forecast post-mortem (Issues #1089 / #1103). Default off.
+    agent_reflection_enabled: bool = False
+    agent_reflection_llm_budget: int = 1  # Max LLM calls per reflection loop (critique)
+    agent_reflection_max_revise: int = 1  # Max in-run revise passes after critique
+    agent_postmortem_enabled: bool = False
+    agent_postmortem_llm_budget: int = 8  # Max LLM calls per resolution batch
+    agent_postmortem_skip_clean_hits: bool = True  # Skip LLM post-mortem on clean hits
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     agent_research_persona: str = ""  # Default-off research stance preset (#467)
     agent_research_persona_custom: str = ""  # Optional custom stance text (#467)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
     decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats
+    prediction_extract_enabled: bool = False  # Extract PredictionRecord drafts from structured decisions (#1108)
     agent_technical_agent_timeout_s: float = 0
     agent_intel_agent_timeout_s: float = 0
     agent_risk_agent_timeout_s: float = 0
@@ -378,6 +398,8 @@ class Config:
     report_language: str = "zh"
     # Report presentation mode for Jinja renderer (#861 Phase 2): brief / standard / research
     report_mode: str = "standard"
+    # Research presentation emphasis only (#205); orthogonal to REPORT_MODE limits.
+    research_presentation_profile: str = "balanced"
     # Optional single-face TTF/OTF used by the bounded report PDF exporter.
     report_export_pdf_font_path: Optional[str] = None
 
@@ -687,6 +709,7 @@ _CONFIG_METHOD_GROUPS = (
             "_parse_agent_planning_on_step_failure",
             "_parse_report_type",
             "_parse_report_mode",
+            "_parse_research_presentation_profile",
             "_get_env_file_value",
             "_resolve_env_value",
             "resolve_with_source",

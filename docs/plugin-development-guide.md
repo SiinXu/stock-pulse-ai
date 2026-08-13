@@ -48,11 +48,14 @@ OS privileges as StockPulse. There is:
 ### Manifest `permissions` (declaration, not sandbox)
 
 - List every capability your `agent_tool` `ToolPolicy.permissions` will require
-  (use ToolSurface strings such as `market_data:read`).
+  (use ToolSurface strings such as `market_data:read` or `alt_data:read`).
 - At load/enable, StockPulse rejects the plugin with
   `manifest_permissions_undeclared` if a tool requires an undeclared capability.
 - Extra declared permissions are allowed; empty means tools must require none.
 - This is **not** sandbox isolation: plugin code still runs with process privileges.
+- Alternative / supporting data tools use capability `alt_data:read` and the
+  [alternative-data plugin contract](alternative-data-plugin-contract.md)
+  (default-off, non-authoritative, gap-not-fabrication).
 
 Review every line before enabling a package. Keep `PLUGINS_DIR` unset in
 production unless the packages are reviewed and pinned. The operator trust
@@ -173,6 +176,12 @@ atomic and the file is restricted to the current OS user when supported. This
 file is local plaintext, not an encrypted secret vault, so protect its data
 directory accordingly. Sensitive values are masked by the API and Web form;
 leaving the mask unchanged preserves the existing stored value.
+
+When a plugin registers an active `notification_channel`, the Extensions roster
+exposes the canonical channel IDs and deep-links into Settings → Notifications.
+The Notifications hub lists those plugin channels with a provider attribution
+and a reverse link back to the Extensions row. Disabled, failed, or unloaded
+adapters stay empty—never shown as connected.
 
 Saving settings for an enabled plugin reports `restart_required`. Re-enable the
 plugin or restart the application before assuming its running instance has the

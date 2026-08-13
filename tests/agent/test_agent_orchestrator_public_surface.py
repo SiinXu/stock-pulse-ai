@@ -19,106 +19,104 @@ ensure_litellm_stub()
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL AGENT_CHAT_FAILURE_MESSAGE
-    AGENT_EXECUTION_FAILURE_MESSAGE AGENT_MAX_STEPS_DEFAULT
-    AgentContext AgentOrchestrator AgentRunStats AgentRuntimeFacts
-    AgentSkillScheduler Any Callable DegradationBoundary DegradedEvent
-    Dict ExecutionState FuturesTimeoutError LLMToolAdapter List
-    NON_CRITICAL_BASE_STAGES Optional OrchestratorResult
-    PipelineTerminationFact RiskOverrideApplication RuntimeGuardPolicy
-    SkillBatchResult StageFailurePolicy StageFailureReason StageResult
-    StageStatus StockScope StrategyEngine StrategyResultStatus
-    TYPE_CHECKING ThreadPoolExecutor ToolRegistry VALID_MODES
-    annotations build_agent_chat_market_context
-    build_agent_chat_tool_registry build_agent_tool_history_context
-    build_agent_disagreement_summary
-    build_agent_runtime_facts build_risk_override_application
-    build_risk_override_plan build_visible_chat_history
-    classify_result_terminal_state contextvars copy dataclass
-    dataclass_fields field get_config inspect json
-    log_runtime_guard_event log_safe_exception logger logging
-    normalize_decision_signal normalize_report_language
-    normalize_stage_failure_reason parse_dashboard_json re
-    resolve_stock_scope run_agent_loop sanitize_agent_dashboard_payload
-    sanitize_agent_diagnostic stream_event threading time
+    AGENT_EXECUTION_FAILURE_MESSAGE AGENT_MAX_STEPS_DEFAULT AgentContext
+    AgentOrchestrator AgentRunStats AgentRuntimeFacts AgentSkillScheduler Any Callable
+    DegradationBoundary DegradedEvent Dict ExecutionState FuturesTimeoutError
+    LLMToolAdapter List NON_CRITICAL_BASE_STAGES Optional OrchestratorResult
+    PipelineTerminationFact RiskOverrideApplication RuntimeGuardPolicy SkillBatchResult
+    StageFailurePolicy StageFailureReason StageResult StageStatus StockScope
+    StrategyEngine StrategyResultStatus TYPE_CHECKING ThreadPoolExecutor ToolRegistry
+    VALID_MODES annotations build_agent_chat_market_context
+    build_agent_chat_tool_registry build_agent_disagreement_summary
+    build_agent_runtime_facts build_agent_tool_history_context
+    build_risk_override_application build_risk_override_plan build_visible_chat_history
+    classify_result_terminal_state contextvars copy dataclass dataclass_fields field
+    get_config inspect json log_runtime_guard_event log_safe_exception logger logging
+    normalize_decision_signal normalize_report_language normalize_stage_failure_reason
+    parse_dashboard_json re resolve_stock_scope run_agent_loop
+    sanitize_agent_dashboard_payload sanitize_agent_diagnostic stream_event threading
+    time
     """.split()
 )
 
 EXPECTED_EXECUTION_METHODS = (
-    "_get_timeout_seconds",
-    "_get_sub_agent_timeout_map",
-    "_resolve_stage_timeout_seconds",
-    "_build_timeout_result",
-    "_build_budget_skip_result",
-    "_build_cancelled_result",
-    "_with_budget_snapshot",
-    "_prepare_agent",
-    "_callable_accepts_kwarg",
-    "_agent_run_accepts_kwarg",
-    "_commit_stage_context",
-    "_execute_isolated_stage",
-    "_run_stage_agent",
+    '_get_timeout_seconds',
+    '_get_sub_agent_timeout_map',
+    '_resolve_stage_timeout_seconds',
+    '_build_timeout_result',
+    '_build_budget_skip_result',
+    '_build_cancelled_result',
+    '_with_budget_snapshot',
+    '_prepare_agent',
+    '_callable_accepts_kwarg',
+    '_agent_run_accepts_kwarg',
+    '_commit_stage_context',
+    '_execute_isolated_stage',
+    '_run_stage_agent',
 )
 
 EXPECTED_CHAT_METHODS = (
-    "run",
-    "chat",
-    "_build_chat_pipeline_context",
-    "_build_multi_symbol_cancelled_result",
-    "_execute_multi_symbol_chat",
-    "_synthesize_multi_symbol_chat",
-    "_build_multi_symbol_limitations",
-    "_build_multi_symbol_fallback",
+    'run',
+    'chat',
+    '_build_chat_pipeline_context',
+    '_build_multi_symbol_cancelled_result',
+    '_execute_multi_symbol_chat',
+    '_synthesize_multi_symbol_chat',
+    '_build_multi_symbol_limitations',
+    '_build_multi_symbol_fallback',
 )
 
 EXPECTED_PIPELINE_METHODS = (
-    "_execute_pipeline",
-    "_tool_registry_for_context",
-    "_trim_agent_tool_names",
-    "_build_agent_chain",
-    "_run_specialist_agent_batch",
-    "_skill_batch_timeout_slice",
-    "_build_specialist_agents",
-    "_build_skill_agents",
-    "_build_strategy_agents",
-    "_skill_aggregator_for_weights",
-    "_aggregate_skill_opinions",
-    "_aggregate_strategy_opinions",
-    "_run_strategy_engine",
-    "_maybe_record_skill_opinion_samples",
-    "_apply_partition_fallback",
-    "_collect_strategy_synthesis",
-    "_prepare_decision_context",
-    "_record_critic_budget_skip",
-    "_record_degraded_stage",
-    "_record_degraded_event",
-    "_record_pipeline_termination",
-    "_is_non_critical_stage",
+    '_execute_pipeline',
+    '_tool_registry_for_context',
+    '_trim_agent_tool_names',
+    '_build_agent_chain',
+    '_run_specialist_agent_batch',
+    '_skill_batch_timeout_slice',
+    '_build_specialist_agents',
+    '_build_skill_agents',
+    '_build_strategy_agents',
+    '_skill_aggregator_for_weights',
+    '_aggregate_skill_opinions',
+    '_aggregate_strategy_opinions',
+    '_run_strategy_engine',
+    '_maybe_record_skill_opinion_samples',
+    '_apply_partition_fallback',
+    '_collect_strategy_synthesis',
+    '_prepare_decision_context',
+    '_record_critic_budget_skip',
+    '_record_degraded_stage',
+    '_record_degraded_event',
+    '_record_pipeline_termination',
+    '_is_non_critical_stage',
 )
 
 EXPECTED_DASHBOARD_METHODS = (
-    "_build_context",
-    "_fallback_summary",
-    "_resolve_final_output",
-    "_resolve_dashboard_payload",
-    "_prepare_dashboard_payload",
-    "_finalize_dashboard_payload",
-    "_collect_key_levels",
-    "_build_data_perspective",
-    "_collect_risk_alerts",
-    "_collect_positive_catalysts",
-    "_latest_opinion",
-    "_select_base_opinion",
-    "_mark_partial_dashboard",
-    "_apply_risk_override",
-    "_annotate_dashboard_with_risk_gate",
-    "_merge_risk_warning",
+    '_build_context',
+    '_seal_agent_input_snapshot',
+    '_fallback_summary',
+    '_resolve_final_output',
+    '_resolve_dashboard_payload',
+    '_maybe_extract_prediction_on_finalize',
+    '_prepare_dashboard_payload',
+    '_finalize_dashboard_payload',
+    '_collect_key_levels',
+    '_build_data_perspective',
+    '_collect_risk_alerts',
+    '_collect_positive_catalysts',
+    '_latest_opinion',
+    '_select_base_opinion',
+    '_mark_partial_dashboard',
+    '_apply_risk_override',
+    '_annotate_dashboard_with_risk_gate',
+    '_merge_risk_warning',
 )
 
 EXPECTED_AST_HASHES = {
-    "_ExecutionMethods": "03b1befb5752d439b5d2aeb35bcee5d50300c89eedb1ebd2aa7564c51f778e25",
-    "_ChatMethods": "1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d",
-    "_PipelineMethods": "694258d443a161a17f8b72f63ec29b223d6c2c5894c6cf4909dfc4991b2f790e",
-    "_DashboardMethods": "fa1bf08f696b88e68b9fc97f3111404ce43aef44a8fdc060b64f01491c1d647a",
+    '_ChatMethods': '1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d',
+    '_DashboardMethods': '0fd0936468ff0309777631bb3cf9bd8f93232b71698d1be118bc8c6fa6267136',
+    '_ExecutionMethods': '092cfe919bada0e2f09144404139a6ce72c91c3563e51204658ef14aeef5d217',
+    '_PipelineMethods': '694258d443a161a17f8b72f63ec29b223d6c2c5894c6cf4909dfc4991b2f790e',
 }
 
 
