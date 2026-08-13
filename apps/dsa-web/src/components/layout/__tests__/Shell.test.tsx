@@ -106,11 +106,11 @@ beforeEach(() => {
 });
 
 describe('Shell', () => {
-  it('renders the shared navigation, profile controls, and completion badge', () => {
+  it('renders the shared navigation and profile controls for the #873 spine', () => {
     renderShell();
 
-    expect(screen.getByRole('link', { name: 'Agent' })).toBeInTheDocument();
-    expect(screen.getByTestId('chat-completion-badge')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '信号中心' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Agent' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'StockPulse' }).length).toBeGreaterThan(0);
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
@@ -163,10 +163,17 @@ describe('Shell', () => {
 
     const main = screen.getByRole('main');
     const sidebar = container.querySelector('[data-shell-sidebar]');
+    const layout = sidebar?.parentElement;
     expect(sidebar).not.toHaveClass('border-r', 'border-border');
+    expect(sidebar).toHaveClass('h-full');
+    expect(sidebar).not.toHaveClass('h-dvh');
+    expect(layout).toHaveClass('h-full');
+    expect(layout).not.toHaveClass('h-dvh');
     expect(main).toHaveAttribute('data-shell-main', 'true');
     expect(main).toHaveClass('rounded-xl', 'border', 'border-border', 'bg-card', 'shadow-soft-card');
     expect(main).toHaveClass('overflow-y-auto');
+    expect(main).toHaveClass('mt-[calc(2.75rem+max(0.75rem,env(safe-area-inset-top)))]');
+    expect(main).not.toHaveClass('mt-[calc(3.5rem+env(safe-area-inset-top))]');
     expect(main).not.toHaveClass('overflow-x-hidden');
   });
 
@@ -196,11 +203,11 @@ describe('Shell', () => {
 
     const drawer = screen.getByRole('dialog', { name: '导航菜单' });
     expect(opener).toHaveAttribute('data-route-focus-key', 'shell:mobile-navigation');
-    expect(within(drawer).getByRole('link', { name: 'Agent' })).toHaveAttribute(
+    expect(within(drawer).getByRole('link', { name: '信号中心' })).toHaveAttribute(
       'data-route-focus-key',
-      'shell-nav-mobile:agent',
+      'shell-nav-mobile:signals',
     );
-    expect(within(drawer).getByRole('link', { name: 'Agent' })).toHaveAttribute(
+    expect(within(drawer).getByRole('link', { name: '信号中心' })).toHaveAttribute(
       'data-route-focus-return-key',
       'shell:mobile-navigation',
     );
@@ -215,7 +222,7 @@ describe('Shell', () => {
     const opener = screen.getByRole('button', { name: '打开导航菜单' });
     fireEvent.click(opener);
     const drawer = screen.getByRole('dialog', { name: '导航菜单' });
-    const home = within(drawer).getByRole('link', { name: '首页' });
+    const home = within(drawer).getByRole('link', { name: '今日' });
 
     expect(home).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:home');
     expect(home).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
@@ -226,7 +233,7 @@ describe('Shell', () => {
   });
 
   it('closes mobile navigation and moves focus to the active desktop route at the breakpoint', async () => {
-    renderShell();
+    renderShell('/signals');
     const opener = screen.getByRole('button', { name: '打开导航菜单' });
     opener.focus();
     fireEvent.click(opener);
@@ -235,7 +242,7 @@ describe('Shell', () => {
     act(() => setMediaMatch(DESKTOP_SIDEBAR_QUERY, true));
 
     expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Agent' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('link', { name: '信号中心' })).toHaveFocus());
   });
 
   it('moves focus to the active compact group when its current child is inside the flyout', async () => {
