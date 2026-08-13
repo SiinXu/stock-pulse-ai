@@ -11,6 +11,8 @@ import {
   AppPage,
   Badge,
   Button,
+  DataTable,
+  type DataTableColumn,
   EmptyState,
   IconButton,
   PageHeader,
@@ -23,6 +25,7 @@ import { formatUiText } from '../i18n/uiText';
 import { PERSONAL_PERFORMANCE_TEXT } from '../locales/personalPerformance';
 import { APP_ROUTE_PATHS } from '../routing/routes';
 import type {
+  PaperDecisionQualityItem,
   PaperDecisionQualityResponse,
   PortfolioAccountItem,
 } from '../types/portfolio';
@@ -122,6 +125,53 @@ const PersonalPerformancePage: React.FC = () => {
 
   const aggregateScore = report?.aggregate?.processScore;
   const dims = report?.aggregate?.dimensions ?? {};
+  const tradeColumns = useMemo<DataTableColumn<PaperDecisionQualityItem>[]>(() => [
+    {
+      id: 'trade',
+      header: text.colTrade,
+      cell: (item) => <span className="font-medium text-foreground">{item.symbol ?? '—'}</span>,
+      rowHeader: true,
+    },
+    {
+      id: 'side',
+      header: text.colSide,
+      cell: (item) => item.side ?? '—',
+      nowrap: true,
+    },
+    {
+      id: 'date',
+      header: text.colDate,
+      cell: (item) => item.tradeDate ?? '—',
+      nowrap: true,
+    },
+    {
+      id: 'score',
+      header: text.colScore,
+      cell: (item) => <span className="tabular-nums">{item.processScore.toFixed(1)}</span>,
+      align: 'end',
+      nowrap: true,
+    },
+    {
+      id: 'signal',
+      header: text.colSignal,
+      cell: (item) => (item.linkedSignalId != null ? `#${item.linkedSignalId}` : text.noSignal),
+      nowrap: true,
+    },
+    {
+      id: 'reasons',
+      header: text.colReasons,
+      cell: (item) => (
+        <ul className="list-disc space-y-1 pl-4">
+          {(item.reasons ?? []).slice(0, 4).map((reason) => (
+            <li key={`${reason.dimension}-${reason.code}`}>
+              {reason.message}
+            </li>
+          ))}
+        </ul>
+      ),
+      width: 'wide',
+    },
+  ], [text]);
 
   return (
     <AppPage data-testid="personal-performance-page" className="space-y-6">
@@ -253,45 +303,21 @@ const PersonalPerformancePage: React.FC = () => {
           </Surface>
 
           {report && report.items.length > 0 ? (
-            <Surface level="section" className="overflow-x-auto p-4">
+            <Surface level="section" className="overflow-hidden p-4">
               <h2 className="mb-3 text-base font-semibold">{text.tradeListTitle}</h2>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-secondary-text">
-                    <th className="py-2 pr-3">{text.colTrade}</th>
-                    <th className="py-2 pr-3">{text.colSide}</th>
-                    <th className="py-2 pr-3">{text.colDate}</th>
-                    <th className="py-2 pr-3">{text.colScore}</th>
-                    <th className="py-2 pr-3">{text.colSignal}</th>
-                    <th className="py-2">{text.colReasons}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.items.map((item) => (
-                    <tr
-                      key={`${item.tradeId}-${item.symbol}-${item.tradeDate}`}
-                      className="border-b border-border/60 align-top"
-                    >
-                      <td className="py-2 pr-3 font-medium">{item.symbol ?? '—'}</td>
-                      <td className="py-2 pr-3">{item.side ?? '—'}</td>
-                      <td className="py-2 pr-3">{item.tradeDate ?? '—'}</td>
-                      <td className="py-2 pr-3 tabular-nums">{item.processScore.toFixed(1)}</td>
-                      <td className="py-2 pr-3">
-                        {item.linkedSignalId != null ? `#${item.linkedSignalId}` : text.noSignal}
-                      </td>
-                      <td className="py-2">
-                        <ul className="list-disc space-y-1 pl-4">
-                          {(item.reasons ?? []).slice(0, 4).map((reason) => (
-                            <li key={`${reason.dimension}-${reason.code}`}>
-                              {reason.message}
-                            </li>
-                          ))}
-                        </ul>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable<PaperDecisionQualityItem>
+                caption={text.tradeListTitle}
+                columns={tradeColumns}
+                rows={report.items}
+                getRowKey={(item, index) => item.tradeId ?? `${item.symbol}-${item.tradeDate}-${index}`}
+                emptyState={{
+                  title: text.emptyTradesTitle,
+                  description: text.emptyTradesDescription,
+                }}
+                density="compact"
+                frame="embedded"
+                minWidth="extra-wide"
+              />
             </Surface>
           ) : null}
 
