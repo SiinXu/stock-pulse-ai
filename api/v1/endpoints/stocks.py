@@ -23,6 +23,7 @@ from api.v1.schemas.stocks import (
     ExtractFromImageResponse,
     ExtractItem,
     KLineData,
+    MoneyFlowViewResponse,
     StockHistoryResponse,
     StockQuote,
 )
@@ -51,7 +52,10 @@ from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
+from src.application_services import get_application_services
+from src.services.smartmoney_flow_service import build_money_flow_view
 from data_provider.daily_cache import LocalDataMissingError
+from data_provider.money_flow_types import MAX_HISTORY_DAYS, validate_history_days
 from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
 
@@ -519,6 +523,60 @@ def get_stock_research_timeline(
                 "error": "internal_error",
                 "message": "Failed to load research timeline",
             },
+        ) from exc
+
+
+@router.get(
+    "/{stock_code}/money-flow",
+    response_model=MoneyFlowViewResponse,
+    responses={
+        200: {"description": "Money-flow / SmartMoney footprint view"},
+        400: {"description": "Invalid stock code or days", "model": ErrorResponse},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Get SmartMoney money-flow footprint for a stock",
+    description=(
+        "Returns main-force order-size bucket ratios (when available) with as-of, "
+        "source, and explicit degradation. Gated by SMARTMONEY_ENABLED: when "
+        "disabled the response is status=disabled with no provider network I/O. "
+        "Decoupled from quote/history fetches. Research evidence only."
+    ),
+    operation_id="getStockMoneyFlow",
+)
+def get_stock_money_flow(
+    stock_code: str,
+    days: int = Query(
+        5,
+        ge=1,
+        le=MAX_HISTORY_DAYS,
+        description=f"History window in sessions (1–{MAX_HISTORY_DAYS})",
+    ),
+) -> MoneyFlowViewResponse:
+    """On-demand SmartMoney view for stock details / research surfaces."""
+    try:
+        code = _validate_and_normalize_stock_code(stock_code)
+        days = validate_history_days(days)
+    except HTTPException:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise api_error(400, "validation_error", str(exc)) from exc
+
+    try:
+        config = get_application_services().config
+        payload = build_money_flow_view(code, days=days, config=config)
+        return MoneyFlowViewResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - map unexpected money-flow view failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Stock money-flow view failed",
+            exc,
+            error_code="stock_money_flow_view_failed",
+            context={"stock_code": stock_code},
+        )
+        raise api_error(
+            500,
+            "internal_error",
+            "Failed to build money-flow view",
         ) from exc
 
 
