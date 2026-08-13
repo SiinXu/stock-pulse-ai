@@ -187,6 +187,7 @@ const decisionSignalOutcomeStatsBucketSchema = z.object({
   miss: z.number(),
   neutral: z.number(),
   unable: z.number(),
+  sampleSufficient: z.boolean().optional(),
   hitRatePct: z.number().nullable().optional(),
   avgStockReturnPct: z.number().nullable().optional(),
   unableReasons: z.record(z.string(), z.number()).optional(),
@@ -200,6 +201,8 @@ const decisionSignalOutcomeStatsResponseSchema = z.object({
   hit: z.number(),
   miss: z.number(),
   neutral: z.number(),
+  sampleSufficient: z.boolean().optional(),
+  minimumCompletedSampleSize: z.number().optional(),
   avgStockReturnPct: z.number().nullable().optional(),
   hitRatePct: z.number().nullable().optional(),
   horizons: z.array(z.string()).nullable().optional(),
@@ -421,6 +424,10 @@ function toDecisionSignalOutcomeRunResponse(data: Record<string, unknown>): Deci
 function toDecisionSignalStatsBucket(data: Record<string, unknown>): DecisionSignalOutcomeStatsBucket {
   const bucket = toCamelCase<DecisionSignalOutcomeStatsBucket>(data);
   bucket.unableReasons = (data.unable_reasons as Record<string, number> | undefined) ?? {};
+  // Older servers omit sample_sufficient; treat as insufficient until rates publish.
+  if (typeof bucket.sampleSufficient !== 'boolean') {
+    bucket.sampleSufficient = bucket.hitRatePct != null;
+  }
   return parseValidatedPayload(bucket, decisionSignalOutcomeStatsBucketSchema, 'DecisionSignalOutcomeStatsBucket');
 }
 
@@ -431,6 +438,17 @@ function toProfileCalibrationBuckets(value: unknown): DecisionSignalProfileCalib
 function toDecisionSignalOutcomeStatsResponse(data: Record<string, unknown>): DecisionSignalOutcomeStatsResponse {
   const response = toCamelCase<DecisionSignalOutcomeStatsResponse>(data);
   response.unableReasons = (data.unable_reasons as Record<string, number> | undefined) ?? {};
+  if (typeof response.sampleSufficient !== 'boolean') {
+    response.sampleSufficient = response.hitRatePct != null;
+  }
+  if (
+    typeof response.minimumCompletedSampleSize !== 'number'
+    || !Number.isFinite(response.minimumCompletedSampleSize)
+    || !Number.isInteger(response.minimumCompletedSampleSize)
+    || response.minimumCompletedSampleSize < 1
+  ) {
+    response.minimumCompletedSampleSize = 30;
+  }
   const rawBreakdowns = data.breakdowns as Record<string, unknown[]> | undefined;
   response.breakdowns = {};
   if (rawBreakdowns && typeof rawBreakdowns === 'object') {

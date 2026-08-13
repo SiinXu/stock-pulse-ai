@@ -6,6 +6,8 @@ Source of truth for all rules remains `AGENTS.md`; skills only operationalize it
 
 Shared practice hard rules (squash body check, config registry guard, reachability grep, Delivered/Remaining comments, merge-train discipline) live in `.claude/skills/references/hard-rules.md`. Standard command recipes live in `.claude/skills/references/test-command-recipes.md` (also summarized below).
 
+For multi-PR merge trains, conflict grouping, registry guards, squash false-close keywords, host resource limits, and worktree cleanup, see the operational [Engineering Efficiency Playbook](engineering-efficiency-playbook_EN.md) ([中文](engineering-efficiency-playbook.md)). That guide does not replace `AGENTS.md` or these skills.
+
 ## Skill inventory
 
 | Skill | Purpose | Typical trigger |
