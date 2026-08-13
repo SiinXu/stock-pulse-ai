@@ -168,6 +168,52 @@ def test_directional_opposition_not_averaged():
     assert all(p.get("source") == "model" for p in handling["points"])
 
 
+@pytest.mark.parametrize(
+    "label, expected",
+    [
+        ("高", 0.85),
+        ("中", 0.55),
+        ("低", 0.3),
+        ("high", 0.85),
+        ("medium", 0.55),
+        ("low", 0.3),
+        ("높음", 0.85),
+        ("보통", 0.55),
+        ("낮음", 0.3),
+    ],
+)
+def test_localized_confidence_labels_map_to_unit(label, expected):
+    stance = build_model_stance(
+        _result(confidence=label, model="m1"),
+        requested_model="m1",
+    )
+    assert stance["confidence"] == expected
+    assert stance["confidence_level"] == label
+
+
+def test_korean_confidence_labels_feed_agreement_and_dispersion():
+    comparison = build_multi_model_comparison(
+        [
+            build_model_stance(
+                _result(signal="buy", score=70, confidence="높음", model="m1"),
+                requested_model="m1",
+            ),
+            build_model_stance(
+                _result(signal="buy", score=68, confidence="낮음", model="m2"),
+                requested_model="m2",
+            ),
+        ],
+        requested_models=["m1", "m2"],
+    )
+    by_model = {row["model_id"]: row for row in comparison["agreement_table"]}
+    assert by_model["m1"]["confidence"] == 0.85
+    assert by_model["m2"]["confidence"] == 0.3
+    assert any(
+        point["kind"] == "confidence_dispersion"
+        for point in comparison["disagreement_handling"]["points"]
+    )
+
+
 def test_aligned_models_high_consensus():
     stances = [
         build_model_stance(_result(signal="buy", score=72, model="m1"), requested_model="m1"),

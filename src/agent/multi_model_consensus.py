@@ -1069,6 +1069,9 @@ def _confidence_to_unit(value: Any) -> Optional[float]:
         "medium": 0.55,
         "mid": 0.55,
         "low": 0.3,
+        "높음": 0.85,
+        "보통": 0.55,
+        "낮음": 0.3,
     }
     return mapping.get(text)
 
