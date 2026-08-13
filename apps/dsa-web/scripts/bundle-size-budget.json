@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 243276,
-      "measuredGzipBytes": 242876,
-      "note": "Local production-build remasure after merging origin/main; measured 242876 B + 400 B retained headroom."
+      "maxGzipBytes": 244087,
+      "measuredGzipBytes": 243687,
+      "note": "Local production-build remasure after merging origin/main; measured 243687 B + 400 B retained headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 159734,
-      "measuredGzipBytes": 159034,
-      "note": "Local production-build remasure after merging origin/main; measured 159034 B + 700 B retained headroom."
+      "maxGzipBytes": 159858,
+      "measuredGzipBytes": 159158,
+      "note": "Local production-build remasure after merging origin/main; measured 159158 B + 700 B retained headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 152929,
-      "measuredGzipBytes": 152229,
-      "note": "Local production-build remasure after merging origin/main; measured 152229 B + 700 B retained headroom."
+      "maxGzipBytes": 153040,
+      "measuredGzipBytes": 152340,
+      "note": "Local production-build remasure after merging origin/main; measured 152340 B + 700 B retained headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 152871,
-      "measuredGzipBytes": 152171,
-      "note": "Local production-build remasure after merging origin/main; measured 152171 B + 700 B retained headroom."
+      "maxGzipBytes": 152972,
+      "measuredGzipBytes": 152272,
+      "note": "Local production-build remasure after merging origin/main; measured 152272 B + 700 B retained headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 152606,
-      "measuredGzipBytes": 152006,
-      "note": "Local production-build remasure after merging origin/main; measured 152006 B + 600 B retained headroom."
+      "maxGzipBytes": 152676,
+      "measuredGzipBytes": 152076,
+      "note": "Local production-build remasure after merging origin/main; measured 152076 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 148374,
-      "measuredGzipBytes": 147674,
-      "note": "Local production-build remasure after merging origin/main; measured 147674 B + 700 B retained headroom."
+      "maxGzipBytes": 148432,
+      "measuredGzipBytes": 147732,
+      "note": "Local production-build remasure after merging origin/main; measured 147732 B + 700 B retained headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 145425,
-      "measuredGzipBytes": 144725,
-      "note": "Local production-build remasure after merging origin/main; measured 144725 B + 700 B retained headroom."
+      "maxGzipBytes": 145453,
+      "measuredGzipBytes": 144753,
+      "note": "Local production-build remasure after merging origin/main; measured 144753 B + 700 B retained headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 138563,
-      "measuredGzipBytes": 137863,
-      "note": "Local production-build remasure after merging origin/main; measured 137863 B + 700 B retained headroom."
+      "maxGzipBytes": 138616,
+      "measuredGzipBytes": 137916,
+      "note": "Local production-build remasure after merging origin/main; measured 137916 B + 700 B retained headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 138641,
-      "measuredGzipBytes": 137941,
-      "note": "Local production-build remasure after merging origin/main; measured 137941 B + 700 B retained headroom."
+      "maxGzipBytes": 138695,
+      "measuredGzipBytes": 137995,
+      "note": "Local production-build remasure after merging origin/main; measured 137995 B + 700 B retained headroom."
     },
     {
       "id": "vendor-charts",

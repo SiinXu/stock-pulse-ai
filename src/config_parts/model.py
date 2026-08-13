@@ -146,6 +146,18 @@ class Config:
     security_audit_retention_days: int = 90
     security_audit_max_events: int = 10_000
 
+    # === Capability write registry + task-aware routing (Issues #221, #204) ===
+    capability_write_registry_path: str = ""
+    task_routing_enabled: bool = False
+    task_routing_policy: str = "quality"
+    task_routing_pin_report: str = ""
+    task_routing_pin_agent: str = ""
+    task_routing_pin_vision: str = ""
+    task_routing_pin_market_review: str = ""
+    task_routing_pin_cheap_scan: str = ""
+    task_routing_pin_deep_reasoning: str = ""
+    task_routing_pin_coding: str = ""
+
     # === Daily brief: personal morning + accuracy review (#149 / #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
