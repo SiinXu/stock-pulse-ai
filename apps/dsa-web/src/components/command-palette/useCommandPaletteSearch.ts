@@ -57,10 +57,11 @@ export function useCommandPaletteSearch(
   const { index, loading: stockIndexLoading } = useStockIndex();
 
   useEffect(() => {
-    if (!isOpen || skillState.loaded || skillState.loading) return undefined;
+    if (!isOpen || skillState.loaded) return undefined;
 
     let active = true;
     // Kick off skill catalog fetch; state transitions happen only in async handlers.
+    // Do not list skillState.loading as a dependency: that re-run would cancel this fetch.
     void Promise.resolve().then(() => {
       if (!active) return;
       setSkillState((current) => (
@@ -89,7 +90,7 @@ export function useCommandPaletteSearch(
     return () => {
       active = false;
     };
-  }, [isOpen, skillState.loaded, skillState.loading]);
+  }, [isOpen, skillState.loaded]);
 
   useEffect(() => {
     if (!isOpen || normalizedQuery.length < STOCK_SEARCH_MIN_LENGTH) {

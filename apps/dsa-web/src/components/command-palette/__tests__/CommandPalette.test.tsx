@@ -201,6 +201,36 @@ describe('CommandPalette', () => {
     expect(onNavigate).toHaveBeenCalledWith('/research/discover?strategy=chan_theory');
   });
 
+  it('settles a delayed skill catalog fetch without leaving the palette spinner stuck', async () => {
+    let resolveSkills: ((value: Awaited<ReturnType<typeof agentApi.getSkills>>) => void) | undefined;
+    getSkills.mockImplementation(() => new Promise((resolve) => {
+      resolveSkills = resolve;
+    }));
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
+    await waitFor(() => expect(input).toHaveFocus());
+    await waitFor(() => expect(getSkills).toHaveBeenCalled());
+
+    // One character avoids stock/report debounce loading, so the spinner is only the catalog fetch.
+    fireEvent.change(input, { target: { value: '缠' } });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('正在加载'));
+
+    await act(async () => {
+      resolveSkills?.({
+        skills: [
+          {
+            id: 'chan_theory',
+            name: '缠论',
+            description: '基于笔、线段和中枢结构分析趋势。',
+          },
+        ],
+        default_skill_id: 'bull_trend',
+      });
+    });
+    await waitFor(() => expect(screen.getByRole('group', { name: '策略' })).toBeInTheDocument());
+    expect(screen.queryByText('正在加载')).not.toBeInTheDocument();
+  });
+
   it('groups pipeline preset results and opens Agent Behavior settings', async () => {
     renderPalette();
     const input = screen.getByRole('combobox', { name: PLACEHOLDER });
