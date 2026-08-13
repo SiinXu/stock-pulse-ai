@@ -74,6 +74,54 @@ class PortfolioAgentRebalancingBaseTests(unittest.TestCase):
         self.assertEqual(det["suggestions"][0]["symbol"], "AAA")
         self.assertEqual(assessment["positions"][0]["code"], "AAA")
 
+    def test_post_process_overwrites_llm_when_base_has_empty_suggestions(self) -> None:
+        agent = _agent()
+        ctx = AgentContext(stock_code="PORT", query="rebalance")
+        base: Dict[str, Any] = {
+            "status": "ok",
+            "status_message": "within band",
+            "disclaimer": "Research aid only — not investment advice.",
+            "suggestions": [],
+            "position_bands": [
+                {
+                    "symbol": "AAA",
+                    "action": "hold",
+                    "target_weight_pct_mid": 13.75,
+                    "target_weight_pct_low": 10.0,
+                    "target_weight_pct_high": 15.0,
+                    "signal": "hold",
+                    "rationale": "within band",
+                }
+            ],
+            "drift": {"breaches": []},
+            "target_model": {"name": "risk_band_v1"},
+            "assumptions": {"method": "risk_band_drift_v1"},
+        }
+        ctx.data["portfolio_rebalancing_base"] = base
+
+        raw = json.dumps(
+            {
+                "portfolio_risk_score": 4,
+                "summary": "ok",
+                "rebalance_suggestions": ["Buy AAA to 40%", "Trim BBB"],
+                "positions": [
+                    {
+                        "code": "ZZZ",
+                        "suggested_weight": 0.40,
+                        "note": "invented",
+                    }
+                ],
+            }
+        )
+        opinion = agent.post_process(ctx, raw)
+        self.assertIsNotNone(opinion)
+        assessment = ctx.data["portfolio_assessment"]
+        self.assertEqual(assessment["rebalance_suggestions"], [])
+        self.assertEqual(len(assessment["positions"]), 1)
+        self.assertEqual(assessment["positions"][0]["code"], "AAA")
+        self.assertAlmostEqual(assessment["positions"][0]["suggested_weight"], 0.1375)
+        self.assertNotEqual(assessment["positions"][0]["code"], "ZZZ")
+
     def test_build_user_message_embeds_base_when_service_returns(self) -> None:
         agent = _agent()
         ctx = AgentContext(stock_code="PORT", query="rebalance")
