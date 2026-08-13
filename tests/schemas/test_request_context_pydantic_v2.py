@@ -138,3 +138,7 @@ def test_type_errors_match_prior_dataclass_contracts() -> None:
         AnalysisRequestContext(contextual_reply_only="yes")
     with pytest.raises(TypeError, match="address must be a string"):
         NotificationReplyTarget("feishu", 123)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="reply_targets must contain NotificationReplyTarget values"):
+        AnalysisRequestContext(reply_targets=None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="reply_targets must contain NotificationReplyTarget values"):
+        AnalysisRequestContext.model_validate({"reply_targets": None})

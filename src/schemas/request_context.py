@@ -135,8 +135,6 @@ class AnalysisRequestContext(BaseModel):
 
         if "reply_targets" in payload:
             targets = payload["reply_targets"]
-            if targets is None:
-                targets = ()
             if not isinstance(targets, (list, tuple)):
                 raise TypeError("reply_targets must contain NotificationReplyTarget values")
             normalized: list[Any] = []
