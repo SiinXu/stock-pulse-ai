@@ -395,6 +395,16 @@ class Config:
     # Analyze interval time (seconds) - to avoid API rate limiting
     analysis_delay: float = 0.0  # Delay between individual stock analysis and major index analysis
 
+    # Stage-level analysis checkpoints (Issues #121 / #136).
+    analysis_checkpoint_enabled: bool = True
+    analysis_checkpoint_dir: str = "./data/checkpoints"
+    analysis_checkpoint_ttl_hours: int = 24
+    analysis_checkpoint_force_full: bool = False
+    # Reproducibility controls.
+    repro_mode_enabled: bool = False
+    repro_record_config: bool = True
+    repro_seed: Optional[int] = None
+
     # Real-time quote prefetch (Issue #455): Set to false to disable, avoid full market pull from efinance/akshare_em
     prefetch_realtime_quotes: bool = True
 

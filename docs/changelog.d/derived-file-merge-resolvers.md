@@ -1,0 +1,1 @@
+- [Chore] Add fail-closed atomic merge resolvers for repository-derived snapshots and generated Web API artifacts.

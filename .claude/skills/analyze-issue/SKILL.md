@@ -1,8 +1,15 @@
+---
+name: analyze-issue
+description: Analyze an existing GitHub issue for validity, priority, ownership boundary, and recommended action.
+---
+
 # Analyze Issue
 
 分析 GitHub Issue，判断其真实性、优先级、仓库责任边界与建议动作。
 
 **Repository**: https://github.com/SiinXu/stock-pulse-ai/issues
+
+**Source of truth**: repository root `AGENTS.md`.
 
 ## Usage
 
