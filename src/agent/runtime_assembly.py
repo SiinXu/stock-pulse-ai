@@ -26,8 +26,8 @@ Usage::
 import copy
 import logging
 import threading
-from dataclasses import dataclass
-from typing import List, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 from src.config import AGENT_MAX_STEPS_DEFAULT, Config
 from src.utils.sanitize import log_safe_exception
@@ -67,6 +67,7 @@ class SkillPromptState:
     skill_instructions: str
     default_skill_policy: str
     technical_skill_policy: str
+    version_trace: Dict[str, Any] = field(default_factory=dict)
 
 
 def _coerce_config_int(raw_value: object, default: int, *, field_name: str | None = None) -> int:
@@ -605,6 +606,29 @@ def resolve_skill_prompt_state(
     skill_manager.activate(skills_to_activate)
     logger.info("[AgentFactory] Activated skills: %s", skills_to_activate)
 
+    version_trace: Dict[str, Any] = {}
+    try:
+        version_trace = skill_manager.get_version_trace(
+            active_only=True,
+            # Actual prompt identity is recorded at the point each prompt body
+            # is resolved; avoid claiming agent.system for analyzer/chat runs.
+            include_prompts=False,
+            use_legacy_default_prompt=use_legacy_default_prompt,
+            record_history=True,
+        )
+        from src.services.run_diagnostics import attach_prompt_artifact_versions
+
+        attach_prompt_artifact_versions(version_trace)
+    except Exception as exc:  # broad-exception: optional_metadata - version trace must not block analysis.
+        log_safe_exception(
+            logger,
+            "Skill/prompt version trace failed",
+            exc,
+            error_code="prompt_artifact_version_trace_failed",
+            level=logging.DEBUG,
+        )
+        version_trace = {}
+
     return SkillPromptState(
         skill_manager=skill_manager,
         skills_to_activate=skills_to_activate,
@@ -617,6 +641,7 @@ def resolve_skill_prompt_state(
         technical_skill_policy=get_default_technical_skill_policy(
             explicit_skill_selection=not use_legacy_default_prompt,
         ),
+        version_trace=version_trace,
     )
 
 

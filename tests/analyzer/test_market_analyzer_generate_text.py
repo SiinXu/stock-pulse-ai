@@ -244,6 +244,7 @@ class TestAnalyzerGenerateText(_AnalyzerFactoryMixin):
             "这不是 JSON，而是 fallback 模型返回的纯文本分析",
             "600519",
             "贵州茅台",
+            analysis_context={"code": "600519", "stock_name": "贵州茅台"},
         )
         mock_persist.assert_called_once_with(
             {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
@@ -864,6 +865,32 @@ class TestAnalyzerGenerateText(_AnalyzerFactoryMixin):
         assert len(dispatch_calls) == 2
         assert dispatch_calls[0]["stream"] is True
         assert "stream" not in dispatch_calls[1]
+
+    def test_repro_mode_applies_seed_and_temperature_to_analysis_provider_call(self):
+        analyzer = self._make_analyzer()
+        analyzer._config_override.repro_mode_enabled = True
+        analyzer._config_override.repro_seed = 23
+        analyzer._config_override.llm_prompt_cache_diagnostics_level = "off"
+        analyzer._config_override.llm_prompt_cache_hints_enabled = False
+        captured = {}
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="repro response"))],
+            usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
+        )
+
+        def fake_dispatch(_model, call_kwargs, **_kwargs):
+            captured.update(call_kwargs)
+            return response
+
+        with patch.object(analyzer, "_dispatch_litellm_completion", side_effect=fake_dispatch):
+            text, _, _ = analyzer._call_litellm_impl(
+                "prompt",
+                {"max_tokens": 128, "temperature": 0.8},
+            )
+
+        assert text == "repro response"
+        assert captured["seed"] == 23
+        assert captured["temperature"] == 0.0
 
     def test_call_litellm_hermes_route_forces_non_stream_direct_client(self, monkeypatch):
         monkeypatch.setenv("OUTBOUND_HTTP_ALLOWLIST", "127.0.0.1:8642")

@@ -32,7 +32,7 @@ flowchart LR
   DESKTOP[Electron shell<br/>apps/dsa-desktop] -->|starts backend and loads Web UI| API
   BOT[Bot adapters<br/>bot/] -->|/analyze| QUEUE
   BOT -->|/batch| PIPE
-  API[FastAPI<br/>server.py and api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue.py]
+  API[FastAPI<br/>server.py and api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue]
   API -->|synchronous use case| SERVICES[Application services<br/>src/services/]
   API -->|scheduled-task CRUD| SCHEDULES[(Definitions and occurrence audit<br/>scheduled_tasks and scheduled_task_runs)]
   SCHEDULES -->|due occurrence via existing runtime scheduler| QUEUE

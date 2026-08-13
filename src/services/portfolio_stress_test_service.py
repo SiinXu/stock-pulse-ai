@@ -74,6 +74,7 @@ class PortfolioStressTestService:
         sector_map: Optional[Mapping[str, str]] = None,
         custom_shocks: Optional[Sequence[Mapping[str, Any]]] = None,
         rate_sensitivity_pct_per_100bp: float = DEFAULT_EQUITY_RATE_SENSITIVITY_PCT_PER_100BP,
+        snapshot: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         as_of_date = as_of or date.today()
         method = str(cost_method or "").strip().lower()
@@ -100,12 +101,13 @@ class PortfolioStressTestService:
                     "sector scenarios are parameterized templates; POST must provide sector_map"
                 )
 
-        snapshot = self.portfolio_service.preview_portfolio_snapshot(
-            account_id=account_id,
-            as_of=as_of_date,
-            cost_method=method,
-            include_realtime=False,
-        )
+        if snapshot is None:
+            snapshot = self.portfolio_service.preview_portfolio_snapshot(
+                account_id=account_id,
+                as_of=as_of_date,
+                cost_method=method,
+                include_realtime=False,
+            )
         response_currency = str(snapshot.get("currency") or "CNY").strip().upper()
         if not response_currency:
             raise ValueError("portfolio snapshot currency is unavailable")

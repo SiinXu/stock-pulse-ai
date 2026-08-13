@@ -145,7 +145,9 @@ class AnalysisStrategyDefinition:
         else:
             source = f"plugin:{plugin_id}"
 
-        return Skill(
+        from src.agent.prompt_versioning import attach_skill_identity
+
+        skill = Skill(
             name=self.name,
             display_name=self.display_name,
             description=self.description,
@@ -169,6 +171,7 @@ class AnalysisStrategyDefinition:
             subagent_type=self.subagent_type,
             preferred_model=self.preferred_model,
         )
+        return attach_skill_identity(skill)
 
 
 @dataclass(frozen=True, slots=True)
