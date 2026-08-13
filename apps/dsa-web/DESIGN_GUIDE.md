@@ -14,8 +14,8 @@
    状态管理、API、数据流、i18n key 和路由，只允许改已批准的样式面。IA、交互或 URL
    任务必须在独立 slice 中获得明确批准；UI-01 获批后才遵循其冻结的 IA 契约，不能把候选
    结论夹带在视觉 diff 中。
-2. **红涨绿跌不可动**：`--home-price-up` 是红、`--home-price-down` 是绿，
-   这是中国市场约定，与「绿色品牌强调色」是两套独立语义，严禁合并、串色或改值。
+2. **红涨绿跌不可动**：Layer 0 `--price-red`/`--price-green` 色相与 `--price-up`/`--price-down` 方向 token
+   （默认 `data-price-direction=cn` 红涨绿跌）是中国市场约定，与「绿色品牌强调色」是两套独立语义，严禁合并、串色或改值。
 3. **遇到问题必须求助，不许猜**：项目 token 未覆盖、外部参考与产品语义冲突、
    lint/build 报错涉及任务范围外逻辑、拿不准是否需要扩展公共组件——一律停下提问。
    提问时给出：页面/文件、现状、StockPulse 依据、外部参考（如有）和倾向方案。
@@ -80,11 +80,21 @@
 
 ### 2.4 ⚠️ 涨跌色（不可触碰）
 
-- `--home-price-up` = 红（涨）、`--home-price-down` = 绿（跌）。中国市场约定。
-- 审计快照：`--home-price-up` light `0 88% 62%` (`#F34949`) / dark
-  `0 88% 64%` (`#F45252`)；`--home-price-down` light `149 100% 42%`
+- **Layer 0 色相身份**：`--price-red` = 红、`--price-green` = 绿。与品牌绿 / success 是独立语义，**禁止合并变量、禁止互相引用、禁止改值**。
+- **方向 token**：`--price-up` / `--price-down` 由 `data-price-direction` 映射（默认 `cn` = 红涨绿跌；`us` = 绿涨红跌）。
+- **遗留别名**：`--home-price-up` → `var(--price-red)`，`--home-price-down` → `var(--price-green)`（色相身份，非方向）。
+- 审计快照：`--price-red` light `0 88% 62%` (`#F34949`) / dark
+  `0 88% 64%` (`#F45252`)；`--price-green` light `149 100% 42%`
   (`#00D668`) / dark `149 100% 44%` (`#00E06C`)。
-- 与品牌绿是两套独立语义：**禁止合并变量、禁止互相引用、禁止改值**。
+- 运行时偏好：Settings `MARKET_REVIEW_COLOR_SCHEME`（`red_up`/`green_up`）同步到 `data-price-direction`；`marketFormat.changeSemantics` 按市场惯例/用户偏好映射方向 → 色相 paint。
+
+### 2.5 Theme Contract v1（#162 / #880）
+
+- 目录：`src/design/theme.ts` + `themePacks.ts`；运行时：`data-theme-pack` / `data-price-direction`。
+- Pack 仅可写 Layer 1 核心语义；**禁止** pack 覆盖 Layer 0 涨跌色。
+- 内置 pack：`classic`（默认 / `:root`）、`slate`（中性品牌验证变体）。
+- 守卫：`themeContractGuard.test.ts` 采用与 production design guard 相同的「基线只减不增」天花板。
+- 格式策略：Layer 1 继续使用 bare HSL channel triples（Tailwind 互操作）；Layer 0 使用完整 `hsl(...)` 颜色串。
 
 ## 3. 字体阶（全部 Geist）
 

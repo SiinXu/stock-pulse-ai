@@ -326,6 +326,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL` | `200` | 是 | 模板中注释 |
 | `LAYERED_MEMORY_RETENTION_DAYS` | `90` | 是 | 模板中注释 |
 | `LAYERED_MEMORY_VECTOR_ENABLED` | `false` | 是 | 模板中注释 |
+| `AGENT_ERROR_PATTERN_ENABLED` | `false` | 是 | 模板中注释; 错误模式百科分析注入总开关 (Issue #1138) |
+| `AGENT_ERROR_PATTERN_INJECT_TOP_K` | `3` | 是 | 模板中注释; 注入卡片 top-K 上限；0 表示不注入 |
+| `AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET` | `2000` | 是 | 模板中注释; 清单字符预算；0 表示不注入 |
 | `LITELLM_CONFIG` | `./litellm_config.yaml` | 是 | 模板中注释; Advanced: Model Routing YAML Configuration (optional, see docs/examples/litellm_config.example.yaml) |
 | `LITELLM_FALLBACK_MODELS` | `空` | 是 | 模板中注释; First-run readiness: GET /api/v1/onboarding/first-run (read-only; never writes .env) |
 | `LITELLM_LOG_LEVEL` | `WARNING` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |

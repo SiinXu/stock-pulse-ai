@@ -308,6 +308,8 @@ describe('StockDetailsPage', () => {
     const changeNode = screen.getByText('— (—)');
     expect(changeNode).toHaveAttribute('data-change-direction', 'flat');
     expect(changeNode).toHaveAttribute('data-change-color', 'neutral');
+    expect(changeNode).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(changeNode).not.toHaveStyle({ color: 'var(--price-green)' });
     expect(changeNode).not.toHaveStyle({ color: 'var(--home-price-up)' });
     expect(changeNode).not.toHaveStyle({ color: 'var(--home-price-down)' });
     expect(container.textContent).not.toMatch(/∞|Infinity/);
