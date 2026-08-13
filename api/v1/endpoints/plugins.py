@@ -80,6 +80,7 @@ def _to_info(snapshot: PluginSnapshot) -> PluginInfo:
         reloadable=snapshot.reloadable,
         package_root=snapshot.package_root,
         extension_points=list(snapshot.extension_points),
+        notification_channels=list(snapshot.notification_channels),
         description=snapshot.manifest.description,
         author=snapshot.manifest.author,
         last_error_code=snapshot.last_error_code,

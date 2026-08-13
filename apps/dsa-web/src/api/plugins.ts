@@ -43,6 +43,8 @@ export type PluginInfo = {
   reloadable: boolean;
   packageRoot?: string | null;
   extensionPoints: string[];
+  /** Active notification_channel registration IDs; empty when not loaded/active. */
+  notificationChannels: string[];
   lastErrorCode?: string | null;
   description: string;
   author: string;
@@ -112,6 +114,7 @@ const pluginInfoSchema = z.object({
   reloadable: z.boolean(),
   packageRoot: z.string().nullable().optional(),
   extensionPoints: z.array(z.string()).optional(),
+  notificationChannels: z.array(z.string()).optional(),
   lastErrorCode: z.string().nullable().optional(),
   description: z.string().optional(),
   author: z.string().optional(),
@@ -176,6 +179,7 @@ function normalizePlugin(raw: z.infer<typeof pluginInfoSchema>): PluginInfo {
     reloadable: raw.reloadable,
     packageRoot: raw.packageRoot ?? null,
     extensionPoints: raw.extensionPoints ?? [],
+    notificationChannels: raw.notificationChannels ?? [],
     lastErrorCode: raw.lastErrorCode ?? null,
     description: raw.description ?? '',
     author: raw.author ?? '',
