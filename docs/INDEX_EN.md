@@ -101,6 +101,8 @@ This is the entry point for project documentation. The README covers the project
 | [Cloud WebUI Deployment](deploy-webui-cloud.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Cloud server WebUI access and deployment notes |
 | [Zeabur Deployment](docker/zeabur-deployment.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Zeabur platform deployment |
 | [Desktop Packaging](desktop-package_EN.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> ([中文](desktop-package.md)) | Electron desktop first-run, local models, and packaging notes |
+| [Desktop vs Web capability matrix](desktop-capability-matrix_EN.md) ([中文](desktop-capability-matrix.md)) | Desktop/Web capability matrix, CLI diagnostics, and update retention |
+| [Desktop deep-link policy](desktop-deep-link-policy_EN.md) ([中文](desktop-deep-link-policy.md)) | `stockpulse://` allowlist, rejection semantics, and UX |
 
 ## Reference And Development
 

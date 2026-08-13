@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Publish Desktop vs Web capability matrix and deep-link policy docs, expose path-safe CLI guidance with open-terminal/install actions, and verify critical local-data update migration (Refs #884).
 - [Added] Personal daily morning brief aggregates portfolio membership, overnight Today's Focus highlights, and observed earnings-event context with optional quiet notify; event research briefs ship bounded metrics and post-event checklists through the shared report notification route (Refs #149, #1131).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after observed-event Daily Brief and Event Research settings help (Refs #149, #1131).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
