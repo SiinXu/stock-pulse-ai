@@ -57,3 +57,7 @@ outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
 ## 回滚
 
 回退新增模块/测试/文档/配置字段与 changelog 行。
+
+## 相关：错误模式百科
+
+从后验/反思教训聚类的人类可编辑错误模式卡片见 [agent-error-pattern-encyclopedia.md](agent-error-pattern-encyclopedia.md) （Issue #1138）。教训是输入，百科是聚合层；与本页 outcome-pattern 记忆不同。
