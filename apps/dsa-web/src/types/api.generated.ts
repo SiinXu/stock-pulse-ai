@@ -2272,6 +2272,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/accounts/{account_id}/paper-decision-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Score paper-trading decisions on process quality (not PnL)
+         * @description Returns explainable process scores for simulated trades on a paper account: analysis support, risk-gate compliance, and position discipline. This is not a return or win-rate evaluation. Outcome metrics remain owned by DecisionSignal post-hoc calibration (issue #987).
+         */
+        get: operations["getPaperDecisionQuality"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/accounts/{account_id}/paper-trades": {
         parameters: {
             query?: never;
@@ -2459,7 +2479,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Parse broker CSV into normalized trade records */
+        /** Parse broker CSV/XLSX into normalized trade records */
         post: operations["parse_csv_import_api_v1_portfolio_imports_csv_parse_post"];
         delete?: never;
         options?: never;
@@ -9937,6 +9957,163 @@ export interface components {
             /** Returned */
             returned: number;
         };
+        /** PaperDecisionQualityAggregate */
+        PaperDecisionQualityAggregate: {
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: components["schemas"]["PaperDecisionQualityAggregateDimension"];
+            };
+            /** Max Process Score */
+            max_process_score?: number | null;
+            /** Min Process Score */
+            min_process_score?: number | null;
+            /** Process Score */
+            process_score?: number | null;
+            /** Sample Size */
+            sample_size: number;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "empty";
+        };
+        /** PaperDecisionQualityAggregateDimension */
+        PaperDecisionQualityAggregateDimension: {
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+        };
+        /** PaperDecisionQualityDimension */
+        PaperDecisionQualityDimension: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: number;
+            };
+            /** Reasons */
+            reasons?: components["schemas"]["PaperDecisionQualityReason"][];
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+        };
+        /** PaperDecisionQualityDivisionOfLabor */
+        PaperDecisionQualityDivisionOfLabor: {
+            /** Does Not Own */
+            does_not_own: string;
+            /**
+             * Outcome Owner Issue
+             * @default 987
+             */
+            outcome_owner_issue: number;
+            /** Owns */
+            owns: string;
+            /**
+             * This Issue
+             * @default 1134
+             */
+            this_issue: number;
+        };
+        /** PaperDecisionQualityItem */
+        PaperDecisionQualityItem: {
+            /** Dimensions */
+            dimensions: {
+                [key: string]: components["schemas"]["PaperDecisionQualityDimension"];
+            };
+            /** Effective Weights */
+            effective_weights?: {
+                [key: string]: number;
+            };
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Formula Version */
+            formula_version: string;
+            /** Linked Signal Id */
+            linked_signal_id?: number | null;
+            /** Market */
+            market?: string | null;
+            /** Price */
+            price?: number | null;
+            /** Process Score */
+            process_score: number;
+            /** Quantity */
+            quantity?: number | null;
+            /** Reasons */
+            reasons?: components["schemas"]["PaperDecisionQualityReason"][];
+            /**
+             * Score Kind
+             * @default process
+             * @constant
+             */
+            score_kind: "process";
+            /** Side */
+            side?: string | null;
+            /** Symbol */
+            symbol?: string | null;
+            /** Trade Date */
+            trade_date?: string | null;
+            /** Trade Id */
+            trade_id?: number | null;
+        };
+        /** PaperDecisionQualityReason */
+        PaperDecisionQualityReason: {
+            /** Code */
+            code: string;
+            /** Dimension */
+            dimension?: string | null;
+            /** Message */
+            message: string;
+        };
+        /** PaperDecisionQualityResponse */
+        PaperDecisionQualityResponse: {
+            /** Account Id */
+            account_id: number;
+            /**
+             * Account Type
+             * @default paper
+             * @constant
+             */
+            account_type: "paper";
+            aggregate: components["schemas"]["PaperDecisionQualityAggregate"];
+            /** As Of */
+            as_of: string;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Disclaimer */
+            disclaimer: string;
+            division_of_labor: components["schemas"]["PaperDecisionQualityDivisionOfLabor"];
+            /** Formula Version */
+            formula_version: string;
+            /** Items */
+            items?: components["schemas"]["PaperDecisionQualityItem"][];
+            /** Sample Size */
+            sample_size: number;
+            /**
+             * Score Kind
+             * @default process
+             * @constant
+             */
+            score_kind: "process";
+            /** Total Trade Count */
+            total_trade_count: number;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** PaperTradeCreateRequest */
         PaperTradeCreateRequest: {
             /** Note */
@@ -11102,6 +11279,34 @@ export interface components {
             /** Record Count */
             record_count: number;
         };
+        /**
+         * PortfolioImportFailedRow
+         * @description One source row rejected during spreadsheet parse (correctable).
+         */
+        PortfolioImportFailedRow: {
+            /**
+             * Reason
+             * @description Human-readable rejection reason
+             */
+            reason: string;
+            /**
+             * Reason Code
+             * @description Stable machine code for the rejection reason
+             */
+            reason_code: string;
+            /**
+             * Row Number
+             * @description 1-based line number in the source file (header is 1)
+             */
+            row_number: number;
+            /**
+             * Source
+             * @description Non-empty original cells from the rejected row for download/correction
+             */
+            source?: {
+                [key: string]: string;
+            };
+        };
         /** PortfolioImportParseResponse */
         PortfolioImportParseResponse: {
             /** Broker */
@@ -11110,6 +11315,11 @@ export interface components {
             error_count: number;
             /** Errors */
             errors?: string[];
+            /**
+             * Failed Rows
+             * @description Structured rejected rows with original cells for client download
+             */
+            failed_rows?: components["schemas"]["PortfolioImportFailedRow"][];
             /** Record Count */
             record_count: number;
             /** Records */
@@ -13393,7 +13603,7 @@ export interface components {
              * Process Mode
              * @enum {string}
              */
-            process_mode: "serve" | "desktop" | "not_attached";
+            process_mode: "serve+schedule" | "desktop" | "cli-schedule" | "not_attached";
             /** Run Now Available */
             run_now_available: boolean;
             /** Run Now Block Reason */
@@ -22949,6 +23159,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPaperDecisionQuality: {
+        parameters: {
+            query?: {
+                /** @description Optional trade date from */
+                date_from?: string | null;
+                /** @description Optional trade date to */
+                date_to?: string | null;
+                /** @description Max trades to score */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Paper account ID */
+                account_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperDecisionQualityResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
