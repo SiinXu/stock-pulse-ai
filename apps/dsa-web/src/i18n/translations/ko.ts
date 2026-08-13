@@ -6140,5 +6140,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "예측 검증 간격",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "예측 검증 임대 시간",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "예측 검증 최대 시도 횟수",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_FETCH_CONCURRENCY": "예측 검증 조회 동시성",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK": "예측 검증 사후 분석 예산",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD": "예측 검증 회로 차단 임계값",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS": "예측 검증 회로 차단 대기 시간",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK": "회로 차단 중 배치 한도",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_RETRY_JITTER_RATIO": "예측 검증 재시도 지터",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "예측 검증 배치 한도",
 } as const;

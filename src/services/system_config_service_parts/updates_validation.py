@@ -197,13 +197,10 @@ class _SystemConfigUpdateMethods:
                     updates=update_map,
                 )
             )
-            prediction_resolver_keys = submitted_keys & {
-                "PREDICTION_RESOLVE_ENABLED",
-                "PREDICTION_RESOLVE_INTERVAL_SECONDS",
-                "PREDICTION_RESOLVE_MAX_PER_TICK",
-                "PREDICTION_RESOLVE_LEASE_SECONDS",
-                "PREDICTION_RESOLVE_MAX_ATTEMPTS",
-            }
+            prediction_resolver_keys = (
+                submitted_keys
+                & SystemConfigService._PREDICTION_RESOLVER_RUNTIME_KEYS
+            )
             if self._runtime_scheduler is not None and submitted_keys & {
                 "SCHEDULE_ENABLED",
                 "SCHEDULE_TIME",
@@ -314,13 +311,10 @@ class _SystemConfigUpdateMethods:
                 raise RuntimeError("Last-known-good configuration activation failed") from exc
 
             changed_key_set = set(changed_keys)
-            prediction_resolver_keys = changed_key_set & {
-                "PREDICTION_RESOLVE_ENABLED",
-                "PREDICTION_RESOLVE_INTERVAL_SECONDS",
-                "PREDICTION_RESOLVE_MAX_PER_TICK",
-                "PREDICTION_RESOLVE_LEASE_SECONDS",
-                "PREDICTION_RESOLVE_MAX_ATTEMPTS",
-            }
+            prediction_resolver_keys = (
+                changed_key_set
+                & SystemConfigService._PREDICTION_RESOLVER_RUNTIME_KEYS
+            )
             if self._runtime_scheduler is not None and changed_key_set & {
                 "SCHEDULE_ENABLED",
                 "SCHEDULE_TIME",

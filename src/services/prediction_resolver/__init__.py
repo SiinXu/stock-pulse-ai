@@ -9,7 +9,12 @@ from src.services.prediction_resolver.ports import (
     ActualsFetcherPort,
     ClaimScorerPort,
     EvolutionEventSink,
+    PostmortemQueuePort,
     PredictionStorePort,
+)
+from src.services.prediction_resolver.postmortem_queue import (
+    InMemoryPostmortemQueue,
+    PostmortemJob,
 )
 from src.services.prediction_resolver.resolver import (
     PREDICTION_RESOLVER_BACKGROUND_TASK_NAME,
@@ -27,10 +32,13 @@ __all__ = [
     "ActualsFetcherPort",
     "ClaimScorerPort",
     "EvolutionEventSink",
+    "InMemoryPostmortemQueue",
     "InMemoryPredictionStore",
     "PREDICTION_RESOLVER_BACKGROUND_TASK_NAME",
     "PREDICTION_RESOLVER_DEFAULT_INTERVAL_SECONDS",
     "PredictionResolver",
+    "PostmortemJob",
+    "PostmortemQueuePort",
     "PredictionStorePort",
     "TickItemResult",
     "TickSummary",

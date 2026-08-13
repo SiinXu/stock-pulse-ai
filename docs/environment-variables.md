@@ -118,17 +118,17 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MAX_STEPS` | `10` | 是 | 模板中注释; Agent maximum inference step limit (default 10, each sub-agent runs according to its preset value; higher than the de... |
 | `AGENT_MEMORY_ENABLED` | `false` | 是 | 模板中注释; Memory and calibration system (tracks historical accuracy and automatically adjusts confidence) |
 | `AGENT_MODE` | `true` | 是 | 模板中注释; =================================== Agent strategy dialogue configuration (Web dialogue page) =======================... |
+| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | 模板中注释; Hard per-mode budgets (LLM turns / tool calls / estimated USD cost / optional tokens) |
+| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
-| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | Enable hard per-mode budgets (turns/tools/cost); breach terminates with explicit reason |
-| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | Global tightener for mode LLM turn caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | Global tightener for mode tool-call caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | Global tightener for mode estimated cost caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | Optional global token ceiling; 0 disables token dimension |
 | `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |
 | `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 是 | 模板中注释 |
@@ -502,11 +502,17 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT` | `10.0` | 是 | 模板中注释 |
 | `PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO` | `0.8` | 是 | 模板中注释 |
 | `PORTFOLIO_STRESS_SCENARIOS_PATH` | `空` | 是 | 模板中注释; Optional YAML path (maximum 1,024 characters) that adds/overrides bounded portfolio stress scenarios by id |
-| `PREDICTION_RESOLVE_ENABLED` | `false` | 是 | 模板中注释; 预测到期解析总开关（Issues #1102 / #1116；默认关闭） |
-| `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | 是 | 模板中注释; PredictionResolver.tick 轮询间隔（秒） |
-| `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | 是 | 模板中注释; resolving 租约 TTL（秒） |
-| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 是 | 模板中注释; 数据不可用解析的最大尝试次数 |
-| `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | 是 | 模板中注释; 每次 tick 最多认领条数 |
+| `PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_ENABLED` | `false` | 是 | 模板中注释; Prediction horizon resolver (Issues #1102 / #1116, Epic #1107; default off) Existing process scheduler runs Predictio... |
+| `PREDICTION_RESOLVE_FETCH_CONCURRENCY` | `4` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS` | `60` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_RETRY_JITTER_RATIO` | `0.1` | 是 | 模板中注释 |
 | `PREFETCH_REALTIME_QUOTES` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |

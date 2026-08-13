@@ -6,18 +6,22 @@ from __future__ import annotations
 
 import logging
 import math
+import random
 import socket
 import threading
 import uuid
+from collections import OrderedDict
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from src.services.prediction_resolver.memory_store import new_lease_token
 from src.services.prediction_resolver.ports import (
     ActualsFetcherPort,
     ClaimScorerPort,
     EvolutionEventSink,
+    PostmortemQueuePort,
     PredictionStorePort,
 )
 from src.utils.sanitize import log_safe_exception
@@ -31,6 +35,7 @@ PREDICTION_RESOLVER_ENGINE_VERSION = "prediction-resolver-v1"
 # Bounded exponential backoff for data_unavailable retries (seconds).
 PREDICTION_RESOLVER_RETRY_BASE_SECONDS = 30.0
 PREDICTION_RESOLVER_RETRY_MAX_SECONDS = 3600.0
+PREDICTION_RESOLVER_BACKLOG_PROBE_LIMIT = 1000
 
 OUTCOME_HIT = "hit"
 OUTCOME_MISS = "miss"
@@ -156,8 +161,10 @@ def compute_retry_delay_seconds(
     *,
     base_seconds: float = PREDICTION_RESOLVER_RETRY_BASE_SECONDS,
     max_seconds: float = PREDICTION_RESOLVER_RETRY_MAX_SECONDS,
+    jitter_ratio: float = 0.0,
+    random_value: float = 0.0,
 ) -> float:
-    """Bounded exponential backoff from the current attempt count."""
+    """Bounded exponential backoff with optional positive jitter."""
     if isinstance(attempts, bool) or not isinstance(attempts, int):
         raise ValueError("attempts must be an integer")
     safe_attempts = max(1, attempts)
@@ -167,10 +174,17 @@ def compute_retry_delay_seconds(
         raise ValueError("base_seconds must be finite and positive")
     if not math.isfinite(maximum) or maximum < base:
         raise ValueError("max_seconds must be finite and >= base_seconds")
+    ratio = float(jitter_ratio)
+    sample = float(random_value)
+    if not math.isfinite(ratio) or not 0.0 <= ratio <= 1.0:
+        raise ValueError("jitter_ratio must be finite and between 0 and 1")
+    if not math.isfinite(sample) or not 0.0 <= sample <= 1.0:
+        raise ValueError("random_value must be finite and between 0 and 1")
     # Avoid constructing 2 ** attempts for corrupt/untrusted persisted counters.
     if safe_attempts > 1 + math.ceil(math.log2(maximum / base)):
         return maximum
-    return min(maximum, base * (2.0 ** (safe_attempts - 1)))
+    delay = min(maximum, base * (2.0 ** (safe_attempts - 1)))
+    return min(maximum, delay * (1.0 + ratio * sample))
 
 
 def build_data_unavailable_outcome(
@@ -181,6 +195,8 @@ def build_data_unavailable_outcome(
     max_attempts: int,
     worker_id: str,
     extra: Optional[Mapping[str, Any]] = None,
+    retry_jitter_ratio: float = 0.0,
+    retry_random_value: float = 0.0,
 ) -> Dict[str, Any]:
     """Build outcome payload including retry scheduling metadata.
 
@@ -206,7 +222,11 @@ def build_data_unavailable_outcome(
     if exhausted:
         payload["next_attempt_at"] = None
     else:
-        delay = compute_retry_delay_seconds(attempts)
+        delay = compute_retry_delay_seconds(
+            attempts,
+            jitter_ratio=retry_jitter_ratio,
+            random_value=retry_random_value,
+        )
         payload["next_attempt_at"] = (
             as_of + timedelta(seconds=delay)
         ).isoformat()
@@ -269,6 +289,31 @@ class TickItemResult:
     applied: bool = False
 
 
+@dataclass(frozen=True)
+class _ActualsRequest:
+    symbol: str
+    market: Optional[str]
+    as_of: date
+    end: date
+
+    @property
+    def key(self) -> Tuple[str, str, str, str]:
+        return (
+            self.symbol.upper(),
+            self.market or "",
+            self.as_of.isoformat(),
+            self.end.isoformat(),
+        )
+
+
+@dataclass(frozen=True)
+class _ClaimedWork:
+    record: Any
+    lease_token: str
+    attempts: int
+    request: _ActualsRequest
+
+
 @dataclass
 class TickSummary:
     claimed: int = 0
@@ -276,6 +321,19 @@ class TickSummary:
     data_unavailable: int = 0
     skipped: int = 0
     errors: int = 0
+    due_before: int = 0
+    due_after: int = 0
+    due_lag_seconds: Optional[float] = None
+    backlog_probe_truncated: bool = False
+    deferred_by_backpressure: int = 0
+    fetch_calls: int = 0
+    fetch_errors: int = 0
+    fetch_coalesced_saved: int = 0
+    groups: int = 0
+    circuit_open: bool = False
+    postmortem_enqueued: int = 0
+    postmortem_dropped: int = 0
+    postmortem_queue_depth: int = 0
     skipped_overlap: bool = False
     items: List[TickItemResult] = field(default_factory=list)
 
@@ -286,6 +344,22 @@ class TickSummary:
             "data_unavailable": self.data_unavailable,
             "skipped": self.skipped,
             "errors": self.errors,
+            "due_before": self.due_before,
+            "due_after": self.due_after,
+            "due_lag_seconds": self.due_lag_seconds,
+            "backlog_probe_truncated": self.backlog_probe_truncated,
+            "deferred_by_backpressure": self.deferred_by_backpressure,
+            "fetch_calls": self.fetch_calls,
+            "fetch_errors": self.fetch_errors,
+            "fetch_coalesced_saved": self.fetch_coalesced_saved,
+            "groups": self.groups,
+            "circuit_open": self.circuit_open,
+            "resolve_rate": (
+                self.resolved / self.claimed if self.claimed else 0.0
+            ),
+            "postmortem_enqueued": self.postmortem_enqueued,
+            "postmortem_dropped": self.postmortem_dropped,
+            "postmortem_queue_depth": self.postmortem_queue_depth,
             "skipped_overlap": self.skipped_overlap,
             "items": [asdict(item) for item in self.items],
         }
@@ -305,6 +379,14 @@ class PredictionResolver:
         max_per_tick: int = 50,
         max_attempts: int = 5,
         event_sink: Optional[EvolutionEventSink] = None,
+        postmortem_queue: Optional[PostmortemQueuePort] = None,
+        postmortem_max_per_tick: int = 10,
+        fetch_concurrency: int = 4,
+        provider_error_circuit_threshold: int = 5,
+        provider_error_circuit_cooldown_seconds: int = 60,
+        circuit_open_max_per_tick: int = 5,
+        retry_jitter_ratio: float = 0.1,
+        rng: Optional[random.Random] = None,
         clock: Optional[Callable[[], datetime]] = None,
         score_config: Any = None,
     ) -> None:
@@ -317,6 +399,36 @@ class PredictionResolver:
         max_attempts = _require_int(
             "max_attempts", max_attempts, minimum=1, maximum=100
         )
+        postmortem_max_per_tick = _require_int(
+            "postmortem_max_per_tick",
+            postmortem_max_per_tick,
+            minimum=0,
+            maximum=10_000,
+        )
+        fetch_concurrency = _require_int(
+            "fetch_concurrency", fetch_concurrency, minimum=1, maximum=64
+        )
+        provider_error_circuit_threshold = _require_int(
+            "provider_error_circuit_threshold",
+            provider_error_circuit_threshold,
+            minimum=1,
+            maximum=10_000,
+        )
+        provider_error_circuit_cooldown_seconds = _require_int(
+            "provider_error_circuit_cooldown_seconds",
+            provider_error_circuit_cooldown_seconds,
+            minimum=1,
+            maximum=86_400,
+        )
+        circuit_open_max_per_tick = _require_int(
+            "circuit_open_max_per_tick",
+            circuit_open_max_per_tick,
+            minimum=0,
+            maximum=10_000,
+        )
+        retry_jitter_ratio = float(retry_jitter_ratio)
+        if not math.isfinite(retry_jitter_ratio) or not 0.0 <= retry_jitter_ratio <= 1.0:
+            raise ValueError("retry_jitter_ratio must be finite and between 0 and 1")
         self._store = store
         self._actuals = actuals_fetcher
         self._scorer = claim_scorer
@@ -325,6 +437,22 @@ class PredictionResolver:
         self._max_per_tick = int(max_per_tick)
         self._max_attempts = int(max_attempts)
         self._event_sink = event_sink
+        self._postmortem_queue = postmortem_queue
+        self._postmortem_max_per_tick = int(postmortem_max_per_tick)
+        self._fetch_concurrency = int(fetch_concurrency)
+        self._provider_error_circuit_threshold = int(
+            provider_error_circuit_threshold
+        )
+        self._provider_error_circuit_cooldown_seconds = int(
+            provider_error_circuit_cooldown_seconds
+        )
+        self._circuit_open_max_per_tick = int(circuit_open_max_per_tick)
+        self._retry_jitter_ratio = retry_jitter_ratio
+        self._rng = rng or random.Random()
+        self._circuit_open_until: Optional[datetime] = None
+        self._postmortem_budget_remaining = 0
+        self._postmortem_enqueued = 0
+        self._postmortem_dropped = 0
         self._clock = clock or _utc_naive_now
         self._score_config = score_config
         self._tick_lock = threading.Lock()
@@ -355,17 +483,55 @@ class PredictionResolver:
                 else _require_int("limit", limit, minimum=0, maximum=10_000)
             )
             claim_limit = min(self._max_per_tick, requested_limit)
+            circuit_was_open = self._circuit_is_open(as_of)
+            summary.circuit_open = circuit_was_open
+            if circuit_was_open:
+                claim_limit = min(claim_limit, self._circuit_open_max_per_tick)
+            self._requeue_ready_retries(as_of=as_of, limit=claim_limit)
+
+            probe_limit = min(
+                10_000,
+                max(PREDICTION_RESOLVER_BACKLOG_PROBE_LIMIT, claim_limit + 1),
+            )
+            observed_due = self._list_claimable(as_of=as_of, limit=probe_limit)
+            summary.due_before = len(observed_due)
+            summary.backlog_probe_truncated = len(observed_due) >= probe_limit
+            if observed_due:
+                oldest_due_at = _to_datetime(_attr(observed_due[0], "resolve_after"))
+                if oldest_due_at is not None:
+                    summary.due_lag_seconds = max(
+                        0.0,
+                        (as_of - oldest_due_at).total_seconds(),
+                    )
+            summary.deferred_by_backpressure = max(
+                0,
+                len(observed_due) - claim_limit,
+            )
             if claim_limit == 0:
+                summary.due_after = summary.due_before
+                summary.postmortem_queue_depth = self._postmortem_depth()
+                self._emit("prediction.resolve.tick", summary.as_dict())
                 return summary
-            self._requeue_ready_retries(as_of=as_of)
-            due = self._list_claimable(as_of=as_of, limit=claim_limit)
-            for candidate in due:
+
+            self._postmortem_budget_remaining = self._postmortem_max_per_tick
+            self._postmortem_enqueued = 0
+            self._postmortem_dropped = 0
+            claimed_work: List[_ClaimedWork] = []
+            for candidate in observed_due[:claim_limit]:
                 prediction_id = str(_attr(candidate, "prediction_id") or "").strip()
                 if not prediction_id:
                     summary.skipped += 1
                     continue
-                item = self._resolve_one(candidate, as_of=as_of)
-                summary.items.append(item)
+                work, item = self._claim_one(candidate, as_of=as_of)
+                if item is not None:
+                    summary.items.append(item)
+                if work is not None:
+                    summary.claimed += 1
+                    claimed_work.append(work)
+                    continue
+                if item is None:
+                    summary.errors += 1
+                    continue
                 if item.disposition == "claimed_failed":
                     summary.skipped += 1
                     continue
@@ -381,26 +547,80 @@ class PredictionResolver:
                     summary.errors += 1
                 else:
                     summary.skipped += 1
-            if summary.claimed or summary.skipped_overlap:
+
+            self._process_claimed_groups(
+                claimed_work,
+                as_of=as_of,
+                summary=summary,
+            )
+            summary.postmortem_enqueued = self._postmortem_enqueued
+            summary.postmortem_dropped = self._postmortem_dropped
+            summary.postmortem_queue_depth = self._postmortem_depth()
+            summary.circuit_open = self._circuit_is_open(as_of)
+            summary.due_after = len(
+                self._list_claimable(as_of=as_of, limit=probe_limit)
+            )
+            self._emit("prediction.resolve.tick", summary.as_dict())
+            if summary.claimed or summary.due_before:
                 logger.info(
                     "[PredictionResolver] tick complete worker=%s claimed=%s "
-                    "resolved=%s data_unavailable=%s skipped=%s errors=%s",
+                    "resolved=%s data_unavailable=%s skipped=%s errors=%s "
+                    "fetch_calls=%s fetch_errors=%s deferred=%s circuit_open=%s",
                     self._worker_id,
                     summary.claimed,
                     summary.resolved,
                     summary.data_unavailable,
                     summary.skipped,
                     summary.errors,
+                    summary.fetch_calls,
+                    summary.fetch_errors,
+                    summary.deferred_by_backpressure,
+                    summary.circuit_open,
                 )
             return summary
         finally:
             self._tick_lock.release()
 
-    def _requeue_ready_retries(self, *, as_of: datetime) -> None:
+    def _circuit_is_open(self, as_of: datetime) -> bool:
+        if self._circuit_open_until is None:
+            return False
+        if as_of >= self._circuit_open_until:
+            self._circuit_open_until = None
+            return False
+        return True
+
+    def _open_circuit(self, as_of: datetime) -> None:
+        self._circuit_open_until = as_of + timedelta(
+            seconds=self._provider_error_circuit_cooldown_seconds
+        )
+        logger.warning(
+            "[PredictionResolver] provider circuit open worker=%s until=%s",
+            self._worker_id,
+            self._circuit_open_until.isoformat(),
+        )
+
+    def _postmortem_depth(self) -> int:
+        if self._postmortem_queue is None:
+            return 0
+        try:
+            return max(0, int(self._postmortem_queue.depth()))
+        except Exception as exc:  # broad-exception: fallback_recorded - metrics only
+            log_safe_exception(
+                logger,
+                "Prediction postmortem queue depth failed",
+                exc,
+                error_code="prediction_resolver_postmortem_depth_failed",
+                level=logging.WARNING,
+            )
+            return 0
+
+    def _requeue_ready_retries(self, *, as_of: datetime, limit: int) -> None:
         """Move durable A3 data-unavailable rows back to pending after backoff."""
+        if limit <= 0:
+            return
         retry_rows = self._store.list_due(
             as_of=as_of,
-            limit=1000,
+            limit=limit,
             statuses=(OUTCOME_DATA_UNAVAILABLE,),
         )
         for row in retry_rows:
@@ -454,7 +674,12 @@ class PredictionResolver:
         )
         return combined[:limit]
 
-    def _resolve_one(self, candidate: Any, *, as_of: datetime) -> TickItemResult:
+    def _claim_one(
+        self,
+        candidate: Any,
+        *,
+        as_of: datetime,
+    ) -> Tuple[Optional[_ClaimedWork], Optional[TickItemResult]]:
         prediction_id = str(_attr(candidate, "prediction_id") or "").strip()
         lease_token = new_lease_token()
         try:
@@ -474,13 +699,11 @@ class PredictionResolver:
                 context={"prediction_id": prediction_id},
                 level=logging.WARNING,
             )
-            return TickItemResult(
-                prediction_id=prediction_id,
-                disposition="error",
-                reason="claim_failed",
+            return None, TickItemResult(
+                prediction_id=prediction_id, disposition="error", reason="claim_failed"
             )
         if claimed is None:
-            return TickItemResult(
+            return None, TickItemResult(
                 prediction_id=prediction_id,
                 disposition="claimed_failed",
                 reason="lease_lost",
@@ -495,54 +718,241 @@ class PredictionResolver:
                 as_of=as_of,
                 attempts=attempts,
             )
-            return self._data_unavailable_result(
+            return None, self._data_unavailable_result(
                 prediction_id=prediction_id,
                 reason="max_attempts_exhausted",
                 applied=applied,
             )
-        try:
-            return self._score_and_write(
-                claimed,
+        request = self._actuals_request(claimed, as_of=as_of)
+        if request is None:
+            applied = self._mark_unavailable(
+                prediction_id=prediction_id,
+                reason="invalid_prediction_fields",
                 lease_token=lease_token,
                 as_of=as_of,
                 attempts=attempts,
             )
-        except Exception as exc:  # broad-exception: fallback_recorded - never invent hit
+            return None, self._data_unavailable_result(
+                prediction_id=prediction_id,
+                reason="invalid_prediction_fields",
+                applied=applied,
+            )
+        return (
+            _ClaimedWork(
+                record=claimed,
+                lease_token=lease_token,
+                attempts=attempts,
+                request=request,
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _actuals_request(claimed: Any, *, as_of: datetime) -> Optional[_ActualsRequest]:
+        symbol = str(_attr(claimed, "symbol") or "").strip()
+        market = str(_attr(claimed, "market") or "").strip().lower() or None
+        as_of_date = _to_date(_attr(claimed, "as_of"))
+        end_date = _to_date(_attr(claimed, "resolve_after")) or _to_date(as_of)
+        if not symbol or as_of_date is None or end_date is None:
+            return None
+        return _ActualsRequest(
+            symbol=symbol,
+            market=market,
+            as_of=as_of_date,
+            end=end_date,
+        )
+
+    def _process_claimed_groups(
+        self,
+        work_items: List[_ClaimedWork],
+        *,
+        as_of: datetime,
+        summary: TickSummary,
+    ) -> None:
+        groups: "OrderedDict[Tuple[str, str, str, str], List[_ClaimedWork]]" = (
+            OrderedDict()
+        )
+        for work in work_items:
+            groups.setdefault(work.request.key, []).append(work)
+        summary.groups = len(groups)
+        summary.fetch_coalesced_saved = sum(
+            max(0, len(group) - 1) for group in groups.values()
+        )
+        if not groups:
+            return
+
+        fetch_workers = min(self._fetch_concurrency, len(groups))
+        futures: Dict[Future[Any], Tuple[str, str, str, str]] = {}
+        snapshots: Dict[Tuple[str, str, str, str], Any] = {}
+        fetch_exceptions: Dict[Tuple[str, str, str, str], Exception] = {}
+        with ThreadPoolExecutor(
+            max_workers=fetch_workers,
+            thread_name_prefix="prediction-actuals",
+        ) as pool:
+            for group in groups.values():
+                request = group[0].request
+                future = pool.submit(
+                    self._actuals.fetch,
+                    symbol=request.symbol,
+                    as_of=request.as_of,
+                    market=request.market,
+                    end=request.end,
+                )
+                futures[future] = request.key
+
+            for future in as_completed(futures):
+                key = futures[future]
+                summary.fetch_calls += 1
+                try:
+                    snapshots[key] = future.result()
+                except Exception as exc:  # broad-exception: fallback_recorded - never invent actuals
+                    summary.fetch_errors += 1
+                    fetch_exceptions[key] = exc
+                    log_safe_exception(
+                        logger,
+                        "ActualsFetcher raised; marking group data_unavailable",
+                        exc,
+                        error_code="prediction_resolver_fetch_failed",
+                        context={"coalesce_key": list(key)},
+                        level=logging.WARNING,
+                    )
+
+        provider_error_counts: Dict[str, int] = {}
+        for key, group in groups.items():
+            if key in fetch_exceptions:
+                provider_error_counts["unknown"] = (
+                    provider_error_counts.get("unknown", 0) + 1
+                )
+                for work in group:
+                    item = self._mark_group_fetch_exception(work, as_of=as_of)
+                    self._record_item(summary, item)
+                continue
+
+            snapshot = snapshots[key]
+            snapshot_failed = not bool(_attr(snapshot, "ok", False)) or bool(
+                _attr(snapshot, "data_unavailable", False)
+            )
+            if snapshot_failed:
+                summary.fetch_errors += 1
+                if bool(_attr(snapshot, "retryable", True)):
+                    provider = str(_attr(snapshot, "provider") or "unknown")
+                    provider_error_counts[provider] = (
+                        provider_error_counts.get(provider, 0) + 1
+                    )
+            for work in group:
+                try:
+                    item = self._score_snapshot_and_write(
+                        work,
+                        snapshot=snapshot,
+                        as_of=as_of,
+                    )
+                except Exception as exc:  # broad-exception: fallback_recorded - isolate one row
+                    log_safe_exception(
+                        logger,
+                        "Prediction resolve path failed; marking data_unavailable",
+                        exc,
+                        error_code="prediction_resolver_path_failed",
+                        context={
+                            "prediction_id": str(
+                                _attr(work.record, "prediction_id") or ""
+                            )
+                        },
+                        level=logging.WARNING,
+                    )
+                    item = self._handle_resolve_exception(
+                        work,
+                        as_of=as_of,
+                    )
+                self._record_item(summary, item)
+
+        if any(
+            count >= self._provider_error_circuit_threshold
+            for count in provider_error_counts.values()
+        ):
+            self._open_circuit(as_of)
+
+    @staticmethod
+    def _record_item(summary: TickSummary, item: TickItemResult) -> None:
+        summary.items.append(item)
+        if item.disposition == "resolved":
+            summary.resolved += 1
+        elif item.disposition == "data_unavailable":
+            summary.data_unavailable += 1
+        elif item.disposition == "error":
+            summary.errors += 1
+        else:
+            summary.skipped += 1
+
+    def _mark_group_fetch_exception(
+        self,
+        work: _ClaimedWork,
+        *,
+        as_of: datetime,
+    ) -> TickItemResult:
+        prediction_id = str(_attr(work.record, "prediction_id"))
+        try:
+            applied = self._mark_unavailable(
+                prediction_id=prediction_id,
+                reason="provider_exception",
+                lease_token=work.lease_token,
+                as_of=as_of,
+                attempts=work.attempts,
+                extra={"retryable": True},
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - preserve lease for recovery
             log_safe_exception(
                 logger,
-                "Prediction resolve path failed; marking data_unavailable",
+                "Prediction provider failure write-back failed",
                 exc,
-                error_code="prediction_resolver_path_failed",
+                error_code="prediction_resolver_writeback_failed",
                 context={"prediction_id": prediction_id},
                 level=logging.WARNING,
             )
-            try:
-                applied = self._mark_unavailable(
-                    prediction_id=prediction_id,
-                    reason="resolver_exception",
-                    lease_token=lease_token,
-                    as_of=as_of,
-                    attempts=attempts,
-                )
-            except Exception as write_exc:  # broad-exception: fallback_recorded - preserve failed lease for recovery
-                log_safe_exception(
-                    logger,
-                    "Prediction data_unavailable write-back failed",
-                    write_exc,
-                    error_code="prediction_resolver_writeback_failed",
-                    context={"prediction_id": prediction_id},
-                    level=logging.WARNING,
-                )
-                return TickItemResult(
-                    prediction_id=prediction_id,
-                    disposition="error",
-                    reason="data_unavailable_write_failed",
-                )
-            return self._data_unavailable_result(
+            return TickItemResult(
+                prediction_id=prediction_id,
+                disposition="error",
+                reason="data_unavailable_write_failed",
+            )
+        return self._data_unavailable_result(
+            prediction_id=prediction_id,
+            reason="provider_exception",
+            applied=applied,
+        )
+
+    def _handle_resolve_exception(
+        self,
+        work: _ClaimedWork,
+        *,
+        as_of: datetime,
+    ) -> TickItemResult:
+        prediction_id = str(_attr(work.record, "prediction_id"))
+        try:
+            applied = self._mark_unavailable(
                 prediction_id=prediction_id,
                 reason="resolver_exception",
-                applied=applied,
+                lease_token=work.lease_token,
+                as_of=as_of,
+                attempts=work.attempts,
             )
+        except Exception as write_exc:  # broad-exception: fallback_recorded - preserve lease for recovery
+            log_safe_exception(
+                logger,
+                "Prediction data_unavailable write-back failed",
+                write_exc,
+                error_code="prediction_resolver_writeback_failed",
+                context={"prediction_id": prediction_id},
+                level=logging.WARNING,
+            )
+            return TickItemResult(
+                prediction_id=prediction_id,
+                disposition="error",
+                reason="data_unavailable_write_failed",
+            )
+        return self._data_unavailable_result(
+            prediction_id=prediction_id,
+            reason="resolver_exception",
+            applied=applied,
+        )
 
     @staticmethod
     def _data_unavailable_result(
@@ -580,6 +990,8 @@ class PredictionResolver:
             max_attempts=self._max_attempts,
             worker_id=self._worker_id,
             extra=extra,
+            retry_jitter_ratio=self._retry_jitter_ratio,
+            retry_random_value=self._rng.random(),
         )
         applied, _ = self._store.mark_data_unavailable(
             prediction_id=prediction_id,
@@ -601,43 +1013,21 @@ class PredictionResolver:
         )
         return applied
 
-    def _score_and_write(
+    def _score_snapshot_and_write(
         self,
-        claimed: Any,
+        work: _ClaimedWork,
         *,
-        lease_token: str,
+        snapshot: Any,
         as_of: datetime,
-        attempts: int,
     ) -> TickItemResult:
+        claimed = work.record
+        lease_token = work.lease_token
+        attempts = work.attempts
+        request = work.request
         prediction_id = str(_attr(claimed, "prediction_id"))
-        symbol = str(_attr(claimed, "symbol") or "").strip()
-        market = str(_attr(claimed, "market") or "").strip().lower() or None
+        symbol = request.symbol
+        market = request.market
         claims = list(_attr(claimed, "claims") or [])
-        prediction_as_of = _attr(claimed, "as_of")
-        resolve_after = _attr(claimed, "resolve_after")
-        as_of_date = _to_date(prediction_as_of)
-        end_date = _to_date(resolve_after) or _to_date(as_of)
-
-        if not symbol or as_of_date is None or end_date is None:
-            applied = self._mark_unavailable(
-                prediction_id=prediction_id,
-                reason="invalid_prediction_fields",
-                lease_token=lease_token,
-                as_of=as_of,
-                attempts=attempts,
-            )
-            return self._data_unavailable_result(
-                prediction_id=prediction_id,
-                reason="invalid_prediction_fields",
-                applied=applied,
-            )
-
-        snapshot = self._actuals.fetch(
-            symbol=symbol,
-            as_of=as_of_date,
-            market=market,
-            end=end_date,
-        )
         snapshot_ok = bool(_attr(snapshot, "ok", False)) and not bool(
             _attr(snapshot, "data_unavailable", False)
         )
@@ -716,8 +1106,8 @@ class PredictionResolver:
             "attempts": attempts,
             "symbol": symbol,
             "market": market,
-            "as_of": as_of_date.isoformat(),
-            "end": end_date.isoformat(),
+            "as_of": request.as_of.isoformat(),
+            "end": request.end.isoformat(),
         }
         applied, _ = self._store.resolve(
             prediction_id=prediction_id,
@@ -736,6 +1126,12 @@ class PredictionResolver:
                 "run_id": _attr(claimed, "run_id"),
             },
         )
+        if applied and label in {OUTCOME_MISS, OUTCOME_PARTIAL}:
+            self._maybe_enqueue_postmortem(
+                prediction_id=prediction_id,
+                outcome=outcome,
+                label=label,
+            )
         return TickItemResult(
             prediction_id=prediction_id,
             disposition="resolved" if applied else "skipped",
@@ -743,6 +1139,40 @@ class PredictionResolver:
             reason=None if applied else "resolve_not_applied",
             applied=applied,
         )
+
+    def _maybe_enqueue_postmortem(
+        self,
+        *,
+        prediction_id: str,
+        outcome: Mapping[str, Any],
+        label: str,
+    ) -> None:
+        if self._postmortem_queue is None:
+            return
+        if self._postmortem_budget_remaining <= 0:
+            self._postmortem_dropped += 1
+            return
+        self._postmortem_budget_remaining -= 1
+        try:
+            accepted = self._postmortem_queue.enqueue(
+                prediction_id=prediction_id,
+                outcome=outcome,
+                priority=10 if label == OUTCOME_MISS else 5,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - optional hand-off
+            log_safe_exception(
+                logger,
+                "Prediction postmortem enqueue failed",
+                exc,
+                error_code="prediction_resolver_postmortem_enqueue_failed",
+                context={"prediction_id": prediction_id},
+                level=logging.WARNING,
+            )
+            accepted = False
+        if accepted:
+            self._postmortem_enqueued += 1
+        else:
+            self._postmortem_dropped += 1
 
     def _emit(self, event_type: str, payload: Mapping[str, Any]) -> None:
         if self._event_sink is None:
@@ -778,6 +1208,13 @@ def build_prediction_resolver(
     lease_seconds: int = 120,
     max_per_tick: int = 50,
     max_attempts: int = 5,
+    fetch_concurrency: int = 4,
+    postmortem_queue: Optional[PostmortemQueuePort] = None,
+    postmortem_max_per_tick: int = 10,
+    provider_error_circuit_threshold: int = 5,
+    provider_error_circuit_cooldown_seconds: int = 60,
+    circuit_open_max_per_tick: int = 5,
+    retry_jitter_ratio: float = 0.1,
     event_sink: Optional[EvolutionEventSink] = None,
     require_persistence: bool = True,
 ) -> Optional[PredictionResolver]:
@@ -843,6 +1280,15 @@ def build_prediction_resolver(
         lease_seconds=lease_seconds,
         max_per_tick=max_per_tick,
         max_attempts=max_attempts,
+        fetch_concurrency=fetch_concurrency,
+        postmortem_queue=postmortem_queue,
+        postmortem_max_per_tick=postmortem_max_per_tick,
+        provider_error_circuit_threshold=provider_error_circuit_threshold,
+        provider_error_circuit_cooldown_seconds=(
+            provider_error_circuit_cooldown_seconds
+        ),
+        circuit_open_max_per_tick=circuit_open_max_per_tick,
+        retry_jitter_ratio=retry_jitter_ratio,
         event_sink=event_sink if event_sink is not None else _LoggingEventSink(),
     )
 
@@ -869,6 +1315,7 @@ def build_prediction_resolver_background_tasks(
     *,
     config_provider: Optional[Callable[[], Any]] = None,
     resolver: Optional[PredictionResolver] = None,
+    postmortem_queue: Optional[PostmortemQueuePort] = None,
 ) -> List[Dict[str, Any]]:
     """Register periodic prediction_resolver task on the existing Scheduler."""
     del config_provider
@@ -878,6 +1325,28 @@ def build_prediction_resolver_background_tasks(
     lease_seconds = int(getattr(config, "prediction_resolve_lease_seconds", 120))
     max_per_tick = int(getattr(config, "prediction_resolve_max_per_tick", 50))
     max_attempts = int(getattr(config, "prediction_resolve_max_attempts", 5))
+    fetch_concurrency = int(
+        getattr(config, "prediction_resolve_fetch_concurrency", 4)
+    )
+    postmortem_max_per_tick = int(
+        getattr(config, "prediction_resolve_postmortem_max_per_tick", 10)
+    )
+    provider_error_circuit_threshold = int(
+        getattr(config, "prediction_resolve_provider_error_circuit_threshold", 5)
+    )
+    provider_error_circuit_cooldown_seconds = int(
+        getattr(
+            config,
+            "prediction_resolve_provider_error_circuit_cooldown_seconds",
+            60,
+        )
+    )
+    circuit_open_max_per_tick = int(
+        getattr(config, "prediction_resolve_circuit_open_max_per_tick", 5)
+    )
+    retry_jitter_ratio = float(
+        getattr(config, "prediction_resolve_retry_jitter_ratio", 0.1)
+    )
 
     active = resolver
     if active is None:
@@ -885,6 +1354,15 @@ def build_prediction_resolver_background_tasks(
             lease_seconds=lease_seconds,
             max_per_tick=max_per_tick,
             max_attempts=max_attempts,
+            fetch_concurrency=fetch_concurrency,
+            postmortem_queue=postmortem_queue,
+            postmortem_max_per_tick=postmortem_max_per_tick,
+            provider_error_circuit_threshold=provider_error_circuit_threshold,
+            provider_error_circuit_cooldown_seconds=(
+                provider_error_circuit_cooldown_seconds
+            ),
+            circuit_open_max_per_tick=circuit_open_max_per_tick,
+            retry_jitter_ratio=retry_jitter_ratio,
             require_persistence=True,
         )
     if active is None:

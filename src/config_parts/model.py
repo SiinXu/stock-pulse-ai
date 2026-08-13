@@ -350,6 +350,12 @@ class Config:
     prediction_resolve_max_per_tick: int = 50
     prediction_resolve_lease_seconds: int = 120
     prediction_resolve_max_attempts: int = 5
+    prediction_resolve_fetch_concurrency: int = 4
+    prediction_resolve_postmortem_max_per_tick: int = 10
+    prediction_resolve_provider_error_circuit_threshold: int = 5
+    prediction_resolve_provider_error_circuit_cooldown_seconds: int = 60
+    prediction_resolve_circuit_open_max_per_tick: int = 5
+    prediction_resolve_retry_jitter_ratio: float = 0.1
 
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)

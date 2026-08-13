@@ -49,6 +49,12 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
                 "SCHEDULE_TIME",
                 "LOG_LEVEL",
                 "PREDICTION_RESOLVE_ENABLED",
+                "PREDICTION_RESOLVE_FETCH_CONCURRENCY",
+                "PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK",
+                "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD",
+                "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS",
+                "PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK",
+                "PREDICTION_RESOLVE_RETRY_JITTER_RATIO",
             )
         }
         for key in (
@@ -56,6 +62,12 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             "SCHEDULE_TIME",
             "LOG_LEVEL",
             "PREDICTION_RESOLVE_ENABLED",
+            "PREDICTION_RESOLVE_FETCH_CONCURRENCY",
+            "PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK",
+            "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD",
+            "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS",
+            "PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK",
+            "PREDICTION_RESOLVE_RETRY_JITTER_RATIO",
         ):
             os.environ.pop(key, None)
         self._original_queue = AnalysisTaskQueue._instance
@@ -425,6 +437,38 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             clear_enabled_override=False,
             refresh_background_tasks={"prediction_resolver"},
         )
+
+    def test_prediction_resolver_backpressure_keys_refresh_runtime_task(self) -> None:
+        runtime_scheduler = Mock()
+        service = SystemConfigService(
+            manager=self.manager,
+            runtime_scheduler=runtime_scheduler,
+        )
+        updates = (
+            ("PREDICTION_RESOLVE_FETCH_CONCURRENCY", "7"),
+            ("PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK", "8"),
+            ("PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD", "9"),
+            (
+                "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS",
+                "600",
+            ),
+            ("PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK", "2"),
+            ("PREDICTION_RESOLVE_RETRY_JITTER_RATIO", "0.2"),
+        )
+
+        with patch.object(service, "_reload_runtime_singletons"):
+            for key, value in updates:
+                with self.subTest(key=key):
+                    runtime_scheduler.reset_mock()
+                    result = service.update(
+                        config_version=self.manager.get_config_version(),
+                        items=[{"key": key, "value": value}],
+                    )
+                    self.assertTrue(result["success"])
+                    runtime_scheduler.reconcile_from_config.assert_called_once_with(
+                        clear_enabled_override=False,
+                        refresh_background_tasks={"prediction_resolver"},
+                    )
 
     def test_prediction_resolver_rollback_refreshes_runtime_background_task(self) -> None:
         runtime_scheduler = Mock()

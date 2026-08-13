@@ -6140,5 +6140,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Selang penyelesaian ramalan",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Tempoh pajakan penyelesaian",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Percubaan penyelesaian maksimum",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_FETCH_CONCURRENCY": "Keserentakan pengambilan resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK": "Bajet postmortem resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD": "Ambang litar resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS": "Tempoh bertenang litar resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK": "Had kelompok ketika litar terbuka",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_RETRY_JITTER_RATIO": "Jiter cuba semula resolusi",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Had kelompok penyelesaian",
 } as const;

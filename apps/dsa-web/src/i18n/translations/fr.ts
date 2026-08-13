@@ -6140,5 +6140,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Intervalle",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Bail",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Essais max",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_FETCH_CONCURRENCY": "Concurrence des récupérations de résolution",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK": "Budget post-mortem de résolution",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD": "Seuil du circuit de résolution",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS": "Délai du circuit de résolution",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK": "Limite de lot circuit ouvert",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_RETRY_JITTER_RATIO": "Gigue de réessai de résolution",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Lot max",
 } as const;

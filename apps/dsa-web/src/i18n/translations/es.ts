@@ -6140,5 +6140,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Intervalo de resolución de predicciones",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Duración del arrendamiento de resolución",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Máximo de intentos de resolución",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_FETCH_CONCURRENCY": "Concurrencia de consultas de resolución",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK": "Presupuesto de análisis posterior",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD": "Umbral del circuito de resolución",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS": "Enfriamiento del circuito de resolución",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK": "Límite de lote con circuito abierto",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_RETRY_JITTER_RATIO": "Variación de reintento de resolución",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Límite de lote de resolución",
 } as const;
