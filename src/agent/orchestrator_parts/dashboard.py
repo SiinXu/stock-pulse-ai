@@ -36,6 +36,10 @@ from src.services.approval_service import ApprovalService as _ApprovalService
 from src.utils.sanitize import log_safe_exception
 from src.agent.runner import parse_dashboard_json
 from src.report_language import normalize_report_language
+from src.services.prediction_extractor import (
+    PRESENTATION_CONFIDENCE_FLAG as _PRESENTATION_CONFIDENCE_FLAG,
+    drop_presentation_confidence as _drop_presentation_confidence,
+)
 
 if TYPE_CHECKING:
     from src.agent.orchestrator import (
@@ -60,6 +64,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("src.agent.orchestrator")
 _PREPARED_DECISION_TYPE_INSERTED = "_prepared_dashboard_decision_type_inserted"
+
+
+def _dashboard_content_json(dashboard: Dict[str, Any]) -> str:
+    """Serialize a dashboard without leaking the internal presentation flag."""
+    public = dict(dashboard)
+    public.pop(_PRESENTATION_CONFIDENCE_FLAG, None)
+    return json.dumps(public, ensure_ascii=False, indent=2)
 
 
 class _DashboardMethods:
@@ -326,7 +337,7 @@ class _DashboardMethods:
         if parse_dashboard:
             dashboard = self._resolve_dashboard_payload(ctx, final_dashboard, final_raw)
             if dashboard is not None:
-                return dashboard, json.dumps(dashboard, ensure_ascii=False, indent=2)
+                return dashboard, _dashboard_content_json(dashboard)
             if ctx.opinions:
                 return None, self._fallback_summary(ctx)
             return None, ""
@@ -338,7 +349,7 @@ class _DashboardMethods:
         if isinstance(final_dashboard, dict):
             dashboard = self._finalize_dashboard_payload(final_dashboard, ctx)
             if dashboard is not None:
-                return dashboard, json.dumps(dashboard, ensure_ascii=False, indent=2)
+                return dashboard, _dashboard_content_json(dashboard)
         if ctx.opinions:
             return None, self._fallback_summary(ctx)
         return None, ""
@@ -373,7 +384,69 @@ class _DashboardMethods:
         if dashboard is None:
             return None
         ctx.set_data("final_dashboard", dashboard)
+        self._maybe_extract_prediction_on_finalize(dashboard, ctx)
         return dashboard
+
+
+    def _maybe_extract_prediction_on_finalize(
+        self,
+        dashboard: Dict[str, Any],
+        ctx: AgentContext,
+    ) -> None:
+        """Feature-flagged PredictionRecord extraction after successful finalize.
+
+        Default-off. Attaches a draft extraction summary to ``ctx.meta`` only;
+        does not persist rows (A3) and never fails the agent run.
+        """
+        try:
+            from src.services.prediction_extractor import (
+                maybe_extract_prediction_on_finalize,
+            )
+
+            source = dict(dashboard)
+            if ctx.stock_code and not source.get("stock_code") and not source.get("code"):
+                source["stock_code"] = ctx.stock_code
+            if ctx.stock_name and not source.get("stock_name") and not source.get("name"):
+                source["stock_name"] = ctx.stock_name
+
+            skill_ids = ctx.meta.get("skills_requested") or ctx.meta.get("skill_ids")
+            run_token = str(ctx.session_id or ctx.meta.get("run_id") or "").strip()
+            base_opinion = self._select_base_opinion(ctx)
+            if base_opinion is None:
+                # Dashboard finalization supplies a presentation-only 0.5
+                # fallback. It is not model confidence and must not mint a claim.
+                source = _drop_presentation_confidence(source)
+            else:
+                source["confidence"] = base_opinion.confidence
+            extraction = maybe_extract_prediction_on_finalize(
+                source,
+                config=getattr(self, "config", None),
+                run_id=run_token or None,
+                mode="agent",
+                soul_version=(
+                    str(ctx.meta.get("soul_version")).strip()
+                    if ctx.meta.get("soul_version")
+                    else None
+                ),
+                skill_ids=skill_ids if isinstance(skill_ids, (list, tuple)) else None,
+                model_id=(
+                    str(ctx.meta.get("model_id") or ctx.meta.get("model_used") or "").strip()
+                    or None
+                ),
+                source_decision_id=str(ctx.meta.get("decision_id") or "").strip() or None,
+            )
+            if extraction is None:
+                return
+            ctx.meta["prediction_extraction"] = extraction.to_dict()
+        except Exception as exc:  # broad-exception: fallback_recorded - never fail finalize
+            log_safe_exception(
+                logger,
+                "Prediction extraction after agent finalize failed",
+                exc,
+                error_code="agent_prediction_extraction_failed",
+                level=logging.WARNING,
+                context={"stock_code": getattr(ctx, "stock_code", None)},
+            )
 
     def _prepare_dashboard_payload(
         self,
@@ -439,6 +512,8 @@ class _DashboardMethods:
             )
         )
         confidence = float(base_opinion.confidence if base_opinion is not None else 0.5)
+        if base_opinion is None:
+            payload[_PRESENTATION_CONFIDENCE_FLAG] = True
         sentiment_score = payload.get("sentiment_score")
         try:
             sentiment_score = int(sentiment_score)

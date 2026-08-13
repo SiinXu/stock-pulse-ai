@@ -116,8 +116,15 @@ from src.schemas.approvals import (
 from src.services.approval_service import ApprovalService as _ApprovalService
 from src.utils.sanitize import log_safe_exception
 from src.agent.facade_binding import bind_facade_methods as _bind_facade_methods
+from src.services.prediction_extractor import (
+    PRESENTATION_CONFIDENCE_FLAG as _PRESENTATION_CONFIDENCE_FLAG,
+    drop_presentation_confidence as _drop_presentation_confidence,
+)
 from src.agent.orchestrator_parts.chat import _ChatMethods
-from src.agent.orchestrator_parts.dashboard import _DashboardMethods
+from src.agent.orchestrator_parts.dashboard import (
+    _DashboardMethods,
+    _dashboard_content_json,
+)
 from src.agent.orchestrator_parts.execution import _ExecutionMethods
 from src.agent.orchestrator_parts.pipeline import _PipelineMethods
 
@@ -162,6 +169,8 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     dataclass_fields,
     DegradationBoundary,
     DegradedEvent,
+    _dashboard_content_json,
+    _drop_presentation_confidence,
     ExecutionState,
     FuturesTimeoutError,
     get_config,
@@ -181,6 +190,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     normalize_stage_failure_reason,
     parse_dashboard_json,
     PipelineTerminationFact,
+    _PRESENTATION_CONFIDENCE_FLAG,
     _resolve_risk_gate_flags,
     resolve_stock_scope,
     _RiskGateOutcome,

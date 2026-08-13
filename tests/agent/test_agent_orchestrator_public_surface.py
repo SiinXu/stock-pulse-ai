@@ -98,6 +98,7 @@ EXPECTED_DASHBOARD_METHODS = (
     '_fallback_summary',
     '_resolve_final_output',
     '_resolve_dashboard_payload',
+    '_maybe_extract_prediction_on_finalize',
     '_prepare_dashboard_payload',
     '_finalize_dashboard_payload',
     '_collect_key_levels',
@@ -114,8 +115,8 @@ EXPECTED_DASHBOARD_METHODS = (
 
 EXPECTED_AST_HASHES = {
     '_ChatMethods': '1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d',
-    '_DashboardMethods': '4bb9d395915b819f88e2bf80f3bdb2137cf1d8cdc4e9f0fdc2b4da64db728af4',
-    '_ExecutionMethods': '03b1befb5752d439b5d2aeb35bcee5d50300c89eedb1ebd2aa7564c51f778e25',
+    '_DashboardMethods': '0532c14e586745f7d59bfeb17ff68b2293d87a50d556d8585a5326f80e541bee',
+    '_ExecutionMethods': '092cfe919bada0e2f09144404139a6ce72c91c3563e51204658ef14aeef5d217',
     '_PipelineMethods': '1d7fb3aeb7fa6755a9b7b1645c94a94bf934c4128cd4b687c7aa21a17efce6ba',
 }
 
