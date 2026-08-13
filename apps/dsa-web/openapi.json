@@ -9774,12 +9774,27 @@
       "ErrorResponse": {
         "description": "Stable API error envelope.",
         "example": {
+          "category": "not_found",
           "error": "not_found",
           "message": "Resource not found",
           "params": {},
+          "severity": "warning",
           "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         },
         "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)",
+            "example": "not_found",
+            "title": "Category"
+          },
           "detail": {
             "anyOf": [
               {},
@@ -9819,6 +9834,19 @@
             "description": "Localization interpolation parameters",
             "title": "Params",
             "type": "object"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy severity: info | warning | error | critical",
+            "example": "warning",
+            "title": "Severity"
           },
           "trace_id": {
             "anyOf": [

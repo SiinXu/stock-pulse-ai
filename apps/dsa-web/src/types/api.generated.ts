@@ -7392,13 +7392,21 @@ export interface components {
          * ErrorResponse
          * @description Stable API error envelope.
          * @example {
+         *       "category": "not_found",
          *       "error": "not_found",
          *       "message": "Resource not found",
          *       "params": {},
+         *       "severity": "warning",
          *       "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
          *     }
          */
         ErrorResponse: {
+            /**
+             * Category
+             * @description Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)
+             * @example not_found
+             */
+            category?: string | null;
             /**
              * Detail
              * @deprecated
@@ -7429,6 +7437,12 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             };
+            /**
+             * Severity
+             * @description Taxonomy severity: info | warning | error | critical
+             * @example warning
+             */
+            severity?: string | null;
             /**
              * Trace Id
              * @description Diagnostic trace ID
