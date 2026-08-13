@@ -2451,11 +2451,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.system.analysis_checkpoint': {
     title: '检查点',
-    summary: '恢复多 Agent 阶段；代码、配置或输入变化时完整重跑。',
   },
   'settings.system.repro_mode': {
     title: '可复现',
-    summary: '记录配置；provider 支持时传递 temperature 0 和 seed。',
   },
 };
 

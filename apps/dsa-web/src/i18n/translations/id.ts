@@ -7,9 +7,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
   ...DR.id,
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.summary": "Menyimpan tahap multiagen yang selesai; perubahan kode, konfigurasi, atau input memaksa proses penuh.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.title": "Checkpoint tahap analisis",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.summary": "Merekam konfigurasi proses serta mengirim suhu 0 dan seed terkonfigurasi bila didukung.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.title": "Kontrol reproduktibilitas",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_ENABLED": "Checkpoint tahap analisis",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_DIR": "Direktori checkpoint analisis",

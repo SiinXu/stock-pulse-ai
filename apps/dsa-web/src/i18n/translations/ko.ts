@@ -7,9 +7,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
   ...DR.ko,
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.summary": "단계를 저장하며 변경 시 전체 재실행합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.title": "단계 저장",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.summary": "구성, 온도 0, 시드를 기록합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.title": "재현 모드",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_ENABLED": "단계 체크포인트",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_DIR": "체크포인트 폴더",

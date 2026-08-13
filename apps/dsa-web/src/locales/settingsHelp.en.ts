@@ -2408,12 +2408,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
   },
   'settings.system.analysis_checkpoint': {
-    title: 'Checkpoints',
-    summary: 'Resume multi-Agent stages; code, config, or input changes rerun all stages.',
+    title: 'Checkpoint',
   },
   'settings.system.repro_mode': {
     title: 'Repro',
-    summary: 'Record config; use temperature 0 and seed when supported.',
   },
 };
 

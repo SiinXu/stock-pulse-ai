@@ -7,9 +7,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 export const translations: Record<UiTranslationKey, string> = {
   ...M.es,
   ...DR.es,
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.summary": "Conserva etapas multiagente completadas; cambios de código, configuración o entradas fuerzan una ejecución completa.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.title": "Puntos de control de etapas",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.summary": "Registra la configuración y envía temperatura 0 y la semilla configurada cuando se admite.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.title": "Controles de reproducibilidad",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_ENABLED": "Puntos de control de etapas",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_DIR": "Directorio de puntos de control",

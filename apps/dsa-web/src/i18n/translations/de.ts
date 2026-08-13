@@ -7,9 +7,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 export const translations: Record<UiTranslationKey, string> = {
   ...M.de,
   ...DR.de,
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.summary": "Etappen speichern; Änderungen starten alles neu.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.title": "Etappen-Checkpoints",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.summary": "Konfiguration, Temperatur 0 und Seed.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.title": "Reproduzierbarkeit",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_ENABLED": "Etappen-Checkpoints",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_DIR": "Checkpoint-Ordner",
