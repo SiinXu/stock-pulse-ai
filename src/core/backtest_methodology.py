@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date
+import hashlib
 from typing import Any, Dict, List, Optional, Sequence
 
 
@@ -37,6 +38,10 @@ DISCLAIMER_SURVIVORSHIP_ANALYZED_UNIVERSE = "survivorship_analyzed_universe"
 DISCLAIMER_COST_MODEL_EXPLICIT = "cost_model_explicit"
 DISCLAIMER_PERCENT_RETURNS_CURRENCY_AGNOSTIC = "percent_returns_currency_agnostic"
 DISCLAIMER_LLM_NONDETERMINISM = "llm_nondeterminism"
+
+# Matches BacktestResult.engine_version VARCHAR(16).
+ENGINE_VERSION_MAX_LEN = 16
+_COST_FINGERPRINT_LEN = 6
 
 
 @dataclass(frozen=True)
@@ -69,6 +74,14 @@ class CostModelConfig:
         payload = asdict(self)
         payload["round_trip_cost_pct"] = self.round_trip_cost_pct
         return payload
+
+    def is_zero_friction(self) -> bool:
+        return self.commission_bps == 0.0 and self.slippage_bps == 0.0
+
+    def fingerprint(self) -> str:
+        """Stable short digest of the bps pair used in stored engine identity."""
+        raw = f"{self.commission_bps:.6f}:{self.slippage_bps:.6f}".encode("ascii")
+        return hashlib.sha1(raw).hexdigest()[:_COST_FINGERPRINT_LEN]
 
 
 @dataclass(frozen=True)
@@ -109,6 +122,27 @@ class SampleSplitConfig:
                 self.split_date.isoformat() if self.split_date is not None else None
             ),
         }
+
+
+def engine_version_for_cost_model(
+    base: str,
+    cost_model: Optional[CostModelConfig] = None,
+) -> str:
+    """Bind stored/query engine identity to the cost model that produced net returns.
+
+    Zero-friction (the default) keeps the configured label so existing ``v1``
+    rows remain visible. Non-zero commission/slippage appends a short
+    fingerprint so changing bps cannot mix previously stored net returns
+    into a new methodology disclosure under the same BACKTEST_ENGINE_VERSION.
+    """
+    label = str(base or "v1").strip() or "v1"
+    cost = cost_model or CostModelConfig()
+    if cost.is_zero_friction():
+        return label[:ENGINE_VERSION_MAX_LEN]
+    fingerprint = cost.fingerprint()
+    prefix_budget = ENGINE_VERSION_MAX_LEN - 1 - len(fingerprint)
+    prefix = label[: max(prefix_budget, 1)]
+    return f"{prefix}-{fingerprint}"[:ENGINE_VERSION_MAX_LEN]
 
 
 def apply_round_trip_cost(

@@ -1540,6 +1540,7 @@ Backtesting triggers automatically after the daily analysis flow completes (non-
 - Look-ahead protection: evaluation uses forward bars after the resolved start session.
 - Survivorship: the universe is symbols that already have analysis history in this installation.
 - Sample split: performance APIs accept `sample_split=full|in_sample|out_of_sample` with `split_date` for in/out-of-sample labeling.
+- Cost model: non-zero commission/slippage is bound into the stored `engine_version` identity so previously completed net returns are not rolled up under a new cost disclosure; re-run the backtest after changing bps.
 - Currency: percent returns are currency-agnostic; absolute prices are never summed across quote currencies without FX normalization.
 - YAML skill/strategy metrics: `GET /api/v1/backtest/skills/{skill_id}/performance` (and agent `get_skill_backtest_summary`) map skill-opinion outcomes onto the same public percentage fields as analysis-advice backtests.
 

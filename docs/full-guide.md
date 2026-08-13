@@ -1682,6 +1682,7 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 - 前视偏差防护：仅使用解析后起始交易日后的前向行情。
 - 幸存者偏差：股票宇宙限于本机已有分析历史的标的。
 - 样本内外：表现 API 支持 `sample_split=full|in_sample|out_of_sample` 与 `split_date`。
+- 成本模型：非零佣金/滑点会绑定进存储的 `engine_version` 身份，避免把旧净收益和新成本披露混在同一汇总；变更 bps 后需重新跑回测。
 - 跨币种：百分比收益币种无关；绝对价格不会在未做汇率归一时跨币种加总。
 - YAML 技能/策略：`GET /api/v1/backtest/skills/{skill_id}/performance`（及 Agent 工具 `get_skill_backtest_summary`）将 skill-opinion 后验映射为与人工策略同构的公开百分比字段。
 

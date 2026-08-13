@@ -18,6 +18,7 @@ from src.core.backtest_methodology import (
     CostModelConfig,
     SampleSplitConfig,
     build_methodology_statement,
+    engine_version_for_cost_model,
     normalize_sample_split,
 )
 from src.market.phase_summary import (
@@ -106,9 +107,9 @@ class BacktestService:
             min_age_days = getattr(config, "backtest_min_age_days", 14)
         min_age_days = self._validate_min_age_days(min_age_days)
 
-        engine_version = str(getattr(config, "backtest_engine_version", "v1") or "v1")
-        neutral_band_pct = float(getattr(config, "backtest_neutral_band_pct", 2.0))
         cost_model = self._resolve_cost_model(config)
+        engine_version = self._resolve_engine_version(config, cost_model)
+        neutral_band_pct = float(getattr(config, "backtest_neutral_band_pct", 2.0))
 
         eval_config = EvaluationConfig(
             eval_window_days=int(eval_window_days),
@@ -740,7 +741,8 @@ class BacktestService:
         analysis_phase: Optional[str] = None,
     ) -> Dict[str, Any]:
         config = get_config()
-        engine_version = str(getattr(config, "backtest_engine_version", "v1"))
+        cost_model = self._resolve_cost_model(config)
+        engine_version = self._resolve_engine_version(config, cost_model)
         code = self._normalize_code(code)
 
         phase_bucket = self._normalize_phase_filter(analysis_phase)
@@ -804,7 +806,8 @@ class BacktestService:
         split_date: Optional[date] = None,
     ) -> Optional[Dict[str, Any]]:
         config = get_config()
-        engine_version = str(getattr(config, "backtest_engine_version", "v1"))
+        cost_model = self._resolve_cost_model(config)
+        engine_version = self._resolve_engine_version(config, cost_model)
         code = self._normalize_code(code)
         lookup_code = OVERALL_SENTINEL_CODE if scope == "overall" else code
         try:
@@ -818,7 +821,6 @@ class BacktestService:
                     "split_date": split_date.isoformat() if split_date else None,
                 },
             ) from exc
-        cost_model = self._resolve_cost_model(config)
 
         phase_bucket = self._normalize_phase_filter(analysis_phase)
         needs_dynamic = (
@@ -876,13 +878,12 @@ class BacktestService:
                     (row, snapshot)
                     for row, snapshot in rows_with_context
                     if self._phase_bucket_from_snapshot(snapshot) == phase_bucket
+                    and split_cfg.includes(getattr(row, "analysis_date", None))
                 ]
-                phase_counts = self._phase_counts_from_contexts([snapshot for _, snapshot in filtered_pairs])
-                filtered_rows = [
-                    row
-                    for row, _ in filtered_pairs
-                    if split_cfg.includes(getattr(row, "analysis_date", None))
-                ]
+                phase_counts = self._phase_counts_from_contexts(
+                    [snapshot for _, snapshot in filtered_pairs]
+                )
+                filtered_rows = [row for row, _ in filtered_pairs]
                 return self._attach_methodology(
                     self._build_dynamic_summary(
                         rows=filtered_rows,
@@ -991,7 +992,6 @@ class BacktestService:
         if not isinstance(bucket, dict):
             return None
 
-        total = int(bucket.get("total") or 0)
         evaluated = int(bucket.get("evaluated") or 0)
         observational = int(bucket.get("observational") or 0)
         unable = int(bucket.get("unable") or 0)
@@ -1000,6 +1000,7 @@ class BacktestService:
         miss = int(bucket.get("miss") or 0)
         hit_rate = bucket.get("hit_rate_pct")
         avg_dir = bucket.get("avg_directional_return_pct")
+        sample_sufficient = bucket.get("sample_sufficient") is True
 
         summary: Dict[str, Any] = {
             "scope": "skill",
@@ -1010,7 +1011,7 @@ class BacktestService:
                 bucket.get("engine_version") or SKILL_OPINION_OUTCOME_ENGINE_VERSION
             ),
             "computed_at": None,
-            "total_evaluations": total,
+            "total_evaluations": evaluated,
             "completed_count": evaluated,
             "insufficient_count": pending + unable,
             "long_count": 0,
@@ -1022,7 +1023,7 @@ class BacktestService:
             "win_rate_pct": hit_rate,
             "neutral_rate_pct": (
                 round(observational / evaluated * 100, 2)
-                if evaluated > 0 and bucket.get("sample_sufficient")
+                if evaluated > 0 and sample_sufficient
                 else None
             ),
             "avg_stock_return_pct": avg_dir,
@@ -1036,7 +1037,7 @@ class BacktestService:
                 "metric_source": "skill_opinion_outcomes",
                 "horizon": horizon,
                 "sample_status": bucket.get("sample_status"),
-                "sample_sufficient": bucket.get("sample_sufficient"),
+                "sample_sufficient": sample_sufficient,
                 "pending_count": pending,
                 "unable_count": unable,
                 "observational_count": observational,
@@ -1055,6 +1056,10 @@ class BacktestService:
                 "bps are not re-applied on this skill rollup path.",
             ),
         )
+        if not sample_sufficient:
+            # Keep rates null so agent memory/autoweight gates cannot treat
+            # placeholder 50% accuracy as a calibrated skill opinion.
+            return with_methodology
         return self._normalize_learning_summary(with_methodology)
 
     def get_strategy_summary(self, strategy_id: str, *, eval_window_days: Optional[int] = None) -> Optional[Dict[str, Any]]:
@@ -1520,6 +1525,13 @@ class BacktestService:
         if number != number or number in (float("inf"), float("-inf")):  # NaN/±Inf
             return default
         return number
+
+    @staticmethod
+    def _resolve_engine_version(config: Any, cost_model: CostModelConfig) -> str:
+        return engine_version_for_cost_model(
+            str(getattr(config, "backtest_engine_version", "v1") or "v1"),
+            cost_model,
+        )
 
     @staticmethod
     def _resolve_cost_model(config: Any) -> CostModelConfig:

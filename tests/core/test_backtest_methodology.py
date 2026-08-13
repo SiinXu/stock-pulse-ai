@@ -7,12 +7,14 @@ import unittest
 from datetime import date
 
 from src.core.backtest_methodology import (
+    ENGINE_VERSION_MAX_LEN,
     SAMPLE_SPLIT_IN_SAMPLE,
     SAMPLE_SPLIT_OUT_OF_SAMPLE,
     CostModelConfig,
     SampleSplitConfig,
     apply_round_trip_cost,
     build_methodology_statement,
+    engine_version_for_cost_model,
     normalize_sample_split,
 )
 
@@ -69,6 +71,24 @@ class BacktestMethodologyTestCase(unittest.TestCase):
         joined = " ".join(stmt["limitations"]).lower()
         self.assertIn("survivorship", joined)
         self.assertIn("look-ahead", joined)
+
+    def test_engine_version_fingerprint_isolates_nonzero_cost_models(self) -> None:
+        zero = engine_version_for_cost_model("v1", CostModelConfig())
+        self.assertEqual(zero, "v1")
+        self.assertLessEqual(len(zero), ENGINE_VERSION_MAX_LEN)
+
+        taxed = engine_version_for_cost_model(
+            "v1",
+            CostModelConfig(commission_bps=50.0, slippage_bps=50.0),
+        )
+        other = engine_version_for_cost_model(
+            "v1",
+            CostModelConfig(commission_bps=10.0, slippage_bps=0.0),
+        )
+        self.assertNotEqual(taxed, "v1")
+        self.assertNotEqual(taxed, other)
+        self.assertLessEqual(len(taxed), ENGINE_VERSION_MAX_LEN)
+        self.assertLessEqual(len(other), ENGINE_VERSION_MAX_LEN)
 
 
 if __name__ == "__main__":
