@@ -26,6 +26,7 @@ import { DecisionSignalMemoryControls } from '../../components/decision-signals/
 import { DecisionSignalOutcomeExplorer } from '../../components/decision-signals/DecisionSignalOutcomeExplorer';
 import { DecisionSignalOutcomeRunPanel } from '../../components/decision-signals/DecisionSignalOutcomeRunPanel';
 import { DecisionSignalOutcomeStatsCard } from '../../components/decision-signals/DecisionSignalOutcomeStatsCard';
+import { DecisionSignalCalibrationBreakdown } from '../../components/decision-signals/DecisionSignalCalibrationBreakdown';
 import { DecisionSignalProfileCalibration } from '../../components/decision-signals/DecisionSignalProfileCalibration';
 import type {
   DecisionSignalOutcomeStatsResponse,
@@ -381,6 +382,17 @@ const DecisionSignalOutcomeStatsCardStory = () => {
       onRunCompleted={() => undefined}
     />
   );
+};
+
+const DecisionSignalCalibrationBreakdownStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const stats = scenario === 'empty'
+    ? {
+        ...fixtureOutcomeStats,
+        breakdowns: { period: [], market: [], action: [] },
+      }
+    : fixtureOutcomeStats;
+  return <DecisionSignalCalibrationBreakdown stats={stats} />;
 };
 
 const DecisionSignalProfileCalibrationStory = () => {
@@ -864,6 +876,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'decision-signal-create-drawer': DecisionSignalCreateDrawerStory,
   'decision-signal-outcome-run-panel': DecisionSignalOutcomeRunPanelStory,
   'decision-signal-outcome-stats-card': DecisionSignalOutcomeStatsCardStory,
+  'decision-signal-calibration-breakdown': DecisionSignalCalibrationBreakdownStory,
   'decision-signal-profile-calibration': DecisionSignalProfileCalibrationStory,
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
