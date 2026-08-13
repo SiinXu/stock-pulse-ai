@@ -151,6 +151,24 @@ class _DashboardMethods:
                 level=logging.WARNING,
             )
 
+        try:
+            from src.services.research_persona_prompt import (
+                apply_research_persona_to_agent_context,
+            )
+
+            apply_research_persona_to_agent_context(
+                ctx,
+                config=getattr(self, "config", None),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Research persona is optional.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] research persona apply failed",
+                exc,
+                error_code="agent_research_persona_apply_failed",
+                level=logging.WARNING,
+            )
+
         return ctx
 
     @staticmethod
@@ -570,6 +588,28 @@ class _DashboardMethods:
                     break
             phase_decision["data_limitations"] = merged
             dashboard_block["phase_decision"] = phase_decision
+
+        try:
+            from src.services.research_persona_prompt import (
+                enrich_dashboard_research_persona,
+            )
+
+            enriched = enrich_dashboard_research_persona(
+                dashboard_block,
+                config=getattr(self, "config", None),
+                agent_meta=ctx.meta if isinstance(ctx.meta, dict) else None,
+                report_language=str(ctx.meta.get("report_language") or "zh"),
+            )
+            if isinstance(enriched, dict):
+                dashboard_block = enriched
+        except Exception as exc:  # broad-exception: fallback_recorded - Research persona label is optional.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] research persona report label failed",
+                exc,
+                error_code="agent_research_persona_report_label_failed",
+                level=logging.WARNING,
+            )
 
         dashboard_block["core_conclusion"] = core
         dashboard_block["intelligence"] = intelligence

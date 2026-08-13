@@ -5,7 +5,10 @@ export type NotificationInboxKind =
   | 'analysis_complete'
   | 'alert_triggered'
   | 'scheduled_task_result'
-  | 'decision_signal';
+  | 'decision_signal'
+  | 'daily_brief'
+  | 'high_disagreement'
+  | 'portfolio_health';
 
 export type NotificationInboxSeverity = 'info' | 'warning' | 'error';
 
@@ -13,13 +16,19 @@ export type NotificationInboxSource =
   | 'analysis'
   | 'alerts'
   | 'scheduled_tasks'
-  | 'decision_signals';
+  | 'decision_signals'
+  | 'daily_briefs'
+  | 'high_disagreement'
+  | 'portfolio_health';
 
 export type NotificationInboxTitleKey =
   | 'analysisCompleteTitle'
   | 'alertTriggeredTitle'
   | 'scheduledTaskResultTitle'
-  | 'decisionSignalTitle';
+  | 'decisionSignalTitle'
+  | 'dailyBriefTitle'
+  | 'highDisagreementTitle'
+  | 'portfolioHealthTitle';
 
 export type NotificationInboxSourceStatus = {
   source: NotificationInboxSource;
