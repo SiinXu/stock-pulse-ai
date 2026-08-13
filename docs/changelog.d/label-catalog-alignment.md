@@ -1,0 +1,1 @@
+- [Chore] Align release changelog categories, stale exemptions, and PR auto-labeling with canonical `config` / `ci` / `enhancement` labels (Refs #1321).
