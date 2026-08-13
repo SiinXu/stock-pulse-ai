@@ -84,9 +84,9 @@ const getPriceChangeStyle = (
     return undefined;
   }
   if (!market) {
-    // Unknown market: keep prior CN-convention CSS vars (do not invent a MarketId).
+    // Unknown market: document price-direction tokens (default CN red-up).
     if (value === 0) return undefined;
-    return { color: value > 0 ? 'var(--home-price-up)' : 'var(--home-price-down)' };
+    return { color: value > 0 ? 'var(--price-up)' : 'var(--price-down)' };
   }
   const color = changeColorCssVar(changeSemantics(value, market, userPref).color);
   return color ? { color } : undefined;
