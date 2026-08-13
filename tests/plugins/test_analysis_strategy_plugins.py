@@ -829,6 +829,7 @@ def test_legacy_yaml_shim_and_plugin_catalog_are_definition_parity():
         "default_router",
         "default_priority",
         "market_regimes",
+        "market_scopes",
         "execution_context",
         "subagent_type",
         "preferred_model",
