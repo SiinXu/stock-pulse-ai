@@ -1,8 +1,15 @@
+---
+name: fix-issue
+description: Implement a fix for a single GitHub issue under this repository's rules, including verification, risks, rollback notes, and Delivered/Remaining issue comments.
+---
+
 # Fix Issue
 
 基于 issue 分析结果实现修复，并按仓库规则补齐验证、风险与回滚说明。
 
 **Repository**: https://github.com/SiinXu/stock-pulse-ai
+
+**Source of truth**: repository root `AGENTS.md`. Hard rules: `.claude/skills/references/hard-rules.md`.
 
 ## Usage
 
@@ -44,18 +51,22 @@ git pull --ff-only
 - 优先复用现有模块、配置入口、脚本和测试
 - 保持默认行为向后兼容，避免破坏 fallback / fail-open
 - 如果修复涉及用户可见行为、配置语义、CLI/API、部署、通知、报告结构，要同步更新相关文档、`docs/CHANGELOG.md`、`.env.example`
-- 向 `docs/CHANGELOG.md` 写入条目时，在 `[Unreleased]` 段追加一行，格式为 `- [类型] 描述`，其中 `[类型]` 从 `[新功能]/[改进]/[修复]/[文档]/[测试]/[chore]` 中按本次变更内容选择；只有修复 bug 时才使用 `[修复]`；**不要**在 `[Unreleased]` 内新增 `### 类目标题`
+- 新增或重命名配置键时，必须同步 `src/core/config_registry_parts/` 与双语环境变量清单，并执行 hard-rules §2 的 registry guard（禁止靠扩大 unregistered baseline 来绿 CI）
+- 若声称用户可到达某能力，须按 hard-rules §3 做可达性 grep；仅有文件存在不算 Delivered
+- 向 `docs/CHANGELOG.md` 写入条目时，在 `[Unreleased]` 段追加一行，格式为 `- [Type] Description`，其中 `Type` 为 `Added`/`Changed`/`Fixed`/`Docs`/`Tests`/`Chore`（与 `AGENTS.md` 一致，英文）；只有修复 bug 时才使用 `Fixed`；**不要**在 `[Unreleased]` 内新增 `###` 类目标题
 - `README.md` 只承载项目定位、核心能力、快速开始、主要入口、赞助/合作等首页级信息；非必要不更新 README，避免持续膨胀
 - 更细的模块行为、页面交互、专题配置、排障说明、字段契约、实现语义和边界条件，优先更新对应 `docs/*.md`
 
 ### Step 4: 按改动面验证
 
-按 `AGENTS.md` 的验证矩阵执行最接近的检查：
+按 `AGENTS.md` 的验证矩阵执行最接近的检查（优先 `/test-change` 或 `/run-verification`）：
 
 - 后端优先：`./scripts/ci_gate.sh`
 - 最低后端要求：`python -m py_compile <changed_python_files>`
+- 配置改动：`python scripts/check_config_doc_consistency.py` 与 registry guard 测试
 - 前端：`cd apps/dsa-web && npm ci && npm run lint && npm run build`
 - 桌面端：先构建 Web，再构建桌面端
+- AI 协作资产：`python scripts/check_ai_assets.py`
 
 如无法完成完整验证，必须记录缺口、原因与潜在风险。
 
@@ -86,9 +97,11 @@ git pull --ff-only
 - 回滚方式：
 ```
 
-### Step 6: 需要确认的后续动作
+### Step 6: Issue 评论与 PR（需确认）
 
-如用户要求创建 PR、生成 PR 标题或整理 PR 描述，PR title 建议遵循 `AGENTS.md`：
+若在 issue 下汇报进度或完成情况，GitHub 评论必须使用英文 **Delivered / Remaining / Verification** 格式（hard-rules §4）。在-scope Remaining 非空时不要使用 `Fixes`/`Closes`。
+
+如用户要求创建 PR、生成 PR 标题或整理 PR 描述：优先 `/pr-template-fill`，并在提交前做 squash 正文体检（hard-rules §1）。PR title 建议遵循 `AGENTS.md`：
 
 - 使用英文 `<type>: <change summary>` 格式，例如 `fix: preserve market analysis history`
 - 类型优先使用 `fix`/`feat`/`refactor`/`docs`/`chore`/`test`/`ci`
@@ -103,6 +116,7 @@ git pull --ff-only
 - `git push`
 - 创建 PR
 - 在 issue 下回复或关闭 issue
+- 合并 / 开启 auto-merge（默认拒绝；火车合并纪律见 hard-rules §5）
 
 ## Allowed Auto-Actions (No Confirmation Needed)
 

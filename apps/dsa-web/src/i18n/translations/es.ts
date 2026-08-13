@@ -3,10 +3,14 @@
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.es,
   ...DR.es,
+  ...CP.es,
+  ...DSC.es,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activa el modo Agente e inténtalo de nuevo.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "El modo agente no está activado",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Solicitud no completada; por favor, revisa los detalles e inténtalo de nuevo.",
@@ -673,7 +677,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "Estas son estadísticas globales de resultados revisados. No corresponden al número de señales visibles ni siguen el filtro de la acción actual.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "Desconocido",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "No disponible",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "Muestra insuficiente: solo se muestran recuentos; las tasas permanecen ocultas.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "Insuficiente",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "Suficiente",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "Completadas {completed} / total {total}",
@@ -682,12 +685,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "Por mercado",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "Por período (mes)",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "Agrupación de calibración",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "Cada grupo necesita al menos {count} muestras completadas antes de publicar las tasas de acierto.",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "Examina la calidad del proceso por período, mercado y tipo de señal. Cada grupo se habilita por separado; un grupo superior suficiente no desbloquea un subgrupo pequeño.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "Calibración posterior de aciertos",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "Insuficiente",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "Las muestras completadas no alcanzan el umbral de publicación ({count}). Los recuentos siguen visibles; las tasas no se publican.",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "Esta página muestra aciertos y calibración posteriores para evaluar la calidad del proceso de análisis. Las tasas de acierto solo describen la consistencia histórica; no predicen rentabilidades futuras ni son garantía o recomendación de inversión.",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "Enfoque como herramienta de investigación",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "Tasa de acierto",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "Estadísticas de calidad del proceso",

@@ -3,10 +3,14 @@
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ja,
   ...DR.ja,
+  ...CP.ja,
+  ...DSC.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -673,7 +677,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "現在の統計は、現行銘柄と比べて可視シグナルやフィルターの数と一致しない、グローバルにレビューされたアウトカムのレベルに基づいています。",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "不明",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "利用できません",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "件数のみ。率は非公開。",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "不足",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "十分",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "完了 {completed} / 合計 {total}",
@@ -682,12 +685,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "市場別",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "期間別（月）",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "校正のグループ分け",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "各グループ{count}件から率を公開。",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "期間・市場・種別別。各グループを個別判定。",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "事後的中率の校正",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "不足",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "{count}件未満：件数のみ。",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "過去の的中率であり、将来収益の予測・保証・投資助言ではありません。",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "調査ツールとしての位置づけ",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "命中率",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "プロセス品質統計",

@@ -48,6 +48,14 @@ class _HistoryMethods:
         Returns:
             新保存的 AnalysisHistory.id；保存失败返回 0。
         """
+        # Sandbox fence at the authoritative history write boundary so every
+        # caller (pipeline, market review, daily brief, repo wrappers) is covered.
+        # Must run before the broad except that maps failures to return 0.
+        from src.agent.sandbox.context import require_sandbox_inactive_for_production_write
+        from src.agent.sandbox.effects import EFFECT_ANALYSIS_HISTORY
+
+        require_sandbox_inactive_for_production_write(EFFECT_ANALYSIS_HISTORY)
+
         if result is None:
             return 0
 
