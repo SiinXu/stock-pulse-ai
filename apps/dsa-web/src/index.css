@@ -1242,8 +1242,8 @@ a {
     transition: opacity 0.15s ease;
   }
 
-  .group\/message:hover .chat-message-actions,
-  .group\/message:focus-within .chat-message-actions {
+  .chat-message:hover .chat-message-actions,
+  .chat-message:focus-within .chat-message-actions {
     pointer-events: auto;
     opacity: 1;
   }
@@ -1359,9 +1359,8 @@ a {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  border-radius: 0.75rem;
-  border: 1px solid transparent;
-  padding: 0.42rem 0.6rem;
+  border: 0;
+  padding: 0.25rem 0;
   font-size: 0.75rem;
   line-height: 1.45;
   transition:
@@ -1391,8 +1390,7 @@ a {
 .chat-progress-item-thinking,
 .chat-progress-item-tool,
 .chat-progress-item-generating {
-  border-color: hsl(var(--primary) / 0.12);
-  background: hsl(var(--primary) / 0.05);
+  background: transparent;
   color: hsl(var(--secondary-text));
 }
 
@@ -1404,8 +1402,7 @@ a {
 }
 
 .chat-progress-item-success {
-  border-color: hsl(var(--success) / 0.18);
-  background: hsl(var(--success) / 0.08);
+  background: transparent;
   color: hsl(var(--success));
 }
 
@@ -1415,8 +1412,7 @@ a {
 }
 
 .chat-progress-item-danger {
-  border-color: hsl(var(--destructive) / 0.18);
-  background: hsl(var(--destructive) / 0.08);
+  background: transparent;
   color: hsl(var(--destructive));
 }
 
@@ -2256,7 +2252,7 @@ a {
 .chat-bubble-ai {
   background-color: var(--chat-bubble-ai-bg);
   color: hsl(var(--secondary-text) / 0.94);
-  border: 1px solid var(--chat-bubble-ai-border);
+  border: 0;
   border-radius: 1rem;
   border-top-left-radius: 0.125rem;
 }
@@ -2386,32 +2382,6 @@ a {
 .quick-question-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-/* Skill description tooltip */
-.skill-desc-tooltip {
-  position: absolute;
-  left: 0;
-  bottom: 100%;
-  margin-bottom: 0.5rem;
-  z-index: 50;
-  width: 16rem;
-  padding: 0.625rem;
-  border-radius: 0.5rem;
-  background: hsl(var(--elevated));
-  border: 1px solid var(--border);
-  box-shadow: 0 18px 48px hsl(var(--neutral-black) / 0.22);
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--text-secondary-text);
-  pointer-events: none;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.skill-desc-tooltip .skill-title {
-  font-weight: 500;
-  color: hsl(var(--foreground));
-  margin-bottom: 0.25rem;
 }
 
 /* Session item styles */

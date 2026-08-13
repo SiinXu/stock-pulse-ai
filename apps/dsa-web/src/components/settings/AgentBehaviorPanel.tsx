@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Agent Behavior section panel: safe preset-first setup with persisted status
- * and registry-owned progressive disclosure.
+ * and three-layer progressive disclosure (Essentials · Behavior · Governance/Expert).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import type { ConfigValidationIssue, SystemConfigItem } from '../../types/systemConfig';
 import type { UiTextKey } from '../../i18n/uiText';
@@ -16,6 +17,7 @@ import {
   resolveFieldRequirement,
 } from '../../utils/configConditions';
 import { cn } from '../../utils/cn';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { Badge, Button, ConfirmDialog } from '../common';
 import type { SettingsSaveStatus } from './autosaveMachine';
 // Import through the settings barrel so the real Settings host test harness can
@@ -32,8 +34,11 @@ import {
   diffAgentPreset,
   formatAgentPresetValue,
   isAgentEssentialKey,
+  resolveAgentDisclosureLayer,
   resolveAgentPresetStatus,
 } from './agentSetupPresets';
+import { buildModelSourceSetupHref } from './modelSourcesRoute';
+import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 
 export type AgentModelSummary = {
   value: string;
@@ -56,6 +61,12 @@ export type AgentBehaviorPanelProps = {
   fieldGroupIdOf: (key: string) => string;
   fieldGroupOrderOf: (key: string) => number;
   readOnlyDiagnosticForItem?: (item: SystemConfigItem, categoryHint?: string) => string | undefined;
+  /**
+   * Chat / remediation deep-link mode: keep summary + presets + essentials
+   * in the primary path; nest Behavior + Governance under one disclosure so
+   * expert fields stay reachable without appearing as a flat expert list.
+   */
+  essentialsFocus?: boolean;
 };
 
 function sortByEssentialOrder(items: SystemConfigItem[]): SystemConfigItem[] {
@@ -88,6 +99,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
   fieldGroupIdOf,
   fieldGroupOrderOf,
   readOnlyDiagnosticForItem,
+  essentialsFocus = false,
 }) => {
   const { language, t } = useUiLanguage();
   const copy = AGENT_SETUP_COPY[language];
@@ -97,13 +109,8 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
   const [draftPresetChanges, setDraftPresetChanges] = useState<AgentPresetFieldChange[]>([]);
   const presetTriggerRef = useRef<HTMLButtonElement | null>(null);
   const restorePresetFocusRef = useRef(false);
-
-  useEffect(() => {
-    if (!confirmPresetId && restorePresetFocusRef.current) {
-      restorePresetFocusRef.current = false;
-      presetTriggerRef.current?.focus();
-    }
-  }, [confirmPresetId]);
+  const askCtaRef = useRef<HTMLAnchorElement | null>(null);
+  const focusAskCtaRef = useRef(false);
 
   const availableKeySet = useMemo(
     () => new Set(items.map((item) => item.key.toUpperCase())),
@@ -118,14 +125,37 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
     () => sortByEssentialOrder(items.filter((item) => isAgentEssentialKey(item.key))),
     [items],
   );
-  const advancedItems = useMemo(
-    () => items.filter((item) => !isAgentEssentialKey(item.key)),
+  const behaviorItems = useMemo(
+    () => items.filter((item) => resolveAgentDisclosureLayer(item.key) === 'behavior'),
+    [items],
+  );
+  const governanceItems = useMemo(
+    () => items.filter((item) => resolveAgentDisclosureLayer(item.key) === 'governance'),
     [items],
   );
   const persistedStatus = useMemo(
     () => resolveAgentPresetStatus(persistedValuesByKey, { availableKeys: availableKeySet }),
     [availableKeySet, persistedValuesByKey],
   );
+
+  useEffect(() => {
+    if (confirmPresetId) {
+      return;
+    }
+    if (focusAskCtaRef.current && askCtaRef.current) {
+      focusAskCtaRef.current = false;
+      restorePresetFocusRef.current = false;
+      askCtaRef.current.focus();
+      return;
+    }
+    if (focusAskCtaRef.current) {
+      return;
+    }
+    if (restorePresetFocusRef.current) {
+      restorePresetFocusRef.current = false;
+      presetTriggerRef.current?.focus();
+    }
+  }, [confirmPresetId, draftPresetId, draftValuesByKey.AGENT_FEATURES_ACKNOWLEDGED_OFF]);
 
   const changesFor = (presetId: AgentSetupPresetId | null) => (
     presetId ? diffAgentPreset(presetId, draftValuesByKey, availableKeySet) : []
@@ -173,7 +203,8 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
     setDraftPresetId(confirmPresetId);
     setDraftPresetChanges(confirmChanges);
     setPreviewPresetId(confirmPresetId);
-    restorePresetFocusRef.current = true;
+    focusAskCtaRef.current = true;
+    restorePresetFocusRef.current = false;
     setConfirmPresetId(null);
   };
 
@@ -241,6 +272,35 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
     />
   );
 
+  const renderGroupedFields = (layerItems: SystemConfigItem[]) => (
+    fieldGroups.map((group) => {
+      const groupItems = layerItems
+        .filter((item) => fieldGroupIdOf(item.key) === group.id)
+        .sort((a, b) => fieldGroupOrderOf(a.key) - fieldGroupOrderOf(b.key));
+      return groupItems.length ? (
+        <div key={group.id} className="space-y-2">
+          <h4 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h4>
+          <form
+            className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-background/25 p-1"
+            onSubmit={(event) => event.preventDefault()}
+          >
+            {groupItems.map(renderField)}
+          </form>
+        </div>
+      ) : null;
+    })
+  );
+
+  const agentAcknowledgedOff = (
+    draftValuesByKey.AGENT_FEATURES_ACKNOWLEDGED_OFF
+    ?? persistedValuesByKey.AGENT_FEATURES_ACKNOWLEDGED_OFF
+  ) === 'true';
+  const modelNeedsConfig = modelSummary.readiness === 'unconfigured'
+    || modelSummary.readiness === 'unavailable'
+    || (!modelSummary.value && modelSummary.readiness !== 'checking');
+  const modelSourcesHref = buildModelSourceSetupHref();
+  const showAskPath = fullySupported && !agentAcknowledgedOff;
+
   return (
     <div className="space-y-4" data-testid="agent-behavior-panel">
       <section className="space-y-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4" data-testid="agent-active-summary">
@@ -288,22 +348,118 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
         </div>
       </section>
 
+      {showAskPath ? (
+        <section
+          className="space-y-2 rounded-lg border border-success/30 bg-success/5 p-4"
+          data-testid="agent-ask-path"
+          aria-labelledby="agent-ask-path-title"
+        >
+          <div className="space-y-1">
+            <h3 id="agent-ask-path-title" className="text-sm font-semibold text-foreground">{copy.askCta}</h3>
+            <p className="text-xs leading-5 text-muted-text">{copy.askCtaDescription}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {modelNeedsConfig ? (
+              <Link
+                to={modelSourcesHref}
+                className={cn(
+                  'inline-flex items-center justify-center rounded-md border border-[var(--settings-border)] bg-background px-3 py-1.5 text-sm font-medium text-foreground',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                )}
+                data-testid="agent-configure-model-cta"
+              >
+                {copy.configureModelCta}
+              </Link>
+            ) : null}
+            <Link
+              ref={askCtaRef}
+              to={APP_ROUTE_PATHS.agent}
+              className={cn(
+                'inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                modelNeedsConfig ? 'opacity-90' : '',
+              )}
+              data-testid="agent-ask-cta"
+            >
+              {copy.askCta}
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
       <section className="space-y-2" data-testid="agent-essentials-fields">
         <h3 className="px-1 text-sm font-medium text-secondary-text">{copy.essentialsTitle}</h3>
         <form className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1" onSubmit={(event) => event.preventDefault()}>{essentialItems.map(renderField)}</form>
       </section>
 
-      {advancedItems.length ? (
-        <details className="group/agent-advanced overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]" data-testid="agent-advanced-fields">
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden"><div className="space-y-1"><p className="text-sm font-semibold text-foreground">{copy.advancedTitle}</p><p className="text-xs leading-5 text-muted-text">{copy.advancedDescription}</p></div><ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-advanced:rotate-180" aria-hidden="true" /></summary>
-          <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
-            {fieldGroups.map((group) => {
-              const groupItems = advancedItems.filter((item) => fieldGroupIdOf(item.key) === group.id).sort((a, b) => fieldGroupOrderOf(a.key) - fieldGroupOrderOf(b.key));
-              return groupItems.length ? <div key={group.id} className="space-y-2"><h4 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h4><form className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-background/25 p-1" onSubmit={(event) => event.preventDefault()}>{groupItems.map(renderField)}</form></div> : null;
-            })}
-          </div>
-        </details>
-      ) : null}
+      {(() => {
+        const behaviorSection = behaviorItems.length ? (
+          <details
+            className="group/agent-behavior overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+            data-testid="agent-behavior-fields"
+          >
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">{copy.advancedTitle}</p>
+                <p className="text-xs leading-5 text-muted-text">{copy.advancedDescription}</p>
+              </div>
+              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-behavior:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
+              {renderGroupedFields(behaviorItems)}
+            </div>
+          </details>
+        ) : null;
+
+        const governanceSection = governanceItems.length ? (
+          <details
+            className="group/agent-governance overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+            data-testid="agent-governance-fields"
+          >
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">{copy.governanceTitle}</p>
+                <p className="text-xs leading-5 text-muted-text">{copy.governanceDescription}</p>
+              </div>
+              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-governance:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
+              {renderGroupedFields(governanceItems)}
+            </div>
+          </details>
+        ) : null;
+
+        if (!behaviorSection && !governanceSection) {
+          return null;
+        }
+
+        // Chat / remediation deep links: nest advanced layers under one control so
+        // the primary surface stays summary + presets + essentials + ask path.
+        if (essentialsFocus) {
+          return (
+            <details
+              className="group/agent-essentials-focus overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+              data-testid="agent-essentials-focus-advanced"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                <span>{SETTINGS_MISC_TEXT[language].showAdvanced}</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-essentials-focus:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
+                {behaviorSection}
+                {governanceSection}
+              </div>
+            </details>
+          );
+        }
+
+        return (
+          <>
+            {behaviorSection}
+            {governanceSection}
+          </>
+        );
+      })()}
 
       <ConfirmDialog
         isOpen={Boolean(confirmPresetId)}

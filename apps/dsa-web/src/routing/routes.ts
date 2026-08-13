@@ -18,6 +18,8 @@ export const APP_ROUTE_PATHS = {
   researchBacktest: '/research/backtest',
   researchSkillOutcomes: '/research/skill-outcomes',
   eventCalendar: '/events',
+  /** Fired corporate-event alerts list (read-only). Discoverable from Event Calendar. */
+  eventAlerts: '/event-alerts',
   researchReportCompare: '/research/report-compare',
   settings: '/settings',
   notifications: '/notifications',
@@ -422,5 +424,26 @@ export function buildInvestmentFrameworkSettingsHref(): string {
   return buildSettingsHref({
     section: 'agent_behavior',
     view: 'investment_framework',
+  });
+}
+
+/** Settings `from` value that opens Agent execution in essentials-first presentation. */
+export const AGENT_SETTINGS_ESSENTIALS_SOURCE = 'agent_essentials' as const;
+
+/**
+ * Deep link to Settings → Agent Behavior → Execution.
+ * When essentialsFocus is true, the Agent panel starts essentials-first
+ * (summary + presets + essentials + ask path) with Behavior/Governance
+ * nested under one progressive-disclosure control.
+ */
+export function buildAgentExecutionSettingsHref(
+  options: { essentialsFocus?: boolean } = {},
+): string {
+  return buildSettingsHref({
+    section: 'agent_behavior',
+    view: 'execution',
+    ...(options.essentialsFocus
+      ? { source: AGENT_SETTINGS_ESSENTIALS_SOURCE }
+      : {}),
   });
 }

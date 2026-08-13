@@ -32,13 +32,17 @@ class _TrackingNotifier:
         self.max_inflight = 0
         self.is_available = MagicMock(return_value=True)
         self.generate_dashboard_report = MagicMock(
-            side_effect=lambda results: "dashboard:" + ",".join(r.code for r in results)
+            side_effect=lambda results, report_date=None, report_type=None: (
+                "dashboard:" + ",".join(r.code for r in results)
+            )
         )
         self.generate_brief_report = MagicMock(
-            side_effect=lambda results: "brief:" + ",".join(r.code for r in results)
+            side_effect=lambda results, report_date=None, report_type=None: (
+                "brief:" + ",".join(r.code for r in results)
+            )
         )
         self.generate_single_stock_report = MagicMock(
-            side_effect=lambda result: f"single:{result.code}"
+            side_effect=lambda result, report_type=None: f"single:{result.code}"
         )
         self.send = MagicMock(side_effect=self._send)
 
@@ -147,7 +151,10 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         )
 
         self.assertIsNotNone(result)
-        pipeline.notifier.generate_brief_report.assert_called_once_with([result])
+        pipeline.notifier.generate_brief_report.assert_called_once_with(
+            [result],
+            report_type=ReportType.BRIEF,
+        )
         pipeline.notifier.send.assert_called_once_with(
             "brief:600519",
             email_stock_codes=["600519"],

@@ -21,6 +21,7 @@ from api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
     DiscoverLLMChannelModelsResponse,
     ExportSystemConfigResponse,
+    DataProviderRuntimeStatusResponse,
     GenerationBackendStatusPreviewRequest,
     GenerationBackendStatusResponse,
     ImportSystemConfigRequest,
@@ -34,6 +35,7 @@ from api.v1.schemas.system_config import (
     SystemConfigResponse,
     SystemConfigSchemaResponse,
     SetupStatusResponse,
+    ReadinessReportResponse,
     TestGenerationBackendRequest,
     TestGenerationBackendResponse,
     SystemConfigValidationErrorResponse,
@@ -378,6 +380,55 @@ def get_setup_status(
 
 
 @router.get(
+    "/readiness",
+    response_model=ReadinessReportResponse,
+    responses={
+        200: {"description": "Structured readiness report loaded"},
+        401: {"description": "Unauthorized", "model": ErrorResponse},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get structured readiness / self-check report",
+    description=(
+        "On-demand structured readiness for data providers, LLM/generation backend, "
+        "task queue, and selected setup dependencies. Reuses existing observational "
+        "probes; does not write config, does not run model smoke tests, and is not "
+        "invoked automatically at process startup. Probe failures and per-check "
+        "timeouts are reported as failed or degraded and never as ready."
+    ),
+    operation_id="getSystemReadiness",
+)
+def get_system_readiness(
+    service: SystemConfigService = Depends(get_system_config_service),
+) -> ReadinessReportResponse:
+    """Return a fail-closed readiness snapshot for diagnostics and operators."""
+    try:
+        from src.core.readiness import build_readiness_report
+
+        # Reuse the same SystemConfigService instance as setup/status so first-run
+        # and readiness share one config owner (no parallel setup implementation).
+        report = build_readiness_report(
+            setup_status_factory=service.get_setup_status,
+            generation_status_factory=service.get_generation_backend_status,
+        )
+        return ReadinessReportResponse.model_validate(report.to_dict())
+    except Exception as exc:  # broad-exception: fallback_recorded - map readiness failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Readiness report load failed",
+            exc,
+            error_code="internal_error",
+            level=logging.ERROR,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to load readiness report",
+            },
+        )
+
+
+@router.get(
     "/config/generation-backends/status",
     response_model=GenerationBackendStatusResponse,
     responses={
@@ -445,6 +496,48 @@ def get_kronos_status() -> KronosStatusResponse:
             detail={
                 "error": "internal_error",
                 "message": "Failed to load Kronos status",
+            },
+        )
+
+
+@router.get(
+    "/config/data-providers/runtime-status",
+    response_model=DataProviderRuntimeStatusResponse,
+    responses={
+        200: {"description": "Data provider runtime status loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get data provider runtime status",
+    description=(
+        "Read a side-effect-free projection of the live market-data provider "
+        "runtime: CN/HK/US daily routing (primary/fallback), process-local "
+        "health, cache quality, and enhancer configured state. Probe failures "
+        "and missing owners are explicit; availability is never defaulted to "
+        "true on failure. Does not call third-party APIs or mutate config."
+    ),
+    operation_id="getDataProviderRuntimeStatus",
+)
+def get_data_provider_runtime_status() -> DataProviderRuntimeStatusResponse:
+    """Return live Data Sources Hub runtime projection without writing config."""
+    try:
+        from src.services.data_provider_runtime_status_service import (
+            build_data_provider_runtime_status,
+        )
+
+        payload = build_data_provider_runtime_status()
+        return DataProviderRuntimeStatusResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - map projection failures to sanitized API error
+        log_safe_exception(
+            logger,
+            "Data provider runtime status load failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to load data provider runtime status",
             },
         )
 

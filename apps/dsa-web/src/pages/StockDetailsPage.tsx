@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
 import { BellPlus, GitCompareArrows, LineChart as LineChartIcon, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { stocksApi } from '../api/stocks';
 import { systemConfigApi } from '../api/systemConfig';
@@ -39,6 +40,7 @@ import type {
 } from '../types/stocks';
 import { aggregateCandles, summarizeCandles } from '../utils/klineAggregate';
 import {
+  APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
   buildReportVersionCompareHref,
@@ -113,6 +115,12 @@ const StockDetailsPage: React.FC = () => {
   const { stockCode: rawParam = '' } = useParams<{ stockCode: string }>();
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.stockDetails,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
 
   const decodedParam = useMemo(() => {
     try {
@@ -318,7 +326,11 @@ const StockDetailsPage: React.FC = () => {
   if (!canonicalCode) {
     return (
       <AppPage>
-        <PageHeader title={t('stocks.workspace.title')} description={t('stocks.workspace.description')} />
+        <PageHeader
+          ref={pageHeadingRef}
+          title={t('stocks.workspace.title')}
+          description={t('stocks.workspace.description')}
+        />
         <EmptyState
           title={t('stocks.workspace.invalidTitle')}
           description={t('stocks.workspace.invalidDescription')}
@@ -361,6 +373,7 @@ const StockDetailsPage: React.FC = () => {
     <AppPage className="max-w-none">
       <div className="space-y-5">
         <PageHeader
+          ref={pageHeadingRef}
           eyebrow={quoteName ? canonicalCode : undefined}
           title={quoteName || canonicalCode}
           description={t('stocks.workspace.description')}

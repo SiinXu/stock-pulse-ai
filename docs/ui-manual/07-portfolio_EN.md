@@ -95,12 +95,15 @@ Paper trades currently exclude fees, taxes, and slippage; the ticket states this
 
 Ledger filters by date/code/direction are common. Deletes usually confirm; some deletes are blocked for consistency.
 
-## CSV import
+## Spreadsheet import
 
-1. Pick broker format or generic template.  
-2. **Preview / dry-run** first.  
-3. Commit only when preview looks right.  
-4. Re-submit should prefer idempotency—avoid double books when the UI says duplicates were skipped.
+1. Open the import wizard and pick the broker format.  
+2. Upload **CSV or Excel (.xlsx)**, or paste table text.  
+3. Review the mapping preview, then validation: rejected rows show line numbers and reasons.  
+4. Download the **failed-rows CSV** to correct bad data; invalid rows are rejected explicitly and never written silently.  
+5. **Dry-run** first, then commit only when the preview looks right.  
+6. Re-submit prefers idempotency—avoid double books when the UI says duplicates were skipped.
+
 
 ## One-click analysis from holdings
 

@@ -310,7 +310,7 @@ class _FailedNotifier:
         """Expose one configured notification route."""
         return True
 
-    def generate_single_stock_report(self, result) -> str:
+    def generate_single_stock_report(self, result, report_type=None) -> str:
         """Return a deterministic rendered report."""
         _ = result
         return "rendered report"
@@ -328,7 +328,7 @@ class _PartialStructuredNotifier:
         """Expose configured report channels."""
         return True
 
-    def generate_single_stock_report(self, result) -> str:
+    def generate_single_stock_report(self, result, report_type=None) -> str:
         """Return a deterministic rendered report."""
         _ = result
         return "rendered report"
@@ -788,7 +788,7 @@ def test_batch_run_persists_actual_render_and_disabled_dispatch() -> None:
         analysis_delay=0,
     )
     pipeline.notifier = SimpleNamespace(
-        generate_dashboard_report=lambda results: "batch report",
+        generate_dashboard_report=lambda results, report_date=None, report_type=None: "batch report",
         save_report_to_file=lambda report: "/tmp/batch-report.md",
     )
     pipeline.process_single_stock = MagicMock(return_value=result)

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { FileText } from 'lucide-react';
+import { Bell, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ParsedApiError } from '../../api/error';
 import {
@@ -20,7 +20,9 @@ import type {
 import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   RUN_FLOW_ROUTE_QUERY_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
+  buildSignalCenterHref,
 } from '../../routing/routes';
 import { DecisionSignalDetails } from './DecisionSignalDisplay';
 import { DecisionSignalMemoryControls } from './DecisionSignalMemoryControls';
@@ -71,6 +73,14 @@ const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProps> = ({
   onRequestStatusChange,
 }) => {
   const { t } = useUiLanguage();
+  const createRuleStock = selected?.item.stockCode?.trim() || '';
+  const createRuleHref = createRuleStock
+    ? buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+      createRule: true,
+      stock: createRuleStock,
+    })
+    : null;
 
   return (
     <Drawer
@@ -116,6 +126,17 @@ const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProps> = ({
                   >
                     <FileText className="h-3.5 w-3.5" />
                     {t('decisionSignals.reassessSource', { id: selected.item.sourceReportId })}
+                  </Link>
+                ) : null}
+                {createRuleHref ? (
+                  <Link
+                    to={createRuleHref}
+                    data-control="navigation-link"
+                    data-testid="decision-signal-create-rule"
+                    className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                  >
+                    <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t('decisionSignals.createRuleFromSignal')}
                   </Link>
                 ) : null}
                 {STATUS_ACTIONS.map((status) => (

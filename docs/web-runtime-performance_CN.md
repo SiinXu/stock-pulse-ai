@@ -1,0 +1,48 @@
+# Web 运行时性能预算
+
+Issue [#883](https://github.com/SiinXu/stock-pulse-ai/issues/883) 在既有 bundle 体积预算（PR #905 / #920）之上，为 `apps/dsa-web` 的三类运行时场景建立可复现的性能预算：
+
+1. 长列表渲染（`HistoryList`）
+2. Settings 大表单（`SettingsField` 隔离）
+3. SSE 聊天流（`agentChatStore` progress 批处理）
+
+英文版：[web-runtime-performance.md](web-runtime-performance.md)。
+
+## 设计原则
+
+- **不得为达标缩小测量范围**（CI 合同保持完整输入规模）。
+- **不得砍功能凑数字**。
+- **软门先行**：超预算在 CI 中告警，默认不阻断 Web gate，待阈值稳定后再考虑 strict。
+- 结构型指标可在 CI 复现；墙钟目标用于参考硬件上手动剖析。
+
+## 预算（权威源）
+
+机器可读：`apps/dsa-web/scripts/runtime-performance-budget.json`。
+
+共享常量：`apps/dsa-web/src/performance/runtimeBudgets.ts`。
+
+| 场景 | 输入规模 | 指标 | 预算 | 依据 |
+| --- | --- | --- | --- | --- |
+| `history-list-virtualization` | 150 条历史 | 已挂载行 DOM 数 | ≤ 40 | 超过 100 行需虚拟化或硬分页；History 已分页但会累积。 |
+| `settings-field-isolation` | 40 个字段 | 编辑一字后兄弟字段 commit 数 | 0 | 单字段编辑不得拖垮整表。 |
+| `sse-progress-batching` | 60 条 progress 事件 | `progressSteps` store commit 数 | ≤ 4 | rAF 批处理保证 Stop 可点。 |
+
+## 测量入口
+
+```bash
+cd apps/dsa-web
+npm ci
+npx vitest run src/performance/__tests__/runtimePerformanceContracts.test.tsx
+node scripts/check-runtime-performance.mjs
+node scripts/check-runtime-performance.mjs --strict   # 未来硬门
+```
+
+## 产品侧缓解（与预算同 PR）
+
+- **HistoryList**：`useVirtualWindow` 窗口化 + `HistoryListItem` memo。
+- **SettingsField**：`React.memo` + 属性相等比较。
+- **SSE**：progress 事件 rAF 合批 + 聊天气泡 memo。
+
+## CI 软门
+
+前端变更时 Web gate 在单元测试后运行 `check-runtime-performance.mjs`；软模式只告警、不失败。
