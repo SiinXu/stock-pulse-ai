@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskInfo } from '../../types/analysis';
 import { useDashboardLifecycle } from '../useDashboardLifecycle';
@@ -7,6 +9,29 @@ import { useTaskStream } from '../useTaskStream';
 vi.mock('../useTaskStream', () => ({
   useTaskStream: vi.fn(),
 }));
+
+function createWrapper() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+}
+
+/** Flush microtasks so TanStack Query's initial queryFn can settle under fake timers. */
+async function flushQueryMicrotasks(rounds = 1) {
+  for (let i = 0; i < rounds; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+}
 
 const createTask = () => ({
   taskId: 'task-1',
@@ -38,7 +63,7 @@ describe('useDashboardLifecycle', () => {
     vi.useRealTimers();
   });
 
-  it('loads history, refreshes on interval, and reacts to visibility changes', () => {
+  it('loads history, refreshes on interval, and reacts to visibility changes', async () => {
     const loadInitialHistory = vi.fn().mockResolvedValue(undefined);
     const refreshHistory = vi.fn().mockResolvedValue(undefined);
     const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
@@ -56,29 +81,121 @@ describe('useDashboardLifecycle', () => {
         onDashboardDataRefresh,
         ...defaultMocks,
       }),
+      { wrapper: createWrapper() },
     );
 
+    await flushQueryMicrotasks();
     expect(loadInitialHistory).toHaveBeenCalledTimes(1);
     expect(refreshActiveTasks).toHaveBeenCalledTimes(1);
 
-    act(() => {
-      vi.advanceTimersByTime(30_000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
     });
+    await flushQueryMicrotasks();
     expect(refreshHistory).toHaveBeenCalledWith(true);
     expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
     expect(onDashboardDataRefresh).toHaveBeenCalledTimes(1);
 
-    act(() => {
+    await act(async () => {
       Object.defineProperty(document, 'visibilityState', {
         configurable: true,
         value: 'visible',
       });
       document.dispatchEvent(new Event('visibilitychange'));
     });
+    await flushQueryMicrotasks();
 
     expect(refreshHistory).toHaveBeenCalledTimes(2);
     expect(refreshActiveTasks).toHaveBeenCalledTimes(3);
     expect(onDashboardDataRefresh).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('remount still runs non-silent initial load after a prior mount completed', async () => {
+    const sharedClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, refetchOnWindowFocus: false },
+        mutations: { retry: false },
+      },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={sharedClient}>{children}</QueryClientProvider>
+    );
+
+    const loadInitialHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
+    const options = {
+      loadInitialHistory,
+      refreshHistory,
+      refreshActiveTasks,
+      syncTaskCreated: vi.fn(),
+      syncTaskUpdated: vi.fn(),
+      syncTaskFailed: vi.fn(),
+      removeTask: vi.fn(),
+      ...defaultMocks,
+    };
+
+    const first = renderHook(() => useDashboardLifecycle(options), { wrapper });
+    await flushQueryMicrotasks();
+    expect(loadInitialHistory).toHaveBeenCalledTimes(1);
+    expect(refreshHistory).not.toHaveBeenCalled();
+    first.unmount();
+
+    // New mount must re-run non-silent initial load (mount useEffect parity),
+    // not silent-refresh solely because a prior mount left Query cache warm.
+    renderHook(() => useDashboardLifecycle(options), { wrapper });
+    await flushQueryMicrotasks();
+    expect(loadInitialHistory).toHaveBeenCalledTimes(2);
+    expect(refreshHistory).not.toHaveBeenCalled();
+    expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('re-runs non-silent initial load when initial loader identities change', async () => {
+    const loadInitialHistoryA = vi.fn().mockResolvedValue(undefined);
+    const loadInitialHistoryB = vi.fn().mockResolvedValue(undefined);
+    const refreshHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
+    const loadStockBarA = vi.fn().mockResolvedValue(undefined);
+    const loadStockBarB = vi.fn().mockResolvedValue(undefined);
+
+    const { rerender } = renderHook(
+      ({ loadInitialHistory, loadStockBar }) => useDashboardLifecycle({
+        loadInitialHistory,
+        refreshHistory,
+        refreshActiveTasks,
+        loadStockBar,
+        refreshStockBar: vi.fn().mockResolvedValue(undefined),
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+      }),
+      {
+        wrapper: createWrapper(),
+        initialProps: {
+          loadInitialHistory: loadInitialHistoryA,
+          loadStockBar: loadStockBarA,
+        },
+      },
+    );
+
+    await flushQueryMicrotasks();
+    expect(loadInitialHistoryA).toHaveBeenCalledTimes(1);
+    expect(loadStockBarA).toHaveBeenCalledTimes(1);
+    expect(refreshHistory).not.toHaveBeenCalled();
+
+    rerender({
+      loadInitialHistory: loadInitialHistoryB,
+      loadStockBar: loadStockBarB,
+    });
+    await flushQueryMicrotasks(2);
+
+    // Parity with old mount-effect deps: identity change re-runs non-silent initial.
+    expect(loadInitialHistoryB).toHaveBeenCalledTimes(1);
+    expect(loadStockBarB).toHaveBeenCalledTimes(1);
+    expect(refreshHistory).not.toHaveBeenCalled();
   });
 
   it('cleans pending task removal timers on unmount', () => {
@@ -95,6 +212,7 @@ describe('useDashboardLifecycle', () => {
         removeTask,
         ...defaultMocks,
       }),
+      { wrapper: createWrapper() },
     );
 
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
@@ -134,6 +252,7 @@ describe('useDashboardLifecycle', () => {
         terminalRetentionMs: 6_000,
         ...defaultMocks,
       }),
+      { wrapper: createWrapper() },
     );
 
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
@@ -171,6 +290,7 @@ describe('useDashboardLifecycle', () => {
         removeTask: vi.fn(),
         ...defaultMocks,
       }),
+      { wrapper: createWrapper() },
     );
 
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
@@ -204,6 +324,7 @@ describe('useDashboardLifecycle', () => {
         terminalRetentionMs: 8_000,
         ...defaultMocks,
       }),
+      { wrapper: createWrapper() },
     );
 
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
@@ -226,7 +347,7 @@ describe('useDashboardLifecycle', () => {
     expect(removeTask).toHaveBeenCalledWith(failedTask.taskId);
   });
 
-  it('reconciles active tasks when the SSE stream connects', () => {
+  it('reconciles active tasks when the SSE stream connects', async () => {
     const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
 
     renderHook(() =>
@@ -240,7 +361,12 @@ describe('useDashboardLifecycle', () => {
         removeTask: vi.fn(),
         ...defaultMocks,
       }),
+      { wrapper: createWrapper() },
     );
+
+    await flushQueryMicrotasks();
+    const afterInitial = refreshActiveTasks.mock.calls.length;
+    expect(afterInitial).toBeGreaterThanOrEqual(1);
 
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
 
@@ -248,7 +374,8 @@ describe('useDashboardLifecycle', () => {
       taskStreamOptions?.onConnected?.();
     });
 
-    expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
+    // onConnected must refresh active tasks beyond the schedule's initial load.
+    expect(refreshActiveTasks).toHaveBeenCalledTimes(afterInitial + 1);
   });
 
   it('polls known task ids while SSE is disconnected', () => {
@@ -272,6 +399,7 @@ describe('useDashboardLifecycle', () => {
         taskPollIntervalMs: 2_000,
         ...defaultMocks,
       }),
+      { wrapper: createWrapper() },
     );
 
     expect(pollKnownTasks).toHaveBeenCalledTimes(1);
@@ -319,7 +447,7 @@ describe('useDashboardLifecycle', () => {
         onCompletedTaskDataRefreshed,
         terminalRetentionMs: 6_000,
       }),
-      { initialProps: { activeTasks: [processingTask] } },
+      { wrapper: createWrapper(), initialProps: { activeTasks: [processingTask] } },
     );
 
     await act(async () => {

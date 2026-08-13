@@ -34,6 +34,10 @@ MAX_EXECUTION_TIMEOUT_SECONDS = 120.0
 MAX_RESULT_SUMMARY_CHARS = 500
 MAX_OBSERVATION_ERROR_CODE_CHARS = 64
 MAX_TRACE_STEPS = 64
+# Structured plan/action/observation/replan/terminate events for one loop (#1078).
+# Shared by the recorder and PlanExecutionResult.to_metadata so reconstruction
+# caps cannot drift between the in-memory list and exported metadata.
+MAX_PLANNING_TRACE_EVENTS = 200
 FAILURE_POLICIES = frozenset({"replan", "terminate"})
 
 # Prompt-projection envelope. Validation rejects any proposal that would not fit,

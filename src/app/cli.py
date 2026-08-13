@@ -129,6 +129,26 @@ class CliRunSummaryCapture:
         self._restore.clear()
 
     def _record_dispatch_result(self, result: Any) -> None:
+        # Prefer the queryable summary contract (channel/ok/error) when present;
+        # fall back to attribute access for test doubles and older shapes.
+        summaries = None
+        channel_summaries = getattr(result, "channel_summaries", None)
+        if callable(channel_summaries):
+            try:
+                summaries = channel_summaries()
+            except Exception:  # broad-exception: cleanup - Best-effort CLI summary capture
+                summaries = None
+        if isinstance(summaries, list) and summaries:
+            for item in summaries:
+                if not isinstance(item, dict):
+                    continue
+                channel = str(item.get("channel") or "").strip()
+                if not channel or channel == "__context__":
+                    continue
+                status = "sent" if item.get("ok") else "failed"
+                self.channel_outcomes.append((channel, status))
+            return
+
         channel_results = getattr(result, "channel_results", None) or []
         for attempt in channel_results:
             channel = str(getattr(attempt, "channel", "") or "").strip()
