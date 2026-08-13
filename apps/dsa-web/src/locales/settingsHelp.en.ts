@@ -2419,6 +2419,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Bounds per-call analysis cost.',
     ],
   },
+  'settings.system.resume': {
+    title: 'Resume & reproduce',
+  },
 };
 
 export default settingsHelpEnUS;

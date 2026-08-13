@@ -3,10 +3,14 @@
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M['zh-TW'],
   ...DR["zh-TW"],
+  ...CP["zh-TW"],
+  ...DSC["zh-TW"],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -673,7 +677,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "目前統計採用全域已覆盤 outcome 口徑，不等於目前可見訊號數量，也不隨目前股票篩選條件變化。",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "未知",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "暫無",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "僅計數，不公佈比率。",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "不足",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "充足",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "{completed}/{total}筆",
@@ -682,12 +685,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "市場",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "月份",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "校準分組",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "每組{count}筆起公佈。",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "各時間、市場、訊號組獨立計閾。",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "校準",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "不足",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "未達{count}筆：僅計數。",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "歷史命中率非收益預測、保證或建議。",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "提示",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "命中率",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "統計",
