@@ -177,6 +177,13 @@
       "measuredGzipBytes": 16615
     },
     {
+      "id": "settingsTranslations",
+      "match": "assets/settingsTranslations-*.js",
+      "maxGzipBytes": 15119,
+      "measuredGzipBytes": 14919,
+      "note": "Local production-build remasure after merging origin/main; measured 14919 B + 200 B retained headroom."
+    },
+    {
       "id": "screening",
       "match": "assets/screening-*.js",
       "maxGzipBytes": 17866,
