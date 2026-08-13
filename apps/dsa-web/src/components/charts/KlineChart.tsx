@@ -3,9 +3,11 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { EmptyState, Surface } from '../common';
+import { HelpKeyButton } from '../help';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { CHARTS_TEXT } from '../../locales/charts';
+import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
 import type { StockHistoryCandle } from '../../types/stocks';
 import { changeSemantics, formatPrice, type ChangeColorPreference, type MarketId } from '../../utils/marketFormat';
 import { formatUiNumber } from '../../utils/uiLocale';
@@ -136,6 +138,12 @@ export const KlineChart: React.FC<KlineChartProps> = ({
               {formatUiText(text.klineMa, { period: String(period) })}
             </span>
           ))}
+          {normalizedPeriods.length > 0 ? (
+            <HelpKeyButton
+              helpKey={EDUCATION_HELP_KEYS.indicatorMa}
+              data-testid={`${testId}-ma-help`}
+            />
+          ) : null}
         </div>
         {sanitized.length > 20 && (
           <div className="flex items-center gap-2">

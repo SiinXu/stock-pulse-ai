@@ -1,0 +1,1 @@
+- [Fixed] Register and document portfolio-aware sizing controls and sanitize fallback diagnostics.
