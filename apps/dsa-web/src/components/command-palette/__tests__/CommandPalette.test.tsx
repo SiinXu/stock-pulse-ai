@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 import { useState, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentApi } from '../../../api/agent';
 import { historyApi } from '../../../api/history';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { HistorySearchItem } from '../../../types/analysis';
@@ -69,9 +70,16 @@ vi.mock('../../../api/history', () => ({
   historyApi: { search: vi.fn() },
 }));
 
+vi.mock('../../../api/agent', () => ({
+  agentApi: { getSkills: vi.fn() },
+}));
+
 const searchHistory = vi.mocked(historyApi.search);
+const getSkills = vi.mocked(agentApi.getSkills);
 const onClose = vi.fn();
 const onNavigate = vi.fn();
+
+const PLACEHOLDER = '搜索股票、报告、策略、管线、设置、页面或操作';
 
 function PaletteProviders({ children }: { children: ReactNode }) {
   return (
@@ -115,11 +123,26 @@ describe('CommandPalette', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchHistory.mockResolvedValue({ query: '', limit: 5, items: [] });
+    getSkills.mockResolvedValue({
+      skills: [
+        {
+          id: 'bull_trend',
+          name: '默认多头趋势',
+          description: '识别多头排列、趋势延续与回踩机会。',
+        },
+        {
+          id: 'chan_theory',
+          name: '缠论',
+          description: '基于笔、线段和中枢结构分析趋势。',
+        },
+      ],
+      default_skill_id: 'bull_trend',
+    });
   });
 
   it('filters localized navigation and executes canonical actions', async () => {
     renderPalette();
-    const input = screen.getByRole('combobox', { name: '搜索股票、报告、页面或操作' });
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
     await waitFor(() => expect(input).toHaveFocus());
 
     fireEvent.change(input, { target: { value: '持仓' } });
@@ -133,7 +156,7 @@ describe('CommandPalette', () => {
 
   it('keeps focus in the combobox while arrows select and Enter executes', async () => {
     renderPalette();
-    const input = screen.getByRole('combobox', { name: '搜索股票、报告、页面或操作' });
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
     await waitFor(() => expect(input).toHaveFocus());
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
@@ -149,7 +172,7 @@ describe('CommandPalette', () => {
   it('groups bounded multi-market stock, report, page, and action results', async () => {
     searchHistory.mockResolvedValue({ query: 'analysis', limit: 5, items: [report] });
     renderPalette();
-    const input = screen.getByRole('combobox', { name: '搜索股票、报告、页面或操作' });
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
     await waitFor(() => expect(input).toHaveFocus());
     expect(screen.getByRole('group', { name: '页面' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: '操作' })).toBeInTheDocument();
@@ -166,6 +189,70 @@ describe('CommandPalette', () => {
     expect(screen.getByRole('option', { name: /贵州茅台.*Long-term analysis/ })).toBeInTheDocument();
   });
 
+  it('groups skill/strategy results and opens the Discover strategy deep link', async () => {
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
+    await waitFor(() => expect(input).toHaveFocus());
+    await waitFor(() => expect(getSkills).toHaveBeenCalled());
+
+    fireEvent.change(input, { target: { value: '缠论' } });
+    await waitFor(() => expect(screen.getByRole('group', { name: '策略' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('option', { name: /缠论/ }));
+    expect(onNavigate).toHaveBeenCalledWith('/research/discover?strategy=chan_theory');
+  });
+
+  it('settles a delayed skill catalog fetch without leaving the palette spinner stuck', async () => {
+    let resolveSkills: ((value: Awaited<ReturnType<typeof agentApi.getSkills>>) => void) | undefined;
+    getSkills.mockImplementation(() => new Promise((resolve) => {
+      resolveSkills = resolve;
+    }));
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
+    await waitFor(() => expect(input).toHaveFocus());
+    await waitFor(() => expect(getSkills).toHaveBeenCalled());
+
+    // One character avoids stock/report debounce loading, so the spinner is only the catalog fetch.
+    fireEvent.change(input, { target: { value: '缠' } });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('正在加载'));
+
+    await act(async () => {
+      resolveSkills?.({
+        skills: [
+          {
+            id: 'chan_theory',
+            name: '缠论',
+            description: '基于笔、线段和中枢结构分析趋势。',
+          },
+        ],
+        default_skill_id: 'bull_trend',
+      });
+    });
+    await waitFor(() => expect(screen.getByRole('group', { name: '策略' })).toBeInTheDocument());
+    expect(screen.queryByText('正在加载')).not.toBeInTheDocument();
+  });
+
+  it('groups pipeline preset results and opens Agent Behavior settings', async () => {
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: '管线' } });
+    expect(screen.getByRole('group', { name: '管线' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /标准研究/ }));
+    expect(onNavigate).toHaveBeenCalledWith('/settings?section=agent_behavior&view=execution');
+  });
+
+  it('indexes settings sections and opens the canonical section/view deep link', async () => {
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: '模型来源' } });
+    expect(screen.getByRole('group', { name: '设置' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /AI 与模型 · 模型来源/ }));
+    expect(onNavigate).toHaveBeenCalledWith('/settings?section=ai_models&view=connections');
+  });
+
   it('runs the full shortcut, query, keyboard selection, report navigation, and close flow', async () => {
     searchHistory.mockResolvedValue({ query: 'long-term', limit: 5, items: [report] });
     render(
@@ -178,7 +265,7 @@ describe('CommandPalette', () => {
 
     fireEvent.keyDown(document, { key: 'k', metaKey: true });
     const dialog = await screen.findByRole('dialog', { name: '快速前往' });
-    const input = within(dialog).getByRole('combobox', { name: '搜索股票、报告、页面或操作' });
+    const input = within(dialog).getByRole('combobox', { name: PLACEHOLDER });
     await waitFor(() => expect(input).toHaveFocus());
     fireEvent.change(input, { target: { value: 'long-term' } });
     await waitFor(() => expect(within(dialog).getByRole('group', { name: '报告' })).toBeInTheDocument());
@@ -200,8 +287,9 @@ describe('CommandPalette', () => {
       resolveSearch = resolve;
     }));
     renderPalette();
-    const input = screen.getByRole('combobox', { name: '搜索股票、报告、页面或操作' });
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
     await waitFor(() => expect(input).toHaveFocus());
+    await waitFor(() => expect(getSkills).toHaveBeenCalled());
 
     fireEvent.change(input, { target: { value: 'no-match-term' } });
     expect(screen.getByRole('status')).toHaveTextContent('正在加载');
@@ -217,7 +305,7 @@ describe('CommandPalette', () => {
   it('keeps stock search available when report search fails', async () => {
     searchHistory.mockRejectedValue(new Error('offline'));
     renderPalette();
-    const input = screen.getByRole('combobox', { name: '搜索股票、报告、页面或操作' });
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
     await waitFor(() => expect(input).toHaveFocus());
     fireEvent.change(input, { target: { value: 'maotai' } });
 
@@ -234,7 +322,7 @@ describe('CommandPalette', () => {
       pending.set(query, resolve);
     }));
     renderPalette();
-    const input = screen.getByRole('combobox', { name: '搜索股票、报告、页面或操作' });
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
     await waitFor(() => expect(input).toHaveFocus());
 
     fireEvent.change(input, { target: { value: 'older-query' } });

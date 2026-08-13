@@ -423,10 +423,10 @@ jobs:
                 labels.add('documentation');
               }
               if (filename.includes('workflow') || filename.includes('.github')) {
-                labels.add('ci/cd');
+                labels.add('ci');
               }
               if (filename.includes('config')) {
-                labels.add('configuration');
+                labels.add('config');
               }
               if (filename.includes('test')) {
                 labels.add('testing');
