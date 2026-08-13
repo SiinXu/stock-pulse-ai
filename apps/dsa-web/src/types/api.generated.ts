@@ -730,7 +730,7 @@ export interface paths {
         put?: never;
         /**
          * Update auth settings
-         * @description Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie.
+         * @description Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie. Successful responses use AuthStatusResponse (same camelCase wire shape as GET /status). Error paths still return JSONResponse error envelopes.
          */
         post: operations["auth_update_settings_api_v1_auth_settings_post"];
         delete?: never;
@@ -17944,7 +17944,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthStatusResponse"];
                 };
             };
             /** @description Validation Error */

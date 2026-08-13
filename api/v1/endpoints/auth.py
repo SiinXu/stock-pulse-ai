@@ -339,12 +339,15 @@ async def auth_status(request: Request):
 
 @router.post(
     "/settings",
+    response_model=AuthStatusResponse,
     summary="Update auth settings",
     description=(
         "Enable or disable password login. When enabling without an existing password, "
         "password + passwordConfirm are required. When re-enabling with a stored password, "
         "currentPassword is required. Disabling authentication always requires currentPassword, "
-        "even when the request has a valid session cookie."
+        "even when the request has a valid session cookie. "
+        "Successful responses use AuthStatusResponse (same camelCase wire shape as GET /status). "
+        "Error paths still return JSONResponse error envelopes."
     ),
 )
 async def auth_update_settings(
