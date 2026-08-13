@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Added] Error-pattern encyclopedia clusters ReflectionLessons into human-editable cards with audit trail and quota-bounded analysis checklists that never rewrite Soul (Refs #1138).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
 - [Fixed] Restore the Chat context-compression switch semantics and shared 44px touch target after the compact workspace migration.
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
