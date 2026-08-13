@@ -68,6 +68,17 @@ EXIT_INTERNAL_ERROR = 1
 EXIT_REFUSED = 2
 
 
+DEFERRED_NOTE = "deferred"
+
+
+def _rollback(ctx: Context, paths: list[str]) -> None:
+    """Restore conflicted files from the still-intact index stages."""
+
+    if not paths:
+        return
+    ctx.git("checkout", "--merge", "--", *paths, check=False)
+
+
 def _select(rel_path: str) -> ModuleType | None:
     for module in RESOLVERS:
         if module.matches(rel_path):
@@ -216,39 +227,50 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  would resolve {rel_path}: {resolution.detail}")
         return EXIT_OK
 
-    # ---- phase 3: write, regenerate, stage --------------------------------
+    # ---- phase 3: write, then run the deferred (expensive) steps ---------
+    #
+    # Nothing is staged yet, so the index still holds all three merge stages
+    # and `git checkout --merge` can restore the conflicted files byte for
+    # byte. That is what keeps the batch atomic even across a failed build or
+    # a failed code generator.
     written: list[str] = []
+    deferred: list[str] = []
     try:
         for rel_path, resolution in resolutions.items():
-            if "regenerate" in resolution.notes:
-                continue
             (repo / rel_path).write_text(resolution.text, encoding="utf-8")
             written.append(rel_path)
-
-        regenerate = [
-            rel_path
-            for rel_path, resolution in resolutions.items()
-            if "regenerate" in resolution.notes
-        ]
-        if regenerate:
-            for rel_path in regenerate:
-                (repo / rel_path).write_text(
-                    resolutions[rel_path].text, encoding="utf-8"
-                )
-            for message in generated_artifacts.finalize(ctx, regenerate):
-                print(f"  {message}")
-            written.extend(regenerate)
-    except Refusal as exc:
-        print(
-            "merge-resolvers: REFUSED during regeneration; "
-            "run `git checkout --merge -- <paths>` to restore the conflicted state.",
-            file=sys.stderr,
-        )
-        print(f"  REFUSE {exc.path}: {exc.reason}", file=sys.stderr)
-        return EXIT_REFUSED
+            if DEFERRED_NOTE in resolution.notes:
+                deferred.append(rel_path)
     except OSError as exc:
+        _rollback(ctx, written)
         print(f"merge-resolvers: internal error while writing: {exc}", file=sys.stderr)
         return EXIT_INTERNAL_ERROR
+
+    messages: list[str] = []
+    for rel_path in deferred:
+        module = owners[rel_path]
+        try:
+            messages.extend(module.finalize(ctx, rel_path))
+        except Refusal as exc:
+            _rollback(ctx, written)
+            print(
+                "merge-resolvers: REFUSED while finalising "
+                f"{rel_path}; the conflicted files were restored and nothing "
+                "was staged.",
+                file=sys.stderr,
+            )
+            print(f"  REFUSE {exc.path}: {exc.reason}", file=sys.stderr)
+            return EXIT_REFUSED
+        except Exception as exc:  # noqa: BLE001
+            _rollback(ctx, written)
+            print(
+                f"merge-resolvers: internal error finalising {rel_path}: "
+                f"{type(exc).__name__}: {exc}",
+                file=sys.stderr,
+            )
+            return EXIT_INTERNAL_ERROR
+    for message in messages:
+        print(f"  {message}")
 
     if not args.no_stage:
         ctx.git("add", "--", *written)
@@ -257,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
         resolution = resolutions[rel_path]
         print(f"  resolved {rel_path}: {resolution.detail}")
         for note in resolution.notes:
-            if note in {"regenerate"} or note.startswith("incoming-rows="):
+            if note == DEFERRED_NOTE or note.startswith("incoming-rows="):
                 continue
             print(f"      note: {note}")
     print(f"merge-resolvers: resolved {len(written)} file(s)")

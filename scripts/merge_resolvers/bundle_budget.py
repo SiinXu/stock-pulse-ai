@@ -48,6 +48,7 @@ NUMERIC_FIELDS = ("maxGzipBytes", "measuredGzipBytes")
 PROVENANCE_KEYS = ("baselineNote", "measuredAt")
 DEFAULT_HEADROOM_BYTES = 200
 
+DEFERRED_NOTE = "deferred"
 NAME = "bundle-size-budget"
 DESCRIPTION = "Merge gzip budget rules by id; refuse ambiguous same-rule numbers."
 
@@ -241,6 +242,7 @@ def resolve(ctx: Context, rel_path: str) -> Resolution:
     )
     merged["rules"] = [merged_rules[rule_id] for rule_id in order]
 
+    merged["rules"] = [merged_rules[rule_id] for rule_id in order]
     notes: list[str] = []
     if ambiguous:
         if not ctx.remeasure:
@@ -252,26 +254,63 @@ def resolve(ctx: Context, rel_path: str) -> Resolution:
                 "build and measure the merged tree, or let the pull request out of "
                 "the train and rebaseline it by hand.",
             )
-        merged["rules"] = [merged_rules[rule_id] for rule_id in order]
-        measured = _remeasure(ctx, rel_path, merged)
-        notes.extend(
-            _apply_measurements(
-                ctx,
-                rel_path,
-                merged_rules,
-                ambiguous,
-                our_rules,
-                their_rules,
-                measured,
-            )
-        )
+        # A real measurement needs a buildable merged tree, so it is deferred
+        # until every other file in the batch has been written.
+        notes.append(DEFERRED_NOTE)
 
     text = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
     detail = (
         f"merged {len(order)} rules by id"
-        + (f"; remeasured {', '.join(sorted(ambiguous))}" if ambiguous else "")
+        + (
+            f"; deferred remeasurement of {', '.join(sorted(ambiguous))}"
+            if ambiguous
+            else ""
+        )
     )
     return Resolution(path=rel_path, text=text, detail=detail, notes=notes)
+
+
+def finalize(ctx: Context, rel_path: str) -> list[str]:
+    """Build and measure the merged tree, then rebaseline the ambiguous rules.
+
+    Runs only after every other file in the batch has been written, because the
+    production build cannot succeed while conflict markers remain anywhere.
+    """
+
+    base_text, our_text, their_text = ctx.require_stages(rel_path)
+    base_rules = _index(_load(rel_path, "base", base_text))
+    our_rules = _index(_load(rel_path, "ours", our_text))
+    their_rules = _index(_load(rel_path, "theirs", their_text))
+
+    merged = json.loads((ctx.repo_root / rel_path).read_text(encoding="utf-8"))
+    merged_rules = _index(merged)
+    ambiguous: list[str] = []
+    for rule_id in merged_rules:
+        ours, theirs = our_rules.get(rule_id), their_rules.get(rule_id)
+        base = base_rules.get(rule_id)
+        if ours is None or theirs is None or base is None:
+            continue
+        for field in NUMERIC_FIELDS:
+            if (
+                ours.get(field) != theirs.get(field)
+                and base.get(field) != ours.get(field)
+                and base.get(field) != theirs.get(field)
+            ):
+                ambiguous.append(rule_id)
+                break
+
+    if not ambiguous:
+        return []
+
+    measured = _remeasure(ctx, rel_path, merged)
+    notes = _apply_measurements(
+        ctx, rel_path, merged_rules, ambiguous, our_rules, their_rules, measured
+    )
+    merged["rules"] = [merged_rules[rule["id"]] for rule in merged["rules"]]
+    (ctx.repo_root / rel_path).write_text(
+        json.dumps(merged, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return [f"remeasured {rel_path}: " + "; ".join(notes)]
 
 
 # --------------------------------------------------------------------------

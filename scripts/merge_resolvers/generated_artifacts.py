@@ -47,8 +47,7 @@ OPENAPI_JSON = "apps/dsa-web/openapi.json"
 API_TYPES = "apps/dsa-web/src/types/api.generated.ts"
 SUPPORTED = (OPENAPI_JSON, API_TYPES)
 
-# Deferred so that regeneration happens once, after the whole batch is planned.
-DEFERRED = True
+DEFERRED_NOTE = "deferred"
 
 
 def matches(rel_path: str) -> bool:
@@ -59,8 +58,8 @@ def resolve(ctx: Context, rel_path: str) -> Resolution:
     """Return a placeholder resolution; the real work happens in ``finalize``."""
 
     # The conflicted working-tree content is irrelevant: the file is replaced
-    # wholesale by the generator. Start from the "ours" stage so that a failed
-    # regeneration cannot leave conflict markers behind.
+    # wholesale by the generator. Start from the "ours" stage so that the tree
+    # is never left holding conflict markers while the generators run.
     ours = ctx.stage(rel_path, 2)
     if ours is None:
         raise Refusal(rel_path, "missing index stage 'ours'; needs a human")
@@ -68,15 +67,15 @@ def resolve(ctx: Context, rel_path: str) -> Resolution:
         path=rel_path,
         text=ours,
         detail="scheduled for regeneration from the merged tree",
-        notes=["regenerate"],
+        notes=[DEFERRED_NOTE],
     )
 
 
-def finalize(ctx: Context, resolved_paths: list[str]) -> list[str]:
-    """Run the generators and return the paths that were rewritten."""
+def finalize(ctx: Context, rel_path: str) -> list[str]:
+    """Run the generator that owns ``rel_path`` and verify its output."""
 
     messages: list[str] = []
-    if OPENAPI_JSON in resolved_paths or API_TYPES in resolved_paths:
+    if rel_path == OPENAPI_JSON:
         script = ctx.repo_root / "scripts" / "export_openapi.py"
         if not script.is_file():
             raise Refusal(OPENAPI_JSON, "scripts/export_openapi.py is missing")
@@ -93,8 +92,7 @@ def finalize(ctx: Context, resolved_paths: list[str]) -> list[str]:
                 + (proc.stderr or proc.stdout).strip()[-600:],
             )
         messages.append("regenerated apps/dsa-web/openapi.json")
-
-    if API_TYPES in resolved_paths:
+    elif rel_path == API_TYPES:
         web_root = ctx.repo_root / "apps" / "dsa-web"
         if not (web_root / "node_modules").is_dir():
             raise Refusal(
@@ -116,10 +114,9 @@ def finalize(ctx: Context, resolved_paths: list[str]) -> list[str]:
             )
         messages.append("regenerated apps/dsa-web/src/types/api.generated.ts")
 
-    for rel_path in resolved_paths:
-        if not (ctx.repo_root / rel_path).is_file():
-            raise Refusal(rel_path, "generator did not produce the expected file")
-        text = Path(ctx.repo_root / rel_path).read_text(encoding="utf-8")
-        if "<<<<<<<" in text:
-            raise Refusal(rel_path, "generated output still contains conflict markers")
+    target = ctx.repo_root / rel_path
+    if not target.is_file():
+        raise Refusal(rel_path, "generator did not produce the expected file")
+    if "<<<<<<<" in Path(target).read_text(encoding="utf-8"):
+        raise Refusal(rel_path, "generated output still contains conflict markers")
     return messages
