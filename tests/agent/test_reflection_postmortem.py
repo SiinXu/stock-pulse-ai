@@ -18,6 +18,7 @@ from src.agent.evolution.lessons import LESSON_KINDS, ReflectionLesson
 from src.agent.evolution.postmortem import (
     ResolvedClaimOutcome,
     ResolvedForecastInput,
+    build_deterministic_lessons,
     infer_lesson_kinds,
     is_postmortem_enabled,
     reflect_resolved_forecast,
@@ -182,6 +183,66 @@ def test_reflection_llm_budget_enforced_and_recorded() -> None:
     assert result.lessons == []
 
 
+def test_reflection_budget_skip_keeps_seed_lessons() -> None:
+    ctx = _ctx(episode_id="ep-seed-budget")
+    seed = [
+        ReflectionLesson(
+            kind="evidence_gap",
+            severity="high",
+            claim_ref="c1",
+            remedy="Require multi-source coverage.",
+            source_step="critic",
+        )
+    ]
+    result = run_reflection_loop(
+        ctx,
+        config=_config(),
+        seed_lessons=seed,
+        llm_complete=lambda _s, _u: (_ for _ in ()).throw(AssertionError("no LLM")),
+        budget=LlmCallBudget(total=0),
+    )
+
+    assert result.status == "budget_skipped"
+    assert result.terminate_reason == "budget"
+    assert len(result.lessons) == 1
+    assert result.lessons[0].kind == "evidence_gap"
+
+
+def test_reflection_uses_config_llm_budget_and_max_revise() -> None:
+    ctx = _ctx(episode_id="ep-config-budget")
+    calls: List[str] = []
+    revise_calls = {"n": 0}
+
+    def _llm(system: str, user: str) -> str:
+        calls.append(system)
+        return json.dumps({"lessons": []})
+
+    def _revise(_ctx: Any, _lessons: Any) -> bool:
+        revise_calls["n"] += 1
+        return True
+
+    skipped = run_reflection_loop(
+        ctx,
+        config=_config(agent_reflection_llm_budget=0),
+        llm_complete=_llm,
+        seed_lessons=[ReflectionLesson(kind="format_violation", severity="low", source_step="decision")],
+    )
+    assert calls == []
+    assert skipped.status == "budget_skipped"
+    assert skipped.llm_budget_total == 0
+    assert skipped.lessons[0].kind == "format_violation"
+
+    ctx2 = _ctx(episode_id="ep-config-revise")
+    result = run_reflection_loop(
+        ctx2,
+        config=_config(agent_reflection_max_revise=0),
+        seed_lessons=[ReflectionLesson(kind="format_violation", severity="low", source_step="decision")],
+        revise_fn=_revise,
+    )
+    assert result.revised is False
+    assert revise_calls["n"] == 0
+
+
 def test_reflection_one_revise_max() -> None:
     ctx = _ctx(episode_id="ep-revise")
     revise_calls = {"n": 0}
@@ -193,9 +254,7 @@ def test_reflection_one_revise_max() -> None:
     result = run_reflection_loop(
         ctx,
         config=_config(),
-        seed_lessons=[
-            ReflectionLesson(kind="format_violation", severity="low", source_step="decision")
-        ],
+        seed_lessons=[ReflectionLesson(kind="format_violation", severity="low", source_step="decision")],
         revise_fn=_revise,
         max_revise=1,
     )
@@ -227,9 +286,7 @@ def test_reflection_does_not_mutate_soul_or_toolsurface() -> None:
     denied = ["hidden_broker_order"]
     denials = ["tool_denied", "outbound_blocked"]
     soul_before = snapshot_soul_identity()
-    tools_before = snapshot_tool_surface_denials(
-        surface, denied_tools=denied, denial_codes=denials
-    )
+    tools_before = snapshot_tool_surface_denials(surface, denied_tools=denied, denial_codes=denials)
     charter_before = AGENT_SOUL_CHARTER
     hash_before = AGENT_SOUL_HASH
     version_before = AGENT_SOUL_VERSION
@@ -263,9 +320,7 @@ def test_reflection_does_not_mutate_soul_or_toolsurface() -> None:
 
     assert result.status == "completed"
     assert soul_before == snapshot_soul_identity()
-    assert tools_before == snapshot_tool_surface_denials(
-        surface, denied_tools=denied, denial_codes=denials
-    )
+    assert tools_before == snapshot_tool_surface_denials(surface, denied_tools=denied, denial_codes=denials)
     assert AGENT_SOUL_CHARTER == charter_before
     assert AGENT_SOUL_HASH == hash_before
     assert AGENT_SOUL_VERSION == version_before
@@ -317,6 +372,43 @@ def test_fixture_actuals_map_to_expected_lesson_kinds(
     assert any(lesson.kind == expected_kind for lesson in result.lessons)
 
 
+def test_partial_with_specific_kind_does_not_add_horizon_mismatch() -> None:
+    item = _miss_item(signals=["evidence_gap"], confidence=0.5, score="partial")
+    kinds = infer_lesson_kinds(item)
+    assert kinds == ["evidence_gap"]
+    assert "horizon_mismatch" not in kinds
+
+
+def test_deterministic_lessons_use_source_claim_ref() -> None:
+    item = ResolvedForecastInput(
+        episode_id="ep-multi",
+        prediction_id="pred-multi",
+        claims=[
+            ResolvedClaimOutcome(
+                claim_id="hit-claim",
+                claim_type="direction",
+                score="hit",
+                confidence=0.6,
+                predicted={"direction": "up"},
+                actual={"direction": "up"},
+            ),
+            ResolvedClaimOutcome(
+                claim_id="miss-claim",
+                claim_type="direction",
+                score="miss",
+                confidence=0.9,
+                predicted={"direction": "up"},
+                actual={"direction": "down"},
+                signals=["overconfidence"],
+            ),
+        ],
+    )
+    lessons = build_deterministic_lessons(item)
+    assert lessons
+    assert all(lesson.claim_ref == "miss-claim" for lesson in lessons)
+    assert any(lesson.kind == "overconfidence" for lesson in lessons)
+
+
 def test_postmortem_misses_generate_lessons_without_user_trigger() -> None:
     item = _miss_item(signals=["evidence_gap"], confidence=0.7)
     result = reflect_resolved_forecast(
@@ -330,10 +422,7 @@ def test_postmortem_misses_generate_lessons_without_user_trigger() -> None:
 
 
 def test_postmortem_batch_llm_budget_hard_cap() -> None:
-    items = [
-        _miss_item(episode_id=f"ep-{i}", prediction_id=f"pred-{i}", signals=["evidence_gap"])
-        for i in range(5)
-    ]
+    items = [_miss_item(episode_id=f"ep-{i}", prediction_id=f"pred-{i}", signals=["evidence_gap"]) for i in range(5)]
     calls: List[str] = []
 
     def _llm(system: str, user: str) -> str:
@@ -376,6 +465,63 @@ def test_postmortem_batch_llm_budget_hard_cap() -> None:
         # Episode linkage remains even when LLM is skipped.
         assert item.episode_id.startswith("ep-")
         assert item.prediction_id.startswith("pred-")
+
+
+def test_postmortem_batch_uses_config_llm_budget() -> None:
+    items = [_miss_item(episode_id=f"ep-{i}", prediction_id=f"pred-{i}", signals=["evidence_gap"]) for i in range(5)]
+    calls: List[str] = []
+
+    def _llm(system: str, user: str) -> str:
+        calls.append(user)
+        return json.dumps(
+            {
+                "lessons": [
+                    {
+                        "kind": "evidence_gap",
+                        "severity": "high",
+                        "claim_ref": "c1",
+                        "remedy": "Need volume confirmation.",
+                        "source_step": "postmortem",
+                    }
+                ]
+            }
+        )
+
+    batch = run_postmortem_batch(
+        items,
+        config=_config(agent_reflection_llm_budget=99, agent_postmortem_llm_budget=2),
+        llm_complete=_llm,
+    )
+
+    assert len(calls) == 2
+    assert batch.llm_budget_total == 2
+    assert batch.llm_budget_consumed == 2
+    assert batch.budget_skips >= 3
+
+
+def test_postmortem_llm_error_keeps_deterministic_lessons() -> None:
+    item = _miss_item(signals=["evidence_gap"], confidence=0.7)
+
+    invalid = reflect_resolved_forecast(
+        item,
+        config=_config(),
+        llm_complete=lambda _s, _u: "not-json",
+        budget=LlmCallBudget(total=1),
+    )
+    assert invalid.status == "error"
+    assert any(lesson.kind == "evidence_gap" for lesson in invalid.lessons)
+
+    def _boom(_system: str, _user: str) -> str:
+        raise RuntimeError("transport")
+
+    failed = reflect_resolved_forecast(
+        item,
+        config=_config(),
+        llm_complete=_boom,
+        budget=LlmCallBudget(total=1),
+    )
+    assert failed.status == "error"
+    assert any(lesson.kind == "evidence_gap" for lesson in failed.lessons)
 
 
 def test_postmortem_skips_clean_hits_under_cost_policy() -> None:
@@ -435,9 +581,7 @@ def test_postmortem_does_not_mutate_soul_or_toolsurface() -> None:
     denied = ["secret_tool"]
     denials = ["capability_denied"]
     soul_before = snapshot_soul_identity()
-    tools_before = snapshot_tool_surface_denials(
-        surface, denied_tools=denied, denial_codes=denials
-    )
+    tools_before = snapshot_tool_surface_denials(surface, denied_tools=denied, denial_codes=denials)
     public_before = list(surface.list_tools(format="public"))
 
     item = _miss_item(signals=["overconfidence"], confidence=0.99)
@@ -467,9 +611,7 @@ def test_postmortem_does_not_mutate_soul_or_toolsurface() -> None:
     assert result.status == "completed"
     assert result.lessons[0].kind == "overconfidence"
     assert soul_before == snapshot_soul_identity()
-    assert tools_before == snapshot_tool_surface_denials(
-        surface, denied_tools=denied, denial_codes=denials
-    )
+    assert tools_before == snapshot_tool_surface_denials(surface, denied_tools=denied, denial_codes=denials)
     assert surface.list_tools(format="public") == public_before
     assert AGENT_SOUL_HASH.startswith("sha256:")
 

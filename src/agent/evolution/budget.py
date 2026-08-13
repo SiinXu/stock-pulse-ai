@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-
 BUDGET_SKIPPED = "budget_skipped"
 DEFAULT_REFLECTION_LLM_BUDGET = 1
 DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET = 8
@@ -71,11 +70,19 @@ class LlmCallBudget:
         }
 
 
-def budget_from_config(config: Any, *, default: int = DEFAULT_REFLECTION_LLM_BUDGET) -> LlmCallBudget:
-    """Build a budget from config attributes with safe defaults."""
-    raw = getattr(config, "agent_reflection_llm_budget", None)
-    if raw is None:
-        raw = getattr(config, "agent_postmortem_llm_budget", None)
+def budget_from_config(
+    config: Any,
+    *,
+    default: int = DEFAULT_REFLECTION_LLM_BUDGET,
+    attr: str = "agent_reflection_llm_budget",
+) -> LlmCallBudget:
+    """Build a budget from one named config attribute with a safe default.
+
+    Callers must pass ``attr`` for post-mortem vs reflection: both fields are
+    always ints on Config, so a reflection-first fallback would never apply
+    ``agent_postmortem_llm_budget``.
+    """
+    raw = getattr(config, attr, None) if config is not None else None
     try:
         total = int(raw) if raw is not None else int(default)
     except (TypeError, ValueError):

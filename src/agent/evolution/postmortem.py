@@ -23,6 +23,7 @@ from src.agent.evolution.budget import (
     BUDGET_SKIPPED,
     DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET,
     LlmCallBudget,
+    budget_from_config,
 )
 from src.agent.evolution.guards import (
     assert_soul_unchanged,
@@ -147,6 +148,38 @@ def _overall_score(item: ResolvedForecastInput) -> ClaimScore:
     return "hit"
 
 
+def _kinds_for_claim(claim: ResolvedClaimOutcome, flag_set: set[str]) -> List[str]:
+    """Infer kinds for one miss/partial claim; unexplained partials get horizon_mismatch."""
+    kinds: List[str] = []
+    signals = set(claim.signals) | flag_set
+    if "evidence_gap" in signals or "missing_evidence" in signals:
+        kinds.append("evidence_gap")
+    if "regime_shift" in signals or "regime_change" in signals:
+        kinds.append("regime_shift")
+    if "horizon_mismatch" in signals or "wrong_horizon" in signals:
+        kinds.append("horizon_mismatch")
+    if "tool_failure" in signals or "tool_error" in signals:
+        kinds.append("tool_failure")
+    if "risk_omission" in signals:
+        kinds.append("risk_omission")
+    if "format_violation" in signals:
+        kinds.append("format_violation")
+    if "overclaim" in signals:
+        kinds.append("overclaim")
+    if "overconfidence" in signals or (
+        claim.confidence is not None and claim.confidence >= 0.8 and claim.score == "miss"
+    ):
+        kinds.append("overconfidence")
+    # Unexplained partials only — a more specific kind on this claim suppresses the default.
+    if claim.score == "partial" and not kinds:
+        kinds.append("horizon_mismatch")
+    ordered: List[str] = []
+    for kind in kinds:
+        if kind not in ordered:
+            ordered.append(kind)
+    return ordered
+
+
 def infer_lesson_kinds(item: ResolvedForecastInput) -> List[str]:
     """Deterministic kind inference from scored claims and structured flags."""
     overall = _overall_score(item)
@@ -158,39 +191,12 @@ def infer_lesson_kinds(item: ResolvedForecastInput) -> List[str]:
     for claim in item.claims:
         if claim.score not in {"miss", "partial"}:
             continue
-        signals = set(claim.signals) | flag_set
-        if "evidence_gap" in signals or "missing_evidence" in signals:
-            kinds.append("evidence_gap")
-        if "regime_shift" in signals or "regime_change" in signals:
-            kinds.append("regime_shift")
-        if "horizon_mismatch" in signals or "wrong_horizon" in signals:
-            kinds.append("horizon_mismatch")
-        if "tool_failure" in signals or "tool_error" in signals:
-            kinds.append("tool_failure")
-        if "risk_omission" in signals:
-            kinds.append("risk_omission")
-        if "format_violation" in signals:
-            kinds.append("format_violation")
-        if "overclaim" in signals:
-            kinds.append("overclaim")
-        if (
-            "overconfidence" in signals
-            or (claim.confidence is not None and claim.confidence >= 0.8 and claim.score == "miss")
-        ):
-            kinds.append("overconfidence")
-        if claim.score == "partial" and "horizon_mismatch" not in kinds:
-            if "regime_shift" in signals:
-                kinds.append("regime_shift")
-            else:
-                kinds.append("horizon_mismatch")
-
-    ordered: List[str] = []
-    for kind in kinds:
-        if kind not in ordered:
-            ordered.append(kind)
-    if not ordered and overall in {"miss", "partial"}:
-        ordered.append("other")
-    return ordered
+        for kind in _kinds_for_claim(claim, flag_set):
+            if kind not in kinds:
+                kinds.append(kind)
+    if not kinds and overall in {"miss", "partial"}:
+        kinds.append("other")
+    return kinds
 
 
 def _default_remedies() -> Dict[str, str]:
@@ -209,16 +215,36 @@ def _default_remedies() -> Dict[str, str]:
 
 def build_deterministic_lessons(item: ResolvedForecastInput) -> List[ReflectionLesson]:
     """Build typed lessons from fixture-friendly score signals."""
-    kinds = infer_lesson_kinds(item)
-    claim_ref = item.claims[0].claim_id if item.claims else item.prediction_id
-    severity = "high" if _overall_score(item) == "miss" else "medium"
-    return lessons_from_kinds(
-        kinds,
-        claim_ref=claim_ref,
-        severity=severity,  # type: ignore[arg-type]
-        remedies=_default_remedies(),
-        source_step="postmortem",
-    )
+    overall = _overall_score(item)
+    if overall in {"hit", "data_unavailable"}:
+        return []
+    severity = "high" if overall == "miss" else "medium"
+    flag_set = {flag.strip().lower() for flag in item.flags}
+    lessons: List[ReflectionLesson] = []
+    for claim in item.claims:
+        if claim.score not in {"miss", "partial"}:
+            continue
+        lessons.extend(
+            lessons_from_kinds(
+                _kinds_for_claim(claim, flag_set),
+                claim_ref=claim.claim_id,
+                severity=severity,  # type: ignore[arg-type]
+                remedies=_default_remedies(),
+                source_step="postmortem",
+            )
+        )
+        if len(lessons) >= 8:
+            return lessons[:8]
+    if not lessons and overall in {"miss", "partial"}:
+        claim_ref = item.claims[0].claim_id if item.claims else item.prediction_id
+        return lessons_from_kinds(
+            ["other"],
+            claim_ref=claim_ref,
+            severity=severity,  # type: ignore[arg-type]
+            remedies=_default_remedies(),
+            source_step="postmortem",
+        )
+    return lessons
 
 
 def _parse_strict_json_object(raw_text: str) -> Optional[Dict[str, Any]]:
@@ -314,9 +340,8 @@ def _postmortem_user_payload(item: ResolvedForecastInput) -> str:
         "flags": list(item.flags),
         "overall_score": _overall_score(item),
     }
-    return (
-        "Review this resolved forecast and emit typed lessons for misses/partials:\n"
-        + json.dumps(payload, ensure_ascii=False, default=str)
+    return "Review this resolved forecast and emit typed lessons for misses/partials:\n" + json.dumps(
+        payload, ensure_ascii=False, default=str
     )
 
 
@@ -380,9 +405,7 @@ def reflect_resolved_forecast(
             llm_budget_consumed=call_budget.consumed,
             llm_budget_remaining=call_budget.remaining,
             validation_status="data_unavailable",
-            skip_reason=(
-                "Actuals unavailable; post-mortem skipped without fabricating a hit."
-            ),
+            skip_reason=("Actuals unavailable; post-mortem skipped without fabricating a hit."),
         )
         assert_soul_unchanged(soul_before)
         assert_tool_surface_unchanged(
@@ -393,10 +416,7 @@ def reflect_resolved_forecast(
         )
         return result
 
-    if overall == "hit" and (
-        cost_mode == "tight"
-        or getattr(config, "agent_postmortem_skip_clean_hits", True) is True
-    ):
+    if overall == "hit" and (cost_mode == "tight" or getattr(config, "agent_postmortem_skip_clean_hits", True) is True):
         result = ReflectionResult(
             lessons=[],
             revised=False,
@@ -435,9 +455,7 @@ def reflect_resolved_forecast(
             terminate_reason = "budget"
             status = "budget_skipped"
             validation_status = BUDGET_SKIPPED
-            skip_reason = (
-                "Post-mortem LLM call skipped: batch LLM budget exhausted."
-            )
+            skip_reason = "Post-mortem LLM call skipped: batch LLM budget exhausted."
         else:
             try:
                 raw = llm_complete(
@@ -455,8 +473,9 @@ def reflect_resolved_forecast(
                     status = "error"
                     validation_status = "invalid"
                     skip_reason = parsed.skip_reason
-                    lessons = []
-            except Exception as exc:  # broad-exception: fallback_recorded - Post-mortem LLM failures are fail-soft and recorded.
+            except (
+                Exception
+            ) as exc:  # broad-exception: fallback_recorded - Post-mortem LLM failures are fail-soft and recorded.
                 log_safe_exception(
                     logger,
                     "Post-mortem LLM call failed",
@@ -467,10 +486,7 @@ def reflect_resolved_forecast(
                 terminate_reason = "error"
                 status = "error"
                 validation_status = "error"
-                skip_reason = sanitize_agent_diagnostic(
-                    f"Post-mortem LLM failed: {type(exc).__name__}"
-                )
-                lessons = []
+                skip_reason = sanitize_agent_diagnostic(f"Post-mortem LLM failed: {type(exc).__name__}")
 
     result = ReflectionResult(
         lessons=lessons,
@@ -511,7 +527,11 @@ def run_postmortem_batch(
     denial_codes: Optional[Sequence[str]] = None,
 ) -> PostMortemBatchResult:
     """Run post-mortem over a resolution batch under one shared LLM budget."""
-    call_budget = budget or LlmCallBudget(total=DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET)
+    call_budget = budget or budget_from_config(
+        config,
+        default=DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET,
+        attr="agent_postmortem_llm_budget",
+    )
     results: List[ReflectionResult] = []
     bundles: List[EpisodeLessonBundle] = []
 

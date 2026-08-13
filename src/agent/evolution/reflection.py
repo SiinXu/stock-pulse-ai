@@ -20,6 +20,7 @@ from src.agent.evolution.budget import (
     BUDGET_SKIPPED,
     DEFAULT_REFLECTION_LLM_BUDGET,
     LlmCallBudget,
+    budget_from_config,
 )
 from src.agent.evolution.guards import (
     assert_soul_unchanged,
@@ -60,9 +61,7 @@ def is_reflection_enabled(config: Any, ctx: Any = None) -> bool:
     if getattr(config, "agent_reflection_enabled", False) is not True:
         return False
     if ctx is not None and getattr(ctx, "meta", None):
-        if ctx.meta.get("response_mode") == "chat" and not getattr(
-            config, "agent_reflection_in_chat", False
-        ):
+        if ctx.meta.get("response_mode") == "chat" and not getattr(config, "agent_reflection_in_chat", False):
             return False
     return True
 
@@ -167,7 +166,7 @@ def run_reflection_loop(
     llm_complete: Optional[LlmCompleteFn] = None,
     revise_fn: Optional[ReviseFn] = None,
     budget: Optional[LlmCallBudget] = None,
-    max_revise: int = DEFAULT_MAX_REVISE,
+    max_revise: Optional[int] = None,
     tool_surface: Any = None,
     denied_tools: Optional[Sequence[str]] = None,
     denial_codes: Optional[Sequence[str]] = None,
@@ -198,7 +197,17 @@ def run_reflection_loop(
         )
         return result
 
-    call_budget = budget or LlmCallBudget(total=DEFAULT_REFLECTION_LLM_BUDGET)
+    call_budget = budget or budget_from_config(
+        config,
+        default=DEFAULT_REFLECTION_LLM_BUDGET,
+        attr="agent_reflection_llm_budget",
+    )
+    if max_revise is None:
+        raw = getattr(config, "agent_reflection_max_revise", None) if config is not None else None
+        try:
+            max_revise = int(raw) if raw is not None else DEFAULT_MAX_REVISE
+        except (TypeError, ValueError):
+            max_revise = DEFAULT_MAX_REVISE
     max_revise = max(0, int(max_revise))
     _emit("reflect_start", {"llm_budget_total": call_budget.total})
 
@@ -216,7 +225,6 @@ def run_reflection_loop(
             status = "budget_skipped"
             validation_status = BUDGET_SKIPPED
             skip_reason = "Reflection LLM call skipped: budget exhausted."
-            lessons = []
         else:
             user_payload = _build_reflection_user_payload(ctx)
             try:
@@ -230,8 +238,9 @@ def run_reflection_loop(
                     status = "error"
                     validation_status = "invalid"
                     skip_reason = parsed.skip_reason
-                    lessons = []
-            except Exception as exc:  # broad-exception: fallback_recorded - Reflection LLM failures are fail-soft and recorded.
+            except (
+                Exception
+            ) as exc:  # broad-exception: fallback_recorded - Reflection LLM failures are fail-soft and recorded.
                 log_safe_exception(
                     logger,
                     "Reflection LLM call failed",
@@ -242,10 +251,7 @@ def run_reflection_loop(
                 terminate_reason = "error"
                 status = "error"
                 validation_status = "error"
-                skip_reason = sanitize_agent_diagnostic(
-                    f"Reflection LLM failed: {type(exc).__name__}"
-                )
-                lessons = []
+                skip_reason = sanitize_agent_diagnostic(f"Reflection LLM failed: {type(exc).__name__}")
 
     for lesson in lessons:
         _emit(
@@ -257,18 +263,15 @@ def run_reflection_loop(
             },
         )
 
-    if (
-        terminate_reason == "ok"
-        and lessons
-        and revise_fn is not None
-        and max_revise > 0
-    ):
+    if terminate_reason == "ok" and lessons and revise_fn is not None and max_revise > 0:
         try:
             did_revise = bool(revise_fn(ctx, lessons))
             if did_revise:
                 revised = True
                 _emit("reflect_revise", {"revised": True})
-        except Exception as exc:  # broad-exception: fallback_recorded - Optional revise failures are fail-soft and recorded.
+        except (
+            Exception
+        ) as exc:  # broad-exception: fallback_recorded - Optional revise failures are fail-soft and recorded.
             log_safe_exception(
                 logger,
                 "Reflection revise failed",
@@ -279,9 +282,7 @@ def run_reflection_loop(
             terminate_reason = "error"
             status = "error"
             validation_status = "error"
-            skip_reason = sanitize_agent_diagnostic(
-                f"Reflection revise failed: {type(exc).__name__}"
-            )
+            skip_reason = sanitize_agent_diagnostic(f"Reflection revise failed: {type(exc).__name__}")
 
     result = ReflectionResult(
         lessons=lessons,
@@ -358,9 +359,8 @@ def _build_reflection_user_payload(ctx: Any) -> str:
         "degraded_stages": meta.get("degraded_stages", []),
         "critic_trace": meta.get("critic_trace"),
     }
-    return (
-        "Critique this completed run snapshot and emit typed lessons only:\n"
-        + json.dumps(payload, ensure_ascii=False, default=str)
+    return "Critique this completed run snapshot and emit typed lessons only:\n" + json.dumps(
+        payload, ensure_ascii=False, default=str
     )
 
 
