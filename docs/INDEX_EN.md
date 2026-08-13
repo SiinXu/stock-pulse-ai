@@ -9,7 +9,7 @@ This is the entry point for project documentation. The README covers the project
 | I want to | Start with | Then read |
 | --- | --- | --- |
 | Understand what the project does | [README (EN, root)](../README.md) | [Full Guide (EN)](full-guide_EN.md) |
-| **Understand StockPulse positioning and highlights** | [README · Why StockPulse](../README.md#why-stockpulse) | [简体 README](README_CN.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
+| **Understand StockPulse positioning and highlights** | [README · Why StockPulse](../README.md#why-stockpulse) | [Competitive landscape (local-first peers)](competitive-landscape.md) ([中文](competitive-landscape_CN.md)), [简体 README](README_CN.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
 | Run the project for the first time | [Beginner client setup (EN)](beginner-client-setup_EN.md) | [Why StockPulse](../README.md#why-stockpulse), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries), [Full Guide (EN)](full-guide_EN.md), [UI User Manual](ui-manual/README_EN.md) |
 | **Learn the Web / desktop UI** | [UI User Manual](ui-manual/README_EN.md) | Per-module chapters (analysis, signals, portfolio, …) |
 | Configure model providers | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) | [Local Model Catalog](local-model-catalog.md), [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
@@ -33,6 +33,7 @@ This is the entry point for project documentation. The README covers the project
 | Document | Contents |
 | --- | --- |
 | [README (EN, root)](../README.md) | Project homepage: positioning, differentiators, features, quick start |
+| [Competitive landscape (local-first finance AI peers)](competitive-landscape.md) | Honest peer table, StockPulse differentiators, shipped vs planned, gaps ([中文](competitive-landscape_CN.md); Refs #799, #1063) |
 | [README (简体中文)](README_CN.md) | Chinese project overview |
 | [Beginner client setup (EN)](beginner-client-setup_EN.md) | Download desktop client, Anspire/AIHubMix keys, watchlist, first analysis; [中文](beginner-client-setup.md) |
 | [Agent-guided onboarding (EN)](agent-guided-onboarding_EN.md) | Profile intake, rule-based config plan, non-secret apply, L0–L3 paths; [中文](agent-guided-onboarding.md) |
@@ -80,12 +81,15 @@ This is the entry point for project documentation. The README covers the project
 | [Daily Brief (personal morning + accuracy)](daily-brief_EN.md) | Holdings, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, honesty-first accuracy ([Chinese](daily-brief.md)) |
 | [Event Research Brief](event-research-brief_EN.md) | Earnings EventBrief (metrics, surprise criteria, post-event checklist) ([Chinese](event-research-brief.md)) |
 | [DecisionSignal Topic](decision-signals.md) <sub><sub>![P7 Badge](https://img.shields.io/badge/P7-orange?style=flat)</sub></sub> (Chinese-only) | AI signal fields, API, Web display, alert/notification/portfolio-risk linkage, outcome evaluation, redaction, migration, and rollback |
+| [Prediction resolve_after calendar policy](prediction-resolve-after_EN.md) | Horizon → UTC `resolve_after` via exchange sessions for CN/HK/US; holidays, half-days, cross-market rules; no natural-day approximation ([中文](prediction-resolve-after.md)) |
 | [Personal Investment Framework](personal-investment-framework_EN.md) | Minimal Settings editor, versioned API, single-stock read-only injection, and report framework_alignment slot |
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
 | [Skill Opinion Outcome Evaluation](skill-opinion-outcome-evaluation.md) | Individual skill samples, offline forward outcomes, sample-sufficiency statistics, migration, and V0 boundaries |
+| [Prediction ActualsFetcher](prediction-actuals-fetcher.md) | Server-path actuals for prediction scoring: DataFetcherManager, short-TTL coalesce, provider_down/data_unavailable, non-finite rejection (#1110 / #1107) |
 | [Analysis Context Pack Contract, Runtime Consumption, And Visibility](analysis-context-pack.md) <sub><sub>![P6 Badge](https://img.shields.io/badge/P6-orange?style=flat)</sub></sub> (Chinese-only) | AnalysisContextPack first-scope boundaries, field quality states, P1/P2 internal contracts, P3 prompt-summary consumption, P4 history/API/Web low-sensitivity visibility, P5 data-quality scoring, and P6 migration/rollback notes, plus source anchors; the full guide adds #1386 market-phase analysis, migration, and rollback entry points |
+| [Sentiment Analysis Pipeline](sentiment-analysis-pipeline_EN.md) | News/event sentiment evidence pipeline with source traceability, freshness, confidence, and AnalysisContextPack evidence role (#179) |
 | [Image Extraction Prompt](image-extract-prompt.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Prompt and boundaries for extracting stock information from images |
 | [OpenClaw Skill Integration](openclaw-skill-integration.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | OpenClaw / Skill external integration notes |
 

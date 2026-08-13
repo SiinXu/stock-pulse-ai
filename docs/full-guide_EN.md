@@ -1318,6 +1318,26 @@ CLI, Web, analysis/watchlist APIs, CSV/Excel/clipboard smart import, and Bot ana
 
 HK daily history skips efinance, pytdx, baostock, and other built-in providers that do not support HK daily data, avoiding mismatches between HK symbols and non-HK market data. AkShare/Tushare/YFinance/Longbridge continue to provide HK fallback paths. If Longbridge is inside its connection cooldown window, the route temporarily skips it and continues with the remaining HK-capable fallbacks.
 
+### ETF and index analysis
+
+For index-tracking ETFs and US indices (for example VOO, QQQ, SPY, 510050, SPX, DJI, IXIC), analysis focuses on **index path, tracking quality, and liquidity**, not fund-manager issuer risk (lawsuits, reputation, executive changes). Risk alerts and performance expectations are based on the constituent basket, not fund-company filings. See Issue #274.
+
+#### A-share ETF analysis semantics (Issue #173)
+
+A-share ETFs are identified as a distinct instrument type and take the **ETF analysis path**, while keeping the same decision-dashboard report structure as single stocks:
+
+| Dimension | Behavior |
+| --- | --- |
+| Identification | Code prefixes `51/52/56/58/15/16/18` (aligned with `data_provider` ETF routing); offshore names still use the existing `is_index_or_etf` heuristic |
+| Tracking target | Liquid bootstrap map first (e.g. `510300→CSI 300`, `159915→ChiNext`), else name heuristics; unresolved → `not_available` |
+| Premium/discount | Computed after realtime maps IOPV/NAV into analysis context when providers expose them; otherwise `not_available` (never invented). Pure indices use `not_applicable`. |
+| Holdings exposure | Coarse `broad_index` / `sector_theme` class; full constituent look-through is outside the public provider contract → `not_available` |
+| Inapplicable metrics | PE/PB/ROE/company financials/chip/Dragon Tiger lists are explicit **`not_applicable`** (including equity-style chip health framing) — do not hard-calculate; separate from validation-layer missing-field calibration (#185) |
+| Index vs ETF | Pure market indices (e.g. SPX) use `instrument_type=index`; A-share/offshore ETFs use `etf` |
+| Report structure | Shared decision-dashboard JSON with equities; no separate ETF template |
+
+Representative regression codes: `510300`, `510050`, `159915`, `159919`, `512880`. Validation-layer ETF false-positive calibration is documented in `docs/data-validation-layer.md` and Issue #185.
+
 ### Multi-Model Switching
 
 Configure multiple models, system auto-switches:
@@ -1739,7 +1759,7 @@ A: Check if Actions is enabled, and if cron expression is correct (note it's UTC
 - Expired idempotency records are lazily removed by a later keyed Portfolio write and an expired key starts a new operation. Cleanup, lookup, and ledger mutation share the same atomic transaction. Cleanup deletes only `portfolio_idempotency_records`; it does not delete trades, cash entries, corporate actions, snapshots, or any other ledger data.
 - Existing SQLite tables receive nullable scope columns, a unique index, and a legacy-write guard trigger through an additive migration. Raw-key legacy rows cannot prove their historical owner at write time, so they are retained unscoped and are not replayed by the current runtime; the same client key starts a new scoped operation.
 - Rollback uses a normal code revert while retaining the nullable columns, index, guard trigger, and all ledger data. The old runtime cannot read a v2 scoped response. If it tries to insert a raw row for an existing v2 client key, the trigger aborts the same transaction and rolls back the ledger mutation, preventing duplication but returning a failure instead of a replay. Other raw-key rows created during rollback remain unscoped on re-upgrade, so they cannot collide with the v2 unique index or block startup.
-- CSV records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
+- Spreadsheet import (CSV / `.xlsx`) is parsed before commit. Invalid rows are returned as structured `failed_rows` (`row_number`, `reason_code`, `reason`, `source`) so the Web wizard can download a correction file; empty rows are skipped. Valid records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
 - The Web client keeps the operation ID after a failed request, locks fields and close behavior while submission is pending, and changes compact forms to one column at 320px.
 
 ### Portfolio account archive on `/portfolio`
