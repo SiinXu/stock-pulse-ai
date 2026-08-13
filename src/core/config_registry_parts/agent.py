@@ -531,6 +531,42 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PREDICTION_EXTRACT_ENABLED": {
+        "title": "Prediction Extraction",
+        "description": (
+            "When enabled, map structured decision/dashboard fields into "
+            "PredictionRecord drafts after successful finalize (research / "
+            "quality-ops only). Default off. Prose is never parsed into claims; "
+            "extraction failures never fail analysis. Persistence of drafts is "
+            "owned by later prediction-verification stages."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 63,
+        "help_key": "settings.agent.PREDICTION_EXTRACT_ENABLED",
+        "examples": [
+            "PREDICTION_EXTRACT_ENABLED=false",
+            "PREDICTION_EXTRACT_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Prediction Extraction",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/prediction-extraction_EN.md",
+            },
+            {
+                "label": "Prediction Contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/prediction-contract_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
 
     "SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED": {
         "title": "Skill Opinion Outcome Weights",
