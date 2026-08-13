@@ -128,3 +128,5 @@ Fresh 数据库由 SQLAlchemy metadata 建表，registered migration 验证 shap
 4. 不要手工删除 `schema_migrations` 记录或直接删表伪造降级；旧代码看到未知更高 migration 会按现有合同 fail closed。
 
 回滚 PR 代码但保留新 migration 数据库并不是支持的旧版本恢复方式。若保留当前或更高版本代码，新增空表本身不会改变没有框架时的分析行为。
+
+可选字段 `research_stance` 保存研究立场预设/自定义文本/偏好视角 Skill id（#119/#467）；未设置默认不生效。见 [投资者 Persona](investor-personas.md)。

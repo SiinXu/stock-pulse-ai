@@ -1,0 +1,13 @@
+{
+  "id": "stockpulse.example-alternative-data",
+  "name": "StockPulse Example Alternative Data",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Default-off reference corporate-events alternative-data agent_tool with alt_data:read declaration and non-authoritative labeling.",
+  "author": "StockPulse Contributors",
+  "permissions": [
+    "alt_data:read"
+  ],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}

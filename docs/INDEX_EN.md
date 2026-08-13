@@ -9,7 +9,7 @@ This is the entry point for project documentation. The README covers the project
 | I want to | Start with | Then read |
 | --- | --- | --- |
 | Understand what the project does | [README (EN, root)](../README.md) | [Full Guide (EN)](full-guide_EN.md) |
-| **Understand StockPulse positioning and highlights** | [README · Why StockPulse](../README.md#why-stockpulse) | [简体 README](README_CN.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
+| **Understand StockPulse positioning and highlights** | [README · Why StockPulse](../README.md#why-stockpulse) | [Competitive landscape (local-first peers)](competitive-landscape.md) ([中文](competitive-landscape_CN.md)), [简体 README](README_CN.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
 | Run the project for the first time | [Beginner client setup (EN)](beginner-client-setup_EN.md) | [Why StockPulse](../README.md#why-stockpulse), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries), [Full Guide (EN)](full-guide_EN.md), [UI User Manual](ui-manual/README_EN.md) |
 | **Learn the Web / desktop UI** | [UI User Manual](ui-manual/README_EN.md) | Per-module chapters (analysis, signals, portfolio, …) |
 | Configure model providers | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) | [Local Model Catalog](local-model-catalog.md), [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
@@ -26,13 +26,14 @@ This is the entry point for project documentation. The README covers the project
 | Troubleshoot runtime issues | [FAQ (EN)](FAQ_EN.md) | [Changelog](CHANGELOG.md) |
 | Troubleshoot data-source failures | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | [FAQ (EN)](FAQ_EN.md), [Chinese version](data-source-stability.md) |
 | Review log/error/audit/trace secret handling | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | [Durable Security Audit](security-audit.md) / [中文](security-audit_zh.md), [Outbound HTTP Policy](security-outbound-policy.md) |
-| Contribute code or docs | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | [Business Architecture](business-architecture.md), [Technical Architecture](architecture-overview.md), [ADR Registry](adr/README.md), [API Spec](architecture/api_spec.json) |
+| Contribute code or docs | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md), [Business Architecture](business-architecture.md), [Technical Architecture](architecture-overview.md), [ADR Registry](adr/README.md), [API Spec](architecture/api_spec.json) |
 
 ## Getting Started
 
 | Document | Contents |
 | --- | --- |
 | [README (EN, root)](../README.md) | Project homepage: positioning, differentiators, features, quick start |
+| [Competitive landscape (local-first finance AI peers)](competitive-landscape.md) | Honest peer table, StockPulse differentiators, shipped vs planned, gaps ([中文](competitive-landscape_CN.md); Refs #799, #1063) |
 | [README (简体中文)](README_CN.md) | Chinese project overview |
 | [Beginner client setup (EN)](beginner-client-setup_EN.md) | Download desktop client, Anspire/AIHubMix keys, watchlist, first analysis; [中文](beginner-client-setup.md) |
 | [Agent-guided onboarding (EN)](agent-guided-onboarding_EN.md) | Profile intake, rule-based config plan, non-secret apply, L0–L3 paths; [中文](agent-guided-onboarding.md) |
@@ -52,9 +53,11 @@ This is the entry point for project documentation. The README covers the project
 | Document | Contents |
 | --- | --- |
 | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) | Model providers and connections, three-tier configuration, Web settings, and common model setup |
+| [LLM cost attribution & routing telemetry](llm-cost-attribution_EN.md) | Token/cost attribution by run/stage/model/mode, routing rates |
 | [Local Model Catalog](local-model-catalog.md) | Curated local models, verified artifacts and licenses, RAM tiers, distribution status, and Ollama packaging guidance |
 | [StockPulse Model Packs](model-packs.md) | Versioned GGUF pack format, offline import, validation failures, build tooling, and release limits |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Market-aware provider order, bounded health learning, circuit control, stale degradation, and production/zero-cost profiles |
+| [Parallel dependency-free data pulls](parallel-data-fetch.md) | Single-stock parallel realtime/chip/money-flow/fundamental pulls with concurrency caps and serial fallback (Issue #1126) |
 | [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Provider presets, GitHub Actions mapping, error categories, and diagnostics |
 | [LiteLLM YAML Example](examples/litellm_config.example.yaml) | Example LiteLLM multi-provider configuration |
 | [Notification Baseline](notifications.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | WeChat Work, Feishu, Telegram, Discord, Slack, Email, and other notification channels |
@@ -75,14 +78,20 @@ This is the entry point for project documentation. The README covers the project
 | [Real-Time Alert Center](alerts.md) <sub><sub>![P4 Badge](https://img.shields.io/badge/P4-yellow?style=flat)</sub></sub> | EventMonitor baseline, Web rule management, notification attempts, cooldown state, and phase boundaries (full Chinese history) |
 | [Alert Center — Issue #241 EN companion](alerts_EN.md) | English companion for context-aware corporate event alerts (backend V0) |
 | [Scheduled Tasks](scheduled-tasks.md) | Versioned daily analysis/research tasks, a read-only today view, trading-day policy, durable run records, bounded retry, and local/Docker/API ownership |
-| [Daily Brief (historical accuracy)](daily-brief_EN.md) | Config-gated morning brief: yesterday's analyses, watchlist context, and honesty-first accuracy from existing outcome stores ([Chinese](daily-brief.md)) |
+| [Daily Brief (personal morning + accuracy)](daily-brief_EN.md) | Holdings, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, honesty-first accuracy ([Chinese](daily-brief.md)) |
+| [Event Research Brief](event-research-brief_EN.md) | Earnings EventBrief (metrics, surprise criteria, post-event checklist) ([Chinese](event-research-brief.md)) |
 | [DecisionSignal Topic](decision-signals.md) <sub><sub>![P7 Badge](https://img.shields.io/badge/P7-orange?style=flat)</sub></sub> (Chinese-only) | AI signal fields, API, Web display, alert/notification/portfolio-risk linkage, outcome evaluation, redaction, migration, and rollback |
+| [Prediction resolve_after calendar policy](prediction-resolve-after_EN.md) | Horizon → UTC `resolve_after` via exchange sessions for CN/HK/US; holidays, half-days, cross-market rules; no natural-day approximation ([中文](prediction-resolve-after.md)) |
 | [Personal Investment Framework](personal-investment-framework_EN.md) | Minimal Settings editor, versioned API, single-stock read-only injection, and report framework_alignment slot |
+| [Portfolio-Level Multi-Symbol Analysis](portfolio-level-analysis_EN.md) | Basket analysis over a code list: correlation, concentration, shared risk, health/stress reuse, size limit and partial degradation; `POST /api/v1/analysis/portfolio` ([Chinese](portfolio-level-analysis.md)) |
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
+| [Investor Personas](investor-personas_EN.md) | Default-off research stances + investment-lens Skills (#119, #467) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
 | [Skill Opinion Outcome Evaluation](skill-opinion-outcome-evaluation.md) | Individual skill samples, offline forward outcomes, sample-sufficiency statistics, migration, and V0 boundaries |
+| [Prediction ActualsFetcher](prediction-actuals-fetcher.md) | Server-path actuals for prediction scoring: DataFetcherManager, short-TTL coalesce, provider_down/data_unavailable, non-finite rejection (#1110 / #1107) |
 | [Analysis Context Pack Contract, Runtime Consumption, And Visibility](analysis-context-pack.md) <sub><sub>![P6 Badge](https://img.shields.io/badge/P6-orange?style=flat)</sub></sub> (Chinese-only) | AnalysisContextPack first-scope boundaries, field quality states, P1/P2 internal contracts, P3 prompt-summary consumption, P4 history/API/Web low-sensitivity visibility, P5 data-quality scoring, and P6 migration/rollback notes, plus source anchors; the full guide adds #1386 market-phase analysis, migration, and rollback entry points |
+| [Sentiment Analysis Pipeline](sentiment-analysis-pipeline_EN.md) | News/event sentiment evidence pipeline with source traceability, freshness, confidence, and AnalysisContextPack evidence role (#179) |
 | [Image Extraction Prompt](image-extract-prompt.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Prompt and boundaries for extracting stock information from images |
 | [OpenClaw Skill Integration](openclaw-skill-integration.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | OpenClaw / Skill external integration notes |
 
@@ -94,6 +103,8 @@ This is the entry point for project documentation. The README covers the project
 | [Cloud WebUI Deployment](deploy-webui-cloud.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Cloud server WebUI access and deployment notes |
 | [Zeabur Deployment](docker/zeabur-deployment.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Zeabur platform deployment |
 | [Desktop Packaging](desktop-package_EN.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> ([中文](desktop-package.md)) | Electron desktop first-run, local models, and packaging notes |
+| [Desktop vs Web capability matrix](desktop-capability-matrix_EN.md) ([中文](desktop-capability-matrix.md)) | Desktop/Web capability matrix, CLI diagnostics, and update retention |
+| [Desktop deep-link policy](desktop-deep-link-policy_EN.md) ([中文](desktop-deep-link-policy.md)) | `stockpulse://` allowlist, rejection semantics, and UX |
 
 ## Reference And Development
 
@@ -102,23 +113,27 @@ This is the entry point for project documentation. The README covers the project
 | [Business Architecture](business-architecture.md) | Stakeholders, business capabilities, outcomes, and the value flow from evidence acquisition to notification |
 | [Technical Architecture](architecture-overview.md) | Current components, entrypoints, ownership boundaries, process modes, cache/fallback branches, and the eight-stage analysis data flow |
 | [Foundation Pipeline And Product Layer](foundation-product-architecture.md) | Responsibility tracks, interaction boundaries, contribution placement, upstream porting, and license provenance |
-| [Upstream Parity Checker](upstream-parity.md) | Weekly drift report, deliberately diverged path whitelist, `Ported-from` trailers, and triage flow |
+| [Upstream Parity Checker](upstream-parity.md) | Weekly drift report, path-presence inventory, deliberately diverged path whitelist, `Ported-from` trailers, triage flow, and governance cadence (#1002 / #1061) |
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [OpenAPI Web Types And Runtime Validation](openapi-web-types.md) | Generated web API types, CI drift gate, and stocks runtime-validation pilot |
+| [API Error Taxonomy](api-error-taxonomy_EN.md) | Stable error codes mapped to category, severity, default user action, and Web remediation ([中文](api-error-taxonomy.md)) |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
+| [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md) | Operational guide for parallel fix/merge trains: batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, and worktree safety ([中文](engineering-efficiency-playbook.md); `AGENTS.md` remains the contract) |
 | [Offline Test Gate (timeouts, coverage floor, markers)](testing-ci-gate.md) | Per-test timeout, faulthandler, measured coverage floor, strict markers, and manual benchmarks |
 | [Config-access ratchet](config-access-ratchet.md) | Shrink-only bare `get_config()` gate, preferred injection / composition-root path, and legitimate baseline changes (ADR-011 / issue #625) |
 | [Import-cycle ratchet](import-cycle-ratchet.md) | Shrink-only bidirectional package-pair gate, failure reading, and legitimate baseline path (ADR-010) |
 | [Offline Analysis Quality Panel](analysis-quality-panel.md) | Fixed-panel offline trust fixtures, extension guide, and non-claims (#617 Phase A) |
 | [Plugin Development Guide](plugin-development-guide.md) | Consolidated entry for the six extension points: what/why, trust model, 10-minute quickstart, official examples, and deep links ([中文](plugin-development-guide_zh.md)) |
 | [Offline Financial Agent Evaluation Benchmark](agent-eval-benchmark_EN.md) | Offline agent-run metrics (correctness, tool discipline, uncertainty honesty), baseline, and refresh flow (#252 V0) |
+| [Performance baselines & profiling](performance-baseline_EN.md) | Offline key-path baselines (data/analysis/report), opt-in spans, cProfile entry (#227) |
 | [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md) | Loadable example, manifest, `PLUGINS_DIR`, lifecycle diagnostics, compatibility, trust, and routing boundaries |
 | [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md) | Declarative-first boundary, `Skill` registration fields, catalog precedence, lifecycle, diagnostics, tests, and trust |
 | [Supply-Chain Maintenance](supply-chain-maintenance.md) | Dependency and GitHub Actions pinning, permissions, updates, exceptions, validation, and rollback policy |
 | [Web UI Foundation Contract](web-ui-foundation.md) | Semantic controls, visible sizes, coarse-pointer targets, guardrails, and migration ownership |
-| [Web responsive breakpoints](web-responsive-breakpoints.md) | Supported 320/768/1024 matrix, page audit gaps, and batch plan (#146 / #234) |
 | [Web PWA (shell-only)](web-pwa.md) | Installable PWA, conservative shell cache boundary, no analysis/market data caching (#234) |
+| [Web responsive breakpoints](web-responsive-breakpoints.md) | Supported 320/768/1024 matrix, page audit gaps, and batch plan (#146 / #234) |
+| [Web Runtime Performance Budgets](web-runtime-performance.md) | List virtualization, Settings isolation, SSE batching soft gate (#883); [中文](web-runtime-performance_CN.md) |
 | [Navigation IA proposal](navigation-ia-proposal.md) | Current-state route/nav audit, legacy redirects, orphan inventory, and **DECISION NEEDED** target options for #368 ([中文](navigation-ia-proposal_zh.md)) |
 | [Multilingual Financial Terminology Guide](financial-terminology-guide.md) | Product semantics and ten-language candidate terminology (guide body in Simplified Chinese) |
 | [High-risk i18n Semantic Audit](high-risk-i18n-audit.md) | Sources, review status, code/display boundaries, and machine snapshots for financial and security-sensitive copy |

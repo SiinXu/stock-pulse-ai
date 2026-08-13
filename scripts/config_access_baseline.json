@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "Per-module counts of bare get_config() call sites in production code (AST Name callees only). Attribute calls such as service.get_config(...) are out of scope. src/config.py and src/application_services.py are excluded. New modules or higher counts are banned; shrink this map by converting callers to constructor/param injection or get_application_services().config and running --write-baseline. Growth requires an explicit PR justification and is refused by --write-baseline.",
-  "total_sites": 99,
-  "module_count": 62,
+  "total_sites": 96,
+  "module_count": 61,
   "modules": {
     "api/app.py": 2,
     "api/deps.py": 1,
@@ -61,9 +61,8 @@
     "src/services/intelligence_service.py": 1,
     "src/services/market_hotspot_service.py": 1,
     "src/services/market_light_alerts.py": 1,
-    "src/services/portfolio_service.py": 3,
+    "src/services/portfolio_service.py": 1,
     "src/services/report_renderer.py": 4,
-    "src/services/task_queue.py": 1,
     "src/stock_analyzer.py": 1,
     "src/storage_parts/lifecycle.py": 1
   }

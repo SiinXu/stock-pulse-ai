@@ -14,7 +14,10 @@ import { cn } from '../../utils/cn';
 import { getStrategyDisplay } from '../../utils/strategyDisplay';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { WhatIfScenarioPanel } from './WhatIfScenarioPanel';
-import type { WhatIfDraftState } from './whatIfScenario';
+import {
+  buildWhatIfPromoteAnalysisHref,
+  type WhatIfDraftState,
+} from './whatIfScenario';
 
 type Translate = (key: UiTextKey, params?: Record<string, string | number>) => string;
 
@@ -188,6 +191,7 @@ export function ChatComposer({
                 draft={whatIfDraft}
                 onChange={onWhatIfChange}
                 disabled={loading || sessionLoading || isSkillsLoading}
+                promoteHref={buildWhatIfPromoteAnalysisHref(activeStockCode)}
               />
             </div>
           </div>
@@ -288,11 +292,12 @@ export function ChatComposer({
               </div>
             ) : null}
             <IconButton
-              size="default"
+              size="navigation"
               variant="bare"
+              role="switch"
               onClick={() => onContextCompressionChange(!contextCompressionEnabled)}
               aria-label={t('chat.contextCompression')}
-              aria-pressed={contextCompressionEnabled}
+              aria-checked={contextCompressionEnabled}
               disabled={!contextCompressionLoaded || contextCompressionSaving}
               className={contextCompressionEnabled ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary' : ''}
             >

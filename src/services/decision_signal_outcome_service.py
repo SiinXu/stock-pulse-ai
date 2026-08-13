@@ -15,6 +15,7 @@ from src.repositories.decision_signal_outcome_repo import DecisionSignalOutcomeR
 from src.repositories.decision_signal_repo import DecisionSignalRepository
 from src.repositories.stock_repo import StockRepository
 from src.services.decision_profile_calibration_service import (
+    MIN_PROFILE_CALIBRATION_SAMPLE_SIZE,
     build_profile_calibration,
     is_decision_profile_calibration_enabled,
 )
@@ -45,6 +46,8 @@ SUPPORTED_OUTCOME_HORIZONS = {
     "10d": 10,
 }
 DEFAULT_STATS_STATUSES = ("active", "expired", "invalidated", "closed")
+# Same publication floor as profile calibration: public rates only when completed >= N.
+MIN_OUTCOME_STATS_SAMPLE_SIZE = MIN_PROFILE_CALIBRATION_SAMPLE_SIZE
 OUTCOME_VALUES = frozenset({"hit", "miss", "neutral"})
 EVAL_STATUSES = frozenset({"completed", "unable"})
 FEEDBACK_VALUES = frozenset({"useful", "not_useful"})
@@ -307,7 +310,14 @@ class DecisionSignalOutcomeService:
         horizons: Optional[List[str]] = None,
         engine_version: Optional[str] = None,
         statuses: Optional[List[str]] = None,
+        publish: bool = True,
     ) -> Dict[str, Any]:
+        """Return outcome aggregates, with public rate gating enabled by default.
+
+        Internal consumers that apply their own explicit sample threshold may use
+        ``publish=False``. API callers must retain the default so thin buckets do
+        not disclose rates.
+        """
         engine_version_norm = str(engine_version or DECISION_SIGNAL_OUTCOME_ENGINE_VERSION).strip()
         horizons_norm = self._normalize_horizons(horizons)
         statuses_norm = (
@@ -321,6 +331,8 @@ class DecisionSignalOutcomeService:
             statuses=statuses_norm,
         )
         rows = [stats_row.outcome for stats_row in stats_rows]
+        # Core process-quality groupings for #987: signal type (action), market,
+        # and calendar period. Remaining dimensions stay for existing consumers.
         dimensions = (
             "action",
             "market",
@@ -332,14 +344,16 @@ class DecisionSignalOutcomeService:
             "holding_state",
         )
         breakdowns = {
-            dimension: self._breakdown(rows, dimension)
+            dimension: self._breakdown(rows, dimension, publish=publish)
             for dimension in dimensions
         }
+        breakdowns["period"] = self._breakdown_period(rows, publish=publish)
         payload: Dict[str, Any] = {
-            **self._aggregate(rows),
+            **self._aggregate(rows, publish=publish),
             "engine_version": engine_version_norm,
             "horizons": horizons_norm,
             "statuses": statuses_norm,
+            "minimum_completed_sample_size": MIN_OUTCOME_STATS_SAMPLE_SIZE,
             "breakdowns": breakdowns,
         }
         # Default-off gate: omit profile_calibration so gate-off responses stay
@@ -710,7 +724,13 @@ class DecisionSignalOutcomeService:
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         }
 
-    def _breakdown(self, rows: List[DecisionSignalOutcomeRecord], dimension: str) -> List[Dict[str, Any]]:
+    def _breakdown(
+        self,
+        rows: List[DecisionSignalOutcomeRecord],
+        dimension: str,
+        *,
+        publish: bool = False,
+    ) -> List[Dict[str, Any]]:
         grouped: Dict[str, List[DecisionSignalOutcomeRecord]] = defaultdict(list)
         for row in rows:
             value = getattr(row, dimension, None)
@@ -720,24 +740,67 @@ class DecisionSignalOutcomeService:
             {
                 "dimension": dimension,
                 "value": value,
-                **self._aggregate(bucket_rows),
+                **self._aggregate(bucket_rows, publish=publish),
             }
             for value, bucket_rows in grouped.items()
         ]
         return sorted(buckets, key=lambda item: (-int(item["total"]), str(item["value"])))
 
+    def _breakdown_period(
+        self,
+        rows: List[DecisionSignalOutcomeRecord],
+        *,
+        publish: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Group outcomes by calendar month for post-hoc process-quality views."""
+        grouped: Dict[str, List[DecisionSignalOutcomeRecord]] = defaultdict(list)
+        for row in rows:
+            grouped[self._period_bucket_value(row)].append(row)
+        buckets = [
+            {
+                "dimension": "period",
+                "value": value,
+                **self._aggregate(bucket_rows, publish=publish),
+            }
+            for value, bucket_rows in grouped.items()
+        ]
+        # Newest dated period first; an unverifiable period is always last.
+        dated = sorted(
+            (item for item in buckets if str(item["value"]) != "unknown"),
+            key=lambda item: str(item["value"]),
+            reverse=True,
+        )
+        unknown = [item for item in buckets if str(item["value"]) == "unknown"]
+        return [*dated, *unknown]
+
+    @staticmethod
+    def _period_bucket_value(row: DecisionSignalOutcomeRecord) -> str:
+        """Return YYYY-MM only from the frozen market-data anchor date."""
+        anchor = getattr(row, "anchor_date", None)
+        if isinstance(anchor, date):
+            return f"{anchor.year:04d}-{anchor.month:02d}"
+        return "unknown"
+
     @staticmethod
     def aggregate_outcome_rows(rows: List[DecisionSignalOutcomeRecord]) -> Dict[str, Any]:
         """Public wrapper over the authoritative outcome aggregation.
 
-        Exposes the same hit/(hit+miss) rate computation used by ``get_stats`` so
-        other callers (e.g. decision memory reflection) reuse a single hit
-        definition instead of re-deriving one.
+        Exposes the same hit/(hit+miss) rate computation used by stats buckets so
+        other callers (e.g. decision memory reflection, scorecard) reuse a single
+        hit definition instead of re-deriving one.
+
+        Rates are always computed here when the hit/miss denominator is non-zero.
+        Publication gating (null rates under the sample floor) is applied only by
+        ``get_stats`` via ``publish=True`` for the process-quality dashboard.
         """
-        return DecisionSignalOutcomeService._aggregate(rows)
+        return DecisionSignalOutcomeService._aggregate(rows, publish=False)
 
     @staticmethod
-    def _aggregate(rows: List[DecisionSignalOutcomeRecord]) -> Dict[str, Any]:
+    def _aggregate(
+        rows: List[DecisionSignalOutcomeRecord],
+        *,
+        publish: bool = False,
+    ) -> Dict[str, Any]:
         total = len(rows)
         completed = [row for row in rows if row.eval_status == "completed"]
         unable = [row for row in rows if row.eval_status == "unable"]
@@ -745,20 +808,33 @@ class DecisionSignalOutcomeService:
         miss = sum(1 for row in completed if row.outcome == "miss")
         neutral = sum(1 for row in completed if row.outcome == "neutral")
         denominator = hit + miss
-        returns = [
-            float(row.stock_return_pct)
-            for row in completed
-            if row.stock_return_pct is not None
-        ]
+        returns: List[float] = []
+        for row in completed:
+            if row.stock_return_pct is None:
+                continue
+            try:
+                value = float(row.stock_return_pct)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(value):
+                returns.append(value)
         unable_reasons = Counter(row.unable_reason or "unknown" for row in unable)
+        completed_count = len(completed)
+        sample_sufficient = completed_count >= MIN_OUTCOME_STATS_SAMPLE_SIZE
+        raw_hit_rate = round(hit / denominator * 100, 2) if denominator else None
+        raw_avg_return = round(sum(returns) / len(returns), 4) if returns else None
+        # Public stats view: hide rates until the completed-sample floor is met.
+        # Internal callers keep raw rates and apply their own thresholds.
+        publish_rates = (not publish) or sample_sufficient
         return {
             "total": total,
-            "completed": len(completed),
+            "completed": completed_count,
             "unable": len(unable),
             "hit": hit,
             "miss": miss,
             "neutral": neutral,
-            "hit_rate_pct": round(hit / denominator * 100, 2) if denominator else None,
-            "avg_stock_return_pct": round(sum(returns) / len(returns), 4) if returns else None,
+            "sample_sufficient": sample_sufficient,
+            "hit_rate_pct": raw_hit_rate if publish_rates else None,
+            "avg_stock_return_pct": raw_avg_return if publish_rates else None,
             "unable_reasons": dict(sorted(unable_reasons.items())),
         }
