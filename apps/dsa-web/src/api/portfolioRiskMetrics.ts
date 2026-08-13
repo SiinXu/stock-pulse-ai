@@ -11,6 +11,16 @@ import type {
   PortfolioRiskMetricsResponse,
 } from '../types/portfolioRiskMetrics';
 
+import type { components } from '../types/api.generated';
+type OpenApiRiskMetrics = components['schemas']['PortfolioRiskMetricsResponse'];
+type OpenApiAssumptions = components['schemas']['PortfolioRiskAssumptions'];
+type _AssertRiskMetrics = keyof OpenApiRiskMetrics;
+type _AssertAssumptions = keyof OpenApiAssumptions;
+const _riskMetricsAnchor: _AssertRiskMetrics = 'portfolio_value';
+const _assumptionsAnchor: _AssertAssumptions = 'var_method';
+void _riskMetricsAnchor;
+void _assumptionsAnchor;
+
 /** Reject NaN and ±Infinity at the response boundary (never silent zeros). */
 const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
   message: 'non-finite number rejected',
