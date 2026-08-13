@@ -853,6 +853,15 @@ class ValuationService:
                 peer_pb_values.append(peer_pb)
             if peer_ev_ebitda is not None and peer_ev_ebitda > 0:
                 peer_ev_ebitda_values.append(peer_ev_ebitda)
+            peer_currency = (
+                peer_quote.get("currency")
+                or peer_quote.get("quote_currency")
+                or peer_earn.get("currency")
+            )
+            if not peer_currency:
+                report = peer_earn.get("financial_report")
+                if isinstance(report, Mapping):
+                    peer_currency = report.get("currency")
             peer_details.append(
                 {
                     "stock_code": peer,
@@ -862,6 +871,10 @@ class ValuationService:
                     "market_cap": peer_mv,
                     "net_debt": peer_net_debt,
                     "ev_ebitda": peer_ev_ebitda,
+                    "current_price": _safe_float(peer_quote.get("price")),
+                    "currency": (
+                        str(peer_currency).strip().upper() if peer_currency else None
+                    ),
                 }
             )
 

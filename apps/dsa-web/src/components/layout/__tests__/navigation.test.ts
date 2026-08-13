@@ -50,6 +50,7 @@ describe('application navigation descriptor', () => {
       ['research-discover', APP_ROUTE_PATHS.researchDiscover, 'layout.nav.discover'],
       ['research-analysis', APP_ROUTE_PATHS.researchAnalysis, 'layout.nav.analysis'],
       ['research-backtest', APP_ROUTE_PATHS.researchBacktest, 'layout.nav.backtest'],
+      ['research-event-calendar', APP_ROUTE_PATHS.eventCalendar, 'layout.nav.eventCalendar'],
       ['research-calculators', APP_ROUTE_PATHS.calculators, 'layout.nav.calculators'],
       ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes, 'layout.nav.skillOutcomes'],
     ]);
@@ -96,6 +97,7 @@ describe('application navigation descriptor', () => {
       ['research-discover', APP_ROUTE_PATHS.researchDiscover],
       ['research-analysis', analysisHref],
       ['research-backtest', APP_ROUTE_PATHS.researchBacktest],
+      ['research-event-calendar', APP_ROUTE_PATHS.eventCalendar],
       ['research-calculators', APP_ROUTE_PATHS.calculators],
       ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes],
       ['signals', APP_ROUTE_PATHS.signals],
