@@ -250,6 +250,9 @@ class PortfolioAgent(BaseAgent):
                 data["rebalance_suggestions"] = [
                     str(base.get("status_message") or base.get("status"))
                 ]
+            else:
+                # Within-band / no-trim still overwrites so the LLM cannot invent trades.
+                data["rebalance_suggestions"] = []
             data["deterministic_rebalancing"] = {
                 "status": base.get("status"),
                 "status_message": base.get("status_message"),
@@ -264,7 +267,7 @@ class PortfolioAgent(BaseAgent):
                 "source": "PortfolioRebalancingService",
             }
             bands = base.get("position_bands") or []
-            if bands and not data.get("positions"):
+            if bands:
                 data["positions"] = [
                     {
                         "code": b.get("symbol"),
