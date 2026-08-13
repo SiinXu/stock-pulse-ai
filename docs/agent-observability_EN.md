@@ -37,6 +37,19 @@ No new endpoint. Task and history run-flow continue to use:
 
 Agent events appear in `events[]` and persist under diagnostics snapshot field `agent_events`.
 
+## Process Timeline And Reasoning Transparency (#124 / #219)
+
+The Web run-flow panel and report pages project agent events from the existing `/flow` snapshot into a **process timeline**:
+
+- Stage, tool, model, and decision rows with status and duration
+- Collapsible per-step layers that show only **real trace fields** (event type, phase, tool, step, attrs such as `reason` / `failure_reason` / plan ids)
+- No model-authored "why" prose — empty when attrs are absent
+- Client-side redaction mirrors server sanitize rules for sensitive keys
+
+Report pages mount a collapsible reasoning/process section that loads the history flow snapshot and hides when no agent events exist. Chat live progress expands stage rows the same way using SSE fields only.
+
+**#1125 switch point:** `TRACE_EVENT_SOURCE` in `apps/dsa-web/src/components/run-flow/processTimelineModel.ts` stays `run_flow` until the unified run-trace surface lands. When #1125 ships, flip the constant and implement the `unified_trace` branch without inventing a third event bus.
+
 ## Agent Replay V1
 
 The existing task and history run-flow panel presents Agent events by `sequence` and provides previous/next cursor controls. Each replay detail includes its event schema version, trace/span correlation, status, and server-sanitized `attrs`; `payload` is shown only when deep payload capture is explicitly enabled and the server has sanitized it.

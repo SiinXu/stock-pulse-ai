@@ -59,6 +59,8 @@ import { RunFlowGraph } from '../../components/run-flow/RunFlowGraph';
 import { RunFlowNodeDetails } from '../../components/run-flow/RunFlowNodeDetails';
 import { RunFlowPanel } from '../../components/run-flow/RunFlowPanel';
 import { RunFlowSummaryBar } from '../../components/run-flow/RunFlowSummaryBar';
+import { ProcessTimeline } from '../../components/run-flow/ProcessTimeline';
+import ReportProcessTimeline from '../../components/report/ReportProcessTimeline';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import type { DecisionSignalItem } from '../../types/decisionSignals';
@@ -862,6 +864,26 @@ const RunFlowPanelStory = () => {
 
 const RunFlowSummaryBarStory = () => <RunFlowSummaryBar snapshot={fixtureRunFlowSnapshot} />;
 
+const ProcessTimelineStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ProcessTimeline
+      snapshot={scenario === 'empty'
+        ? { ...fixtureRunFlowSnapshot, events: [] }
+        : fixtureRunFlowSnapshot}
+      hideWhenEmpty={false}
+    />
+  );
+};
+
+const ReportProcessTimelineStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return <ReportProcessTimeline />;
+  }
+  return <ReportProcessTimeline recordId={101} onOpenRunFlow={() => undefined} />;
+};
+
 
 const ShareImageButtonStory = () => (
   <div className="flex justify-end p-4">
@@ -918,4 +940,6 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'run-flow-node-details': RunFlowNodeDetailsStory,
   'run-flow-panel': RunFlowPanelStory,
   'run-flow-summary-bar': RunFlowSummaryBarStory,
+  'process-timeline': ProcessTimelineStory,
+  'report-process-timeline': ReportProcessTimelineStory,
 };
