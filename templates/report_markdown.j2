@@ -392,6 +392,10 @@
 {% endfor %}
 {% endif %}
 
+{% if scenario_sensitivity_markdown %}
+{{ scenario_sensitivity_markdown }}
+{% endif %}
+
 {{ report_disclaimer_line() }}
 
 *{{ labels.generated_at_label }}：{{ report_timestamp }}*

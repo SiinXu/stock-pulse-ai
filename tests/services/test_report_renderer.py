@@ -1485,3 +1485,36 @@ class TestDecisionFirstLayeredReading(unittest.TestCase):
         card_idx = exported.find("### 🃏")
         strata_idx = exported.find("证据分层")
         self.assertGreater(strata_idx, card_idx)
+
+
+class TestReportScenarioSensitivityAppendix(unittest.TestCase):
+    """Issue #1136: optional hypothetical scenario appendix on Jinja reports."""
+
+    @patch("src.services.report_renderer.get_config", return_value=_make_renderer_config())
+    def test_markdown_includes_sensitivity_when_scenario_id_requested(self, _cfg) -> None:
+        r = _make_result()
+        out = render(
+            "markdown",
+            [r],
+            summary_only=True,
+            extra_context={
+                "report_language": "en",
+                "report_sensitivity": {"scenario_id": "rate_hike_100bp"},
+            },
+        )
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("[HYPOTHETICAL SCENARIO]", out)
+        self.assertIn("rate_hike_100bp", out)
+        self.assertIn("Report sensitivity", out)
+        # Baseline content remains present and is not replaced.
+        self.assertTrue("贵州茅台" in out or "Moutai" in out)
+
+    @patch("src.services.report_renderer.get_config", return_value=_make_renderer_config())
+    def test_markdown_omits_sensitivity_without_request(self, _cfg) -> None:
+        r = _make_result()
+        out = render("markdown", [r], summary_only=True)
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertNotIn("Report sensitivity scenario", out)
+        self.assertNotIn("报告敏感性情景", out)
