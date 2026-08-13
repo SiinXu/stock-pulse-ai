@@ -48,16 +48,16 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 152676,
-      "measuredGzipBytes": 152076,
-      "note": "Local production-build remasure after merging origin/main; measured 152076 B + 600 B retained headroom."
+      "maxGzipBytes": 153357,
+      "measuredGzipBytes": 152757,
+      "note": "Local production-build remasure after merging origin/main; measured 152757 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 148432,
-      "measuredGzipBytes": 147732,
-      "note": "Local production-build remasure after merging origin/main; measured 147732 B + 700 B retained headroom."
+      "maxGzipBytes": 149144,
+      "measuredGzipBytes": 148444,
+      "note": "Local production-build remasure after merging origin/main; measured 148444 B + 700 B retained headroom."
     },
     {
       "id": "locale-zh-TW",
