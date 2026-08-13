@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Changed] Historical Decision Reflection injection revalidates every renderer, admits only bounded finite structured outcomes with `signal_id` provenance, wraps the analysis prompt block as untrusted memory data, and keeps free-form signal reason text out of the inject path (Fixes #118; aligns with #1119 admission and #1017 isolation).
 - [Added] Personal daily morning brief aggregates portfolio membership, overnight Today's Focus highlights, and observed earnings-event context with optional quiet notify; event research briefs ship bounded metrics and post-event checklists through the shared report notification route (Refs #149, #1131).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after observed-event Daily Brief and Event Research settings help (Refs #149, #1131).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
