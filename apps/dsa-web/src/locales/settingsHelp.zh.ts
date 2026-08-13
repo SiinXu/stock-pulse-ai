@@ -2459,6 +2459,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '限制单次分析成本。',
     ],
   },
+  'settings.system.resume': {
+    title: '续跑与复现',
+  },
 };
 
 export default settingsHelpZhCN;
