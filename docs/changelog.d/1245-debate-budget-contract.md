@@ -1,0 +1,1 @@
+- [Fixed] Stop optional debate calls when hard-budget accounting is unavailable and reserve Decision-stage capacity before synthesis.

@@ -641,9 +641,14 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 631,
-        "help_key": "settings.agent.DEBATE_ENABLED",
+        "help_key": "settings.agent.DEBATE",
         "examples": ["DEBATE_ENABLED=false", "DEBATE_ENABLED=true"],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "DEBATE_MAX_ROUNDS": {
@@ -659,9 +664,14 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 1, "max": 3},
         "display_order": 632,
-        "help_key": "settings.agent.DEBATE_MAX_ROUNDS",
+        "help_key": "settings.agent.DEBATE",
         "examples": ["DEBATE_MAX_ROUNDS=2"],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "DEBATE_TEMPERATURE": {
@@ -677,9 +687,14 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 0, "max": 1.5},
         "display_order": 633,
-        "help_key": "settings.agent.DEBATE_TEMPERATURE",
+        "help_key": "settings.agent.DEBATE",
         "examples": ["DEBATE_TEMPERATURE=0.4"],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "DEBATE_MODEL": {
@@ -695,9 +710,14 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 634,
-        "help_key": "settings.agent.DEBATE_MODEL",
+        "help_key": "settings.agent.DEBATE",
         "examples": ["DEBATE_MODEL="],
-        "docs": [],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
         "warning_codes": [],
     },
     "AGENT_INVESTMENT_COMMITTEE_MODE": {

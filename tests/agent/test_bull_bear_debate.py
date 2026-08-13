@@ -343,6 +343,36 @@ def test_mode_budget_check_failure_stops_before_provider_call():
     assert ctx.meta["bull_bear_debate"]["budget"]["terminated_reason"] == "budget_unavailable"
 
 
+def test_mode_budget_record_failure_stops_after_first_provider_call():
+    class _BrokenAccount:
+        def check(self):
+            return None
+
+        def record_llm_turn(self, **_kwargs):
+            raise RuntimeError("budget accounting unavailable")
+
+    bull_json = '{"stance":"buy","confidence":0.8,"arguments":["a"],"evidence_refs":[],"contention_topics":[]}'
+    bear_json = '{"stance":"sell","confidence":0.7,"arguments":["b"],"evidence_refs":[],"contention_topics":[]}'
+    synth_json = '{"final_lean":"hold","confidence":0.4,"summary":"split","winner":"draw","resolution_status":"unresolved","key_contentions":[]}'
+    adapter = _ScriptedAdapter([bull_json, bear_json, synth_json])
+    agent = BoundedBullBearDebateAgent(
+        tool_registry=SimpleNamespace(),
+        llm_adapter=adapter,
+        debate_config=adapter._config,
+    )
+    ctx = AgentContext(query="x", stock_code="AAPL")
+    ctx.meta["mode_budget_account"] = _BrokenAccount()
+
+    result = agent.run(ctx)
+
+    record = ctx.meta["bull_bear_debate"]
+    assert result.status == StageStatus.FAILED
+    assert adapter.calls == 1
+    assert record["budget"]["terminated_reason"] == "budget_unavailable"
+    assert record["synthesis"] is None
+    assert not any(op.agent_name == DEBATE_STAGE_NAME for op in ctx.opinions)
+
+
 def test_mode_budget_preflight_preserves_last_turn_for_decision():
     class _Account:
         def check(self):
@@ -368,6 +398,48 @@ def test_mode_budget_preflight_preserves_last_turn_for_decision():
     assert result.status == StageStatus.FAILED
     assert adapter.calls == 0
     assert ctx.meta["bull_bear_debate"]["budget"]["terminated_reason"] == "budget_turns"
+
+
+def test_synthesis_preflight_preserves_decision_turn_after_two_sides():
+    class _Account:
+        def __init__(self):
+            self.used = 7
+
+        def check(self):
+            return None
+
+        def snapshot(self):
+            return {
+                "limits": {"enabled": True, "max_llm_turns": 10},
+                "used": {"llm_turns": self.used},
+            }
+
+        def record_llm_turn(self, **_kwargs):
+            self.used += 1
+            return None
+
+    bull_json = '{"stance":"buy","confidence":0.8,"arguments":["a"],"evidence_refs":[],"contention_topics":[]}'
+    bear_json = '{"stance":"sell","confidence":0.7,"arguments":["b"],"evidence_refs":[],"contention_topics":[]}'
+    synth_json = '{"final_lean":"hold","confidence":0.4,"summary":"split","winner":"draw","resolution_status":"unresolved","key_contentions":[]}'
+    adapter = _ScriptedAdapter([bull_json, bear_json, synth_json])
+    agent = BoundedBullBearDebateAgent(
+        tool_registry=SimpleNamespace(),
+        llm_adapter=adapter,
+        debate_config=adapter._config,
+    )
+    ctx = AgentContext(query="x", stock_code="AAPL")
+    account = _Account()
+    ctx.meta["mode_budget_account"] = account
+
+    result = agent.run(ctx)
+
+    record = ctx.meta["bull_bear_debate"]
+    assert result.status == StageStatus.FAILED
+    assert adapter.calls == 2
+    assert account.used == 9
+    assert record["budget"]["terminated_reason"] == "budget_turns"
+    assert record["synthesis"] is None
+    assert not any(op.agent_name == DEBATE_STAGE_NAME for op in ctx.opinions)
 
 
 def test_disabled_mode_budget_does_not_block_debate_calls():

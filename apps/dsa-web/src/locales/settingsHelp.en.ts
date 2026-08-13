@@ -1426,44 +1426,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
-  'settings.agent.DEBATE_ENABLED': {
-    title: 'Structured Bull-Bear Debate',
-    summary: 'Optional Bull vs Bear debate stage before Decision on Native Multi runs.',
-    usage: 'Default off. Enable when multi-party stances and contention points should appear on the final product.',
-    valueNotes: [
-      'Off preserves existing single-pass analysis behavior.',
-      'Only non-Chat Native Multi runs enter the stage.',
-    ],
-    impact: [
-      'Adds up to 2*rounds+1 debate LLM turns before Decision and surfaces dashboard.bull_bear_debate.',
-    ],
-    notes: [
-      'Debate synthesis is non-authoritative; DecisionAgent remains final authority. Provider or budget failures write a data_unavailable product record.',
-    ],
-  },
-  'settings.agent.DEBATE_MAX_ROUNDS': {
-    title: 'Debate Max Rounds',
-    summary: 'Maximum Bull-Bear debate rounds when debate is enabled (1–3).',
-    usage: 'Raise only when residual wall-clock and cost budget can absorb bull+bear turns plus synthesis.',
-    valueNotes: ['Default 2. Clamped to 1–3.'],
-    impact: ['Scales debate LLM turns roughly as 2*rounds+1.'],
-    notes: ['Per-request debate_max_rounds can override this value.'],
-  },
-  'settings.agent.DEBATE_TEMPERATURE': {
-    title: 'Debate Temperature',
-    summary: 'Sampling temperature for debate LLM turns.',
-    usage: 'Increase slightly for more diverse bull/bear arguments; keep moderate for stability.',
-    valueNotes: ['Default 0.4. Range 0–1.5.'],
-    impact: ['Affects stance diversity only; does not change stage enablement.'],
-    notes: ['Applied to all debate completions, including a configured debate-specific model route.'],
-  },
-  'settings.agent.DEBATE_MODEL': {
-    title: 'Debate Model',
-    summary: 'Optional model name used for debate completions.',
-    usage: 'Leave empty to use the agent primary LiteLLM route.',
-    valueNotes: ['Empty default uses the shared agent route.'],
-    impact: ['A non-empty value routes every debate turn through that LiteLLM model.'],
-    notes: ['Invalid or unavailable dedicated models fail closed to a data_unavailable debate record.'],
+  'settings.agent.DEBATE': {
+    title: 'Bull-Bear debate',
+    summary: 'Configure the optional debate stage, limits, and dedicated model.',
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',

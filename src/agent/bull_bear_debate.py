@@ -64,6 +64,7 @@ _MAX_ARG_LEN = 280
 _MAX_POINTS = 12
 _MAX_TOKENS_STANCE = 900
 _MAX_TOKENS_SYNTHESIS = 700
+_DECISION_LLM_TURN_RESERVE = 1
 _JSON_FENCE_PATTERN = re.compile(
     r"\A```(?:json)?\s*(?P<body>.*?)\s*```\Z",
     re.DOTALL | re.IGNORECASE,
@@ -781,7 +782,7 @@ Never claim majority consensus.
         )
         if budget_reason and budget_state.get("terminated_reason") is None:
             budget_state["terminated_reason"] = budget_reason
-        if raw is None:
+        if raw is None or budget_reason:
             return None
         return parse_stance_output(raw, side=side)
 
@@ -827,7 +828,7 @@ Return only one JSON object:
         )
         if budget_reason and budget_state.get("terminated_reason") is None:
             budget_state["terminated_reason"] = budget_reason
-        if raw is None:
+        if raw is None or budget_reason:
             return None
         return parse_synthesis_output(raw)
 
@@ -948,9 +949,13 @@ def _mode_budget_block_reason(
                 return None
             max_turns = _safe_nonnegative_int((limits or {}).get("max_llm_turns"))
             used_turns = _safe_nonnegative_int((used or {}).get("llm_turns"))
+            required_with_decision = (
+                max(1, int(required_turns or 1))
+                + _DECISION_LLM_TURN_RESERVE
+            )
             if (
                 max_turns > 0
-                and used_turns + max(1, int(required_turns or 1)) > max_turns
+                and used_turns + required_with_decision > max_turns
             ):
                 return "budget_turns"
         return None

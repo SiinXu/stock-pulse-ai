@@ -1044,7 +1044,7 @@ const fieldDescriptionMap: Record<string, string> = {
   DEBATE_ENABLED: '可选的 Decision 前 Bull vs Bear 结构化辩论（默认关闭，仅 Native Multi 非 Chat）。',
   DEBATE_MAX_ROUNDS: '启用辩论时的最大轮数（1–3）。',
   DEBATE_TEMPERATURE: '辩论 LLM 采样温度（0–1.5）。',
-  DEBATE_MODEL: '可选辩论模型名（诊断用）；为空使用 Agent 主路由。',
+  DEBATE_MODEL: '可选辩论模型名；设置后使用专用路由，为空使用 Agent 主路由。',
   AGENT_RISK_OVERRIDE: '控制 legacy 风险计划是否直接执行下调；不可关闭的最终动作裁决仍独立运行。',
   RISK_GATE_PROFILE: '选择最终建议发布前不可关闭的风控裁决档位；非法值会阻止启动。',
   AGENT_SKILL_AUTOWEIGHT: "根据回测表现自动调整策略权重。",
