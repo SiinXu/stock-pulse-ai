@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Dict, List
 
 import pytest
@@ -100,6 +101,83 @@ def test_planning_trace_event_schema_shape() -> None:
     assert terminate["event_type"] == AgentEventType.TERMINATE.value
 
 
+def test_trace_contract_rejects_forged_or_non_finite_events() -> None:
+    recorder = PlanningTraceRecorder(run_id="run-contract", enabled=True)
+    event = recorder.emit_terminate(
+        reason="completed",
+        status="succeeded",
+        success=True,
+        attrs={
+            "run_id": "forged-run",
+            "kind": "action",
+            "reason": "forged-reason",
+            "success": False,
+        },
+        budget=recorder.budget_attrs(tool_call_count=1),
+    )
+    assert event is not None
+    assert event["attrs"]["run_id"] == "run-contract"
+    assert event["attrs"]["kind"] == "terminate"
+    assert event["attrs"]["reason"] == "completed"
+    assert event["attrs"]["success"] is True
+
+    wrong_type = deepcopy(event)
+    wrong_type["event_type"] = AgentEventType.ACTION.value
+    assert "event_type must match kind" in validate_planning_trace_event(wrong_type)
+
+    mixed_correlation = deepcopy(event)
+    mixed_correlation["attrs"]["run_id"] = "another-run"
+    assert "attrs.run_id must match run_id" in validate_planning_trace_event(
+        mixed_correlation
+    )
+
+    non_finite_budget = deepcopy(event)
+    non_finite_budget["attrs"]["budget"]["planning_tokens"] = float("inf")
+    assert any(
+        "planning_tokens must be a non-negative int" in error
+        for error in validate_planning_trace_event(non_finite_budget)
+    )
+
+
+@pytest.mark.parametrize("value", [True, -1, 1.5, float("nan"), float("inf")])
+def test_trace_budget_rejects_invalid_numeric_boundaries(value: Any) -> None:
+    recorder = PlanningTraceRecorder(run_id="run-budget", enabled=True)
+    with pytest.raises(ValueError, match="tool_call_count"):
+        recorder.budget_attrs(tool_call_count=value)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"run_id": ""},
+        {"run_id": "x" * 65},
+        {"enabled": "false"},
+        {"max_events": True},
+        {"max_events": 0},
+    ],
+)
+def test_trace_recorder_rejects_invalid_public_bounds(kwargs: Dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        PlanningTraceRecorder(**kwargs)
+
+
+def test_reconstruction_rejects_mixed_runs_and_out_of_order_events() -> None:
+    first = PlanningTraceRecorder(run_id="run-first", enabled=True)
+    first.emit_plan(plan_id="p1", step_count=1)
+    first.emit_terminate(reason="completed", status="succeeded", success=True)
+    second = PlanningTraceRecorder(run_id="run-second", enabled=True)
+    second.emit_terminate(reason="failed", status="failed", success=False)
+
+    mixed_story = reconstruct_planning_run(first.events + second.events)
+    assert mixed_story["run_id"] == "run-first"
+    assert mixed_story["mixed_run_event_count"] == 1
+    assert mixed_story["complete"] is False
+
+    reversed_story = reconstruct_planning_run(list(reversed(first.events)))
+    assert reversed_story["out_of_order_event_count"] == 1
+    assert reversed_story["complete"] is False
+
+
 def test_failed_run_reconstructable_from_trace_events() -> None:
     plan, tools = _plan([["get_realtime_quote"], ["analyze_trend"]])
 
@@ -144,6 +222,7 @@ def test_failed_run_reconstructable_from_trace_events() -> None:
     assert story["terminate"]["reason"]
     assert story["terminate"]["success"] is False
     assert story["budget"].get("tool_call_count", 0) >= 1
+    assert story["complete"] is True
 
     kinds = [event["kind"] for event in result.trace_events]
     assert kinds[0] == "plan"
