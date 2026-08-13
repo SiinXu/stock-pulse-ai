@@ -1,6 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+/**
+ * Composes calendar events from alert trigger list pages (no dedicated calendar schema).
+ * Anchors on AlertTriggerListResponse / AlertTriggerItem OpenAPI components.
+ */
 import { z } from 'zod';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type {
@@ -10,6 +15,16 @@ import type {
   EventCalendarResponse,
 } from '../types/eventCalendar';
 import { CORPORATE_EVENT_CATEGORIES } from '../types/eventAlerts';
+
+
+type OpenApiTriggerList = components['schemas']['AlertTriggerListResponse'];
+type OpenApiTriggerItem = components['schemas']['AlertTriggerItem'];
+type _AssertTriggerList = keyof OpenApiTriggerList;
+type _AssertTriggerItem = keyof OpenApiTriggerItem;
+const _triggerListAnchor: _AssertTriggerList = 'page_size';
+const _triggerItemAnchor: _AssertTriggerItem = 'triggered_at';
+void _triggerListAnchor;
+void _triggerItemAnchor;
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;

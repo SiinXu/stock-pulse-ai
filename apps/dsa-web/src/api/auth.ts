@@ -1,5 +1,13 @@
 import { z } from 'zod';
 import apiClient from './index';
+import type { components } from '../types/api.generated';
+// Auth status response schema is currently empty `{}` in OpenAPI (backend gap).
+// Anchor the known request model so renames still surface at compile time.
+type OpenApiAuthSettingsRequest = components['schemas']['AuthSettingsRequest'];
+type _AssertAuthSettings = keyof OpenApiAuthSettingsRequest;
+const _authSettingsAnchor: _AssertAuthSettings = 'authEnabled';
+void _authSettingsAnchor;
+
 import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 
