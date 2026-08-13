@@ -14,6 +14,7 @@ vi.mock('../../../api/history', () => ({
   historyApi: {
     getDiagnostics: vi.fn(),
     getNews: vi.fn(),
+    getRecordFlow: vi.fn().mockResolvedValue(null),
   },
 }));
 

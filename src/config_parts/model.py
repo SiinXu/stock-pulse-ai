@@ -333,6 +333,13 @@ class Config:
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    # Run-local reflection + resolved-forecast post-mortem (Issues #1089 / #1103). Default off.
+    agent_reflection_enabled: bool = False
+    agent_reflection_llm_budget: int = 1  # Max LLM calls per reflection loop (critique)
+    agent_reflection_max_revise: int = 1  # Max in-run revise passes after critique
+    agent_postmortem_enabled: bool = False
+    agent_postmortem_llm_budget: int = 8  # Max LLM calls per resolution batch
+    agent_postmortem_skip_clean_hits: bool = True  # Skip LLM post-mortem on clean hits
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     agent_research_persona: str = ""  # Default-off research stance preset (#467)
     agent_research_persona_custom: str = ""  # Optional custom stance text (#467)
