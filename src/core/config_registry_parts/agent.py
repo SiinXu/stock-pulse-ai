@@ -1451,6 +1451,82 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         }],
         "warning_codes": [],
     },
+    "AGENT_ERROR_PATTERN_ENABLED": {
+        "title": "Error Pattern Encyclopedia",
+        "description": (
+            "Enable retrieval of human-editable error-pattern cards (clustered from "
+            "reflection/post-mortem lessons) as a read-only analysis checklist. "
+            "Default off. Never rewrites Agent Soul."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 670,
+        "help_key": "settings.agent.AGENT_ERROR_PATTERN_ENABLED",
+        "examples": [
+            "AGENT_ERROR_PATTERN_ENABLED=false",
+            "AGENT_ERROR_PATTERN_ENABLED=true",
+        ],
+        "docs": [{
+            "label": "Error-pattern encyclopedia",
+            "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-error-pattern-encyclopedia_EN.md",
+        }],
+        "warning_codes": [],
+    },
+    "AGENT_ERROR_PATTERN_INJECT_TOP_K": {
+        "title": "Error Pattern Inject Top-K",
+        "description": (
+            "Maximum number of enabled error-pattern cards injected into analysis "
+            "context (hard cap 3). 0 injects nothing."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "3",
+        "options": [],
+        "validation": {"min": 0, "max": 3},
+        "display_order": 671,
+        "help_key": "settings.agent.AGENT_ERROR_PATTERN_ENABLED",
+        "examples": ["AGENT_ERROR_PATTERN_INJECT_TOP_K=3"],
+        "docs": [{
+            "label": "Error-pattern encyclopedia",
+            "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-error-pattern-encyclopedia_EN.md",
+        }],
+        "warning_codes": [],
+    },
+    "AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET": {
+        "title": "Error Pattern Inject Char Budget",
+        "description": (
+            "Maximum characters for the error-pattern checklist block injected into "
+            "analysis context (hard cap 8000). 0 injects nothing (not unlimited)."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "2000",
+        "options": [],
+        "validation": {"min": 0, "max": 8000},
+        "display_order": 672,
+        "help_key": "settings.agent.AGENT_ERROR_PATTERN_ENABLED",
+        "examples": ["AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET=2000"],
+        "docs": [{
+            "label": "Error-pattern encyclopedia",
+            "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-error-pattern-encyclopedia_EN.md",
+        }],
+        "warning_codes": [],
+    },
     "AGENT_PLANNING_ENABLED": {
         "title": "Agent Planning Loop",
         "description": (
