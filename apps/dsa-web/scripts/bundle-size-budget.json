@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-13",
-  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1158) (ChatSendFeedback). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
+  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1148) (js-entry). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -20,65 +20,65 @@
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
-      "maxGzipBytes": 178912,
-      "measuredGzipBytes": 178512,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 400 B headroom."
+      "maxGzipBytes": 187048,
+      "measuredGzipBytes": 186648,
+      "note": "Remeasured after merging origin/main (#1148); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 161647,
-      "measuredGzipBytes": 160947,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 700 B headroom."
+      "maxGzipBytes": 160635,
+      "measuredGzipBytes": 159935,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 154733,
-      "measuredGzipBytes": 154033,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 700 B headroom."
+      "maxGzipBytes": 153829,
+      "measuredGzipBytes": 153129,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 154740,
-      "measuredGzipBytes": 154040,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 700 B headroom."
+      "maxGzipBytes": 153802,
+      "measuredGzipBytes": 153102,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 154448,
-      "measuredGzipBytes": 153848,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 600 B headroom."
+      "maxGzipBytes": 153531,
+      "measuredGzipBytes": 152931,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 150175,
-      "measuredGzipBytes": 149475,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 700 B headroom."
+      "maxGzipBytes": 149288,
+      "measuredGzipBytes": 148588,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 147061,
-      "measuredGzipBytes": 146361,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 700 B headroom."
+      "maxGzipBytes": 146254,
+      "measuredGzipBytes": 145554,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 140177,
-      "measuredGzipBytes": 139477,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 700 B headroom."
+      "maxGzipBytes": 139365,
+      "measuredGzipBytes": 138665,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 140274,
-      "measuredGzipBytes": 139574,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 700 B headroom."
+      "maxGzipBytes": 139485,
+      "measuredGzipBytes": 138785,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "vendor-charts",
@@ -146,13 +146,6 @@
       "note": "Merge of the OpenAPI client migration Zod boundaries (PR #1242 / Refs #721) with the cost attribution and routing telemetry Settings controls (Refs #166 / #248). Keeps the larger of the two rebaselines; the merged branch measures 45624 B gzip locally, so CI should remeasure on GitHub Actions Linux before tightening."
     },
     {
-      "id": "HomeWatchlistGroupsSection",
-      "match": "assets/HomeWatchlistGroupsSection-*.js",
-      "maxGzipBytes": 17125,
-      "measuredGzipBytes": 16725,
-      "note": "Local production-build remasure after merging origin/main into Home dashboard layout (PR #1158 / Refs #189); overflowing rule only, measured gzip + 400 B headroom. Chunk overflowed default-js after taking origin/main budgets."
-    },
-    {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
       "maxGzipBytes": 46602,
@@ -183,13 +176,6 @@
       "match": "assets/ChatPage-*.js",
       "maxGzipBytes": 18277,
       "measuredGzipBytes": 16615
-    },
-    {
-      "id": "ChatSendFeedback",
-      "match": "assets/ChatSendFeedback-*.js",
-      "maxGzipBytes": 13838,
-      "measuredGzipBytes": 13438,
-      "note": "Remeasured after merging origin/main (#1158); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "screening",
