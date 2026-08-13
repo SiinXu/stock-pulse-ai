@@ -74,6 +74,19 @@ def _snapshot_context(ctx: AgentContext) -> Dict[str, Any]:
     }
 
 
+def _dashboard_host(*, committee_enabled: bool) -> SimpleNamespace:
+    host = SimpleNamespace(
+        config=SimpleNamespace(
+            agent_investment_committee_mode=committee_enabled,
+        ),
+        skill_manager=None,
+    )
+    host._seal_agent_input_snapshot = (  # type: ignore[attr-defined]
+        _DashboardMethods._seal_agent_input_snapshot.__get__(host)
+    )
+    return host
+
+
 def test_flag_default_off():
     config = Config.get_instance()
     assert getattr(config, "agent_investment_committee_mode", None) is False
@@ -337,10 +350,7 @@ def test_section_builder_attaches_when_committee_active():
 
 
 def test_build_context_flag_off_parity():
-    host = SimpleNamespace(
-        config=SimpleNamespace(agent_investment_committee_mode=False),
-        skill_manager=None,
-    )
+    host = _dashboard_host(committee_enabled=False)
     ctx_a = _DashboardMethods._build_context(host, "分析 600519", {"stock_code": "600519"})  # type: ignore[arg-type]
     ctx_b = _DashboardMethods._build_context(host, "分析 600519", {"stock_code": "600519"})  # type: ignore[arg-type]
     assert ctx_a.meta.get(META_COMMITTEE_MODE) is None
@@ -349,10 +359,7 @@ def test_build_context_flag_off_parity():
 
 
 def test_build_context_flag_on_injects_personas():
-    host = SimpleNamespace(
-        config=SimpleNamespace(agent_investment_committee_mode=True),
-        skill_manager=None,
-    )
+    host = _dashboard_host(committee_enabled=True)
     ctx = _DashboardMethods._build_context(  # type: ignore[arg-type]
         host,
         "analyze",
