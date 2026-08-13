@@ -7,6 +7,7 @@ import logging
 import time
 import uuid
 from dataclasses import replace
+from inspect import signature as _signature
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent.llm_adapter import LLMToolAdapter
@@ -56,6 +57,31 @@ logger = logging.getLogger("src.agent.runner")
 # Defense-in-depth for every native tool result before it becomes the next
 # model message. Transcript parsing keeps its own valid-JSON result below 96 KiB.
 _NATIVE_TOOL_RESULT_MAX_BYTES = 128 * 1024
+
+
+def _record_usage_with_optional_attribution(
+    recorder: Any,
+    usage: Any,
+    model: str,
+    **telemetry: Any,
+) -> Any:
+    """Preserve legacy injected recorder sinks while enriching current ones."""
+    record = recorder.record
+    try:
+        parameters = _signature(record).parameters
+    except (TypeError, ValueError):
+        return record(usage, model, call_type=telemetry["call_type"])
+
+    accepts_arbitrary_keywords = any(
+        parameter.kind is parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    supported = (
+        telemetry
+        if accepts_arbitrary_keywords
+        else {key: value for key, value in telemetry.items() if key in parameters}
+    )
+    return record(usage, model, **supported)
 
 
 def run_agent_loop(
@@ -112,6 +138,12 @@ def run_agent_loop(
     """
     labels = thinking_labels or _THINKING_TOOL_LABELS
     recorder = usage_recorder if usage_recorder is not None else get_default_usage_recorder()
+    run_id = uuid.uuid4().hex[:16]
+    try:
+        from src.config import get_config as _get_config
+        agent_mode = str(getattr(_get_config(), "agent_orchestrator_mode", "") or "").strip() or None
+    except Exception:  # broad-exception: optional_metadata - attribution must not fail the agent loop
+        agent_mode = None
     guard_policy = runtime_guard_policy or RuntimeGuardPolicy.from_sources()
     budget_account = mode_budget_account
     if tool_call_timeout_seconds is None:
@@ -327,12 +359,29 @@ def run_agent_loop(
         if m and m != "error":
             models_used.append(m)
         model_for_usage = m or response.provider
-        if model_for_usage and model_for_usage != "error":
-            recorder.record(response.usage, model_for_usage, call_type="agent")
+        step_latency_ms = max(0, int((time.perf_counter() - model_started) * 1000))
+        call_ok = getattr(response, "provider", None) != "error"
+        if model_for_usage:
+            recorded_usage = response.usage
+            response_usage = recorded_usage or {}
+            _record_usage_with_optional_attribution(
+                recorder,
+                recorded_usage,
+                model_for_usage if model_for_usage != "error" else (m or "unknown"),
+                call_type="agent",
+                run_id=run_id,
+                stage="agent_step",
+                agent_mode=agent_mode,
+                latency_ms=response_usage.get("latency_ms", step_latency_ms),
+                call_success=bool(response_usage.get("call_success", call_ok)),
+                route_outcome=response_usage.get("route_outcome"),
+                route_attempt=response_usage.get("route_attempt"),
+                primary_model=response_usage.get("primary_model"),
+            )
         emit_model_end(
             str(m or model_label or "model"),
-            success=getattr(response, "provider", None) != "error",
-            duration_ms=max(0, int((time.perf_counter() - model_started) * 1000)),
+            success=call_ok,
+            duration_ms=step_latency_ms,
             step=step + 1,
             attrs={
                 "provider": provider_used,

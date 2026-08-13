@@ -7,6 +7,7 @@ import {
   Activity,
   ArrowRight,
   BarChart3,
+  CalendarDays,
   FlaskConical,
   Gauge,
   Search,
@@ -58,6 +59,13 @@ const RESEARCH_DESTINATIONS: readonly ResearchDestination[] = [
     icon: Activity,
   },
   {
+    key: 'event-calendar',
+    titleKey: 'layout.nav.eventCalendar',
+    descriptionKey: 'researchOverview.eventCalendarDescription',
+    to: APP_ROUTE_PATHS.eventCalendar,
+    icon: CalendarDays,
+  },
+  {
     key: 'skill-outcomes',
     titleKey: 'layout.nav.skillOutcomes',
     descriptionKey: 'researchOverview.skillOutcomesDescription',
@@ -90,7 +98,7 @@ const ResearchOverviewPage: React.FC = () => {
         description={t('researchOverview.description')}
       />
 
-      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+      <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
         {RESEARCH_DESTINATIONS.map((destination) => {
           const Icon = destination.icon;
           const title = t(destination.titleKey);
