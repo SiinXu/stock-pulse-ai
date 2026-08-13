@@ -41,6 +41,8 @@ _LEGACY_FLAT_ATTRIBUTE_NAMES = (
     'decision_memory_min_samples',
     'signal_scorecard_public_enabled',
     'signal_scorecard_min_samples',
+    'research_api_enabled',
+    'research_api_rate_limit_per_minute',
     'paper_portfolio_initial_cash',
     'generation_backend',
     'generation_fallback_backend',
