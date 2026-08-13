@@ -233,8 +233,7 @@ def serialize_baseline(
             ),
             (
                 "Priority gravity modules at introduction: data_provider/base.py, "
-                "data_provider/akshare_fetcher.py, src/services/task_queue.py, "
-                "src/services/run_diagnostics.py, src/services/portfolio_service.py, "
+                "src/services/run_diagnostics.py, "
                 "src/services/scheduled_task_service.py, src/market/analyzer.py."
             ),
             (

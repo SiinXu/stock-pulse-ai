@@ -1,7 +1,7 @@
 # Hot-Path Module Size Ratchet
 
 - Status: `Living`
-- Last verified: 2026-08-12
+- Last verified: 2026-08-13
 - Related: [architecture overview](architecture-overview.md),
   [layer-direction ratchet](layer-direction-ratchet.md),
   `scripts/check_hot_path_module_size.py`,
@@ -49,17 +49,17 @@ for a deterministic, encoding-stable measurement.
 
 Historical oversized modules live in
 `scripts/hot_path_module_size_baseline.json` as `path → max_lines`. At
-introduction the inventory included gravity modules such as:
+introduction (remeasured against current `main`) the inventory includes
+gravity modules such as:
 
 - `data_provider/base.py`
-- `data_provider/akshare_fetcher.py`
-- `src/services/task_queue.py`
 - `src/services/run_diagnostics.py`
-- `src/services/portfolio_service.py`
 - `src/services/scheduled_task_service.py`
 - `src/market/analyzer.py`
 
-plus other services modules between 1500 and 2000 lines.
+plus other hot-path modules between 1500 and 2000 lines. Splits that already
+landed on `main` (`akshare_fetcher`, `task_queue`, `portfolio_service`) are
+under the soft budget and are not allowlisted.
 
 ### Cleanup plan
 
@@ -75,7 +75,7 @@ plus other services modules between 1500 and 2000 lines.
 
 ```text
 [hot-path-size] ERROR: new-oversized-module: src/services/foo.py: 1600 lines exceeds soft budget 1500; ...
-[hot-path-size] ERROR: module-grew: data_provider/base.py: 4800 lines exceeds baselined max 4733; ...
+[hot-path-size] ERROR: module-grew: data_provider/base.py: 4800 lines exceeds baselined max 4659; ...
 ```
 
 Typical fixes:

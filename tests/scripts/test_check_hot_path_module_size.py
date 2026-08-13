@@ -117,6 +117,6 @@ def test_baseline_hard_ceilings_pin_introduction_inventory() -> None:
     """Hard ceilings pin introduction inventory; never raise them to green CI."""
 
     modules = load_baseline(BASELINE)
-    assert len(modules) <= 11
-    assert max(modules.values()) <= 4733
+    assert len(modules) <= 10
+    assert max(modules.values()) <= 4659
     assert all(lines > SOFT_BUDGET_LINES for lines in modules.values())
