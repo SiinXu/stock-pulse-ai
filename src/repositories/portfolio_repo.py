@@ -14,6 +14,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from sqlalchemy import and_, delete, desc, func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 
+from src.agent.sandbox.context import require_sandbox_inactive_for_production_write
+from src.agent.sandbox.effects import EFFECT_PRODUCTION_PORTFOLIO
 from src.storage import (
     DatabaseManager,
     PortfolioAccount,
@@ -49,6 +51,10 @@ class PortfolioRepository:
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         self.db = db_manager or DatabaseManager.get_instance()
 
+    @staticmethod
+    def _require_production_write_allowed() -> None:
+        require_sandbox_inactive_for_production_write(EFFECT_PRODUCTION_PORTFOLIO)
+
     # ------------------------------------------------------------------
     # Account CRUD
     # ------------------------------------------------------------------
@@ -61,6 +67,7 @@ class PortfolioRepository:
         base_currency: str,
         owner_id: Optional[str] = None,
     ) -> PortfolioAccount:
+        self._require_production_write_allowed()
         with self.db.get_session() as session:
             row = PortfolioAccount(
                 owner_id=owner_id,
@@ -106,6 +113,7 @@ class PortfolioRepository:
         ).scalar_one_or_none()
 
     def update_account(self, account_id: int, fields: Dict[str, Any]) -> Optional[PortfolioAccount]:
+        self._require_production_write_allowed()
         with self.db.get_session() as session:
             row = session.execute(
                 select(PortfolioAccount).where(PortfolioAccount.id == account_id).limit(1)
@@ -120,6 +128,7 @@ class PortfolioRepository:
             return row
 
     def deactivate_account(self, account_id: int) -> bool:
+        self._require_production_write_allowed()
         with self.db.get_session() as session:
             row = session.execute(
                 select(PortfolioAccount).where(PortfolioAccount.id == account_id).limit(1)
@@ -160,6 +169,7 @@ class PortfolioRepository:
     ) -> int:
         """Delete idempotency records older than the replay cutoff."""
 
+        self._require_production_write_allowed()
         result = session.execute(
             delete(PortfolioIdempotencyRecord).where(
                 PortfolioIdempotencyRecord.created_at < created_at_before
@@ -181,6 +191,7 @@ class PortfolioRepository:
         response_json: str,
         created_at: datetime,
     ) -> PortfolioIdempotencyRecord:
+        self._require_production_write_allowed()
         row = PortfolioIdempotencyRecord(
             operation_id=operation_id,
             client_operation_id=client_operation_id,
@@ -199,6 +210,7 @@ class PortfolioRepository:
 
     @contextmanager
     def portfolio_write_session(self):
+        self._require_production_write_allowed()
         session = self.db.get_session()
         try:
             session.connection().exec_driver_sql("BEGIN IMMEDIATE")
@@ -216,7 +228,7 @@ class PortfolioRepository:
             if self._is_sqlite_locked_error(exc):
                 raise PortfolioBusyError("Portfolio ledger is busy; please retry shortly.") from exc
             raise
-        except Exception:
+        except Exception:  # broad-exception: cleanup - rollback before re-raising.
             session.rollback()
             raise
         finally:
@@ -383,6 +395,7 @@ class PortfolioRepository:
         note: Optional[str] = None,
         dedup_hash: Optional[str] = None,
     ) -> PortfolioTrade:
+        self._require_production_write_allowed()
         row = PortfolioTrade(
             account_id=account_id,
             trade_uid=trade_uid,
@@ -427,6 +440,7 @@ class PortfolioRepository:
         currency: str,
         note: Optional[str] = None,
     ) -> PortfolioCashLedger:
+        self._require_production_write_allowed()
         row = PortfolioCashLedger(
             account_id=account_id,
             event_date=event_date,
@@ -459,6 +473,7 @@ class PortfolioRepository:
         split_ratio: Optional[float] = None,
         note: Optional[str] = None,
     ) -> PortfolioCorporateAction:
+        self._require_production_write_allowed()
         row = PortfolioCorporateAction(
             account_id=account_id,
             symbol=symbol,
@@ -499,6 +514,7 @@ class PortfolioRepository:
         ).scalar_one_or_none()
 
     def delete_trade_in_session(self, *, session: Any, trade_id: int) -> bool:
+        self._require_production_write_allowed()
         row = session.execute(
             select(PortfolioTrade).where(PortfolioTrade.id == trade_id).limit(1)
         ).scalar_one_or_none()
@@ -514,6 +530,7 @@ class PortfolioRepository:
         return True
 
     def delete_cash_ledger_in_session(self, *, session: Any, entry_id: int) -> bool:
+        self._require_production_write_allowed()
         row = session.execute(
             select(PortfolioCashLedger).where(PortfolioCashLedger.id == entry_id).limit(1)
         ).scalar_one_or_none()
@@ -529,6 +546,7 @@ class PortfolioRepository:
         return True
 
     def delete_corporate_action_in_session(self, *, session: Any, action_id: int) -> bool:
+        self._require_production_write_allowed()
         row = session.execute(
             select(PortfolioCorporateAction).where(PortfolioCorporateAction.id == action_id).limit(1)
         ).scalar_one_or_none()
@@ -835,6 +853,7 @@ class PortfolioRepository:
         source: str = "manual",
         is_stale: bool = False,
     ) -> None:
+        self._require_production_write_allowed()
         with self.db.get_session() as session:
             existing = session.execute(
                 select(PortfolioFxRate).where(
@@ -1012,6 +1031,7 @@ class PortfolioRepository:
         lots: Iterable[Dict[str, Any]],
         valuation_currency: str,
     ) -> None:
+        self._require_production_write_allowed()
         with self.db.get_session() as session:
             session.execute(
                 delete(PortfolioPosition).where(
@@ -1066,6 +1086,7 @@ class PortfolioRepository:
             session.commit()
 
     def _invalidate_account_cache_in_session(self, *, session: Any, account_id: int, from_date: date) -> None:
+        self._require_production_write_allowed()
         session.execute(
             delete(PortfolioPositionLot).where(PortfolioPositionLot.account_id == account_id)
         )
@@ -1133,6 +1154,7 @@ class PortfolioRepository:
         fx_stale: bool,
         payload: str,
     ) -> None:
+        self._require_production_write_allowed()
         with self.db.get_session() as session:
             existing = session.execute(
                 select(PortfolioDailySnapshot).where(
@@ -1197,6 +1219,7 @@ class PortfolioRepository:
         valuation_currency: str,
     ) -> None:
         """Atomically refresh position cache and daily snapshot in one transaction."""
+        self._require_production_write_allowed()
         with self.db.get_session() as session:
             session.execute(
                 delete(PortfolioPosition).where(

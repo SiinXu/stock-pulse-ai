@@ -23,6 +23,11 @@ def test_config_forces_full_suite() -> None:
     assert select_targets([".github/workflows/ci.yml"]) == "FULL"
 
 
+def test_non_collectable_test_support_forces_full_suite() -> None:
+    assert select_targets(["tests/system_config_service_test_support.py"]) == "FULL"
+    assert select_targets(["tests/services/conftest.py"]) == "FULL"
+
+
 def test_docs_only_is_none() -> None:
     assert select_targets(["docs/CHANGELOG.md", "docs/FAQ.md"]) == []
 

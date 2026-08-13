@@ -310,7 +310,7 @@ class _FailedNotifier:
         """Expose one configured notification route."""
         return True
 
-    def generate_single_stock_report(self, result) -> str:
+    def generate_single_stock_report(self, result, report_type=None) -> str:
         """Return a deterministic rendered report."""
         _ = result
         return "rendered report"
@@ -328,7 +328,7 @@ class _PartialStructuredNotifier:
         """Expose configured report channels."""
         return True
 
-    def generate_single_stock_report(self, result) -> str:
+    def generate_single_stock_report(self, result, report_type=None) -> str:
         """Return a deterministic rendered report."""
         _ = result
         return "rendered report"
@@ -415,6 +415,11 @@ def test_single_stock_partial_dispatch_is_degraded_and_not_retryable() -> None:
     assert dispatch_run["output_summary"]["dispatch_status"] == "partial_failed"
     assert dispatch_run["output_summary"]["attempt_count"] == 2
     assert dispatch_run["output_summary"]["failure_count"] == 1
+    # Stage summary sanitization drops null `error` keys while preserving failures.
+    assert dispatch_run["output_summary"]["channels"] == [
+        {"channel": "email", "ok": True},
+        {"channel": "ntfy", "ok": False, "error": "send_failed"},
+    ]
     assert [
         (run["channel"], run["status"])
         for run in snapshot["notification_runs"]
@@ -788,7 +793,7 @@ def test_batch_run_persists_actual_render_and_disabled_dispatch() -> None:
         analysis_delay=0,
     )
     pipeline.notifier = SimpleNamespace(
-        generate_dashboard_report=lambda results: "batch report",
+        generate_dashboard_report=lambda results, report_date=None, report_type=None: "batch report",
         save_report_to_file=lambda report: "/tmp/batch-report.md",
     )
     pipeline.process_single_stock = MagicMock(return_value=result)
@@ -992,3 +997,12 @@ def test_partial_dispatch_is_degraded_and_retryable_with_channel_fences() -> Non
     assert dispatch_run["retryable"] is True
     assert dispatch_run["output_summary"]["attempt_count"] == 2
     assert dispatch_run["output_summary"]["failure_count"] == 1
+    assert isinstance(dispatch_run["output_summary"].get("channels"), list)
+    assert any(
+        item.get("channel") == "ntfy" and item.get("ok") is True
+        for item in dispatch_run["output_summary"]["channels"]
+    )
+    assert any(
+        item.get("channel") == "__context__" and item.get("ok") is False
+        for item in dispatch_run["output_summary"]["channels"]
+    )

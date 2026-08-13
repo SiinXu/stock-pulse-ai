@@ -74,6 +74,19 @@ def _snapshot_context(ctx: AgentContext) -> Dict[str, Any]:
     }
 
 
+def _dashboard_host(*, committee_enabled: bool) -> SimpleNamespace:
+    host = SimpleNamespace(
+        config=SimpleNamespace(
+            agent_investment_committee_mode=committee_enabled,
+        ),
+        skill_manager=None,
+    )
+    host._seal_agent_input_snapshot = (  # type: ignore[attr-defined]
+        _DashboardMethods._seal_agent_input_snapshot.__get__(host)
+    )
+    return host
+
+
 def test_flag_default_off():
     config = Config.get_instance()
     assert getattr(config, "agent_investment_committee_mode", None) is False
@@ -264,6 +277,78 @@ def test_two_personas_deliberation_and_synthesis():
     assert any("Value" in line or "Moat" in line for line in section["model_inference"])
     assert section["risks_counter_evidence"]
 
+    # Conclusion + dissent are deterministic traces from synthesis (#546 / #985).
+    assert section["conclusion"] is not None
+    assert section["conclusion"]["final_signal"] == "hold"
+    assert section["conclusion"]["consensus_level"] == "low"
+    assert section["status"] == "split"
+    assert section["outcome"] == "hold"
+    assert {
+        opinion["persona_id"] for opinion in section["dissenting_opinions"]
+    } == {"persona_value_moat", "persona_tail_risk"}
+    assert section["divergence_points"][0] == {
+        "source": "strategy",
+        "kind": "directional_opposition",
+        "severity": "high",
+        "participants": ["persona_value_moat", "persona_tail_risk"],
+        "summary_key": "disagreement.point.strategy.directional_opposition",
+    }
+
+
+def test_committee_prefers_versioned_disagreement_points_over_legacy_conflicts():
+    section = build_committee_deliberation_section(
+        strategy_synthesis={
+            "final_signal": "hold",
+            "consensus_level": "low",
+            "conflicts": [
+                {
+                    "conflict_type": "legacy_conflict",
+                    "participants": ["legacy"],
+                }
+            ],
+            "disagreement_handling": {
+                "schema_version": "disagreement-handling-v1",
+                "enabled": True,
+                "points": [
+                    {
+                        "source": "role",
+                        "kind": "mixed_directional_signals",
+                        "severity": "high",
+                        "participants": ["technical", "risk"],
+                        "summary_key": "disagreement.point.role.mixed_directional_signals",
+                        "private_reasoning": "must not leak",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert section["divergence_points"] == [
+        {
+            "source": "role",
+            "kind": "mixed_directional_signals",
+            "severity": "high",
+            "participants": ["technical", "risk"],
+            "summary_key": "disagreement.point.role.mixed_directional_signals",
+        }
+    ]
+
+
+def test_committee_rejects_unknown_disagreement_contract_without_fallback():
+    section = build_committee_deliberation_section(
+        strategy_synthesis={
+            "final_signal": "hold",
+            "consensus_level": "low",
+            "conflicts": [{"conflict_type": "must_not_be_inferred"}],
+            "disagreement_handling": {
+                "schema_version": "disagreement-handling-v2",
+                "enabled": True,
+                "points": [{"kind": "unknown"}],
+            },
+        },
+    )
+    assert section["divergence_points"] == []
+
 
 def test_invalid_skill_signal_isolated_in_section():
     opinions = [
@@ -337,10 +422,7 @@ def test_section_builder_attaches_when_committee_active():
 
 
 def test_build_context_flag_off_parity():
-    host = SimpleNamespace(
-        config=SimpleNamespace(agent_investment_committee_mode=False),
-        skill_manager=None,
-    )
+    host = _dashboard_host(committee_enabled=False)
     ctx_a = _DashboardMethods._build_context(host, "分析 600519", {"stock_code": "600519"})  # type: ignore[arg-type]
     ctx_b = _DashboardMethods._build_context(host, "分析 600519", {"stock_code": "600519"})  # type: ignore[arg-type]
     assert ctx_a.meta.get(META_COMMITTEE_MODE) is None
@@ -349,10 +431,7 @@ def test_build_context_flag_off_parity():
 
 
 def test_build_context_flag_on_injects_personas():
-    host = SimpleNamespace(
-        config=SimpleNamespace(agent_investment_committee_mode=True),
-        skill_manager=None,
-    )
+    host = _dashboard_host(committee_enabled=True)
     ctx = _DashboardMethods._build_context(  # type: ignore[arg-type]
         host,
         "analyze",

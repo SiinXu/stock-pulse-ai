@@ -20,6 +20,7 @@ from src.services.ocr_extraction_service import (
     OCR_SCHEMA_VERSION,
     OcrExtractionService,
     assess_ocr_dependencies,
+    normalize_ocr_document_kind,
     normalize_ocr_langs,
 )
 
@@ -335,3 +336,181 @@ def test_real_tesseract_english_fixture_when_available(tmp_path: Path) -> None:
     if payload["status"] == "available":
         joined = payload["text"].upper()
         assert "AAPL" in joined or "600519" in joined or "STATEMENT" in joined
+
+
+def test_normalize_document_kind_defaults() -> None:
+    assert normalize_ocr_document_kind(None) == "screenshot"
+    assert normalize_ocr_document_kind("table_statement") == "table_statement"
+    assert normalize_ocr_document_kind("statement_table") == "table_statement"
+    assert normalize_ocr_document_kind("FILING-PAGE") == "filing_page"
+    assert normalize_ocr_document_kind("not-a-kind") == "screenshot"
+
+
+def test_document_kinds_carry_untrusted_non_decision_envelope(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    cases = [
+        ("sample_statement_en.png", "screenshot", "AAPL screenshot text"),
+        ("sample_filing_page.png", "filing_page", "Item 1A Risk Factors EXMP"),
+        ("sample_table_statement.png", "table_statement", "AAPL  120  198.50"),
+        ("sample_chart_annotation.png", "chart_annotation", "Support 175 Resistance 210"),
+        ("sample_pdf_page.pdf", "pdf_page", "SEC Form risk factors EXMP"),
+    ]
+    for fixture_name, kind, text in cases:
+        (root / fixture_name).write_bytes((FIXTURES / fixture_name).read_bytes())
+        payload = OcrExtractionService(
+            file_root=str(root),
+            engine=lambda *_a, **_k: text,
+        ).extract_path(fixture_name, document_kind=kind)
+        assert payload["status"] == "available", kind
+        assert payload["document_kind"] == kind
+        assert payload["schema_version"] == OCR_SCHEMA_VERSION
+        assert payload["trust"]["classification"] == "untrusted_user_document"
+        assert payload["trust"]["authoritative_for_decisions"] is False
+        assert payload["trust"]["may_authorize_decisions"] is False
+        assert payload["content"]["decision_authority"] is False
+        assert payload["structure"]["verified"] is False
+        assert payload["structure"]["decision_authority"] is False
+        if kind == "table_statement":
+            assert payload["structure"]["status"] == "unverified_candidates"
+            assert payload["structure"]["row_count"] >= 1
+        if kind == "chart_annotation":
+            assert payload["structure"]["not_chart_semantics"] is True
+            assert payload["structure"]["use_for_semantic_chart"] == "read_price_chart"
+        if kind == "pdf_page":
+            assert payload["source"]["container_mime_type"] == "application/pdf"
+            assert payload["source"]["pdf_page_index"] == 0
+
+
+def test_text_layer_pdf_without_embedded_image_degrades_explicitly(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    multi = Path(__file__).resolve().parents[1] / "fixtures" / "multimodal" / "sample_financial_report.pdf"
+    (root / "text_only.pdf").write_bytes(multi.read_bytes())
+    called = False
+
+    def engine(*_args) -> str:
+        nonlocal called
+        called = True
+        return "should-not-run"
+
+    payload = OcrExtractionService(file_root=str(root), engine=engine).extract_path(
+        "text_only.pdf",
+        document_kind="pdf_page",
+    )
+    assert payload["status"] == "unavailable"
+    # Fail closed without inventing pixels for text-layer PDFs. Builtin scan
+    # and optional pypdf both report no embedded raster; import absence is also
+    # an explicit unavailable reason when neither path can proceed.
+    assert payload["reason_code"] in {
+        "pdf_no_embedded_image",
+        "pdf_image_extract_failed",
+        "pdf_reader_unavailable",
+    }
+    assert called is False
+    assert payload["trust"]["authoritative_for_decisions"] is False
+
+
+def test_malformed_pdf_is_unavailable(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "bad.pdf").write_bytes(b"%PDF-not-really")
+    payload = OcrExtractionService(
+        file_root=str(root),
+        engine=lambda *_a, **_k: "x",
+    ).extract_path("bad.pdf", document_kind="pdf_page")
+    assert payload["status"] == "unavailable"
+    assert payload["reason_code"] in {
+        "malformed_pdf",
+        "pdf_empty",
+        "pdf_image_extract_failed",
+        "pdf_no_embedded_image",
+        "pdf_reader_unavailable",
+    }
+
+
+def test_pdf_page_fixture_works_without_pypdf(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI baseline may omit optional pypdf; builtin JPEG scan must still work."""
+    import builtins
+    import sys
+
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "sample_pdf_page.pdf").write_bytes((FIXTURES / "sample_pdf_page.pdf").read_bytes())
+
+    real_import = builtins.__import__
+
+    def _block_pypdf(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "pypdf" or name.startswith("pypdf."):
+            raise ImportError("blocked for OCR offline test")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _block_pypdf)
+    sys.modules.pop("pypdf", None)
+
+    payload = OcrExtractionService(
+        file_root=str(root),
+        engine=lambda *_a, **_k: "Risk Factors EXMP",
+    ).extract_path("sample_pdf_page.pdf", document_kind="pdf_page")
+    assert payload["status"] == "available"
+    assert payload["document_kind"] == "pdf_page"
+    assert payload["source"].get("pdf_extractor") == "builtin_scan"
+    assert payload["trust"]["authoritative_for_decisions"] is False
+
+
+def test_table_statement_kind_emits_unverified_row_candidates(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "table.png").write_bytes((FIXTURES / "sample_table_statement.png").read_bytes())
+    raw = "Symbol  Qty  Price  Value\nAAPL  120  198.50  23820.00\n600519  10  1650.00  16500.00"
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: raw)
+    payload = service.extract_path("table.png", document_kind="table_statement")
+    assert payload["document_kind"] == "table_statement"
+    assert payload["structure"]["verified"] is False
+    assert payload["structure"]["row_count"] >= 2
+    assert payload["trust"]["authoritative_for_decisions"] is False
+
+
+def test_chart_annotation_kind_emits_sparse_label_candidates(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "chart.png").write_bytes((FIXTURES / "sample_chart_annotation.png").read_bytes())
+    raw = "AAPL Daily\nSupport 185.00\nResistance 205.50\nMA50 192.30"
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: raw)
+    payload = service.extract_path("chart.png", document_kind="chart_annotation")
+    assert payload["structure"]["not_chart_semantics"] is True
+    assert payload["structure"]["use_for_semantic_chart"] == "read_price_chart"
+
+
+def test_filing_page_kind_envelope(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "filing.png").write_bytes((FIXTURES / "sample_filing_page.png").read_bytes())
+    service = OcrExtractionService(
+        file_root=str(root), engine=lambda *_a: "FORM 10-K FILING EXCERPT AAPL"
+    )
+    payload = service.extract_path("filing.png", document_kind="filing_page")
+    assert payload["document_kind"] == "filing_page"
+    assert payload["trust"]["classification"] == "untrusted_user_document"
+
+
+def test_pdf_page_embedded_or_honest_degrade(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "page.pdf").write_bytes((FIXTURES / "sample_pdf_page.pdf").read_bytes())
+    service = OcrExtractionService(
+        file_root=str(root), engine=lambda *_a: "FORM 10-K embedded AAPL"
+    )
+    payload = service.extract_path("page.pdf", document_kind="pdf_page", page_index=0)
+    if payload["status"] == "available":
+        assert payload["document_kind"] == "pdf_page"
+        assert payload["trust"]["authoritative_for_decisions"] is False
+    else:
+        assert payload["reason_code"] in {
+            "pdf_reader_unavailable",
+            "pdf_no_embedded_image",
+            "pdf_image_extract_failed",
+            "malformed_pdf",
+            "unsupported_embedded_image",
+        }
+

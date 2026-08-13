@@ -17,6 +17,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT as _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
     logger,
     normalize_tickflow_kline_adjust,
     parse_prompt_cache_diagnostics_level,
@@ -701,6 +702,25 @@ class _ConfigLoadingMethods:
                 == "reject"
                 else "warn"
             ),
+            data_validation_fund_pe_suspect_abs=parse_env_float(
+                os.getenv('DATA_VALIDATION_FUND_PE_SUSPECT_ABS'),
+                200.0,
+                field_name='DATA_VALIDATION_FUND_PE_SUSPECT_ABS',
+                minimum=1.0,
+            ),
+            data_validation_fund_pb_suspect_abs=parse_env_float(
+                os.getenv('DATA_VALIDATION_FUND_PB_SUSPECT_ABS'),
+                50.0,
+                field_name='DATA_VALIDATION_FUND_PB_SUSPECT_ABS',
+                minimum=0.1,
+            ),
+            data_validation_cross_source_rel_threshold=parse_env_float(
+                os.getenv('DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD'),
+                0.05,
+                field_name='DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD',
+                minimum=0.0001,
+                maximum=1.0,
+            ),
             plugin_data_provider_auto_bind_enabled=parse_env_bool(
                 os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
                 default=False,
@@ -734,6 +754,10 @@ class _ConfigLoadingMethods:
             ),
             llm_prompt_cache_diagnostics_level=parse_prompt_cache_diagnostics_level(
                 os.getenv("LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL")
+            ),
+            llm_usage_attribution_enabled=parse_env_bool(
+                os.getenv("LLM_USAGE_ATTRIBUTION_ENABLED"),
+                default=True,
             ),
             gemini_api_keys=gemini_api_keys,
             anthropic_api_keys=anthropic_api_keys,
@@ -835,6 +859,94 @@ class _ConfigLoadingMethods:
                 field_name='AGENT_ORCHESTRATOR_TIMEOUT_S',
                 minimum=0,
             ),
+            agent_mode_budget_enabled=parse_env_bool(
+                os.getenv('AGENT_MODE_BUDGET_ENABLED'),
+                True,
+            ),
+            agent_mode_budget_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_MAX_LLM_TURNS'),
+                0,
+                field_name='AGENT_MODE_BUDGET_MAX_LLM_TURNS',
+                minimum=0,
+            ),
+            agent_mode_budget_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_MAX_TOOL_CALLS'),
+                0,
+                field_name='AGENT_MODE_BUDGET_MAX_TOOL_CALLS',
+                minimum=0,
+            ),
+            agent_mode_budget_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_MAX_COST_USD'),
+                0.0,
+                field_name='AGENT_MODE_BUDGET_MAX_COST_USD',
+                minimum=0.0,
+            ),
+            agent_mode_budget_max_tokens=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_MAX_TOKENS'),
+                0,
+                field_name='AGENT_MODE_BUDGET_MAX_TOKENS',
+                minimum=0,
+            ),
+            agent_mode_budget_quick_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_quick_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_quick_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_standard_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_standard_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_standard_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_full_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_full_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_full_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_specialist_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_specialist_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_specialist_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_chat_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_chat_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_chat_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_COST_USD', minimum=0.0,
+            ),
             agent_critic_enabled=parse_env_bool(
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
@@ -842,6 +954,12 @@ class _ConfigLoadingMethods:
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
+            ),
+            agent_research_persona=(
+                (os.getenv('AGENT_RESEARCH_PERSONA') or '').strip().lower()
+            ),
+            agent_research_persona_custom=(
+                (os.getenv('AGENT_RESEARCH_PERSONA_CUSTOM') or '').strip()
             ),
             skill_opinion_recording_enabled=parse_env_bool(
                 os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
@@ -1001,6 +1119,8 @@ class _ConfigLoadingMethods:
             agent_context_protected_turns=agent_context_protected_turns,
             agent_observability_enabled=os.getenv('AGENT_OBSERVABILITY_ENABLED', 'true').lower() == 'true',
             agent_observability_deep_payload=os.getenv('AGENT_OBSERVABILITY_DEEP_PAYLOAD', 'false').lower() == 'true',
+            perf_collection_enabled=os.getenv('PERF_COLLECTION_ENABLED', 'false').lower() == 'true',
+            perf_profile_enabled=os.getenv('PERF_PROFILE_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_enabled=os.getenv('AGENT_EVENT_MONITOR_ENABLED', 'false').lower() == 'true',
             agent_event_monitor_interval_minutes=parse_env_int(
                 os.getenv('AGENT_EVENT_MONITOR_INTERVAL_MINUTES'),
@@ -1107,6 +1227,42 @@ class _ConfigLoadingMethods:
             report_integrity_retry=parse_env_int(os.getenv('REPORT_INTEGRITY_RETRY'), 1, field_name='REPORT_INTEGRITY_RETRY', minimum=0),
             report_history_compare_n=parse_env_int(os.getenv('REPORT_HISTORY_COMPARE_N'), 0, field_name='REPORT_HISTORY_COMPARE_N', minimum=0),
             analysis_delay=parse_env_float(os.getenv('ANALYSIS_DELAY'), 0.0, field_name='ANALYSIS_DELAY', minimum=0.0),
+            analysis_checkpoint_enabled=parse_env_bool(
+                os.getenv('ANALYSIS_CHECKPOINT_ENABLED'),
+                True,
+            ),
+            analysis_checkpoint_dir=(
+                (os.getenv('ANALYSIS_CHECKPOINT_DIR') or '').strip()
+                or './data/checkpoints'
+            ),
+            analysis_checkpoint_ttl_hours=parse_env_int(
+                os.getenv('ANALYSIS_CHECKPOINT_TTL_HOURS'),
+                24,
+                field_name='ANALYSIS_CHECKPOINT_TTL_HOURS',
+                minimum=0,
+            ),
+            analysis_checkpoint_force_full=parse_env_bool(
+                os.getenv('ANALYSIS_CHECKPOINT_FORCE_FULL'),
+                False,
+            ),
+            repro_mode_enabled=parse_env_bool(
+                os.getenv('REPRO_MODE_ENABLED'),
+                False,
+            ),
+            repro_record_config=parse_env_bool(
+                os.getenv('REPRO_RECORD_CONFIG'),
+                True,
+            ),
+            repro_seed=(
+                parse_env_int(
+                    os.getenv('REPRO_SEED'),
+                    0,
+                    field_name='REPRO_SEED',
+                    minimum=0,
+                )
+                if os.getenv('REPRO_SEED') is not None
+                else None
+            ),
             merge_email_notification=os.getenv('MERGE_EMAIL_NOTIFICATION', 'false').lower() == 'true',
             feishu_max_bytes=parse_env_int(os.getenv('FEISHU_MAX_BYTES'), 20000, field_name='FEISHU_MAX_BYTES', minimum=1),
             feishu_send_as_file=os.getenv('FEISHU_SEND_AS_FILE', '').lower() in ('true', '1', 'yes'),
@@ -1170,6 +1326,34 @@ class _ConfigLoadingMethods:
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),
+            readiness_check_timeout_seconds=parse_env_float(
+                os.getenv('READINESS_CHECK_TIMEOUT_SECONDS'),
+                _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
+                field_name='READINESS_CHECK_TIMEOUT_SECONDS',
+                minimum=0.1,
+            ),
+            analysis_parallel_fetch_enabled=parse_env_bool(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_ENABLED'),
+                default=True,
+            ),
+            analysis_parallel_fetch_max_concurrent=parse_env_int(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT'),
+                3,
+                field_name='ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT',
+                minimum=1,
+            ),
+            analysis_parallel_fetch_per_provider_limit=parse_env_int(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT'),
+                1,
+                field_name='ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT',
+                minimum=1,
+            ),
+            analysis_parallel_fetch_budget_seconds=parse_env_float(
+                os.getenv('ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS'),
+                0.0,
+                field_name='ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS',
+                minimum=0.0,
+            ),
             debug=os.getenv('DEBUG', 'false').lower() == 'true',
             config_validate_mode=os.getenv('CONFIG_VALIDATE_MODE', 'warn').lower(),
             http_proxy=os.getenv('HTTP_PROXY'),
@@ -1417,7 +1601,11 @@ class _ConfigLoadingMethods:
             ),
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
-                os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
+                os.getenv('DECISION_MEMORY_LOOKBACK'),
+                5,
+                field_name='DECISION_MEMORY_LOOKBACK',
+                minimum=0,
+                maximum=40,
             ),
             decision_memory_min_age_days=parse_env_int(
                 os.getenv('DECISION_MEMORY_MIN_AGE_DAYS'), 3, field_name='DECISION_MEMORY_MIN_AGE_DAYS', minimum=0
@@ -1430,6 +1618,16 @@ class _ConfigLoadingMethods:
             ),
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
+            ),
+            research_api_enabled=parse_env_bool(
+                os.getenv('RESEARCH_API_ENABLED'), default=False
+            ),
+            research_api_rate_limit_per_minute=parse_env_int(
+                os.getenv('RESEARCH_API_RATE_LIMIT_PER_MINUTE'),
+                60,
+                field_name='RESEARCH_API_RATE_LIMIT_PER_MINUTE',
+                minimum=1,
+                maximum=10_000,
             ),
             reasoning_trace_export_enabled=parse_env_bool(
                 os.getenv('REASONING_TRACE_EXPORT_ENABLED'), default=False
@@ -1475,6 +1673,28 @@ class _ConfigLoadingMethods:
             ),
             daily_brief_save_report_file=parse_env_bool(
                 os.getenv('DAILY_BRIEF_SAVE_REPORT_FILE'), default=True
+            ),
+            daily_brief_quiet_when_empty=parse_env_bool(
+                os.getenv('DAILY_BRIEF_QUIET_WHEN_EMPTY'), default=False
+            ),
+            event_research_brief_enabled=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_ENABLED'), default=False
+            ),
+            event_research_brief_notify=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_NOTIFY'), default=True
+            ),
+            event_research_brief_persist_history=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_PERSIST_HISTORY'), default=True
+            ),
+            event_research_brief_save_report_file=parse_env_bool(
+                os.getenv('EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE'), default=True
+            ),
+            event_research_brief_lookback_hours=parse_env_int(
+                os.getenv('EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS'), 48,
+                field_name='EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS', minimum=1,
+            ),
+            event_research_brief_categories=(
+                os.getenv('EVENT_RESEARCH_BRIEF_CATEGORIES', 'earnings').strip() or 'earnings'
             ),
             paper_portfolio_initial_cash=parse_env_float(
                 os.getenv('PAPER_PORTFOLIO_INITIAL_CASH'), 1_000_000.0, field_name='PAPER_PORTFOLIO_INITIAL_CASH', minimum=0.0
@@ -1596,20 +1816,54 @@ class _ConfigLoadingMethods:
         default: Optional[str] = None,
         prefer_env_file: bool = False,
     ) -> Optional[str]:
-        """Resolve one env value, optionally preferring the persisted `.env` copy."""
+        """Resolve one env value, optionally preferring the persisted `.env` copy.
+
+        Value selection is delegated to
+        :func:`src.core.config.resolve.resolve_config_value` so runtime and the
+        public resolve path share one precedence algorithm. Source metadata is
+        available via :meth:`resolve_with_source`.
+        """
+        from src.core.config.resolve import resolve_config_value
+
         env_value = os.getenv(key)
         file_value = cls._get_env_file_value(key)
+        resolved = resolve_config_value(
+            key,
+            env_value=env_value,
+            file_value=file_value,
+            default=default,
+            prefer_env_file=prefer_env_file,
+            has_bootstrap_override=cls._has_bootstrap_runtime_env_override(key),
+            webui_file_priority=key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS,
+        )
+        return resolved.value
 
-        should_prefer_file = prefer_env_file or key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
-        if should_prefer_file and file_value is not None:
-            if env_value is not None and cls._has_bootstrap_runtime_env_override(key):
-                return env_value
-            return file_value
-        if env_value is not None:
-            return env_value
-        if file_value is not None:
-            return file_value
-        return default
+    @classmethod
+    def resolve_with_source(
+        cls,
+        key: str,
+        *,
+        default: Optional[str] = None,
+        prefer_env_file: bool = False,
+    ):
+        """Resolve one key through the single path and return value + source.
+
+        Thin facade for diagnostics and gradual call-site migration. Value is
+        identical to :meth:`_resolve_env_value`.
+        """
+        from src.core.config.resolve import resolve_config_value
+
+        env_value = os.getenv(key)
+        file_value = cls._get_env_file_value(key)
+        return resolve_config_value(
+            key,
+            env_value=env_value,
+            file_value=file_value,
+            default=default,
+            prefer_env_file=prefer_env_file,
+            has_bootstrap_override=cls._has_bootstrap_runtime_env_override(key),
+            webui_file_priority=key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS,
+        )
 
     @classmethod
     def _capture_bootstrap_runtime_env_overrides(cls) -> None:
