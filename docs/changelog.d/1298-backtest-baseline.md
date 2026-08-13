@@ -1,0 +1,1 @@
+- [Fixed] Preserve hardened backtest methodology and localized configuration contracts after synchronizing with the latest baseline.

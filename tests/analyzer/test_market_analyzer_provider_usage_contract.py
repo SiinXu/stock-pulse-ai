@@ -714,7 +714,12 @@ class TestAnalyzerGenerateText(_AnalyzerFactoryMixin):
         assert usage_arg["transport"] == "litellm"
         assert usage_arg["message_count"] == 2
         assert json.loads(usage_arg["known_dynamic_marker_positions"]) == []
-        assert mock_usage.call_args.kwargs == {"call_type": "analysis", "stock_code": "600519"}
+        assert mock_usage.call_args.kwargs == {
+            "call_type": "analysis",
+            "stock_code": "600519",
+            "stage": "analysis",
+            "call_success": True,
+        }
 
     def test_analyze_records_marker_positions_from_real_prompt_format(self):
         analyzer = self._make_analyzer()
