@@ -89,6 +89,7 @@ This is the entry point for project documentation. The README covers the project
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
 | [Investor Personas](investor-personas_EN.md) | Default-off research stances + investment-lens Skills (#119, #467) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
+| [A-share Specialist Roles](ashare-specialist-roles.md) | Default-off policy / capital-flow / microstructure Skills with fail-soft data deps (#192) |
 | [Skill Opinion Outcome Evaluation](skill-opinion-outcome-evaluation.md) | Individual skill samples, offline forward outcomes, sample-sufficiency statistics, migration, and V0 boundaries |
 | [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema and CAS store (Issue #1112) |
 | [Market Regime Detection](market-regime.md) | Explainable rule-based regime labels, evidence artifacts, adaptive analysis focus, and skill routing (Issue #220) |
