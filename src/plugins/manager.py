@@ -120,6 +120,7 @@ class PluginSnapshot:
     package_root: str | None = None
     reloadable: bool = False
     extension_points: tuple[ExtensionPoint, ...] = ()
+    notification_channels: tuple[str, ...] = ()
     last_error_code: str | None = None
 
 
@@ -610,6 +611,13 @@ class PluginManager:
                 if handle.active
             )
         )
+        notification_channels = tuple(
+            dict.fromkeys(
+                handle.registration_id
+                for handle in record.handles
+                if handle.active and handle.extension_point == "notification_channel"
+            )
+        )
         package_root = (
             None if record.package_root is None else str(record.package_root)
         )
@@ -627,6 +635,7 @@ class PluginManager:
             package_root=package_root,
             reloadable=reloadable,
             extension_points=extension_points,
+            notification_channels=notification_channels,
             last_error_code=record.last_error_code,
         )
 
