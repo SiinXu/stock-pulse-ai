@@ -40,6 +40,7 @@ from scripts.merge_resolvers import (  # noqa: E402
     i18n_locales,
     playground_catalog,
     public_surface,
+    settings_help,
 )
 from scripts.merge_resolvers.common import (  # noqa: E402
     Context,
@@ -49,14 +50,17 @@ from scripts.merge_resolvers.common import (  # noqa: E402
     repo_root,
 )
 
+# Exact-path resolvers come first: ``public_surface`` dispatches on content and
+# would otherwise claim files that have a dedicated resolver.
 RESOLVERS: tuple[ModuleType, ...] = (
     bundle_budget,
-    public_surface,
     config_registry,
     docs_index,
     playground_catalog,
-    i18n_locales,
     generated_artifacts,
+    settings_help,
+    i18n_locales,
+    public_surface,
 )
 
 EXIT_OK = 0
@@ -84,8 +88,11 @@ def _print_list() -> None:
             print(f"      - {pattern}")
         if module is i18n_locales:
             print("      - apps/dsa-web/src/i18n/**/*.ts")
+        if module is settings_help:
+            print("      - apps/dsa-web/src/locales/settingsHelp.<lang>.ts")
         if module is public_surface:
             print("      - tests/**/*_public_surface.py")
+            print("      - any tests/**/*.py defining EXPECTED_PUBLIC_EXPORTS")
         print()
 
 
@@ -197,6 +204,11 @@ def main(argv: list[str] | None = None) -> int:
         print("merge-resolvers: REFUSED, nothing was written.", file=sys.stderr)
         for message in refusals:
             print(f"  REFUSE {message}", file=sys.stderr)
+        for rel_path in resolutions:
+            print(
+                f"  (would have resolved {rel_path}: {resolutions[rel_path].detail})",
+                file=sys.stderr,
+            )
         return EXIT_REFUSED
 
     if args.dry_run:

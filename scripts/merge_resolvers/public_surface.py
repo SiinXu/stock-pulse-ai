@@ -61,7 +61,11 @@ SUPPORTED = (
     "tests/agent/test_agent_executor_public_surface.py",
     "tests/core/test_pipeline_public_surface.py",
     "tests/notification/test_notification_public_surface.py",
+    "tests/test_analysis_stage_facade.py",
 )
+
+# Owned by ``config_registry``, which needs its own recompute recipes.
+EXCLUDED = ("tests/core/test_config_registry_public_exports.py",)
 
 _PUBLIC_EXPORTS_NAME = "EXPECTED_PUBLIC_EXPORTS"
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -70,9 +74,21 @@ _INDENT = "    "
 
 
 def matches(rel_path: str) -> bool:
+    if rel_path in EXCLUDED:
+        return False
     if rel_path in SUPPORTED:
         return True
-    return rel_path.startswith("tests/") and rel_path.endswith("_public_surface.py")
+    if not (rel_path.startswith("tests/") and rel_path.endswith(".py")):
+        return False
+    if rel_path.endswith("_public_surface.py"):
+        return True
+    # Dispatch on content rather than on file naming: the same snapshot shape
+    # is used by facade guards that are not named ``*_public_surface.py``.
+    try:
+        text = Path(rel_path).read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return "EXPECTED_PUBLIC_EXPORTS" in text
 
 
 # --------------------------------------------------------------------------
@@ -128,22 +144,95 @@ def _string_constants(node: ast.expr) -> list[ast.Constant]:
     return found
 
 
-def _target_module(path: str, tree: ast.Module) -> str:
-    names: set[str] = set()
+def _import_module_literal(node: ast.expr) -> str | None:
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "import_module"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    ):
+        return node.args[0].value
+    return None
+
+
+def _all_import_targets(tree: ast.Module) -> set[str]:
+    found: set[str] = set()
     for node in ast.walk(tree):
+        literal = _import_module_literal(node)
+        if literal is not None:
+            found.add(literal)
+    return found
+
+
+def _local_module_bindings(function: ast.AST) -> dict[str, str]:
+    bindings: dict[str, str] = {}
+    for node in ast.walk(function):
         if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "import_module"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
         ):
-            names.add(node.args[0].value)
+            literal = _import_module_literal(node.value)
+            if literal is not None:
+                bindings[node.targets[0].id] = literal
+    return bindings
+
+
+def _functions(tree: ast.Module) -> list[ast.AST]:
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+
+
+def _module_for_exports(path: str, tree: ast.Module) -> str:
+    """The module whose ``vars()`` the EXPECTED_PUBLIC_EXPORTS test compares."""
+
+    for function in _functions(tree):
+        names = {
+            node.id for node in ast.walk(function) if isinstance(node, ast.Name)
+        }
+        if _PUBLIC_EXPORTS_NAME not in names:
+            continue
+        bindings = _local_module_bindings(function)
+        for node in ast.walk(function):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "vars"
+                and node.args
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id in bindings
+            ):
+                return bindings[node.args[0].id]
+    return _sole_target(path, tree, "the public-export set")
+
+
+def _module_for_digests(path: str, tree: ast.Module) -> str:
+    """The module whose containers ``_container_ast_hash`` digests."""
+
+    for function in _functions(tree):
+        uses_hasher = any(
+            isinstance(node, ast.Name) and node.id == "_container_ast_hash"
+            for node in ast.walk(function)
+        )
+        if not uses_hasher:
+            continue
+        bindings = _local_module_bindings(function)
+        if len(bindings) == 1:
+            return next(iter(bindings.values()))
+    return _sole_target(path, tree, "the AST digests")
+
+
+def _sole_target(path: str, tree: ast.Module, purpose: str) -> str:
+    names = _all_import_targets(tree)
     if len(names) != 1:
         raise Refusal(
             path,
-            "cannot determine the guarded module: found "
+            f"cannot determine which module backs {purpose}: found "
             f"{sorted(names) or 'no'} importlib.import_module() targets",
         )
     return names.pop()
@@ -163,30 +252,34 @@ source = open(request["candidate"], encoding="utf-8").read()
 namespace = {{"__name__": "_merge_resolver_public_surface", "__file__": request["origin"]}}
 exec(compile(source, request["origin"], "exec"), namespace)
 
-module = importlib.import_module(request["target"])
 result = {{}}
 
-if request["need_exports"]:
+if request["exports_target"]:
+    module = importlib.import_module(request["exports_target"])
     result["exports"] = sorted(
         name for name in vars(module) if not name.startswith("_")
     )
 
 digests = []
-for group in request["digest_groups"]:
+if request["digest_groups"]:
+    module = importlib.import_module(request["digest_target"])
     hasher = namespace.get("_container_ast_hash")
     if hasher is None:
-        print("MISSING_HASHER", file=sys.stderr)
+        print("the test file has no _container_ast_hash helper", file=sys.stderr)
         raise SystemExit(3)
-    container_name = None
-    for candidate in reversed(group["candidates"]):
-        value = getattr(module, candidate, None)
-        if isinstance(value, type):
-            container_name = candidate
-            break
-    if container_name is None:
-        print("UNRESOLVED_CONTAINER:" + json.dumps(group), file=sys.stderr)
-        raise SystemExit(4)
-    digests.append({{"key": group["key"], "value": hasher(getattr(module, container_name))}})
+    for group in request["digest_groups"]:
+        container_name = None
+        for candidate in reversed(group["candidates"]):
+            value = getattr(module, candidate, None)
+            if isinstance(value, type):
+                container_name = candidate
+                break
+        if container_name is None:
+            print("cannot resolve container for " + json.dumps(group), file=sys.stderr)
+            raise SystemExit(4)
+        digests.append(
+            {{"key": group["key"], "value": hasher(getattr(module, container_name))}}
+        )
 result["digests"] = digests
 
 sys.stdout.write(json.dumps(result))
@@ -357,10 +450,13 @@ def resolve(ctx: Context, rel_path: str) -> Resolution:
                 f"{name} conflicts but contains no recomputable digest literal",
             )
 
-    target = _target_module(rel_path, tree_ours)
     request = {
-        "target": target,
-        "need_exports": need_exports,
+        "exports_target": (
+            _module_for_exports(rel_path, tree_ours) if need_exports else None
+        ),
+        "digest_target": (
+            _module_for_digests(rel_path, tree_ours) if digest_nodes else None
+        ),
         "digest_groups": [
             {"key": f"{index}", "candidates": candidates}
             for index, (_, _, candidates) in enumerate(digest_nodes)

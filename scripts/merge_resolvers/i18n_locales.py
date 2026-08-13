@@ -36,10 +36,10 @@ from .common import Context, Hunk, Refusal, Resolution, parse_conflicts, render
 NAME = "i18n-locales"
 DESCRIPTION = "Union both sides' translation entries, de-duplicate, restore sorting."
 
-_PREFIXES = (
-    "apps/dsa-web/src/i18n/",
-    "apps/dsa-web/src/locales/",
-)
+# Only the flat tables. ``apps/dsa-web/src/locales/`` holds nested help maps
+# and structured catalogues that this resolver must not touch; the nested
+# settings-help catalogue has its own resolver.
+_PREFIXES = ("apps/dsa-web/src/i18n/",)
 _ENTRY = re.compile(r'^\s*"((?:[^"\\]|\\.)*)"\s*(?::\s*.*,?\s*|,\s*)$')
 
 
