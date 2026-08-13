@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-13",
-  "baselineNote": "IntelligenceSourcesPanel and locale budgets use the production build after the checkpoint-settings and DecisionSignal calibration localizations landed on main; each rule retains its fixed headroom.",
+  "baselineNote": "PR #1179 remasured after merging origin/main. Only overflowing IntelligenceSourcesPanel and locale-fr were rebuilt locally; each retains its previous fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 244087,
-      "measuredGzipBytes": 243687,
-      "note": "Local production-build remasure after merging origin/main; measured 243687 B + 400 B retained headroom."
+      "maxGzipBytes": 247256,
+      "measuredGzipBytes": 246856,
+      "note": "Local production-build measurement after merging origin/main (PR #1179); measured 246856 B + 400 B retained headroom."
     },
     {
       "id": "js-entry",
@@ -47,9 +47,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 152676,
-      "measuredGzipBytes": 152076,
-      "note": "Local production-build remasure after merging origin/main; measured 152076 B + 600 B retained headroom."
+      "maxGzipBytes": 153327,
+      "measuredGzipBytes": 152727,
+      "note": "Local production-build measurement after merging origin/main (PR #1179); measured 152727 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
