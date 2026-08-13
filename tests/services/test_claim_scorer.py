@@ -686,6 +686,57 @@ def test_custom_token_comparison_does_not_coerce_invalid_actuals(actual: Any) ->
     assert report.aggregate.hit_count == 0
 
 
+@pytest.mark.parametrize(
+    "operator,payload_extra",
+    [
+        ("gt", {}),
+        ("gte", {}),
+        ("lt", {}),
+        ("lte", {}),
+        ("in_range", {"expected_high": 20.0}),
+    ],
+)
+@pytest.mark.parametrize("actual", ["10", "1e2", "100.0"])
+def test_custom_numeric_ops_do_not_coerce_string_tokens(
+    operator: str,
+    payload_extra: Dict[str, Any],
+    actual: str,
+) -> None:
+    payload: Dict[str, Any] = {
+        "metric": "value",
+        "operator": operator,
+        "expected": 1.0,
+        **payload_extra,
+    }
+    result, report = _single(
+        _claim("c", "custom", payload, confidence=0.9),
+        {"metrics": {"value": actual}},
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "invalid_metric"
+    assert result.score is None
+    assert report.aggregate.hit_count == 0
+    assert report.aggregate.miss_count == 0
+    assert report.aggregate.calibrated_claims == 0
+
+
+def test_custom_numeric_ops_do_not_coerce_string_expected() -> None:
+    result, report = _single(
+        _claim(
+            "c",
+            "custom",
+            {"metric": "value", "operator": "gt", "expected": "10"},
+            confidence=0.9,
+        ),
+        {"metrics": {"value": 15.0}},
+    )
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "invalid_metric"
+    assert result.score is None
+    assert report.aggregate.hit_count == 0
+    assert report.aggregate.calibrated_claims == 0
+
+
 def test_custom_malformed_metrics_container_is_unavailable() -> None:
     result, _ = _single(
         _claim(
