@@ -1,0 +1,12 @@
+{
+  "version": "prediction_eval/1.0",
+  "description": "Offline prediction-verification integrity fixtures (Issue #1092 / Epic #1107).",
+  "case_ids": [
+    "pred-direction-hit",
+    "pred-provider-failure-unavailable",
+    "pred-missing-actuals-no-hit",
+    "pred-unstructured-prose-rejected",
+    "pred-seeded-miss-lesson",
+    "pred-trajectory-tool-discipline"
+  ]
+}

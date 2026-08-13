@@ -1598,6 +1598,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 置信度校准和长期分析质量。'],
     notes: ['需要配合回测功能使用效果更佳。'],
   },
+  'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
+    title: 'Agent 进化 episode 日志',
+    summary: '保存精简 Agent 轨迹、教训和可选结果。',
+  },
+  'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
+    title: 'Agent episode 保留天数',
+    summary: 'episode 清理前的最大保留天数。',
+  },
+  'settings.agent.AGENT_EPISODE_MAX_ROWS': {
+    title: 'Agent episode 最大行数',
+    summary: 'episode 行数上限；优先删除最旧行。',
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent 规划循环',
     summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',
