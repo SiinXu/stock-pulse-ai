@@ -197,6 +197,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'chat-send-feedback-alert', 'ChatSendFeedbackAlert', 'components/chat/ChatSendFeedback.tsx', ['states', 'error', 'empty']),
   entry('reports', 'chat-message-list', 'ChatMessageList', 'components/chat/ChatMessageList.tsx', ['default', 'loading', 'empty']),
   entry('reports', 'what-if-scenario-panel', 'WhatIfScenarioPanel', 'components/chat/WhatIfScenarioPanel.tsx', ['default', 'states', 'empty']),
+  entry('reports', 'report-scenario-sensitivity-panel', 'ReportScenarioSensitivityPanel', 'components/chat/ReportScenarioSensitivityPanel.tsx', ['default']),
   entry('reports', 'chat-session-sidebar', 'ChatSessionSidebar', 'components/chat/ChatSessionSidebar.tsx', ['default', 'loading', 'empty', 'error']),
   entry('reports', 'chat-thinking-details', 'ChatThinkingDetails', 'components/chat/ChatThinkingDetails.tsx', ['default']),
   entry('reports', 'chat-thinking-toggle', 'ChatThinkingToggle', 'components/chat/ChatThinkingDetails.tsx', ['interactive']),

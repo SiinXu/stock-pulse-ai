@@ -87,6 +87,7 @@ This is the entry point for project documentation. The README covers the project
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |
 | [Portfolio Rebalancing & Position Bands](portfolio-rebalancing_EN.md) | Risk-band rebalancing suggestions, position bands, refusal rules; `GET /api/v1/portfolio/rebalancing-recommendations` ([Chinese](portfolio-rebalancing.md)) |
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
+| [Report Sensitivity Scenario Library](report-scenario-library_EN.md) | Versioned rate/FX/industry presets + custom save/reuse via Chat what-if channel; hypothetical risk framing for report sensitivity (#1136) ([Chinese](report-scenario-library.md)) |
 | [Investor Personas](investor-personas_EN.md) | Default-off research stances + investment-lens Skills (#119, #467) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
 | [A-share Specialist Roles](ashare-specialist-roles.md) | Default-off policy / capital-flow / microstructure Skills with fail-soft data deps (#192) |
