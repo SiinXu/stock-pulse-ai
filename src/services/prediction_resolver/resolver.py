@@ -618,12 +618,18 @@ class PredictionResolver:
         """Move durable A3 data-unavailable rows back to pending after backoff."""
         if limit <= 0:
             return
+        # A3's generic status scan does not understand outcome backoff fields.
+        # Inspect a bounded window so exhausted / still-backoff rows with older
+        # resolve_after cannot starve ready retries out of the per-tick cap.
         retry_rows = self._store.list_due(
             as_of=as_of,
-            limit=limit,
+            limit=PREDICTION_RESOLVER_BACKLOG_PROBE_LIMIT,
             statuses=(OUTCOME_DATA_UNAVAILABLE,),
         )
+        requeued = 0
         for row in retry_rows:
+            if requeued >= limit:
+                break
             outcome = _mapping(_attr(row, "outcome"))
             if bool(outcome.get("retry_exhausted", False)):
                 continue
@@ -639,6 +645,7 @@ class PredictionResolver:
                 prediction_id=prediction_id,
                 as_of=as_of,
             )
+            requeued += 1
 
     def _list_claimable(self, *, as_of: datetime, limit: int) -> List[Any]:
         """Combine pending rows with only genuinely expired A3 leases."""

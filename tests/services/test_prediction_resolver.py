@@ -871,6 +871,99 @@ def test_a3_style_status_scan_still_honors_durable_backoff() -> None:
     assert resolver.tick(now=row.next_attempt_at + timedelta(seconds=1)).claimed == 1
 
 
+def test_a3_retry_scan_is_not_starved_by_exhausted_prefix() -> None:
+    """A3 list_due is status+resolve_after only; exhausted older rows must not hide ready retries."""
+
+    class _A3OrderedStore(InMemoryPredictionStore):
+        def list_due(self, *, as_of, limit, statuses=None):
+            if statuses == (STATUS_DATA_UNAVAILABLE,):
+                with self._lock:
+                    rows = [
+                        row.snapshot()
+                        for row in self._rows.values()
+                        if row.status == STATUS_DATA_UNAVAILABLE
+                        and row.resolve_after <= as_of
+                    ]
+                rows.sort(key=lambda row: (row.resolve_after, row.prediction_id))
+                return rows[:limit]
+            return super().list_due(as_of=as_of, limit=limit, statuses=statuses)
+
+    now = _now()
+    store = _A3OrderedStore()
+    store._clock = _now
+    for index in range(2):
+        store.insert(
+            prediction_id=f"exhausted-{index}",
+            run_id="run-1",
+            symbol="600519",
+            market="cn",
+            horizon="1d",
+            resolve_after=now - timedelta(hours=3),
+            created_at=now - timedelta(days=1),
+            claims=[{"claim_id": "c1", "claim_type": "direction", "type": "direction", "direction": "up"}],
+            status=STATUS_DATA_UNAVAILABLE,
+            retry_exhausted=True,
+            outcome={
+                "label": STATUS_DATA_UNAVAILABLE,
+                "retry_exhausted": True,
+                "retryable": False,
+                "next_attempt_at": None,
+            },
+        )
+    store.insert(
+        prediction_id="still-backoff",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=2),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "type": "direction", "direction": "up"}],
+        status=STATUS_DATA_UNAVAILABLE,
+        next_attempt_at=now + timedelta(hours=1),
+        outcome={
+            "label": STATUS_DATA_UNAVAILABLE,
+            "retry_exhausted": False,
+            "retryable": True,
+            "next_attempt_at": (now + timedelta(hours=1)).isoformat(),
+        },
+    )
+    store.insert(
+        prediction_id="ready-retry",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=1),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "type": "direction", "direction": "up"}],
+        status=STATUS_DATA_UNAVAILABLE,
+        next_attempt_at=now - timedelta(seconds=1),
+        outcome={
+            "label": STATUS_DATA_UNAVAILABLE,
+            "retry_exhausted": False,
+            "retryable": True,
+            "next_attempt_at": (now - timedelta(seconds=1)).isoformat(),
+        },
+    )
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(105.0), return_pct=5.0)
+        ),
+        claim_scorer=_FakeScorer(),
+        max_per_tick=2,
+        clock=_now,
+    )
+
+    summary = resolver.tick()
+    assert summary.claimed == 1
+    assert store.get("ready-retry").status == STATUS_RESOLVED  # type: ignore[union-attr]
+    assert store.get("exhausted-0").status == STATUS_DATA_UNAVAILABLE  # type: ignore[union-attr]
+    assert store.get("exhausted-1").status == STATUS_DATA_UNAVAILABLE  # type: ignore[union-attr]
+    assert store.get("still-backoff").status == STATUS_DATA_UNAVAILABLE  # type: ignore[union-attr]
+
+
 def test_writeback_failure_is_reported_and_lease_is_left_for_recovery() -> None:
     class _FailingWriteStore(InMemoryPredictionStore):
         def mark_data_unavailable(self, **kwargs):
