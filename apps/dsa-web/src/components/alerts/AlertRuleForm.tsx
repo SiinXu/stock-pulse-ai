@@ -80,6 +80,7 @@ interface AlertRuleFormValues {
   minItems: string;
   cooldownMode: AlertCooldownMode;
   customCooldownSeconds: string;
+  autoAnalysis: boolean;
 }
 
 function numText(value: number | undefined | null, fallback = ''): string {
@@ -156,6 +157,11 @@ function alertRuleToFormValues(rule: AlertRuleItem): AlertRuleFormValues {
     minItems: numText(params.minItems, '1'),
     cooldownMode: cooldown.mode,
     customCooldownSeconds: cooldown.customSeconds,
+    autoAnalysis: Boolean(
+      rule.notificationPolicy
+      && typeof rule.notificationPolicy === 'object'
+      && (rule.notificationPolicy as Record<string, unknown>).auto_analysis === true
+    ),
   };
 }
 
@@ -232,6 +238,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
   const [cooldownMode, setCooldownMode] = useState<AlertCooldownMode>(
     seed?.cooldownMode ?? 'default',
   );
+  const [autoAnalysis, setAutoAnalysis] = useState<boolean>(seed?.autoAnalysis ?? false);
   const [customCooldownSeconds, setCustomCooldownSeconds] = useState(
     seed?.customCooldownSeconds ?? DEFAULT_CUSTOM_COOLDOWN_SECONDS,
   );
@@ -510,6 +517,12 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
     setFieldErrors({});
   };
 
+  const autoAnalysisEligible = (
+    alertType === 'corporate_event'
+    || alertType === 'volume_spike'
+    || alertType === 'price_change_percent'
+  );
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFieldErrors({});
@@ -547,6 +560,16 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
       severity,
       enabled,
       ...(cooldownPolicy !== undefined ? { cooldownPolicy } : {}),
+      ...(autoAnalysisEligible
+        ? {
+            notificationPolicy: {
+              ...(typeof initialRule?.notificationPolicy === 'object' && initialRule.notificationPolicy
+                ? initialRule.notificationPolicy
+                : {}),
+              auto_analysis: autoAnalysis,
+            },
+          }
+        : {}),
     });
     if (submitted === false) return;
     // In edit mode the parent closes the modal on success; keep the values so
@@ -1015,6 +1038,19 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
                 disabled={isSubmitting}
               />
             </div>
+          </div>
+        ) : null}
+
+        {autoAnalysisEligible ? (
+          <div className="space-y-1" data-testid="alert-auto-analysis-field">
+            <Checkbox
+              id="alert-auto-analysis"
+              checked={autoAnalysis}
+              onChange={(event) => setAutoAnalysis(event.target.checked)}
+              label={text.autoAnalysis}
+              data-testid="alert-auto-analysis"
+            />
+            <p className="text-xs text-muted-text">{text.autoAnalysisHelp}</p>
           </div>
         ) : null}
 
