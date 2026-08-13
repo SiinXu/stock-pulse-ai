@@ -1,6 +1,6 @@
 """Response assembly method sources for the analyzer facade."""
 
-from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, ForwardRef, List, Mapping, Optional, Tuple
 
 from src.llm.generation_backend import GenerationError, GenerationErrorCode
 
@@ -172,7 +172,9 @@ class GeminiAnalyzer:
         self,
         response_text: str,
         code: str,
-        name: str
+        name: str,
+        *,
+        analysis_context: Optional[Mapping[str, Any]] = None,
     ) -> AnalysisResult:
         """
         解析 Gemini 响应（决策仪表盘版）
@@ -237,6 +239,26 @@ class GeminiAnalyzer:
                         "Failed to enrich framework alignment strata",
                         framework_exc,
                         error_code="report_strata_framework_enrich_failed",
+                        level=logging.WARNING,
+                        context={"symbol": code},
+                    )
+                try:
+                    from src.services.research_persona_prompt import (
+                        enrich_dashboard_research_persona,
+                    )
+
+                    dashboard = enrich_dashboard_research_persona(
+                        dashboard,
+                        config=self._get_runtime_config(),
+                        analysis_context=analysis_context,
+                        report_language=report_language,
+                    )
+                except Exception as persona_exc:  # broad-exception: fallback_recorded - persona label is optional
+                    log_safe_exception(
+                        logger,
+                        "Failed to enrich active research persona label",
+                        persona_exc,
+                        error_code="report_research_persona_enrich_failed",
                         level=logging.WARNING,
                         context={"symbol": code},
                     )

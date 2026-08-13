@@ -13,5 +13,7 @@ export function createParsedApiError(options: CreateParsedApiErrorOptions): Pars
     params: options.params,
     details: options.details,
     traceId: options.traceId,
+    taxonomyCategory: options.taxonomyCategory,
+    taxonomySeverity: options.taxonomySeverity,
   };
 }

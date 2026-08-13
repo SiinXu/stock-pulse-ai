@@ -148,6 +148,27 @@ class _PersistenceStageMixin:
             snapshot["diagnostics"] = diagnostic_snapshot
         if self.analysis_skills is not None:
             snapshot["skills"] = list(self.analysis_skills)
+        from src.services.analysis_stage_checkpoint import current_checkpoint_session
+
+        checkpoint_session = current_checkpoint_session()
+        if checkpoint_session is not None:
+            try:
+                metadata = checkpoint_session.metadata_for_snapshot()
+                if isinstance(metadata, dict):
+                    if metadata.get("checkpoint"):
+                        snapshot["analysis_checkpoint"] = metadata["checkpoint"]
+                    if metadata.get("run_configuration"):
+                        snapshot["run_configuration"] = metadata["run_configuration"]
+                    if metadata.get("repro_status"):
+                        snapshot["repro_status"] = metadata["repro_status"]
+            except Exception as exc:  # broad-exception: optional_metadata - Checkpoint audit metadata is optional and failures are recorded without changing analysis persistence.
+                log_safe_exception(
+                    logger,
+                    "Failed to attach analysis checkpoint metadata to context snapshot",
+                    exc,
+                    error_code="analysis_checkpoint_snapshot_attach_failed",
+                    level=logging.DEBUG,
+                )
         return snapshot
 
     def _persist_analysis_history_stage(

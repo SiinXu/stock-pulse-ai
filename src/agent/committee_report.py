@@ -1,15 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Build the Investment Committee deliberation report section (#545).
+"""Build the Investment Committee deliberation report section (#545 / #546 / #985).
 
 Produces an additive ``dashboard.committee_deliberation`` payload shaped with
 report-strata conventions (facts / gaps / inference / risks / disclaimer) so
 templates can render a structured committee section without inventing a second
 strategy engine. Synthesis still comes from the existing StrategyEngine path.
+
+All positions, dissent, and divergence points are derived from real specialist
+opinions and ``strategy_synthesis`` — never model-authored free text.
+Divergence point shape reuses multi-strategy conflict fields so consumers stay
+aligned with structured disagreement product contracts (#1205).
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from src.agent.committee_presets import (
     COMMITTEE_SECTION_SCHEMA_VERSION,
@@ -25,6 +30,8 @@ from src.schemas.report_strata import default_disclaimer
 
 
 _REASONING_EXCERPT_MAX = 240
+_MAX_TRACE_ITEMS = 12
+_DISAGREEMENT_HANDLING_SCHEMA_VERSION = "disagreement-handling-v1"
 
 
 def _truncate(text: str, limit: int = _REASONING_EXCERPT_MAX) -> str:
@@ -68,6 +75,178 @@ def _member_from_opinion(
         "invalid": False,
         "invalid_reason": None,
     }
+
+
+def _skill_id_from_mapping(item: Mapping[str, Any]) -> str:
+    for key in ("skill_id", "persona_id", "agent_name"):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            text = value.strip()
+            if key == "agent_name":
+                extracted = extract_skill_id(text)
+                return str(extracted or text)
+            return text
+    return ""
+
+
+def _opinion_trace_from_skill(
+    item: Any,
+    *,
+    language: str,
+) -> Optional[Dict[str, Any]]:
+    """Project one strategy_synthesis skill row into a bounded persona stance."""
+    if not isinstance(item, Mapping):
+        return None
+    skill_id = _skill_id_from_mapping(item)
+    if not skill_id:
+        return None
+    confidence = item.get("confidence")
+    try:
+        confidence_value = float(confidence) if confidence is not None else None
+    except (TypeError, ValueError):
+        confidence_value = None
+    reasoning = item.get("reasoning")
+    return {
+        "persona_id": skill_id,
+        "display_name": persona_display_name(skill_id, language),
+        "agent_name": item.get("agent_name") or f"skill_{skill_id}",
+        "signal": item.get("signal") if isinstance(item.get("signal"), str) else None,
+        "confidence": confidence_value,
+        "reasoning_excerpt": _truncate(str(reasoning or "")),
+    }
+
+
+def _build_conclusion(
+    strategy_synthesis: Optional[Mapping[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Authoritative committee conclusion from strategy_synthesis only."""
+    if not isinstance(strategy_synthesis, Mapping) or not strategy_synthesis:
+        return None
+    conclusion: Dict[str, Any] = {}
+    for key in ("final_signal", "consensus_level", "conflict_severity"):
+        value = strategy_synthesis.get(key)
+        if isinstance(value, str) and value.strip():
+            conclusion[key] = value.strip()
+    for key in ("confidence", "conflict_count", "weighted_score"):
+        value = strategy_synthesis.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            conclusion[key] = value
+    return conclusion or None
+
+
+def _build_divergence_points(
+    strategy_synthesis: Optional[Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Project canonical #1205 points, falling back only when no record exists."""
+    if not isinstance(strategy_synthesis, Mapping):
+        return []
+    if "disagreement_handling" in strategy_synthesis:
+        handling = strategy_synthesis.get("disagreement_handling")
+        if (
+            not isinstance(handling, Mapping)
+            or handling.get("schema_version")
+            != _DISAGREEMENT_HANDLING_SCHEMA_VERSION
+            or handling.get("enabled") is not True
+        ):
+            return []
+        raw_points = handling.get("points")
+        if not isinstance(raw_points, list):
+            return []
+        points: List[Dict[str, Any]] = []
+        for raw in raw_points[:_MAX_TRACE_ITEMS]:
+            point = _canonical_divergence_point(raw)
+            if point is not None:
+                points.append(point)
+        return points
+
+    points: List[Dict[str, Any]] = []
+    conflicts = strategy_synthesis.get("conflicts") or []
+    if not isinstance(conflicts, list):
+        return []
+    for raw in conflicts[:_MAX_TRACE_ITEMS]:
+        if not isinstance(raw, Mapping):
+            continue
+        conflict_type = raw.get("conflict_type")
+        if not isinstance(conflict_type, str) or not conflict_type.strip():
+            continue
+        fallback = {
+            "source": "strategy",
+            "kind": conflict_type,
+            "severity": raw.get("severity"),
+            "participants": raw.get("participants"),
+            "summary_key": f"disagreement.point.strategy.{conflict_type.strip()}",
+        }
+        point = _canonical_divergence_point(fallback)
+        if point is not None:
+            points.append(point)
+    return points
+
+
+def _canonical_divergence_point(value: Any) -> Optional[Dict[str, Any]]:
+    """Return the bounded public fields of one structured-disagreement point."""
+    if not isinstance(value, Mapping):
+        return None
+    kind = value.get("kind")
+    if not isinstance(kind, str) or not kind.strip():
+        return None
+    participants: List[str] = []
+    participants_raw = value.get("participants")
+    if isinstance(participants_raw, list):
+        for item in participants_raw[:_MAX_TRACE_ITEMS]:
+            if not isinstance(item, str):
+                continue
+            text = item.strip()
+            if text and text not in participants:
+                participants.append(text)
+    source = value.get("source")
+    severity = value.get("severity")
+    summary_key = value.get("summary_key")
+    return {
+        "source": (
+            source.strip()
+            if isinstance(source, str) and source.strip()
+            else "strategy"
+        ),
+        "kind": kind.strip(),
+        "severity": (
+            severity.strip()
+            if isinstance(severity, str) and severity.strip()
+            else "medium"
+        ),
+        "participants": participants,
+        "summary_key": (
+            summary_key.strip()
+            if isinstance(summary_key, str) and summary_key.strip()
+            else f"disagreement.point.strategy.{kind.strip()}"
+        ),
+    }
+
+
+def _derive_status(
+    *,
+    conclusion: Optional[Mapping[str, Any]],
+    members: Sequence[Mapping[str, Any]],
+    divergence_points: Sequence[Mapping[str, Any]],
+    dissenting: Sequence[Mapping[str, Any]],
+) -> str:
+    """Compact status for trace export / UI badges (not LLM text)."""
+    valid_members = [
+        m for m in members if isinstance(m, Mapping) and not m.get("invalid")
+    ]
+    if not valid_members and not conclusion:
+        return "insufficient"
+    consensus = str((conclusion or {}).get("consensus_level") or "").lower()
+    if consensus == "insufficient":
+        return "insufficient"
+    if divergence_points or dissenting:
+        if consensus in {"low", "medium"}:
+            return "split"
+        return "deliberated"
+    if consensus == "high":
+        return "consensus"
+    return "deliberated"
 
 
 def _members_from_opinions(
@@ -191,6 +370,80 @@ def build_committee_deliberation_section(
                 }
             )
 
+    synthesis_map: Optional[Dict[str, Any]] = (
+        dict(strategy_synthesis) if isinstance(strategy_synthesis, Mapping) else None
+    )
+    conclusion = _build_conclusion(synthesis_map)
+    supporting_opinions = [
+        item
+        for item in (
+            _opinion_trace_from_skill(raw, language=language)
+            for raw in (
+                (synthesis_map or {}).get("supporting_skills") or []
+            )[:_MAX_TRACE_ITEMS]
+        )
+        if item is not None
+    ]
+    dissenting_opinions = [
+        item
+        for item in (
+            _opinion_trace_from_skill(raw, language=language)
+            for raw in (
+                (synthesis_map or {}).get("opposing_skills") or []
+            )[:_MAX_TRACE_ITEMS]
+        )
+        if item is not None
+    ]
+    if not dissenting_opinions and conclusion and conclusion.get("final_signal"):
+        final_signal = str(conclusion.get("final_signal") or "").lower()
+        if final_signal and final_signal != "hold":
+            for member in members:
+                if member.get("invalid"):
+                    continue
+                member_signal = str(member.get("signal") or "").lower()
+                if not member_signal or member_signal == final_signal:
+                    continue
+                bullish = {"buy", "strong_buy", "add"}
+                bearish = {"sell", "strong_sell", "reduce"}
+                final_side = (
+                    "bull"
+                    if final_signal in bullish
+                    else "bear"
+                    if final_signal in bearish
+                    else "other"
+                )
+                member_side = (
+                    "bull"
+                    if member_signal in bullish
+                    else "bear"
+                    if member_signal in bearish
+                    else "other"
+                )
+                if final_side != "other" and member_side != "other" and final_side != member_side:
+                    dissenting_opinions.append(
+                        {
+                            "persona_id": member.get("persona_id"),
+                            "display_name": member.get("display_name"),
+                            "agent_name": member.get("agent_name"),
+                            "signal": member.get("signal"),
+                            "confidence": member.get("confidence"),
+                            "reasoning_excerpt": member.get("reasoning_excerpt") or "",
+                        }
+                    )
+
+    divergence_points = _build_divergence_points(synthesis_map)
+    status = _derive_status(
+        conclusion=conclusion,
+        members=members,
+        divergence_points=divergence_points,
+        dissenting=dissenting_opinions,
+    )
+    outcome = None
+    if conclusion and conclusion.get("final_signal"):
+        outcome = str(conclusion["final_signal"])
+    elif status:
+        outcome = status
+
     model_inference: List[str] = []
     for member in members:
         if member.get("invalid"):
@@ -205,9 +458,9 @@ def build_committee_deliberation_section(
             line = f"{line}; {excerpt}"
         model_inference.append(line)
 
-    if isinstance(strategy_synthesis, dict) and strategy_synthesis:
-        final_signal = strategy_synthesis.get("final_signal")
-        consensus = strategy_synthesis.get("consensus_level")
+    if conclusion:
+        final_signal = conclusion.get("final_signal")
+        consensus = conclusion.get("consensus_level")
         if final_signal or consensus:
             model_inference.append(
                 f"committee synthesis: final_signal={final_signal or 'n/a'}, "
@@ -231,6 +484,15 @@ def build_committee_deliberation_section(
             risks_counter_evidence.append(
                 f"{member.get('display_name')}: {member.get('lens_verdict')}"
             )
+    for dissent in dissenting_opinions:
+        label = dissent.get("display_name") or dissent.get("persona_id")
+        signal = dissent.get("signal") or "n/a"
+        line = f"{label}: reserved opinion signal={signal}"
+        excerpt = dissent.get("reasoning_excerpt") or ""
+        if excerpt:
+            line = f"{line}; {excerpt}"
+        if line not in risks_counter_evidence:
+            risks_counter_evidence.append(line)
 
     return {
         "schema_version": COMMITTEE_SECTION_SCHEMA_VERSION,
@@ -242,9 +504,13 @@ def build_committee_deliberation_section(
         "personas_invalid": invalid_ids,
         "personas_truncated": truncated,
         "members": members,
-        "strategy_synthesis": (
-            dict(strategy_synthesis) if isinstance(strategy_synthesis, dict) else None
-        ),
+        "conclusion": conclusion,
+        "supporting_opinions": supporting_opinions,
+        "dissenting_opinions": dissenting_opinions,
+        "divergence_points": divergence_points,
+        "status": status,
+        "outcome": outcome,
+        "strategy_synthesis": synthesis_map,
         "missing_or_conflicts": missing_or_conflicts,
         "model_inference": model_inference,
         "risks_counter_evidence": risks_counter_evidence,

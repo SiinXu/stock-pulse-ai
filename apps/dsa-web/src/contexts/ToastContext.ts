@@ -15,6 +15,8 @@ export interface ToastInput {
   title: string;
   message?: React.ReactNode;
   tone?: ToastTone;
+  /** Live-region semantics are independent from the visual tone. */
+  role?: 'alert' | 'status';
   durationMs?: number;
   action?: ToastAction;
   closeLabel?: string;

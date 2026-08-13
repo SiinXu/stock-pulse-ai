@@ -1,15 +1,92 @@
 # -*- coding: utf-8 -*-
-"""Shared notification configuration contracts.
+"""Shared notification configuration and dispatch-result contracts.
 
 This module intentionally stays lightweight: no sender imports, no SDK imports,
 and no NotificationService imports. It is safe for config, diagnostics, and
 runtime channel detection to share.
+
+Dispatch result types (Issue #1081) live here so callers can depend on the
+stable query shape without importing the full notification facade.
 """
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 from urllib.parse import parse_qsl, urlsplit
+
+
+@dataclass
+class ChannelAttemptResult:
+    """One notification channel send attempt (built-in or plugin).
+
+    Callers that need a stable, JSON-friendly shape should use
+    :meth:`as_summary` (minimal ``channel`` / ``ok`` / ``error``) or
+    :meth:`as_dict` (includes retry and diagnostic fields).
+    """
+
+    channel: str
+    success: bool
+    error_code: Optional[str] = None
+    retryable: bool = False
+    latency_ms: Optional[int] = None
+    diagnostics: Optional[str] = None
+
+    def as_summary(self) -> Dict[str, Any]:
+        """Return the minimal queryable per-channel shape (Issue #1081)."""
+
+        return {
+            "channel": self.channel,
+            "ok": bool(self.success),
+            "error": self.error_code,
+        }
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return the full queryable per-channel attempt record."""
+
+        summary = self.as_summary()
+        summary.update(
+            {
+                "retryable": bool(self.retryable),
+                "latency_ms": self.latency_ms,
+                "diagnostics": self.diagnostics,
+            }
+        )
+        return summary
+
+
+@dataclass
+class NotificationDispatchResult:
+    """Structured multi-channel notification dispatch result.
+
+    Separates analysis success from notification delivery outcomes:
+    ``status`` may be ``sent``, ``partial_failed``, ``all_failed``,
+    ``no_channel``, or ``noise_suppressed`` while ``channel_results``
+    retains every attempted channel for query and diagnostics.
+    """
+
+    dispatched: bool
+    success: bool
+    status: str
+    channel_results: List[ChannelAttemptResult] = field(default_factory=list)
+    message: Optional[str] = None
+
+    def channel_summaries(self) -> List[Dict[str, Any]]:
+        """Return ``[{channel, ok, error}, ...]`` for API/bot/diagnostics callers."""
+
+        return [item.as_summary() for item in self.channel_results]
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return a JSON-friendly dispatch record for query and logging."""
+
+        return {
+            "dispatched": bool(self.dispatched),
+            "success": bool(self.success),
+            "status": self.status,
+            "message": self.message,
+            "channels": self.channel_summaries(),
+            "channel_results": [item.as_dict() for item in self.channel_results],
+        }
 
 
 FEISHU_WEBHOOK_ENV_GROUP: Tuple[str, ...] = ("FEISHU_WEBHOOK_URL",)
