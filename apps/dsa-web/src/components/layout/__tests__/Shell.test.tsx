@@ -163,10 +163,17 @@ describe('Shell', () => {
 
     const main = screen.getByRole('main');
     const sidebar = container.querySelector('[data-shell-sidebar]');
+    const layout = sidebar?.parentElement;
     expect(sidebar).not.toHaveClass('border-r', 'border-border');
+    expect(sidebar).toHaveClass('h-full');
+    expect(sidebar).not.toHaveClass('h-dvh');
+    expect(layout).toHaveClass('h-full');
+    expect(layout).not.toHaveClass('h-dvh');
     expect(main).toHaveAttribute('data-shell-main', 'true');
     expect(main).toHaveClass('rounded-xl', 'border', 'border-border', 'bg-card', 'shadow-soft-card');
     expect(main).toHaveClass('overflow-y-auto');
+    expect(main).toHaveClass('mt-[calc(2.75rem+max(0.75rem,env(safe-area-inset-top)))]');
+    expect(main).not.toHaveClass('mt-[calc(3.5rem+env(safe-area-inset-top))]');
     expect(main).not.toHaveClass('overflow-x-hidden');
   });
 
