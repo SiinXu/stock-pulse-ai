@@ -80,6 +80,7 @@
 | [多标的组合级分析](portfolio-level-analysis.md) | 对一组标的做组合层面相关性/集中度/共同风险分析，复用健康评分与压力测试数据面，含规模上界与缺数降级；`POST /api/v1/analysis/portfolio` ([English](portfolio-level-analysis_EN.md)) |
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
+| [投资者 Persona](investor-personas.md) | 默认关闭的研究立场与投资视角 Skills（#119, #467） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
 | [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
