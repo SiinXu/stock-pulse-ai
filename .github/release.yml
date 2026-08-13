@@ -28,13 +28,13 @@ changelog:
         - feishu
     - title: "⚙️ Configuration"
       labels:
-        - configuration
+        - config
     - title: "🧪 Testing"
       labels:
         - testing
     - title: "🔧 CI/CD & Maintenance"
       labels:
-        - ci/cd
+        - ci
     - title: "📝 Documentation"
       labels:
         - documentation
