@@ -11,7 +11,22 @@ export type {
   ParsedApiError,
 } from './types';
 export { isPermanentlyUnavailableResourceError } from './types';
-export { resolveErrorRemediation } from './catalog';
+export {
+  resolveErrorRemediation,
+  type ResolveErrorRemediationOptions,
+} from './catalog';
+export {
+  classifyErrorCode,
+  classifyParsedApiError,
+  docsUrlForPath,
+  isClassifiedErrorCode,
+  isRetryableClassification,
+  REGISTERED_TAXONOMY_CODES,
+  type ErrorClassification,
+  type TaxonomyAction,
+  type TaxonomyCategory,
+  type TaxonomySeverity,
+} from './taxonomy';
 export {
   formatErrorTemplate,
   formatParsedApiError,
