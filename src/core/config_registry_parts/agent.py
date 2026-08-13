@@ -1180,6 +1180,157 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "EVENT_TRIGGERED_ANALYSIS_ENABLED": {
+        "title": "Event-Triggered Deep Analysis",
+        "description": (
+            "Master switch for enqueueing deep analysis when opted-in alert rules fire "
+            "(corporate events, volume spikes, large percent moves). Default off. "
+            "Rules must also set notification_policy.auto_analysis=true. Debounce and "
+            "hourly/daily budgets still apply."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 726,
+        "help_key": "settings.agent.event_triggered_analysis",
+        "examples": [
+            "EVENT_TRIGGERED_ANALYSIS_ENABLED=false",
+            "EVENT_TRIGGERED_ANALYSIS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "EVENT_TRIGGER_COOLDOWN_MINUTES": {
+        "title": "Event Trigger Analysis Cooldown",
+        "description": (
+            "Per rule+symbol debounce window in minutes before another event-triggered "
+            "deep analysis can be enqueued. Default 180."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "180",
+        "options": [],
+        "validation": {"min": 0, "max": 10080},
+        "display_order": 727,
+        "help_key": "settings.agent.event_triggered_analysis",
+        "examples": [
+            "EVENT_TRIGGER_COOLDOWN_MINUTES=180",
+            "EVENT_TRIGGER_COOLDOWN_MINUTES=60",
+        ],
+        "docs": [
+            {
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "EVENT_TRIGGER_DEFAULT_PIPELINE": {
+        "title": "Event Trigger Default Pipeline",
+        "description": (
+            "Default analysis pipeline/report type for event-triggered deep analysis. "
+            "Accepts standard|detailed|simple (standard maps to detailed)."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "standard",
+        "options": [
+            {"value": "standard", "label": "standard"},
+            {"value": "detailed", "label": "detailed"},
+            {"value": "simple", "label": "simple"},
+        ],
+        "validation": {},
+        "display_order": 728,
+        "help_key": "settings.agent.event_triggered_analysis",
+        "examples": [
+            "EVENT_TRIGGER_DEFAULT_PIPELINE=standard",
+            "EVENT_TRIGGER_DEFAULT_PIPELINE=simple",
+        ],
+        "docs": [
+            {
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "EVENT_TRIGGER_MAX_PER_HOUR": {
+        "title": "Event Trigger Max Per Hour",
+        "description": (
+            "Process-local upper bound on event-triggered analysis submissions per hour. "
+            "0 disables the hourly cap. Default 5."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "5",
+        "options": [],
+        "validation": {"min": 0, "max": 10000},
+        "display_order": 729,
+        "help_key": "settings.agent.event_triggered_analysis",
+        "examples": [
+            "EVENT_TRIGGER_MAX_PER_HOUR=5",
+            "EVENT_TRIGGER_MAX_PER_HOUR=10",
+        ],
+        "docs": [
+            {
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "EVENT_TRIGGER_MAX_PER_DAY": {
+        "title": "Event Trigger Max Per Day",
+        "description": (
+            "Process-local upper bound on event-triggered analysis submissions per day. "
+            "0 disables the daily cap. Default 20."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "20",
+        "options": [],
+        "validation": {"min": 0, "max": 10000},
+        "display_order": 730,
+        "help_key": "settings.agent.event_triggered_analysis",
+        "examples": [
+            "EVENT_TRIGGER_MAX_PER_DAY=20",
+            "EVENT_TRIGGER_MAX_PER_DAY=50",
+        ],
+        "docs": [
+            {
+                "label": "告警中心文档",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/alerts.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MEMORY_ENABLED": {
         "title": "Agent Memory",
         "description": "Enable the memory & calibration system. Tracks prediction accuracy and adjusts agent confidence over time.",

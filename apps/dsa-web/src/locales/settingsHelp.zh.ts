@@ -1502,6 +1502,30 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['在后验统计中增加可选的 profile_calibration；Web 在字段存在时展示校准卡片。'],
     notes: ['不改变后验评估、持久化或 reassess 生命周期。'],
   },
+  'settings.agent.event_triggered_analysis': {
+    title: '事件触发深度分析',
+    summary: '在显式启用的告警规则触发后，按防抖与预算上限异步入队深度分析。',
+    usage:
+      '默认关闭 EVENT_TRIGGERED_ANALYSIS_ENABLED。开启后仍需规则 notification_policy.auto_analysis=true。企业事件/放量/涨跌幅规则可选用；冷却与每小时/每日预算仍然生效。',
+    valueNotes: [
+      '配置总开关与规则级 opt-in 都必须显式开启。',
+      '适用类型：corporate_event、volume_spike、price_change_percent。',
+    ],
+    impact: [
+      '开启且规则 opt-in 后，告警触发可能通过共享任务队列异步入队分析任务。',
+    ],
+    notes: [
+      '不会在告警热路径内联跑完分析。',
+      '通知静默时段仍由 NOTIFICATION_QUIET_HOURS 控制 alert 路由投递。',
+    ],
+    examples: [
+      'EVENT_TRIGGERED_ANALYSIS_ENABLED=false',
+      'EVENT_TRIGGER_COOLDOWN_MINUTES=180',
+      'EVENT_TRIGGER_DEFAULT_PIPELINE=standard',
+      'EVENT_TRIGGER_MAX_PER_HOUR=5',
+      'EVENT_TRIGGER_MAX_PER_DAY=20',
+    ],
+  },
   'settings.agent.event_impact_context': {
     title: '告警影响上下文',
     summary: '开启后，告警通知会附带该标的在自选/持仓中的影响上下文。',
