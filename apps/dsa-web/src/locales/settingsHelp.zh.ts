@@ -1455,15 +1455,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
-  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
-    title: 'Critic 最大修订轮次',
-    summary: '限制 Critic 发现问题后的受控白名单修订轮次（默认 1，硬上限 2）。',
-    usage: '仅当剩余流水线预算和模式预算足以支持额外修订时才提高此值。',
-    impact: ['设为 2 时允许一次收敛复核；如仍需修订，可再重跑一个不同的白名单阶段。'],
-    notes: ['只有复核明确返回 pass 才标记收敛。证据发生变化不会伪造成功；未复核或收敛失败时，Critic 意见会保留在 data_limitations。'],
-    valueNotes: ['默认 1，硬上限 2。', '仅在 AGENT_CRITIC_ENABLED=true 时生效。'],
-  },
-
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
