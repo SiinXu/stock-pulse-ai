@@ -1,0 +1,1 @@
+- [Fixed] Preserve legacy pipeline execution while registering analysis checkpoint and reproducibility controls (Refs #121).

@@ -183,6 +183,7 @@ class DecisionSignalOutcomeStatsBucket(BaseModel):
     hit: int
     miss: int
     neutral: int
+    sample_sufficient: bool = False
     hit_rate_pct: Optional[float] = None
     avg_stock_return_pct: Optional[float] = None
     unable_reasons: Dict[str, int] = Field(default_factory=dict)
@@ -228,9 +229,12 @@ class DecisionSignalOutcomeStatsResponse(BaseModel):
     hit: int
     miss: int
     neutral: int
+    sample_sufficient: bool = False
+    minimum_completed_sample_size: int = Field(default=30, ge=1)
     hit_rate_pct: Optional[float] = None
     avg_stock_return_pct: Optional[float] = None
     unable_reasons: Dict[str, int] = Field(default_factory=dict)
+    # Includes action/market/period (and legacy dimensions). Rates null when sample_sufficient is false.
     breakdowns: Dict[str, List[DecisionSignalOutcomeStatsBucket]] = Field(default_factory=dict)
     # Present only when DECISION_PROFILE_CALIBRATION_ENABLED is true.
     profile_calibration: Optional[DecisionSignalProfileCalibration] = None

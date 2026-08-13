@@ -18,42 +18,41 @@ ensure_litellm_stub()
 
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
-    AGENT_CHAT_FAILURE_HISTORY_SENTINEL AGENT_CHAT_FAILURE_MESSAGE
-    AGENT_SYSTEM_PROMPT AgentExecutor AgentResult AgentRuntimeFacts Any
-    CHAT_SYSTEM_PROMPT Callable ContextVar Dict ExecutionState
-    LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT
-    LLMToolAdapter List Optional StockScope ToolRegistry Tuple
-    build_agent_chat_chip_instruction build_agent_chat_context_bundle
-    build_agent_chat_market_context build_agent_chat_tool_registry
-    build_agent_tool_history_context
-    classify_result_terminal_state create_mode_budget_account dataclass extract_provider_trace_turns field
-    format_daily_market_context_prompt_section format_market_phase_prompt_section
-    format_market_structure_prompt_section get_config get_db
-    get_market_guidelines get_market_role json log_safe_exception logger logging
-    normalize_report_language parse_dashboard_json_result resolve_stock_scope
-    run_agent_loop sanitize_agent_diagnostic uuid
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL AGENT_CHAT_FAILURE_MESSAGE AGENT_SYSTEM_PROMPT
+    AgentExecutor AgentResult AgentRuntimeFacts Any CHAT_SYSTEM_PROMPT Callable
+    ContextVar Dict ExecutionState LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT
+    LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT LLMToolAdapter List Optional StockScope
+    ToolRegistry Tuple build_agent_chat_chip_instruction
+    build_agent_chat_context_bundle build_agent_chat_market_context
+    build_agent_chat_tool_registry build_agent_tool_history_context
+    classify_result_terminal_state create_mode_budget_account dataclass
+    extract_provider_trace_turns field format_daily_market_context_prompt_section
+    format_market_phase_prompt_section format_market_structure_prompt_section
+    get_config get_db get_market_guidelines get_market_role json log_safe_exception
+    logger logging normalize_report_language parse_dashboard_json_result
+    resolve_stock_scope run_agent_loop sanitize_agent_diagnostic uuid
     """.split()
 )
 
 EXPECTED_RUN_METHODS = (
-    "run",
-    "build_run_messages",
+    'run',
+    'build_run_messages',
 )
 
 EXPECTED_CHAT_METHODS = (
-    "chat",
-    "_persist_provider_trace",
+    'chat',
+    '_persist_provider_trace',
 )
 
 EXPECTED_LOOP_METHODS = (
-    "_run_loop",
-    "_build_user_message",
+    '_run_loop',
+    '_build_user_message',
 )
 
 EXPECTED_AST_HASHES = {
-    "_RunMethods": "066616a5f791599c035e67100f1c8a8d981d393634dc18948e3d914241dcf0a4",
-    "_ChatMethods": "75eaf86972c4deee476834bcb47b804aeff4ff433a110a13ff0ddd9fb2464817",
-    "_LoopMethods": "ae0817f7c382325c8842966e51e0d79639e52814ebdbbaa5e4dd39d1ba4236e2",
+    '_ChatMethods': '251e864cddab46b625bfa95d33f32d998150c515eeb91519c3ff6039616336e5',
+    '_LoopMethods': 'ae0817f7c382325c8842966e51e0d79639e52814ebdbbaa5e4dd39d1ba4236e2',
+    '_RunMethods': 'cb60b06a89fe2b9366ea7886f06fe6d065dbb10715649ee3b3d1ea41c73255ba',
 }
 
 

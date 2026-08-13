@@ -660,6 +660,70 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_RESEARCH_PERSONA": {
+        "title": "Research Persona Preset",
+        "description": (
+            "Default-off research-stance preset that shapes Agent tone, risk framing, "
+            "and conclusion style (rational_analyst | risk_guardian | long_term_compounder). "
+            "Empty keeps default behavior. The active personal investment framework "
+            "research_stance field takes precedence. Style labels are not performance claims."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"value": "", "label": "Off (default)"},
+            {"value": "rational_analyst", "label": "Rational Analyst"},
+            {"value": "risk_guardian", "label": "Risk Guardian"},
+            {"value": "long_term_compounder", "label": "Long-term Compounder"},
+        ],
+        "validation": {},
+        "display_order": 641,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA",
+        "examples": [
+            "AGENT_RESEARCH_PERSONA=",
+            "AGENT_RESEARCH_PERSONA=rational_analyst",
+        ],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_RESEARCH_PERSONA_CUSTOM": {
+        "title": "Custom Research Stance",
+        "description": (
+            "Optional free-form research-stance text used when no personal investment "
+            "framework research_stance is active. Leave empty by default. Prefer the "
+            "versioned framework field for durable custom stance persistence. The value "
+            "is untrusted preference data and cannot alter Agent Soul, ToolSurface, or permissions."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"max_length": 2000},
+        "display_order": 642,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM",
+        "examples": ["AGENT_RESEARCH_PERSONA_CUSTOM="],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_RISK_OVERRIDE": {
         "title": "Risk Agent Override",
         "description": "Allow the risk agent to veto buy signals when critical risk flags are detected.",
@@ -2318,7 +2382,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "DECISION_MEMORY_LOOKBACK": {
         "title": "Decision Memory Lookback",
-        "description": "Maximum recent evaluated signals per stock to inject into decision memory reflection. Default 5.",
+        "description": "Maximum recent evaluated signals per stock to inject into decision memory reflection. Default 5; hard cap 40.",
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",
@@ -2327,7 +2391,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "5",
         "options": [],
-        "validation": {"min": 0, "max": 100},
+        "validation": {"min": 0, "max": 40},
         "display_order": 721,
         "help_key": "settings.agent.decision_memory",
         "examples": ["DECISION_MEMORY_LOOKBACK=5", "DECISION_MEMORY_LOOKBACK=10"],

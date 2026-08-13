@@ -242,13 +242,19 @@ If there is a corresponding CI result on the existing PR, you can directly quote
 - The repository provides the following skills for preferred reuse:
   - `.claude/skills/analyze-issue/SKILL.md`
   - `.claude/skills/analyze-pr/SKILL.md`
+  - `.claude/skills/review-pr/SKILL.md`
   - `.claude/skills/fix-issue/SKILL.md`
   - `.claude/skills/develop-feature/SKILL.md`
   - `.claude/skills/run-verification/SKILL.md`
+  - `.claude/skills/test-change/SKILL.md`
   - `.claude/skills/draft-issue/SKILL.md`
   - `.claude/skills/handle-review-feedback/SKILL.md`
-- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`. For planned development tasks prefer `develop-feature` (which embeds `run-verification` and the `analyze-pr` review order); for responding to review feedback on your own PR follow `handle-review-feedback`. Skill selection guidance lives in `docs/claude-skills-guide.md`.
-- Commands, templates, validation order, and delivery structure in these skills must remain consistent with `AGENTS.md`.
+  - `.claude/skills/sync-ai-assets/SKILL.md`
+  - `.claude/skills/pr-template-fill/SKILL.md`
+  - `.claude/skills/regression-scout/SKILL.md`
+  - Shared hard rules and command recipes: `.claude/skills/references/hard-rules.md`, `.claude/skills/references/test-command-recipes.md`
+- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`. For planned development tasks prefer `develop-feature` (which embeds `test-change` / `run-verification` and the `review-pr` / `analyze-pr` review order); for responding to review feedback on your own PR follow `handle-review-feedback`. Skill selection guidance lives in `docs/claude-skills-guide.md`.
+- Commands, templates, validation order, and delivery structure in these skills must remain consistent with `AGENTS.md`. After editing AGENTS/skills/copilot mirrors, run `python scripts/check_ai_assets.py` (see `sync-ai-assets`).
 - Before creating or updating a PR, reviewing a PR, or analyzing an issue, synchronize the latest codebase: first check the workspace status and execute `git fetch --all --prune`; if the workspace is clean and the current branch can be fast-forwarded, execute `git pull --ff-only`. If there are local modifications, conflict states, untracked risk files, or inability to fast-forward, do not forcibly switch branches, stash, reset, or overwrite local status; PR review/issue analysis can use the fetched remote refs/PR head for analysis and clearly record the reason for not updating the local working tree and the current local HEAD with the remote baseline in the analysis document; PR creation/update should first explain the difference between the current branch and the target baseline, and request user confirmation to rebase, merge, or continue based on the current branch.
 - Skills should inspect CI and workflow evidence before deciding whether additional local validation is needed.
 - Except for the safe fast-forward synchronization described above for PR creation/update, PR review, and issue analysis, skills must not run `git pull`, `git push`, `git tag`, `gh pr create`, or other operations that change remote or current branch state by default. These operations require user confirmation.
