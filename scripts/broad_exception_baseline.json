@@ -117,7 +117,6 @@
     {"path":"data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"a0af82c117e461dcdd00ecf7e3711f4abfc275825e7b971d4f1fee4f8994edd2"},
     {"path":"data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"bbfa99a4443d2c073b6e01afb8852bffc606fe27900bc6e8d9dee5542aa4ce7b"},
     {"path":"data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"ea9d1510a48fa7f4845ad959ec58b46990a492b235b585ded630222e79a490e9"},
-    {"path":"data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher._get_etf_realtime_quote","caught":["Exception"],"digest":"5d7c4aacbde42e4ac245e894222b056ecbe99431b61a8ca4a735250f18bd500c"},
     {"path":"data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher._set_random_user_agent","caught":["Exception"],"digest":"8f0af97cda4e804db932e9af45c6891fe5da12f474435a6810d95b940b88ba8c"},
     {"path":"data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher.get_base_info","caught":["Exception"],"digest":"7ba3070c6f143bafe5d70032518ed3dfaf993f97daac32a23f30570751e8cb8a"},
     {"path":"data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher.get_belong_board","caught":["Exception"],"digest":"55e6cab5290ac5ceaa39bb984b35a355c05a7ccaa74780f0dc6edaf1fdaeb022"},

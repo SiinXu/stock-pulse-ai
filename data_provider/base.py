@@ -2215,6 +2215,8 @@ class DataFetcherManager:
         'volume_ratio', 'turnover_rate',
         'pe_ratio', 'pb_ratio', 'total_mv', 'circ_mv',
         'amplitude',
+        # ETF premium/discount references (Issue #173); optional when any source has them.
+        'iopv', 'nav',
     ]
 
     @classmethod

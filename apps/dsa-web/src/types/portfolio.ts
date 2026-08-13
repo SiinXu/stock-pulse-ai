@@ -393,6 +393,13 @@ export interface PortfolioImportTradeItem {
   currency?: string | null;
 }
 
+export interface PortfolioImportFailedRow {
+  rowNumber: number;
+  reasonCode: string;
+  reason: string;
+  source: Record<string, string>;
+}
+
 export interface PortfolioImportParseResponse {
   broker: string;
   recordCount: number;
@@ -400,6 +407,7 @@ export interface PortfolioImportParseResponse {
   errorCount: number;
   records: PortfolioImportTradeItem[];
   errors: string[];
+  failedRows?: PortfolioImportFailedRow[];
 }
 
 export interface PortfolioImportCommitResponse {
