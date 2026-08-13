@@ -177,6 +177,12 @@ file is local plaintext, not an encrypted secret vault, so protect its data
 directory accordingly. Sensitive values are masked by the API and Web form;
 leaving the mask unchanged preserves the existing stored value.
 
+When a plugin registers an active `notification_channel`, the Extensions roster
+exposes the canonical channel IDs and deep-links into Settings → Notifications.
+The Notifications hub lists those plugin channels with a provider attribution
+and a reverse link back to the Extensions row. Disabled, failed, or unloaded
+adapters stay empty—never shown as connected.
+
 Saving settings for an enabled plugin reports `restart_required`. Re-enable the
 plugin or restart the application before assuming its running instance has the
 new values. Omitted keys reset to their declared defaults, and unknown keys,
