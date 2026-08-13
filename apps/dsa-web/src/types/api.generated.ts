@@ -3844,6 +3844,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/valuation/peer-canvas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build peer relative-value comparison canvas
+         * @description Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.
+         */
+        post: operations["buildPeerValuationCanvas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/watchlist/scores": {
         parameters: {
             query?: never;
@@ -9973,6 +9993,88 @@ export interface components {
             price: number;
             /** Price Source */
             price_source: string;
+        };
+        /**
+         * PeerValuationCanvasRequest
+         * @description Request body for the constrained peer relative-value canvas (issue #1139).
+         */
+        PeerValuationCanvasRequest: {
+            /**
+             * Base Currency
+             * @description Base currency for cross-market estimate normalization (default: target listing currency)
+             */
+            base_currency?: string | null;
+            /**
+             * Industry Label
+             * @description Optional industry label override when peer_source=industry
+             */
+            industry_label?: string | null;
+            /**
+             * Peer Codes
+             * @description Peer stock codes (required for comparison; never invented server-side)
+             */
+            peer_codes?: string[] | null;
+            /**
+             * Peer Source
+             * @description Explainable peer-set source: custom codes or industry-constrained set
+             * @default custom
+             * @enum {string}
+             */
+            peer_source: "custom" | "industry";
+            /**
+             * Stock Code
+             * @description Target stock code
+             */
+            stock_code: string;
+        };
+        /** PeerValuationCanvasResponse */
+        PeerValuationCanvasResponse: {
+            /** Base Currency */
+            base_currency?: string | null;
+            /** Currency Metrics */
+            currency_metrics?: string[] | null;
+            /** Disclaimer */
+            disclaimer?: string | null;
+            /** Fx Stale */
+            fx_stale?: boolean | null;
+            /** Heatmap Cells */
+            heatmap_cells?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Medians */
+            medians?: {
+                [key: string]: unknown;
+            } | null;
+            /** Message */
+            message?: string | null;
+            /** Metrics */
+            metrics?: string[];
+            /** Multiple Metrics */
+            multiple_metrics?: string[] | null;
+            /** Peer Set */
+            peer_set?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason */
+            reason?: string | null;
+            /** Relative Summary */
+            relative_summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Rows */
+            rows?: {
+                [key: string]: unknown;
+            }[];
+            /** Schema Version */
+            schema_version: string;
+            /** Status */
+            status: string;
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Valuation Status */
+            valuation_status?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** PerformanceMetrics */
         PerformanceMetrics: {
@@ -27773,6 +27875,57 @@ export interface operations {
                 };
             };
             /** @description Valuation estimate failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    buildPeerValuationCanvas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeerValuationCanvasRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerValuationCanvasResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Peer canvas build failed */
             500: {
                 headers: {
                     [name: string]: unknown;
