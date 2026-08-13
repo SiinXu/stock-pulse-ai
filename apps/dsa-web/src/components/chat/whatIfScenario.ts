@@ -1,16 +1,36 @@
 /**
  * Structured what-if scenario helpers for Agent Chat (Issue #130).
+ * Issue #1136 reuses this channel for the report sensitivity scenario library.
  * Free-text assumptions are intentionally out of scope for v1.
  */
 import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   buildAnalysisWorkbenchHref,
 } from '../../routing/routes';
+import builtinsCatalog from './scenarioLibraryBuiltins.json';
 
 export const HYPOTHETICAL_ASSUMPTION_MARKER = '[HYPOTHETICAL ASSUMPTION]';
 export const HYPOTHETICAL_RESULT_MARKER = '[HYPOTHETICAL SCENARIO]';
 export const DEFAULT_WHAT_IF_MAX_TURNS = 5;
-export type WhatIfDimension = 'index_move' | 'fx_rate' | 'interest_rate' | 'earnings';
+
+function isServerKnownLibraryScenarioId(scenarioId: string): boolean {
+  const scenarios = Array.isArray(builtinsCatalog.scenarios) ? builtinsCatalog.scenarios : [];
+  return scenarios.some(
+    (item) => item && typeof item === 'object' && String((item as { id?: string }).id || '') === scenarioId,
+  );
+}
+
+function libraryCatalogVersion(): string {
+  return typeof builtinsCatalog.catalog_version === 'string' && builtinsCatalog.catalog_version
+    ? builtinsCatalog.catalog_version
+    : '1.0.0';
+}
+export type WhatIfDimension =
+  | 'index_move'
+  | 'fx_rate'
+  | 'interest_rate'
+  | 'earnings'
+  | 'sector_shock';
 export type WhatIfDirection = 'up' | 'down' | 'beat' | 'miss' | 'inline';
 export interface WhatIfAssumption {
   dimension: WhatIfDimension;
@@ -24,6 +44,9 @@ export interface WhatIfScenarioPayload {
   turn_index: number;
   max_turns: number;
   assumptions: WhatIfAssumption[];
+  scenario_id?: string;
+  catalog_version?: string;
+  scenario_hash?: string;
 }
 export interface WhatIfDraftState {
   enabled: boolean;
@@ -32,6 +55,8 @@ export interface WhatIfDraftState {
   magnitude: string;
   currencyPair: string;
   turnCount: number;
+  /** Optional library scenario id applied via the #1136 scenario library. */
+  scenarioId?: string | null;
 }
 export const DEFAULT_WHAT_IF_DRAFT: WhatIfDraftState = {
   enabled: false,
@@ -40,6 +65,7 @@ export const DEFAULT_WHAT_IF_DRAFT: WhatIfDraftState = {
   magnitude: '50',
   currencyPair: 'USD/CNY',
   turnCount: 0,
+  scenarioId: null,
 };
 export function contentHasHypotheticalMarker(content: string | undefined | null): boolean {
   if (!content) return false;
@@ -67,7 +93,19 @@ export function buildWhatIfAssumption(draft: WhatIfDraftState): WhatIfAssumption
 export function buildWhatIfContextPayload(draft: WhatIfDraftState): WhatIfScenarioPayload | null {
   const assumption = buildWhatIfAssumption(draft);
   if (!assumption || draft.turnCount >= DEFAULT_WHAT_IF_MAX_TURNS) return null;
-  return { enabled: true, turn_index: draft.turnCount + 1, max_turns: DEFAULT_WHAT_IF_MAX_TURNS, assumptions: [assumption] };
+  const payload: WhatIfScenarioPayload = {
+    enabled: true,
+    turn_index: draft.turnCount + 1,
+    max_turns: DEFAULT_WHAT_IF_MAX_TURNS,
+    assumptions: [assumption],
+  };
+  // Only built-in library ids are server-known. Custom localStorage scenarios
+  // reuse the what-if assumptions channel without a scenario_id (Issue #1136).
+  if (draft.scenarioId && isServerKnownLibraryScenarioId(draft.scenarioId)) {
+    payload.scenario_id = draft.scenarioId;
+    payload.catalog_version = libraryCatalogVersion();
+  }
+  return payload;
 }
 export function isWhatIfLimitReached(draft: WhatIfDraftState): boolean {
   return draft.enabled && draft.turnCount >= DEFAULT_WHAT_IF_MAX_TURNS;
