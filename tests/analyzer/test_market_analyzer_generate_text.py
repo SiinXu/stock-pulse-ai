@@ -250,6 +250,8 @@ class TestAnalyzerGenerateText(_AnalyzerFactoryMixin):
             "provider/fallback-model",
             call_type="analysis",
             stock_code="600519",
+            stage="analysis",
+            call_success=True,
         )
         primary_backend.generate.assert_called_once()
         fallback_backend.generate.assert_called_once()
