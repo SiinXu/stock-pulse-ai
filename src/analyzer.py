@@ -366,6 +366,9 @@ class AnalysisResult:
     # ========== Historical Decision Reflection (Issue #118; runtime only, not persisted to to_dict) ==========
     # Carries a DecisionReflection so the report renderer can emit its section.
     decision_reflection: Optional[Any] = None
+    # Exact structured model output used by PredictionExtractor. Runtime only:
+    # normalized action/decision defaults must not be mistaken for model claims.
+    prediction_source: Optional[Dict[str, Any]] = None
     # Canonical low-sensitivity Risk Manager verdict, persisted by ``to_dict``.
     risk_gate_result: Optional[Dict[str, Any]] = None
     # Pipeline analysis quality gate (no invented facts); persisted by ``to_dict``.

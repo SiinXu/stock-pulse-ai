@@ -816,6 +816,7 @@ class _AgentAnalysisStageMixin:
                     failure_reason="Agent analysis history was not saved.",
                     failure_message="Agent analysis history persistence failed",
                     failure_error_code="pipeline_agent_analysis_history_save_failed",
+                    prediction_mode="agent",
                 )
                 persistence_value = persistence_result.value
                 self._finish_pipeline_stage(
