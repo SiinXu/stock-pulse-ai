@@ -4,9 +4,12 @@
 DSA Schemas
 ===================================
 
-Internal analysis and domain contracts. This package intentionally includes
-Pydantic models, dataclasses, and TypedDicts according to boundary needs;
-public HTTP request and response DTOs live in ``api/v1/schemas``.
+Internal analysis and domain contracts. Prefer Pydantic v2
+(``model_validate`` / ``model_dump``, explicit ``model_config``) for new or
+migrated service-boundary DTOs; dataclasses and TypedDicts remain valid for
+stable internal or performance-sensitive shapes. Public HTTP request and
+response DTOs live in ``api/v1/schemas``. Do not adopt PydanticAI as the
+agent orchestrator from this package.
 """
 
 from src.schemas.analysis_context_pack import (

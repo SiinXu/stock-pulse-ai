@@ -331,20 +331,13 @@ def compute_position_band(
     fraction = _SIGNAL_CAP_FRACTIONS.get(signal_norm, 0.55)
     fraction = _finite_number(fraction, "signal_cap_fraction", minimum=0.0, maximum=1.0)
 
+    cap_pct = effective_single_name_cap_pct(
+        risk_tolerance=risk_tolerance,
+        soft_max_weight=soft_max_weight,
+    )
     if enabled and has_portfolio:
-        cap_pct = effective_single_name_cap_pct(
-            risk_tolerance=risk_tolerance,
-            soft_max_weight=soft_max_weight,
-        )
         mode = "portfolio_aware"
     else:
-        band = risk_band_for(risk_tolerance)
-        cap_pct = _finite_number(
-            band["max_single_weight_pct"],
-            "max_single_weight_pct",
-            minimum=_EPS,
-            maximum=100.0,
-        )
         mode = "stock_only_fallback" if not has_portfolio else "sizing_disabled"
 
     target_mid = round(cap_pct * fraction, 6)
