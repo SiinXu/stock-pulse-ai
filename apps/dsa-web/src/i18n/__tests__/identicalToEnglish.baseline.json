@@ -1,6 +1,6 @@
 {
   "description": "Shrink-only allowlist of non-English UI keys whose value is currently byte-identical to English. New identical pairs fail CI; fixed pairs must be removed from this file. Add entries only with PR justification (proper nouns, codes, intentional English).",
-  "count": 1740,
+  "count": 1738,
   "pairs": [
     "de\tapi.error.STABLE_ERROR_TEXT.approval_auth_required.message",
     "de\tapi.error.STABLE_ERROR_TEXT.approval_auth_required.title",
@@ -1009,8 +1009,6 @@
     "id\tutils.systemConfigI18n.fieldTitleMaps.AGENT_MODE_BUDGET_MAX_TOOL_CALLS",
     "id\tutils.systemConfigI18n.fieldTitleMaps.RESEARCH_PACK_EXPORT_ENABLED",
     "id\tutils.systemConfigI18n.fieldTitleMaps.RESEARCH_PACK_MAX_ZIP_BYTES",
-    "ja\tapi.error.STABLE_ERROR_TEXT.approval_auth_required.message",
-    "ja\tapi.error.STABLE_ERROR_TEXT.approval_auth_required.title",
     "ja\tapi.error.STABLE_ERROR_TEXT.research_pack_auth_required.message",
     "ja\tapi.error.STABLE_ERROR_TEXT.research_pack_auth_required.title",
     "ja\tapi.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message",
