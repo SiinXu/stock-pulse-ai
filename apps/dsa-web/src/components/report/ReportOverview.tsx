@@ -17,6 +17,8 @@ import {
   formatSignedChangePercent,
   resolveMarketIdFromStockCode,
 } from '../../utils/marketFormat';
+import { changeColorPrefFromPriceDirection } from '../../design/theme';
+import { readDocumentPriceDirection } from '../theme/themeRuntime';
 import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/marketPhase';
 import { normalizeBoardType } from '../../utils/reportDomain';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
@@ -191,13 +193,14 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
     if (changePct === undefined || changePct === null || !Number.isFinite(Number(changePct))) {
       return undefined;
     }
-    if (marketId) {
-      const color = changeColorCssVar(changeSemantics(changePct, marketId).color);
-      return color ? { color } : undefined;
-    }
-    if (changePct > 0) return { color: 'var(--home-price-up)' };
-    if (changePct < 0) return { color: 'var(--home-price-down)' };
-    return undefined;
+    // Market-aware paint via marketFormat; document price-direction supplies the
+    // active red_up/green_up preference so report boards stay aligned with Settings.
+    // Unresolvable codes fall back to the cn market convention rather than the
+    // --home-* micro tokens, which the Theme Contract keeps out of price paint.
+    const market = marketId ?? 'cn';
+    const userPref = changeColorPrefFromPriceDirection(readDocumentPriceDirection());
+    const paint = changeColorCssVar(changeSemantics(changePct, market, userPref).color);
+    return paint ? { color: paint } : undefined;
   };
 
   const formatChangePct = (changePct: number | undefined): string => {
