@@ -1,5 +1,4 @@
-import type React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, Check, Clipboard, FileText, Gauge, Layers, ShieldAlert, TrendingUp, WalletCards, Workflow } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
@@ -26,6 +25,7 @@ import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 import { ShareImageButton } from './ShareImageButton';
+const ReportProcessTimeline = React.lazy(() => import('./ReportProcessTimeline'));
 
 interface MarketReviewReportViewProps {
   report?: AnalysisReport;
@@ -692,6 +692,13 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
           ))}
         </div>
       )}
+
+      <Suspense fallback={false}>
+        <ReportProcessTimeline
+          recordId={recordId}
+          onOpenRunFlow={onOpenRunFlow}
+        />
+      </Suspense>
     </div>
   );
 };
