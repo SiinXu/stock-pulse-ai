@@ -20,8 +20,9 @@
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
-      "maxGzipBytes": 177591,
-      "measuredGzipBytes": 161446
+      "maxGzipBytes": 177972,
+      "measuredGzipBytes": 177772,
+      "note": "Local production-build remasure after merging origin/main (PR #1273); measured 177772 B + 200 B retained headroom."
     },
     {
       "id": "locale-ja",
