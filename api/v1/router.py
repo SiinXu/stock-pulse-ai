@@ -35,6 +35,7 @@ from api.v1.endpoints import (
     paper_decision_quality,
     portfolio,
     portfolio_health,
+    portfolio_level_analysis,
     portfolio_risk_metrics,
     portfolio_stress_test,
     reasoning_trace,
@@ -80,6 +81,12 @@ router.include_router(
     analysis.router,
     prefix="/analysis",
     tags=["Analysis"]
+)
+
+router.include_router(
+    portfolio_level_analysis.router,
+    prefix="/analysis",
+    tags=["Analysis"],
 )
 
 router.include_router(
