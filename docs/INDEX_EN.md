@@ -83,6 +83,7 @@ This is the entry point for project documentation. The README covers the project
 | [DecisionSignal Topic](decision-signals.md) <sub><sub>![P7 Badge](https://img.shields.io/badge/P7-orange?style=flat)</sub></sub> (Chinese-only) | AI signal fields, API, Web display, alert/notification/portfolio-risk linkage, outcome evaluation, redaction, migration, and rollback |
 | [Prediction resolve_after calendar policy](prediction-resolve-after_EN.md) | Horizon → UTC `resolve_after` via exchange sessions for CN/HK/US; holidays, half-days, cross-market rules; no natural-day approximation ([中文](prediction-resolve-after.md)) |
 | [Personal Investment Framework](personal-investment-framework_EN.md) | Minimal Settings editor, versioned API, single-stock read-only injection, and report framework_alignment slot |
+| [Portfolio-Level Multi-Symbol Analysis](portfolio-level-analysis_EN.md) | Basket analysis over a code list: correlation, concentration, shared risk, health/stress reuse, size limit and partial degradation; `POST /api/v1/analysis/portfolio` ([Chinese](portfolio-level-analysis.md)) |
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
@@ -101,6 +102,8 @@ This is the entry point for project documentation. The README covers the project
 | [Cloud WebUI Deployment](deploy-webui-cloud.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Cloud server WebUI access and deployment notes |
 | [Zeabur Deployment](docker/zeabur-deployment.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Zeabur platform deployment |
 | [Desktop Packaging](desktop-package_EN.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> ([中文](desktop-package.md)) | Electron desktop first-run, local models, and packaging notes |
+| [Desktop vs Web capability matrix](desktop-capability-matrix_EN.md) ([中文](desktop-capability-matrix.md)) | Desktop/Web capability matrix, CLI diagnostics, and update retention |
+| [Desktop deep-link policy](desktop-deep-link-policy_EN.md) ([中文](desktop-deep-link-policy.md)) | `stockpulse://` allowlist, rejection semantics, and UX |
 
 ## Reference And Development
 
