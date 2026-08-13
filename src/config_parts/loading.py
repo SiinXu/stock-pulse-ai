@@ -1290,6 +1290,9 @@ class _ConfigLoadingMethods:
             report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_language=cls._parse_report_language(report_language_raw),
             report_mode=cls._parse_report_mode(os.getenv('REPORT_MODE', 'standard')),
+            research_presentation_profile=cls._parse_research_presentation_profile(
+                os.getenv('RESEARCH_PRESENTATION_PROFILE', 'balanced')
+            ),
             report_export_pdf_font_path=(
                 os.getenv('REPORT_EXPORT_PDF_FONT_PATH') or ''
             ).strip() or None,
@@ -1871,6 +1874,15 @@ class _ConfigLoadingMethods:
         from src.services.report_mode import normalize_report_mode
 
         return normalize_report_mode(value, default="standard")
+
+    @classmethod
+    def _parse_research_presentation_profile(cls, value: Optional[str]) -> str:
+        """Parse RESEARCH_PRESENTATION_PROFILE; invalid values fall back to balanced."""
+        from src.services.research_presentation_profile import (
+            normalize_research_presentation_profile,
+        )
+
+        return normalize_research_presentation_profile(value, default="balanced")
 
     @classmethod
     def _get_env_file_value(cls, key: str) -> Optional[str]:
