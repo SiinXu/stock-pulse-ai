@@ -1455,25 +1455,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
-  'settings.agent.AGENT_STEP_CRITIQUE_ENABLED': {
-    title: '批评',
-    summary: '失败/矛盾类型化批评。',
-  },
-  'settings.agent.AGENT_REFLECTION_ENABLED': {
-    title: '反思',
-    summary: '有界脱敏证据。',
-  },
-  'settings.agent.AGENT_REFLECTION_LLM_BUDGET': {
-    title: '调用',
-    summary: '0–1 次 provider 调用。',
-  },
-  'settings.agent.AGENT_META_REVIEW_ENABLED': {
-    title: '审查',
-    summary: '已校验 lesson 确定性报告。',
-  },
-  'settings.agent.AGENT_META_REVIEW_MIN_EPISODES': {
-    title: '样本',
-    summary: '建议需已校验 episode。',
+  'settings.agent.multi_level_reflection': {
+    title: '多层反思',
+    summary: '控制步骤、运行与离线反思。',
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
