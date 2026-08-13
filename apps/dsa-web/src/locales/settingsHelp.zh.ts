@@ -2395,25 +2395,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
   'settings.system.analysis_checkpoint': {
-    title: '分析阶段检查点',
-    summary: '持久化已完成的多 Agent 阶段状态，在中断后以 fail-closed 方式恢复。',
-    usage: '仅对多 Agent 分析启用；代码、配置或重新组装的输入不一致时会完整重跑。',
-    impact: [
-      '目录和保留时长控制进程本地检查点的存储与清理。',
-      '强制完整重跑会忽略并替换当前请求匹配的检查点。',
-    ],
-    notes: [
-      '关闭后不会写入检查点；成功完成的运行会删除临时检查点。',
-    ],
+    title: '阶段检查点',
+    summary: '持久化多 Agent 阶段；代码、配置或输入变化时完整重跑。',
   },
   'settings.system.repro_mode': {
-    title: '可复现控制',
-    summary: '记录运行配置，并可按请求使用更确定性的 provider 参数。',
-    usage: '启用后在 provider 支持时按请求传递 temperature 0 和配置的 seed。',
-    impact: [
-      'provider 侧采样仍可能存在非确定性。',
-      'seed 不会重置共享的 Python 或 NumPy 随机数状态。',
-    ],
+    title: '可复现模式',
+    summary: '记录运行配置；provider 支持时传递 temperature 0 和 seed。',
   },
 };
 

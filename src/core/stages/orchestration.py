@@ -314,12 +314,13 @@ class _OrchestrationStageMixin:
         diag_token = None
         frozen_target_token = None
         checkpoint_token = None
+        pipeline_config = getattr(self, "config", None)
         force_full_checkpoint = bool(
             getattr(self, "analysis_checkpoint_force_full", False)
-            or getattr(self.config, "analysis_checkpoint_force_full", False)
+            or getattr(pipeline_config, "analysis_checkpoint_force_full", False)
         )
         checkpoint_session = create_checkpoint_session(
-            self.config,
+            pipeline_config,
             query_id=effective_query_id,
             stock_code=code,
             skills=getattr(self, "analysis_skills", None),
@@ -328,8 +329,8 @@ class _OrchestrationStageMixin:
             force_full=force_full_checkpoint,
             active=(
                 not skip_analysis
-                and bool(getattr(self.config, "agent_mode", False))
-                and str(getattr(self.config, "agent_arch", "single") or "single").lower()
+                and bool(getattr(pipeline_config, "agent_mode", False))
+                and str(getattr(pipeline_config, "agent_arch", "single") or "single").lower()
                 == "multi"
             ),
         )
