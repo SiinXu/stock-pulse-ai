@@ -61,10 +61,14 @@ aliases: [我的战法, 我的模型]
 # default_router: 是否属于路由 fallback 技能集
 # default_priority: 默认展示/排序优先级，数值越小越靠前
 # market_regimes: 该技能优先适配的市场状态标签
+# version: 可选作者版本号；缺省时使用 content-addressed 标识 ca-<hash12>（#249）
+# lifecycle: 可选 draft|active|deprecated|archived（默认 active；晋升见 #1093）
 default_active: true
 default_router: false
 default_priority: 100
 market_regimes: [trending_up]
+# version: "1.0.0"
+# lifecycle: active
 
 # 策略详细说明（自然语言，支持 Markdown 格式）
 instructions: |

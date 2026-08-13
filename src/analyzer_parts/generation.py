@@ -156,8 +156,10 @@ class GeminiAnalyzer:
         market_role = get_market_role(stock_code, lang)
         market_guidelines = get_market_guidelines(stock_code, lang)
         skill_instructions, default_skill_policy, use_legacy_default_prompt = self._get_skill_prompt_sections()
+        from src.agent.prompt_versioning import resolve_key_prompt_text
+
         if use_legacy_default_prompt:
-            base_prompt = self.LEGACY_DEFAULT_SYSTEM_PROMPT.replace(
+            base_prompt = resolve_key_prompt_text("analyzer.system.legacy").replace(
                 "{market_placeholder}", market_role
             ).replace(
                 "{guidelines_placeholder}", market_guidelines
@@ -170,7 +172,8 @@ class GeminiAnalyzer:
             if default_skill_policy:
                 default_skill_policy_section = f"{default_skill_policy}\n"
             base_prompt = (
-                self.SYSTEM_PROMPT.replace("{market_placeholder}", market_role)
+                resolve_key_prompt_text("analyzer.system")
+                .replace("{market_placeholder}", market_role)
                 .replace("{guidelines_placeholder}", market_guidelines)
                 .replace("{default_skill_policy_section}", default_skill_policy_section)
                 .replace("{skills_section}", skills_section)
@@ -991,7 +994,12 @@ class GeminiAnalyzer:
         last_response_text: Optional[str] = None
         last_model: Optional[str] = None
         last_usage: Dict[str, Any] = {}
-        effective_system_prompt = system_prompt or self.TEXT_SYSTEM_PROMPT
+        if system_prompt:
+            effective_system_prompt = system_prompt
+        else:
+            from src.agent.prompt_versioning import resolve_key_prompt_text
+
+            effective_system_prompt = resolve_key_prompt_text("analyzer.text")
         router_model_names = set(get_configured_llm_models(config.llm_model_list))
         for model in models_to_try:
             origins = route_deployment_origins(config.llm_model_list, model)

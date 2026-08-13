@@ -1,5 +1,8 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TaskInfo } from '../types/analysis';
+import { useDashboardDataRefreshQuery } from './useDashboardDataRefreshQuery';
 import { useTaskStream } from './useTaskStream';
 
 type UseDashboardLifecycleOptions = {
@@ -56,55 +59,31 @@ export function useDashboardLifecycle({
   const previousTaskStatusesRef = useRef<Map<string, TaskInfo['status']>>(new Map());
   const handledTerminalStatusesRef = useRef<Map<string, TaskInfo['status']>>(new Map());
   const [isInitialStockBarLoadSettled, setIsInitialStockBarLoadSettled] = useState(false);
-
+  const isMountedRef = useRef(true);
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    void loadInitialHistory();
-    let active = true;
-    void loadStockBar().finally(() => {
-      if (active) setIsInitialStockBarLoadSettled(true);
-    });
-    void refreshActiveTasks();
+    isMountedRef.current = true;
     return () => {
-      active = false;
+      isMountedRef.current = false;
     };
-  }, [enabled, loadInitialHistory, loadStockBar, refreshActiveTasks]);
+  }, []);
 
-  useEffect(() => {
-    if (!enabled) {
-      return;
+  const onInitialStockBarSettled = useCallback(() => {
+    // Parity with the previous loadStockBar().finally({ if (active) ... }) unmount guard.
+    if (isMountedRef.current) {
+      setIsInitialStockBarLoadSettled(true);
     }
+  }, []);
 
-    const intervalId = window.setInterval(() => {
-      void refreshHistory(true);
-      void refreshStockBar();
-      void refreshActiveTasks();
-      onDashboardDataRefresh?.();
-    }, 30_000);
-
-    return () => window.clearInterval(intervalId);
-  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshStockBar, refreshActiveTasks]);
-
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshHistory(true);
-        void refreshStockBar();
-        void refreshActiveTasks();
-        onDashboardDataRefresh?.();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshStockBar, refreshActiveTasks]);
+  useDashboardDataRefreshQuery({
+    enabled,
+    loadInitialHistory,
+    refreshHistory,
+    loadStockBar,
+    refreshStockBar,
+    refreshActiveTasks,
+    onDashboardDataRefresh,
+    onInitialStockBarSettled,
+  });
 
   useEffect(() => {
     const removalTimeouts = removalTimeoutsRef.current;
