@@ -1859,6 +1859,23 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'The hard-coded notification fallback path is unchanged when the renderer is off.',
     ],
   },
+  'settings.report.RESEARCH_PRESENTATION_PROFILE': {
+    title: 'Research Presentation Profile',
+    summary: 'Evidence stays unchanged.',
+    usage: 'Choose a profile.',
+    valueNotes: [
+      'conservative: risks first.',
+      'balanced: default order.',
+      'aggressive: opportunity first.',
+      'Equal risk disclosure.',
+      'Facts and decisions do not change.',
+    ],
+    impact: ['Only order and emphasis.'],
+    notes: [
+      'Requires REPORT_RENDERER_ENABLED=true.',
+      'Not investment advice.',
+    ],
+  },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: 'Report Rendering Engine',
     summary: 'Enable the Jinja2 template rendering engine for report output.',
