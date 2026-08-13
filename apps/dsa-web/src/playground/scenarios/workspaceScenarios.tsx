@@ -10,6 +10,8 @@ import { OnboardingTodayPlanCard } from '../../components/onboarding/OnboardingT
 import { TaskPanel } from '../../components/tasks/TaskPanel';
 import { HomeWatchlistGroupsSection } from '../../components/watchlist/HomeWatchlistGroupsSection';
 import { WatchlistGroupsPanel } from '../../components/watchlist/WatchlistGroupsPanel';
+import { MoneyFlowPanel } from '../../components/money-flow/MoneyFlowPanel';
+import type { MoneyFlowView } from '../../api/moneyFlow';
 import { createParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
@@ -305,7 +307,55 @@ const AgentOnboardingWizardStory = () => {
   );
 };
 
+
+const FIXTURE_MONEY_FLOW_VIEW: MoneyFlowView = {
+  schemaVersion: 'money_flow_view/1.0',
+  stockCode: '600519',
+  enabled: true,
+  status: 'partial',
+  requestedDays: 5,
+  asOf: '2026-08-08T08:00:00+00:00',
+  providerDate: '2026-08-08',
+  ageDays: 0,
+  source: 'akshare:stock_individual_fund_flow',
+  message: 'Money-flow data is degraded (status=partial).',
+  warnings: ['money_flow_amount_scale_is_not_authoritatively_calibrated'],
+  sourceChain: [{ provider: 'akshare', status: 'success' }],
+  disclaimer: 'Research evidence only.',
+  snapshot: {
+    code: '600519',
+    date: '2026-08-08',
+    source: 'akshare:stock_individual_fund_flow',
+    market: 'cn',
+    mainNetInflowRatio: 1.5,
+    superLargeNetInflowRatio: 0.8,
+    largeNetInflowRatio: 0.7,
+    mediumNetInflowRatio: -0.3,
+    smallNetInflowRatio: -1.2,
+    unit: 'unknown',
+    amountScale: 'unknown',
+    bucketDefinition: 'eastmoney_em_order_size_buckets_v1',
+    asOf: '2026-08-08T08:00:00+00:00',
+    completeness: 'complete',
+    observedDays: 5,
+    requestedDays: 5,
+    attitude: 'inflow',
+    calibrationNote: 'Order-size buckets follow bucket_definition.',
+  },
+};
+
+const MoneyFlowPanelStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <MoneyFlowPanel
+      stockCode="600519"
+      initialView={scenario === 'states' ? { ...FIXTURE_MONEY_FLOW_VIEW, status: 'disabled', enabled: false, snapshot: undefined, message: 'SmartMoney money-flow is disabled.' } : FIXTURE_MONEY_FLOW_VIEW}
+    />
+  );
+};
+
 export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'money-flow-panel': MoneyFlowPanelStory,
   'stock-autocomplete': StockAutocompleteStory,
   'suggestions-list': SuggestionsListStory,
   'task-panel': TaskPanelStory,

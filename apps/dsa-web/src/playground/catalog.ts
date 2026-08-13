@@ -260,6 +260,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('stockSearch', 'suggestions-list', 'SuggestionsList', 'components/StockAutocomplete/SuggestionsList.tsx', ['default', 'empty']),
   entry('tasks', 'analysis-phase-select', 'AnalysisPhaseSelect', 'components/analysis/AnalysisPhaseSelect.tsx', ['interactive', 'states']),
   entry('tasks', 'task-panel', 'TaskPanel', 'components/tasks/TaskPanel.tsx', ['default', 'loading', 'states']),
+  entry('watchlist', 'money-flow-panel', 'MoneyFlowPanel', 'components/money-flow/MoneyFlowPanel.tsx', ['default', 'states']),
   entry('watchlist', 'home-stock-workspace', 'HomeStockWorkspace', 'components/watchlist/HomeStockWorkspace.tsx', ['interactive', 'loading', 'empty', 'error']),
   entry('watchlist', 'watchlist-score-column', 'WatchlistScoreColumn', 'components/watchlist/WatchlistScoreColumn.tsx', ['default', 'interactive', 'empty']),
   entry('watchlist', 'home-watchlist-groups-section', 'HomeWatchlistGroupsSection', 'components/watchlist/HomeWatchlistGroupsSection.tsx', ['default', 'loading', 'error']),
