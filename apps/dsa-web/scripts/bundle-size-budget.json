@@ -148,9 +148,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45803,
-      "measuredGzipBytes": 45603,
-      "note": "GitHub Actions Linux remeasure after cost attribution and routing telemetry Settings controls (Refs #166 / #248); measured gzip + 200 B headroom."
+      "maxGzipBytes": 45965,
+      "measuredGzipBytes": 45765,
+      "note": "Merge of the OpenAPI client migration Zod boundaries (PR #1242 / Refs #721) with the cost attribution and routing telemetry Settings controls (Refs #166 / #248). Keeps the larger of the two rebaselines; the merged branch measures 45624 B gzip locally, so CI should remeasure on GitHub Actions Linux before tightening."
     },
     {
       "id": "AlertsWorkspace",
