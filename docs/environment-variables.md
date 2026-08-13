@@ -572,6 +572,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPRO_MODE_ENABLED` | `false` | 是 | 模板中注释; Request-scoped temperature=0 plus provider seed forwarding where supported. |
 | `REPRO_RECORD_CONFIG` | `true` | 是 | 模板中注释 |
 | `REPRO_SEED` | `0` | 是 | 模板中注释 |
+| `RESEARCH_PRESENTATION_PROFILE` | `balanced` | 是 | 模板中注释; Research presentation profile (emphasis/order only; same evidence, full risk disclosure): conservative = risks first ... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |
