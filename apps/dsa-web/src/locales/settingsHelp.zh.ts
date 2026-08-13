@@ -1457,13 +1457,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: '反思与预测复盘',
-    summary: '控制有界的运行内反思与已解析预测经验生成。',
-    usage: '除非显式的调用与修订预算符合工作流，否则保持两项功能关闭。',
-    valueNotes: [
-      '反思在分析与决策后运行；复盘用于 miss 或 partial 的已解析预测。',
-      '调用预算为 0 时会显式记录预算跳过，clean hit 可跳过复盘调用。',
-    ],
-    notes: ['两条路径都不会修改 Agent Soul 或 ToolSurface 拒绝规则。'],
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
