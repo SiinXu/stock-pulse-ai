@@ -1518,6 +1518,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['在保留 Decision 预算的同时限制可选 Critic 修订成本。'],
     notes: ['达到轮次上限仍无显式 pass 时保持 not_converged，并保留 Critic 限制项。'],
   },
+  'settings.agent.REFLECTION_POSTMORTEM': {
+    title: '反思与预测复盘',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
