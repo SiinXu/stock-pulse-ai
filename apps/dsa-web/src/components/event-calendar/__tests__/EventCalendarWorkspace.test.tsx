@@ -126,4 +126,12 @@ describe('EventCalendarWorkspace', () => {
     expect(screen.queryByText('Stale response')).not.toBeInTheDocument();
     expect(screen.getByText('Newest response')).toBeInTheDocument();
   });
+
+  it('exposes a production entry to the corporate event alerts page (#1058)', async () => {
+    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue(emptyPayload);
+    renderWorkspace();
+    const link = await screen.findByTestId('event-calendar-open-event-alerts');
+    expect(link).toHaveAttribute('href', APP_ROUTE_PATHS.eventAlerts);
+    expect(link).toHaveAccessibleName('Event-driven alerts');
+  });
 });

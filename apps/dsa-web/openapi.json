@@ -4329,6 +4329,46 @@
         "title": "AuthSettingsRequest",
         "type": "object"
       },
+      "AuthStatusResponse": {
+        "additionalProperties": false,
+        "description": "Wire-stable auth status payload (camelCase aliases, Issue #549).",
+        "properties": {
+          "authEnabled": {
+            "title": "Authenabled",
+            "type": "boolean"
+          },
+          "loggedIn": {
+            "title": "Loggedin",
+            "type": "boolean"
+          },
+          "passwordChangeable": {
+            "title": "Passwordchangeable",
+            "type": "boolean"
+          },
+          "passwordSet": {
+            "title": "Passwordset",
+            "type": "boolean"
+          },
+          "setupState": {
+            "enum": [
+              "enabled",
+              "password_retained",
+              "no_password"
+            ],
+            "title": "Setupstate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authEnabled",
+          "loggedIn",
+          "passwordSet",
+          "passwordChangeable",
+          "setupState"
+        ],
+        "title": "AuthStatusResponse",
+        "type": "object"
+      },
       "BacktestAppliedConfig": {
         "description": "Echo of the effective run configuration used for evaluation honesty.",
         "properties": {
@@ -10163,6 +10203,35 @@
           "sentiment_label"
         ],
         "title": "DemoAnalysisSummary",
+        "type": "object"
+      },
+      "DependencyIssueResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "dependency": {
+            "title": "Dependency",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependency",
+          "capability_id",
+          "reason_code"
+        ],
+        "title": "DependencyIssueResponse",
         "type": "object"
       },
       "DiscoverLLMChannelModelsRequest": {
@@ -26504,6 +26573,118 @@
         "title": "ResearchStanceContent",
         "type": "object"
       },
+      "ResolutionResultResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "checked_against_generation": {
+            "minimum": 0.0,
+            "title": "Checked Against Generation",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyIssueResponse"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "satisfied": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Satisfied",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability_id",
+          "ready",
+          "reason_code",
+          "checked_against_generation"
+        ],
+        "title": "ResolutionResultResponse",
+        "type": "object"
+      },
+      "ResolveCapabilitiesRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability Ids"
+          },
+          "include_inventory": {
+            "default": true,
+            "title": "Include Inventory",
+            "type": "boolean"
+          }
+        },
+        "title": "ResolveCapabilitiesRequest",
+        "type": "object"
+      },
+      "ResolveCapabilitiesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked_count": {
+            "minimum": 0.0,
+            "title": "Blocked Count",
+            "type": "integer"
+          },
+          "ready_count": {
+            "minimum": 0.0,
+            "title": "Ready Count",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ResolutionResultResponse"
+            },
+            "maxItems": 1024,
+            "title": "Results",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "capability-resolution/v1",
+            "default": "capability-resolution/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "write_generation": {
+            "minimum": 0.0,
+            "title": "Write Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "write_generation",
+          "ready_count",
+          "blocked_count"
+        ],
+        "title": "ResolveCapabilitiesResponse",
+        "type": "object"
+      },
       "RollbackSystemConfigRequest": {
         "description": "Request one-step restoration of the last-known-good runtime config.",
         "properties": {
@@ -26516,6 +26697,44 @@
           "config_version"
         ],
         "title": "RollbackSystemConfigRequest",
+        "type": "object"
+      },
+      "RouteCandidateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "model_route": {
+            "title": "Model Route",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability_id",
+          "model_route",
+          "score"
+        ],
+        "title": "RouteCandidateResponse",
         "type": "object"
       },
       "RunDiagnosticComponent": {
@@ -32449,6 +32668,135 @@
         "title": "TaskListResponse",
         "type": "object"
       },
+      "TaskRouteDecisionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "default": "",
+            "title": "As Of",
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/RouteCandidateResponse"
+            },
+            "maxItems": 8,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "explain": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Explain",
+            "type": "array"
+          },
+          "fallback_used": {
+            "default": false,
+            "title": "Fallback Used",
+            "type": "boolean"
+          },
+          "pin_source": {
+            "default": "",
+            "title": "Pin Source",
+            "type": "string"
+          },
+          "policy": {
+            "enum": [
+              "quality",
+              "cost",
+              "local_first"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "routing_enabled": {
+            "default": false,
+            "title": "Routing Enabled",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "task-route-decision/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "selected_capability_id": {
+            "default": "",
+            "title": "Selected Capability Id",
+            "type": "string"
+          },
+          "selected_model": {
+            "default": "",
+            "title": "Selected Model",
+            "type": "string"
+          },
+          "task_class": {
+            "enum": [
+              "report",
+              "agent",
+              "vision",
+              "market_review",
+              "cheap_scan",
+              "deep_reasoning",
+              "coding"
+            ],
+            "title": "Task Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "task_class",
+          "policy",
+          "reason_code"
+        ],
+        "title": "TaskRouteDecisionResponse",
+        "type": "object"
+      },
+      "TaskRouteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quality",
+                  "cost",
+                  "local_first"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "task_class": {
+            "enum": [
+              "report",
+              "agent",
+              "vision",
+              "market_review",
+              "cheap_scan",
+              "deep_reasoning",
+              "coding"
+            ],
+            "title": "Task Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_class"
+        ],
+        "title": "TaskRouteRequest",
+        "type": "object"
+      },
       "TaskStatus": {
         "description": "Task status model",
         "example": {
@@ -35647,6 +35995,453 @@
         ],
         "title": "WatchlistScoreSourceRows",
         "type": "object"
+      },
+      "WriteCapabilityEntryRequest": {
+        "additionalProperties": false,
+        "description": "Payload for register and update of write-side capability declarations.",
+        "properties": {
+          "capability_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "capability_type": {
+            "enum": [
+              "data_provider",
+              "data_method",
+              "agent_tool",
+              "analysis_skill",
+              "pipeline_stage",
+              "llm_model",
+              "persona_role"
+            ],
+            "title": "Capability Type",
+            "type": "string"
+          },
+          "cost_tier": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Cost Tier",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "data",
+              "tool",
+              "skill",
+              "pipeline",
+              "llm",
+              "persona"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "latency_class": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Latency Class",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Markets",
+            "type": "array"
+          },
+          "model_route": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Model Route",
+            "type": "string"
+          },
+          "provider": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Provider",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Tags",
+            "type": "array"
+          },
+          "version": {
+            "default": "1",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "domain",
+          "capability_type"
+        ],
+        "title": "WriteCapabilityEntryRequest",
+        "type": "object"
+      },
+      "WriteCapabilityEntryResponse": {
+        "additionalProperties": false,
+        "description": "One declared capability from the write-side registry.",
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "capability_type": {
+            "enum": [
+              "data_provider",
+              "data_method",
+              "agent_tool",
+              "analysis_skill",
+              "pipeline_stage",
+              "llm_model",
+              "persona_role"
+            ],
+            "title": "Capability Type",
+            "type": "string"
+          },
+          "cost_tier": {
+            "default": "",
+            "title": "Cost Tier",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "data",
+              "tool",
+              "skill",
+              "pipeline",
+              "llm",
+              "persona"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "generation": {
+            "minimum": 1.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "latency_class": {
+            "default": "",
+            "title": "Latency Class",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "model_route": {
+            "default": "",
+            "title": "Model Route",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "registered_at": {
+            "default": "",
+            "title": "Registered At",
+            "type": "string"
+          },
+          "retired_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retired At"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "retired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "domain",
+          "capability_type",
+          "version",
+          "status",
+          "provider",
+          "generation"
+        ],
+        "title": "WriteCapabilityEntryResponse",
+        "type": "object"
+      },
+      "WriteCapabilityListResponse": {
+        "additionalProperties": false,
+        "description": "Versioned write-side registry listing.",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "generation": {
+            "minimum": 0.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+            },
+            "maxItems": 1024,
+            "title": "Items",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "capability-write-registry/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "generation",
+          "as_of",
+          "total"
+        ],
+        "title": "WriteCapabilityListResponse",
+        "type": "object"
+      },
+      "WriteCapabilityUpdateRequest": {
+        "additionalProperties": false,
+        "description": "Partial update payload; identity fields are rejected by the service.",
+        "properties": {
+          "cost_tier": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Tier"
+          },
+          "dependencies": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependencies"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "latency_class": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Class"
+          },
+          "markets": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markets"
+          },
+          "model_route": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Route"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "title": "WriteCapabilityUpdateRequest",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -38312,7 +39107,7 @@
     },
     "/api/v1/auth/settings": {
       "post": {
-        "description": "Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie.",
+        "description": "Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie. Successful responses use AuthStatusResponse (same camelCase wire shape as GET /status). Error paths still return JSONResponse error envelopes.",
         "operationId": "auth_update_settings_api_v1_auth_settings_post",
         "requestBody": {
           "content": {
@@ -38328,7 +39123,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -38358,7 +39155,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -39138,7 +39937,7 @@
     },
     "/api/v1/capabilities": {
       "get": {
-        "description": "Capture a versioned read-only inventory from the live data-provider, tool, plugin, skill, and pipeline owners. Availability comes only from runtime registration and owner health state, never from a static catalog. Unknown readiness remains null. Source or config read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or perform side-effecting health checks.",
+        "description": "Capture a versioned read-only inventory from live owners. Availability comes only from runtime registration and owner health state.",
         "operationId": "listCapabilities",
         "parameters": [
           {
@@ -39182,7 +39981,7 @@
                 }
               }
             },
-            "description": "Invalid domain filter"
+            "description": "Invalid request"
           },
           "401": {
             "content": {
@@ -39194,6 +39993,26 @@
             },
             "description": "Login required when ADMIN_AUTH_ENABLED=true"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -39203,6 +40022,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
           }
         },
         "security": [
@@ -39211,6 +40040,610 @@
           }
         ],
         "summary": "List the runtime capability inventory (read-only)",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry": {
+      "get": {
+        "operationId": "listCapabilityRegistry",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_retired",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Retired",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List write-side capability declarations",
+        "tags": [
+          "Capabilities"
+        ]
+      },
+      "post": {
+        "operationId": "registerCapability",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteCapabilityEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Register a write-side capability declaration",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry/{capability_id}": {
+      "put": {
+        "operationId": "updateCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability_id",
+            "required": true,
+            "schema": {
+              "title": "Capability Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteCapabilityUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Update a write-side capability declaration",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry/{capability_id}/retire": {
+      "post": {
+        "operationId": "retireCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability_id",
+            "required": true,
+            "schema": {
+              "title": "Capability Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Retire a write-side capability declaration",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/resolve": {
+      "post": {
+        "operationId": "resolveCapabilities",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCapabilitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveCapabilitiesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Resolve capability dependencies and version compatibility",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/route": {
+      "post": {
+        "operationId": "routeTaskModel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRouteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRouteDecisionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Compute a task-aware model routing decision",
         "tags": [
           "Capabilities"
         ]
