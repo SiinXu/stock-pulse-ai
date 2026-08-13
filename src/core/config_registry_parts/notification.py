@@ -10,6 +10,12 @@ from src.services.report_mode import (
     REPORT_MODE_STANDARD,
     VALID_REPORT_MODES,
 )
+from src.services.research_presentation_profile import (
+    PROFILE_AGGRESSIVE,
+    PROFILE_BALANCED,
+    PROFILE_CONSERVATIVE,
+    VALID_RESEARCH_PRESENTATION_PROFILES,
+)
 
 _REPORT_MODE_ORDERED: List[str] = [
     REPORT_MODE_BRIEF,
@@ -31,6 +37,34 @@ if set(_REPORT_MODE_ORDERED) != set(VALID_REPORT_MODES):
     extra = set(_REPORT_MODE_ORDERED) - set(VALID_REPORT_MODES)
     raise RuntimeError(
         "REPORT_MODE registry options drifted from VALID_REPORT_MODES "
+        f"(missing={sorted(missing)}, extra={sorted(extra)})"
+    )
+
+_RESEARCH_PRESENTATION_PROFILE_ORDERED: List[str] = [
+    PROFILE_CONSERVATIVE,
+    PROFILE_BALANCED,
+    PROFILE_AGGRESSIVE,
+]
+_RESEARCH_PRESENTATION_PROFILE_LABELS = {
+    PROFILE_CONSERVATIVE: "Conservative (risk-first emphasis)",
+    PROFILE_BALANCED: "Balanced (default emphasis)",
+    PROFILE_AGGRESSIVE: "Aggressive (opportunity-first emphasis)",
+}
+_RESEARCH_PRESENTATION_PROFILE_OPTIONS = [
+    {"label": _RESEARCH_PRESENTATION_PROFILE_LABELS[profile], "value": profile}
+    for profile in _RESEARCH_PRESENTATION_PROFILE_ORDERED
+    if profile in VALID_RESEARCH_PRESENTATION_PROFILES
+]
+if set(_RESEARCH_PRESENTATION_PROFILE_ORDERED) != set(VALID_RESEARCH_PRESENTATION_PROFILES):
+    missing = set(VALID_RESEARCH_PRESENTATION_PROFILES) - set(
+        _RESEARCH_PRESENTATION_PROFILE_ORDERED
+    )
+    extra = set(_RESEARCH_PRESENTATION_PROFILE_ORDERED) - set(
+        VALID_RESEARCH_PRESENTATION_PROFILES
+    )
+    raise RuntimeError(
+        "RESEARCH_PRESENTATION_PROFILE registry options drifted from "
+        "VALID_RESEARCH_PRESENTATION_PROFILES "
         f"(missing={sorted(missing)}, extra={sorted(extra)})"
     )
 
@@ -1135,6 +1169,48 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             f"REPORT_MODE={REPORT_MODE_STANDARD}",
             f"REPORT_MODE={REPORT_MODE_BRIEF}",
             f"REPORT_MODE={REPORT_MODE_RESEARCH}",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：环境变量完整列表",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+            {
+                "label": "Full guide (EN): environment variables",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "RESEARCH_PRESENTATION_PROFILE": {
+        "title": "Research Presentation Profile",
+        "description": (
+            "Research framing emphasis for Jinja stock reports when "
+            "REPORT_RENDERER_ENABLED is true. "
+            f"'{PROFILE_CONSERVATIVE}' shows risks first; "
+            f"'{PROFILE_BALANCED}' (default) keeps the current balanced order; "
+            f"'{PROFILE_AGGRESSIVE}' emphasizes catalysts first. "
+            "Presentation only: same underlying evidence; risk disclosure "
+            "completeness is equal across profiles and independent of "
+            "REPORT_MODE hard limits. Does not change RISK_GATE_PROFILE or "
+            "decision analysis. Per-request override: "
+            "extra_context.research_presentation_profile."
+        ),
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": PROFILE_BALANCED,
+        "options": list(_RESEARCH_PRESENTATION_PROFILE_OPTIONS),
+        "validation": {"enum": list(_RESEARCH_PRESENTATION_PROFILE_ORDERED)},
+        "display_order": 59,
+        "help_key": "settings.report.RESEARCH_PRESENTATION_PROFILE",
+        "examples": [
+            f"RESEARCH_PRESENTATION_PROFILE={PROFILE_BALANCED}",
+            f"RESEARCH_PRESENTATION_PROFILE={PROFILE_CONSERVATIVE}",
+            f"RESEARCH_PRESENTATION_PROFILE={PROFILE_AGGRESSIVE}",
         ],
         "docs": [
             {
