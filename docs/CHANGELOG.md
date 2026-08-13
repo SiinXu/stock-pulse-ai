@@ -13,8 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after parallel-fetch Settings help/locale keys (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after Agent mode hard-budget Settings help and fieldTitleMaps inventory strings (Refs #1121, #125).
 - [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
-- [Fixed] Untrusted-document follow-on fence arms only for content-bearing multimodal tool statuses (`available`/`degraded`), not pure validation rejects (chart/OCR/transcript; issue #253 review).
-- [Added] Chart reading `chart-reading-v2`: structured trend/pattern/key-level observations with confidence inside an untrusted-document envelope (redaction, timeout, garbage/non-chart explicit reject); `read_price_chart` joins the session follow-on fence; `CHART_READ_TIMEOUT_SECONDS` (issue #253 remaining chart gap).
 - [Added] Parallel dependency-free market-input pulls inside stock analysis with concurrency caps, per-provider limits, failure isolation, total budget, and serial fallback (Refs #1126).
 - [Chore] Rebaseline Web locale gzip budgets after PERF_* Settings help i18n strings (Refs #227).
 - [Tests] CI report-export-stack job installs optional report-export dependencies and host fonts, and fails when HTML/PDF fixture, Chinese glyph-coverage, or bound export tests skip (Refs #163).
