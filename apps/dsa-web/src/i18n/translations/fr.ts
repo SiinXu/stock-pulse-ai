@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "Cotation d'action",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "Volume",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "Ajouter au suivi",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "Marché {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "Dans le suivi",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "Toute l’histoire",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "Moyenne {score}",
