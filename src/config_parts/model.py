@@ -371,6 +371,10 @@ class Config:
     agent_episode_log_enabled: bool = False
     agent_episode_retention_days: int = 90
     agent_episode_max_rows: int = 50_000
+    # Error-pattern encyclopedia from lessons (Issue #1138); default off
+    agent_error_pattern_enabled: bool = False
+    agent_error_pattern_inject_top_k: int = 3
+    agent_error_pattern_inject_char_budget: int = 2000
     # Opt-in plan→act→observe production path on AgentExecutor.run (#199). Default off.
     agent_planning_enabled: bool = False
     agent_planning_strategy: str = "template"  # template | llm
