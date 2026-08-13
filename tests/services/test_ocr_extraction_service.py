@@ -341,6 +341,7 @@ def test_real_tesseract_english_fixture_when_available(tmp_path: Path) -> None:
 def test_normalize_document_kind_defaults() -> None:
     assert normalize_ocr_document_kind(None) == "screenshot"
     assert normalize_ocr_document_kind("table_statement") == "table_statement"
+    assert normalize_ocr_document_kind("statement_table") == "table_statement"
     assert normalize_ocr_document_kind("FILING-PAGE") == "filing_page"
     assert normalize_ocr_document_kind("not-a-kind") == "screenshot"
 
@@ -375,6 +376,7 @@ def test_document_kinds_carry_untrusted_non_decision_envelope(tmp_path: Path) ->
             assert payload["structure"]["row_count"] >= 1
         if kind == "chart_annotation":
             assert payload["structure"]["not_chart_semantics"] is True
+            assert payload["structure"]["use_for_semantic_chart"] == "read_price_chart"
         if kind == "pdf_page":
             assert payload["source"]["container_mime_type"] == "application/pdf"
             assert payload["source"]["pdf_page_index"] == 0
@@ -454,4 +456,61 @@ def test_pdf_page_fixture_works_without_pypdf(tmp_path: Path, monkeypatch: pytes
     assert payload["document_kind"] == "pdf_page"
     assert payload["source"].get("pdf_extractor") == "builtin_scan"
     assert payload["trust"]["authoritative_for_decisions"] is False
+
+
+def test_table_statement_kind_emits_unverified_row_candidates(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "table.png").write_bytes((FIXTURES / "sample_table_statement.png").read_bytes())
+    raw = "Symbol  Qty  Price  Value\nAAPL  120  198.50  23820.00\n600519  10  1650.00  16500.00"
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: raw)
+    payload = service.extract_path("table.png", document_kind="table_statement")
+    assert payload["document_kind"] == "table_statement"
+    assert payload["structure"]["verified"] is False
+    assert payload["structure"]["row_count"] >= 2
+    assert payload["trust"]["authoritative_for_decisions"] is False
+
+
+def test_chart_annotation_kind_emits_sparse_label_candidates(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "chart.png").write_bytes((FIXTURES / "sample_chart_annotation.png").read_bytes())
+    raw = "AAPL Daily\nSupport 185.00\nResistance 205.50\nMA50 192.30"
+    service = OcrExtractionService(file_root=str(root), engine=lambda *_a: raw)
+    payload = service.extract_path("chart.png", document_kind="chart_annotation")
+    assert payload["structure"]["not_chart_semantics"] is True
+    assert payload["structure"]["use_for_semantic_chart"] == "read_price_chart"
+
+
+def test_filing_page_kind_envelope(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "filing.png").write_bytes((FIXTURES / "sample_filing_page.png").read_bytes())
+    service = OcrExtractionService(
+        file_root=str(root), engine=lambda *_a: "FORM 10-K FILING EXCERPT AAPL"
+    )
+    payload = service.extract_path("filing.png", document_kind="filing_page")
+    assert payload["document_kind"] == "filing_page"
+    assert payload["trust"]["classification"] == "untrusted_user_document"
+
+
+def test_pdf_page_embedded_or_honest_degrade(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "page.pdf").write_bytes((FIXTURES / "sample_pdf_page.pdf").read_bytes())
+    service = OcrExtractionService(
+        file_root=str(root), engine=lambda *_a: "FORM 10-K embedded AAPL"
+    )
+    payload = service.extract_path("page.pdf", document_kind="pdf_page", page_index=0)
+    if payload["status"] == "available":
+        assert payload["document_kind"] == "pdf_page"
+        assert payload["trust"]["authoritative_for_decisions"] is False
+    else:
+        assert payload["reason_code"] in {
+            "pdf_reader_unavailable",
+            "pdf_no_embedded_image",
+            "pdf_image_extract_failed",
+            "malformed_pdf",
+            "unsupported_embedded_image",
+        }
 
