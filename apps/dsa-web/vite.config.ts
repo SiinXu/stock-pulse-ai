@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import { shellPwaPlugin } from './vite-plugin-shell-pwa'
 
 // The Loupe dev annotator is an optional local tool (optionalDependencies).
 // Only wire it into dev optimizeDeps when it actually resolves, so a clean
@@ -129,6 +130,8 @@ export default defineConfig({
         plugins: [['babel-plugin-react-compiler']],
       },
     }),
+    // Emits production sw.js that precaches shell/static assets only (Refs #234).
+    shellPwaPlugin(),
   ],
   server: {
     host: '0.0.0.0',  // Allow public access
