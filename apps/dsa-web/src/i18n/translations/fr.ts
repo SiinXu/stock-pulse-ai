@@ -3,10 +3,14 @@
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.fr,
   ...DR.fr,
+  ...CP.fr,
+  ...DSC.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -673,7 +677,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "Tous les résultats évalués; indépendant des signaux visibles et du filtre d’action.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "Autre",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "Aucun",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "Comptes seuls.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "Insuffisant",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "Suffisant",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "{completed}/{total}",
@@ -682,12 +685,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "Marché",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "Mois",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "Groupes",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "Seuil: {count}/groupe.",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "Seuil indépendant par période, marché et signal.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "Calibrage",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "Insuffisant",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "<{count}: comptes.",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "Taux passés: ni prévision, garantie ou conseil.",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "Avertissement",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "Réussite",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "Qualité",
