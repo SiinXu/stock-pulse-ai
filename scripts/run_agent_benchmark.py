@@ -162,6 +162,27 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    prediction_comparison = outputs.get("prediction_comparison") or {}
+    if args.strict_baseline and prediction_comparison.get("regressed"):
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification regression "
+            f"(delta={float(prediction_comparison.get('delta') or 0.0):+.4f}, "
+            f"drop_count={prediction_comparison.get('drop_count')}, "
+            "threshold=0.0 fixed)",
+            file=sys.stderr,
+        )
+        return 2
+    pred_report = report.get("prediction_verification_evaluation") or {}
+    pred_agg = pred_report.get("aggregate") or {}
+    if args.strict_baseline and int(pred_agg.get("checks_passed") or 0) < int(
+        pred_agg.get("checks_total") or 0
+    ):
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification checks incomplete "
+            f"({pred_agg.get('checks_passed')}/{pred_agg.get('checks_total')})",
+            file=sys.stderr,
+        )
+        return 2
 
     print("[agent-eval-benchmark] OK", file=sys.stderr)
     return 0

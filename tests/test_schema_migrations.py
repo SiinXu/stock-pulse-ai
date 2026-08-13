@@ -33,6 +33,7 @@ from src.migrations.legacy_profiles import (
 )
 from src.migrations.registry import (
     ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
+    AGENT_EPISODE_SCHEMA_MIGRATION,
     APPROVAL_GATE_SCHEMA_MIGRATION,
     CHAT_TURN_IDENTITY_MIGRATION,
     DECISION_SIGNAL_PROFILE_MIGRATION,
@@ -447,6 +448,7 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         CHAT_TURN_IDENTITY_MIGRATION.id,
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
         LLM_USAGE_COST_ATTRIBUTION_MIGRATION.id,
+        AGENT_EPISODE_SCHEMA_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)
