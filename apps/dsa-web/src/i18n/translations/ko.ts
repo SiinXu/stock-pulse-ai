@@ -6209,4 +6209,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "시장 입력 병렬 수집",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.notes.0": "포트폴리오 데이터가 없어도 명시적인 단일 종목 폴백 모드로 계산할 수 있습니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "현재 포트폴리오 비중으로 결정적 포지션 범위를 제어합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "포트폴리오 인지 포지션 산정",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "포트폴리오 인지 범위에서는 활성화하세요. 단일 종목 최대 비중은 0~1 소수이며 기본값은 0.15입니다.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "포트폴리오 인지 산정 활성화",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "단일 종목 최대 비중",
 } as const;

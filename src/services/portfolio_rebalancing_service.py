@@ -30,6 +30,7 @@ from src.services.portfolio_risk_metrics_service import (
     PortfolioRiskMetricsService,
 )
 from src.services.portfolio_service import PortfolioService
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -1007,7 +1008,12 @@ class PortfolioRebalancingService:
                     for s, w in weights.items()
                 }
         except Exception as exc:  # broad-exception: fallback_recorded - stock-only sizing
-            logger.debug("Portfolio snapshot unavailable for sizing: %s", exc)
+            log_safe_exception(
+                logger,
+                "Portfolio snapshot unavailable for sizing",
+                exc,
+                error_code="portfolio_sizing_snapshot_unavailable",
+            )
             has_portfolio = False
             currency = None
 

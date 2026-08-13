@@ -495,6 +495,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PLUGIN_DATA_PROVIDER_AUTO_BIND` | `false` | 是 | 模板中注释; Opt-in Data Provider auto-bind (default off) |
 | `PLUGIN_STATE_PATH` | `./data/plugin_lifecycle_state.json` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PORTFOLIO_FX_UPDATE_ENABLED` | `true` | 是 | 模板中注释 |
+| `PORTFOLIO_AWARE_SIZING_ENABLED` | `true` | 是 | 模板中注释；启用组合感知仓位区间 |
+| `PORTFOLIO_MAX_SINGLE_NAME_WEIGHT` | `0.15` | 是 | 模板中注释；单一标的软上限（小数） |
 | `PORTFOLIO_HEALTH_CASH_HIGH_ALERT_PCT` | `50.0` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_CASH_LOW_ALERT_PCT` | `2.0` | 是 | 模板中注释 |
 | `PORTFOLIO_HEALTH_CONCENTRATION_ALERT_PCT` | `35.0` | 是 | 模板中注释; Optional finite insight thresholds (cash low must be strictly below cash high): |

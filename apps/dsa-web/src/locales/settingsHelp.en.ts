@@ -2035,6 +2035,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT, PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT, and PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT are percentages. PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO is a fraction of the stop-loss threshold (0–1). PORTFOLIO_RISK_LOOKBACK_DAYS sets the trading-day lookback (default 180).',
     impact: ['Affects portfolio risk alerts and agent risk snapshots.'],
   },
+  'settings.system.portfolio_aware_sizing': {
+    title: 'Portfolio-aware Position Sizing',
+    summary: 'Controls deterministic position bands using current portfolio weights.',
+    usage: 'Keep enabled for portfolio-aware bands. The maximum single-name weight is a fraction from 0 to 1 and defaults to 0.15.',
+    notes: ['Without portfolio data, sizing remains available in explicit stock-only fallback mode.'],
+  },
   'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
     title: 'Portfolio FX Update Enabled',
     summary: 'Whether portfolio valuation may refresh FX rates for multi-currency holdings.',

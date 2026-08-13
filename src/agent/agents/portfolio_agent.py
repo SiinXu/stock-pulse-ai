@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 from src.agent.agents.base_agent import BaseAgent
 from src.agent.protocols import AgentContext, AgentOpinion
 from src.agent.runner import try_parse_json
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,12 @@ def _build_deterministic_portfolio_base(ctx: AgentContext) -> Optional[Dict[str,
             PortfolioRebalancingService,
         )
     except Exception as exc:  # broad-exception: fallback_recorded - agent keeps LLM path
-        logger.debug("[PortfolioAgent] rebalancing service unavailable: %s", exc)
+        log_safe_exception(
+            logger,
+            "PortfolioAgent rebalancing service unavailable",
+            exc,
+            error_code="portfolio_agent_rebalancing_service_unavailable",
+        )
         return None
 
     risk_tolerance = (
@@ -73,7 +79,12 @@ def _build_deterministic_portfolio_base(ctx: AgentContext) -> Optional[Dict[str,
             stock_signals=stock_signals or None,
         )
     except Exception as exc:  # broad-exception: fallback_recorded - LLM-only narrative
-        logger.debug("[PortfolioAgent] deterministic rebalancing failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "PortfolioAgent deterministic rebalancing failed",
+            exc,
+            error_code="portfolio_agent_rebalancing_failed",
+        )
         return None
 
     if not isinstance(result, dict):

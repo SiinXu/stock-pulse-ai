@@ -6209,4 +6209,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "市場入力の並行取得",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取得の全体上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取得のプロバイダ別上限",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.notes.0": "ポートフォリオデータがない場合も、明示的な個別銘柄フォールバックで計算できます。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "現在のポートフォリオ比率を使って決定的なポジション範囲を制御します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "ポートフォリオ対応ポジションサイズ",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "ポートフォリオ対応範囲では有効にします。1銘柄の上限は 0～1 の小数で、既定値は 0.15 です。",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "ポートフォリオ対応サイズを有効化",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "1銘柄の最大比率",
 } as const;
