@@ -21220,6 +21220,107 @@
         "title": "PortfolioPositionAnalysisRequest",
         "type": "object"
       },
+      "PortfolioPositionBand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "add",
+              "reduce",
+              "hold",
+              "exit"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "auto_execute": {
+            "default": false,
+            "title": "Auto Execute",
+            "type": "boolean"
+          },
+          "current_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Current Weight Pct",
+            "type": "number"
+          },
+          "effective_cap_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Effective Cap Pct",
+            "type": "number"
+          },
+          "is_suggestion_only": {
+            "default": true,
+            "title": "Is Suggestion Only",
+            "type": "boolean"
+          },
+          "mode": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Mode",
+            "type": "string"
+          },
+          "rationale": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "signal": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Signal",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "target_weight_pct_high": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Target Weight Pct High",
+            "type": "number"
+          },
+          "target_weight_pct_low": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Target Weight Pct Low",
+            "type": "number"
+          },
+          "target_weight_pct_mid": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Target Weight Pct Mid",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "action",
+          "current_weight_pct",
+          "target_weight_pct_low",
+          "target_weight_pct_mid",
+          "target_weight_pct_high",
+          "effective_cap_pct",
+          "signal",
+          "mode",
+          "rationale"
+        ],
+        "title": "PortfolioPositionBand",
+        "type": "object"
+      },
       "PortfolioPositionItem": {
         "properties": {
           "avg_cost": {
@@ -21336,6 +21437,531 @@
           "valuation_currency"
         ],
         "title": "PortfolioPositionItem",
+        "type": "object"
+      },
+      "PortfolioRebalanceAssumptions": {
+        "additionalProperties": false,
+        "properties": {
+          "cross_currency": {
+            "title": "Cross Currency",
+            "type": "string"
+          },
+          "drift_threshold_pct": {
+            "title": "Drift Threshold Pct",
+            "type": "number"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "portfolio_aware_sizing_enabled": {
+            "title": "Portfolio Aware Sizing Enabled",
+            "type": "boolean"
+          },
+          "provider_calls_on_hot_path": {
+            "title": "Provider Calls On Hot Path",
+            "type": "boolean"
+          },
+          "recommendation_honesty": {
+            "title": "Recommendation Honesty",
+            "type": "string"
+          },
+          "risk_metrics_source": {
+            "title": "Risk Metrics Source",
+            "type": "string"
+          },
+          "tax_and_transaction_costs": {
+            "title": "Tax And Transaction Costs",
+            "type": "string"
+          },
+          "uses_risk_metrics": {
+            "title": "Uses Risk Metrics",
+            "type": "boolean"
+          },
+          "weight_basis": {
+            "title": "Weight Basis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "uses_risk_metrics",
+          "risk_metrics_source",
+          "provider_calls_on_hot_path",
+          "tax_and_transaction_costs",
+          "recommendation_honesty",
+          "weight_basis",
+          "cross_currency",
+          "portfolio_aware_sizing_enabled",
+          "drift_threshold_pct"
+        ],
+        "title": "PortfolioRebalanceAssumptions",
+        "type": "object"
+      },
+      "PortfolioRebalanceBreach": {
+        "additionalProperties": false,
+        "properties": {
+          "current_pct": {
+            "title": "Current Pct",
+            "type": "number"
+          },
+          "drift_pct": {
+            "title": "Drift Pct",
+            "type": "number"
+          },
+          "kind": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit_pct": {
+            "title": "Limit Pct",
+            "type": "number"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "kind",
+          "current_pct",
+          "limit_pct",
+          "drift_pct"
+        ],
+        "title": "PortfolioRebalanceBreach",
+        "type": "object"
+      },
+      "PortfolioRebalanceCurrent": {
+        "additionalProperties": false,
+        "properties": {
+          "diversification_score": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Score"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective N"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "portfolio_value": {
+            "default": 0.0,
+            "title": "Portfolio Value",
+            "type": "number"
+          },
+          "risk_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Status"
+          },
+          "var_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Pct"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRebalanceWeightItem"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "title": "PortfolioRebalanceCurrent",
+        "type": "object"
+      },
+      "PortfolioRebalanceDrift": {
+        "additionalProperties": false,
+        "properties": {
+          "breaches": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRebalanceBreach"
+            },
+            "title": "Breaches",
+            "type": "array"
+          },
+          "max_abs_weight_drift_pct": {
+            "default": 0.0,
+            "title": "Max Abs Weight Drift Pct",
+            "type": "number"
+          }
+        },
+        "title": "PortfolioRebalanceDrift",
+        "type": "object"
+      },
+      "PortfolioRebalanceRiskSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "concentration_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration Status"
+          },
+          "correlation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Status"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "var_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Status"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioRebalanceRiskSummary",
+        "type": "object"
+      },
+      "PortfolioRebalanceSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "trim",
+              "add",
+              "hold"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "approx_notional": {
+            "title": "Approx Notional",
+            "type": "number"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "auto_execute": {
+            "default": false,
+            "title": "Auto Execute",
+            "type": "boolean"
+          },
+          "delta_weight_pct": {
+            "title": "Delta Weight Pct",
+            "type": "number"
+          },
+          "from_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "From Weight Pct",
+            "type": "number"
+          },
+          "is_suggestion_only": {
+            "default": true,
+            "title": "Is Suggestion Only",
+            "type": "boolean"
+          },
+          "rationale": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "to_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "To Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "action",
+          "symbol",
+          "from_weight_pct",
+          "to_weight_pct",
+          "delta_weight_pct",
+          "approx_notional",
+          "rationale"
+        ],
+        "title": "PortfolioRebalanceSuggestion",
+        "type": "object"
+      },
+      "PortfolioRebalanceTargetModel": {
+        "additionalProperties": false,
+        "properties": {
+          "band_max_single_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Band Max Single Weight Pct",
+            "type": "number"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "max_hhi": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Max Hhi",
+            "type": "number"
+          },
+          "max_single_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Max Single Weight Pct",
+            "type": "number"
+          },
+          "min_effective_n": {
+            "title": "Min Effective N",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Notes",
+            "type": "array"
+          },
+          "soft_max_single_name_weight": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Soft Max Single Name Weight",
+            "type": "number"
+          },
+          "target_var_pct_ceiling": {
+            "title": "Target Var Pct Ceiling",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "max_single_weight_pct",
+          "band_max_single_weight_pct",
+          "soft_max_single_name_weight",
+          "min_effective_n",
+          "max_hhi",
+          "target_var_pct_ceiling"
+        ],
+        "title": "PortfolioRebalanceTargetModel",
+        "type": "object"
+      },
+      "PortfolioRebalanceWeightItem": {
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "PortfolioRebalanceWeightItem",
+        "type": "object"
+      },
+      "PortfolioRebalancingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/PortfolioRebalanceAssumptions"
+          },
+          "auto_execute": {
+            "default": false,
+            "title": "Auto Execute",
+            "type": "boolean"
+          },
+          "cost_method": {
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "current": {
+            "$ref": "#/components/schemas/PortfolioRebalanceCurrent"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "drift": {
+            "$ref": "#/components/schemas/PortfolioRebalanceDrift"
+          },
+          "is_suggestion_only": {
+            "default": true,
+            "title": "Is Suggestion Only",
+            "type": "boolean"
+          },
+          "position_bands": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioPositionBand"
+            },
+            "title": "Position Bands",
+            "type": "array"
+          },
+          "risk_metrics_summary": {
+            "$ref": "#/components/schemas/PortfolioRebalanceRiskSummary"
+          },
+          "risk_tolerance": {
+            "enum": [
+              "conservative",
+              "moderate",
+              "aggressive"
+            ],
+            "title": "Risk Tolerance",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty_portfolio",
+              "insufficient_data",
+              "refused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRebalanceSuggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "target_model": {
+            "$ref": "#/components/schemas/PortfolioRebalanceTargetModel"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "disclaimer",
+          "risk_tolerance",
+          "target_model",
+          "current",
+          "drift",
+          "assumptions",
+          "risk_metrics_summary"
+        ],
+        "title": "PortfolioRebalancingResponse",
         "type": "object"
       },
       "PortfolioRiskAssumptions": {
@@ -46832,6 +47458,184 @@
           }
         },
         "summary": "Submit manual analysis for a held portfolio position",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/rebalancing-recommendations": {
+      "get": {
+        "description": "Deterministic risk-band rebalancing suggestions and risk-adjusted position weight bands from the current portfolio snapshot and portfolio risk metrics. Suggestions are for human review only and are never auto-executed. Insufficient history yields an explicit refusal (no invented trades). Never calls market data providers on the hot path.",
+        "operationId": "getPortfolioRebalancingRecommendations",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "enum": [
+                "fifo",
+                "avg"
+              ],
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Risk preference band used for caps and target position ranges",
+            "in": "query",
+            "name": "risk_tolerance",
+            "required": false,
+            "schema": {
+              "default": "moderate",
+              "description": "Risk preference band used for caps and target position ranges",
+              "enum": [
+                "conservative",
+                "moderate",
+                "aggressive"
+              ],
+              "title": "Risk Tolerance",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Minimum absolute weight drift (percentage points) to emit a suggestion",
+            "in": "query",
+            "name": "drift_threshold_pct",
+            "required": false,
+            "schema": {
+              "default": 5.0,
+              "description": "Minimum absolute weight drift (percentage points) to emit a suggestion",
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "title": "Drift Threshold Pct",
+              "type": "number"
+            }
+          },
+          {
+            "description": "VaR confidence forwarded to risk metrics (exclusive of 0.5 and 1.0)",
+            "in": "query",
+            "name": "confidence",
+            "required": false,
+            "schema": {
+              "default": 0.95,
+              "description": "VaR confidence forwarded to risk metrics (exclusive of 0.5 and 1.0)",
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.5,
+              "title": "Confidence",
+              "type": "number"
+            }
+          },
+          {
+            "description": "VaR horizon forwarded to risk metrics",
+            "in": "query",
+            "name": "horizon_days",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "VaR horizon forwarded to risk metrics",
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Horizon Days",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Lookback trading days forwarded to risk metrics",
+            "in": "query",
+            "name": "lookback_trading_days",
+            "required": false,
+            "schema": {
+              "default": 252,
+              "description": "Lookback trading days forwarded to risk metrics",
+              "maximum": 1000,
+              "minimum": 60,
+              "title": "Lookback Trading Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRebalancingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rebalancing recommendation computation failed"
+          }
+        },
+        "summary": "Get portfolio rebalancing and position-band recommendations",
         "tags": [
           "Portfolio"
         ]
