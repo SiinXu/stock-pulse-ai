@@ -118,6 +118,51 @@ describe('AlertRuleForm', () => {
     });
   });
 
+  it('preserves unknown notification policy fields while editing auto-analysis', async () => {
+    const rule: AlertRuleItem = {
+      id: 12,
+      name: 'Corporate event auto analysis',
+      targetScope: 'single_symbol',
+      target: 'AAPL',
+      alertType: 'corporate_event',
+      parameters: {
+        eventCategories: ['earnings', 'regulatory'],
+        lookbackHours: 72,
+        minItems: 3,
+      },
+      severity: 'warning',
+      enabled: true,
+      source: 'api',
+      notificationPolicy: {
+        auto_analysis: true,
+        pipeline: 'simple',
+        event_categories: ['earnings'],
+      },
+    };
+
+    render(<AlertRuleForm mode="edit" initialRule={rule} onSubmit={onSubmit} />);
+
+    const autoAnalysis = screen.getByLabelText('事件触发深度分析');
+    expect(autoAnalysis).toBeChecked();
+    fireEvent.click(autoAnalysis);
+    fireEvent.click(screen.getByRole('button', { name: '更新规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        parameters: {
+          eventCategories: ['earnings', 'regulatory'],
+          lookbackHours: 72,
+          minItems: 3,
+        },
+        notificationPolicy: {
+          auto_analysis: false,
+          pipeline: 'simple',
+          event_categories: ['earnings'],
+        },
+      }));
+    });
+  });
+
   it('submits a price_cross rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
