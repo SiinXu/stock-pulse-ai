@@ -1428,8 +1428,8 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.agent.AGENT_CRITIC_MAX_ITERS': {
     title: 'Critic Max Revision Rounds',
-    summary: 'Caps controlled whitelist revision rounds after the Critic finds material evidence gaps.',
-    usage: 'Use 1 for one conservative revision or 2 to allow one recheck and a second distinct target.',
+    summary: 'Caps Critic revision rounds after material evidence gaps.',
+    usage: 'Use 1 for one revision, or 2 for a recheck and second target.',
     valueNotes: [
       'Allowed range is 1–2; the default is 1.',
       'Changed evidence never proves convergence; only an explicit post-revision Critic pass does.',
