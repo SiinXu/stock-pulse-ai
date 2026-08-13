@@ -1,0 +1,1 @@
+- [Fixed] Do not mint verifiable prediction claims from the agent dashboard finalizer's presentation-only 0.5 confidence fallback after history save.
