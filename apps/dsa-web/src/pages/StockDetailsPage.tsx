@@ -24,7 +24,9 @@ import {
   Select,
 } from '../components/common';
 import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
+import { MoneyFlowPanel } from '../components/money-flow';
 import { VALUATION_TEXT } from '../locales/valuation';
+import { MONEY_FLOW_TEXT } from '../locales/moneyFlow';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   buildStockDetailsHistoryQueryKey,
@@ -371,6 +373,7 @@ const StockDetailsPage: React.FC = () => {
   ];
 
   const valuationText = VALUATION_TEXT[language] ?? VALUATION_TEXT.en;
+  const moneyFlowText = MONEY_FLOW_TEXT[language] ?? MONEY_FLOW_TEXT.en;
 
   return (
     <AppPage className="max-w-none">
@@ -587,6 +590,10 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <section aria-label={moneyFlowText.title} data-testid="stock-details-money-flow-section">
+          <MoneyFlowPanel key={`money-flow-${canonicalCode}`} stockCode={canonicalCode} />
+        </section>
 
         <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
           <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
