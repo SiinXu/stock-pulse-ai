@@ -1488,6 +1488,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'Bull-Bear debate',
     summary: 'Configure the optional debate stage, limits, and dedicated model.',
   },
+  'settings.agent.REFLECTION_POSTMORTEM': {
+    title: 'Reflection and Forecast Post-mortem',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',

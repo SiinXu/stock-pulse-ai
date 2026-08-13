@@ -105,6 +105,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DEBATE_MAX_ROUNDS` | `2` | 是 | 模板中注释; Debate rounds 1-3 |
 | `DEBATE_TEMPERATURE` | `0.4` | 是 | 模板中注释; Debate LLM temperature |
 | `DEBATE_MODEL` | empty | 是 | 模板中注释; Optional debate model name |
+| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内反思循环（类型化教训；默认 false） |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限 |
+| `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释; 反思后运行内修订次数上限 |
+| `AGENT_POSTMORTEM_ENABLED` | `false` | 是 | 模板中注释; 可选已解析预测后验复盘（默认 false） |
+| `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 是 | 模板中注释; 单批后验 LLM 调用上限 |
+| `AGENT_POSTMORTEM_SKIP_CLEAN_HITS` | `true` | 是 | 模板中注释; 干净命中跳过后验 LLM |
 | `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep-research tool token budget and timeout (seconds) for Agent analysis paths that enable deep research. |
 | `AGENT_DEEP_RESEARCH_TIMEOUT` | `180` | 是 | 模板中注释 |

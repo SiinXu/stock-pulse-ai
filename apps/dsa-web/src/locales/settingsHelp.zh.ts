@@ -1511,6 +1511,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     title: '多空辩论',
     summary: '配置可选辩论阶段、限制与专用模型。',
   },
+  'settings.agent.REFLECTION_POSTMORTEM': {
+    title: '反思与预测复盘',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',

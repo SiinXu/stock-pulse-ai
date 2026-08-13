@@ -334,6 +334,13 @@ class Config:
     debate_max_rounds: int = 2
     debate_temperature: float = 0.4
     debate_model: str = ""  # Optional dedicated model; empty uses agent primary route
+    # Run-local reflection + resolved-forecast post-mortem (Issues #1089 / #1103). Default off.
+    agent_reflection_enabled: bool = False
+    agent_reflection_llm_budget: int = 1  # Max LLM calls per reflection loop (critique)
+    agent_reflection_max_revise: int = 1  # Max in-run revise passes after critique
+    agent_postmortem_enabled: bool = False
+    agent_postmortem_llm_budget: int = 8  # Max LLM calls per resolution batch
+    agent_postmortem_skip_clean_hits: bool = True  # Skip LLM post-mortem on clean hits
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     agent_research_persona: str = ""  # Default-off research stance preset (#467)
     agent_research_persona_custom: str = ""  # Optional custom stance text (#467)

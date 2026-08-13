@@ -37,6 +37,19 @@
 
 agent 事件会出现在 `events[]` 中，并在 diagnostics 快照的 `agent_events` 字段中持久化。
 
+## 过程时间线与推理透明（#124 / #219）
+
+Web 运行流面板与报告页将既有 `/flow` 快照中的 agent 事件投影为**过程时间线**：
+
+- 阶段 / 工具 / 模型 / 决策行，含状态与耗时
+- 每步可折叠层仅展示**真实 trace 字段**（事件类型、phase、tool、step，以及 `reason` / `failure_reason` / plan id 等 attrs）
+- 不生成模型旁白；attrs 缺失时对应层为空
+- 客户端对敏感 key 做与服务端一致的脱敏
+
+报告页以可折叠「思考过程」区块加载历史 flow 快照；无 agent 事件时自动隐藏。问股 Chat 对 stage 进度行同样只展开 SSE 真实字段。
+
+**#1125 切换位：** `apps/dsa-web/src/components/run-flow/processTimelineModel.ts` 中 `TRACE_EVENT_SOURCE` 在统一 run-trace 落地前保持 `run_flow`；#1125 交付后切换常量并实现 `unified_trace` 分支，不另建事件源。
+
 ## Agent 回放 V1
 
 任务与历史记录的既有运行流面板按 `sequence` 展示 Agent 事件，并提供上一条/下一条游标。每条回放明细包含事件 schema 版本、trace/span 关联、状态以及后端已脱敏的 `attrs`；仅在显式开启深度 payload 且后端完成脱敏后展示 `payload`。
