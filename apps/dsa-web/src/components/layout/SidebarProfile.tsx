@@ -7,6 +7,7 @@ import { Popover } from '../common/Popover';
 import { Tooltip } from '../common/Tooltip';
 import { UiLanguageToggle } from '../i18n/UiLanguageToggle';
 import { ThemeToggle } from '../theme/ThemeToggle';
+import { ThemePackSelect } from '../theme/ThemePackSelect';
 
 interface SidebarProfileProps {
   collapsed?: boolean;
@@ -101,6 +102,11 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
         <div className="mx-2 border-t border-border" />
         <ThemeToggle
           menuLayout="select"
+          wrapperClassName="w-full"
+          triggerClassName={menuRowClass}
+          iconClassName="h-4 w-4 shrink-0"
+        />
+        <ThemePackSelect
           wrapperClassName="w-full"
           triggerClassName={menuRowClass}
           iconClassName="h-4 w-4 shrink-0"
