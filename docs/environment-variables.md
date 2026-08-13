@@ -479,6 +479,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `MINIMAX_API_KEYS` | `your_minimax_key_here` | 是 | 模板中注释; MiniMax API Key(Coding Plan Web Search, Supports multiple, Comma-separated) Get: https://platform.minimax.io/ |
 | `MULTIMODAL_AGENT_TOOLS_ENABLED` | `false` | 是 | Optional multimodal PDF/chart/transcript Agent Tools (issue #253) |
 | `MULTIMODAL_FILE_ROOT` | `/absolute/path/to/multimodal-uploads` | 是 | 模板中注释 |
+| `CHART_READ_TIMEOUT_SECONDS` | `30` | 是 | `read_price_chart` 视觉调用超时（钳制 1-120 秒） |
 | `NEWSNOW_BASE_URL` | `https://newsnow.busiyi.world` | 是 | 模板中注释; NewsNow HTTP API base address – external dependency configuration - Official project and deployment guide: https://gi... |
 | `NEWS_INTEL_AUTO_FETCH_ENABLED` | `false` | 是 | 模板中注释; When enabled, automatically initialize built-in news sources and pull them into use before reading local news pools i... |
 | `NEWS_INTEL_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; RSS/Atom feed source pull timeout (seconds) |

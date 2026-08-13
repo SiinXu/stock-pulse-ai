@@ -36,6 +36,7 @@ def test_multimodal_config_defaults_off(
 
     assert config.multimodal_agent_tools_enabled is False
     assert config.multimodal_file_root is None
+    assert config.chart_read_timeout_seconds == 30
 
 
 @patch("src.config.setup_env")
@@ -59,3 +60,31 @@ def test_multimodal_config_enabled_with_root(
 
     assert config.multimodal_agent_tools_enabled is True
     assert config.multimodal_file_root == "/tmp/multimodal-root"
+
+
+def test_chart_read_timeout_registered() -> None:
+    field = get_field_definition("CHART_READ_TIMEOUT_SECONDS")
+    assert field is not None
+    assert field.get("default_value") == "30"
+    assert field.get("help_key") == "settings.agent.CHART_READ_TIMEOUT_SECONDS"
+    assert field.get("validation", {}).get("max") == 120
+
+
+@patch("src.config.setup_env")
+@patch.object(Config, "_parse_litellm_yaml", return_value=[])
+@patch.object(Config, "_parse_stock_email_groups", return_value=[])
+def test_chart_read_timeout_loads(
+    _mock_groups,
+    _mock_litellm,
+    _mock_setup_env,
+) -> None:
+    with patch.dict(
+        os.environ,
+        {
+            "STOCK_LIST": "600519",
+            "CHART_READ_TIMEOUT_SECONDS": "45",
+        },
+        clear=True,
+    ):
+        config = Config._load_from_env()
+    assert config.chart_read_timeout_seconds == 45

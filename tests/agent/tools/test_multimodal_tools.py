@@ -41,10 +41,12 @@ def test_build_multimodal_tools_registers_when_enabled(tmp_path: Path) -> None:
     chart_path.write_bytes((FIXTURES / "sample_chart.png").read_bytes())
 
     mock_chart = {
+        "is_market_chart": True,
         "chart_type": "line",
         "symbol_hints": ["AAPL"],
         "timeframe_hint": "1D",
         "trend": "sideways",
+        "patterns": [{"name": "range", "confidence": "medium"}],
         "key_levels": [],
         "observations": ["flat range"],
         "confidence": "medium",
@@ -86,6 +88,9 @@ def test_build_multimodal_tools_registers_when_enabled(tmp_path: Path) -> None:
     assert "600519" in pdf_payload["text"]
 
     chart_payload = chart_tool.handler(file_path="chart.png")
-    assert chart_payload["schema_version"] == "chart-reading-v1"
+    assert chart_payload["schema_version"] == "chart-reading-v2"
     assert chart_payload["status"] == "available"
     assert chart_payload["symbol_hints"] == ["AAPL"]
+    assert chart_payload["trust"]["classification"] == "untrusted_user_document"
+    assert chart_payload["content"]["observation_not_fact"] is True
+    assert chart_payload["patterns"][0]["name"] == "range"

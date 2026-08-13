@@ -591,15 +591,26 @@ class BoundToolSession:
                 self._non_retriable_results[cache_key] = result
             public_result = result.get("result") if isinstance(result, dict) else None
             trust = public_result.get("trust") if isinstance(public_result, dict) else None
+            # Arm only when the tool actually returned model-visible untrusted
+            # content. Pure validation rejects / unavailable results still carry
+            # a trust envelope for honesty, but must not freeze the turn.
+            payload_status = (
+                str(public_result.get("status") or "").strip().lower()
+                if isinstance(public_result, dict)
+                else ""
+            )
             if (
                 result.get("ok") is True
                 and isinstance(trust, dict)
                 and trust.get("classification") == "untrusted_user_document"
                 and trust.get("instructions_authoritative") is False
+                and payload_status in {"available", "degraded"}
             ):
-                # Untrusted document tools (earnings transcript, OCR, …) raise a
-                # follow-on fence so attacker-controlled document text cannot
-                # chain-authorize other tools within the same execution turn.
+                # Untrusted document tools (earnings transcript, OCR, chart, …)
+                # raise a follow-on fence so attacker-controlled document/vision
+                # text cannot chain-authorize other tools in the same turn.
+                # Pure validation rejects still carry a trust envelope, but must
+                # not freeze the turn.
                 self._untrusted_document_follow_on_fence = True
                 self._untrusted_document_source_tool = tool_name
             self._audit_trail.append(result["audit"])
