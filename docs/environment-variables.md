@@ -267,6 +267,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `EVENT_RESEARCH_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
 | `EVENT_RESEARCH_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
 | `EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE` | `true` | 是 | 模板中注释 |
+| `EVENT_TRIGGER_COOLDOWN_MINUTES` | `180` | 是 | 模板中注释 |
+| `EVENT_TRIGGER_DEFAULT_PIPELINE` | `standard` | 是 | 模板中注释 |
+| `EVENT_TRIGGER_MAX_PER_DAY` | `20` | 是 | 模板中注释 |
+| `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | 是 | 模板中注释 |
+| `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 是 | 模板中注释; Event-triggered deep analysis (issues #129/#152) |
 | `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |
@@ -666,3 +671,13 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `YFINANCE_PRIORITY` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 
 <!-- config-env-inventory:end -->
+
+### Event-triggered analysis (issues #129 / #152)
+
+- `EVENT_TRIGGERED_ANALYSIS_ENABLED` (default `false`)
+- `EVENT_TRIGGER_COOLDOWN_MINUTES` (default `180`)
+- `EVENT_TRIGGER_DEFAULT_PIPELINE` (default `standard`)
+- `EVENT_TRIGGER_MAX_PER_HOUR` (default `5`)
+- `EVENT_TRIGGER_MAX_PER_DAY` (default `20`)
+
+See [alerts](alerts.md) / [alerts_EN](alerts_EN.md).

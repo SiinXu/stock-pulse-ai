@@ -127,6 +127,78 @@ def _event_context(value: Any) -> Optional[Dict[str, Any]]:
     return {key: item for key, item in output.items() if item not in (None, [])} or None
 
 
+def _deep_links(value: Any) -> Optional[Dict[str, str]]:
+    if not isinstance(value, Mapping):
+        return None
+    allowed = ("event_alerts", "signals_rules", "stock_detail", "analysis", "source")
+    output: Dict[str, str] = {}
+    for key in allowed:
+        text = _text(value.get(key), limit=MAX_SOURCE_URL if key == "source" else 256)
+        if not text:
+            continue
+        if key == "source":
+            url = _source_url(text)
+            if url:
+                output[key] = url
+            continue
+        if text.startswith("/") and "://" not in text and not text.startswith("//"):
+            output[key] = text
+    return output or None
+
+
+def _auto_analysis(value: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(value, Mapping):
+        return None
+    status = _text(value.get("status"), limit=64)
+    if not status:
+        return None
+    output: Dict[str, Any] = {
+        "status": status,
+        "submitted": bool(value.get("submitted")) if isinstance(value.get("submitted"), bool) else False,
+    }
+    stock_code = _text(value.get("stock_code"), limit=64)
+    if stock_code:
+        output["stock_code"] = stock_code
+    pipeline = _text(value.get("pipeline"), limit=32)
+    if pipeline:
+        output["pipeline"] = pipeline
+    reason = _text(value.get("reason"), limit=MAX_PUBLIC_TEXT)
+    if reason:
+        output["reason"] = reason
+    return output
+
+
+def _suggested_action(value: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(value, Mapping):
+        return None
+    action_code = _text(value.get("action_code"), limit=64)
+    if not action_code:
+        return None
+    output: Dict[str, Any] = {"action_code": action_code}
+    label = _text(value.get("label"), limit=128)
+    if label:
+        output["label"] = label
+    rationale = _text(value.get("rationale"))
+    if rationale:
+        output["rationale"] = rationale
+    deep_links = _deep_links(value.get("deep_links"))
+    if deep_links:
+        output["deep_links"] = deep_links
+    relevance = value.get("relevance")
+    if isinstance(relevance, list):
+        cleaned = []
+        for item in relevance[:5]:
+            text = _text(item, limit=32)
+            if text and text not in cleaned:
+                cleaned.append(text)
+        if cleaned:
+            output["relevance"] = cleaned
+    auto = _auto_analysis(value.get("auto_analysis"))
+    if auto:
+        output["auto_analysis"] = auto
+    return output
+
+
 def _impact_context(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping):
         return None
@@ -138,12 +210,19 @@ def _impact_context(value: Any) -> Optional[Dict[str, Any]]:
     related_analysis = _text(value.get("related_analysis"))
     if related_analysis:
         output["related_analysis"] = related_analysis
+    suggested = _suggested_action(value.get("suggested_action"))
+    if suggested:
+        output["suggested_action"] = suggested
     return output or None
 
 
 def extract_event_display_contexts(diagnostics: Any) -> Dict[str, Optional[Dict[str, Any]]]:
     payload = parse_diagnostics_object(diagnostics) or {}
+    top_suggested = _suggested_action(payload.get("suggested_action"))
+    top_auto = _auto_analysis(payload.get("auto_analysis"))
     return {
         "impact_context": _impact_context(payload.get("impact_context")),
         "event_context": _event_context(payload.get("event_context")),
+        "suggested_action": top_suggested,
+        "auto_analysis": top_auto,
     }
