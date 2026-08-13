@@ -113,9 +113,9 @@ EXPECTED_DASHBOARD_METHODS = (
 
 EXPECTED_AST_HASHES = {
     '_ChatMethods': '1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d',
-    '_DashboardMethods': 'c4782045d7fdc638a35a801c824121a27d15901fa6c95aaff3b1c970c03225d4',
+    '_DashboardMethods': '236a60be1b964b54d8fbc64c6ff5a1ec59ff7e79e1912d03cf1db680976d968f',
     '_ExecutionMethods': '03b1befb5752d439b5d2aeb35bcee5d50300c89eedb1ebd2aa7564c51f778e25',
-    '_PipelineMethods': '3037c62dbe8168a7439346dd6ae97e9cef797c9f66d693b16fd4d21957cefdc0',
+    '_PipelineMethods': 'a201021eaa085ce596adddb5da711a8ada70da8d74a71d7abb5cf53cbe15c4b2',
 }
 
 
