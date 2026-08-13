@@ -390,6 +390,8 @@ class Config:
     report_language: str = "zh"
     # Report presentation mode for Jinja renderer (#861 Phase 2): brief / standard / research
     report_mode: str = "standard"
+    # Research presentation emphasis only (#205); orthogonal to REPORT_MODE limits.
+    research_presentation_profile: str = "balanced"
     # Optional single-face TTF/OTF used by the bounded report PDF exporter.
     report_export_pdf_font_path: Optional[str] = None
 
@@ -699,6 +701,7 @@ _CONFIG_METHOD_GROUPS = (
             "_parse_agent_planning_on_step_failure",
             "_parse_report_type",
             "_parse_report_mode",
+            "_parse_research_presentation_profile",
             "_get_env_file_value",
             "_resolve_env_value",
             "resolve_with_source",

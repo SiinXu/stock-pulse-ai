@@ -12,6 +12,12 @@ from src.services.report_mode import (
     REPORT_MODE_STANDARD,
     VALID_REPORT_MODES,
 )
+from src.services.research_presentation_profile import (
+    PROFILE_AGGRESSIVE,
+    PROFILE_BALANCED,
+    PROFILE_CONSERVATIVE,
+    VALID_RESEARCH_PRESENTATION_PROFILES,
+)
 
 
 class TestReportModeRegistry(unittest.TestCase):
@@ -137,6 +143,40 @@ class TestDecisionMemoryRegistry(unittest.TestCase):
             self.assertEqual(field["help_key"], "settings.agent.decision_memory")
             self.assertEqual(field["category"], "agent")
 
+
+
+class TestResearchPresentationProfileRegistry(unittest.TestCase):
+    def test_research_presentation_profile_is_select_with_runtime_contract(self) -> None:
+        field = get_field_definition("RESEARCH_PRESENTATION_PROFILE")
+        self.assertEqual(field["category"], "notification")
+        self.assertEqual(field["data_type"], "string")
+        self.assertEqual(field["ui_control"], "select")
+        self.assertEqual(field["default_value"], PROFILE_BALANCED)
+        self.assertEqual(
+            field["help_key"], "settings.report.RESEARCH_PRESENTATION_PROFILE"
+        )
+        self.assertNotEqual(field["display_order"], 9000)
+
+        option_values = {
+            option["value"] if isinstance(option, dict) else option
+            for option in field["options"]
+        }
+        self.assertEqual(option_values, set(VALID_RESEARCH_PRESENTATION_PROFILES))
+        self.assertEqual(
+            set(field["validation"]["enum"]), set(VALID_RESEARCH_PRESENTATION_PROFILES)
+        )
+        self.assertIn(PROFILE_CONSERVATIVE, field["validation"]["enum"])
+        self.assertIn(PROFILE_AGGRESSIVE, field["validation"]["enum"])
+
+    def test_schema_response_includes_research_presentation_profile(self) -> None:
+        schema = build_schema_response()
+        notification = next(
+            category
+            for category in schema["categories"]
+            if category["category"] == "notification"
+        )
+        keys = {field["key"] for field in notification["fields"]}
+        self.assertIn("RESEARCH_PRESENTATION_PROFILE", keys)
 
 if __name__ == "__main__":
     unittest.main()
