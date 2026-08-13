@@ -47,9 +47,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 151617,
-      "measuredGzipBytes": 151017,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 600 B headroom."
+      "maxGzipBytes": 152320,
+      "measuredGzipBytes": 151720,
+      "note": "Local production-build remeasure after merging origin/main (PR #1268); measured 151720 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
