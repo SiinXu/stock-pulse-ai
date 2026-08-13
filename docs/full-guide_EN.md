@@ -1540,10 +1540,21 @@ Set the following variables in `.env` (all optional, have defaults):
 | `BACKTEST_MIN_AGE_DAYS` | `14` | Only backtest records older than N days to avoid incomplete data |
 | `BACKTEST_ENGINE_VERSION` | `v1` | Engine version, used to distinguish results when logic is updated |
 | `BACKTEST_NEUTRAL_BAND_PCT` | `2.0` | Neutral band threshold (%), ±2% treated as range-bound |
+| `BACKTEST_COMMISSION_BPS` | `0` | Explicit commission in basis points **per side** for long simulated returns |
+| `BACKTEST_SLIPPAGE_BPS` | `0` | Explicit slippage in basis points **per side**; round-trip cost % = `2 × (commission + slippage) / 100` |
 
 ### Auto-run
 
 Backtesting triggers automatically after the daily analysis flow completes (non-blocking; failures do not affect notifications). It can also be triggered manually via API.
+
+### Methodology notes (research honesty)
+
+- Metrics are **historical simulations only** — not return promises and not live fills.
+- Look-ahead protection: evaluation uses forward bars after the resolved start session.
+- Survivorship: the universe is symbols that already have analysis history in this installation.
+- Sample split: performance APIs accept `sample_split=full|in_sample|out_of_sample` with `split_date` for in/out-of-sample labeling.
+- Currency: percent returns are currency-agnostic; absolute prices are never summed across quote currencies without FX normalization.
+- YAML skill/strategy metrics: `GET /api/v1/backtest/skills/{skill_id}/performance` (and agent `get_skill_backtest_summary`) map skill-opinion outcomes onto the same public percentage fields as analysis-advice backtests.
 
 ### Evaluation Metrics
 
@@ -1551,10 +1562,11 @@ Backtesting triggers automatically after the daily analysis flow completes (non-
 |--------|-------------|
 | `direction_accuracy_pct` | Direction prediction accuracy (expected direction matches actual) |
 | `win_rate_pct` | Win rate (wins / (wins + losses), excludes neutral) |
-| `avg_stock_return_pct` | Average stock return percentage |
-| `avg_simulated_return_pct` | Average simulated execution return (including SL/TP exits) |
+| `avg_stock_return_pct` | Average stock return percentage (gross of costs) |
+| `avg_simulated_return_pct` | Average simulated execution return after explicit commission/slippage |
 | `stop_loss_trigger_rate` | Stop-loss trigger rate (only counts records with SL configured) |
 | `take_profit_trigger_rate` | Take-profit trigger rate (only counts records with TP configured) |
+| `methodology` | Structured limitations block (`is_return_promise=false`) |
 
 ---
 

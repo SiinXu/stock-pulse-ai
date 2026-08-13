@@ -457,6 +457,8 @@ class Config:
     backtest_min_age_days: int = 14
     backtest_engine_version: str = "v1"
     backtest_neutral_band_pct: float = 2.0
+    backtest_commission_bps: float = 0.0
+    backtest_slippage_bps: float = 0.0
 
     # Log Configuration
     log_dir: str = "./logs"  # Log file directory

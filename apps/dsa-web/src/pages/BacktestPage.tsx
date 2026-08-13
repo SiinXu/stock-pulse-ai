@@ -282,6 +282,13 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
           {text.engineVersion}: <span className="font-mono text-secondary-text">{metrics.engineVersion}</span>
         </div>
       ) : null}
+      <div
+        data-testid="backtest-methodology-disclaimer"
+        className="mt-3 border-t border-subtle pt-2 text-xs leading-relaxed text-muted-text"
+        role="note"
+      >
+        {metrics.methodology?.disclaimer || text.methodologyDisclaimer}
+      </div>
       {phaseText ? (
         <div className="mt-3 border-t border-subtle pt-2 text-xs text-muted-text">
           {formatUiText(text.phaseDistribution, { text: phaseText })}
