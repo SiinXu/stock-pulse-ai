@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-13",
-  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1148) (js-entry). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
+  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1243) (overflowing locale-ja, locale-de, locale-ko, locale-fr, locale-es, locale-zh-TW, locale-ms, locale-id, AlertsWorkspace). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -27,58 +27,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 161478,
-      "measuredGzipBytes": 160778,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 161507,
+      "measuredGzipBytes": 160807,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 154691,
-      "measuredGzipBytes": 153991,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 154705,
+      "measuredGzipBytes": 154005,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 154608,
-      "measuredGzipBytes": 153908,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 154676,
+      "measuredGzipBytes": 153976,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 154442,
-      "measuredGzipBytes": 153742,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 154419,
+      "measuredGzipBytes": 153819,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 150051,
-      "measuredGzipBytes": 149351,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 150094,
+      "measuredGzipBytes": 149394,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 147051,
-      "measuredGzipBytes": 146351,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 147114,
+      "measuredGzipBytes": 146414,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 140104,
-      "measuredGzipBytes": 139404,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 140112,
+      "measuredGzipBytes": 139412,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 140219,
-      "measuredGzipBytes": 139519,
-      "note": "Remeasured overflowing locale gzip from CI web-gate after critic i18n keys (#1279); overflowing rule only, +700 headroom retained."
+      "maxGzipBytes": 140253,
+      "measuredGzipBytes": 139553,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "vendor-charts",
@@ -148,8 +148,9 @@
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
-      "maxGzipBytes": 46602,
-      "measuredGzipBytes": 42365
+      "maxGzipBytes": 47199,
+      "measuredGzipBytes": 46799,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
