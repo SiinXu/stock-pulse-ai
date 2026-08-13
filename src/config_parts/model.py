@@ -142,6 +142,18 @@ class Config:
     security_audit_retention_days: int = 90
     security_audit_max_events: int = 10_000
 
+    # === Capability write registry + task-aware routing (Issues #221, #204) ===
+    capability_write_registry_path: str = ""
+    task_routing_enabled: bool = False
+    task_routing_policy: str = "quality"
+    task_routing_pin_report: str = ""
+    task_routing_pin_agent: str = ""
+    task_routing_pin_vision: str = ""
+    task_routing_pin_market_review: str = ""
+    task_routing_pin_cheap_scan: str = ""
+    task_routing_pin_deep_reasoning: str = ""
+    task_routing_pin_coding: str = ""
+
     # === Daily brief: personal morning + accuracy review (#149 / #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
@@ -378,6 +390,8 @@ class Config:
     report_language: str = "zh"
     # Report presentation mode for Jinja renderer (#861 Phase 2): brief / standard / research
     report_mode: str = "standard"
+    # Research presentation emphasis only (#205); orthogonal to REPORT_MODE limits.
+    research_presentation_profile: str = "balanced"
     # Optional single-face TTF/OTF used by the bounded report PDF exporter.
     report_export_pdf_font_path: Optional[str] = None
 
@@ -687,6 +701,7 @@ _CONFIG_METHOD_GROUPS = (
             "_parse_agent_planning_on_step_failure",
             "_parse_report_type",
             "_parse_report_mode",
+            "_parse_research_presentation_profile",
             "_get_env_file_value",
             "_resolve_env_value",
             "resolve_with_source",

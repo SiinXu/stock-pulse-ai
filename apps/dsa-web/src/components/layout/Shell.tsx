@@ -135,10 +135,10 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   }, [setMobileNavigationOpen]);
 
   return (
-    <div className="h-dvh overflow-hidden bg-background text-foreground">
+    <div className="h-dvh overflow-hidden bg-background text-foreground supports-[padding:max(0px)]:pb-[env(safe-area-inset-bottom)]">
       <div
         data-shell-mobile-header="true"
-        className="pointer-events-none fixed inset-x-0 top-3 z-40 flex min-w-0 items-center gap-3 px-3 lg:hidden"
+        className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-w-0 items-center gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden"
       >
         <span className="pointer-events-auto">
           <IconButton
@@ -173,13 +173,13 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         />
       </div>
 
-      <div className="mx-auto flex h-dvh w-full overflow-hidden">
+      <div className="mx-auto flex h-full w-full overflow-hidden">
         <aside
           data-shell-sidebar="true"
           data-shell-sidebar-mode={sidebarCollapsed ? 'compact' : 'expanded'}
           tabIndex={-1}
           className={cn(
-            'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible bg-background px-2 py-4 transition-[width] duration-300 ease-out motion-reduce:transition-none lg:flex lg:flex-col',
+            'sticky top-0 z-40 hidden h-full shrink-0 self-start overflow-visible bg-background px-2 py-4 transition-[width] duration-300 ease-out motion-reduce:transition-none lg:flex lg:flex-col',
             sidebarCollapsed ? 'w-20' : 'w-60'
           )}
           aria-label={t('layout.desktopSidebar')}
@@ -200,7 +200,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
 
         <main
           data-shell-main="true"
-          className="relative mt-14 mb-3 mx-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-soft-card lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4"
+          className="relative mt-[calc(2.75rem+max(0.75rem,env(safe-area-inset-top)))] mb-3 mx-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-soft-card lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4"
         >
           {children ?? <Outlet />}
         </main>

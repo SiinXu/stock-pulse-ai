@@ -4329,6 +4329,46 @@
         "title": "AuthSettingsRequest",
         "type": "object"
       },
+      "AuthStatusResponse": {
+        "additionalProperties": false,
+        "description": "Wire-stable auth status payload (camelCase aliases, Issue #549).",
+        "properties": {
+          "authEnabled": {
+            "title": "Authenabled",
+            "type": "boolean"
+          },
+          "loggedIn": {
+            "title": "Loggedin",
+            "type": "boolean"
+          },
+          "passwordChangeable": {
+            "title": "Passwordchangeable",
+            "type": "boolean"
+          },
+          "passwordSet": {
+            "title": "Passwordset",
+            "type": "boolean"
+          },
+          "setupState": {
+            "enum": [
+              "enabled",
+              "password_retained",
+              "no_password"
+            ],
+            "title": "Setupstate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authEnabled",
+          "loggedIn",
+          "passwordSet",
+          "passwordChangeable",
+          "setupState"
+        ],
+        "title": "AuthStatusResponse",
+        "type": "object"
+      },
       "BacktestAppliedConfig": {
         "description": "Echo of the effective run configuration used for evaluation honesty.",
         "properties": {
@@ -10163,6 +10203,35 @@
           "sentiment_label"
         ],
         "title": "DemoAnalysisSummary",
+        "type": "object"
+      },
+      "DependencyIssueResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "dependency": {
+            "title": "Dependency",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependency",
+          "capability_id",
+          "reason_code"
+        ],
+        "title": "DependencyIssueResponse",
         "type": "object"
       },
       "DiscoverLLMChannelModelsRequest": {
@@ -17576,6 +17645,14 @@
             "title": "Name",
             "type": "string"
           },
+          "notification_channels": {
+            "description": "Canonical notification channel IDs from active notification_channel registrations; empty when the adapter is not loaded or not active",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notification Channels",
+            "type": "array"
+          },
           "package_root": {
             "anyOf": [
               {
@@ -21220,6 +21297,107 @@
         "title": "PortfolioPositionAnalysisRequest",
         "type": "object"
       },
+      "PortfolioPositionBand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "add",
+              "reduce",
+              "hold",
+              "exit"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "auto_execute": {
+            "default": false,
+            "title": "Auto Execute",
+            "type": "boolean"
+          },
+          "current_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Current Weight Pct",
+            "type": "number"
+          },
+          "effective_cap_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Effective Cap Pct",
+            "type": "number"
+          },
+          "is_suggestion_only": {
+            "default": true,
+            "title": "Is Suggestion Only",
+            "type": "boolean"
+          },
+          "mode": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Mode",
+            "type": "string"
+          },
+          "rationale": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "signal": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Signal",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "target_weight_pct_high": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Target Weight Pct High",
+            "type": "number"
+          },
+          "target_weight_pct_low": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Target Weight Pct Low",
+            "type": "number"
+          },
+          "target_weight_pct_mid": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Target Weight Pct Mid",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "action",
+          "current_weight_pct",
+          "target_weight_pct_low",
+          "target_weight_pct_mid",
+          "target_weight_pct_high",
+          "effective_cap_pct",
+          "signal",
+          "mode",
+          "rationale"
+        ],
+        "title": "PortfolioPositionBand",
+        "type": "object"
+      },
       "PortfolioPositionItem": {
         "properties": {
           "avg_cost": {
@@ -21336,6 +21514,531 @@
           "valuation_currency"
         ],
         "title": "PortfolioPositionItem",
+        "type": "object"
+      },
+      "PortfolioRebalanceAssumptions": {
+        "additionalProperties": false,
+        "properties": {
+          "cross_currency": {
+            "title": "Cross Currency",
+            "type": "string"
+          },
+          "drift_threshold_pct": {
+            "title": "Drift Threshold Pct",
+            "type": "number"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "portfolio_aware_sizing_enabled": {
+            "title": "Portfolio Aware Sizing Enabled",
+            "type": "boolean"
+          },
+          "provider_calls_on_hot_path": {
+            "title": "Provider Calls On Hot Path",
+            "type": "boolean"
+          },
+          "recommendation_honesty": {
+            "title": "Recommendation Honesty",
+            "type": "string"
+          },
+          "risk_metrics_source": {
+            "title": "Risk Metrics Source",
+            "type": "string"
+          },
+          "tax_and_transaction_costs": {
+            "title": "Tax And Transaction Costs",
+            "type": "string"
+          },
+          "uses_risk_metrics": {
+            "title": "Uses Risk Metrics",
+            "type": "boolean"
+          },
+          "weight_basis": {
+            "title": "Weight Basis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "uses_risk_metrics",
+          "risk_metrics_source",
+          "provider_calls_on_hot_path",
+          "tax_and_transaction_costs",
+          "recommendation_honesty",
+          "weight_basis",
+          "cross_currency",
+          "portfolio_aware_sizing_enabled",
+          "drift_threshold_pct"
+        ],
+        "title": "PortfolioRebalanceAssumptions",
+        "type": "object"
+      },
+      "PortfolioRebalanceBreach": {
+        "additionalProperties": false,
+        "properties": {
+          "current_pct": {
+            "title": "Current Pct",
+            "type": "number"
+          },
+          "drift_pct": {
+            "title": "Drift Pct",
+            "type": "number"
+          },
+          "kind": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit_pct": {
+            "title": "Limit Pct",
+            "type": "number"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "kind",
+          "current_pct",
+          "limit_pct",
+          "drift_pct"
+        ],
+        "title": "PortfolioRebalanceBreach",
+        "type": "object"
+      },
+      "PortfolioRebalanceCurrent": {
+        "additionalProperties": false,
+        "properties": {
+          "diversification_score": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Score"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective N"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "portfolio_value": {
+            "default": 0.0,
+            "title": "Portfolio Value",
+            "type": "number"
+          },
+          "risk_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Status"
+          },
+          "var_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Pct"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRebalanceWeightItem"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "title": "PortfolioRebalanceCurrent",
+        "type": "object"
+      },
+      "PortfolioRebalanceDrift": {
+        "additionalProperties": false,
+        "properties": {
+          "breaches": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRebalanceBreach"
+            },
+            "title": "Breaches",
+            "type": "array"
+          },
+          "max_abs_weight_drift_pct": {
+            "default": 0.0,
+            "title": "Max Abs Weight Drift Pct",
+            "type": "number"
+          }
+        },
+        "title": "PortfolioRebalanceDrift",
+        "type": "object"
+      },
+      "PortfolioRebalanceRiskSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "concentration_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration Status"
+          },
+          "correlation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Status"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "var_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Status"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioRebalanceRiskSummary",
+        "type": "object"
+      },
+      "PortfolioRebalanceSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "trim",
+              "add",
+              "hold"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "approx_notional": {
+            "title": "Approx Notional",
+            "type": "number"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "auto_execute": {
+            "default": false,
+            "title": "Auto Execute",
+            "type": "boolean"
+          },
+          "delta_weight_pct": {
+            "title": "Delta Weight Pct",
+            "type": "number"
+          },
+          "from_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "From Weight Pct",
+            "type": "number"
+          },
+          "is_suggestion_only": {
+            "default": true,
+            "title": "Is Suggestion Only",
+            "type": "boolean"
+          },
+          "rationale": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "to_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "To Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "action",
+          "symbol",
+          "from_weight_pct",
+          "to_weight_pct",
+          "delta_weight_pct",
+          "approx_notional",
+          "rationale"
+        ],
+        "title": "PortfolioRebalanceSuggestion",
+        "type": "object"
+      },
+      "PortfolioRebalanceTargetModel": {
+        "additionalProperties": false,
+        "properties": {
+          "band_max_single_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Band Max Single Weight Pct",
+            "type": "number"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "max_hhi": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Max Hhi",
+            "type": "number"
+          },
+          "max_single_weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Max Single Weight Pct",
+            "type": "number"
+          },
+          "min_effective_n": {
+            "title": "Min Effective N",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Notes",
+            "type": "array"
+          },
+          "soft_max_single_name_weight": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Soft Max Single Name Weight",
+            "type": "number"
+          },
+          "target_var_pct_ceiling": {
+            "title": "Target Var Pct Ceiling",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "max_single_weight_pct",
+          "band_max_single_weight_pct",
+          "soft_max_single_name_weight",
+          "min_effective_n",
+          "max_hhi",
+          "target_var_pct_ceiling"
+        ],
+        "title": "PortfolioRebalanceTargetModel",
+        "type": "object"
+      },
+      "PortfolioRebalanceWeightItem": {
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "PortfolioRebalanceWeightItem",
+        "type": "object"
+      },
+      "PortfolioRebalancingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/PortfolioRebalanceAssumptions"
+          },
+          "auto_execute": {
+            "default": false,
+            "title": "Auto Execute",
+            "type": "boolean"
+          },
+          "cost_method": {
+            "title": "Cost Method",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "current": {
+            "$ref": "#/components/schemas/PortfolioRebalanceCurrent"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "drift": {
+            "$ref": "#/components/schemas/PortfolioRebalanceDrift"
+          },
+          "is_suggestion_only": {
+            "default": true,
+            "title": "Is Suggestion Only",
+            "type": "boolean"
+          },
+          "position_bands": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioPositionBand"
+            },
+            "title": "Position Bands",
+            "type": "array"
+          },
+          "risk_metrics_summary": {
+            "$ref": "#/components/schemas/PortfolioRebalanceRiskSummary"
+          },
+          "risk_tolerance": {
+            "enum": [
+              "conservative",
+              "moderate",
+              "aggressive"
+            ],
+            "title": "Risk Tolerance",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty_portfolio",
+              "insufficient_data",
+              "refused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioRebalanceSuggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "target_model": {
+            "$ref": "#/components/schemas/PortfolioRebalanceTargetModel"
+          }
+        },
+        "required": [
+          "as_of",
+          "cost_method",
+          "currency",
+          "status",
+          "disclaimer",
+          "risk_tolerance",
+          "target_model",
+          "current",
+          "drift",
+          "assumptions",
+          "risk_metrics_summary"
+        ],
+        "title": "PortfolioRebalancingResponse",
         "type": "object"
       },
       "PortfolioRiskAssumptions": {
@@ -25878,6 +26581,118 @@
         "title": "ResearchStanceContent",
         "type": "object"
       },
+      "ResolutionResultResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "checked_against_generation": {
+            "minimum": 0.0,
+            "title": "Checked Against Generation",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyIssueResponse"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "satisfied": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Satisfied",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability_id",
+          "ready",
+          "reason_code",
+          "checked_against_generation"
+        ],
+        "title": "ResolutionResultResponse",
+        "type": "object"
+      },
+      "ResolveCapabilitiesRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability Ids"
+          },
+          "include_inventory": {
+            "default": true,
+            "title": "Include Inventory",
+            "type": "boolean"
+          }
+        },
+        "title": "ResolveCapabilitiesRequest",
+        "type": "object"
+      },
+      "ResolveCapabilitiesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked_count": {
+            "minimum": 0.0,
+            "title": "Blocked Count",
+            "type": "integer"
+          },
+          "ready_count": {
+            "minimum": 0.0,
+            "title": "Ready Count",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ResolutionResultResponse"
+            },
+            "maxItems": 1024,
+            "title": "Results",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "capability-resolution/v1",
+            "default": "capability-resolution/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "write_generation": {
+            "minimum": 0.0,
+            "title": "Write Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "write_generation",
+          "ready_count",
+          "blocked_count"
+        ],
+        "title": "ResolveCapabilitiesResponse",
+        "type": "object"
+      },
       "RollbackSystemConfigRequest": {
         "description": "Request one-step restoration of the last-known-good runtime config.",
         "properties": {
@@ -25890,6 +26705,44 @@
           "config_version"
         ],
         "title": "RollbackSystemConfigRequest",
+        "type": "object"
+      },
+      "RouteCandidateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "model_route": {
+            "title": "Model Route",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability_id",
+          "model_route",
+          "score"
+        ],
+        "title": "RouteCandidateResponse",
         "type": "object"
       },
       "RunDiagnosticComponent": {
@@ -31823,6 +32676,135 @@
         "title": "TaskListResponse",
         "type": "object"
       },
+      "TaskRouteDecisionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "default": "",
+            "title": "As Of",
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/RouteCandidateResponse"
+            },
+            "maxItems": 8,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "explain": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Explain",
+            "type": "array"
+          },
+          "fallback_used": {
+            "default": false,
+            "title": "Fallback Used",
+            "type": "boolean"
+          },
+          "pin_source": {
+            "default": "",
+            "title": "Pin Source",
+            "type": "string"
+          },
+          "policy": {
+            "enum": [
+              "quality",
+              "cost",
+              "local_first"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "routing_enabled": {
+            "default": false,
+            "title": "Routing Enabled",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "task-route-decision/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "selected_capability_id": {
+            "default": "",
+            "title": "Selected Capability Id",
+            "type": "string"
+          },
+          "selected_model": {
+            "default": "",
+            "title": "Selected Model",
+            "type": "string"
+          },
+          "task_class": {
+            "enum": [
+              "report",
+              "agent",
+              "vision",
+              "market_review",
+              "cheap_scan",
+              "deep_reasoning",
+              "coding"
+            ],
+            "title": "Task Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "task_class",
+          "policy",
+          "reason_code"
+        ],
+        "title": "TaskRouteDecisionResponse",
+        "type": "object"
+      },
+      "TaskRouteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quality",
+                  "cost",
+                  "local_first"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "task_class": {
+            "enum": [
+              "report",
+              "agent",
+              "vision",
+              "market_review",
+              "cheap_scan",
+              "deep_reasoning",
+              "coding"
+            ],
+            "title": "Task Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_class"
+        ],
+        "title": "TaskRouteRequest",
+        "type": "object"
+      },
       "TaskStatus": {
         "description": "Task status model",
         "example": {
@@ -35021,6 +36003,453 @@
         ],
         "title": "WatchlistScoreSourceRows",
         "type": "object"
+      },
+      "WriteCapabilityEntryRequest": {
+        "additionalProperties": false,
+        "description": "Payload for register and update of write-side capability declarations.",
+        "properties": {
+          "capability_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "capability_type": {
+            "enum": [
+              "data_provider",
+              "data_method",
+              "agent_tool",
+              "analysis_skill",
+              "pipeline_stage",
+              "llm_model",
+              "persona_role"
+            ],
+            "title": "Capability Type",
+            "type": "string"
+          },
+          "cost_tier": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Cost Tier",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "data",
+              "tool",
+              "skill",
+              "pipeline",
+              "llm",
+              "persona"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "latency_class": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Latency Class",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Markets",
+            "type": "array"
+          },
+          "model_route": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Model Route",
+            "type": "string"
+          },
+          "provider": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Provider",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Tags",
+            "type": "array"
+          },
+          "version": {
+            "default": "1",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "domain",
+          "capability_type"
+        ],
+        "title": "WriteCapabilityEntryRequest",
+        "type": "object"
+      },
+      "WriteCapabilityEntryResponse": {
+        "additionalProperties": false,
+        "description": "One declared capability from the write-side registry.",
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "capability_type": {
+            "enum": [
+              "data_provider",
+              "data_method",
+              "agent_tool",
+              "analysis_skill",
+              "pipeline_stage",
+              "llm_model",
+              "persona_role"
+            ],
+            "title": "Capability Type",
+            "type": "string"
+          },
+          "cost_tier": {
+            "default": "",
+            "title": "Cost Tier",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "data",
+              "tool",
+              "skill",
+              "pipeline",
+              "llm",
+              "persona"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "generation": {
+            "minimum": 1.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "latency_class": {
+            "default": "",
+            "title": "Latency Class",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "model_route": {
+            "default": "",
+            "title": "Model Route",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "registered_at": {
+            "default": "",
+            "title": "Registered At",
+            "type": "string"
+          },
+          "retired_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retired At"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "retired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "domain",
+          "capability_type",
+          "version",
+          "status",
+          "provider",
+          "generation"
+        ],
+        "title": "WriteCapabilityEntryResponse",
+        "type": "object"
+      },
+      "WriteCapabilityListResponse": {
+        "additionalProperties": false,
+        "description": "Versioned write-side registry listing.",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "generation": {
+            "minimum": 0.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+            },
+            "maxItems": 1024,
+            "title": "Items",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "capability-write-registry/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "generation",
+          "as_of",
+          "total"
+        ],
+        "title": "WriteCapabilityListResponse",
+        "type": "object"
+      },
+      "WriteCapabilityUpdateRequest": {
+        "additionalProperties": false,
+        "description": "Partial update payload; identity fields are rejected by the service.",
+        "properties": {
+          "cost_tier": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Tier"
+          },
+          "dependencies": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependencies"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "latency_class": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Class"
+          },
+          "markets": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markets"
+          },
+          "model_route": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Route"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "title": "WriteCapabilityUpdateRequest",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -37686,7 +39115,7 @@
     },
     "/api/v1/auth/settings": {
       "post": {
-        "description": "Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie.",
+        "description": "Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie. Successful responses use AuthStatusResponse (same camelCase wire shape as GET /status). Error paths still return JSONResponse error envelopes.",
         "operationId": "auth_update_settings_api_v1_auth_settings_post",
         "requestBody": {
           "content": {
@@ -37702,7 +39131,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -37732,7 +39163,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -38512,7 +39945,7 @@
     },
     "/api/v1/capabilities": {
       "get": {
-        "description": "Capture a versioned read-only inventory from the live data-provider, tool, plugin, skill, and pipeline owners. Availability comes only from runtime registration and owner health state, never from a static catalog. Unknown readiness remains null. Source or config read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or perform side-effecting health checks.",
+        "description": "Capture a versioned read-only inventory from live owners. Availability comes only from runtime registration and owner health state.",
         "operationId": "listCapabilities",
         "parameters": [
           {
@@ -38556,7 +39989,7 @@
                 }
               }
             },
-            "description": "Invalid domain filter"
+            "description": "Invalid request"
           },
           "401": {
             "content": {
@@ -38568,6 +40001,26 @@
             },
             "description": "Login required when ADMIN_AUTH_ENABLED=true"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -38577,6 +40030,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
           }
         },
         "security": [
@@ -38585,6 +40048,610 @@
           }
         ],
         "summary": "List the runtime capability inventory (read-only)",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry": {
+      "get": {
+        "operationId": "listCapabilityRegistry",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_retired",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Retired",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List write-side capability declarations",
+        "tags": [
+          "Capabilities"
+        ]
+      },
+      "post": {
+        "operationId": "registerCapability",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteCapabilityEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Register a write-side capability declaration",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry/{capability_id}": {
+      "put": {
+        "operationId": "updateCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability_id",
+            "required": true,
+            "schema": {
+              "title": "Capability Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteCapabilityUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Update a write-side capability declaration",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry/{capability_id}/retire": {
+      "post": {
+        "operationId": "retireCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability_id",
+            "required": true,
+            "schema": {
+              "title": "Capability Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Retire a write-side capability declaration",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/resolve": {
+      "post": {
+        "operationId": "resolveCapabilities",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCapabilitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveCapabilitiesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Resolve capability dependencies and version compatibility",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/route": {
+      "post": {
+        "operationId": "routeTaskModel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRouteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRouteDecisionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit or registry storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Compute a task-aware model routing decision",
         "tags": [
           "Capabilities"
         ]
@@ -46539,6 +48606,184 @@
           }
         },
         "summary": "Submit manual analysis for a held portfolio position",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
+    "/api/v1/portfolio/rebalancing-recommendations": {
+      "get": {
+        "description": "Deterministic risk-band rebalancing suggestions and risk-adjusted position weight bands from the current portfolio snapshot and portfolio risk metrics. Suggestions are for human review only and are never auto-executed. Insufficient history yields an explicit refusal (no invented trades). Never calls market data providers on the hot path.",
+        "operationId": "getPortfolioRebalancingRecommendations",
+        "parameters": [
+          {
+            "description": "Optional account id",
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional account id",
+              "title": "Account Id"
+            }
+          },
+          {
+            "description": "As-of date; default today",
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "As-of date; default today",
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cost_method",
+            "required": false,
+            "schema": {
+              "default": "fifo",
+              "enum": [
+                "fifo",
+                "avg"
+              ],
+              "title": "Cost Method",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Risk preference band used for caps and target position ranges",
+            "in": "query",
+            "name": "risk_tolerance",
+            "required": false,
+            "schema": {
+              "default": "moderate",
+              "description": "Risk preference band used for caps and target position ranges",
+              "enum": [
+                "conservative",
+                "moderate",
+                "aggressive"
+              ],
+              "title": "Risk Tolerance",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Minimum absolute weight drift (percentage points) to emit a suggestion",
+            "in": "query",
+            "name": "drift_threshold_pct",
+            "required": false,
+            "schema": {
+              "default": 5.0,
+              "description": "Minimum absolute weight drift (percentage points) to emit a suggestion",
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "title": "Drift Threshold Pct",
+              "type": "number"
+            }
+          },
+          {
+            "description": "VaR confidence forwarded to risk metrics (exclusive of 0.5 and 1.0)",
+            "in": "query",
+            "name": "confidence",
+            "required": false,
+            "schema": {
+              "default": 0.95,
+              "description": "VaR confidence forwarded to risk metrics (exclusive of 0.5 and 1.0)",
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.5,
+              "title": "Confidence",
+              "type": "number"
+            }
+          },
+          {
+            "description": "VaR horizon forwarded to risk metrics",
+            "in": "query",
+            "name": "horizon_days",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "VaR horizon forwarded to risk metrics",
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Horizon Days",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Lookback trading days forwarded to risk metrics",
+            "in": "query",
+            "name": "lookback_trading_days",
+            "required": false,
+            "schema": {
+              "default": 252,
+              "description": "Lookback trading days forwarded to risk metrics",
+              "maximum": 1000,
+              "minimum": 60,
+              "title": "Lookback Trading Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRebalancingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid query parameters"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rebalancing recommendation computation failed"
+          }
+        },
+        "summary": "Get portfolio rebalancing and position-band recommendations",
         "tags": [
           "Portfolio"
         ]

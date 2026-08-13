@@ -98,7 +98,7 @@ path-filter, container-smoke, and reference-update coverage.
 | --- | --- | --- |
 | `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection. New/touched code should prefer constructor injection or `get_application_services().config` over bare `get_config()`; growth is ratcheted by [config-access ratchet](config-access-ratchet.md) / [ADR-011](adr/ADR-011-config-access-ratchet.md). | Full dependency injection for every caller; adoption is currently incremental. |
 | `src/services/` | Application use cases, task queue adapter, scheduling, analysis, history, portfolio, alerts, intelligence, and rendering services | HTTP transport schemas or provider-specific normalization. |
-| `src/core/pipeline.py` and `src/core/stages/` | Analysis orchestration, typed stage outcomes, analysis stages, rendering, and dispatch sequencing | Transport lifecycle or persistent query APIs. |
+| `src/core/pipeline.py`, `src/core/stages/`, and `src/core/contracts/` | Analysis orchestration facade, stage implementations, typed stage outcomes, and formal stage IO contracts (`RunContext`, fetch/analyze/render IO, stage errors). `pipeline.py` is orchestration-only; business rules stay in stages/services. | Transport lifecycle or persistent query APIs. |
 | `data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control | Product task lifecycle or report presentation. |
 | `src/search_service.py` and intelligence/context services | News and intelligence retrieval, context assembly, and source diagnostics | Market-price provider ownership or HTTP presentation. |
 | `src/agent/` and `src/llm/` | Native Agent execution, tools, skills, conversation/runtime contracts, and model invocation adapters | Provider configuration source of truth, task lifecycle, or public report persistence. |
@@ -115,6 +115,17 @@ Request aliases, defaults, coercion, and extra-field behavior are compatibility
 decisions that must be tested. Response and service core fields validate
 strictly and fail closed; `extra="allow"` is reserved for documented
 forward-compatible extension fields and does not relax declared fields.
+
+Do not introduce Pydantic v1 APIs in new code (`@validator`, `@root_validator`,
+nested `class Config`, `.parse_obj`, `.dict()`, `.from_orm`). Prefer
+`field_validator` / `model_validator`, `ConfigDict`, and `model_dump` /
+`model_validate`. Dual `model_dump` then `.dict()` shims may remain only where
+foreign SDK objects are still untyped; they are not a model-definition style.
+
+Service-boundary examples: `src/schemas/request_context.py`
+(`AnalysisRequestContext`, `NotificationReplyTarget`) uses frozen Pydantic v2
+models with explicit `model_config`. LLM report boundaries stay on Pydantic
+(`src/schemas/report_schema.py`).
 
 Internal domain contracts can remain Pydantic models, dataclasses, or
 `TypedDict`s according to their boundary needs. This convention does not change

@@ -136,6 +136,9 @@ def test_renderer_outputs_only_public_schema_fields() -> None:
     assert overview is not None
     assert set(overview) == {
         "pack_version",
+        "snapshot_id",
+        "snapshot_revision",
+        "as_of",
         "created_at",
         "subject",
         "blocks",
@@ -145,7 +148,12 @@ def test_renderer_outputs_only_public_schema_fields() -> None:
         "metadata",
     }
     assert set(overview["subject"]) == {"code", "stock_name", "market"}
-    assert set(overview["metadata"]) == {"trigger_source", "news_result_count"}
+    assert set(overview["metadata"]) == {
+        "trigger_source",
+        "news_result_count",
+        "content_digest",
+        "snapshot_sealed",
+    }
     assert set(overview["blocks"][0]) == {
         "key",
         "label",

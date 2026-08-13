@@ -47,8 +47,11 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 ### Manifest `permissions`（声明 ≠ 沙箱）
 
-- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read`）。
+- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read` 或 `alt_data:read`）。
 - 加载/启用时若工具要求未声明能力，将以稳定错误码 `manifest_permissions_undeclared` 拒绝该插件（失败隔离，不影响核心与其它插件）。
+- 另类 / 支持性数据工具使用能力 `alt_data:read`，契约见
+  [另类数据插件契约](alternative-data-plugin-contract_zh.md)
+  （默认关闭、非权威、失败为缺口而非编造）。
 - 允许声明多余权限；空列表表示工具不得要求任何能力。
 - **声明 ≠ 沙箱隔离**：插件代码仍以进程同等权限运行。
 
@@ -160,6 +163,11 @@ Settings → System & Security → Extensions 提供生成式表单与持久化�
 并在系统支持时将文件限制为当前 OS 用户可读写。该文件是本机明文文件，**不是加密
 密钥库**，因此必须保护数据目录。API 与 Web 表单会掩码敏感值；保持掩码不变即可
 保留已存值。
+
+当插件注册了活跃的 `notification_channel` 时，Extensions 名册会暴露规范渠道 ID，
+并可深链到 Settings → Notifications。Notifications 枢纽会列出这些插件渠道、显示
+提供方插件，并提供回到 Extensions 行的反向链接。已停用、失败或未加载的适配器保持
+空态，**不会**显示为已连接。
 
 为已启用插件保存设置会报告 `restart_required`。必须重新启用插件或重启应用后，
 才能认为运行实例已使用新值。省略的键会恢复声明默认值；未知键、错误类型、越界值、

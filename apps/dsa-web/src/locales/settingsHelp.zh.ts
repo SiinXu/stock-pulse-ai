@@ -957,6 +957,58 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['限制审计存储增长；高特权操作量时可能删除较旧事件。'],
     notes: ['详见 docs/security-audit_zh.md。若必须保留更旧事件，请提高容量或先导出。'],
   },
+  'settings.system.CAPABILITY_WRITE_REGISTRY_PATH': {
+    title: '能力写入注册表路径',
+    summary: '操作员声明式能力登记的持久化路径。',
+    usage: '留空则使用 <DATABASE_PATH 目录>/capability_write_registry.json。',
+    valueNotes: ['仅保存写入侧元数据；运行时清单仍由各 owner 实时探测。'],
+    impact: ['影响能力写入登记、依赖解析与任务感知路由标签。'],
+    notes: ['详见 docs/capability-inventory.md。'],
+  },
+  'settings.system.TASK_ROUTING_ENABLED': {
+    title: '任务感知模型路由',
+    summary: '按任务类型与已登记 LLM 能力标签自动选择模型（默认关闭）。',
+    usage: '保持 false 以沿用现有模型分配。手动钉选始终优先。',
+    valueNotes: ['决策可通过 POST /api/v1/capabilities/route 解释与追溯。'],
+    impact: ['开启且未钉选时，不同任务类可能按策略选择不同模型。'],
+    notes: ['可选 ensemble 不在本开关范围内。'],
+  },
+  'settings.system.TASK_ROUTING_POLICY': {
+    title: '任务路由策略',
+    summary: '自动任务感知模型选择的打分策略。',
+    usage: '可选 quality / cost / local_first。',
+    valueNotes: ['quality 偏好推理质量；cost 偏好低成本；local_first 偏好本地路由。'],
+    impact: ['多个候选匹配时决定胜出模型。'],
+    notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_REPORT': {
+    title: '任务路由钉选（报告）', summary: '报告生成任务的可选显式模型钉选。',
+    usage: '设置后强制 report 任务使用该模型。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_AGENT': {
+    title: '任务路由钉选（Agent）', summary: 'Agent 任务的可选显式模型钉选。',
+    usage: '设置后强制 agent 任务使用该模型。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_VISION': {
+    title: '任务路由钉选（视觉）', summary: '视觉任务的可选显式模型钉选。',
+    usage: '设置后强制 vision 任务使用该模型。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_MARKET_REVIEW': {
+    title: '任务路由钉选（大盘复盘）', summary: '大盘复盘任务的可选显式模型钉选。',
+    usage: '设置后强制 market_review 选择。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CHEAP_SCAN': {
+    title: '任务路由钉选（廉价扫描）', summary: '廉价扫描任务的可选显式模型钉选。',
+    usage: '设置后强制 cheap_scan 选择。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_DEEP_REASONING': {
+    title: '任务路由钉选（深度推理）', summary: '深度推理任务的可选显式模型钉选。',
+    usage: '设置后强制 deep_reasoning 选择。', valueNotes: [], impact: [], notes: [],
+  },
+  'settings.system.TASK_ROUTING_PIN_CODING': {
+    title: '任务路由钉选（编码）', summary: '编码类任务的可选显式模型钉选。',
+    usage: '设置后强制 coding 选择。', valueNotes: [], impact: [], notes: [],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
 
     title: '信任 X-Forwarded-For',
@@ -1819,6 +1871,23 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '渲染关闭时的硬编码通知 fallback 路径不变。',
     ],
   },
+  'settings.report.RESEARCH_PRESENTATION_PROFILE': {
+    title: '研究呈现偏好',
+    summary: '证据不变。',
+    usage: '选择偏好。',
+    valueNotes: [
+      '保守：风险优先。',
+      '平衡：默认顺序。',
+      '积极：机会优先。',
+      '风险披露同等。',
+      '事实与判断不变。',
+    ],
+    impact: ['仅调整顺序与强调。'],
+    notes: [
+      '仅在渲染开启时生效。',
+      '不构成投资建议。',
+    ],
+  },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: '报告渲染引擎',
     summary: '启用 Jinja2 模板渲染引擎处理报告输出。',
@@ -2063,6 +2132,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage:
       'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT、PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT、PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT 为百分比；PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO 为止损阈值的近距比例（0–1）；PORTFOLIO_RISK_LOOKBACK_DAYS 为交易日回看窗口（默认 180）。',
     impact: ['影响组合风险告警与 Agent 风险快照。'],
+  },
+  'settings.system.portfolio_aware_sizing': {
+    title: '组合感知仓位计算',
+    summary: '使用当前组合权重控制确定性仓位区间。',
+    usage: '需要组合感知区间时保持开启。单一标的权重上限为 0 到 1 的小数，默认 0.15。',
+    notes: ['没有组合数据时，仓位计算仍会以明确的单股降级模式运行。'],
   },
   'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
     title: '启用组合汇率更新',

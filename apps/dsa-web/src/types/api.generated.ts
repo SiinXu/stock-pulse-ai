@@ -750,7 +750,7 @@ export interface paths {
         put?: never;
         /**
          * Update auth settings
-         * @description Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie.
+         * @description Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie. Successful responses use AuthStatusResponse (same camelCase wire shape as GET /status). Error paths still return JSONResponse error envelopes.
          */
         post: operations["auth_update_settings_api_v1_auth_settings_post"];
         delete?: never;
@@ -922,11 +922,97 @@ export interface paths {
         };
         /**
          * List the runtime capability inventory (read-only)
-         * @description Capture a versioned read-only inventory from the live data-provider, tool, plugin, skill, and pipeline owners. Availability comes only from runtime registration and owner health state, never from a static catalog. Unknown readiness remains null. Source or config read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or perform side-effecting health checks.
+         * @description Capture a versioned read-only inventory from live owners. Availability comes only from runtime registration and owner health state.
          */
         get: operations["listCapabilities"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List write-side capability declarations */
+        get: operations["listCapabilityRegistry"];
+        put?: never;
+        /** Register a write-side capability declaration */
+        post: operations["registerCapability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/registry/{capability_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a write-side capability declaration */
+        put: operations["updateCapability"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/registry/{capability_id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire a write-side capability declaration */
+        post: operations["retireCapability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve capability dependencies and version compatibility */
+        post: operations["resolveCapabilities"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compute a task-aware model routing decision */
+        post: operations["routeTaskModel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2629,6 +2715,26 @@ export interface paths {
         put?: never;
         /** Submit manual analysis for a held portfolio position */
         post: operations["analyze_position_api_v1_portfolio_positions__symbol__analysis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/rebalancing-recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get portfolio rebalancing and position-band recommendations
+         * @description Deterministic risk-band rebalancing suggestions and risk-adjusted position weight bands from the current portfolio snapshot and portfolio risk metrics. Suggestions are for human review only and are never auto-executed. Insufficient history yields an explicit refusal (no invented trades). Never calls market data providers on the hot path.
+         */
+        get: operations["getPortfolioRebalancingRecommendations"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5524,6 +5630,25 @@ export interface components {
             passwordConfirm?: string | null;
         };
         /**
+         * AuthStatusResponse
+         * @description Wire-stable auth status payload (camelCase aliases, Issue #549).
+         */
+        AuthStatusResponse: {
+            /** Authenabled */
+            authEnabled: boolean;
+            /** Loggedin */
+            loggedIn: boolean;
+            /** Passwordchangeable */
+            passwordChangeable: boolean;
+            /** Passwordset */
+            passwordSet: boolean;
+            /**
+             * Setupstate
+             * @enum {string}
+             */
+            setupState: "enabled" | "password_retained" | "no_password";
+        };
+        /**
          * BacktestAppliedConfig
          * @description Echo of the effective run configuration used for evaluation honesty.
          */
@@ -7670,6 +7795,20 @@ export interface components {
             sentiment_score: number;
             /** Trend Prediction */
             trend_prediction: string;
+        };
+        /** DependencyIssueResponse */
+        DependencyIssueResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /** Dependency */
+            dependency: string;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /** Reason Code */
+            reason_code: string;
         };
         /**
          * DiscoverLLMChannelModelsRequest
@@ -10806,6 +10945,11 @@ export interface components {
             /** Name */
             name: string;
             /**
+             * Notification Channels
+             * @description Canonical notification channel IDs from active notification_channel registrations; empty when the adapter is not loaded or not active
+             */
+            notification_channels?: string[];
+            /**
              * Package Root
              * @description Absolute package directory for external plugins when known
              */
@@ -12101,6 +12245,44 @@ export interface components {
              */
             force: boolean;
         };
+        /** PortfolioPositionBand */
+        PortfolioPositionBand: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add" | "reduce" | "hold" | "exit";
+            /** Assumptions */
+            assumptions?: string[];
+            /**
+             * Auto Execute
+             * @default false
+             */
+            auto_execute: boolean;
+            /** Current Weight Pct */
+            current_weight_pct: number;
+            /** Effective Cap Pct */
+            effective_cap_pct: number;
+            /**
+             * Is Suggestion Only
+             * @default true
+             */
+            is_suggestion_only: boolean;
+            /** Mode */
+            mode: string;
+            /** Rationale */
+            rationale: string;
+            /** Signal */
+            signal: string;
+            /** Symbol */
+            symbol: string;
+            /** Target Weight Pct High */
+            target_weight_pct_high: number;
+            /** Target Weight Pct Low */
+            target_weight_pct_low: number;
+            /** Target Weight Pct Mid */
+            target_weight_pct_mid: number;
+        };
         /** PortfolioPositionItem */
         PortfolioPositionItem: {
             /** Avg Cost */
@@ -12151,6 +12333,187 @@ export interface components {
             unrealized_pnl_pct?: number | null;
             /** Valuation Currency */
             valuation_currency: string;
+        };
+        /** PortfolioRebalanceAssumptions */
+        PortfolioRebalanceAssumptions: {
+            /** Cross Currency */
+            cross_currency: string;
+            /** Drift Threshold Pct */
+            drift_threshold_pct: number;
+            /** Method */
+            method: string;
+            /** Portfolio Aware Sizing Enabled */
+            portfolio_aware_sizing_enabled: boolean;
+            /** Provider Calls On Hot Path */
+            provider_calls_on_hot_path: boolean;
+            /** Recommendation Honesty */
+            recommendation_honesty: string;
+            /** Risk Metrics Source */
+            risk_metrics_source: string;
+            /** Tax And Transaction Costs */
+            tax_and_transaction_costs: string;
+            /** Uses Risk Metrics */
+            uses_risk_metrics: boolean;
+            /** Weight Basis */
+            weight_basis: string;
+        };
+        /** PortfolioRebalanceBreach */
+        PortfolioRebalanceBreach: {
+            /** Current Pct */
+            current_pct: number;
+            /** Drift Pct */
+            drift_pct: number;
+            /** Kind */
+            kind: string;
+            /** Limit Pct */
+            limit_pct: number;
+            /** Symbol */
+            symbol?: string | null;
+        };
+        /** PortfolioRebalanceCurrent */
+        PortfolioRebalanceCurrent: {
+            /** Diversification Score */
+            diversification_score?: number | null;
+            /** Effective N */
+            effective_n?: number | null;
+            /** Hhi */
+            hhi?: number | null;
+            /**
+             * Portfolio Value
+             * @default 0
+             */
+            portfolio_value: number;
+            /** Risk Status */
+            risk_status?: string | null;
+            /** Var Pct */
+            var_pct?: number | null;
+            /** Weights */
+            weights?: components["schemas"]["PortfolioRebalanceWeightItem"][];
+        };
+        /** PortfolioRebalanceDrift */
+        PortfolioRebalanceDrift: {
+            /** Breaches */
+            breaches?: components["schemas"]["PortfolioRebalanceBreach"][];
+            /**
+             * Max Abs Weight Drift Pct
+             * @default 0
+             */
+            max_abs_weight_drift_pct: number;
+        };
+        /** PortfolioRebalanceRiskSummary */
+        PortfolioRebalanceRiskSummary: {
+            /** Concentration Status */
+            concentration_status?: string | null;
+            /** Correlation Status */
+            correlation_status?: string | null;
+            /** Status */
+            status: string;
+            /** Var Status */
+            var_status?: string | null;
+        };
+        /** PortfolioRebalanceSuggestion */
+        PortfolioRebalanceSuggestion: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "trim" | "add" | "hold";
+            /** Approx Notional */
+            approx_notional: number;
+            /** Assumptions */
+            assumptions?: string[];
+            /**
+             * Auto Execute
+             * @default false
+             */
+            auto_execute: boolean;
+            /** Delta Weight Pct */
+            delta_weight_pct: number;
+            /** From Weight Pct */
+            from_weight_pct: number;
+            /**
+             * Is Suggestion Only
+             * @default true
+             */
+            is_suggestion_only: boolean;
+            /** Rationale */
+            rationale: string;
+            /** Symbol */
+            symbol: string;
+            /** To Weight Pct */
+            to_weight_pct: number;
+        };
+        /** PortfolioRebalanceTargetModel */
+        PortfolioRebalanceTargetModel: {
+            /** Band Max Single Weight Pct */
+            band_max_single_weight_pct: number;
+            /** Description */
+            description: string;
+            /** Max Hhi */
+            max_hhi: number;
+            /** Max Single Weight Pct */
+            max_single_weight_pct: number;
+            /** Min Effective N */
+            min_effective_n: number;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string[];
+            /** Soft Max Single Name Weight */
+            soft_max_single_name_weight: number;
+            /** Target Var Pct Ceiling */
+            target_var_pct_ceiling: number;
+        };
+        /** PortfolioRebalanceWeightItem */
+        PortfolioRebalanceWeightItem: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
+        };
+        /** PortfolioRebalancingResponse */
+        PortfolioRebalancingResponse: {
+            /** Account Id */
+            account_id?: number | null;
+            /** As Of */
+            as_of: string;
+            assumptions: components["schemas"]["PortfolioRebalanceAssumptions"];
+            /**
+             * Auto Execute
+             * @default false
+             */
+            auto_execute: boolean;
+            /** Cost Method */
+            cost_method: string;
+            /** Currency */
+            currency: string;
+            current: components["schemas"]["PortfolioRebalanceCurrent"];
+            /** Disclaimer */
+            disclaimer: string;
+            drift: components["schemas"]["PortfolioRebalanceDrift"];
+            /**
+             * Is Suggestion Only
+             * @default true
+             */
+            is_suggestion_only: boolean;
+            /** Position Bands */
+            position_bands?: components["schemas"]["PortfolioPositionBand"][];
+            risk_metrics_summary: components["schemas"]["PortfolioRebalanceRiskSummary"];
+            /**
+             * Risk Tolerance
+             * @enum {string}
+             */
+            risk_tolerance: "conservative" | "moderate" | "aggressive";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "empty_portfolio" | "insufficient_data" | "refused";
+            /** Status Message */
+            status_message?: string | null;
+            /** Suggestions */
+            suggestions?: components["schemas"]["PortfolioRebalanceSuggestion"][];
+            target_model: components["schemas"]["PortfolioRebalanceTargetModel"];
         };
         /** PortfolioRiskAssumptions */
         PortfolioRiskAssumptions: {
@@ -13808,6 +14171,48 @@ export interface components {
             /** Preset Id */
             preset_id?: ("rational_analyst" | "risk_guardian" | "long_term_compounder") | null;
         };
+        /** ResolutionResultResponse */
+        ResolutionResultResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /** Checked Against Generation */
+            checked_against_generation: number;
+            /** Issues */
+            issues?: components["schemas"]["DependencyIssueResponse"][];
+            /** Ready */
+            ready: boolean;
+            /** Reason Code */
+            reason_code: string;
+            /** Satisfied */
+            satisfied?: string[];
+        };
+        /** ResolveCapabilitiesRequest */
+        ResolveCapabilitiesRequest: {
+            /** Capability Ids */
+            capability_ids?: string[] | null;
+            /**
+             * Include Inventory
+             * @default true
+             */
+            include_inventory: boolean;
+        };
+        /** ResolveCapabilitiesResponse */
+        ResolveCapabilitiesResponse: {
+            /** Blocked Count */
+            blocked_count: number;
+            /** Ready Count */
+            ready_count: number;
+            /** Results */
+            results?: components["schemas"]["ResolutionResultResponse"][];
+            /**
+             * Schema Version
+             * @default capability-resolution/v1
+             * @constant
+             */
+            schema_version: "capability-resolution/v1";
+            /** Write Generation */
+            write_generation: number;
+        };
         /**
          * RollbackSystemConfigRequest
          * @description Request one-step restoration of the last-known-good runtime config.
@@ -13815,6 +14220,19 @@ export interface components {
         RollbackSystemConfigRequest: {
             /** Config Version */
             config_version: string;
+        };
+        /** RouteCandidateResponse */
+        RouteCandidateResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /** Model Route */
+            model_route: string;
+            /** Reasons */
+            reasons?: string[];
+            /** Score */
+            score: number;
+            /** Tags */
+            tags?: string[];
         };
         /**
          * RunDiagnosticComponent
@@ -16310,6 +16728,70 @@ export interface components {
              */
             total: number;
         };
+        /** TaskRouteDecisionResponse */
+        TaskRouteDecisionResponse: {
+            /**
+             * As Of
+             * @default
+             */
+            as_of: string;
+            /** Candidates */
+            candidates?: components["schemas"]["RouteCandidateResponse"][];
+            /** Explain */
+            explain?: string[];
+            /**
+             * Fallback Used
+             * @default false
+             */
+            fallback_used: boolean;
+            /**
+             * Pin Source
+             * @default
+             */
+            pin_source: string;
+            /**
+             * Policy
+             * @enum {string}
+             */
+            policy: "quality" | "cost" | "local_first";
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Routing Enabled
+             * @default false
+             */
+            routing_enabled: boolean;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "task-route-decision/v1";
+            /**
+             * Selected Capability Id
+             * @default
+             */
+            selected_capability_id: string;
+            /**
+             * Selected Model
+             * @default
+             */
+            selected_model: string;
+            /**
+             * Task Class
+             * @enum {string}
+             */
+            task_class: "report" | "agent" | "vision" | "market_review" | "cheap_scan" | "deep_reasoning" | "coding";
+        };
+        /** TaskRouteRequest */
+        TaskRouteRequest: {
+            /** Policy */
+            policy?: ("quality" | "cost" | "local_first") | null;
+            /**
+             * Task Class
+             * @enum {string}
+             */
+            task_class: "report" | "agent" | "vision" | "market_review" | "cheap_scan" | "deep_reasoning" | "coding";
+        };
         /**
          * TaskStatus
          * @description Task status model
@@ -17599,6 +18081,176 @@ export interface components {
             analysis: number;
             /** Signals */
             signals: number;
+        };
+        /**
+         * WriteCapabilityEntryRequest
+         * @description Payload for register and update of write-side capability declarations.
+         */
+        WriteCapabilityEntryRequest: {
+            /** Capability Id */
+            capability_id: string;
+            /**
+             * Capability Type
+             * @enum {string}
+             */
+            capability_type: "data_provider" | "data_method" | "agent_tool" | "analysis_skill" | "pipeline_stage" | "llm_model" | "persona_role";
+            /**
+             * Cost Tier
+             * @default
+             */
+            cost_tier: string;
+            /** Dependencies */
+            dependencies?: string[];
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "data" | "tool" | "skill" | "pipeline" | "llm" | "persona";
+            /**
+             * Latency Class
+             * @default
+             */
+            latency_class: string;
+            /** Markets */
+            markets?: string[];
+            /**
+             * Model Route
+             * @default
+             */
+            model_route: string;
+            /**
+             * Provider
+             * @default
+             */
+            provider: string;
+            /** Scopes */
+            scopes?: string[];
+            /** Tags */
+            tags?: string[];
+            /**
+             * Version
+             * @default 1
+             */
+            version: string;
+        };
+        /**
+         * WriteCapabilityEntryResponse
+         * @description One declared capability from the write-side registry.
+         */
+        WriteCapabilityEntryResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /**
+             * Capability Type
+             * @enum {string}
+             */
+            capability_type: "data_provider" | "data_method" | "agent_tool" | "analysis_skill" | "pipeline_stage" | "llm_model" | "persona_role";
+            /**
+             * Cost Tier
+             * @default
+             */
+            cost_tier: string;
+            /** Dependencies */
+            dependencies?: string[];
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "data" | "tool" | "skill" | "pipeline" | "llm" | "persona";
+            /** Generation */
+            generation: number;
+            /**
+             * Latency Class
+             * @default
+             */
+            latency_class: string;
+            /** Markets */
+            markets?: string[];
+            /**
+             * Model Route
+             * @default
+             */
+            model_route: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Registered At
+             * @default
+             */
+            registered_at: string;
+            /** Retired At */
+            retired_at?: string | null;
+            /** Scopes */
+            scopes?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            /** Tags */
+            tags?: string[];
+            /**
+             * Updated At
+             * @default
+             */
+            updated_at: string;
+            /** Version */
+            version: string;
+        };
+        /**
+         * WriteCapabilityListResponse
+         * @description Versioned write-side registry listing.
+         */
+        WriteCapabilityListResponse: {
+            /** As Of */
+            as_of: string;
+            /** Generation */
+            generation: number;
+            /** Items */
+            items?: components["schemas"]["WriteCapabilityEntryResponse"][];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "capability-write-registry/v1";
+            /** Total */
+            total: number;
+        };
+        /**
+         * WriteCapabilityUpdateRequest
+         * @description Partial update payload; identity fields are rejected by the service.
+         */
+        WriteCapabilityUpdateRequest: {
+            /** Cost Tier */
+            cost_tier?: string | null;
+            /** Dependencies */
+            dependencies?: string[] | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Latency Class */
+            latency_class?: string | null;
+            /** Markets */
+            markets?: string[] | null;
+            /** Model Route */
+            model_route?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Scopes */
+            scopes?: string[] | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Version */
+            version?: string | null;
         };
     };
     responses: never;
@@ -19455,7 +20107,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthStatusResponse"];
                 };
             };
             /** @description Validation Error */
@@ -19484,7 +20136,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AuthStatusResponse"];
                 };
             };
         };
@@ -19908,7 +20560,7 @@ export interface operations {
                     "application/json": components["schemas"]["CapabilityListResponse"];
                 };
             };
-            /** @description Invalid domain filter */
+            /** @description Invalid request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -19926,6 +20578,24 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -19933,6 +20603,482 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit or registry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listCapabilityRegistry: {
+        parameters: {
+            query?: {
+                domain?: string | null;
+                include_retired?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityListResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit or registry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    registerCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteCapabilityEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityEntryResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit or registry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteCapabilityUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityEntryResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit or registry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retireCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityEntryResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit or registry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resolveCapabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveCapabilitiesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveCapabilitiesResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit or registry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    routeTaskModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRouteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRouteDecisionResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit or registry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -25246,6 +26392,69 @@ export interface operations {
                 };
             };
             /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPortfolioRebalancingRecommendations: {
+        parameters: {
+            query?: {
+                /** @description Optional account id */
+                account_id?: number | null;
+                /** @description As-of date; default today */
+                as_of?: string | null;
+                cost_method?: "fifo" | "avg";
+                /** @description Risk preference band used for caps and target position ranges */
+                risk_tolerance?: "conservative" | "moderate" | "aggressive";
+                /** @description Minimum absolute weight drift (percentage points) to emit a suggestion */
+                drift_threshold_pct?: number;
+                /** @description VaR confidence forwarded to risk metrics (exclusive of 0.5 and 1.0) */
+                confidence?: number;
+                /** @description VaR horizon forwarded to risk metrics */
+                horizon_days?: number;
+                /** @description Lookback trading days forwarded to risk metrics */
+                lookback_trading_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRebalancingResponse"];
+                };
+            };
+            /** @description Invalid query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rebalancing recommendation computation failed */
             500: {
                 headers: {
                     [name: string]: unknown;
