@@ -74,10 +74,10 @@ MODULES = {
 
 EXPECTED_AST_DIGESTS = {
     "src.analysis_context_pack.prompt": (
-        "6ed5a8c9507402b7ca0589d90286c79fd2ee8c9e69efec46a2571f53b791f268"
+        "bce6d6e9ef3c42efb656b944fa7f4d2c1c3c2f9d085904fa9aca41e03cea48b6"
     ),
     "src.analysis_context_pack.overview": (
-        "9012a94ccfe27609d4213e9770df14f2bbb650825529188b91e59204541a8365"
+        "13ad09206cd1bab28ee6ff40b191bd4b8787b55e20eb377068986b1edbbc81c0"
     ),
 }
 
@@ -220,7 +220,7 @@ def test_prompt_patch_seam_works_through_both_paths(module_name: str) -> None:
             ) == "patched"
 
     converter.assert_called_once()
-    formatter.assert_called_once_with(payload)
+    formatter.assert_called_once_with(payload, enforce_forced_conclusion=True)
 
 
 @pytest.mark.parametrize(
