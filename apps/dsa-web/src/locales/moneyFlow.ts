@@ -1,0 +1,108 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import type { UiLanguage } from '../i18n/uiText';
+
+const zh = {
+  title: '主力资金足迹',
+  description:
+    '展示订单规模分桶净流入占比（主力 / 超大 / 大 / 中 / 小）。这不是机构持仓或北向资金，也不是预测。',
+  status: '状态',
+  source: '来源',
+  asOf: '数据时点',
+  providerDate: '交易日',
+  ageDays: '距今（交易日）',
+  attitude: '主力态度',
+  mainRatio: '主力净占比',
+  superLargeRatio: '超大单净占比',
+  largeRatio: '大单净占比',
+  mediumRatio: '中单净占比',
+  smallRatio: '小单净占比',
+  main5d: '主力 5 日净额',
+  main10d: '主力 10 日净额',
+  unit: '单位',
+  amountScale: '金额量级',
+  bucketDefinition: '分桶定义',
+  calibration: '校准说明',
+  warnings: '质量提示',
+  refresh: '刷新',
+  refreshing: '刷新中…',
+  disabledTitle: 'SmartMoney 未启用',
+  disabledDescription:
+    '当前 SMARTMONEY_ENABLED=false，不会发起资金流网络请求。可在系统配置中开启后查看。',
+  unavailableTitle: '资金流暂不可用',
+  unavailableDescription: '数据缺失或市场不支持时不会编造数字；请查看状态与错误码。',
+  degradedTitle: '资金流已降级',
+  emptyTitle: '暂无资金流快照',
+  emptyDescription: '尚无可用分桶观察值。',
+  loadFailed: '资金流请求失败',
+  disclaimer: '研究证据，非投资建议',
+  notAvailable: '—',
+  attitudeInflow: '净流入',
+  attitudeOutflow: '净流出',
+  attitudeNeutral: '中性',
+  attitudeUnknown: '未知',
+  completeness: '覆盖完整度',
+  observedDays: '已观察天数',
+  requestedDays: '请求天数',
+} as const;
+
+const en = {
+  title: 'Smart Money footprint',
+  description:
+    'Order-size bucket net ratios (main / super-large / large / medium / small). Not institutional ownership, Northbound flow, or a price forecast.',
+  status: 'Status',
+  source: 'Source',
+  asOf: 'As of',
+  providerDate: 'Session date',
+  ageDays: 'Age (sessions)',
+  attitude: 'Main-force attitude',
+  mainRatio: 'Main net ratio',
+  superLargeRatio: 'Super-large net ratio',
+  largeRatio: 'Large net ratio',
+  mediumRatio: 'Medium net ratio',
+  smallRatio: 'Small net ratio',
+  main5d: 'Main 5d net',
+  main10d: 'Main 10d net',
+  unit: 'Unit',
+  amountScale: 'Amount scale',
+  bucketDefinition: 'Bucket definition',
+  calibration: 'Calibration note',
+  warnings: 'Quality notes',
+  refresh: 'Refresh',
+  refreshing: 'Refreshing…',
+  disabledTitle: 'SmartMoney disabled',
+  disabledDescription:
+    'SMARTMONEY_ENABLED=false — no money-flow network calls are made. Enable it in system settings to load evidence.',
+  unavailableTitle: 'Money flow unavailable',
+  unavailableDescription:
+    'Missing or unsupported markets never invent numbers. Check status and error code.',
+  degradedTitle: 'Money flow degraded',
+  emptyTitle: 'No money-flow snapshot',
+  emptyDescription: 'No bucket observation is available yet.',
+  loadFailed: 'Money-flow request failed',
+  disclaimer: 'Research evidence only — not investment advice',
+  notAvailable: '—',
+  attitudeInflow: 'Inflow',
+  attitudeOutflow: 'Outflow',
+  attitudeNeutral: 'Neutral',
+  attitudeUnknown: 'Unknown',
+  completeness: 'Completeness',
+  observedDays: 'Observed days',
+  requestedDays: 'Requested days',
+} as const;
+
+export type MoneyFlowText = { readonly [Key in keyof typeof en]: string };
+
+/** Bilingual copy for the Smart Money footprint panel (zh source + en; other UI langs fall back to en). */
+export const MONEY_FLOW_TEXT: Record<UiLanguage, MoneyFlowText> = {
+  zh,
+  en,
+  'zh-TW': zh,
+  ja: en,
+  ko: en,
+  de: en,
+  es: en,
+  ms: en,
+  fr: en,
+  id: en,
+};
