@@ -56,6 +56,13 @@ describe('shell SW template mirrors shellCachePolicy', () => {
     expect(pluginSource).toContain("urls.delete('/stocks.index.json')");
   });
 
+  it('seeds install precache from the entry static import graph, not only index-*', () => {
+    expect(pluginSource).toContain('collectSyncShellAssetPaths');
+    expect(pluginSource).toContain('item.isEntry');
+    expect(pluginSource).toContain('item.imports');
+    expect(pluginSource).not.toContain('/^assets\\/index-[^/]+\\.(js|css)$/');
+  });
+
   it('unit policy still denies API and market index (behavioral lock)', () => {
     expect(isNeverCachePath('/api/v1/history')).toBe(true);
     expect(isNeverCachePath('/stocks.index.json')).toBe(true);
