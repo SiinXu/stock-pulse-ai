@@ -1,0 +1,24 @@
+# 📌 {{ labels.title }} · {{ brief.stock_name or brief.stock_code }} ({{ brief.stock_code }})
+{% if brief.event_category %}**{{ brief.event_category }}**{% endif %}{% if brief.in_portfolio %} · ★ {{ labels.portfolio_flag }}{% endif %}{% if brief.on_watchlist %} · {{ labels.watchlist_flag }}{% endif %}
+
+## {{ labels.context_heading }}
+{% if brief.what_happened %}{{ brief.what_happened }}{% endif %}
+{% if brief.why_it_matters %}{{ brief.why_it_matters }}{% endif %}
+
+## {{ labels.metrics_heading }}
+{% for metric in brief.metrics_to_watch or [] %}- **{{ metric.label }}** — {{ metric.why }}
+{% endfor %}
+
+## {{ labels.surprise_heading }}
+{{ brief.surprise_criteria }}
+
+## {{ labels.hypotheses_heading }}
+{% for hyp in brief.linked_hypotheses or [] %}- {{ hyp.label }}
+{% endfor %}
+
+## {{ labels.checklist_heading }}
+{% for item in brief.post_event_checklist or [] %}- [ ] {{ item.label }}
+{% endfor %}
+
+---
+*{{ labels.disclaimer }}*

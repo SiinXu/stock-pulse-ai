@@ -121,6 +121,6 @@ If this PR changes `EXTRACT_PROMPT` in `src/services/image_stock_extractor.py`, 
 - [ ] Reproducible verification commands and results are included
 - [ ] Compatibility and risk have been assessed
 - [ ] An actionable rollback plan is included
-- [ ] User-visible changes are documented in the relevant docs and `docs/CHANGELOG.md`; `README.md` is updated only for homepage-level changes
+- [ ] User-visible changes are documented in the relevant docs and a `docs/changelog.d/` fragment (or, for in-flight PRs, `docs/CHANGELOG.md`); `README.md` is updated only for homepage-level changes
 - [ ] Report or Web UI changes include affected page/report screenshots or reproducible alternative visual evidence
 - [ ] Web settings changes include evidence that visibly identifies the changed fields, labels, and help text

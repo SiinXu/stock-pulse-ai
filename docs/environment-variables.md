@@ -201,10 +201,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | `空` | 是 | 模板中注释; Optional: For Webhooks requiring authentication (Header Authorization: Bearer <token>) |
 | `CUSTOM_WEBHOOK_BODY_TEMPLATE` | `空` | 是 | 模板中注释; Optional global JSON body template, overrides Bark/Slack/Discord etc |
 | `CUSTOM_WEBHOOK_URLS` | `https://oapi.dingtalk.com/robot/send?access_token=xxx,https://hooks.slack.com/services/xxx` | 是 | 模板中注释; Custom Webhook (Supports multiple, comma-separated) Suitable for: DingTalk, Discord, Slack, Bark, and any service tha... |
-| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Daily brief with historical accuracy review (Issue #466; default off) When enabled, the runtime scheduler may emit at... |
+| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Personal daily morning brief (#149) + historical accuracy review (#466; default off) |
 | `DAILY_BRIEF_MIN_SAMPLES` | `10` | 是 | 模板中注释 |
 | `DAILY_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
 | `DAILY_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
+| `DAILY_BRIEF_QUIET_WHEN_EMPTY` | `false` | 是 | 模板中注释 |
 | `DAILY_BRIEF_SAVE_REPORT_FILE` | `true` | 是 | 模板中注释 |
 | `DAILY_BRIEF_SCHEDULE_TIME` | `08:30` | 是 | 模板中注释 |
 | `DAILY_BRIEF_TIMEZONE` | `Asia/Shanghai` | 是 | 模板中注释 |
@@ -250,6 +251,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ENABLE_FUNDAMENTAL_PIPELINE` | `true` | 是 | 模板中注释; Enable fundamental aggregation (new P0 capability) |
 | `ENABLE_REALTIME_QUOTE` | `true` | 是 | 模板中注释; Enable real-time quotes (disabling uses historical closing prices for analysis) |
 | `ENABLE_REALTIME_TECHNICAL_INDICATORS` | `true` | 是 | 模板中注释; Intraday technical analysis: when enabled, real-time prices are used to calculate moving averages and bullish MA alig... |
+| `EVENT_RESEARCH_BRIEF_CATEGORIES` | `earnings` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Event-driven research briefs (#1131; default off) |
+| `EVENT_RESEARCH_BRIEF_LOOKBACK_HOURS` | `48` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
+| `EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE` | `true` | 是 | 模板中注释 |
 | `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |
@@ -384,6 +391,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_SILICONFLOW_PROVIDER` | `siliconflow` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_TEMPERATURE` | `0.7` | 是 | 模板中注释; Sampling temperature (0.0-2.0, default 0.7; 0 is most deterministic and 2 is most random) |
 | `LLM_TIMEOUT_SEC` | `60` | 是 | 模板中注释; The timeout seconds for a single LLM request; AlphaSift stock selection reuses DSA configuration, downgrades to non-L... |
+| `LLM_COST_PRICING_PATH` | `空` | 是 | 模板中注释; Optional JSON path of per-model token rates for estimated_cost_usd |
+| `LLM_USAGE_ATTRIBUTION_ENABLED` | `true` | 是 | 模板中注释; Fine-grained cost attribution and routing quality on llm_usage |
 | `LLM_USAGE_HMAC_KEY_VERSION` | `local-v1` | 是 | 模板中注释 |
 | `LLM_USAGE_HMAC_SECRET` | `空` | 是 | 模板中注释; LLM usage telemetry message HMAC configuration (optional) |
 | `LLM_VOLCENGINE_API_KEY` | `xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -483,6 +492,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `OUTBOUND_HTTP_ALLOWLIST` | `192.168.1.100:11434,searxng.internal:8080,10.0.0.20:3000` | 是 | 模板中注释 |
 | `OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP` | `false` | 是 | 模板中注释; Clash/Mihomo TUN Fake-IP users can opt in to the standard synthetic DNS ranges for public hostnames only |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | `1000000` | 是 | 模板中注释; Paper trading portfolio (Issue #370; forward simulation with persistent positions) Initial paper cash seeded as a dep... |
+| `PERF_COLLECTION_ENABLED` | `false` | 是 | 模板中注释; Performance baseline collection / offline profiling (Issue #227) |
+| `PERF_PROFILE_ENABLED` | `false` | 是 | 模板中注释; PERF_PROFILE_ENABLED only documents intent for offline tooling; production request paths are never auto-wrapped in cP... |
 | `PLUGINS_DIR` | `/absolute/path/to/reviewed/plugins` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PLUGIN_DATA_PROVIDER_AUTO_BIND` | `false` | 是 | 模板中注释; Opt-in Data Provider auto-bind (default off) |
 | `PLUGIN_STATE_PATH` | `./data/plugin_lifecycle_state.json` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -534,6 +545,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PYTDX_PRIORITY` | `2` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PYTDX_SERVERS` | `192.168.1.100:7709,10.0.0.1:7709` | 是 | 模板中注释; Comma-separated ip:port list; overrides PYTDX_HOST/PYTDX_PORT when set. |
 | `REALTIME_SOURCE_PRIORITY` | `tencent,akshare_sina,efinance,akshare_em` | 是 | 模板中注释 |
+| `READINESS_CHECK_TIMEOUT_SECONDS` | `1.0` | 是 | 模板中注释; 结构化就绪/自检单检查超时（GET /api/v1/system/readiness；仅按需；钳制 0.1–5.0；超时不得报就绪） |
 | `REASONING_TRACE_EXPORT_ENABLED` | `false` | 是 | 模板中注释; Reasoning-trace export (Issue #135): default off |
 | `REASONING_TRACE_EXPORT_MAX_CHARS` | `500000` | 是 | 模板中注释; clamped to 10000..2000000 |
 | `REPORT_EXPORT_PDF_FONT_PATH` | `空` | 是 | 模板中注释; Report export (optional PDF) |
@@ -568,6 +580,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SHARE_IMAGE_XIAOHONGSHU_QR_PATH` | `src/assets/share_image/xiaohongshu_qr.jpg` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SHARE_IMAGE_XIAOHONGSHU_URL` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | `10` | 是 | 模板中注释; Buckets below this decided sample render as insufficient_data |
+| `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; 分层结论只读研究 API（Issue #1143；默认关闭；仅主 API 端口） |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释; 研究 API 每主体滑动窗口限流 |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | `false` | 是 | 模板中注释; Public signal scorecard (Issue #379; default off so self-hosted stays private) Exposes an aggregated, non-sensitive n... |
 | `SINGLE_STOCK_NOTIFY` | `false` | 是 | 模板中注释; =================================== (Optional) Single stock push configuration =================================== Si... |
 | `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` | `false` | 是 | 模板中注释; Default-off Bayesian outcome weights for skill aggregation (issue #714) |

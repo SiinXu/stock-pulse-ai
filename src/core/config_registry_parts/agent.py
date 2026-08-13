@@ -1597,6 +1597,66 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PERF_COLLECTION_ENABLED": {
+        "title": "Performance Span Collection",
+        "description": (
+            "Opt-in recording of lightweight performance spans for key paths "
+            "(pipeline stages, offline baselines). Default off. When disabled, "
+            "collection helpers are no-ops."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 707,
+        "help_key": "settings.agent.performance",
+        "examples": [
+            "PERF_COLLECTION_ENABLED=false",
+            "PERF_COLLECTION_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Performance baselines and profiling",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/performance-baseline_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PERF_PROFILE_ENABLED": {
+        "title": "Performance cProfile Flag",
+        "description": (
+            "Signals that optional stdlib cProfile wrapping is desired for "
+            "offline baseline tooling. Default off. Does not auto-profile "
+            "production request paths."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 708,
+        "help_key": "settings.agent.performance",
+        "examples": [
+            "PERF_PROFILE_ENABLED=false",
+            "PERF_PROFILE_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Performance baselines and profiling",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/performance-baseline_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_EVENT_MONITOR_ENABLED": {
         "title": "Event Monitor",
         "description": "Enable background Event Monitor polling in schedule mode.",

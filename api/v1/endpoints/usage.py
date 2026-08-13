@@ -59,8 +59,18 @@ def _build_summary_payload(period: str, from_dt: datetime, to_dt: datetime, data
         "total_prompt_tokens": data.get("total_prompt_tokens", 0),
         "total_completion_tokens": data.get("total_completion_tokens", 0),
         "total_tokens": data.get("total_tokens", 0),
+        "total_estimated_cost_usd": data.get("total_estimated_cost_usd"),
+        "priced_calls": data.get("priced_calls", 0),
+        "unpriced_calls": data.get("unpriced_calls", 0),
+        "routing_primary_success": data.get("routing_primary_success", 0),
+        "routing_fallback_success": data.get("routing_fallback_success", 0),
+        "routing_failed": data.get("routing_failed", 0),
+        "routing_success_rate": data.get("routing_success_rate"),
+        "routing_fallback_rate": data.get("routing_fallback_rate"),
         "by_call_type": data.get("by_call_type", []),
         "by_model": data.get("by_model", []),
+        "by_stage": data.get("by_stage", []),
+        "by_agent_mode": data.get("by_agent_mode", []),
     }
 
 
