@@ -1388,24 +1388,24 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
   'settings.agent.AGENT_STEP_CRITIQUE_ENABLED': {
-    title: 'Step Critique',
-    summary: 'Typed critique for failed or contradictory steps.',
+    title: 'Critique',
+    summary: 'Typed failure/contradiction.',
   },
   'settings.agent.AGENT_REFLECTION_ENABLED': {
-    title: 'Run Reflection',
-    summary: 'Optional reflection on bounded, redacted run evidence.',
+    title: 'Reflection',
+    summary: 'Bounded, redacted evidence.',
   },
   'settings.agent.AGENT_REFLECTION_LLM_BUDGET': {
-    title: 'Reflection Calls',
-    summary: 'Allows 0–1 provider call.',
+    title: 'Calls',
+    summary: '0–1 provider call.',
   },
   'settings.agent.AGENT_META_REVIEW_ENABLED': {
-    title: 'Meta Review',
-    summary: 'Deterministic reports from validated episode lessons.',
+    title: 'Review',
+    summary: 'Validated lessons; deterministic reports.',
   },
   'settings.agent.AGENT_META_REVIEW_MIN_EPISODES': {
-    title: 'Episode Minimum',
-    summary: 'Validated episodes required before recommendations.',
+    title: 'Minimum',
+    summary: 'Validated episodes gate advice.',
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
