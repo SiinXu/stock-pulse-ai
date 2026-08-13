@@ -18235,6 +18235,14 @@
             "title": "Name",
             "type": "string"
           },
+          "notification_channels": {
+            "description": "Canonical notification channel IDs from active notification_channel registrations; empty when the adapter is not loaded or not active",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notification Channels",
+            "type": "array"
+          },
           "package_root": {
             "anyOf": [
               {
