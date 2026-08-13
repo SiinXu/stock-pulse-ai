@@ -5,6 +5,16 @@ import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { TodaysFocusQuery, TodaysFocusResponse } from '../types/todaysFocus';
 
+import type { components } from '../types/api.generated';
+type OpenApiTodaysFocus = components['schemas']['TodaysFocusResponse'];
+type OpenApiTodaysFocusItem = components['schemas']['TodaysFocusItem'];
+type _AssertFocus = keyof OpenApiTodaysFocus;
+type _AssertItem = keyof OpenApiTodaysFocusItem;
+const _focusAnchor: _AssertFocus = 'pack_version';
+const _itemAnchor: _AssertItem = 'reason_code';
+void _focusAnchor;
+void _itemAnchor;
+
 const awareDatetime = z.string().datetime({ offset: true });
 const directionalAction = z.enum(['buy', 'sell', 'hold']);
 const reasonCode = z.enum([

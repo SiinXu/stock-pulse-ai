@@ -7,7 +7,9 @@ import type {
   ReportStrataGapOrConflict,
   ReportStrataVerifiedFact,
 } from '../../types/analysis';
+import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
 import { Card } from '../common';
+import { HelpKeyButton } from '../help';
 import { DashboardPanelHeader } from '../dashboard';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { resolveReportStrataFromDetails } from './reportStrataUtils';
@@ -246,8 +248,12 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
             </section>
 
             <section data-testid="report-strata-risks">
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
-                4. {text.risksCounterEvidence}
+              <h3 className="mb-1 flex flex-wrap items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
+                <span>4. {text.risksCounterEvidence}</span>
+                <HelpKeyButton
+                  helpKey={EDUCATION_HELP_KEYS.riskSection}
+                  data-testid="report-strata-risks-help"
+                />
               </h3>
               {risks.length > 0 ? (
                 <ul className="list-disc space-y-1 pl-5">

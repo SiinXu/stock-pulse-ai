@@ -1,28 +1,44 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
-import { createApiError, getParsedApiError } from './error';
+import { createApiError, getParsedApiError, isApiRequestError } from './error';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 
+type OpenApiValuationEstimate = components['schemas']['ValuationEstimateResponse'];
+type _AssertValuation = keyof OpenApiValuationEstimate;
+const _valuationAnchor: _AssertValuation = 'schema_version';
+void _valuationAnchor;
+
+type OpenApiPeerValuationCanvas = components['schemas']['PeerValuationCanvasResponse'];
+type _AssertPeerCanvas = keyof OpenApiPeerValuationCanvas;
+const _peerCanvasAnchor: _AssertPeerCanvas = 'status';
+void _peerCanvasAnchor;
+
+const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
+  message: 'non-finite number rejected',
+});
+const optionalFinite = finiteNumber.nullable().optional();
+
 const sensitivityRowSchema = z.object({
-  growthRate: z.number().optional(),
-  discountRate: z.number().optional(),
-  terminalGrowthRate: z.number().optional(),
-  equityValue: z.number().optional(),
+  growthRate: optionalFinite,
+  discountRate: optionalFinite,
+  terminalGrowthRate: optionalFinite,
+  equityValue: optionalFinite,
 }).passthrough();
 
 const dcfSchema = z.object({
   status: z.string().optional(),
-  equityValue: z.number().optional().nullable(),
-  enterpriseValue: z.number().optional().nullable(),
-  intrinsicValuePerShare: z.number().optional().nullable(),
+  equityValue: optionalFinite,
+  enterpriseValue: optionalFinite,
+  intrinsicValuePerShare: optionalFinite,
   assumptions: z.record(z.string(), z.unknown()).optional(),
   sensitivity: z.object({
     rows: z.array(sensitivityRowSchema).optional(),
-    equityValueLow: z.number().optional().nullable(),
-    equityValueMid: z.number().optional().nullable(),
-    equityValueHigh: z.number().optional().nullable(),
+    equityValueLow: optionalFinite,
+    equityValueMid: optionalFinite,
+    equityValueHigh: optionalFinite,
   }).passthrough().optional(),
   market: z.record(z.string(), z.unknown()).optional(),
   message: z.string().optional(),
@@ -30,7 +46,7 @@ const dcfSchema = z.object({
 }).passthrough();
 
 const valuationEstimateSchema = z.object({
-  schemaVersion: z.string().optional(),
+  schemaVersion: z.string(),
   status: z.string(),
   stockCode: z.string(),
   dcf: dcfSchema.optional(),
@@ -69,10 +85,11 @@ export async function estimateStockValuation(params: ValuationEstimateParams): P
       'valuation',
     );
   } catch (error) {
+    // Preserve fail-closed validation errors from parseCamelCasePayload.
+    if (isApiRequestError(error)) throw error;
     throw createApiError(getParsedApiError(error), { cause: error });
   }
 }
-
 
 const peerMetricCellSchema = z.object({
   value: z.number().nullable().optional(),
@@ -142,6 +159,8 @@ export async function buildPeerValuationCanvas(
       'valuation',
     );
   } catch (error) {
+    // Preserve fail-closed validation errors from parseCamelCasePayload.
+    if (isApiRequestError(error)) throw error;
     throw createApiError(getParsedApiError(error), { cause: error });
   }
 }

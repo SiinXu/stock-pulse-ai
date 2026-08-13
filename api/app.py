@@ -49,6 +49,8 @@ _FRONTEND_ASSET_MEDIA_TYPES = {
     ".css": "text/css",
     ".js": "text/javascript",
     ".mjs": "text/javascript",
+    # PWA install surface (Refs #234).
+    ".webmanifest": "application/manifest+json",
 }
 _SAFE_MISSING_ASSET_MEDIA_TYPES = frozenset(_FRONTEND_ASSET_MEDIA_TYPES.values())
 _FRONTEND_INDEX_NO_CACHE_HEADERS = {
@@ -621,6 +623,16 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
                 # Issue #520: Explicitly resolve MIME type to avoid
                 # browsers rejecting JS modules served as text/plain.
                 content_type = _frontend_asset_media_type(str(file_path))
+                # PWA: never long-cache the service worker script so deploys
+                # re-evaluate the shell policy promptly (Refs #234).
+                if file_path.name == "sw.js":
+                    return FileResponse(
+                        file_path,
+                        media_type=content_type,
+                        headers={
+                            "Cache-Control": "no-cache, no-store, must-revalidate",
+                        },
+                    )
                 return FileResponse(file_path, media_type=content_type)
 
             return _frontend_index_response(static_dir)

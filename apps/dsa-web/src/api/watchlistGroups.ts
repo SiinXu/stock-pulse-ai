@@ -5,6 +5,16 @@ import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { WatchlistGroupState } from '../types/watchlist';
 
+import type { components } from '../types/api.generated';
+type OpenApiGroupsResponse = components['schemas']['WatchlistGroupsResponse'];
+type OpenApiGroup = components['schemas']['WatchlistGroupSchema'];
+type _AssertGroups = keyof OpenApiGroupsResponse;
+type _AssertGroup = keyof OpenApiGroup;
+const _groupsAnchor: _AssertGroups = 'revision';
+const _groupAnchor: _AssertGroup = 'is_default';
+void _groupsAnchor;
+void _groupAnchor;
+
 const memberSchema = z.object({
   stockCode: z.string().min(1).max(32),
   sortOrder: z.number().int().nonnegative(),
