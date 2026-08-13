@@ -1,8 +1,7 @@
 # 有界本地 OCR Agent 工具
 
 StockPulse 可选用 Tesseract 从**本地图片**以及**内嵌位图的 PDF 页**提取原始文字。
-本阶段用于低成本文字恢复，不声称已校验的表格单元格、OCR 置信度、券商对账单精度
-或图表语义理解。OCR 原文**不得**作为权威决策结论。
+`document_kind` 覆盖截图、公告/PDF 页图像、表格型对账单与图表标注；结果始终为不可信文档信封。本阶段用于低成本文字恢复，不声称已校验的表格单元格、OCR 置信度、券商对账单精度或图表语义理解。OCR 原文**不得**作为权威决策结论。
 
 可选的高影响结论二次校验、与其它 Agent 工具共享的预算/限流计量仍在 issue #196
 跟踪中。
@@ -17,13 +16,15 @@ StockPulse 可选用 Tesseract 从**本地图片**以及**内嵌位图的 PDF �
 
 ## 目标类型 `document_kind`
 
-| 值 | 输入 | 结构提示 |
-| --- | --- | --- |
-| `screenshot` | 图片 | 仅原文 |
-| `filing_page` | 图片或内嵌位图 PDF 页 | 仅原文；文本层 PDF 请用 `parse_financial_pdf` |
-| `table_statement` | 表格型图片 | 未验证的空白分隔候选行 |
-| `chart_annotation` | 图表截图 | 稀疏标注 token；语义图表仍用 `read_price_chart` |
-| `pdf_page` | 含内嵌图的 PDF | `page_index` 页首个内嵌图；无内嵌图则显式失败 |
+| `document_kind` | 输入 | 结构提示 | 明确不声称 |
+| --- | --- | --- | --- |
+| `screenshot` | 图片 | 仅原文 | 版面结构 |
+| `filing_page` | 图片或内嵌位图 PDF 页 | 仅原文；文本层 PDF 请用 `parse_financial_pdf` | 完整 PDF 文字层解析 |
+| `table_statement` | 表格型图片 | 未验证的空白分隔候选行 | 已校验单元格 |
+| `chart_annotation` | 图表截图 | 稀疏标注 token；语义图表仍用 `read_price_chart` | K 线语义 |
+| `pdf_page` | 含内嵌图的 PDF | `page_index` 页首个内嵌图；无内嵌图则显式失败 | 完整 PDF 文字层解析 |
+
+成功 OCR 后，同一执行轮次内 BoundToolSession 会阻止 follow-on 工具，直至新的用户回合。
 
 ## 信任与治理
 
