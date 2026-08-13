@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_TOOL_SURFACE_SCOPE_DIMENSIONS = frozenset({"stock"})
 SUPPORTED_AGENT_TOOL_CAPABILITIES = frozenset({
+    "alt_data:read",
     "analysis_context:read",
     "backtest:read",
     "community_intel:read",

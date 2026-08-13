@@ -2466,7 +2466,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "DECISION_MEMORY_LOOKBACK": {
         "title": "Decision Memory Lookback",
-        "description": "Maximum recent evaluated signals per stock to inject into decision memory reflection. Default 5.",
+        "description": "Maximum recent evaluated signals per stock to inject into decision memory reflection. Default 5; hard cap 40.",
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",
@@ -2475,7 +2475,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "5",
         "options": [],
-        "validation": {"min": 0, "max": 100},
+        "validation": {"min": 0, "max": 40},
         "display_order": 721,
         "help_key": "settings.agent.decision_memory",
         "examples": ["DECISION_MEMORY_LOOKBACK=5", "DECISION_MEMORY_LOOKBACK=10"],
