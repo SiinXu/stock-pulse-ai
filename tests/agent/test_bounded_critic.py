@@ -815,7 +815,12 @@ def test_missing_intelligence_retries_once_replaces_context_and_keeps_authority(
     ]
     assert ctx.meta["critic_trace"]["retry_budget_consumed"] == 1
     assert ctx.meta["critic_trace"]["retry_budget_remaining"] == 0
-    assert [event["type"] for event in events].count("critic_verdict") == 1
+    verdict_events = [
+        event for event in events if event["type"] == "critic_verdict"
+    ]
+    assert len(verdict_events) == 2
+    assert verdict_events[0]["verdict"] == "retry"
+    assert verdict_events[-1]["convergence_status"] == "not_converged"
     assert [event["type"] for event in events].count("critic_retry_start") == 1
     assert [event["type"] for event in events].count("critic_retry_done") == 1
     retry_done = next(
@@ -1418,10 +1423,20 @@ def test_revision_without_recheck_is_not_claimed_as_converged(monkeypatch) -> No
         return _stage_result("decision", raw_text="final")
 
     decision = _FixtureStage("decision", _decision)
+    events = []
     monkeypatch.setattr(critic, "BoundedCriticAgent", lambda **_kwargs: fixture_critic)
     monkeypatch.setattr(orch, "_build_agent_chain", lambda _ctx: [intel, decision])
-    result = orch._execute_pipeline(ctx, parse_dashboard=False)
+    result = orch._execute_pipeline(
+        ctx,
+        parse_dashboard=False,
+        progress_callback=events.append,
+    )
     assert result.success is True
+    verdict_events = [
+        event for event in events if event["type"] == "critic_verdict"
+    ]
+    assert len(verdict_events) == 2
+    assert verdict_events[-1]["convergence_status"] == "not_converged"
     limitations = critic.project_critic_product_limitations(ctx.meta["critic_trace"])
     joined = "\n".join(limitations)
     assert any("revision round" in line for line in limitations)
@@ -1487,7 +1502,13 @@ def test_explicit_recheck_pass_is_the_only_convergence_signal(monkeypatch) -> No
     assert result.success is True
     assert sequence_critic.calls == 2
     assert intel.calls == 2
-    assert [event["type"] for event in events].count("critic_verdict") == 2
+    verdict_events = [
+        event for event in events if event["type"] == "critic_verdict"
+    ]
+    assert len(verdict_events) == 2
+    assert verdict_events[0]["verdict"] == "retry"
+    assert verdict_events[-1]["verdict"] == "pass"
+    assert verdict_events[-1]["convergence_status"] == "converged"
     limitations = critic.project_critic_product_limitations(
         ctx.meta["critic_trace"]
     )
@@ -1591,6 +1612,10 @@ def test_second_revision_is_bounded_audited_and_not_auto_converged(monkeypatch) 
     ]
     assert [event["type"] for event in events].count("critic_retry_start") == 2
     assert [event["type"] for event in events].count("critic_retry_done") == 2
+    verdict_events = [
+        event for event in events if event["type"] == "critic_verdict"
+    ]
+    assert verdict_events[-1]["convergence_status"] == "not_converged"
     limitations = "\n".join(
         critic.project_critic_product_limitations(ctx.meta["critic_trace"])
     )
@@ -1629,6 +1654,7 @@ def test_recheck_exception_remains_unavailable_and_keeps_findings(monkeypatch) -
         return _stage_result("decision", raw_text="final")
 
     decision = _FixtureStage("decision", _decision)
+    events = []
     monkeypatch.setattr(
         critic,
         "BoundedCriticAgent",
@@ -1636,9 +1662,17 @@ def test_recheck_exception_remains_unavailable_and_keeps_findings(monkeypatch) -
     )
     monkeypatch.setattr(orch, "_build_agent_chain", lambda _ctx: [intel, decision])
 
-    result = orch._execute_pipeline(ctx, parse_dashboard=False)
+    result = orch._execute_pipeline(
+        ctx,
+        parse_dashboard=False,
+        progress_callback=events.append,
+    )
 
     assert result.success is True
+    verdict_events = [
+        event for event in events if event["type"] == "critic_verdict"
+    ]
+    assert verdict_events[-1]["convergence_status"] == "unavailable"
     limitations = "\n".join(
         critic.project_critic_product_limitations(ctx.meta["critic_trace"])
     )

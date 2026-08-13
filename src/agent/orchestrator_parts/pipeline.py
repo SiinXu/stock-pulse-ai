@@ -359,6 +359,14 @@ class _PipelineMethods:
                     "unverified.",
                 )
 
+            if (
+                recheck_result.status == StageStatus.COMPLETED
+                and verdict in {"pass", "fail_soft"}
+            ):
+                trace = _critic.finalize_convergence(
+                    ctx,
+                    recheck_verdict=verdict,
+                )
             recheck_result.meta["critic"] = _critic.trace_event_fields(trace)
             _record_optional_stage(recheck_result)
             if progress_callback:
@@ -368,11 +376,12 @@ class _PipelineMethods:
                     status=recheck_result.status.value,
                     duration=recheck_result.duration_s,
                 ))
-                progress_callback(stream_event(
-                    "critic_verdict",
-                    stage=_critic.CRITIC_STAGE_NAME,
-                    **_critic.trace_event_fields(trace),
-                ))
+                if verdict == "retry":
+                    progress_callback(stream_event(
+                        "critic_verdict",
+                        stage=_critic.CRITIC_STAGE_NAME,
+                        **_critic.trace_event_fields(trace),
+                    ))
             if recheck_result.status == StageStatus.FAILED:
                 self._record_degraded_stage(
                     ctx,
@@ -1065,7 +1074,7 @@ class _PipelineMethods:
                 if critic_trace is not None and not retry_attempted:
                     critic_trace = _critic.finalize_convergence(ctx)
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
-                if progress_callback and not retry_attempted:
+                if progress_callback:
                     progress_callback(stream_event(
                         "critic_verdict",
                         stage=stage_name,
