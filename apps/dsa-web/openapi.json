@@ -9774,12 +9774,27 @@
       "ErrorResponse": {
         "description": "Stable API error envelope.",
         "example": {
+          "category": "not_found",
           "error": "not_found",
           "message": "Resource not found",
           "params": {},
+          "severity": "warning",
           "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         },
         "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)",
+            "example": "not_found",
+            "title": "Category"
+          },
           "detail": {
             "anyOf": [
               {},
@@ -9819,6 +9834,19 @@
             "description": "Localization interpolation parameters",
             "title": "Params",
             "type": "object"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy severity: info | warning | error | critical",
+            "example": "warning",
+            "title": "Severity"
           },
           "trace_id": {
             "anyOf": [
@@ -14624,7 +14652,10 @@
               "analysis_complete",
               "alert_triggered",
               "scheduled_task_result",
-              "decision_signal"
+              "decision_signal",
+              "daily_brief",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Kind",
             "type": "string"
@@ -14657,7 +14688,10 @@
               "analysisCompleteTitle",
               "alertTriggeredTitle",
               "scheduledTaskResultTitle",
-              "decisionSignalTitle"
+              "decisionSignalTitle",
+              "dailyBriefTitle",
+              "highDisagreementTitle",
+              "portfolioHealthTitle"
             ],
             "title": "Title Key",
             "type": "string"
@@ -14890,7 +14924,10 @@
               "analysis",
               "alerts",
               "scheduled_tasks",
-              "decision_signals"
+              "decision_signals",
+              "daily_briefs",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Source",
             "type": "string"
@@ -15591,6 +15628,445 @@
         "title": "OutboundActivityPage",
         "type": "object"
       },
+      "PaperDecisionQualityAggregate": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityAggregateDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "max_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Process Score"
+          },
+          "min_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Process Score"
+          },
+          "process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Score"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "empty"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sample_size"
+        ],
+        "title": "PaperDecisionQualityAggregate",
+        "type": "object"
+      },
+      "PaperDecisionQualityAggregateDimension": {
+        "properties": {
+          "sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Size"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityAggregateDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDimension": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Inputs",
+            "type": "object"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDivisionOfLabor": {
+        "properties": {
+          "does_not_own": {
+            "title": "Does Not Own",
+            "type": "string"
+          },
+          "outcome_owner_issue": {
+            "default": 987,
+            "title": "Outcome Owner Issue",
+            "type": "integer"
+          },
+          "owns": {
+            "title": "Owns",
+            "type": "string"
+          },
+          "this_issue": {
+            "default": 1134,
+            "title": "This Issue",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "owns",
+          "does_not_own"
+        ],
+        "title": "PaperDecisionQualityDivisionOfLabor",
+        "type": "object"
+      },
+      "PaperDecisionQualityItem": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "effective_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Effective Weights",
+            "type": "object"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "linked_signal_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Signal Id"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "process_score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Process Score",
+            "type": "number"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "trade_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Date"
+          },
+          "trade_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Id"
+          }
+        },
+        "required": [
+          "process_score",
+          "dimensions",
+          "formula_version"
+        ],
+        "title": "PaperDecisionQualityItem",
+        "type": "object"
+      },
+      "PaperDecisionQualityReason": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimension"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "PaperDecisionQualityReason",
+        "type": "object"
+      },
+      "PaperDecisionQualityResponse": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "account_type": {
+            "const": "paper",
+            "default": "paper",
+            "title": "Account Type",
+            "type": "string"
+          },
+          "aggregate": {
+            "$ref": "#/components/schemas/PaperDecisionQualityAggregate"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "division_of_labor": {
+            "$ref": "#/components/schemas/PaperDecisionQualityDivisionOfLabor"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "total_trade_count": {
+            "title": "Total Trade Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "formula_version",
+          "disclaimer",
+          "account_id",
+          "as_of",
+          "sample_size",
+          "total_trade_count",
+          "truncated",
+          "aggregate",
+          "division_of_labor"
+        ],
+        "title": "PaperDecisionQualityResponse",
+        "type": "object"
+      },
       "PaperTradeCreateRequest": {
         "properties": {
           "note": {
@@ -15686,6 +16162,261 @@
           "price_source"
         ],
         "title": "PaperTradeCreatedResponse",
+        "type": "object"
+      },
+      "PeerValuationCanvasRequest": {
+        "description": "Request body for the constrained peer relative-value canvas (issue #1139).",
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Base currency for cross-market estimate normalization (default: target listing currency)",
+            "title": "Base Currency"
+          },
+          "industry_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional industry label override when peer_source=industry",
+            "title": "Industry Label"
+          },
+          "peer_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Peer stock codes (required for comparison; never invented server-side)",
+            "title": "Peer Codes"
+          },
+          "peer_source": {
+            "default": "custom",
+            "description": "Explainable peer-set source: custom codes or industry-constrained set",
+            "enum": [
+              "custom",
+              "industry"
+            ],
+            "title": "Peer Source",
+            "type": "string"
+          },
+          "stock_code": {
+            "description": "Target stock code",
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code"
+        ],
+        "title": "PeerValuationCanvasRequest",
+        "type": "object"
+      },
+      "PeerValuationCanvasResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "currency_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Metrics"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "fx_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Stale"
+          },
+          "heatmap_cells": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heatmap Cells"
+          },
+          "medians": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medians"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "multiple_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiple Metrics"
+          },
+          "peer_set": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Set"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "relative_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Summary"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "valuation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Status"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status"
+        ],
+        "title": "PeerValuationCanvasResponse",
         "type": "object"
       },
       "PerformanceMetrics": {
@@ -42379,6 +43110,134 @@
         ]
       }
     },
+    "/api/v1/portfolio/accounts/{account_id}/paper-decision-quality": {
+      "get": {
+        "description": "Returns explainable process scores for simulated trades on a paper account: analysis support, risk-gate compliance, and position discipline. This is not a return or win-rate evaluation. Outcome metrics remain owned by DecisionSignal post-hoc calibration (issue #987).",
+        "operationId": "getPaperDecisionQuality",
+        "parameters": [
+          {
+            "description": "Paper account ID",
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "description": "Paper account ID",
+              "minimum": 1,
+              "title": "Account Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional trade date from",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date from",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Optional trade date to",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date to",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Max trades to score",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Max trades to score",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperDecisionQualityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Score paper-trading decisions on process quality (not PnL)",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
     "/api/v1/portfolio/accounts/{account_id}/paper-trades": {
       "post": {
         "operationId": "create_paper_trade_api_v1_portfolio_accounts__account_id__paper_trades_post",
@@ -49618,6 +50477,68 @@
           }
         },
         "summary": "Estimate stock valuation with body overrides",
+        "tags": [
+          "Valuation"
+        ]
+      }
+    },
+    "/api/v1/valuation/peer-canvas": {
+      "post": {
+        "description": "Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.",
+        "operationId": "buildPeerValuationCanvas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeerValuationCanvasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerValuationCanvasResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Peer canvas build failed"
+          }
+        },
+        "summary": "Build peer relative-value comparison canvas",
         "tags": [
           "Valuation"
         ]

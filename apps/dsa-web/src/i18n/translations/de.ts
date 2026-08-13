@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "Aktienkurs",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "Volumen",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "Zur Watchlist",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "Markt {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "In Watchlist",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "Alle Geschichte",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "Durchschnitt {score}",
@@ -6215,4 +6216,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Parallele Marktdaten-Abfrage",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Parallele Abfrage – globales Limit",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Parallele Abfrage – Limit pro Provider",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Prozesswert",
 } as const;

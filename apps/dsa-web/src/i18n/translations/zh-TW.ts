@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "股票行情",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "成交量",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "加入自選",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "市場 {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "已加入自選",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "全部歷史",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "平均分 {score}",
@@ -6215,4 +6216,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "分析內並行取數",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取數全域並行上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取數單源並行上限",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "流程品質",
 } as const;

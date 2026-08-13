@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "銘柄相場",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "出来高",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "ウォッチリストに追加",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "市場 {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "追加済み",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "すべての歴史",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "平均 {score}",
@@ -6215,4 +6216,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "市場入力の並行取得",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取得の全体上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取得のプロバイダ別上限",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "プロセス品質",
 } as const;

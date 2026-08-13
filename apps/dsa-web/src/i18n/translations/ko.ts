@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "종목 시세",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "거래량",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "관심목록 추가",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "시장 {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "관심목록에 있음",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "모든 역사",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "평균입니다 {score}",
@@ -6215,4 +6216,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "시장 입력 병렬 수집",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "과정 품질",
 } as const;

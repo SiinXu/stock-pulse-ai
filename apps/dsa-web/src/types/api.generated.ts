@@ -2272,6 +2272,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolio/accounts/{account_id}/paper-decision-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Score paper-trading decisions on process quality (not PnL)
+         * @description Returns explainable process scores for simulated trades on a paper account: analysis support, risk-gate compliance, and position discipline. This is not a return or win-rate evaluation. Outcome metrics remain owned by DecisionSignal post-hoc calibration (issue #987).
+         */
+        get: operations["getPaperDecisionQuality"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/accounts/{account_id}/paper-trades": {
         parameters: {
             query?: never;
@@ -3838,6 +3858,26 @@ export interface paths {
          * @description Same as GET /estimate with JSON body for interactive Web sensitivity UI.
          */
         post: operations["estimateStockValuationPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/valuation/peer-canvas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build peer relative-value comparison canvas
+         * @description Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.
+         */
+        post: operations["buildPeerValuationCanvas"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7392,13 +7432,21 @@ export interface components {
          * ErrorResponse
          * @description Stable API error envelope.
          * @example {
+         *       "category": "not_found",
          *       "error": "not_found",
          *       "message": "Resource not found",
          *       "params": {},
+         *       "severity": "warning",
          *       "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
          *     }
          */
         ErrorResponse: {
+            /**
+             * Category
+             * @description Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)
+             * @example not_found
+             */
+            category?: string | null;
             /**
              * Detail
              * @deprecated
@@ -7429,6 +7477,12 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             };
+            /**
+             * Severity
+             * @description Taxonomy severity: info | warning | error | critical
+             * @example warning
+             */
+            severity?: string | null;
             /**
              * Trace Id
              * @description Diagnostic trace ID
@@ -9514,7 +9568,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "analysis_complete" | "alert_triggered" | "scheduled_task_result" | "decision_signal";
+            kind: "analysis_complete" | "alert_triggered" | "scheduled_task_result" | "decision_signal" | "daily_brief" | "high_disagreement" | "portfolio_health";
             /** Metadata */
             metadata?: {
                 [key: string]: unknown;
@@ -9533,7 +9587,7 @@ export interface components {
              * Title Key
              * @enum {string}
              */
-            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle";
+            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle" | "dailyBriefTitle" | "highDisagreementTitle" | "portfolioHealthTitle";
             /** Title Params */
             title_params?: {
                 [key: string]: string;
@@ -9627,7 +9681,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals";
+            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals" | "daily_briefs" | "high_disagreement" | "portfolio_health";
         };
         /**
          * NotificationInboxUnreadCountResponse
@@ -9922,6 +9976,163 @@ export interface components {
             /** Returned */
             returned: number;
         };
+        /** PaperDecisionQualityAggregate */
+        PaperDecisionQualityAggregate: {
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: components["schemas"]["PaperDecisionQualityAggregateDimension"];
+            };
+            /** Max Process Score */
+            max_process_score?: number | null;
+            /** Min Process Score */
+            min_process_score?: number | null;
+            /** Process Score */
+            process_score?: number | null;
+            /** Sample Size */
+            sample_size: number;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "empty";
+        };
+        /** PaperDecisionQualityAggregateDimension */
+        PaperDecisionQualityAggregateDimension: {
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+        };
+        /** PaperDecisionQualityDimension */
+        PaperDecisionQualityDimension: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: number;
+            };
+            /** Reasons */
+            reasons?: components["schemas"]["PaperDecisionQualityReason"][];
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+        };
+        /** PaperDecisionQualityDivisionOfLabor */
+        PaperDecisionQualityDivisionOfLabor: {
+            /** Does Not Own */
+            does_not_own: string;
+            /**
+             * Outcome Owner Issue
+             * @default 987
+             */
+            outcome_owner_issue: number;
+            /** Owns */
+            owns: string;
+            /**
+             * This Issue
+             * @default 1134
+             */
+            this_issue: number;
+        };
+        /** PaperDecisionQualityItem */
+        PaperDecisionQualityItem: {
+            /** Dimensions */
+            dimensions: {
+                [key: string]: components["schemas"]["PaperDecisionQualityDimension"];
+            };
+            /** Effective Weights */
+            effective_weights?: {
+                [key: string]: number;
+            };
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Formula Version */
+            formula_version: string;
+            /** Linked Signal Id */
+            linked_signal_id?: number | null;
+            /** Market */
+            market?: string | null;
+            /** Price */
+            price?: number | null;
+            /** Process Score */
+            process_score: number;
+            /** Quantity */
+            quantity?: number | null;
+            /** Reasons */
+            reasons?: components["schemas"]["PaperDecisionQualityReason"][];
+            /**
+             * Score Kind
+             * @default process
+             * @constant
+             */
+            score_kind: "process";
+            /** Side */
+            side?: string | null;
+            /** Symbol */
+            symbol?: string | null;
+            /** Trade Date */
+            trade_date?: string | null;
+            /** Trade Id */
+            trade_id?: number | null;
+        };
+        /** PaperDecisionQualityReason */
+        PaperDecisionQualityReason: {
+            /** Code */
+            code: string;
+            /** Dimension */
+            dimension?: string | null;
+            /** Message */
+            message: string;
+        };
+        /** PaperDecisionQualityResponse */
+        PaperDecisionQualityResponse: {
+            /** Account Id */
+            account_id: number;
+            /**
+             * Account Type
+             * @default paper
+             * @constant
+             */
+            account_type: "paper";
+            aggregate: components["schemas"]["PaperDecisionQualityAggregate"];
+            /** As Of */
+            as_of: string;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Disclaimer */
+            disclaimer: string;
+            division_of_labor: components["schemas"]["PaperDecisionQualityDivisionOfLabor"];
+            /** Formula Version */
+            formula_version: string;
+            /** Items */
+            items?: components["schemas"]["PaperDecisionQualityItem"][];
+            /** Sample Size */
+            sample_size: number;
+            /**
+             * Score Kind
+             * @default process
+             * @constant
+             */
+            score_kind: "process";
+            /** Total Trade Count */
+            total_trade_count: number;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** PaperTradeCreateRequest */
         PaperTradeCreateRequest: {
             /** Note */
@@ -9959,6 +10170,88 @@ export interface components {
             price: number;
             /** Price Source */
             price_source: string;
+        };
+        /**
+         * PeerValuationCanvasRequest
+         * @description Request body for the constrained peer relative-value canvas (issue #1139).
+         */
+        PeerValuationCanvasRequest: {
+            /**
+             * Base Currency
+             * @description Base currency for cross-market estimate normalization (default: target listing currency)
+             */
+            base_currency?: string | null;
+            /**
+             * Industry Label
+             * @description Optional industry label override when peer_source=industry
+             */
+            industry_label?: string | null;
+            /**
+             * Peer Codes
+             * @description Peer stock codes (required for comparison; never invented server-side)
+             */
+            peer_codes?: string[] | null;
+            /**
+             * Peer Source
+             * @description Explainable peer-set source: custom codes or industry-constrained set
+             * @default custom
+             * @enum {string}
+             */
+            peer_source: "custom" | "industry";
+            /**
+             * Stock Code
+             * @description Target stock code
+             */
+            stock_code: string;
+        };
+        /** PeerValuationCanvasResponse */
+        PeerValuationCanvasResponse: {
+            /** Base Currency */
+            base_currency?: string | null;
+            /** Currency Metrics */
+            currency_metrics?: string[] | null;
+            /** Disclaimer */
+            disclaimer?: string | null;
+            /** Fx Stale */
+            fx_stale?: boolean | null;
+            /** Heatmap Cells */
+            heatmap_cells?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Medians */
+            medians?: {
+                [key: string]: unknown;
+            } | null;
+            /** Message */
+            message?: string | null;
+            /** Metrics */
+            metrics?: string[];
+            /** Multiple Metrics */
+            multiple_metrics?: string[] | null;
+            /** Peer Set */
+            peer_set?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason */
+            reason?: string | null;
+            /** Relative Summary */
+            relative_summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Rows */
+            rows?: {
+                [key: string]: unknown;
+            }[];
+            /** Schema Version */
+            schema_version: string;
+            /** Status */
+            status: string;
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Valuation Status */
+            valuation_status?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** PerformanceMetrics */
         PerformanceMetrics: {
@@ -23104,6 +23397,72 @@ export interface operations {
             };
         };
     };
+    getPaperDecisionQuality: {
+        parameters: {
+            query?: {
+                /** @description Optional trade date from */
+                date_from?: string | null;
+                /** @description Optional trade date to */
+                date_to?: string | null;
+                /** @description Max trades to score */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Paper account ID */
+                account_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperDecisionQualityResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     create_paper_trade_api_v1_portfolio_accounts__account_id__paper_trades_post: {
         parameters: {
             query?: never;
@@ -27865,6 +28224,57 @@ export interface operations {
                 };
             };
             /** @description Valuation estimate failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    buildPeerValuationCanvas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeerValuationCanvasRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerValuationCanvasResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Peer canvas build failed */
             500: {
                 headers: {
                     [name: string]: unknown;

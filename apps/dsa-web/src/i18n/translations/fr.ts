@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "Cotation d'action",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "Volume",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "Ajouter au suivi",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "Marché {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "Dans le suivi",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "Toute l’histoire",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "Moyenne {score}",
@@ -6215,4 +6216,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Extraction parallèle des données de marché",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Plafond global d’extraction parallèle",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Plafond par fournisseur d’extraction parallèle",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Score du processus",
 } as const;

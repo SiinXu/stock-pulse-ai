@@ -1961,6 +1961,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "Kuotasi saham",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "Volume",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "Tambah ke watchlist",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "Pasar {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "Di watchlist",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "Semua sejarah",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "Rata-rata {score}",
@@ -6215,4 +6216,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Tarikan data pasar paralel",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Batas global tarikan paralel",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Batas per-penyedia tarikan paralel",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualitas proses",
 } as const;

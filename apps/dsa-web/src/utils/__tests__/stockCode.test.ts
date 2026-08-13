@@ -55,6 +55,12 @@ describe('normalizeStockCode', () => {
     expect(normalizeStockCode('BRK.B')).toBe('BRK.B');
   });
 
+  it('canonicalizes explicit crypto:TICKER identities without promoting bare tickers', () => {
+    expect(normalizeStockCode('crypto:BTC')).toBe('CRYPTO:BTC');
+    expect(normalizeStockCode('CRYPTO:eth')).toBe('CRYPTO:ETH');
+    expect(normalizeStockCode('BTC')).toBe('BTC');
+  });
+
   it('keeps JP/KR Yahoo suffix codes in canonical uppercase suffix form', () => {
     expect(normalizeStockCode('7203.T')).toBe('7203.T');
     expect(normalizeStockCode('6758.t')).toBe('6758.T');
