@@ -94,6 +94,11 @@ export interface AlertRuleCreateRequest {
    * server-owned fields survive edit round-trips.
    */
   cooldownPolicy?: AlertCooldownPolicy | null;
+  /**
+   * Opaque server policy. Known key: auto_analysis (boolean), pipeline (string).
+   * Other server-owned fields must round-trip unchanged.
+   */
+  notificationPolicy?: Record<string, unknown> | null;
 }
 
 export interface AlertDeleteResponse {
@@ -145,6 +150,27 @@ export interface AlertTriggerItem {
   decisionSignalSummary?: Partial<DecisionSignalItem> | null;
   impactContext?: EventAlertImpactContext | null;
   eventContext?: EventAlertEventContext | null;
+  suggestedAction?: {
+    actionCode?: string | null;
+    label?: string | null;
+    rationale?: string | null;
+    deepLinks?: Record<string, string> | null;
+    relevance?: string[] | null;
+    autoAnalysis?: {
+      status?: string | null;
+      submitted?: boolean | null;
+      stockCode?: string | null;
+      pipeline?: string | null;
+      reason?: string | null;
+    } | null;
+  } | null;
+  autoAnalysis?: {
+    status?: string | null;
+    submitted?: boolean | null;
+    stockCode?: string | null;
+    pipeline?: string | null;
+    reason?: string | null;
+  } | null;
   impactResult?: EventAlertImpactResult | null;
 }
 
