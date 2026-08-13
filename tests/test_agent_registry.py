@@ -689,6 +689,10 @@ class TestBuiltinToolDefinitions(unittest.TestCase):
             "eval_window_days": 20,
             "total_evaluations": 7,
             "completed_count": 6,
+            "insufficient_count": 1,
+            "win_count": 4,
+            "loss_count": 2,
+            "neutral_count": 0,
             "win_rate": 0.64,
             "direction_accuracy": 0.71,
             "avg_return": 0.083,
@@ -697,6 +701,8 @@ class TestBuiltinToolDefinitions(unittest.TestCase):
             "avg_stock_return_pct": 6.8,
             "avg_simulated_return_pct": 8.3,
             "computed_at": "2026-03-20T07:00:00+00:00",
+            "methodology": {"return_unit": "fraction"},
+            "diagnostics": {"source": "evaluated"},
         }
 
         with patch("src.agent.tools.backtest_tools._get_backtest_service", return_value=svc):
@@ -711,6 +717,10 @@ class TestBuiltinToolDefinitions(unittest.TestCase):
                 "eval_window_days": 20,
                 "total_evaluations": 7,
                 "completed_count": 6,
+                "insufficient_count": 1,
+                "win_count": 4,
+                "loss_count": 2,
+                "neutral_count": 0,
                 "win_rate": 0.64,
                 "direction_accuracy": 0.71,
                 "avg_return": 0.083,
@@ -719,6 +729,9 @@ class TestBuiltinToolDefinitions(unittest.TestCase):
                 "avg_stock_return_pct": 6.8,
                 "avg_simulated_return_pct": 8.3,
                 "computed_at": "2026-03-20T07:00:00+00:00",
+                "methodology": {"return_unit": "fraction"},
+                "diagnostics": {"source": "evaluated"},
+                "is_return_promise": False,
             },
         )
 

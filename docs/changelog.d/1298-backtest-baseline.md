@@ -1,1 +1,2 @@
 - [Fixed] Preserve hardened backtest methodology and localized configuration contracts after synchronizing with the latest baseline.
+- [Tests] Cover the expanded skill-backtest tool payload, including counts, methodology, diagnostics, and the no-return-promise marker.
