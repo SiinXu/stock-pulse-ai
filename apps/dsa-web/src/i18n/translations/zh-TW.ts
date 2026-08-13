@@ -3096,7 +3096,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.screening.SCREENING_TEXT.diagnosticTimeout": "請求超時",
   "locales.screening.SCREENING_TEXT.diagnosticWarning": "AlphaSift 已降級執行",
   "locales.screening.SCREENING_TEXT.disabled": "選股功能已停用",
-  "locales.screening.SCREENING_TEXT.documentTitle": "AlphaSift 選股 - StockPulse",
   "locales.screening.SCREENING_TEXT.dsaEnrichment": "StockPulse 增強：{enriched} / {requested}",
   "locales.screening.SCREENING_TEXT.dsaHints": "StockPulse 增強提示",
   "locales.screening.SCREENING_TEXT.dsaNews": "StockPulse 新聞",

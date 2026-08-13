@@ -3096,7 +3096,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.screening.SCREENING_TEXT.diagnosticTimeout": "Tiempo de espera agotado",
   "locales.screening.SCREENING_TEXT.diagnosticWarning": "AlphaSift Operación degradada",
   "locales.screening.SCREENING_TEXT.disabled": "Selección desactivada",
-  "locales.screening.SCREENING_TEXT.documentTitle": "AlphaSift Selección de acciones -StockPulse",
   "locales.screening.SCREENING_TEXT.dsaEnrichment": "StockPulse Enriquecimiento:{enriched} / {requested}",
   "locales.screening.SCREENING_TEXT.dsaHints": "StockPulse Notas de enriquecimiento",
   "locales.screening.SCREENING_TEXT.dsaNews": "StockPulse Noticias",

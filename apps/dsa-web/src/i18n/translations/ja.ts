@@ -3096,7 +3096,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.screening.SCREENING_TEXT.diagnosticTimeout": "リクエストがタイムアウトしました",
   "locales.screening.SCREENING_TEXT.diagnosticWarning": "AlphaSift は縮退モードで動作しています",
   "locales.screening.SCREENING_TEXT.disabled": "スクリーニングは無効です",
-  "locales.screening.SCREENING_TEXT.documentTitle": "AlphaSift スクリーニング - StockPulse",
   "locales.screening.SCREENING_TEXT.dsaEnrichment": "StockPulse エンリッチメント:{enriched} / {requested}",
   "locales.screening.SCREENING_TEXT.dsaHints": "StockPulse エンリッチメントノート",
   "locales.screening.SCREENING_TEXT.dsaNews": "StockPulse ニュース",

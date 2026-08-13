@@ -21,6 +21,7 @@ from api.v1.endpoints import (
     backtest,
     calculators,
     capabilities,
+    candidate_discovery,
     config_profiles,
     decision_signals,
     health,
@@ -216,6 +217,12 @@ router.include_router(
     alphasift.router,
     prefix="/alphasift",
     tags=["AlphaSift"]
+)
+
+router.include_router(
+    candidate_discovery.router,
+    prefix="/discover",
+    tags=["CandidateDiscovery"],
 )
 
 router.include_router(
