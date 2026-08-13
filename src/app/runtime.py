@@ -536,6 +536,18 @@ def _run_schedule_mode(
             )
         )
 
+    if getattr(config, "prediction_resolve_enabled", False):
+        from src.services.prediction_resolver import (
+            build_prediction_resolver_background_tasks,
+        )
+
+        background_tasks.extend(
+            build_prediction_resolver_background_tasks(
+                config,
+                config_provider=_reload_runtime_config,
+            )
+        )
+
     schedule_kwargs = {
         "task": scheduled_task,
         "schedule_time": config.schedule_time,
