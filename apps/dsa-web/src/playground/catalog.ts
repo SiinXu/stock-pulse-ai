@@ -152,6 +152,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('signals', 'decision-signal-create-drawer', 'DecisionSignalCreateDrawer', 'components/decision-signals/DecisionSignalCreateDrawer.tsx', ['interactive', 'states']),
   entry('signals', 'decision-signal-outcome-run-panel', 'DecisionSignalOutcomeRunPanel', 'components/decision-signals/DecisionSignalOutcomeRunPanel.tsx', ['interactive', 'empty', 'error']),
   entry('signals', 'decision-signal-outcome-stats-card', 'DecisionSignalOutcomeStatsCard', 'components/decision-signals/DecisionSignalOutcomeStatsCard.tsx', ['default', 'empty', 'loading']),
+  entry('signals', 'decision-signal-calibration-breakdown', 'DecisionSignalCalibrationBreakdown', 'components/decision-signals/DecisionSignalCalibrationBreakdown.tsx', ['default', 'empty']),
   entry('signals', 'decision-signal-profile-calibration', 'DecisionSignalProfileCalibration', 'components/decision-signals/DecisionSignalProfileCalibration.tsx', ['default', 'states']),
   entry('signals', 'skill-outcome-performance-table', 'SkillOutcomePerformanceTable', 'components/skill-outcomes/SkillOutcomePerformanceTable.tsx', ['default', 'empty']),
   entry('signals', 'skill-outcome-recent-lists', 'SkillOutcomeRecentLists', 'components/skill-outcomes/SkillOutcomeRecentLists.tsx', ['default', 'empty']),
@@ -241,6 +242,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
 
   entry('reports', 'dcf-sensitivity-panel', 'DcfSensitivityPanel', 'components/valuation/DcfSensitivityPanel.tsx', ['default', 'empty', 'interactive']),
+  entry('reports', 'peer-valuation-canvas', 'PeerValuationCanvas', 'components/valuation/PeerValuationCanvas.tsx', ['default', 'empty', 'interactive']),
   entry('stockSearch', 'kline-chart', 'KlineChart', 'components/charts/KlineChart.tsx', ['default', 'empty', 'states']),
   entry('stockSearch', 'risk-heatmap', 'RiskHeatmap', 'components/charts/RiskHeatmap.tsx', ['default', 'empty']),
 

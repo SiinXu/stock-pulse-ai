@@ -282,7 +282,13 @@ def run_with_planning(
     # Successful plan: inject observation evidence and run LLM synthesis.
     evidence = compact_observation_summary(exec_result.step_observations)
     synthesis_context = dict(effective_context)
-    synthesis_context["planning_execution_metadata"] = planning_metadata
+    # Keep full trace_events on AgentResult.planning_metadata; omit the dense list
+    # from synthesis context (not prompt keys today, avoids accidental growth).
+    synthesis_context["planning_execution_metadata"] = {
+        key: value
+        for key, value in planning_metadata.items()
+        if key != "trace_events"
+    }
     if evidence:
         synthesis_context["plan_execution_evidence"] = evidence
 

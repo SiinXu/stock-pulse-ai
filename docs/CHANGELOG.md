@@ -8,21 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Tests] Add deterministic HITL approve/reject/lifetime-timeout/pipeline-deadline contracts through real ApprovalService and dashboard risk entry (Refs #225, #1079).
+- [Added] Paper-trading decision process-quality scores (analysis support, risk-gate compliance, position discipline) with explainable reasons, trade-date equity sizing, and a portfolio API; process-only and not a PnL evaluation (Refs #1134, #1127, #987).
+- [Changed] Scheduler observability: four-state process mode (`serve+schedule` / `desktop` / `cli-schedule` / `not_attached`), field-level hot-reload vs restart labels based on real attach/runtime behavior, and a Notifications channels deep link from the scheduler status card (#869).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
-- [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
-- [Changed] Jinja stock reports use Decision Card-first layered reading (card → mode-density evidence strata → detail sections) for brief/standard/research, and `ReportType.BRIEF` notifications force `report_mode=brief` so push length budgets hold (Refs #861, #874).
-- [Changed] Split `data_provider/akshare_fetcher.py` into capability-domain modules under `data_provider/akshare_parts/` (symbols, timeout client, history, realtime quotes, market boards, enhanced data, pure Tencent parsers) behind an ADR-006 compatibility facade with stable re-exports and patch targets; no intentional provider fallback or cache behavior change (Refs #1068).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).
 - [Added] Data Sources Hub runtime projection: live primary/fallback daily routing, process-local provider health, cache quality, and enhancer configured state under Settings → Data sources (Refs #867).
 - [Chore] Rebaseline Web locale gzip budgets after HTML report-export download chrome strings (Refs #163).
 - [Added] Report Markdown panel one-click HTML export uses history export capabilities so office-friendly HTML is user-reachable alongside Markdown and PDF (Refs #163).
-- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after data-validation Settings help inventory keys (Refs #185).
 - [Chore] Rebaseline Web locale gzip budgets after Agent three-layer progressive-disclosure copy (Refs #868).
 - [Changed] Expose Event Alerts production discovery from Event Calendar (and calendar back-link) so `/event-alerts` is not URL-only (Refs #1058, #1008).
-- [Added] Complete remaining data-validation gaps: pre-synthesis OHLCV finite checks with explicit degradation, PE/PB soft plausibility (suspect/keep), multi-provider cross-source divergence warnings with attribution, and ETF/edge false-positive calibration fixtures (Refs #185).
 - [Changed] Mount DecisionSignalOutcomeStatsCard on Signal Center Review so outcome stats are no longer Playground-only (Refs #1058, #1008).
 - [Fixed] Signal detail drawer exposes a create-rule command that deep-links into Signal Center Rules with stock context (Refs #879 A3).
 - [Changed] Agent Behavior settings use Essentials · Behavior · Governance/Expert progressive disclosure, move expert JSON behind the expert layer, and add a default preset-to-ask path without changing config semantics (#868).

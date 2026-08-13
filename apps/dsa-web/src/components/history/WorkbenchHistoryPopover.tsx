@@ -49,11 +49,11 @@ export const WorkbenchHistoryPopover: React.FC<WorkbenchHistoryPopoverProps> = (
       ariaLabel={t('analysisWorkbench.history')}
       placement="bottom"
       align="start"
-      contentClassName="w-80 max-w-[calc(100vw-2rem)] rounded-2xl border-border/80 shadow-2xl shadow-black/30"
+      contentClassName="w-80 max-w-[calc(100vw-2rem)] rounded-2xl border-border/80 shadow-elevation-popper"
       trigger={({ open, toggle }) => (
         <IconButton
           type="button"
-          variant="outline"
+          variant="ghost"
           size="default"
           onClick={toggle}
           aria-label={t('analysisWorkbench.history')}

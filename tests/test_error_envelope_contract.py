@@ -101,6 +101,8 @@ def test_structured_error_uses_stable_envelope_and_trace_id() -> None:
         "params": {"stock_code": "600519", "existing_task_id": "task-1"},
         "details": None,
         "detail": None,
+        "category": "busy",
+        "severity": "warning",
         "trace_id": "trace-contract-1",
     }
     assert response.headers["x-trace-id"] == "trace-contract-1"
@@ -115,6 +117,8 @@ def test_legacy_http_exception_is_adapted_without_using_raw_copy_as_message() ->
     assert payload["details"] == {"legacy_message": "legacy raw failure"}
     assert payload["detail"] == payload["details"]
     assert payload["params"] == {}
+    assert payload["category"] == "internal"
+    assert payload["severity"] == "error"
     assert payload["trace_id"]
 
 
@@ -131,6 +135,8 @@ def test_structured_client_error_preserves_public_semantics_and_headers() -> Non
         "params": {"current_config_version": "version-2"},
         "details": {"retryable": True},
         "detail": {"retryable": True},
+        "category": "config_conflict",
+        "severity": "warning",
         "trace_id": "trace-client-conflict",
     }
     assert response.headers["retry-after"] == "3"
@@ -161,6 +167,8 @@ def test_structured_server_error_discards_all_private_payload_fields(caplog) -> 
         "params": {},
         "details": None,
         "detail": None,
+        "category": "internal",
+        "severity": "critical",
         "trace_id": "trace-safe-server-error",
     }
     assert response.headers["x-trace-id"] == "trace-safe-server-error"

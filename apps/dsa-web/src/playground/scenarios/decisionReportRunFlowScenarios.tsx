@@ -26,6 +26,7 @@ import { DecisionSignalMemoryControls } from '../../components/decision-signals/
 import { DecisionSignalOutcomeExplorer } from '../../components/decision-signals/DecisionSignalOutcomeExplorer';
 import { DecisionSignalOutcomeRunPanel } from '../../components/decision-signals/DecisionSignalOutcomeRunPanel';
 import { DecisionSignalOutcomeStatsCard } from '../../components/decision-signals/DecisionSignalOutcomeStatsCard';
+import { DecisionSignalCalibrationBreakdown } from '../../components/decision-signals/DecisionSignalCalibrationBreakdown';
 import { DecisionSignalProfileCalibration } from '../../components/decision-signals/DecisionSignalProfileCalibration';
 import type {
   DecisionSignalOutcomeStatsResponse,
@@ -278,10 +279,75 @@ const fixtureOutcomeStats: DecisionSignalOutcomeStatsResponse = {
   hit: 26,
   miss: 18,
   neutral: 4,
+  sampleSufficient: true,
+  minimumCompletedSampleSize: 30,
   hitRatePct: 59.09,
   avgStockReturnPct: 0.9,
   unableReasons: {},
-  breakdowns: {},
+  breakdowns: {
+    period: [
+      {
+        dimension: 'period',
+        value: '2024-01',
+        total: 32,
+        completed: 32,
+        unable: 0,
+        hit: 18,
+        miss: 12,
+        neutral: 2,
+        sampleSufficient: true,
+        hitRatePct: 60,
+        avgStockReturnPct: 1.1,
+        unableReasons: {},
+      },
+      {
+        dimension: 'period',
+        value: '2024-02',
+        total: 16,
+        completed: 16,
+        unable: 0,
+        hit: 8,
+        miss: 6,
+        neutral: 2,
+        sampleSufficient: false,
+        hitRatePct: null,
+        avgStockReturnPct: null,
+        unableReasons: {},
+      },
+    ],
+    market: [
+      {
+        dimension: 'market',
+        value: 'cn',
+        total: 40,
+        completed: 40,
+        unable: 0,
+        hit: 22,
+        miss: 14,
+        neutral: 4,
+        sampleSufficient: true,
+        hitRatePct: 61.11,
+        avgStockReturnPct: 0.8,
+        unableReasons: {},
+      },
+    ],
+    action: [
+      {
+        dimension: 'action',
+        value: 'buy',
+        total: 30,
+        completed: 30,
+        unable: 0,
+        hit: 18,
+        miss: 10,
+        neutral: 2,
+        sampleSufficient: true,
+        hitRatePct: 64.29,
+        avgStockReturnPct: 1.4,
+        unableReasons: {},
+      },
+    ],
+  },
   profileCalibration: fixtureProfileCalibration,
 };
 
@@ -318,6 +384,17 @@ const DecisionSignalOutcomeStatsCardStory = () => {
       onRunCompleted={() => undefined}
     />
   );
+};
+
+const DecisionSignalCalibrationBreakdownStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const stats = scenario === 'empty'
+    ? {
+        ...fixtureOutcomeStats,
+        breakdowns: { period: [], market: [], action: [] },
+      }
+    : fixtureOutcomeStats;
+  return <DecisionSignalCalibrationBreakdown stats={stats} />;
 };
 
 const DecisionSignalProfileCalibrationStory = () => {
@@ -573,7 +650,12 @@ const WhatIfScenarioPanelStory = () => {
   };
   return (
     <div className="max-w-3xl rounded-lg border border-subtle bg-card p-2">
-      <WhatIfScenarioPanel t={t as never} draft={draft} onChange={() => undefined} />
+      <WhatIfScenarioPanel
+        t={t as never}
+        draft={draft}
+        onChange={() => undefined}
+        promoteHref={scenario === 'states' ? '/research/analysis?stock=600519' : null}
+      />
     </div>
   );
 };
@@ -816,6 +898,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'decision-signal-create-drawer': DecisionSignalCreateDrawerStory,
   'decision-signal-outcome-run-panel': DecisionSignalOutcomeRunPanelStory,
   'decision-signal-outcome-stats-card': DecisionSignalOutcomeStatsCardStory,
+  'decision-signal-calibration-breakdown': DecisionSignalCalibrationBreakdownStory,
   'decision-signal-profile-calibration': DecisionSignalProfileCalibrationStory,
   'analysis-context-summary': AnalysisContextSummaryStory,
   'market-review-report-view': MarketReviewReportViewStory,
