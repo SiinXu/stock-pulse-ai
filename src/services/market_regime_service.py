@@ -746,7 +746,7 @@ def extract_market_regime_context(payload: Any) -> Optional[Dict[str, Any]]:
         return None
     try:
         model = MarketRegimeContext.model_validate(payload)
-    except Exception:
+    except Exception:  # broad-exception: optional_metadata - Invalid stored regime metadata is omitted instead of affecting analysis recovery.
         return None
     return dump_market_regime_model(model)
 
