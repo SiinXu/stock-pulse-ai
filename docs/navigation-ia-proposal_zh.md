@@ -1,8 +1,9 @@
 # 导航信息架构（IA）— 目标方案提案
 
-**状态**：需要决策（在结构性改路由之前须维护者批准）  
+**状态**：阶段 2 B0/B1 按 [\#873](https://github.com/SiinXu/stock-pulse-ai/issues/873) 脊柱实施中（Today · Research · Signals · Portfolio · Settings；Agent 降级）。下方 A–D 选项保留作历史上下文。  
 **Issue**：[\#368](https://github.com/SiinXu/stock-pulse-ai/issues/368)  
-**配套 PR**：仅含无争议的标签 / 重定向 / 命令面板卫生项（本文档不是实施令）
+**设计输入**：[\#873](https://github.com/SiinXu/stock-pulse-ai/issues/873)  
+**配套 PR**：审计基线仅含机械卫生；chrome 批次单独合入
 
 本文记录**现状审计**与**目标 IA 选项**，供维护者选型。机械 PR 不推测性重组路由。
 

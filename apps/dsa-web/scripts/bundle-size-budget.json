@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 243133,
-      "measuredGzipBytes": 242733,
-      "note": "Gzip-9 remasure after high-disagreement alert settings copy on merged main; 400 B headroom."
+      "maxGzipBytes": 244087,
+      "measuredGzipBytes": 243687,
+      "note": "Local production-build remasure after merging origin/main; measured 243687 B + 400 B retained headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 158718,
-      "measuredGzipBytes": 158018,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 159858,
+      "measuredGzipBytes": 159158,
+      "note": "Local production-build remasure after merging origin/main; measured 159158 B + 700 B retained headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151940,
-      "measuredGzipBytes": 151240,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 153040,
+      "measuredGzipBytes": 152340,
+      "note": "Local production-build remasure after merging origin/main; measured 152340 B + 700 B retained headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151860,
-      "measuredGzipBytes": 151160,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 152972,
+      "measuredGzipBytes": 152272,
+      "note": "Local production-build remasure after merging origin/main; measured 152272 B + 700 B retained headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 151617,
-      "measuredGzipBytes": 151017,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 600 B headroom."
+      "maxGzipBytes": 152676,
+      "measuredGzipBytes": 152076,
+      "note": "Local production-build remasure after merging origin/main; measured 152076 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 147500,
-      "measuredGzipBytes": 146800,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 148432,
+      "measuredGzipBytes": 147732,
+      "note": "Local production-build remasure after merging origin/main; measured 147732 B + 700 B retained headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 144356,
-      "measuredGzipBytes": 143656,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 145453,
+      "measuredGzipBytes": 144753,
+      "note": "Local production-build remasure after merging origin/main; measured 144753 B + 700 B retained headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 137634,
-      "measuredGzipBytes": 136934,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 138616,
+      "measuredGzipBytes": 137916,
+      "note": "Local production-build remasure after merging origin/main; measured 137916 B + 700 B retained headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 137721,
-      "measuredGzipBytes": 137021,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 138695,
+      "measuredGzipBytes": 137995,
+      "note": "Local production-build remasure after merging origin/main; measured 137995 B + 700 B retained headroom."
     },
     {
       "id": "vendor-charts",
