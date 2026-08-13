@@ -531,6 +531,28 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "LLM_USAGE_ATTRIBUTION_ENABLED": {
+        "title": "Usage Cost Attribution",
+        "description": "Attach run/stage/mode cost estimates and model-routing quality fields to llm_usage rows. Shares metering with per-mode budgets.",
+        "category": "ai_model", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "true", "options": [], "validation": {}, "display_order": 7,
+        "help_key": "settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED",
+        "examples": ["LLM_USAGE_ATTRIBUTION_ENABLED=true", "LLM_USAGE_ATTRIBUTION_ENABLED=false"],
+        "docs": [{"label": "LLM cost attribution", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/llm-cost-attribution.md"}],
+        "warning_codes": [],
+    },
+    "LLM_COST_PRICING_PATH": {
+        "title": "LLM Cost Pricing Table Path",
+        "description": "Optional JSON path of per-model token rates for estimated_cost_usd. When unset, LiteLLM model_cost is used.",
+        "category": "ai_model", "data_type": "string", "ui_control": "text",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "", "options": [], "validation": {}, "display_order": 8,
+        "help_key": "settings.ai_model.LLM_COST_PRICING_PATH",
+        "examples": ["LLM_COST_PRICING_PATH=/path/to/pricing.json"],
+        "docs": [{"label": "LLM cost attribution", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/llm-cost-attribution.md"}],
+        "warning_codes": [],
+    },
     "LLM_PROMPT_CACHE_HINTS_ENABLED": {
         "title": "Prompt Cache Hints",
         "description": "Allows the project to send verified provider-specific prompt-cache hints such as prompt_cache_key or cache_control. Unknown providers and unverified routes remain telemetry-only.",
@@ -1166,7 +1188,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
 
     "TASK_ROUTING_ENABLED": {
-        "title": "Task-Aware Model Routing",
+        "title": "Model Routing",
         "description": (
             "When enabled, select models for task classes from write-registry "
             "LLM capabilities using tags and TASK_ROUTING_POLICY. Explicit "
@@ -1183,7 +1205,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 45,
-        "help_key": "settings.ai_model.TASK_ROUTING_ENABLED",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_ENABLED=false", "TASK_ROUTING_ENABLED=true"],
         "docs": [
             {
@@ -1194,7 +1216,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "TASK_ROUTING_POLICY": {
-        "title": "Task Routing Policy",
+        "title": "Routing Policy",
         "description": "Scoring policy for automatic model selection: quality, cost, or local_first.",
         "category": "ai_model",
         "data_type": "string",
@@ -1210,7 +1232,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "validation": {"enum": ["quality", "cost", "local_first"]},
         "display_order": 46,
-        "help_key": "settings.ai_model.TASK_ROUTING_POLICY",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_POLICY=quality"],
         "docs": [
             {
@@ -1221,7 +1243,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "CAPABILITY_WRITE_REGISTRY_PATH": {
-        "title": "Capability Write Registry Path",
+        "title": "Registry Path",
         "description": (
             "Optional path for the durable write-side capability registry JSON. "
             "Empty uses <database-dir>/capability_write_registry.json."
@@ -1236,7 +1258,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 47,
-        "help_key": "settings.ai_model.CAPABILITY_WRITE_REGISTRY_PATH",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["CAPABILITY_WRITE_REGISTRY_PATH=./data/capability_write_registry.json"],
         "docs": [
             {
@@ -1247,7 +1269,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "TASK_ROUTING_PIN_REPORT": {
-        "title": "Task Routing Pin (Report)",
+        "title": "Report Pin",
         "description": "Optional explicit model pin for report tasks. Always overrides automatic routing when set.",
         "category": "ai_model",
         "data_type": "string",
@@ -1259,7 +1281,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 48,
-        "help_key": "settings.ai_model.TASK_ROUTING_PIN_REPORT",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_PIN_REPORT="],
         "docs": [
             {
@@ -1270,7 +1292,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "TASK_ROUTING_PIN_AGENT": {
-        "title": "Task Routing Pin (Agent)",
+        "title": "Agent Pin",
         "description": "Optional explicit model pin for Agent tasks. Always overrides automatic routing when set.",
         "category": "ai_model",
         "data_type": "string",
@@ -1282,7 +1304,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 49,
-        "help_key": "settings.ai_model.TASK_ROUTING_PIN_AGENT",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_PIN_AGENT="],
         "docs": [
             {
@@ -1293,7 +1315,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "TASK_ROUTING_PIN_VISION": {
-        "title": "Task Routing Pin (Vision)",
+        "title": "Vision Pin",
         "description": "Optional explicit model pin for vision tasks. Always overrides automatic routing when set.",
         "category": "ai_model",
         "data_type": "string",
@@ -1305,7 +1327,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 50,
-        "help_key": "settings.ai_model.TASK_ROUTING_PIN_VISION",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_PIN_VISION="],
         "docs": [
             {
@@ -1317,7 +1339,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
 
     "TASK_ROUTING_PIN_MARKET_REVIEW": {
-        "title": "Task Routing Pin (Market Review)",
+        "title": "Market Review Pin",
         "description": "Optional explicit model pin for market review tasks. Always overrides automatic routing when set.",
         "category": "ai_model",
         "data_type": "string",
@@ -1329,7 +1351,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 51,
-        "help_key": "settings.ai_model.TASK_ROUTING_PIN_MARKET_REVIEW",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_PIN_MARKET_REVIEW="],
         "docs": [
             {
@@ -1341,7 +1363,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
 
     "TASK_ROUTING_PIN_CHEAP_SCAN": {
-        "title": "Task Routing Pin (Cheap Scan)",
+        "title": "Cheap Scan Pin",
         "description": "Optional explicit model pin for cheap scan tasks. Always overrides automatic routing when set.",
         "category": "ai_model",
         "data_type": "string",
@@ -1353,7 +1375,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 52,
-        "help_key": "settings.ai_model.TASK_ROUTING_PIN_CHEAP_SCAN",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_PIN_CHEAP_SCAN="],
         "docs": [
             {
@@ -1365,7 +1387,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
 
     "TASK_ROUTING_PIN_DEEP_REASONING": {
-        "title": "Task Routing Pin (Deep Reasoning)",
+        "title": "Deep Reasoning Pin",
         "description": "Optional explicit model pin for deep reasoning tasks. Always overrides automatic routing when set.",
         "category": "ai_model",
         "data_type": "string",
@@ -1377,7 +1399,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 53,
-        "help_key": "settings.ai_model.TASK_ROUTING_PIN_DEEP_REASONING",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_PIN_DEEP_REASONING="],
         "docs": [
             {
@@ -1389,7 +1411,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
 
     "TASK_ROUTING_PIN_CODING": {
-        "title": "Task Routing Pin (Coding)",
+        "title": "Coding Pin",
         "description": "Optional explicit model pin for coding tasks. Always overrides automatic routing when set.",
         "category": "ai_model",
         "data_type": "string",
@@ -1401,7 +1423,7 @@ AI_MODEL_LEGACY_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 54,
-        "help_key": "settings.ai_model.TASK_ROUTING_PIN_CODING",
+        "help_key": "settings.ai_model.TASK_ROUTING",
         "examples": ["TASK_ROUTING_PIN_CODING="],
         "docs": [
             {

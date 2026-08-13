@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale budgets remeasured on GitHub Actions Linux after capability write registry / task-routing Settings help inventory (Refs #221 / #204); failed locales use measured gzip + 200 B headroom. Untouched budgets remain unchanged.",
+  "baselineNote": "Settings, locale, and IntelligenceSourcesPanel budgets use a combined production build after landing Daily Brief/Event Research, research API, and cost-attribution inventory changes (Refs #149 / #1131 / #1143 / #166 / #248); each rule retains its fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 236558,
-      "measuredGzipBytes": 236358,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys on post-main rebase (PR #1177 / #221 / #204); measured 236358 B + 200 B headroom."
+      "maxGzipBytes": 242114,
+      "measuredGzipBytes": 241714,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution inventory changes, with 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 153597,
-      "measuredGzipBytes": 153397,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 153397 B + 200 B headroom."
+      "maxGzipBytes": 157947,
+      "measuredGzipBytes": 157247,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 146968,
-      "measuredGzipBytes": 146768,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 146768 B + 200 B headroom."
+      "maxGzipBytes": 151228,
+      "measuredGzipBytes": 150528,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 146942,
-      "measuredGzipBytes": 146742,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 146742 B + 200 B headroom."
+      "maxGzipBytes": 151114,
+      "measuredGzipBytes": 150414,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 147208,
-      "measuredGzipBytes": 147008,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 147008 B + 200 B headroom."
+      "maxGzipBytes": 150955,
+      "measuredGzipBytes": 150355,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 600 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 142985,
-      "measuredGzipBytes": 142785,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 142785 B + 200 B headroom."
+      "maxGzipBytes": 146787,
+      "measuredGzipBytes": 146087,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 139499,
-      "measuredGzipBytes": 139299,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 139299 B + 200 B headroom."
+      "maxGzipBytes": 143593,
+      "measuredGzipBytes": 142893,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 132906,
-      "measuredGzipBytes": 132706,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 132706 B + 200 B headroom."
+      "maxGzipBytes": 136900,
+      "measuredGzipBytes": 136200,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 132960,
-      "measuredGzipBytes": 132760,
-      "note": "GitHub Actions Linux measurement after capability write registry / task-routing help keys (PR #1177 / #221 / #204); measured 132760 B + 200 B headroom."
+      "maxGzipBytes": 136987,
+      "measuredGzipBytes": 136287,
+      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -139,8 +139,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45391,
-      "measuredGzipBytes": 41264
+      "maxGzipBytes": 45803,
+      "measuredGzipBytes": 45603,
+      "note": "GitHub Actions Linux remeasure after cost attribution and routing telemetry Settings controls (Refs #166 / #248); measured gzip + 200 B headroom."
     },
     {
       "id": "AlertsWorkspace",

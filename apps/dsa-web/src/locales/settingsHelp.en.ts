@@ -207,6 +207,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Prevents accidental comparison across different HMAC keys or deployments.'],
     notes: ['This is only a version label, not a secret.'],
   },
+  'settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED': {
+    title: 'Usage Cost Attribution',
+    summary: 'Attaches run/stage/mode cost estimates and model-routing quality fields to llm_usage rows.',
+    usage: 'Enabled by default. When disabled, cost estimation and attribution columns are skipped while token totals still persist.',
+    valueNotes: ['Shares metering with per-mode budgets (#1213) via src/llm/cost.py. Unpriced models stay cost_status=unpriced without inventing $0.'],
+    impact: ['Affects Usage page cost and routing rates, and fields consumable by the budget gate.'],
+    notes: ['Collection overhead is small; disable temporarily when debugging cost anomalies.'],
+  },
+  'settings.ai_model.LLM_COST_PRICING_PATH': {
+    title: 'LLM Cost Pricing Table Path',
+    summary: 'Optional JSON pricing table path used for estimated_cost_usd.',
+    usage: 'Leave empty to use LiteLLM model_cost, or point to a maintained per-model rate table.',
+    valueNotes: ['Accepts input_cost_per_token / output_cost_per_token or per-1M token fields.'],
+    impact: ['Changes cost-estimate sources only; does not change model calls.'],
+    notes: ['See docs/llm-cost-attribution_EN.md.'],
+  },
   'settings.ai_model.provider_keys': {
     title: 'Provider API Key',
     summary: 'Configures credentials for model providers or gateways.',
@@ -603,6 +619,39 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects how final aggregated fundamental validation failures are surfaced to callers.'],
     notes: ['Independent of DATA_VALIDATION_STRICT provider-candidate rejection.'],
   },
+  'settings.data_source.DATA_VALIDATION_FUND_PE_SUSPECT_ABS': {
+    title: 'Fundamental PE Suspect Bound',
+    summary: 'Soft absolute PE bound. Values at or above this magnitude are marked suspect and kept.',
+    usage: 'Default 200. Raise only when legitimate PE values commonly exceed the soft band for your universe.',
+    valueNotes: [
+      'Suspect findings are warn-only; the PE value is retained for analysis.',
+      'Hard feed extremes still reject and remain separate from this soft bound.',
+    ],
+    impact: ['Changes when PE is annotated as suspect in diagnostics and context evidence.'],
+    notes: ['See docs/data-validation-layer.md for hard vs soft fundamental ranges.'],
+  },
+  'settings.data_source.DATA_VALIDATION_FUND_PB_SUSPECT_ABS': {
+    title: 'Fundamental PB Suspect Bound',
+    summary: 'Soft absolute PB bound. Values at or above this magnitude are marked suspect and kept.',
+    usage: 'Default 50. Raise only when legitimate PB values commonly exceed the soft band for your universe.',
+    valueNotes: [
+      'Suspect findings are warn-only; the PB value is retained for analysis.',
+      'Hard feed extremes still reject and remain separate from this soft bound.',
+    ],
+    impact: ['Changes when PB is annotated as suspect in diagnostics and context evidence.'],
+    notes: ['Missing PE/PB remains valid for ETFs and partial offshore providers.'],
+  },
+  'settings.data_source.DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD': {
+    title: 'Cross-Source Relative Threshold',
+    summary: 'Relative divergence threshold for multi-provider field comparison.',
+    usage: 'Default 0.05 (5%). Increase to reduce warnings when providers use different quote conventions.',
+    valueNotes: [
+      'Only applies when two or more providers supply the same finite field.',
+      'Divergent values are kept with provider attribution; a single source never interrupts analysis.',
+    ],
+    impact: ['Controls when cross-source WARN evidence is written to run diagnostics.'],
+    notes: ['Comparison is observational and fail-open on comparison errors.'],
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
     summary: 'Sends analysis reports to a Feishu group through a custom bot webhook.',
@@ -947,6 +996,29 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.research_api': {
+    title: 'Read-only research API',
+    summary: 'Controls the authenticated read-only research API that exposes stratified conclusions for embed/portal clients.',
+    usage: 'Keep RESEARCH_API_ENABLED off unless you intentionally need GET /api/v1/research/conclusions*. When enabled, clients request brief/standard/research density plus as-of, confidence, and evidence counts. RESEARCH_API_RATE_LIMIT_PER_MINUTE sets the per-principal sliding-window budget (same pattern as MCP).',
+    valueNotes: [
+      'Default is off; routes return 404 while disabled.',
+      'Mounted on the main API port only — no separate listener.',
+      'Reuses session auth (when ADMIN_AUTH_ENABLED), fail-closed security audit, and sliding-window rate limits.',
+      'Responses are compact projections only: no raw_result dump and no write methods.',
+    ],
+    impact: [
+      'Affects whether /api/v1/research/conclusions* is reachable when authenticated.',
+      'Does not change analysis generation, history storage, or MCP tool inventory.',
+    ],
+    notes: [
+      'Capability registry work remains separate (see related tracking issues).',
+    ],
+    examples: [
+      'RESEARCH_API_ENABLED=false',
+      'RESEARCH_API_ENABLED=true',
+      'RESEARCH_API_RATE_LIMIT_PER_MINUTE=60',
+    ],
+  },
   'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
     title: 'Report Export PDF Font Path',
     summary: 'Selects the single-face TTF/OTF used by optional PDF report export.',
@@ -1179,6 +1251,47 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects reasoning depth, duration, and token consumption.'],
     notes: ['Very low values may cause incomplete reasoning.'],
   },
+  'settings.agent.AGENT_MODE_BUDGET_ENABLED': {
+    title: 'Mode Hard Budget Enabled',
+    summary: 'Enable hard per-mode Agent budgets for turns, tools, and cost.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS': {
+    title: 'Mode Budget Max LLM Turns (global)',
+    summary: 'Global tightener for mode LLM turn caps; 0 keeps mode defaults.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS': {
+    title: 'Mode Budget Max Tool Calls (global)',
+    summary: 'Global tightener for mode tool-call caps; 0 keeps mode defaults.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_COST_USD': {
+    title: 'Mode Budget Max Cost USD (global)',
+    summary: 'Global tightener for estimated USD cost caps; 0 keeps mode defaults.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOKENS': {
+    title: 'Mode Budget Max Tokens (global)',
+    summary: 'Optional global token ceiling; 0 disables the token dimension.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
+    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    valueNotes: ['Requires process restart to take effect.'],
+  },
+
   'settings.agent.AGENT_SKILLS': {
     title: 'Agent Strategies',
     summary: 'Specifies the list of strategy skills the Agent uses.',
@@ -1484,6 +1597,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Adds low-overhead agent timeline detail for debugging multi-step runs.'],
     notes: ['See docs/agent-observability_EN.md for privacy and overhead notes.'],
+  },
+  'settings.agent.performance': {
+    title: 'Performance Baselines',
+    summary: 'Opt-in performance span collection and offline profiling for key analysis paths.',
+    usage: 'PERF_COLLECTION_ENABLED records lightweight spans when a collector is active (default off). PERF_PROFILE_ENABLED documents offline cProfile intent and does not auto-wrap production requests.',
+    valueNotes: [
+      'Disabled path is a no-op so production overhead stays near zero.',
+      'Use scripts/run_perf_baseline.py for offline baselines and optional cProfile.',
+    ],
+    impact: ['Enables local baseline compare and pipeline stage duration mirrors without changing default runtime behavior.'],
+    notes: ['See docs/performance-baseline_EN.md for workloads, CI impact, and refresh guidance.'],
   },
   'settings.agent.event_monitor': {
     title: 'Event Monitor',
@@ -1807,6 +1931,26 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects total analysis time and API call frequency.'],
     notes: ['Too many workers can cause API rate-limit errors.'],
   },
+  'settings.system.ANALYSIS_PARALLEL_FETCH': {
+    title: 'Parallel Market-Input Fetch',
+    summary:
+      'Runs dependency-free market-input pulls (realtime, chip, money-flow, fundamental) concurrently inside one stock analysis.',
+    usage:
+      'ANALYSIS_PARALLEL_FETCH_ENABLED toggles parallel vs serial declaration-order execution. MAX_CONCURRENT is the global slot cap. PER_PROVIDER_LIMIT caps branches that share a logical provider key. BUDGET_SECONDS is an optional wall-clock budget (0 disables); unstarted branches become typed budget_skipped gaps.',
+    valueNotes: [
+      'Still uses DataFetcherManager (fallback, cache, circuit, validation); parallel mode is not a side-channel HTTP path.',
+      'Default concurrent=3 and per-provider=1 reduce stampede risk while overlapping independent capabilities.',
+      'Disable the switch to force serial fetch order when diagnosing provider issues.',
+    ],
+    impact: [
+      'Affects single-stock analysis latency and peak concurrent provider calls within one run.',
+      'Does not change multi-stock MAX_WORKERS concurrency across the queue.',
+    ],
+    notes: [
+      'Merge order into stage IO / AgentContext follows declared task keys, never completion order.',
+      'Compatible with prediction ActualsFetcher coalesce: overlapping symbol pulls still go through the provider manager path.',
+    ],
+  },
   'settings.system.ANALYSIS_DELAY': {
     title: 'Analysis Delay',
     summary: 'Delay in seconds between stock analyses for rate limiting.',
@@ -1817,16 +1961,19 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.system.daily_brief': {
     title: 'Daily Brief',
-    summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
-    usage:
-      'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown. DAILY_BRIEF_NOTIFY controls channel push after a successful brief. DAILY_BRIEF_PERSIST_HISTORY keeps review history. DAILY_BRIEF_SAVE_REPORT_FILE writes a report file under the report directory.',
-    valueNotes: [
-      'Default off keeps existing schedules unchanged.',
-      'Accuracy review is informational and does not auto-trade.',
-      'Notify/persist/save-file defaults are true once the brief itself is enabled.',
-    ],
-    impact: ['Affects scheduled brief generation, push, history, and accuracy review panels.'],
+    summary: 'Scheduled personal morning brief: portfolio membership, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, and historical accuracy review.',
+    usage: 'DAILY_BRIEF_ENABLED turns the feature on. SCHEDULE_TIME/TIMEZONE control timing. MIN_SAMPLES gates accuracy stats. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. QUIET_WHEN_EMPTY skips notify without material content.',
+    valueNotes: ['Default off.', 'Accuracy is informational.', 'Quiet mode still generates and may persist.'],
+    impact: ['Affects scheduled brief generation, shared report-route notification, history, and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
+  },
+  'settings.system.event_research_brief': {
+    title: 'Event Research Brief',
+    summary: 'Optional standalone review of observed earnings-event triggers with metrics, surprise criteria, and a post-event checklist.',
+    usage: 'EVENT_RESEARCH_BRIEF_ENABLED turns the standalone scheduler on. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. LOOKBACK_HOURS and CATEGORIES bound recent managed triggers (day one: earnings). The daily brief embeds recent event context; this is not a future-event catalog.',
+    valueNotes: ['Default off.', 'Managed corporate-event triggers only.', 'Consensus figures are never fabricated.'],
+    impact: ['Affects recent event-context notifications and optional history rows.'],
+    notes: ['Requires schedule mode for the standalone path.'],
   },
   'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
     title: 'Admin Session Max Age (Hours)',
@@ -2028,6 +2175,19 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
     ],
   },
+
+  'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
+    title: 'Readiness Check Timeout',
+    summary: 'Per-check timeout for the structured readiness/self-check report.',
+    usage:
+      'Default 1.0s (clamped to 0.1–5.0). Applies to on-demand GET /api/v1/system/readiness only; ' +
+      'never runs automatically at process startup. Timed-out or failed probes are never reported as ready.',
+    examples: [
+      'READINESS_CHECK_TIMEOUT_SECONDS=1.0',
+      'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
+    ],
+  },
+
 
   'settings.system.portfolio_health': {
     title: 'Portfolio Health Formula',
@@ -2247,82 +2407,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Bounds per-call analysis cost.',
     ],
   },
-  'settings.ai_model.TASK_ROUTING_ENABLED': {
-    title: 'Task-Aware Model Routing',
-    summary: 'Enable task-aware model routing from the write-side capability registry.',
-    usage: 'Default off. When enabled, active LLM capabilities are scored by task tags and TASK_ROUTING_POLICY. Explicit TASK_ROUTING_PIN_* always wins.',
-    valueNotes: [
-      'Default off. Explicit TASK_ROUTING_PIN_* always wins.',
-      'See docs/capability-write-registry.md.',
-    ],
-    impact: ['Changes which model is selected for report, agent, vision, and other task classes when registry LLM entries exist.'],
-    notes: ['Does not replace existing LITELLM_MODEL assignments when routing is disabled or no candidate matches.'],
-  },
-  'settings.ai_model.TASK_ROUTING_POLICY': {
-    title: 'Task Routing Policy',
-    summary: 'Scoring policy for automatic model selection: quality, cost, or local_first.',
-    usage: 'Used only when TASK_ROUTING_ENABLED=true.',
-    valueNotes: [
-      'Used only when TASK_ROUTING_ENABLED=true.',
-      'Allowed values: quality, cost, local_first.',
-    ],
-  },
-  'settings.ai_model.CAPABILITY_WRITE_REGISTRY_PATH': {
-    title: 'Capability Write Registry Path',
-    summary: 'Optional path for capability_write_registry.json.',
-    usage: 'Empty uses <database-dir>/capability_write_registry.json.',
-    valueNotes: [
-      'Empty uses the database directory.',
-    ],
-    notes: ['Write-side only; does not change the live-owner inventory endpoint.'],
-  },
-  'settings.ai_model.TASK_ROUTING_PIN_REPORT': {
-    title: 'Task Routing Pin (Report)',
-    summary: 'Optional report task model pin.',
-    usage: 'Always overrides automatic selection when set.',
-    valueNotes: [
-      'Always overrides automatic selection when set.',
-    ],
-  },
-  'settings.ai_model.TASK_ROUTING_PIN_AGENT': {
-    title: 'Task Routing Pin (Agent)',
-    summary: 'Optional Agent task model pin.',
-    usage: 'Always overrides automatic selection when set.',
-    valueNotes: [
-      'Always overrides automatic selection when set.',
-    ],
-  },
-  'settings.ai_model.TASK_ROUTING_PIN_VISION': {
-    title: 'Task Routing Pin (Vision)',
-    summary: 'Optional vision task model pin.',
-    usage: 'Always overrides automatic selection when set.',
-    valueNotes: [
-      'Always overrides automatic selection when set.',
-    ],
-  },
-  'settings.ai_model.TASK_ROUTING_PIN_MARKET_REVIEW': {
-    title: 'Task Routing Pin (Market Review)',
-    summary: 'Optional market-review task model pin.',
-    usage: 'Always overrides automatic selection when set.',
-    valueNotes: [],
-  },
-  'settings.ai_model.TASK_ROUTING_PIN_CHEAP_SCAN': {
-    title: 'Task Routing Pin (Cheap Scan)',
-    summary: 'Optional cheap-scan task model pin.',
-    usage: 'Always overrides automatic selection when set.',
-    valueNotes: [],
-  },
-  'settings.ai_model.TASK_ROUTING_PIN_DEEP_REASONING': {
-    title: 'Task Routing Pin (Deep Reasoning)',
-    summary: 'Optional deep-reasoning task model pin.',
-    usage: 'Always overrides automatic selection when set.',
-    valueNotes: [],
-  },
-  'settings.ai_model.TASK_ROUTING_PIN_CODING': {
-    title: 'Task Routing Pin (Coding)',
-    summary: 'Optional coding task model pin.',
-    usage: 'Always overrides automatic selection when set.',
-    valueNotes: [],
+  'settings.ai_model.TASK_ROUTING': {
+    title: 'Routing',
+    summary: 'Configure routing and overrides.',
   },
 };
 

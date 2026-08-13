@@ -104,4 +104,3 @@ GET /api/v1/capabilities?domain=data&domain=tool
 ## 写入侧注册表
 
 登记、依赖解析与任务感知路由见 [capability-write-registry_CN.md](capability-write-registry_CN.md)。本清单接口保持只读。
-

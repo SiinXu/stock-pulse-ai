@@ -167,4 +167,3 @@ and open under issue #221.
 ## Write-side registry
 
 Operator registration, dependency resolution, and task-aware routing live in a separate control plane documented in [capability-write-registry.md](capability-write-registry.md). This inventory endpoint remains read-only.
-

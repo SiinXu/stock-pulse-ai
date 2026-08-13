@@ -191,6 +191,58 @@ class PortfolioPr2TestCase(unittest.TestCase):
             content=csv_text.encode("utf-8"),
         )
         self.assertEqual(parsed["record_count"], 0)
+        self.assertEqual(parsed["error_count"], 1)
+        self.assertEqual(len(parsed["failed_rows"]), 1)
+        self.assertEqual(parsed["failed_rows"][0]["reason_code"], "invalid_side")
+        self.assertEqual(parsed["failed_rows"][0]["row_number"], 2)
+        self.assertIn("600519", parsed["failed_rows"][0]["source"].get("证券代码", ""))
+
+    def test_import_xlsx_and_structured_failed_rows(self) -> None:
+        import io
+
+        import pandas as pd
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "成交日期": "2026-01-02",
+                    "证券代码": "600519",
+                    "买卖标志": "买入",
+                    "成交数量": "10",
+                    "成交均价": "100",
+                    "成交编号": "HT-XLSX-1",
+                },
+                {
+                    "成交日期": "not-a-date",
+                    "证券代码": "000001",
+                    "买卖标志": "买入",
+                    "成交数量": "5",
+                    "成交均价": "12",
+                    "成交编号": "HT-XLSX-2",
+                },
+            ]
+        )
+        buffer = io.BytesIO()
+        frame.to_excel(buffer, index=False, engine="openpyxl")
+        parsed = self.import_service.parse_trade_csv(
+            broker="huatai",
+            content=buffer.getvalue(),
+            filename="broker.xlsx",
+        )
+        self.assertEqual(parsed["record_count"], 1)
+        self.assertEqual(parsed["records"][0]["symbol"], "600519")
+        self.assertEqual(parsed["error_count"], 1)
+        self.assertEqual(parsed["failed_rows"][0]["reason_code"], "invalid_trade_date")
+        self.assertEqual(parsed["failed_rows"][0]["source"].get("证券代码"), "000001")
+
+    def test_import_rejects_legacy_xls_extension(self) -> None:
+        with self.assertRaises(ValueError) as ctx:
+            self.import_service.parse_trade_csv(
+                broker="huatai",
+                content=b"not-an-excel-file",
+                filename="legacy.xls",
+            )
+        self.assertIn(".xlsx", str(ctx.exception))
 
     def test_import_supported_broker_registry(self) -> None:
         items = self.import_service.list_supported_brokers()
