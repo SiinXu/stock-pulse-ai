@@ -24,7 +24,7 @@ export const PageHeader = forwardRef<
 }, ref) => {
   return (
     <header {...props} data-pattern="page-header" className={cn('py-1', className)}>
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col density-gap-header md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           {eyebrow ? <span className="label-uppercase">{eyebrow}</span> : null}
           <h1
@@ -37,7 +37,7 @@ export const PageHeader = forwardRef<
           </h1>
           {description ? <p className="mt-1.5 max-w-2xl text-sm text-secondary-text">{description}</p> : null}
         </div>
-        {actions ? <div data-slot="actions" className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? <div data-slot="actions" className="flex flex-wrap items-center density-gap-tools">{actions}</div> : null}
       </div>
     </header>
   );

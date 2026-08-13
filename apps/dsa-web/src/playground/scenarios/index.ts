@@ -11,7 +11,7 @@ import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
 
 type ChartScenarioId = 'kline-chart' | 'risk-heatmap';
-type ValuationScenarioId = 'dcf-sensitivity-panel';
+type ValuationScenarioId = 'dcf-sensitivity-panel' | 'peer-valuation-canvas';
 
 function createLazyScenario(loadRenderer: () => Promise<PlaygroundScenarioRenderer>): PlaygroundScenarioRenderer {
   const LazyRenderer = lazy(async () => {
@@ -75,6 +75,9 @@ const LAZY_REPORT_MARKDOWN_SCENARIOS: Record<string, PlaygroundScenarioRenderer>
 const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRenderer> = {
   'dcf-sensitivity-panel': createLazyScenario(async () => (
     (await import('./valuationScenarios')).VALUATION_SCENARIOS['dcf-sensitivity-panel']
+  )),
+  'peer-valuation-canvas': createLazyScenario(async () => (
+    (await import('./valuationScenarios')).VALUATION_SCENARIOS['peer-valuation-canvas']
   )),
 };
 

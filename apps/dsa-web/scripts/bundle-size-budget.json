@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-12",
-  "baselineNote": "Settings, locale, and IntelligenceSourcesPanel budgets use a combined production build after landing Daily Brief/Event Research, research API, and cost-attribution inventory changes (Refs #149 / #1131 / #1143 / #166 / #248); each rule retains its fixed headroom.",
+  "measuredAt": "2026-08-13",
+  "baselineNote": "IntelligenceSourcesPanel and locale budgets use the production build after the checkpoint-settings and DecisionSignal calibration localizations landed on main; each rule retains its fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 242114,
-      "measuredGzipBytes": 241714,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution inventory changes, with 400 B headroom."
+      "maxGzipBytes": 242532,
+      "measuredGzipBytes": 242132,
+      "note": "Post-checkpoint-settings production-build measurement, with 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 157947,
-      "measuredGzipBytes": 157247,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 158718,
+      "measuredGzipBytes": 158018,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151228,
-      "measuredGzipBytes": 150528,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 151940,
+      "measuredGzipBytes": 151240,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151114,
-      "measuredGzipBytes": 150414,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 151860,
+      "measuredGzipBytes": 151160,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 150955,
-      "measuredGzipBytes": 150355,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 600 B headroom."
+      "maxGzipBytes": 151617,
+      "measuredGzipBytes": 151017,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 600 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 146787,
-      "measuredGzipBytes": 146087,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 147500,
+      "measuredGzipBytes": 146800,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 143593,
-      "measuredGzipBytes": 142893,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 144356,
+      "measuredGzipBytes": 143656,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 136900,
-      "measuredGzipBytes": 136200,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 137634,
+      "measuredGzipBytes": 136934,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 136987,
-      "measuredGzipBytes": 136287,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 137721,
+      "measuredGzipBytes": 137021,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -112,8 +112,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10376,
-      "measuredGzipBytes": 9432
+      "maxGzipBytes": 10861,
+      "measuredGzipBytes": 10461,
+      "note": "Combined production-build measurement after merge train 20260813-03 (#1149 #1240 #1157 #1227 #1218 #1236 #1265). Each member is individually within the previous budget; the icon set grows cumulatively because each adds a small number of distinct Lucide icons. Measured 10461 B with 400 B headroom, matching the IntelligenceSourcesPanel convention."
     },
     {
       "id": "vendor-misc",
@@ -161,7 +162,7 @@
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 26601,
       "measuredGzipBytes": 26401,
-      "note": "GitHub Actions Linux measurement on the current PR/main synthetic merge; route code is unchanged and the residual variation is Vite dependency-map hashes. Measured 26401 B + 200 B headroom."
+      "note": "GitHub Actions Linux measurement after committee insights were split behind a dynamic import; the route retains only Vite dependency-map hashes. Measured 26401 B on the PR/main synthetic merge + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",

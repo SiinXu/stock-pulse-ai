@@ -13,6 +13,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from data_provider.base import normalize_stock_code
 from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from src.analyzer import AnalysisResult
+from src.core.contracts import (
+    FetchDailyDataOutput,
+    FetchStageInput,
+    RunContext,
+    build_run_context,
+)
 from src.core.pipeline_stage_results import (
     PipelineStageName,
     PipelineStageResult,
@@ -299,14 +305,57 @@ class _OrchestrationStageMixin:
             AnalysisResult 或 None
         """
         from src.plugins.event_hooks import dispatch_analysis_event
+        from src.services.analysis_stage_checkpoint import (
+            activate_checkpoint_session,
+            create_checkpoint_session,
+            pipeline_stage_name,
+            reset_checkpoint_session,
+        )
 
         logger.info("========== Processing %s ==========", code)
 
         from src.services.history_loader import set_frozen_target_date, reset_frozen_target_date
         effective_query_id = analysis_query_id or getattr(self, "query_id", None) or uuid.uuid4().hex
         effective_trace_id = getattr(self, "trace_id", None) or effective_query_id
+        # Formal run context (Issue #1072): shared stage identity without
+        # embedding business rules in the orchestration facade.
+        run_context: RunContext = build_run_context(
+            query_id=effective_query_id,
+            trace_id=effective_trace_id,
+            stock_code=code,
+            report_type=report_type,
+            query_source=getattr(self, "query_source", None),
+            current_time=current_time,
+            analysis_phase=str(getattr(self, "analysis_phase", "auto") or "auto"),
+            portfolio_context=getattr(self, "portfolio_context", None),
+            skip_analysis=skip_analysis,
+            single_stock_notify=single_stock_notify,
+            save_context_snapshot=bool(getattr(self, "save_context_snapshot", False)),
+        )
+        self._current_run_context = run_context
         diag_token = None
         frozen_target_token = None
+        checkpoint_token = None
+        pipeline_config = getattr(self, "config", None)
+        force_full_checkpoint = bool(
+            getattr(self, "analysis_checkpoint_force_full", False)
+            or getattr(pipeline_config, "analysis_checkpoint_force_full", False)
+        )
+        checkpoint_session = create_checkpoint_session(
+            pipeline_config,
+            query_id=effective_query_id,
+            stock_code=code,
+            skills=getattr(self, "analysis_skills", None),
+            report_type=getattr(report_type, "value", report_type),
+            analysis_phase=getattr(self, "analysis_phase", None),
+            force_full=force_full_checkpoint,
+            active=(
+                not skip_analysis
+                and bool(getattr(pipeline_config, "agent_mode", False))
+                and str(getattr(pipeline_config, "agent_arch", "single") or "single").lower()
+                == "multi"
+            ),
+        )
         if get_current_diagnostic_context() is None:
             diag_token = activate_run_diagnostic_context(
                 trace_id=effective_trace_id,
@@ -318,8 +367,8 @@ class _OrchestrationStageMixin:
             with observe_pipeline_stage(
                 "resolve",
                 input_summary={
-                    "stock_code": code,
-                    "query_source": getattr(self, "query_source", None),
+                    "stock_code": run_context.stock_code,
+                    "query_source": run_context.query_source,
                 },
                 retryable=False,
             ) as resolve_stage:
@@ -349,7 +398,20 @@ class _OrchestrationStageMixin:
                     ),
                 )
                 frozen_td, frozen_target_token = resolve_result.unwrap()
+                if checkpoint_session.enabled and resolve_result.successful:
+                    checkpoint_session.save_stage(
+                        pipeline_stage_name("resolve"),
+                        {
+                            "target_date": (
+                                resolved_value[0].isoformat()
+                                if resolved_value is not None
+                                else None
+                            ),
+                            "query_id": effective_query_id,
+                        },
+                    )
         except Exception:
+            checkpoint_session.fail_keep()
             record_missing_pipeline_stages_as_skipped(
                 PIPELINE_STAGE_NAMES,
                 input_summary={"stock_code": code},
@@ -370,32 +432,39 @@ class _OrchestrationStageMixin:
                 trigger_source=getattr(self, "query_source", None) or "system",
             )
 
+        checkpoint_token = activate_checkpoint_session(checkpoint_session)
         try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
             # Step 1: Get and save data
+            fetch_input = FetchStageInput(
+                stock_code=run_context.stock_code,
+                operation="prepare_daily_data",
+                force_refresh=False,
+                current_time=current_time,
+                run=run_context,
+            )
             with observe_pipeline_stage(
                 "fetch",
-                input_summary={
-                    "stock_code": code,
-                    "operation": "prepare_daily_data",
-                    "force_refresh": False,
-                },
+                input_summary=fetch_input.to_input_summary(),
                 retryable=True,
             ) as fetch_stage:
                 def _prepare_daily_data() -> PipelineStageResult[Any]:
-                    stage_value = self.fetch_and_save_stock_data(
+                    data_ready, stage_error = self.fetch_and_save_stock_data(
                         code,
                         current_time=current_time,
                     )
-                    data_ready, stage_error = stage_value
-                    if data_ready:
+                    fetch_output = FetchDailyDataOutput(
+                        data_ready=bool(data_ready),
+                        error=stage_error,
+                    )
+                    if fetch_output.data_ready:
                         return PipelineStageResult.success(
                             PipelineStageName.FETCH,
-                            stage_value,
+                            fetch_output,
                         )
                     return PipelineStageResult.degraded(
                         PipelineStageName.FETCH,
-                        stage_value,
+                        fetch_output,
                         reason=stage_error,
                         retryable=True,
                     )
@@ -406,12 +475,17 @@ class _OrchestrationStageMixin:
                     retryable=True,
                 )
                 fetch_value = fetch_result.value
+                output_summary = (
+                    fetch_value.to_output_summary()
+                    if isinstance(fetch_value, FetchDailyDataOutput)
+                    else {
+                        "data_ready": bool(fetch_value and fetch_value[0]),
+                    }
+                )
                 self._finish_pipeline_stage(
                     fetch_stage,
                     fetch_result,
-                    output_summary={
-                        "data_ready": bool(fetch_value and fetch_value[0]),
-                    },
+                    output_summary=output_summary,
                 )
                 success, error = fetch_result.unwrap()
 
@@ -507,6 +581,7 @@ class _OrchestrationStageMixin:
                         trigger_source=getattr(self, "query_source", None) or "system",
                         result_reference=effective_query_id,
                     )
+                    checkpoint_session.complete()
                 else:
                     dispatch_analysis_event(
                         "analysis.failed",
@@ -516,9 +591,15 @@ class _OrchestrationStageMixin:
                         trigger_source=getattr(self, "query_source", None) or "system",
                         error_code="analysis_failed",
                     )
+                    checkpoint_session.fail_keep()
+            elif result and result.success:
+                checkpoint_session.complete()
+            else:
+                checkpoint_session.fail_keep()
             return result
 
         except __LocalDataMissingError__:
+            checkpoint_session.fail_keep()
             record_missing_pipeline_stages_as_skipped(
                 PIPELINE_STAGE_NAMES,
                 input_summary={"stock_code": code},
@@ -536,6 +617,7 @@ class _OrchestrationStageMixin:
             raise
         except Exception as e:  # broad-exception: fallback_recorded - Per-stock failures are safely logged so the batch can continue.
             # Capture all exceptions to ensure individual stock failure does not affect the overall result
+            checkpoint_session.fail_keep()
             record_missing_pipeline_stages_as_skipped(
                 PIPELINE_STAGE_NAMES,
                 input_summary={"stock_code": code},
@@ -559,6 +641,7 @@ class _OrchestrationStageMixin:
                 )
             return None
         finally:
+            reset_checkpoint_session(checkpoint_token)
             reset_run_diagnostic_context(diag_token)
             if frozen_target_token is not None:
                 reset_frozen_target_date(frozen_target_token)

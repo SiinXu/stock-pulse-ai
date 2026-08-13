@@ -495,8 +495,8 @@ stock-pulse-ai/
 | `MAX_WORKERS` | 并发线程数 | `3` |
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | 将当日大盘环境摘要注入个股分析 Prompt，并在高风险/退潮环境下软化激进买入建议；默认开启，设为 `false` 后仍可运行大盘复盘 | `true` |
-| `DECISION_MEMORY_ENABLED` | 将“历史决策复盘”（该股过往信号的命中战绩与同类判断校准）注入分析 Prompt 与个股报告；仅用于校准置信度，永不翻转方向；关闭或无历史时零额外开销。可用请求参数 `use_memory` 单次覆盖 | `true` |
-| `DECISION_MEMORY_LOOKBACK` | 复盘时纳入的该股最近“已产生结果”的信号条数上限 | `5` |
+| `DECISION_MEMORY_ENABLED` | 将“历史决策复盘”（该股过往信号的命中战绩与同类判断校准）注入分析 Prompt 与个股报告；仅用于校准置信度，永不翻转方向；仅准入带 `signal_id` 来源的结构化已结算 outcome，并以不可信记忆数据隔离；关闭或无历史时零额外开销。可用请求参数 `use_memory` 单次覆盖 | `true` |
+| `DECISION_MEMORY_LOOKBACK` | 复盘注入时该股准入后的已评估信号条数上限（硬上限 40） | `5` |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | 仅复盘创建时间早于该天数的信号（确保其结果已结算） | `3` |
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据。可在 Web 设置 → 系统与安全 → 系统设置中编辑；运营预览使用同一公开路由，关闭时返回 404 | `false` |
@@ -1420,6 +1420,16 @@ PUSHOVER_API_TOKEN=your_api_token
 - 其余可选参数见官方 [环境变量说明](https://open.longbridge.com/zh-CN/docs/getting-started#环境变量)
 - 仅在 YFinance（美股）或 AkShare（港股）返回数据不完整时自动触发，不影响 A 股链路
 - 未配置凭据时不会实例化该可选数据源；若运行时出现连接关闭类异常，会在冷却期内临时跳过 Longbridge，避免请求级频繁重连
+
+### 另类数据插件（默认关闭）
+
+公司事件、持仓变动、供应链标签、量化情绪等**不是**内置主行情源。它们使用 ToolSurface 能力 `alt_data:read`，且只能作为**非权威支持性证据**。
+
+- **默认关闭：** 保持 `PLUGINS_DIR` 未设置；公司事件工具不在默认 Agent 工具目录中。
+- **参考包：** `examples/plugins/example-alternative-data`（确定性夹具；manifest 声明 `alt_data:read`）。
+- **启用：** 将 `PLUGINS_DIR` 指向已审查的父目录（例如 `examples/plugins`），重启进程，并仅在需要时为会话授予 `alt_data:read`。
+- **治理：** 无效/缺失载荷转为缺口且 `confidence=null`；附加另类数据不改变核心 `AnalysisContextPack` 质量分，也不投影到 `verified_fact` / `decision` 层。
+- **契约：** [alternative-data-plugin-contract_zh.md](alternative-data-plugin-contract_zh.md)
 
 ### 东财接口频繁失败时的处理
 
