@@ -236,6 +236,9 @@ def _subject_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
     name = _safe_text(subject.get("stock_name"))
     market = _safe_text(subject.get("market"))
     version = _safe_text(payload.get("pack_version"))
+    snapshot_id = _safe_text(payload.get("snapshot_id"))
+    snapshot_revision = payload.get("snapshot_revision")
+    as_of = _safe_text(payload.get("as_of"))
 
     if lang == "en":
         label = code or "unknown"
@@ -247,6 +250,12 @@ def _subject_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
             details.append(f"market={market}")
         if version:
             details.append(f"pack_version={version}")
+        if snapshot_id:
+            details.append(f"snapshot_id={snapshot_id}")
+        if isinstance(snapshot_revision, int) and not isinstance(snapshot_revision, bool):
+            details.append(f"snapshot_revision={snapshot_revision}")
+        if as_of:
+            details.append(f"as_of={as_of}")
         if details:
             line += f"; {', '.join(details)}"
         return [line]
@@ -260,6 +269,12 @@ def _subject_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
         details.append(f"市场={market}")
     if version:
         details.append(f"pack_version={version}")
+    if snapshot_id:
+        details.append(f"snapshot_id={snapshot_id}")
+    if isinstance(snapshot_revision, int) and not isinstance(snapshot_revision, bool):
+        details.append(f"snapshot_revision={snapshot_revision}")
+    if as_of:
+        details.append(f"as_of={as_of}")
     if details:
         line += f"；{'，'.join(details)}"
     return [line]

@@ -15,24 +15,23 @@ ensure_litellm_stub()
 
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
-    AnalysisResult Any ChipDistribution DailyMarketContext
-    DailyMarketContextService Dict FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
+    AnalysisResult AnalyzeStageInput AnalyzeStageOutput Any ChipDistribution
+    DailyMarketContext DailyMarketContextService Dict
+    FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT FetchMarketInputsOutput FetchStageInput
     List MarketHotspotService MarketStructureService Optional PipelineStageName
     PipelineStageObservation PipelineStageResult ReportType SearchService
-    SentimentPipelineService SimpleNamespace StockAnalysisPipeline
-    TrendAnalysisResult Tuple
-    apply_daily_market_context_guardrail apply_phase_decision_guardrails
-    build_market_phase_context current_diagnostic_snapshot date datetime
-    fill_price_position_if_needed format_daily_market_context_prompt_section
-    get_effective_trading_date get_market_for_stock get_market_now
-    get_placeholder_text get_unknown_text infer_decision_type_from_advice
-    is_market_open is_us_stock_code localize_confidence_level
-    localize_operation_advice localize_trend_prediction log_safe_exception
-    logger logging normalize_chip_structure_availability
+    SentimentPipelineService SimpleNamespace StockAnalysisPipeline TrendAnalysisResult
+    Tuple apply_daily_market_context_guardrail apply_phase_decision_guardrails
+    build_market_phase_context build_run_context current_diagnostic_snapshot date
+    datetime fill_price_position_if_needed format_daily_market_context_prompt_section
+    get_effective_trading_date get_market_for_stock get_market_now get_placeholder_text
+    get_unknown_text infer_decision_type_from_advice is_market_open is_us_stock_code
+    localize_confidence_level localize_operation_advice localize_trend_prediction
+    log_safe_exception logger logging normalize_chip_structure_availability
     normalize_report_language normalize_stock_code observe_pipeline_stage pd
     populate_decision_action_fields record_llm_run record_llm_run_started
-    render_market_phase_summary stabilize_decision_with_structure threading
-    time timedelta
+    render_market_phase_summary stabilize_decision_with_structure threading time
+    timedelta
     """.split()
 )
 
