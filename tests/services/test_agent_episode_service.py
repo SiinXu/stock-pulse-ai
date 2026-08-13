@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from src.config import Config
 from src.agent.executor import AgentExecutor, AgentResult
+from src.agent.soul import AGENT_SOUL_HASH, AGENT_SOUL_VERSION
 from src.repositories.agent_episode_repo import AgentEpisodeRepository
 from src.repositories.agent_episode_tables import agent_episodes_table
 from src.repositories.base import RepositoryError
@@ -70,6 +71,13 @@ def test_flag_default_off(isolated_db) -> None:
     assert is_agent_episode_log_enabled(config) is False
     assert not is_agent_episode_log_enabled(SimpleNamespace(agent_episode_log_enabled="true"))
     assert is_agent_episode_log_enabled(SimpleNamespace(agent_episode_log_enabled=True))
+
+
+def test_soul_hash_accepts_production_prefixed_digest() -> None:
+    create = _valid_create(soul_hash=AGENT_SOUL_HASH)
+    assert create.soul_hash == AGENT_SOUL_HASH
+    with pytest.raises(ValidationError):
+        _valid_create(soul_hash="sha256:not-hex")
 
 
 def test_serialize_round_trip(isolated_db) -> None:
@@ -230,9 +238,12 @@ def test_record_from_agent_result_fail_soft(isolated_db) -> None:
             {"tool": "get_daily_history", "success": True, "arguments": {"code": "AAPL"}}
         ],
         runtime_facts=SimpleNamespace(
-            soul_version="v1",
-            soul_hash="abcdef0123456789",
-            to_metadata=lambda: {"soul_version": "v1", "soul_hash": "abcdef0123456789"},
+            soul_version=AGENT_SOUL_VERSION,
+            soul_hash=AGENT_SOUL_HASH,
+            to_metadata=lambda: {
+                "soul_version": AGENT_SOUL_VERSION,
+                "soul_hash": AGENT_SOUL_HASH,
+            },
         ),
     )
     stored = try_record_agent_episode_from_result(
@@ -251,7 +262,7 @@ def test_record_from_agent_result_fail_soft(isolated_db) -> None:
     )
     assert stored is not None
     assert stored.symbol == "AAPL"
-    assert stored.soul_hash == "abcdef0123456789"
+    assert stored.soul_hash == AGENT_SOUL_HASH
     assert stored.run_id == "run-correlated"
 
 

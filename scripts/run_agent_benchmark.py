@@ -112,7 +112,15 @@ def main(argv: list[str] | None = None) -> int:
         candidate_agent_version=args.candidate_agent_version,
         candidate_config_version=args.candidate_config_version,
     )
-    outputs = build_full_outputs(report, with_baseline=not args.write_baseline)
+    try:
+        outputs = build_full_outputs(report, with_baseline=not args.write_baseline)
+    except FileNotFoundError as exc:
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification baseline "
+            f"missing ({exc})",
+            file=sys.stderr,
+        )
+        return 2
     score_view = outputs["score_view"]
     comparison = outputs["comparison"]
     markdown = outputs["markdown"]
@@ -120,7 +128,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.write_baseline:
         path = write_baseline(report)
         print(f"[agent-eval-benchmark] wrote baseline {path}", file=sys.stderr)
-        outputs = build_full_outputs(report, with_baseline=True)
+        try:
+            outputs = build_full_outputs(report, with_baseline=True)
+        except FileNotFoundError as exc:
+            print(
+                "[agent-eval-benchmark] FAIL: prediction-verification baseline "
+                f"missing ({exc})",
+                file=sys.stderr,
+            )
+            return 2
         comparison = outputs["comparison"]
         markdown = outputs["markdown"]
 
@@ -162,7 +178,14 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    prediction_comparison = outputs.get("prediction_comparison") or {}
+    prediction_comparison = outputs.get("prediction_comparison")
+    if args.strict_baseline and prediction_comparison is None:
+        print(
+            "[agent-eval-benchmark] FAIL: prediction-verification baseline "
+            "missing; cannot freeze the acceptance table",
+            file=sys.stderr,
+        )
+        return 2
     if args.strict_baseline and prediction_comparison.get("regressed"):
         print(
             "[agent-eval-benchmark] FAIL: prediction-verification regression "

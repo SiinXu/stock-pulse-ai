@@ -174,3 +174,49 @@ def test_eval_not_bypassable_by_soul_skip_flag() -> None:
     assert REGRESSION_THRESHOLD == 0.0
     report = run_prediction_eval_suite()
     assert report["aggregate"]["checks_total"] >= 6
+
+
+def test_missing_prediction_baseline_does_not_skip_acceptance_freeze(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.agent.benchmark.runner import build_full_outputs
+    from scripts.run_agent_benchmark import main as benchmark_main
+
+    def _missing_baseline(*_args, **_kwargs):
+        raise FileNotFoundError("Prediction eval baseline missing")
+
+    monkeypatch.setattr(
+        "tests.agent.benchmark.runner.load_prediction_baseline",
+        _missing_baseline,
+    )
+    report = {
+        "schema_version": "agent-eval-benchmark-v0",
+        "aggregate": {
+            "scenarios": 1,
+            "checks_passed": 1,
+            "checks_total": 1,
+            "score": 1.0,
+        },
+        "scenarios": [],
+        "prediction_verification_evaluation": score_only_prediction_view(
+            run_prediction_eval_suite()
+        ),
+    }
+    with pytest.raises(FileNotFoundError, match="Prediction eval baseline missing"):
+        build_full_outputs(report, with_baseline=True)
+
+    monkeypatch.setattr(
+        "scripts.run_agent_benchmark.run_benchmark",
+        lambda **_kwargs: report,
+    )
+    monkeypatch.setattr(
+        "scripts.run_agent_benchmark.build_full_outputs",
+        lambda *_args, **_kwargs: {
+            "report": report,
+            "score_view": {"aggregate": report["aggregate"]},
+            "comparison": {"dropped": False, "drop_count": 0},
+            "prediction_comparison": None,
+            "markdown": "ok\n",
+        },
+    )
+    assert benchmark_main(["--strict-baseline", "--quiet"]) == 2

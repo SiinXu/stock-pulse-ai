@@ -32,7 +32,7 @@ AGENT_EPISODE_MAX_OUTCOME_KEYS = 16
 _MODE_PATTERN = r"^[a-z][a-z0-9_.-]{0,31}$"
 _ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$"
 _SYMBOL_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"
-_HASH_PATTERN = r"^[a-f0-9]{8,128}$"
+_HASH_PATTERN = r"^(?:sha256:)?[a-f0-9]{8,128}$"
 
 
 class _StrictEpisodeModel(BaseModel):

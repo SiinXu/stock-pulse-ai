@@ -209,13 +209,10 @@ def build_full_outputs(
     prediction_report = report.get("prediction_verification_evaluation") or {}
     prediction_comparison = None
     if with_baseline and prediction_report:
-        try:
-            prediction_comparison = compare_prediction_to_baseline(
-                score_only_prediction_view(prediction_report),
-                load_prediction_baseline(),
-            )
-        except FileNotFoundError:
-            prediction_comparison = None
+        prediction_comparison = compare_prediction_to_baseline(
+            score_only_prediction_view(prediction_report),
+            load_prediction_baseline(),
+        )
     markdown = render_markdown_report(score_only_view(report), comparison)
     if prediction_report:
         pred_agg = prediction_report.get("aggregate") or {}
