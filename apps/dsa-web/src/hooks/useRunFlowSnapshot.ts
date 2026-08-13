@@ -490,12 +490,17 @@ export function useRunFlowSnapshot({
 
     let active = true;
 
-    const request = sourceType === 'task'
-      ? analysisApi.getTaskFlow(taskId)
-      : historyApi.getRecordFlow(recordId ?? 0);
+    // Always wrap in Promise.resolve so partial test mocks / missing methods
+    // cannot crash with "Cannot read properties of undefined (reading 'then')".
+    const rawRequest = sourceType === 'task'
+      ? analysisApi.getTaskFlow?.(taskId)
+      : historyApi.getRecordFlow?.(recordId ?? 0);
 
-    request
+    void Promise.resolve(rawRequest)
       .then((result) => {
+        if (result == null) {
+          throw new Error('Run flow snapshot unavailable');
+        }
         if (active) {
           const snapshot = sourceType === 'task'
             ? replayFlowEvents(result, flowEventBufferRef.current)

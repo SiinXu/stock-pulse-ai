@@ -15,6 +15,7 @@ import { RunFlowGraph } from './RunFlowGraph';
 import { RunFlowNodeDetails } from './RunFlowNodeDetails';
 import { RunFlowSummaryBar } from './RunFlowSummaryBar';
 import { buildRunFlowTopologyModel } from './topologyViewModel';
+import { ProcessTimeline } from './ProcessTimeline';
 import AgentReplayInspector from './AgentReplayInspector';
 
 interface RunFlowPanelProps {
@@ -177,6 +178,8 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
       </div>
 
       <RunFlowSummaryBar snapshot={snapshot} />
+
+      <ProcessTimeline snapshot={snapshot} onSelectNode={selectNodeById} hideWhenEmpty />
 
       <AgentReplayInspector snapshot={snapshot} onSelectNode={selectNodeById} />
 
