@@ -1753,6 +1753,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls the filesystem sandbox for parse_financial_pdf and read_price_chart.'],
     notes: ['Example: /var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.CHART_READ_TIMEOUT_SECONDS': {
+    title: 'Chart Read Timeout Seconds',
+    summary: 'Hard 1–120 second wall-clock limit for read_price_chart vision calls; default 30.',
+  },
   'settings.agent.OCR_AGENT_TOOL_ENABLED': {
     title: 'Enable Offline OCR Agent Tool',
     summary: 'Default-off bounded Tesseract text extraction. Image bytes stay local, but redacted untrusted text enters Agent context and may reach a remote model; enable LOCAL_ONLY_MODE for zero remote egress.',
