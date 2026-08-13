@@ -5,6 +5,9 @@
 {% if market_status_line %}
 {{ market_status_line }}
 {% endif %}
+{% if presentation_framing_notice %}
+{{ presentation_framing_notice }}
+{% endif %}
 
 ## 📊 {{ labels.summary_heading }}
 
@@ -40,30 +43,29 @@
 {% if mode_limits.include_intelligence and intel %}
 ### 📰 {{ labels.info_heading }}
 
-{% if intel.get('sentiment_summary') %}
+{% set _intel_order = presentation_plan.intelligence_block_order if presentation_plan is defined and presentation_plan.intelligence_block_order is defined else ['sentiment_summary', 'earnings_outlook', 'risk_alerts', 'positive_catalysts', 'latest_news'] %}
+{% for block_key in _intel_order %}
+{% if block_key == 'sentiment_summary' and intel.get('sentiment_summary') %}
 **💭 {{ labels.sentiment_summary_label }}**: {{ intel.sentiment_summary }}
-{% endif %}
-{% if intel.get('earnings_outlook') %}
+{% elif block_key == 'earnings_outlook' and intel.get('earnings_outlook') %}
 **📊 {{ labels.earnings_outlook_label }}**: {{ intel.earnings_outlook }}
-{% endif %}
-{% if intel.get('risk_alerts') %}
+{% elif block_key == 'risk_alerts' and intel.get('risk_alerts') %}
 
 **🚨 {{ labels.risk_alerts_label }}**:
 {% for alert in intel.risk_alerts %}
 - {{ alert }}
 {% endfor %}
-{% endif %}
-{% if intel.get('positive_catalysts') %}
+{% elif block_key == 'positive_catalysts' and intel.get('positive_catalysts') %}
 
 **✨ {{ labels.positive_catalysts_label }}**:
 {% for cat in intel.positive_catalysts %}
 - {{ cat }}
 {% endfor %}
-{% endif %}
-{% if intel.get('latest_news') %}
+{% elif block_key == 'latest_news' and intel.get('latest_news') %}
 
 **📢 {{ labels.latest_news_label }}**: {{ intel.latest_news }}
 {% endif %}
+{% endfor %}
 
 {% endif %}
 

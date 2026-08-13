@@ -422,7 +422,9 @@ vi.mock('../../components/settings', async () => {
     item: {
       key: string;
       schema?: {
+        title?: string;
         description?: string;
+        uiControl?: string;
         options?: Array<string | { label: string; value: string }>;
       };
     };
@@ -443,6 +445,23 @@ vi.mock('../../components/settings', async () => {
     });
     if (enumEmptyState && enumOptionFilter && visibleOptions.length === 0 && selectedValues.length === 0) {
       return <div data-testid={`settings-field-${item.key}`}>{enumEmptyState}</div>;
+    }
+    if (item.schema?.uiControl === 'select') {
+      const accessibleName = item.schema.title ?? item.key;
+      return (
+        <div data-testid={`settings-field-${item.key}`}>
+          <label>
+            {accessibleName}
+            <select aria-label={accessibleName} value={value ?? ''} onChange={() => {}}>
+              {visibleOptions.map((option) => {
+                const label = typeof option === 'string' ? option : option.label;
+                const optionValue = typeof option === 'string' ? option : option.value;
+                return <option key={`${item.key}-${optionValue}`} value={optionValue}>{label}</option>;
+              })}
+            </select>
+          </label>
+        </div>
+      );
     }
     return (
       <div
