@@ -63,6 +63,9 @@ class Skill:
         execution_context: Inline/fork execution hint from frontmatter.
         subagent_type: Optional subagent type hint from frontmatter.
         preferred_model: Optional model hint from frontmatter.
+        version: Author version label or content-addressed identity (issue #249).
+        content_hash: Stable sha256 hash of the definition-bearing payload.
+        lifecycle: draft|active|deprecated|archived (promotion stays in #1093).
     """
     name: str
     display_name: str
@@ -87,6 +90,9 @@ class Skill:
     execution_context: str = "inline"
     subagent_type: str = ""
     preferred_model: str = ""
+    version: str = ""
+    content_hash: str = ""
+    lifecycle: str = "active"
 
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\r?\n(.*?)\r?\n---\s*\r?\n?(.*)$", re.DOTALL)
@@ -168,7 +174,9 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
             f"Skill file {filepath.name} missing required fields: {missing}"
         )
 
-    return Skill(
+    from src.agent.prompt_versioning import attach_skill_identity
+
+    skill = Skill(
         name=str(data["name"]).strip(),
         display_name=str(data["display_name"]).strip(),
         description=str(data["description"]).strip(),
@@ -198,7 +206,15 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
         execution_context=str(data.get("context", "inline")).strip() or "inline",
         subagent_type=str(data.get("agent", "")).strip(),
         preferred_model=str(data.get("model", "")).strip(),
+        version=str(data.get("version", "") or "").strip(),
+        lifecycle=str(data.get("lifecycle", "active") or "active").strip() or "active",
     )
+    attach_skill_identity(
+        skill,
+        authored_version=data.get("version"),
+        lifecycle=data.get("lifecycle"),
+    )
+    return skill
 
 
 def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
@@ -232,7 +248,9 @@ def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
     if not required_tools:
         required_tools = _coerce_string_list(metadata.get("required_tools"))
 
-    return Skill(
+    from src.agent.prompt_versioning import attach_skill_identity
+
+    skill = Skill(
         name=skill_name,
         display_name=display_name,
         description=description,
@@ -271,7 +289,15 @@ def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
         execution_context=str(metadata.get("context", "inline")).strip() or "inline",
         subagent_type=str(metadata.get("agent", "")).strip(),
         preferred_model=str(metadata.get("model", "")).strip(),
+        version=str(metadata.get("version", "") or "").strip(),
+        lifecycle=str(metadata.get("lifecycle", "active") or "active").strip() or "active",
     )
+    attach_skill_identity(
+        skill,
+        authored_version=metadata.get("version"),
+        lifecycle=metadata.get("lifecycle"),
+    )
+    return skill
 
 
 def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
@@ -464,3 +490,34 @@ class SkillManager:
         for s in self.list_active_skills():
             tools.update(s.required_tools)
         return list(tools)
+
+    def get_version_trace(
+        self,
+        *,
+        active_only: bool = True,
+        include_prompts: bool = True,
+        use_legacy_default_prompt: bool = False,
+        record_history: bool = False,
+    ) -> dict:
+        """Return Skill/prompt version identity for the current activation set."""
+        from src.agent.prompt_versioning import get_prompt_artifact_service
+
+        skills = self.list_active_skills() if active_only else self.list_skills()
+        active_ids = [skill.name for skill in self.list_active_skills()]
+        service = get_prompt_artifact_service()
+        if include_prompts:
+            return service.build_skill_run_trace(
+                skills,
+                active_skill_ids=active_ids,
+                use_legacy_default_prompt=use_legacy_default_prompt,
+                record_history=record_history,
+            )
+        from src.agent.prompt_versioning import build_run_version_trace
+
+        for skill in skills:
+            service.ensure_skill(skill, record_history=record_history)
+        return build_run_version_trace(
+            skills=skills,
+            prompts=(),
+            active_skill_ids=active_ids,
+        )

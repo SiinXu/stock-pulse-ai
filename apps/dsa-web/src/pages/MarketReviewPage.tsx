@@ -4,6 +4,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import ActionableApiErrorInline from '../components/analysis/ActionableApiErrorInline';
 import {
   ApiErrorAlert,
   AppPage,
@@ -36,6 +37,10 @@ import {
 } from '../routing/routes';
 import type { MarketReviewRegion } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
+import {
+  isOperationRetryableError,
+  isTaskBusyError,
+} from '../utils/asyncTaskUx';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
 
 type RunFlowDialogState =
@@ -248,12 +253,12 @@ const MarketReviewPage: React.FC = () => {
           <>
             <MarketReviewRegionSelector
               value={marketReviewRegionOverride}
-              disabled={runner.isSubmitting}
+              disabled={runner.isLaunchBlocked}
               onChange={setMarketReviewRegionOverride}
             />
             <Checkbox
               checked={notify}
-              disabled={runner.isSubmitting}
+              disabled={runner.isLaunchBlocked}
               onChange={(event) => setNotify(event.target.checked)}
               label={t('home.notify')}
             />
@@ -262,6 +267,7 @@ const MarketReviewPage: React.FC = () => {
               variant="primary"
               isLoading={runner.isSubmitting}
               loadingText={t('home.submitMarketReview')}
+              disabled={runner.isLaunchBlocked && !runner.isSubmitting}
               onClick={() => void triggerMarketReview()}
             >
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -281,7 +287,23 @@ const MarketReviewPage: React.FC = () => {
           />
         ) : null}
         {runner.error ? (
-          <ApiErrorAlert error={runner.error} onDismiss={runner.dismissError} />
+          <ActionableApiErrorInline
+            error={runner.error}
+            onDismiss={runner.dismissError}
+            actions={[
+              ...(isOperationRetryableError(runner.error) && !isTaskBusyError(runner.error)
+                ? [{
+                    label: t('common.retry'),
+                    onClick: () => {
+                      runner.dismissError();
+                      void triggerMarketReview();
+                    },
+                    disabled: runner.isSubmitting,
+                    isLoading: runner.isSubmitting,
+                  }]
+                : []),
+            ]}
+          />
         ) : null}
         {urlState.urlIssue ? (
           <InlineAlert
