@@ -365,6 +365,19 @@ class AlertApiTestCase(unittest.TestCase):
             self.assertEqual(resp.status_code, 400, resp.text)
             self.assertEqual(resp.json()["error"], "validation_error")
 
+    def test_rejects_non_finite_price_parameters(self) -> None:
+        response = self.client.post(
+            "/api/v1/alerts/rules",
+            content=(
+                '{"target_scope":"single_symbol","target":"600519",'
+                '"alert_type":"price_cross","parameters":{"direction":"above","price":1e400}}'
+            ),
+            headers={"content-type": "application/json"},
+        )
+
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("price must be finite", response.text)
+
     def test_p6_scope_type_matrix_and_target_validation(self) -> None:
         account = PortfolioService().create_account(
             name="Main",

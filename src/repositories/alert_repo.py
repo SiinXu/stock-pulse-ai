@@ -160,6 +160,22 @@ class AlertRepository:
             session.refresh(row)
             return row, True
 
+    def update_trigger_diagnostics(
+        self,
+        trigger_id: int,
+        diagnostics: Optional[str],
+    ) -> Optional[AlertTriggerRecord]:
+        with self.db.get_session() as session:
+            row = session.execute(
+                select(AlertTriggerRecord).where(AlertTriggerRecord.id == int(trigger_id)).limit(1)
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            row.diagnostics = diagnostics
+            session.commit()
+            session.refresh(row)
+            return row
+
     @staticmethod
     def _validate_trigger_fields(fields: Dict[str, Any]) -> None:
         if not fields.get("target"):
