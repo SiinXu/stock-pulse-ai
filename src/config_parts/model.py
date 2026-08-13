@@ -331,6 +331,9 @@ class Config:
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
     risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
+    # Pipeline quality gate: factual claims must bind to input evidence (#887).
+    analysis_quality_gate_enabled: bool = True
+    analysis_quality_gate_on_failure: str = "annotate"  # annotate | intercept
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout

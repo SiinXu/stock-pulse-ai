@@ -158,7 +158,10 @@ class _ConfigLoadingMethods:
         2. WebUI 可写的运行期关键键优先复用持久化 `.env`，但保留启动时显式进程环境变量的 override
         3. 代码中的默认值
         """
-        from src.config_parts.parsers import parse_risk_gate_profile
+        from src.config_parts.parsers import (
+            parse_quality_gate_failure_policy,
+            parse_risk_gate_profile,
+        )
 
         cls._capture_bootstrap_runtime_env_overrides()
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
@@ -1002,6 +1005,13 @@ class _ConfigLoadingMethods:
             ),
             risk_gate_profile=parse_risk_gate_profile(
                 os.getenv('RISK_GATE_PROFILE')
+            ),
+            analysis_quality_gate_enabled=parse_env_bool(
+                os.getenv('ANALYSIS_QUALITY_GATE_ENABLED'),
+                True,
+            ),
+            analysis_quality_gate_on_failure=parse_quality_gate_failure_policy(
+                os.getenv('ANALYSIS_QUALITY_GATE_ON_FAILURE')
             ),
             agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
             agent_deep_research_budget=parse_env_int(

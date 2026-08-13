@@ -6235,4 +6235,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Batas global tarikan paralel",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Batas per-penyedia tarikan paralel",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualitas proses",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.summary": "Mengikat klaim faktual analisis ke bukti masukan dengan dimensi evaluasi agen luring.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.title": "Gerbang kualitas analisis",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.summary": "Pilih annotate (bawaan) atau intercept saat fakta tanpa bukti ditemukan.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.title": "Kebijakan kegagalan gerbang kualitas",
+  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ENABLED": "Gerbang kualitas analisis",
+  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ON_FAILURE": "Kebijakan kegagalan gerbang kualitas",
 } as const;

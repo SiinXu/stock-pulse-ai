@@ -6235,4 +6235,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Plafond global d’extraction parallèle",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Plafond par fournisseur d’extraction parallèle",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Score du processus",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.summary": "Lie les affirmations factuelles de l’analyse aux preuves d’entrée avec les dimensions d’évaluation hors ligne.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.title": "Porte de qualité de l’analyse",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.summary": "Choisit annotate (par défaut) ou intercept lorsque des faits non étayés sont trouvés.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.title": "Politique d’échec de la porte de qualité",
+  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ENABLED": "Porte de qualité de l’analyse",
+  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ON_FAILURE": "Politique d’échec de la porte de qualité",
 } as const;
