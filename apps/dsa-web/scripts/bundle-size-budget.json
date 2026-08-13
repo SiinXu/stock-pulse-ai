@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 242114,
-      "measuredGzipBytes": 241714,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution inventory changes, with 400 B headroom."
+      "maxGzipBytes": 242837,
+      "measuredGzipBytes": 242437,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 157947,
-      "measuredGzipBytes": 157247,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 158809,
+      "measuredGzipBytes": 158109,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151228,
-      "measuredGzipBytes": 150528,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 152064,
+      "measuredGzipBytes": 151364,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151114,
-      "measuredGzipBytes": 150414,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 151955,
+      "measuredGzipBytes": 151255,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 150955,
-      "measuredGzipBytes": 150355,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 600 B headroom."
+      "maxGzipBytes": 151726,
+      "measuredGzipBytes": 151126,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 146787,
-      "measuredGzipBytes": 146087,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 147493,
+      "measuredGzipBytes": 146793,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 143593,
-      "measuredGzipBytes": 142893,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 144466,
+      "measuredGzipBytes": 143766,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 136900,
-      "measuredGzipBytes": 136200,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 137725,
+      "measuredGzipBytes": 137025,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 136987,
-      "measuredGzipBytes": 136287,
-      "note": "Combined production-build measurement after Daily Brief/Event Research, research API, and cost-attribution locale changes, with 700 B headroom."
+      "maxGzipBytes": 137818,
+      "measuredGzipBytes": 137118,
+      "note": "Local production-build remeasure after merging main (analysis stage checkpoint settings and locale growth) into the portfolio rebalancing branch (PR #1204); measured gzip plus the previous per-rule headroom."
     },
     {
       "id": "vendor-charts",

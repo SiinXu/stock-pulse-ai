@@ -6237,4 +6237,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取數全域並行上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取數單源並行上限",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "流程品質",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.notes.0": "沒有組合資料時，倉位計算仍可以明確的單股降級模式運行。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "使用當前組合權重控制確定性倉位區間。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "組合感知倉位計算",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "需要組合感知區間時保持啟用。單一標的權重上限為 0 到 1 的小數，預設 0.15。",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "啟用組合感知倉位計算",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "組合單一標的最大權重",
 } as const;
