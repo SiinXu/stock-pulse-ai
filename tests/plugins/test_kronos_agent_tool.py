@@ -670,9 +670,17 @@ def test_application_services_uses_the_same_native_registry_for_builtin_tool(
     results = services.start_plugins()
 
     assert results[0].success is True
+    from src.plugins.agent_tools import flush_deferred_agent_tool_registrations
+    import src.agent.runtime_assembly as runtime_assembly
+
+    flush_deferred_agent_tool_registrations(registry)
     assert registry.get(KRONOS_FORECAST_TOOL_NAME) is not None
     services.close()
     assert registry.get(KRONOS_FORECAST_TOOL_NAME) is None
+    # Do not leave a process registry cache built under the monkeypatched
+    # get_tool_registry provider for later tests.
+    runtime_assembly._TOOL_REGISTRY = None
+    runtime_assembly._TOOL_REGISTRY_BUILDING = None
 
 
 def test_plugin_cannot_overwrite_an_existing_builtin_tool(tmp_path) -> None:

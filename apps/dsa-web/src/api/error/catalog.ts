@@ -3,6 +3,11 @@
 import { createUiLanguageRecord } from '../../i18n/createUiLanguageRecord';
 import { UI_TEXT, type UiLanguage, type UiTextKey } from '../../i18n/uiText';
 import { APP_ROUTE_PATHS, buildAgentExecutionSettingsHref, buildSettingsHref } from '../../routing/routes';
+import {
+  classifyParsedApiError,
+  docsUrlForPath,
+  type TaxonomyAction,
+} from './taxonomy';
 import type {
   ApiErrorCategory,
   ErrorRemediation,
@@ -427,17 +432,123 @@ const ERROR_REMEDIATION_BY_CATEGORY: Partial<Record<ApiErrorCategory, Remediatio
   upstream_network: ERROR_REMEDIATION_BY_CODE.upstream_network,
 };
 
+export type ResolveErrorRemediationOptions = {
+  /**
+   * Operation-owned retry callback. Required to emit a Retry CTA.
+   * Without this, retry-classified errors stay guidance-only (no dead button).
+   */
+  onRetry?: () => void;
+};
+
+function taxonomyActionLabel(
+  action: TaxonomyAction,
+  language: UiLanguage,
+): string {
+  if (action === 'retry') return UI_TEXT[language]['common.retry'];
+  if (action === 'login') return UI_TEXT[language]['login.adminLogin'];
+  if (action === 'docs') return UI_TEXT[language]['settings.helpRelatedDocs'];
+  if (action === 'settings') return UI_TEXT[language]['onboarding.openSettings'];
+  return UI_TEXT[language]['common.details'];
+}
+
+/**
+ * Resolve actionable remediation for a parsed error.
+ * Retry never invents a handler: pass `options.onRetry` to enable the CTA.
+ */
 export function resolveErrorRemediation(
   error: ParsedApiError,
   language: UiLanguage,
+  options: ResolveErrorRemediationOptions = {},
 ): ErrorRemediation | null {
+  const classification = classifyParsedApiError(error);
   const definition = (
     (error.code ? ERROR_REMEDIATION_BY_CODE[error.code] : undefined)
     ?? ERROR_REMEDIATION_BY_CATEGORY[error.category]
   );
-  if (!definition) return null;
-  return {
-    actionLabel: UI_TEXT[language][definition.actionKey],
-    href: definition.href,
-  };
+
+  if (definition?.href) {
+    return {
+      actionLabel: UI_TEXT[language][definition.actionKey],
+      href: definition.href,
+      actionKind: definition.href === APP_ROUTE_PATHS.login ? 'login' : 'settings',
+      taxonomyCategory: classification.category,
+      severity: classification.severity,
+    };
+  }
+
+  if (definition && definition.actionKey === 'common.retry') {
+    if (!options.onRetry) {
+      return {
+        actionLabel: UI_TEXT[language][definition.actionKey],
+        actionKind: 'none',
+        taxonomyCategory: classification.category,
+        severity: classification.severity,
+      };
+    }
+    return {
+      actionLabel: UI_TEXT[language][definition.actionKey],
+      actionKind: 'retry',
+      taxonomyCategory: classification.category,
+      severity: classification.severity,
+    };
+  }
+
+  if (classification.defaultAction === 'retry') {
+    if (!options.onRetry) {
+      return null;
+    }
+    return {
+      actionLabel: taxonomyActionLabel('retry', language),
+      actionKind: 'retry',
+      taxonomyCategory: classification.category,
+      severity: classification.severity,
+    };
+  }
+
+  if (classification.defaultAction === 'login') {
+    const href = classification.href ?? APP_ROUTE_PATHS.login;
+    return {
+      actionLabel: taxonomyActionLabel('login', language),
+      href,
+      actionKind: 'login',
+      taxonomyCategory: classification.category,
+      severity: classification.severity,
+    };
+  }
+
+  if (classification.defaultAction === 'settings') {
+    const href = classification.href
+      ?? definition?.href
+      ?? buildSettingsHref({ section: 'overview', view: 'readiness' });
+    return {
+      actionLabel: taxonomyActionLabel('settings', language),
+      href,
+      actionKind: 'settings',
+      taxonomyCategory: classification.category,
+      severity: classification.severity,
+    };
+  }
+
+  if (classification.defaultAction === 'docs' && classification.docsPath) {
+    const docsLanguage = language === 'zh' || language === 'zh-TW' ? 'zh' : 'en';
+    return {
+      actionLabel: taxonomyActionLabel('docs', language),
+      href: docsUrlForPath(classification.docsPath, docsLanguage),
+      actionKind: 'docs',
+      taxonomyCategory: classification.category,
+      severity: classification.severity,
+    };
+  }
+
+  if (definition) {
+    return {
+      actionLabel: UI_TEXT[language][definition.actionKey],
+      href: definition.href,
+      actionKind: 'none',
+      taxonomyCategory: classification.category,
+      severity: classification.severity,
+    };
+  }
+
+  return null;
 }

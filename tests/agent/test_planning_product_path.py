@@ -174,6 +174,13 @@ def test_agent_executor_run_uses_planning_loop_when_enabled() -> None:
     assert result.planning_metadata.get("success") is True
     assert result.planning_metadata.get("proposal_applied") is True
     assert result.planning_metadata.get("tool_call_count", 0) >= 1
+    trace_events = result.planning_metadata.get("trace_events")
+    assert isinstance(trace_events, list) and trace_events
+    assert trace_events[0]["kind"] == "plan"
+    assert trace_events[-1]["kind"] == "terminate"
+    assert {
+        event["run_id"] for event in trace_events
+    } == {result.planning_metadata.get("planning_run_id")}
     # Real plan-loop tools were invoked (not only synthesis).
     assert session_calls, "plan loop must call BoundToolSession tools"
     assert all(row.get("source") == "plan_loop" for row in result.tool_calls_log if row.get("source"))

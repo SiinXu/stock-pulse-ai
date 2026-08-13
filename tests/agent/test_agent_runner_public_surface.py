@@ -79,7 +79,7 @@ EXPECTED_GROUPS = (
         "_runner_loop",
         "_LOOP_FUNCTION_NAMES",
         ("run_agent_loop",),
-        "ba42576a7d72dc7b2e1c3e9600832c64a6b8b52a8f4a4a96024edc8d1c15a718",
+        "37f7babeb0257e6c9fb033c68f2e389a6a20dd873fbc2bf1848e3910d653e38f",
     ),
     (
         "_runner_tools",

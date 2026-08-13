@@ -3,6 +3,7 @@
 // Lazy workspace-tab surface for the Portfolio route.
 
 import type React from 'react';
+import { RefreshCw } from 'lucide-react';
 import type { UiLanguage } from '../../i18n/uiText';
 import { formatUiText } from '../../i18n/uiText';
 import type { PortfolioText } from '../../hooks/portfolio/types';
@@ -17,7 +18,7 @@ import {
   formatCorporateActionLabel,
   formatSideLabel,
 } from '../../utils/portfolioFormat';
-import { Button, Card, EmptyState, SegmentedControl } from '../common';
+import { Button, Card, EmptyState, IconButton, SegmentedControl } from '../common';
 import type { PortfolioTab } from './portfolioUrlState';
 
 type PortfolioWorkspaceTabsProps = {
@@ -68,14 +69,15 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
       <Card padding="md" data-testid="portfolio-tab-ledger" className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground">{text.eventLog}</h2>
-          <Button
+          <IconButton
             type="button"
-            variant="secondary"
-            size="comfortable"
+            variant="ghost"
+            size="default"
+            aria-label={text.refreshLedger}
             onClick={onOpenLedger}
           >
-            {text.refreshLedger}
-          </Button>
+            <RefreshCw aria-hidden="true" />
+          </IconButton>
         </div>
         <p className="text-xs text-secondary-text">{text.deleteHint}</p>
         <div className="max-h-96 overflow-auto rounded-lg border border-subtle p-2">

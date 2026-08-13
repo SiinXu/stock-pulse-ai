@@ -10,7 +10,8 @@ required_tools:
   - get_realtime_quote
   - get_volume_analysis
   - search_comprehensive_intel
-aliases: [尾部风险, 脆弱性, 压力测试]
+# Style-reference aliases only (not affiliation or return endorsement).
+aliases: [尾部风险, 脆弱性, 压力测试, tail-risk-style, 尾部风险风格]
 default_active: false
 default_router: false
 default_priority: 250
