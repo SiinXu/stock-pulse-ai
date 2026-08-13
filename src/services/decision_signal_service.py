@@ -134,6 +134,12 @@ class DecisionSignalService:
     def create_signal_with_outcome(self, payload: Dict[str, Any]) -> DecisionSignalWriteOutcome:
         """Create through the canonical path while preserving repository disposition."""
 
+        # Sandbox fence: never persist production DecisionSignals during simulation.
+        from src.agent.sandbox.context import require_sandbox_inactive_for_production_write
+        from src.agent.sandbox.effects import EFFECT_DECISION_SIGNAL
+
+        require_sandbox_inactive_for_production_write(EFFECT_DECISION_SIGNAL)
+
         result = self._store_signal(payload)
         # Active duplicates can be retries after a prior partial create; rerun invalidation to repair old opposing signals.
         if result.row.status == "active":
@@ -151,6 +157,11 @@ class DecisionSignalService:
         market_phase_summary: Any = None,
     ) -> DecisionSignalWriteOutcome:
         """Persist a report-derived signal on the source report's timeline."""
+
+        from src.agent.sandbox.context import require_sandbox_inactive_for_production_write
+        from src.agent.sandbox.effects import EFFECT_DECISION_SIGNAL
+
+        require_sandbox_inactive_for_production_write(EFFECT_DECISION_SIGNAL)
 
         history_payload = dict(payload)
         self._apply_history_bound_lifecycle(
