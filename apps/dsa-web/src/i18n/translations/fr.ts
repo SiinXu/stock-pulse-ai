@@ -978,6 +978,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.emptyDescription": "Rétablissez la disposition par défaut pour réafficher la liste de suivi et les autres widgets.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "La disposition a été mise à jour dans un autre onglet ; préférence la plus récente rechargée.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Cette modification rendrait le tableau de bord inutilisable et a été annulée.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.storageFailed": "Impossible d'enregistrer la disposition dans ce navigateur. La modification n'a pas été appliquée.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.leaseBusy": "Une autre modification de disposition est encore en cours. Réessayez.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Ce widget est masqué",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "Sur les appareils tactiles, utilisez les boutons monter/descendre pour réordonner",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Santé du portefeuille",

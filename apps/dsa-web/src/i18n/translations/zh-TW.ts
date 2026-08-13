@@ -978,6 +978,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.emptyDescription": "恢復預設佈局以重新顯示關注列表與其他小工具。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "佈局已在其他分頁更新，已重新載入最新偏好。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "該操作會讓儀表板無法使用，已取消。",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.storageFailed": "無法在此瀏覽器儲存版面配置，本次變更未套用。",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.leaseBusy": "另一項版面配置變更仍在進行中，請稍後再試。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "此小工具已隱藏",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "觸控請使用上移／下移按鈕調整順序",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "組合健康",

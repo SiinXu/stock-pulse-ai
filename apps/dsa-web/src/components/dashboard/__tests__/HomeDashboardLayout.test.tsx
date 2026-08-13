@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { resetDashboardLayoutStoreForTests } from '../../../stores/dashboardLayoutStore';
@@ -71,5 +71,25 @@ describe('HomeDashboardLayout', () => {
     fireEvent.click(within(dashboard).getByRole('button', { name: 'Done customizing' }));
     expect(within(dashboard).getByText('Alerts body')).toBeInTheDocument();
     expect(within(dashboard).getByRole('status')).toHaveTextContent(/default/i);
+  });
+
+  it('surfaces storage write failures in status text and the live announcement', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    });
+    try {
+      renderLayout();
+      const dashboard = screen.getByRole('region', { name: 'Dashboard layout' });
+      fireEvent.click(within(dashboard).getByRole('button', { name: 'Customize layout' }));
+      fireEvent.click(within(dashboard).getByRole('button', { name: 'Hide Triggered alerts' }));
+      expect(within(dashboard).getByTestId('home-dashboard-layout-error')).toHaveTextContent(
+        'Could not save the layout in this browser. The change was not applied.',
+      );
+      expect(within(dashboard).getByTestId('home-dashboard-layout-announcement')).toHaveTextContent(
+        'Could not save the layout in this browser. The change was not applied.',
+      );
+    } finally {
+      setItem.mockRestore();
+    }
   });
 });

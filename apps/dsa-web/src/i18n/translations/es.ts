@@ -978,6 +978,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.emptyDescription": "Restablezca el diseño para volver a mostrar la lista de seguimiento y otros widgets.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "El diseño se actualizó en otra pestaña; se recargó la preferencia más reciente.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Ese cambio dejaría el panel inutilizable y se canceló.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.storageFailed": "No se pudo guardar el diseño en este navegador. El cambio no se aplicó.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.leaseBusy": "Otro cambio de diseño sigue en curso. Inténtelo de nuevo.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Este widget está oculto",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "En dispositivos táctiles, usa los botones de subir y bajar para reordenar",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Salud de la cartera",

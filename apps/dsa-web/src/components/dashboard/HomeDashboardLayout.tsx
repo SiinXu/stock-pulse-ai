@@ -12,7 +12,10 @@ import {
 } from 'lucide-react';
 import { Button, EmptyState, IconButton } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
+import {
+  type DashboardLayoutCommitReason,
+  useDashboardLayoutStore,
+} from '../../stores/dashboardLayoutStore';
 import {
   type DashboardWidgetId,
   movedIds,
@@ -85,13 +88,28 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
   );
   const visible = useMemo(() => visibleDashboardWidgets(layout), [layout]);
 
+  const describeError = useCallback((reason: DashboardLayoutCommitReason) => {
+    switch (reason) {
+      case 'revision_conflict':
+        return t('home.dashboardLayout.conflict');
+      case 'invalid':
+        return t('home.dashboardLayout.invalid');
+      case 'storage_failed':
+        return t('home.dashboardLayout.storageFailed');
+      case 'lease_busy':
+        return t('home.dashboardLayout.leaseBusy');
+    }
+  }, [t]);
+
   const commitReorder = useCallback((nextIds: DashboardWidgetId[]) => {
     const result = reorder(nextIds, layout.revision);
     if (result.ok) {
       setAnnouncement(t('home.dashboardLayout.reorderAnnouncement'));
+    } else {
+      setAnnouncement(describeError(result.reason));
     }
     return result.ok;
-  }, [layout.revision, reorder, t]);
+  }, [describeError, layout.revision, reorder, t]);
 
   const reorderBy = useCallback((widgetId: DashboardWidgetId, delta: number) => {
     if (isActioning) return;
@@ -123,22 +141,22 @@ export const HomeDashboardLayout: React.FC<HomeDashboardLayoutProps> = ({
           ? t('home.dashboardLayout.showAnnouncement', { item: titleFor(widgetId) })
           : t('home.dashboardLayout.hideAnnouncement', { item: titleFor(widgetId) }),
       );
+    } else {
+      setAnnouncement(describeError(result.reason));
     }
-  }, [isActioning, layout.revision, setVisible, t, titleFor]);
+  }, [describeError, isActioning, layout.revision, setVisible, t, titleFor]);
 
   const handleReset = useCallback(() => {
     if (isActioning) return;
     const result = reset(layout.revision);
     if (result.ok) {
       setAnnouncement(t('home.dashboardLayout.resetAnnouncement'));
+    } else {
+      setAnnouncement(describeError(result.reason));
     }
-  }, [isActioning, layout.revision, reset, t]);
+  }, [describeError, isActioning, layout.revision, reset, t]);
 
-  const conflictMessage = lastError === 'revision_conflict'
-    ? t('home.dashboardLayout.conflict')
-    : lastError === 'invalid'
-      ? t('home.dashboardLayout.invalid')
-      : null;
+  const conflictMessage = lastError ? describeError(lastError) : null;
 
   const boardItems = customizing ? layout.widgets : visible;
 

@@ -978,6 +978,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.emptyDescription": "Standardlayout wiederherstellen, um Watchlist und andere Widgets zu zeigen.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "Layout wurde in einem anderen Tab aktualisiert; neueste Einstellung geladen.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Diese Änderung würde das Dashboard unbenutzbar machen und wurde abgebrochen.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.storageFailed": "Das Layout konnte in diesem Browser nicht gespeichert werden. Die Änderung wurde nicht übernommen.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.leaseBusy": "Eine andere Layout-Änderung läuft noch. Bitte erneut versuchen.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Dieses Widget ist ausgeblendet",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "Auf Touch-Geräten Reihenfolge mit den Schaltflächen Nach oben/unten ändern",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Portfolio-Gesundheit",

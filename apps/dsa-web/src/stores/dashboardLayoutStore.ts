@@ -98,6 +98,7 @@ function commitWithRevision(
   set: (partial: Partial<DashboardLayoutState>) => void,
 ): DashboardLayoutCommitResult {
   if (actionLease) {
+    set({ lastError: 'lease_busy' });
     return { ok: false, reason: 'lease_busy', layout: get().layout };
   }
   actionLease = true;
@@ -123,25 +124,28 @@ function commitWithRevision(
 
     // Shrink the multi-tab race window: re-read durable storage immediately before
     // writing so a concurrent winner is not overwritten by a stale mutator.
-    const recheck = readDashboardLayoutFromStorage();
-    if (recheck.revision !== expectedRevision) {
+    // Memory-only sessions have no durable peer; skip the re-read so later
+    // mutations are not compared against the default revision 0.
+    const storage = getLocalStorage();
+    const recheck = readDashboardLayoutFromStorage(storage);
+    if (storage && recheck.revision !== expectedRevision) {
       const recovered = normalizeDashboardLayout(recheck);
       set({ layout: recovered, lastError: 'revision_conflict' });
       return { ok: false, reason: 'revision_conflict', layout: recovered };
     }
 
-    const persisted = writeDashboardLayoutToStorage(next);
-    if (!persisted && getLocalStorage()) {
+    const persisted = writeDashboardLayoutToStorage(next, storage);
+    if (!persisted && storage) {
       // Storage exists but write failed: do not claim success; keep prior durable state.
-      const recovered = readDashboardLayoutFromStorage();
+      const recovered = readDashboardLayoutFromStorage(storage);
       set({ layout: recovered, lastError: 'storage_failed' });
       return { ok: false, reason: 'storage_failed', layout: recovered };
     }
 
     // Confirm durable content after write; treat unexpected drift as conflict.
-    const confirmed = readDashboardLayoutFromStorage();
+    const confirmed = readDashboardLayoutFromStorage(storage);
     if (
-      getLocalStorage()
+      storage
       && (
         confirmed.revision !== next.revision
         || JSON.stringify(confirmed.widgets) !== JSON.stringify(next.widgets)

@@ -76,7 +76,7 @@ export const HomePortfolioHealthWidget: React.FC<HomePortfolioHealthWidgetProps>
           size="compact"
           titleAs="p"
         />
-      ) : !data || data.status === 'empty_portfolio' || data.status === 'unavailable' ? (
+      ) : !data || data.status === 'empty_portfolio' ? (
         <EmptyState
           compact
           title={t('home.dashboardLayout.widget.portfolioHealthEmptyTitle')}
@@ -86,6 +86,19 @@ export const HomePortfolioHealthWidget: React.FC<HomePortfolioHealthWidgetProps>
               {t('home.dashboardLayout.widget.openPortfolio')}
             </Button>
           )}
+        />
+      ) : data.status === 'unavailable' ? (
+        <StatePanel
+          state="blocked"
+          title={t('home.dashboardLayout.widget.portfolioHealthUnavailable')}
+          description={data.statusMessage || t('home.partialDataMessage')}
+          action={(
+            <Button variant="secondary" size="default" onClick={openPortfolio}>
+              {t('home.dashboardLayout.widget.openPortfolio')}
+            </Button>
+          )}
+          size="compact"
+          titleAs="p"
         />
       ) : (
         <button

@@ -978,6 +978,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.emptyDescription": "기본 레이아웃으로 복원해 관심 목록 등을 다시 표시하세요.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "다른 탭에서 레이아웃이 갱신되어 최신 설정을 다시 불러왔습니다.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "해당 작업은 대시보드를 사용할 수 없게 만들어 취소되었습니다.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.storageFailed": "이 브라우저에 레이아웃을 저장할 수 없어 변경이 적용되지 않았습니다.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.leaseBusy": "다른 레이아웃 변경이 진행 중입니다. 잠시 후 다시 시도하세요.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "이 위젯은 숨겨져 있습니다",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "터치 기기에서는 위로/아래로 이동 버튼으로 순서를 바꾸세요",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "포트폴리오 건전성",

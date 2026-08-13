@@ -978,6 +978,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.emptyDescription": "デフォルト配置に戻してウォッチリストなどを再表示してください。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "別タブで配置が更新されたため、最新の設定を再読み込みしました。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "その操作ではダッシュボードが使えなくなるため取り消しました。",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.storageFailed": "このブラウザーにレイアウトを保存できませんでした。変更は適用されていません。",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.leaseBusy": "別のレイアウト変更が進行中です。しばらくしてから再試行してください。",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "このウィジェットは非表示です",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "タッチ端末では上下移動ボタンで並べ替えてください",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "ポートフォリオ健全性",

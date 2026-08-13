@@ -109,4 +109,33 @@ describe('dashboardLayoutStore', () => {
     // Stale reverse order must not have landed.
     expect(durable.widgets.map((w) => w.id)).not.toEqual([...DASHBOARD_WIDGET_IDS].reverse());
   });
+
+  it('keeps sequential customizations working when localStorage is unavailable', () => {
+    const original = window.localStorage;
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('blocked');
+      },
+    });
+    try {
+      useDashboardLayoutStore.getState().hydrate();
+      const first = useDashboardLayoutStore.getState().setVisible('alerts', false, 0);
+      expect(first.ok).toBe(true);
+      expect(useDashboardLayoutStore.getState().layout.revision).toBe(1);
+
+      const second = useDashboardLayoutStore.getState().setVisible('recent_reports', false, 1);
+      expect(second.ok).toBe(true);
+      expect(useDashboardLayoutStore.getState().layout.revision).toBe(2);
+      expect(useDashboardLayoutStore.getState().layout.widgets.find((w) => w.id === 'alerts')?.visible).toBe(false);
+      expect(
+        useDashboardLayoutStore.getState().layout.widgets.find((w) => w.id === 'recent_reports')?.visible,
+      ).toBe(false);
+    } finally {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        value: original,
+      });
+    }
+  });
 });

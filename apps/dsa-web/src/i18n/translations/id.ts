@@ -978,6 +978,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.dashboardLayout.emptyDescription": "Pulihkan tata letak bawaan untuk menampilkan kembali daftar pantau dan widget lain.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.conflict": "Tata letak diperbarui di tab lain; preferensi terbaru dimuat ulang.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.invalid": "Perubahan itu akan membuat dasbor tidak dapat digunakan dan dibatalkan.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.storageFailed": "Tidak dapat menyimpan tata letak di browser ini. Perubahan tidak diterapkan.",
+  "i18n.uiText.UI_TEXT.home.dashboardLayout.leaseBusy": "Perubahan tata letak lain masih berlangsung. Coba lagi.",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.hiddenPlaceholder": "Widget ini disembunyikan",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.mobileMoveHint": "Di perangkat sentuh, gunakan tombol naik dan turun untuk mengurutkan ulang",
   "i18n.uiText.UI_TEXT.home.dashboardLayout.widget.portfolioHealth": "Kesehatan portofolio",
