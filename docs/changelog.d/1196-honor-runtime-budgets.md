@@ -1,0 +1,1 @@
+- [Fixed] Honor configured reflection/post-mortem LLM budgets and max-revise at runtime, keep fallback lessons on LLM or budget failure, and attribute deterministic lessons to the claim that produced them (Refs #1103, #1089).
