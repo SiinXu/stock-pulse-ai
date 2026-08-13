@@ -1317,6 +1317,17 @@ class _ConfigLoadingMethods:
                 os.getenv('NOTIFICATION_DELTA_FIRST'),
                 default=False,
             ),
+            high_disagreement_alerts_enabled=parse_env_bool(
+                os.getenv('HIGH_DISAGREEMENT_ALERTS_ENABLED'),
+                default=True,
+            ),
+            high_disagreement_threshold=parse_env_float(
+                os.getenv('HIGH_DISAGREEMENT_THRESHOLD'),
+                0.6,
+                field_name='HIGH_DISAGREEMENT_THRESHOLD',
+                minimum=0.0,
+                maximum=1.0,
+            ),
             single_stock_notify=os.getenv('SINGLE_STOCK_NOTIFY', 'false').lower() == 'true',
             report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_language=cls._parse_report_language(report_language_raw),
