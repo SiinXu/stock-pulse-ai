@@ -109,7 +109,7 @@ describe('StockHistoryTrendDrawer', () => {
     expect(screen.getByText('USD 189.10')).toBeTruthy();
     const changeNode = screen.getByText('+1.25%');
     expect(changeNode.getAttribute('data-change-color')).toBe('green');
-    expect(changeNode).toHaveStyle({ color: 'var(--home-price-down)' });
+    expect(changeNode).toHaveStyle({ color: 'var(--price-green)' });
   });
 
   it('renders non-finite history metrics as missing without percent suffixes or paint', () => {
