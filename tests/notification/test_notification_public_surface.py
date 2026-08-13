@@ -15,50 +15,46 @@ from types import CodeType, FunctionType, SimpleNamespace
 
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
-    AnalysisRequestContext Any AstrbotSender ChannelAttemptResult
-    ChannelDetector Config CustomWebhookSender Dict DingtalkSender
-    DiscordSender EmailSender Enum FeishuSender GotifySender List
-    NotificationBuilder NotificationChannel NotificationDispatchResult
-    NotificationNoiseDecision NotificationService NtfySender Optional
-    PushoverSender PushplusSender ReportType Serverchan3Sender SlackSender
-    TYPE_CHECKING TelegramSender Tuple WECHAT_IMAGE_MAX_BYTES WechatSender
-    annotations datetime display_action_fields_for_result
-    display_decision_type_for_result display_operation_advice_for_result
-    evaluate_notification_noise format_public_market_status_line
-    format_public_phase_pack_excerpt format_strategy_skill_items
-    get_chip_unavailable_reason get_config get_localized_stock_name
-    get_notification_route_config get_notification_service get_report_labels
-    get_signal_level is_chip_structure_unavailable
-    is_feishu_static_configured localize_chip_health
-    localize_conflict_severity localize_consensus_level
-    localize_strategy_conflict_description localize_strategy_signal
-    localize_strategy_skill localize_strategy_synthesis_summary
-    localize_trend_prediction log_safe_exception logger logging
-    normalize_model_used normalize_report_language
+    AnalysisRequestContext Any AstrbotSender ChannelAttemptResult ChannelDetector
+    Config CustomWebhookSender Dict DingtalkSender DiscordSender EmailSender Enum
+    FeishuSender GotifySender List NotificationBuilder NotificationChannel
+    NotificationDispatchResult NotificationNoiseDecision NotificationService NtfySender
+    Optional PushoverSender PushplusSender ReportType Serverchan3Sender SlackSender
+    TYPE_CHECKING TelegramSender Tuple WECHAT_IMAGE_MAX_BYTES WechatSender annotations
+    datetime display_action_fields_for_result display_decision_type_for_result
+    display_operation_advice_for_result evaluate_notification_noise
+    format_public_market_status_line format_public_phase_pack_excerpt
+    format_strategy_skill_items get_chip_unavailable_reason get_config
+    get_localized_stock_name get_notification_route_config get_notification_service
+    get_report_labels get_signal_level is_chip_structure_unavailable
+    is_feishu_static_configured localize_chip_health localize_conflict_severity
+    localize_consensus_level localize_strategy_conflict_description
+    localize_strategy_signal localize_strategy_skill
+    localize_strategy_synthesis_summary localize_trend_prediction log_safe_exception
+    logger logging normalize_model_used normalize_report_language
     normalize_strategy_synthesis_payload record_notification_noise
-    release_notification_noise resolve_gotify_message_endpoint
-    resolve_ntfy_endpoint sanitize_diagnostic_text sanitize_exception_chain
-    send_daily_report signal_attribution_has_content
-    signal_attribution_weight_items split_notification_route_channels
-    strategy_invalid_opinion_count time
+    release_notification_noise resolve_gotify_message_endpoint resolve_ntfy_endpoint
+    sanitize_diagnostic_text sanitize_exception_chain send_daily_report
+    signal_attribution_has_content signal_attribution_weight_items
+    split_notification_route_channels strategy_invalid_opinion_count time
     """.split()
 )
 
 EXPECTED_BASES = (
-    "AstrbotSender",
-    "CustomWebhookSender",
-    "DingtalkSender",
-    "DiscordSender",
-    "EmailSender",
-    "FeishuSender",
-    "GotifySender",
-    "NtfySender",
-    "PushoverSender",
-    "PushplusSender",
-    "Serverchan3Sender",
-    "SlackSender",
-    "TelegramSender",
-    "WechatSender",
+    'AstrbotSender',
+    'CustomWebhookSender',
+    'DingtalkSender',
+    'DiscordSender',
+    'EmailSender',
+    'FeishuSender',
+    'GotifySender',
+    'NtfySender',
+    'PushoverSender',
+    'PushplusSender',
+    'Serverchan3Sender',
+    'SlackSender',
+    'TelegramSender',
+    'WechatSender',
 )
 
 EXPECTED_SOURCE_DISPLAY_NAMES = (
@@ -111,100 +107,100 @@ EXPECTED_UNRESOLVED_HINT_METHODS = frozenset(
 
 EXPECTED_GROUPS = (
     (
-        "_ReportSetupMethods",
-        "_REPORT_SETUP_METHOD_NAMES",
+        '_ReportSetupMethods',
+        '_REPORT_SETUP_METHOD_NAMES',
         (
-            "_normalize_report_type",
-            "_get_report_language",
-            "_get_labels",
-            "_get_display_name",
-            "_get_history_compare_context",
-            "_prepend_report_delta_section",
-            "generate_aggregate_report",
-            "_collect_models_used",
-            "_public_phase_pack_excerpt",
-            "_public_market_status_line",
-            "_append_market_status_line",
-            "_should_show_llm_model",
+            '_normalize_report_type',
+            '_get_report_language',
+            '_get_labels',
+            '_get_display_name',
+            '_get_history_compare_context',
+            '_prepend_report_delta_section',
+            'generate_aggregate_report',
+            '_collect_models_used',
+            '_public_phase_pack_excerpt',
+            '_public_market_status_line',
+            '_append_market_status_line',
+            '_should_show_llm_model',
         ),
-        "e43757976154d28c970d1a9e385f980d0b5735459ff4834014aa8728668bcd82",
+        'e43757976154d28c970d1a9e385f980d0b5735459ff4834014aa8728668bcd82',
     ),
     (
-        "_RoutingMethods",
-        "_ROUTING_METHOD_NAMES",
+        '_RoutingMethods',
+        '_ROUTING_METHOD_NAMES',
         (
-            "detect_configured_channels",
-            "_detect_all_channels",
-            "is_available",
-            "get_available_channels",
-            "_notification_delivery_snapshot",
-            "get_channels_for_route",
-            "get_channel_names",
-            "evaluate_noise_control",
-            "record_noise_control",
-            "release_noise_control",
-            "_has_context_channel",
-            "_extract_telegram_context_chat_id",
-            "should_broadcast_static_channels",
-            "_extract_dingtalk_session_webhook",
-            "_extract_feishu_reply_info",
-            "send_to_context",
-            "_send_via_source_context",
-            "_send_feishu_stream_reply",
-            "_send_feishu_stream_chunked",
+            'detect_configured_channels',
+            '_detect_all_channels',
+            'is_available',
+            'get_available_channels',
+            '_notification_delivery_snapshot',
+            'get_channels_for_route',
+            'get_channel_names',
+            'evaluate_noise_control',
+            'record_noise_control',
+            'release_noise_control',
+            '_has_context_channel',
+            '_extract_telegram_context_chat_id',
+            'should_broadcast_static_channels',
+            '_extract_dingtalk_session_webhook',
+            '_extract_feishu_reply_info',
+            'send_to_context',
+            '_send_via_source_context',
+            '_send_feishu_stream_reply',
+            '_send_feishu_stream_chunked',
         ),
-        "779c906e0a2fe29d5a9dac5da777900995a3f7e24667cf02eb68e216e7ebccf1",
+        '779c906e0a2fe29d5a9dac5da777900995a3f7e24667cf02eb68e216e7ebccf1',
     ),
     (
-        "_RenderingMethods",
-        "_RENDERING_METHOD_NAMES",
+        '_RenderingMethods',
+        '_RENDERING_METHOD_NAMES',
         (
-            "generate_daily_report",
-            "_escape_md",
-            "_clean_sniper_value",
-            "_phase_decision_list",
-            "_phase_decision_has_content",
-            "_append_phase_decision_block",
-            "_get_display_operation_advice",
-            "_count_display_decisions",
-            "_get_signal_level",
-            "generate_dashboard_report",
-            "generate_wechat_dashboard",
-            "generate_wechat_summary",
-            "generate_brief_report",
-            "generate_single_stock_report",
-            "_get_source_display_name",
-            "_append_market_snapshot",
-            "_format_amount_cn",
-            "_format_percent",
-            "_format_per_share",
-            "_format_text",
-            "_get_fundamental_blocks",
-            "_append_fundamental_blocks",
-            "_append_financial_summary",
-            "_append_shareholder_return",
-            "_format_net_shares",
-            "_append_institutional_flow",
-            "_append_related_boards",
+            'generate_daily_report',
+            '_escape_md',
+            '_clean_sniper_value',
+            '_phase_decision_list',
+            '_phase_decision_has_content',
+            '_append_phase_decision_block',
+            '_get_display_operation_advice',
+            '_count_display_decisions',
+            '_get_signal_level',
+            'generate_dashboard_report',
+            'generate_wechat_dashboard',
+            'generate_wechat_summary',
+            'generate_brief_report',
+            'generate_single_stock_report',
+            '_get_source_display_name',
+            '_append_market_snapshot',
+            '_format_amount_cn',
+            '_format_percent',
+            '_format_per_share',
+            '_format_text',
+            '_get_fundamental_blocks',
+            '_append_fundamental_blocks',
+            '_append_financial_summary',
+            '_append_shareholder_return',
+            '_format_net_shares',
+            '_append_institutional_flow',
+            '_append_related_boards',
         ),
-        "0129790cc3f7a29bf5699dfc3fe39508f5d07035df07ba7594a446d813f23343",  # committee rendering
+        '0129790cc3f7a29bf5699dfc3fe39508f5d07035df07ba7594a446d813f23343',
     ),
     (
-        "_DispatchMethods",
-        "_DISPATCH_METHOD_NAMES",
+        '_DispatchMethods',
+        '_DISPATCH_METHOD_NAMES',
         (
-            "_should_use_image_for_channel",
-            "_sanitize_notification_diagnostics",
-            "_send_to_static_channel",
-            "_send_to_plugin_channel",
-            "send_with_results",
-            "_send_with_results_under_lease",
-            "get_last_dispatch_result",
-            "send",
-            "save_report_to_file",
-            "save_and_send_feishu_file",
+            '_should_use_image_for_channel',
+            '_sanitize_notification_diagnostics',
+            '_send_to_static_channel',
+            '_send_to_plugin_channel',
+            'send_with_results',
+            '_send_with_results_under_lease',
+            'get_last_dispatch_result',
+            'send',
+            'save_report_to_file',
+            'save_and_send_feishu_file',
         ),
-        "9106021ab3dcb5d7b052be63948cf899677b636b533a976dbd7c27fec49abbf5",
+        '361984f8563469a7a849ddc47277abcb5fcea8e929cc0d325cea721dc90800ff',
     ),
 )
 
