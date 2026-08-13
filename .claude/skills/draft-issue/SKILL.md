@@ -1,8 +1,14 @@
-# Draft Issue
+---
+name: draft-issue
+description: Draft a high-quality English GitHub issue for this repository with dedupe and evidence-verified claims.
+---
+
 
 Draft a high-quality issue in this repository's style: dedupe first, then structure as "background evidence → proposal → boundaries → acceptance", producing an English body plus label suggestions. Produces a draft only by default; publishing requires confirmation.
 
 **Repository**: https://github.com/SiinXu/stock-pulse-ai/issues
+
+**Source of truth**: repository root `AGENTS.md`. Issue titles and bodies published to GitHub must be in English.
 
 ## Usage
 
