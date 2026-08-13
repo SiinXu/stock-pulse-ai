@@ -433,10 +433,14 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | Scorecard buckets below this decided sample (hit+miss) render as `insufficient_data` instead of a rate | `10` |
-| `DAILY_BRIEF_ENABLED` | Opt-in daily brief with historical accuracy review (decision-signal outcomes, backtest summary, skill-opinion performance). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
+| `RESEARCH_API_ENABLED` | Opt-in authenticated read-only research API (`GET /api/v1/research/conclusions*`) for stratified conclusions (brief/standard/research) with as-of, confidence, and evidence counts. Default off. Mounted on the main API port only (session auth, security audit, sliding-window rate limits). See [research-api_EN.md](research-api_EN.md) | `false` |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | Per-principal sliding-window rate limit for research API reads when enabled (same governance pattern as MCP) | `60` |
+| `DAILY_BRIEF_ENABLED` | Opt-in personal morning brief (holdings, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, accuracy review). Default off. See [daily-brief_EN.md](daily-brief_EN.md) | `false` |
 | `DAILY_BRIEF_SCHEDULE_TIME` | Local `HH:MM` after which the enabled brief may fire (at most once per local day) | `08:30` |
 | `DAILY_BRIEF_TIMEZONE` | IANA timezone for schedule and “yesterday” mapping | `Asia/Shanghai` |
 | `DAILY_BRIEF_MIN_SAMPLES` | Minimum completed samples before publishing an accuracy percentage; below this the brief states insufficient history | `10` |
+| `DAILY_BRIEF_QUIET_WHEN_EMPTY` | Skip notification when there is no material overnight/event/yesterday content (generation/persistence still run) | `false` |
+| `EVENT_RESEARCH_BRIEF_ENABLED` | Opt-in standalone earnings event research briefs. Default off. See [event-research-brief_EN.md](event-research-brief_EN.md) | `false` |
 | `PAPER_PORTFOLIO_INITIAL_CASH` | Initial cash seeded (as a cash-in ledger entry) when a paper portfolio is created; simulated fills use the latest available close at the trade date, fees/slippage are ignored in the MVP, and buys are validated against available cash | `1000000` |
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), hk (HK stocks), us (US stocks), jp (JP stocks), kr (KR stocks), both (all five markets) | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | Index change color style in market reviews: `green_up` = green gains/red losses (default), `red_up` = red gains/green losses | `green_up` |
@@ -1324,6 +1328,26 @@ CLI, Web, analysis/watchlist APIs, CSV/Excel/clipboard smart import, and Bot ana
 
 HK daily history skips efinance, pytdx, baostock, and other built-in providers that do not support HK daily data, avoiding mismatches between HK symbols and non-HK market data. AkShare/Tushare/YFinance/Longbridge continue to provide HK fallback paths. If Longbridge is inside its connection cooldown window, the route temporarily skips it and continues with the remaining HK-capable fallbacks.
 
+### ETF and index analysis
+
+For index-tracking ETFs and US indices (for example VOO, QQQ, SPY, 510050, SPX, DJI, IXIC), analysis focuses on **index path, tracking quality, and liquidity**, not fund-manager issuer risk (lawsuits, reputation, executive changes). Risk alerts and performance expectations are based on the constituent basket, not fund-company filings. See Issue #274.
+
+#### A-share ETF analysis semantics (Issue #173)
+
+A-share ETFs are identified as a distinct instrument type and take the **ETF analysis path**, while keeping the same decision-dashboard report structure as single stocks:
+
+| Dimension | Behavior |
+| --- | --- |
+| Identification | Code prefixes `51/52/56/58/15/16/18` (aligned with `data_provider` ETF routing); offshore names still use the existing `is_index_or_etf` heuristic |
+| Tracking target | Liquid bootstrap map first (e.g. `510300→CSI 300`, `159915→ChiNext`), else name heuristics; unresolved → `not_available` |
+| Premium/discount | Computed after realtime maps IOPV/NAV into analysis context when providers expose them; otherwise `not_available` (never invented). Pure indices use `not_applicable`. |
+| Holdings exposure | Coarse `broad_index` / `sector_theme` class; full constituent look-through is outside the public provider contract → `not_available` |
+| Inapplicable metrics | PE/PB/ROE/company financials/chip/Dragon Tiger lists are explicit **`not_applicable`** (including equity-style chip health framing) — do not hard-calculate; separate from validation-layer missing-field calibration (#185) |
+| Index vs ETF | Pure market indices (e.g. SPX) use `instrument_type=index`; A-share/offshore ETFs use `etf` |
+| Report structure | Shared decision-dashboard JSON with equities; no separate ETF template |
+
+Representative regression codes: `510300`, `510050`, `159915`, `159919`, `512880`. Validation-layer ETF false-positive calibration is documented in `docs/data-validation-layer.md` and Issue #185.
+
 ### Multi-Model Switching
 
 Configure multiple models, system auto-switches:
@@ -1620,7 +1644,7 @@ For this feature, the product behavior is:
 > Note: filter market-review-only history via `GET /api/v1/history` with `stock_code=MARKET&report_type=market_review` to avoid mixing with regular stock history.
 > Note: `GET /api/v1/history/{record_id}/diagnostics` accepts either the history primary key ID or `query_id`, and returns a `normal/degraded/failed/unknown` summary, key pipeline components, and sanitized `copy_text`. Older reports without `context_snapshot.diagnostics` return `unknown` without affecting normal report reads.
 > Note: `GET /api/v1/history` list summaries can be paginated by `stock_code` for same-stock history and now include optional trend, summary, model, and analysis-time price/change fields. Older rows without persisted snapshots return empty values. `created_at` and `/api/v1/history/stocks` `last_analysis_time` are ISO 8601 timestamps with the server timezone offset; date filters are still interpreted as server-local dates. The Web report page's "History Trend" drawer reuses this endpoint.
-> Note: `GET /api/v1/usage/dashboard` reuses the existing `llm_usage` audit table and adds no configuration key or database migration. It returns only persisted call counts, prompt/completion/total token aggregates, model-level usage, and recent call records; it does not infer model context windows or provider metadata.
+> Note: `GET /api/v1/usage/dashboard` reuses the `llm_usage` audit table. Besides token aggregates it returns estimated cost (priced rows only), stage/agent_mode attribution, and model routing success/fallback rates. Set `LLM_USAGE_ATTRIBUTION_ENABLED=false` to skip attribution fields. See `docs/llm-cost-attribution_EN.md`.
 > Issue #1520 compatibility note: The `model`/`model_used` returned here is read-only historical snapshot metadata from each record, used only for trend drawer/history display. It does not alter runtime model/model-provider/base URL resolution, config migration, or cleanup semantics in the analysis path. Rollback is by reverting this commit; history query, API response shapes, and UI drawer consumption remain compatible.
 > Note: history detail, sync analysis responses, and completed task status responses expose a low-sensitivity input data-block overview at `report.details.analysis_context_pack_overview`; sync analysis responses depend on the just-persisted `analysis_history.context_snapshot`, so new records do not guarantee the overview when `SAVE_CONTEXT_SNAPSHOT=false`. `details.context_snapshot` strips that top-level field and does not return the full `AnalysisContextPack` or prompt summary.
 > Note: `POST /api/v1/agent/chat` and `POST /api/v1/agent/chat/stream` use the frontend-provided `context.stock_code` as the active Ask Stock baseline only after server-side stock-scope resolution. When `context.report_language` is missing, the endpoints fall back to global `REPORT_LANGUAGE`; an explicit caller value stays authoritative. Each turn is classified as `maintain`, `switch`, or `compare`: unchanged follow-ups can call stock-scoped tools only for the current stock; explicit switches clear stale stock summaries and prefetched context; comparison prompts such as compare/vs/difference allow the explicitly mentioned codes for that turn without rewriting the current stock. If a model attempts to call a stock tool with financial abbreviations such as TTM, PE, MACD, KDJ, contextual indicator tokens such as `MA` in moving-average prompts, or exchange fragments such as SH/SZ/BJ/HK/SS, the backend returns a non-retriable `stock_scope_violation` tool result instead of executing that stock tool. Tool names are resolved only by exact registry name; provider namespaces or suffixes are not routed to existing tools.
@@ -1745,7 +1769,7 @@ A: Check if Actions is enabled, and if cron expression is correct (note it's UTC
 - Expired idempotency records are lazily removed by a later keyed Portfolio write and an expired key starts a new operation. Cleanup, lookup, and ledger mutation share the same atomic transaction. Cleanup deletes only `portfolio_idempotency_records`; it does not delete trades, cash entries, corporate actions, snapshots, or any other ledger data.
 - Existing SQLite tables receive nullable scope columns, a unique index, and a legacy-write guard trigger through an additive migration. Raw-key legacy rows cannot prove their historical owner at write time, so they are retained unscoped and are not replayed by the current runtime; the same client key starts a new scoped operation.
 - Rollback uses a normal code revert while retaining the nullable columns, index, guard trigger, and all ledger data. The old runtime cannot read a v2 scoped response. If it tries to insert a raw row for an existing v2 client key, the trigger aborts the same transaction and rolls back the ledger mutation, preventing duplication but returning a failure instead of a replay. Other raw-key rows created during rollback remain unscoped on re-upgrade, so they cannot collide with the v2 unique index or block startup.
-- CSV records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
+- Spreadsheet import (CSV / `.xlsx`) is parsed before commit. Invalid rows are returned as structured `failed_rows` (`row_number`, `reason_code`, `reason`, `source`) so the Web wizard can download a correction file; empty rows are skipped. Valid records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
 - The Web client keeps the operation ID after a failed request, locks fields and close behavior while submission is pending, and changes compact forms to one column at 320px.
 
 ### Portfolio account archive on `/portfolio`
@@ -1773,6 +1797,10 @@ The global Critic retry budget is fixed at one per run, and the same target cann
 `StrategyEngine` remains the sole owner of Skill evidence partitioning and `strategy_synthesis` at the existing Decision boundary. The Critic is read-only, has no ToolSurface, and cannot author the final investment decision. Its verdict, reasons, missing evidence, requested/executed targets, budget consumption, and retry status are recorded in internal `AgentContext.meta`, `StageResult.meta`, and `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events. This does not expand persisted runtime facts or public Chat metadata.
 
 Cost boundary: an eligible enabled Multi run adds at most one Critic LLM call. Only a `retry` verdict adds at most one whitelist-stage LLM/tool rerun. Both remain bounded by the existing `AGENT_ORCHESTRATOR_TIMEOUT_S` remaining budget, and their timeouts exclude the minimum reserved for Decision. Disable or remove `AGENT_CRITIC_ENABLED` to roll back; no data migration or cleanup is required.
+### Hard per-mode budgets (#1121 / #125)
+
+Each run mode (`quick` / `standard` / `full` / `specialist` / chat) has hard caps for LLM turns, tool calls, and estimated USD cost (optional token ceiling via `AGENT_MODE_BUDGET_MAX_TOKENS`). Consumption is tracked on a shared `mode_budget` account and exposed in diagnostics (`ctx.meta["mode_budget"]` / `result.budget_snapshot`). On breach the run terminates with `success=false` and an explicit reason (`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`). Existing residual wall-clock skips remain `budget_skip` / `timeout` and record into the same snapshot — there is a single budget concept, not a parallel system. Configure via `AGENT_MODE_BUDGET_*` (see `.env.example`).
+
 
 ## Agent Runtime Guards
 

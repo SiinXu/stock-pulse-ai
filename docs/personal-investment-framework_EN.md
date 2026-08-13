@@ -128,3 +128,5 @@ Production migrations are forward-only:
 4. Never delete a `schema_migrations` row or drop tables manually to simulate a downgrade. Older code fails closed on an unknown higher migration by design.
 
 Reverting the PR code while retaining a migrated database is not a supported old-version restoration path. When current or newer code remains deployed, empty additive tables do not change analysis behavior in the absence of a framework.
+
+Optional `research_stance` field stores research-tone preset/custom text/preferred lens Skill ids (#119/#467). Unset means inactive. See [Investor Personas](investor-personas_EN.md).

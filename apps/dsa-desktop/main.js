@@ -23,6 +23,14 @@ const {
   readEnvFileValues,
   summarizeDesktopEnvironmentDiagnostics,
 } = require('./desktop-env');
+const {
+  buildCliOperatorGuidance,
+  getDeepLinkRejectionCopy,
+  getGuidanceCopy,
+  normalizeGuidanceLocale,
+  openCliInstallGuide,
+  openOperatorTerminal,
+} = require('./cli-operator-guidance');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { ModelPackError, importModelPack } = require('./model-pack');
 const {
@@ -84,6 +92,9 @@ const WINDOWS_NSIS_UNINSTALLER_NAMES = Object.freeze([
 const DESKTOP_PROTOCOL = 'stockpulse';
 const DESKTOP_PROTOCOL_HOST = 'app';
 const DESKTOP_DEEP_LINK_MAX_LENGTH = 4096;
+const DESKTOP_GET_ENV_DIAGNOSTICS_CHANNEL = 'desktop:get-env-diagnostics';
+const DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL = 'desktop:open-operator-terminal';
+const DESKTOP_OPEN_CLI_INSTALL_GUIDE_CHANNEL = 'desktop:open-cli-install-guide';
 const DESKTOP_ASSISTANT_GET_STATE_CHANNEL = 'desktop-assistant:get-state';
 const DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL = 'desktop-assistant:open-action';
 const DESKTOP_ASSISTANT_SET_MAIN_VISIBILITY_CHANNEL = 'desktop-assistant:set-main-visibility';
@@ -410,10 +421,39 @@ function assertDesktopAssistantSender(event) {
   }
 }
 
-function queueDesktopDeepLink(rawUrl, { outcome = null } = {}) {
+function resolveDesktopGuidanceLocale(locale) {
+  if (locale) {
+    return normalizeGuidanceLocale(locale);
+  }
+  const envLocale = String(process.env.LANG || process.env.LC_ALL || '').toLowerCase();
+  return normalizeGuidanceLocale(envLocale.startsWith('zh') ? 'zh' : 'en');
+}
+
+function notifyDesktopDeepLinkRejection({ locale } = {}) {
+  const copy = getDeepLinkRejectionCopy(resolveDesktopGuidanceLocale(locale));
+  logLine('[deep-link] rejected inbound protocol URL');
+  if (typeof dialog.showMessageBox === 'function') {
+    void dialog.showMessageBox({
+      type: 'info',
+      title: copy.title,
+      message: copy.title,
+      detail: copy.message,
+      buttons: ['OK'],
+      defaultId: 0,
+      noLink: true,
+    }).catch(() => undefined);
+  }
+  return copy;
+}
+
+function queueDesktopDeepLink(rawUrl, { outcome = null, notifyRejection = false, locale } = {}) {
   const route = parseDesktopDeepLink(rawUrl);
   if (!route) {
-    logLine('[deep-link] rejected inbound protocol URL');
+    if (notifyRejection) {
+      notifyDesktopDeepLinkRejection({ locale });
+    } else {
+      logLine('[deep-link] rejected inbound protocol URL');
+    }
     return false;
   }
   if (pendingDesktopDeepLinkOutcome) {
@@ -3504,6 +3544,54 @@ function scheduleDesktopEnvironmentDiagnosticsLog(options = {}) {
     });
 }
 
+async function getDesktopEnvDiagnosticsForRenderer({
+  locale,
+  probe = probeDesktopEnvironmentDiagnostics,
+} = {}) {
+  const diagnostics = await probe();
+  return buildCliOperatorGuidance(diagnostics, {
+    locale: resolveDesktopGuidanceLocale(locale),
+  });
+}
+
+async function handleOpenOperatorTerminal({ locale } = {}) {
+  const copy = getGuidanceCopyForTerminal(locale);
+  const result = await openOperatorTerminal({ platform: process.platform, spawnImpl: spawn });
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: copy.terminalUnsupported,
+    };
+  }
+  return {
+    ok: true,
+    message: copy.terminalOpened,
+  };
+}
+
+function getGuidanceCopyForTerminal(locale) {
+  return getGuidanceCopy(resolveDesktopGuidanceLocale(locale));
+}
+
+async function handleOpenCliInstallGuide(commandName, { locale } = {}) {
+  const copy = getGuidanceCopyForTerminal(locale);
+  const result = await openCliInstallGuide(commandName, {
+    openExternal: (url) => shell.openExternal(url),
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: copy.guideUnsupported,
+    };
+  }
+  return {
+    ok: true,
+    message: copy.guideOpened,
+    // Host only — never return the full URL path to the renderer.
+    urlHost: result.urlHost,
+  };
+}
+
 async function runLocalModelOperation(operation) {
   if (localModelOperationInFlight) {
     return { ok: false, error: 'busy', message: 'Another local model operation is in progress.' };
@@ -3629,6 +3717,24 @@ ipcMain.handle('desktop:open-release-page', async (event, releaseUrl) => {
   assertDesktopUpdateSender(event);
   await shell.openExternal(sanitizeReleaseUrl(releaseUrl));
   return true;
+});
+ipcMain.handle(DESKTOP_GET_ENV_DIAGNOSTICS_CHANNEL, async (event, payload = {}) => {
+  assertDesktopUpdateSender(event);
+  return getDesktopEnvDiagnosticsForRenderer({
+    locale: payload && payload.locale,
+  });
+});
+ipcMain.handle(DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL, async (event, payload = {}) => {
+  assertDesktopUpdateSender(event);
+  return handleOpenOperatorTerminal({
+    locale: payload && payload.locale,
+  });
+});
+ipcMain.handle(DESKTOP_OPEN_CLI_INSTALL_GUIDE_CHANNEL, async (event, payload = {}) => {
+  assertDesktopUpdateSender(event);
+  return handleOpenCliInstallGuide(payload && payload.command, {
+    locale: payload && payload.locale,
+  });
 });
 ipcMain.handle(DESKTOP_ASSISTANT_GET_STATE_CHANNEL, (event) => {
   assertDesktopAssistantSender(event);
@@ -4001,7 +4107,10 @@ function focusExistingMainWindow() {
 async function handleDesktopSecondInstance(_event, argv) {
   focusExistingMainWindow();
   const rawUrl = extractDesktopDeepLink(argv);
-  if (!rawUrl || !queueDesktopDeepLink(rawUrl)) {
+  if (!rawUrl) {
+    return false;
+  }
+  if (!queueDesktopDeepLink(rawUrl, { notifyRejection: true })) {
     return false;
   }
   return flushPendingDesktopDeepLink();
@@ -4011,7 +4120,7 @@ async function handleDesktopOpenUrl(event, rawUrl) {
   if (event && typeof event.preventDefault === 'function') {
     event.preventDefault();
   }
-  if (!queueDesktopDeepLink(rawUrl)) {
+  if (!queueDesktopDeepLink(rawUrl, { notifyRejection: true })) {
     return false;
   }
   focusExistingMainWindow();
@@ -4095,19 +4204,27 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_STATUS,
   DESKTOP_PROTOCOL,
   DESKTOP_PROTOCOL_HOST,
+  DESKTOP_GET_ENV_DIAGNOSTICS_CHANNEL,
+  DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL,
+  DESKTOP_OPEN_CLI_INSTALL_GUIDE_CHANNEL,
   DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES,
   UPDATE_MODE,
   UPDATE_STATUS,
   buildUpdateState,
   backupPackagedRuntimeState,
   buildBackendArgs,
+  buildCliOperatorGuidance,
   checkForDesktopUpdates,
   compareVersions,
   evaluateReleaseUpdate,
   buildBackendUrl,
   buildBackendEnvironment,
   createDesktopModelPackAttestation,
+  getDesktopEnvDiagnosticsForRenderer,
+  handleOpenCliInstallGuide,
+  handleOpenOperatorTerminal,
   logDesktopEnvironmentDiagnosticsSummary,
+  notifyDesktopDeepLinkRejection,
   scheduleDesktopEnvironmentDiagnosticsLog,
   extendMacDesktopBackendPath,
   extractReleaseMetadata,
