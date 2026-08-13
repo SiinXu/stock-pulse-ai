@@ -3,6 +3,10 @@
  * Issue #1136 reuses this channel for the report sensitivity scenario library.
  * Free-text assumptions are intentionally out of scope for v1.
  */
+import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  buildAnalysisWorkbenchHref,
+} from '../../routing/routes';
 import builtinsCatalog from './scenarioLibraryBuiltins.json';
 
 export const HYPOTHETICAL_ASSUMPTION_MARKER = '[HYPOTHETICAL ASSUMPTION]';
@@ -116,4 +120,20 @@ export function mergeWhatIfIntoContext(
 }
 export function countWhatIfTurnsInMessages(messages: Array<{ role: string; content: string }>): number {
   return messages.filter((m) => m.role === 'user' && contentHasHypotheticalMarker(m.content)).length;
+}
+
+/**
+ * Optional handoff from a what-if session to the analysis workbench launch UI.
+ * Prefills stock only — does not auto-start a run and never injects hypothetical
+ * assumptions (isolation: no DecisionSignal pollution from this handoff).
+ */
+export function buildWhatIfPromoteAnalysisHref(
+  stockCode: string | null | undefined,
+): string | null {
+  const code = (stockCode || '').trim();
+  if (!code) return null;
+  return buildAnalysisWorkbenchHref({
+    stock: code,
+    segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+  });
 }

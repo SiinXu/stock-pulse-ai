@@ -1,6 +1,7 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { FlaskConical } from 'lucide-react';
-import { InlineAlert, Input, Select, Switch } from '../common';
+import { Button, InlineAlert, Input, Select, Switch } from '../common';
 import { cn } from '../../utils/cn';
 import type { UiTextKey } from '../../i18n/uiText';
 import {
@@ -20,6 +21,8 @@ export interface WhatIfScenarioPanelProps {
   draft: WhatIfDraftState;
   onChange: (next: WhatIfDraftState) => void;
   disabled?: boolean;
+  /** Analysis workbench launch href for the active stock; null when no stock context. */
+  promoteHref?: string | null;
 }
 
 const DIMENSION_OPTIONS: Array<{ value: WhatIfDimension; labelKey: UiTextKey }> = [
@@ -30,7 +33,13 @@ const DIMENSION_OPTIONS: Array<{ value: WhatIfDimension; labelKey: UiTextKey }> 
   { value: 'earnings', labelKey: 'chat.whatIf.dimension.earnings' },
 ];
 
-export function WhatIfScenarioPanel({ t, draft, onChange, disabled = false }: WhatIfScenarioPanelProps): React.ReactElement {
+export function WhatIfScenarioPanel({
+  t,
+  draft,
+  onChange,
+  disabled = false,
+  promoteHref = null,
+}: WhatIfScenarioPanelProps): React.ReactElement {
   const limitReached = isWhatIfLimitReached(draft);
   const magnitudeInvalid = draft.enabled && draft.dimension !== 'earnings' && parseMagnitude(draft.magnitude) === null;
   const setField = <K extends keyof WhatIfDraftState>(key: K, value: WhatIfDraftState[K]) => {
@@ -165,6 +174,36 @@ export function WhatIfScenarioPanel({ t, draft, onChange, disabled = false }: Wh
             {whatIfFields}
           </ScenarioLibraryPanel>
           <p className="text-xs text-secondary-text">{t('chat.whatIf.extraTurnHint')}</p>
+          <div className="space-y-1.5 border-t border-subtle pt-3" data-testid="chat-what-if-promote">
+            <p className="text-xs text-secondary-text">{t('chat.whatIf.promoteHint')}</p>
+            {promoteHref ? (
+              disabled ? (
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  disabled
+                >
+                  {t('chat.whatIf.promote')}
+                </Button>
+              ) : (
+                <Link
+                  to={promoteHref}
+                  className={cn(
+                    'control-hit-target inline-flex h-5 min-w-5 items-center justify-center gap-1.5 rounded-md',
+                    'border border-border bg-hover px-2 text-xs font-medium text-foreground shadow-soft-card',
+                    'transition-colors hover:bg-subtle-hover dark:bg-border dark:hover:bg-subtle-active',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25',
+                  )}
+                >
+                  {t('chat.whatIf.promote')}
+                </Link>
+              )
+            ) : (
+              <p className="text-xs text-muted-text">
+                {t('chat.whatIf.promoteNeedStock')}
+              </p>
+            )}
+          </div>
         </div>
       ) : null}
     </div>

@@ -64,6 +64,21 @@ second operator-facing switch. The legacy status card reports only legacy
 day-batch next/last times — it does not expose a live “this process owns
 versioned tasks” indicator.
 
+Authoritative legacy `process_mode` values on the status API / Settings card
+(computed, never static labels):
+
+| Value | Meaning |
+| --- | --- |
+| `serve+schedule` | This long-lived Web/API process owns and has attached the legacy day-batch |
+| `desktop` | Desktop process with the legacy day-batch attached |
+| `cli-schedule` | This process does **not** own the schedule (`DSA_CLI_SCHEDULER_OWNS_SCHEDULE`) |
+| `not_attached` | This process could own the schedule but the legacy day-batch is not attached (e.g. `--serve-only`) |
+
+Apply semantics on the card: **hot-reload on save** badges appear only when
+`attached=true` for `SCHEDULE_ENABLED` / times. `SCHEDULE_RUN_IMMEDIATELY` stays
+`restart_required` (start-time only). The card also deep-links to
+Settings → Notifications → Channels.
+
 There is no English twin of this document yet (`docs/scheduled-tasks_EN.md`);
 this file is the single source for both tracks.
 

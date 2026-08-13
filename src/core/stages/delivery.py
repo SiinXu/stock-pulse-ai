@@ -384,9 +384,22 @@ class _DeliveryStageMixin:
                             if channel_results
                             else True
                         )
+                    channel_summaries = None
+                    if dispatch_result is not None:
+                        summaries_fn = getattr(
+                            dispatch_result,
+                            "channel_summaries",
+                            None,
+                        )
+                        if callable(summaries_fn):
+                            try:
+                                channel_summaries = list(summaries_fn())
+                            except Exception:  # broad-exception: optional_metadata - stage payload keeps raw attempts when summary projection fails
+                                channel_summaries = None
                     stage_value = {
                         "dispatch_result": dispatch_result,
                         "channel_results": channel_results,
+                        "channel_summaries": channel_summaries,
                         "dispatch_result_status": dispatch_result_status,
                         "dispatched": dispatched,
                         "sent": sent,
@@ -437,6 +450,7 @@ class _DeliveryStageMixin:
                 cached_failure_count = int(
                     dispatch_value.get("delivery_failure_count") or 0
                 )
+                stage_channels = dispatch_value.get("channel_summaries")
                 self._finish_pipeline_stage(
                     dispatch_stage,
                     dispatch_execution,
@@ -462,6 +476,10 @@ class _DeliveryStageMixin:
                             cached_failure_count if cached_dispatch else 0
                         ),
                         "reused": cached_dispatch,
+                        # Queryable per-channel shape for diagnostics/API (Issue #1081).
+                        "channels": (
+                            None if cached_dispatch else stage_channels
+                        ),
                     },
                 )
                 dispatch_execution.unwrap()
@@ -954,6 +972,17 @@ class _DeliveryStageMixin:
                     "reason": "notification_not_configured",
                 }
             else:
+                aggregate_channels = None
+                summaries_fn = getattr(
+                    dispatch_result,
+                    "channel_summaries",
+                    None,
+                )
+                if callable(summaries_fn):
+                    try:
+                        aggregate_channels = list(summaries_fn())
+                    except Exception:  # broad-exception: optional_metadata - aggregate stage summary stays count-only when projection fails
+                        aggregate_channels = None
                 output_summary = {
                     "delivered": bool(dispatch_result.success),
                     "channel_count": execution.target_channel_count,
@@ -965,6 +994,8 @@ class _DeliveryStageMixin:
                     "attempt_count": execution.attempt_count,
                     "failure_count": execution.failure_count,
                     "reused_count": execution.reused_count,
+                    # Queryable per-channel shape for diagnostics/API (Issue #1081).
+                    "channels": aggregate_channels,
                 }
 
             self._finish_pipeline_stage(
