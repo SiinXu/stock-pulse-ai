@@ -31,6 +31,19 @@ const pick = (
   snakeKey: string,
 ): unknown => record[camelKey] ?? record[snakeKey];
 
+const pickFirst = (
+  record: Record<string, unknown>,
+  keys: readonly string[],
+): unknown => {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== null && value !== undefined) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
 const cleanText = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
     return undefined;
@@ -435,13 +448,13 @@ const normalizeCommitteeDivergence = (
   }
   const point: ReportCommitteeDivergence = {};
   const textFields = [
-    ['source', 'source'],
-    ['conflictType', 'conflict_type'],
-    ['severity', 'severity'],
-    ['descriptionKey', 'description_key'],
+    ['source', ['source']],
+    ['conflictType', ['kind', 'conflictType', 'conflict_type']],
+    ['severity', ['severity']],
+    ['descriptionKey', ['summaryKey', 'summary_key', 'description_key']],
   ] as const;
-  textFields.forEach(([camelKey, snakeKey]) => {
-    const text = cleanText(pick(record, camelKey, snakeKey));
+  textFields.forEach(([camelKey, sourceKeys]) => {
+    const text = cleanText(pickFirst(record, sourceKeys));
     if (text !== undefined) {
       point[camelKey] = text;
     }

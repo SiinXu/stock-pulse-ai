@@ -21963,12 +21963,8 @@
       "ReportStructuredCommitteeDivergence": {
         "description": "Divergence point aligned with multi-strategy conflict / #1205 records.",
         "properties": {
-          "conflict_type": {
-            "title": "Conflict Type",
-            "type": "string"
-          },
-          "description_key": {
-            "title": "Description Key",
+          "kind": {
+            "title": "Kind",
             "type": "string"
           },
           "participants": {
@@ -21984,6 +21980,10 @@
           },
           "source": {
             "title": "Source",
+            "type": "string"
+          },
+          "summary_key": {
+            "title": "Summary Key",
             "type": "string"
           }
         },

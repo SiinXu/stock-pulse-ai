@@ -12102,16 +12102,16 @@ export interface components {
          * @description Divergence point aligned with multi-strategy conflict / #1205 records.
          */
         ReportStructuredCommitteeDivergence: {
-            /** Conflict Type */
-            conflict_type?: string;
-            /** Description Key */
-            description_key?: string;
+            /** Kind */
+            kind?: string;
             /** Participants */
             participants?: string[];
             /** Severity */
             severity?: string;
             /** Source */
             source?: string;
+            /** Summary Key */
+            summary_key?: string;
         };
         /**
          * ReportStructuredCommitteeMember

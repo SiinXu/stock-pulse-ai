@@ -58,7 +58,7 @@ It follows report-strata presentation conventions and includes:
 | `members` | Per-persona stance (signal, confidence, reasoning excerpt) |
 | `conclusion` | Final signal + consensus level + confidence from `strategy_synthesis` |
 | `dissenting_opinions` | Reserved / opposing opinions (trace from opposing skills or opposing member signals) |
-| `divergence_points` | Conflict rows aligned with multi-strategy conflict / structured disagreement records |
+| `divergence_points` | Canonical structured-disagreement rows: `source`, `kind`, `severity`, `participants`, and `summary_key`; legacy conflicts are mapped only when no versioned record exists |
 | `status` / `outcome` | Compact badges for export and UI |
 
 Markdown / WeChat / History / Notification render the section after

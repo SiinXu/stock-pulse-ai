@@ -252,7 +252,7 @@
 {% if committee.get('divergence_points') %}
 **{{ labels.committee_divergence_label }}**
 {% for point in (committee.get('divergence_points') or [])[:8] %}
-- {{ localize_conflict_severity(point.get('severity', 'medium'), report_language) }}: {{ localize_strategy_conflict_description(point.get('conflict_type'), report_language) }}{% if point.get('participants') %}（{% for participant in point.get('participants') %}{{ localize_strategy_skill(participant, report_language) }}{{ '、' if not loop.last else '' }}{% endfor %}）{% endif %}
+- {{ localize_conflict_severity(point.get('severity', 'medium'), report_language) }}: {{ localize_strategy_conflict_description(point.get('kind') or point.get('conflict_type'), report_language) }}{% if point.get('participants') %}（{% for participant in point.get('participants') %}{{ localize_strategy_skill(participant, report_language) }}{{ '、' if not loop.last else '' }}{% endfor %}）{% endif %}
 {% endfor %}
 {% endif %}
 {% if committee.get('personas_invalid') %}

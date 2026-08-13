@@ -122,9 +122,10 @@ def test_projects_complete_dashboard_payload() -> None:
                     ],
                     "divergence_points": [
                         {
-                            "source": "strategy_conflict",
-                            "conflict_type": "directional_opposition",
+                            "source": "strategy",
+                            "kind": "directional_opposition",
                             "severity": "medium",
+                            "summary_key": "disagreement.point.strategy.directional_opposition",
                             "participants": ["persona_value_moat", "persona_tail_risk"],
                         }
                     ],
@@ -153,7 +154,13 @@ def test_projects_complete_dashboard_payload() -> None:
     assert committee["conclusion"]["consensus_level"] == "medium"
     assert len(committee["members"]) == 2
     assert committee["dissenting_opinions"][0]["persona_id"] == "persona_tail_risk"
-    assert committee["divergence_points"][0]["conflict_type"] == "directional_opposition"
+    assert committee["divergence_points"][0] == {
+        "source": "strategy",
+        "kind": "directional_opposition",
+        "severity": "medium",
+        "summary_key": "disagreement.point.strategy.directional_opposition",
+        "participants": ["persona_value_moat", "persona_tail_risk"],
+    }
 
 
 def test_projects_partial_payload_without_synthesizing_missing_sections() -> None:

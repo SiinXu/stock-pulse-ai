@@ -41,7 +41,7 @@ from src.notification_noise import (
     release_notification_noise,
 )
 from src.report_language import (
-    append_committee_deliberation_lines,
+    append_committee_deliberation_lines as _append_committee_deliberation_lines,
     format_strategy_skill_items,
     get_localized_stock_name,
     get_report_labels,
@@ -242,16 +242,13 @@ def _append_committee_deliberation_block(
     compact: bool = False,
 ) -> None:
     """Append the Investment Committee block from the real deliberation payload."""
-    append_committee_deliberation_lines(
+    _append_committee_deliberation_lines(
         lines,
         committee,
         labels,
         report_language,
         compact=compact,
     )
-
-
-
 
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult

@@ -31,6 +31,7 @@ from src.schemas.report_strata import default_disclaimer
 
 _REASONING_EXCERPT_MAX = 240
 _MAX_TRACE_ITEMS = 12
+_DISAGREEMENT_HANDLING_SCHEMA_VERSION = "disagreement-handling-v1"
 
 
 def _truncate(text: str, limit: int = _REASONING_EXCERPT_MAX) -> str:
@@ -138,9 +139,28 @@ def _build_conclusion(
 def _build_divergence_points(
     strategy_synthesis: Optional[Mapping[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Deterministic divergence points from synthesis conflicts (#1205-aligned)."""
+    """Project canonical #1205 points, falling back only when no record exists."""
     if not isinstance(strategy_synthesis, Mapping):
         return []
+    if "disagreement_handling" in strategy_synthesis:
+        handling = strategy_synthesis.get("disagreement_handling")
+        if (
+            not isinstance(handling, Mapping)
+            or handling.get("schema_version")
+            != _DISAGREEMENT_HANDLING_SCHEMA_VERSION
+            or handling.get("enabled") is not True
+        ):
+            return []
+        raw_points = handling.get("points")
+        if not isinstance(raw_points, list):
+            return []
+        points: List[Dict[str, Any]] = []
+        for raw in raw_points[:_MAX_TRACE_ITEMS]:
+            point = _canonical_divergence_point(raw)
+            if point is not None:
+                points.append(point)
+        return points
+
     points: List[Dict[str, Any]] = []
     conflicts = strategy_synthesis.get("conflicts") or []
     if not isinstance(conflicts, list):
@@ -151,28 +171,57 @@ def _build_divergence_points(
         conflict_type = raw.get("conflict_type")
         if not isinstance(conflict_type, str) or not conflict_type.strip():
             continue
-        participants_raw = raw.get("participants") or []
-        participants: List[str] = []
-        if isinstance(participants_raw, list):
-            for item in participants_raw:
-                text = str(item or "").strip()
-                if text and text not in participants:
-                    participants.append(text)
-        point: Dict[str, Any] = {
-            "source": "strategy_conflict",
-            "conflict_type": conflict_type.strip(),
-            "severity": (
-                str(raw.get("severity")).strip()
-                if raw.get("severity") is not None
-                else "medium"
-            ),
-            "participants": participants,
+        fallback = {
+            "source": "strategy",
+            "kind": conflict_type,
+            "severity": raw.get("severity"),
+            "participants": raw.get("participants"),
+            "summary_key": f"disagreement.point.strategy.{conflict_type.strip()}",
         }
-        description_key = raw.get("description_key")
-        if isinstance(description_key, str) and description_key.strip():
-            point["description_key"] = description_key.strip()
-        points.append(point)
+        point = _canonical_divergence_point(fallback)
+        if point is not None:
+            points.append(point)
     return points
+
+
+def _canonical_divergence_point(value: Any) -> Optional[Dict[str, Any]]:
+    """Return the bounded public fields of one structured-disagreement point."""
+    if not isinstance(value, Mapping):
+        return None
+    kind = value.get("kind")
+    if not isinstance(kind, str) or not kind.strip():
+        return None
+    participants: List[str] = []
+    participants_raw = value.get("participants")
+    if isinstance(participants_raw, list):
+        for item in participants_raw[:_MAX_TRACE_ITEMS]:
+            if not isinstance(item, str):
+                continue
+            text = item.strip()
+            if text and text not in participants:
+                participants.append(text)
+    source = value.get("source")
+    severity = value.get("severity")
+    summary_key = value.get("summary_key")
+    return {
+        "source": (
+            source.strip()
+            if isinstance(source, str) and source.strip()
+            else "strategy"
+        ),
+        "kind": kind.strip(),
+        "severity": (
+            severity.strip()
+            if isinstance(severity, str) and severity.strip()
+            else "medium"
+        ),
+        "participants": participants,
+        "summary_key": (
+            summary_key.strip()
+            if isinstance(summary_key, str) and summary_key.strip()
+            else f"disagreement.point.strategy.{kind.strip()}"
+        ),
+    }
 
 
 def _derive_status(

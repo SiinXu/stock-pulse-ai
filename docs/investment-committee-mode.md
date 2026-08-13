@@ -56,7 +56,7 @@ dashboard.committee_deliberation  # schema_version: committee-deliberation-v1
 | `members` | 各人格立场（信号、置信度、理由摘录） |
 | `conclusion` | 来自 `strategy_synthesis` 的最终信号 + 共识度 + 置信度 |
 | `dissenting_opinions` | 保留/反方意见（来自 opposing skills 或成员对立信号） |
-| `divergence_points` | 与多策略冲突 / 结构化分歧记录对齐的分歧点 |
+| `divergence_points` | 结构化分歧标准字段：`source`、`kind`、`severity`、`participants`、`summary_key`；仅在版本化记录不存在时映射旧冲突 |
 | `status` / `outcome` | 导出与 UI 用紧凑状态 |
 
 Markdown / WeChat / History / Notification 在 `strategy_synthesis` 之后渲染。历史报告无该字段时保持安静。

@@ -1402,7 +1402,7 @@ def append_committee_deliberation_lines(
                     point.get("severity", "medium"), report_language
                 )
                 description = localize_strategy_conflict_description(
-                    point.get("conflict_type"), report_language
+                    point.get("kind") or point.get("conflict_type"), report_language
                 )
                 participants = point.get("participants") or []
                 participant_text = ""

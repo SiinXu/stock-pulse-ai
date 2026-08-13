@@ -230,7 +230,8 @@ describe('ReportStructuredInsights', () => {
         ],
         divergence_points: [
           {
-            conflict_type: 'directional_opposition',
+            kind: 'directional_opposition',
+            summary_key: 'disagreement.point.strategy.directional_opposition',
             participants: ['persona_value_moat', '', 9],
           },
         ],
@@ -259,6 +260,12 @@ describe('ReportStructuredInsights', () => {
     expect(normalized?.committeeDeliberation?.divergencePoints?.[0].participants).toEqual([
       'persona_value_moat',
     ]);
+    expect(normalized?.committeeDeliberation?.divergencePoints?.[0].conflictType).toBe(
+      'directional_opposition',
+    );
+    expect(normalized?.committeeDeliberation?.divergencePoints?.[0].descriptionKey).toBe(
+      'disagreement.point.strategy.directional_opposition',
+    );
   });
 
   it('renders a committee-only payload for Signal/History review', () => {

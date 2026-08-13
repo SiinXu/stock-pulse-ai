@@ -1026,6 +1026,15 @@ class _RenderingMethods:
                         lines.append(summary)
                     lines.append("")
 
+                # Investment Committee (compact for notifications).
+                _append_committee_deliberation_block(
+                    lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
+
                 # Simplified checklist
                 checklist = battle.get('action_checklist', []) if battle else []
                 if checklist:

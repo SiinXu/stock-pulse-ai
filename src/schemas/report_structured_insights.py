@@ -162,10 +162,10 @@ class ReportStructuredCommitteeDivergence(TypedDict, total=False):
     """Divergence point aligned with multi-strategy conflict / #1205 records."""
 
     source: str
-    conflict_type: str
+    kind: str
     severity: str
     participants: List[str]
-    description_key: str
+    summary_key: str
 
 
 class ReportStructuredCommitteeDeliberation(TypedDict, total=False):
@@ -584,14 +584,24 @@ def _project_committee_divergence(
     if not isinstance(value, dict):
         return None
     projected: Dict[str, Any] = {}
-    for field in ("source", "conflict_type", "severity", "description_key"):
-        text = _clean_text(value.get(field))
+    aliases = {
+        "source": ("source",),
+        "kind": ("kind", "conflict_type"),
+        "severity": ("severity",),
+        "summary_key": ("summary_key", "description_key"),
+    }
+    for field, source_fields in aliases.items():
+        raw = next(
+            (value.get(key) for key in source_fields if value.get(key) is not None),
+            None,
+        )
+        text = _clean_text(raw)
         if text is not None:
             projected[field] = text
     participants = _clean_string_list(value.get("participants"))
     if participants:
         projected["participants"] = participants
-    if not projected.get("conflict_type") and not projected.get("participants"):
+    if not projected.get("kind") and not projected.get("participants"):
         return None
     return cast(ReportStructuredCommitteeDivergence, projected)
 
