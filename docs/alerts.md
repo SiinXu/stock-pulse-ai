@@ -531,3 +531,36 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 - P5 新增 Alert API/Web 支持的技术指标规则。最小回滚方式是 revert P5 PR；已创建的 P5 `alert_rules` 记录不会自动删除，旧代码会在 worker 加载阶段 skip unsupported `alert_type`，不影响 legacy 三类规则执行。如需清理，需要维护者确认后手动删除相关规则记录。
 - P6 新增 Alert API/Web 支持的 watchlist、portfolio holdings 与 portfolio account 规则。最小回滚方式是 revert P6 PR；没有新表或迁移，已创建的 P6 `alert_rules` 会保留。回滚前建议 disable/delete 非 `single_symbol` 的 P6 规则；否则旧 worker 可能把 `watchlist` / `portfolio_holdings` 的父级 `target` 当作股票代码评估并产生 failed/skipped 噪声，portfolio 专用 `alert_type` 会在 worker 加载阶段被 skip。
 - P7 新增 Alert API/Web 支持的 `market` 规则和大盘复盘 `market_light_snapshots` 历史快照。最小回滚方式是 revert P7 PR；没有新表或迁移，已创建的 P7 `alert_rules` 会保留。回滚前建议 disable/delete `target_scope=market` 规则；旧 worker 会 skip unsupported `market_light_*` 类型或因 scope/type 不识别产生配置噪声。
+
+## 事件触发深度分析与上下文动作（Issues #129 / #152）
+
+### 总开关（默认全部关闭）
+
+| 配置 | 默认 | 含义 |
+| --- | --- | --- |
+| `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 事件触发后入队深度分析的总开关 |
+| `EVENT_TRIGGER_COOLDOWN_MINUTES` | `180` | 规则+标的维度防抖分钟数 |
+| `EVENT_TRIGGER_DEFAULT_PIPELINE` | `standard` | 默认分析管线（`standard`/`detailed`→`detailed`） |
+| `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | 进程内每小时预算上界（`0` 关闭） |
+| `EVENT_TRIGGER_MAX_PER_DAY` | `20` | 进程内每日预算上界（`0` 关闭） |
+
+规则还需显式设置 `notification_policy.auto_analysis=true`。适用类型：
+`corporate_event`、`volume_spike`、`price_change_percent`。
+
+分析通过 `AnalysisSubmissionService` 异步入队，**不会**在告警热路径内联跑完整分析。
+只有队列实际接受的任务才占用防抖与小时/每日预算；重复任务、空结果或入队失败会释放预留额度。
+规则数值、自然语言编译数值与触发记录一律拒绝 `NaN` / `+Inf` / `-Inf`。
+
+### 上下文建议动作
+
+真实触发后 worker 写入有界 `suggested_action`（及可选 `auto_analysis` 状态）。公开投影
+对齐 #957 事件告警面：不泄露账户/数量等敏感持仓字段；深度链接为站内路径与可选 http(s) 来源 URL。
+缺少影响结论时，Web 明确显示“未评估”，不会把缺失状态呈现为通过。
+
+告警通知静默时段继续复用 `NOTIFICATION_QUIET_HOURS` / `NOTIFICATION_TIMEZONE`。
+
+### 自然语言编译规则（C5 / #1133）
+
+`POST /api/v1/alerts/rules/compile-nl` 将白名单内自然语言编译为 Alert 创建载荷。
+结果：`success` | `need_clarification` | `rejected`。禁止任意代码执行。
+企业事件编译始终包含 `event_categories` / `lookback_hours` / `min_items`，防止编辑丢字段回归。

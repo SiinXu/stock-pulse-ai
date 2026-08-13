@@ -2248,6 +2248,31 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls whether the Kronos Agent Tool can register and run local inference.'],
     notes: ['Example: /absolute/path/to/kronos-weights with Kronos-mini/ and Kronos-Tokenizer-2k/.'],
   },
+  'settings.agent.event_triggered_analysis': {
+    title: 'Event-Triggered Deep Analysis',
+    summary:
+      'Master switch and budgets for enqueueing deep analysis when opted-in alert rules fire.',
+    usage:
+      'Keep EVENT_TRIGGERED_ANALYSIS_ENABLED=false unless you intentionally want corporate-event / volume / percent-move alerts to enqueue analysis. Rules must also set notification_policy.auto_analysis=true. Cooldown and hourly/daily caps still apply.',
+    valueNotes: [
+      'Default off; explicit enable required at config and per-rule levels.',
+      'Eligible types: corporate_event, volume_spike, price_change_percent.',
+    ],
+    impact: [
+      'When enabled and opted in, alert triggers may enqueue async analysis tasks via the shared task queue.',
+    ],
+    notes: [
+      'Does not run analysis inline on the alert hot path.',
+      'Quiet hours for delivery still use NOTIFICATION_QUIET_HOURS on the alert notification route.',
+    ],
+    examples: [
+      'EVENT_TRIGGERED_ANALYSIS_ENABLED=false',
+      'EVENT_TRIGGER_COOLDOWN_MINUTES=180',
+      'EVENT_TRIGGER_DEFAULT_PIPELINE=standard',
+      'EVENT_TRIGGER_MAX_PER_HOUR=5',
+      'EVENT_TRIGGER_MAX_PER_DAY=20',
+    ],
+  },
   'settings.agent.event_impact_context': {
     title: 'Alert Impact Context',
     summary: 'When enabled, alert notifications include watchlist/portfolio impact context for the symbol.',
