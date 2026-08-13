@@ -4,6 +4,11 @@
 
 from src.schemas.report_structured_insights import (
     REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION,
+    ReportStructuredCommitteeConclusion,
+    ReportStructuredCommitteeDeliberation,
+    ReportStructuredCommitteeDivergence,
+    ReportStructuredCommitteeMember,
+    ReportStructuredCommitteeOpinion,
     ReportStructuredInsights,
     ReportStructuredPhaseContext,
     ReportStructuredPhaseDecision,
@@ -17,6 +22,11 @@ from src.schemas.report_structured_insights import (
 
 __all__ = [
     "REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION",
+    "ReportStructuredCommitteeConclusion",
+    "ReportStructuredCommitteeDeliberation",
+    "ReportStructuredCommitteeDivergence",
+    "ReportStructuredCommitteeMember",
+    "ReportStructuredCommitteeOpinion",
     "ReportStructuredInsights",
     "ReportStructuredPhaseContext",
     "ReportStructuredPhaseDecision",

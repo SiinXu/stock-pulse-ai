@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
 import { Badge, Button, CredentialInput, IconButton, Input, Select, Textarea, TimePicker } from '../common';
-import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
+import type { SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
 import { MODEL_ACCESS_TEXT } from '../../locales/settingsModelAccess';
@@ -21,6 +21,10 @@ import {
   resolveSettingsFieldControl,
   type ResolvedSettingsControl,
 } from './settingsFieldControl';
+import {
+  areSettingsFieldPropsEqual,
+  type SettingsFieldProps,
+} from './settingsFieldMemo';
 
 function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['options'] = [], locale: UiLanguage) {
   return options.map((option) => {
@@ -92,24 +96,6 @@ function resolveDisplayValue(
   }
 
   return value;
-}
-
-interface SettingsFieldProps {
-  item: SystemConfigItem;
-  value: string;
-  disabled?: boolean;
-  onChange: (key: string, value: string) => void;
-  issues?: ConfigValidationIssue[];
-  /** Effective requirement from the field's schema contract. */
-  requirement?: 'required' | 'optional' | 'inherited' | null;
-  /** True when the field's enabledWhen conditions are not met (read-only). */
-  dependencyLocked?: boolean;
-  /** Fail-safe schema diagnostic that forces a field into read-only mode. */
-  readOnlyDiagnostic?: string;
-  /** Restricts multi-enum options to those passing the filter (already-selected values always stay visible). */
-  enumOptionFilter?: (value: string) => boolean;
-  /** Rendered instead of the multi-enum control when the filter leaves no option and nothing is selected. */
-  enumEmptyState?: React.ReactNode;
 }
 
 function renderFieldControl(
@@ -387,7 +373,7 @@ function renderFieldControl(
   );
 }
 
-export const SettingsField: React.FC<SettingsFieldProps> = ({
+function SettingsFieldComponent({
   item,
   value,
   disabled = false,
@@ -398,7 +384,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   readOnlyDiagnostic,
   enumOptionFilter,
   enumEmptyState,
-}) => {
+}: SettingsFieldProps) {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
   // Resolve once per render and share across layout, default backfill, and control.
@@ -513,4 +499,6 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
       </div>
     </div>
   );
-};
+}
+
+export const SettingsField = memo(SettingsFieldComponent, areSettingsFieldPropsEqual);

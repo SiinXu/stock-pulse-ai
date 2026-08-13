@@ -1,6 +1,50 @@
 {
   "components": {
     "schemas": {
+      "AgentModeBreakdown": {
+        "properties": {
+          "agent_mode": {
+            "title": "Agent Mode",
+            "type": "string"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_mode",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "AgentModeBreakdown",
+        "type": "object"
+      },
       "AgentModelDeployment": {
         "properties": {
           "api_base": {
@@ -5266,6 +5310,17 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "prompt_tokens": {
             "default": 0,
             "title": "Prompt Tokens",
@@ -5282,6 +5337,575 @@
           "total_tokens"
         ],
         "title": "CallTypeBreakdown",
+        "type": "object"
+      },
+      "CandidateDiscoveryCandidate": {
+        "additionalProperties": true,
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "factor_scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Factor Scores",
+            "type": "object"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "llm_thesis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Thesis"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          }
+        },
+        "required": [
+          "rank",
+          "code"
+        ],
+        "title": "CandidateDiscoveryCandidate",
+        "type": "object"
+      },
+      "CandidateDiscoveryCriteria": {
+        "properties": {
+          "exclude_st": {
+            "default": true,
+            "title": "Exclude St",
+            "type": "boolean"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "max_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Change Pct"
+          },
+          "min_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Amount"
+          },
+          "min_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Change Pct"
+          }
+        },
+        "title": "CandidateDiscoveryCriteria",
+        "type": "object"
+      },
+      "CandidateDiscoveryRequest": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Codes",
+            "type": "array"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateDiscoveryCriteria"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "default": "en",
+            "pattern": "^(en|zh)$",
+            "title": "Language",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "max_provider_calls": {
+            "default": 20,
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Max Provider Calls",
+            "type": "integer"
+          },
+          "max_results": {
+            "default": 10,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "page": {
+            "default": 1,
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 50,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "query": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Query",
+            "type": "string"
+          },
+          "universe": {
+            "default": "watchlist",
+            "description": "watchlist | portfolio | index | codes",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Universe",
+            "type": "string"
+          },
+          "use_llm": {
+            "default": false,
+            "title": "Use Llm",
+            "type": "boolean"
+          }
+        },
+        "title": "CandidateDiscoveryRequest",
+        "type": "object"
+      },
+      "CandidateDiscoveryResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "candidate_count": {
+            "title": "Candidate Count",
+            "type": "integer"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateDiscoveryCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "cost_contract": {
+            "additionalProperties": true,
+            "title": "Cost Contract",
+            "type": "object"
+          },
+          "criteria": {
+            "additionalProperties": true,
+            "title": "Criteria",
+            "type": "object"
+          },
+          "empty_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Message"
+          },
+          "empty_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Reason"
+          },
+          "market": {
+            "default": "cn",
+            "title": "Market",
+            "type": "string"
+          },
+          "max_results": {
+            "default": 10,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "pack_version": {
+            "title": "Pack Version",
+            "type": "string"
+          },
+          "page": {
+            "default": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 50,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "research_disclaimer": {
+            "default": "Research screening only. Not investment advice or trade instructions.",
+            "title": "Research Disclaimer",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "universe": {
+            "title": "Universe",
+            "type": "string"
+          },
+          "universe_contract": {
+            "additionalProperties": true,
+            "title": "Universe Contract",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pack_version",
+          "run_id",
+          "status",
+          "universe",
+          "candidate_count"
+        ],
+        "title": "CandidateDiscoveryResponse",
+        "type": "object"
+      },
+      "CandidateDiscoveryTaskAccepted": {
+        "additionalProperties": true,
+        "properties": {
+          "max_provider_calls": {
+            "title": "Max Provider Calls",
+            "type": "integer"
+          },
+          "max_results": {
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "message_code": {
+            "default": "task.discovery.queued",
+            "title": "Message Code",
+            "type": "string"
+          },
+          "message_params": {
+            "additionalProperties": true,
+            "title": "Message Params",
+            "type": "object"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "universe": {
+            "title": "Universe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "trace_id",
+          "status",
+          "message",
+          "universe",
+          "page",
+          "page_size",
+          "max_results",
+          "max_provider_calls"
+        ],
+        "title": "CandidateDiscoveryTaskAccepted",
+        "type": "object"
+      },
+      "CandidateDiscoveryTaskStatus": {
+        "additionalProperties": true,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "message_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Code"
+          },
+          "message_params": {
+            "additionalProperties": true,
+            "title": "Message Params",
+            "type": "object"
+          },
+          "progress": {
+            "default": 0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateDiscoveryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "task_id",
+          "status"
+        ],
+        "title": "CandidateDiscoveryTaskStatus",
         "type": "object"
       },
       "CapabilityListResponse": {
@@ -8506,6 +9130,11 @@
             "title": "Neutral",
             "type": "integer"
           },
+          "sample_sufficient": {
+            "default": false,
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
           "total": {
             "title": "Total",
             "type": "integer"
@@ -8599,6 +9228,12 @@
             ],
             "title": "Horizons"
           },
+          "minimum_completed_sample_size": {
+            "default": 30,
+            "minimum": 1.0,
+            "title": "Minimum Completed Sample Size",
+            "type": "integer"
+          },
           "miss": {
             "title": "Miss",
             "type": "integer"
@@ -8616,6 +9251,11 @@
                 "type": "null"
               }
             ]
+          },
+          "sample_sufficient": {
+            "default": false,
+            "title": "Sample Sufficient",
+            "type": "boolean"
           },
           "statuses": {
             "items": {
@@ -9719,12 +10359,27 @@
       "ErrorResponse": {
         "description": "Stable API error envelope.",
         "example": {
+          "category": "not_found",
           "error": "not_found",
           "message": "Resource not found",
           "params": {},
+          "severity": "warning",
           "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         },
         "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)",
+            "example": "not_found",
+            "title": "Category"
+          },
           "detail": {
             "anyOf": [
               {},
@@ -9764,6 +10419,19 @@
             "description": "Localization interpolation parameters",
             "title": "Params",
             "type": "object"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy severity: info | warning | error | critical",
+            "example": "warning",
+            "title": "Severity"
           },
           "trace_id": {
             "anyOf": [
@@ -11778,6 +12446,16 @@
               }
             ],
             "title": "Free Form Rules"
+          },
+          "research_stance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchStanceContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "risk_rules": {
             "items": {
@@ -14248,6 +14926,17 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "max_total_tokens": {
             "default": 0,
             "title": "Max Total Tokens",
@@ -14558,7 +15247,10 @@
               "analysis_complete",
               "alert_triggered",
               "scheduled_task_result",
-              "decision_signal"
+              "decision_signal",
+              "daily_brief",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Kind",
             "type": "string"
@@ -14591,7 +15283,10 @@
               "analysisCompleteTitle",
               "alertTriggeredTitle",
               "scheduledTaskResultTitle",
-              "decisionSignalTitle"
+              "decisionSignalTitle",
+              "dailyBriefTitle",
+              "highDisagreementTitle",
+              "portfolioHealthTitle"
             ],
             "title": "Title Key",
             "type": "string"
@@ -14824,7 +15519,10 @@
               "analysis",
               "alerts",
               "scheduled_tasks",
-              "decision_signals"
+              "decision_signals",
+              "daily_briefs",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Source",
             "type": "string"
@@ -15525,6 +16223,445 @@
         "title": "OutboundActivityPage",
         "type": "object"
       },
+      "PaperDecisionQualityAggregate": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityAggregateDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "max_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Process Score"
+          },
+          "min_process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Process Score"
+          },
+          "process_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Score"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "empty"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sample_size"
+        ],
+        "title": "PaperDecisionQualityAggregate",
+        "type": "object"
+      },
+      "PaperDecisionQualityAggregateDimension": {
+        "properties": {
+          "sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Size"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityAggregateDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDimension": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Inputs",
+            "type": "object"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PaperDecisionQualityDimension",
+        "type": "object"
+      },
+      "PaperDecisionQualityDivisionOfLabor": {
+        "properties": {
+          "does_not_own": {
+            "title": "Does Not Own",
+            "type": "string"
+          },
+          "outcome_owner_issue": {
+            "default": 987,
+            "title": "Outcome Owner Issue",
+            "type": "integer"
+          },
+          "owns": {
+            "title": "Owns",
+            "type": "string"
+          },
+          "this_issue": {
+            "default": 1134,
+            "title": "This Issue",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "owns",
+          "does_not_own"
+        ],
+        "title": "PaperDecisionQualityDivisionOfLabor",
+        "type": "object"
+      },
+      "PaperDecisionQualityItem": {
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PaperDecisionQualityDimension"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "effective_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Effective Weights",
+            "type": "object"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "linked_signal_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Signal Id"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "process_score": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Process Score",
+            "type": "number"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "trade_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Date"
+          },
+          "trade_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Id"
+          }
+        },
+        "required": [
+          "process_score",
+          "dimensions",
+          "formula_version"
+        ],
+        "title": "PaperDecisionQualityItem",
+        "type": "object"
+      },
+      "PaperDecisionQualityReason": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "dimension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimension"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "PaperDecisionQualityReason",
+        "type": "object"
+      },
+      "PaperDecisionQualityResponse": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "integer"
+          },
+          "account_type": {
+            "const": "paper",
+            "default": "paper",
+            "title": "Account Type",
+            "type": "string"
+          },
+          "aggregate": {
+            "$ref": "#/components/schemas/PaperDecisionQualityAggregate"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "division_of_labor": {
+            "$ref": "#/components/schemas/PaperDecisionQualityDivisionOfLabor"
+          },
+          "formula_version": {
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaperDecisionQualityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "score_kind": {
+            "const": "process",
+            "default": "process",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "total_trade_count": {
+            "title": "Total Trade Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "formula_version",
+          "disclaimer",
+          "account_id",
+          "as_of",
+          "sample_size",
+          "total_trade_count",
+          "truncated",
+          "aggregate",
+          "division_of_labor"
+        ],
+        "title": "PaperDecisionQualityResponse",
+        "type": "object"
+      },
       "PaperTradeCreateRequest": {
         "properties": {
           "note": {
@@ -15620,6 +16757,261 @@
           "price_source"
         ],
         "title": "PaperTradeCreatedResponse",
+        "type": "object"
+      },
+      "PeerValuationCanvasRequest": {
+        "description": "Request body for the constrained peer relative-value canvas (issue #1139).",
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Base currency for cross-market estimate normalization (default: target listing currency)",
+            "title": "Base Currency"
+          },
+          "industry_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional industry label override when peer_source=industry",
+            "title": "Industry Label"
+          },
+          "peer_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Peer stock codes (required for comparison; never invented server-side)",
+            "title": "Peer Codes"
+          },
+          "peer_source": {
+            "default": "custom",
+            "description": "Explainable peer-set source: custom codes or industry-constrained set",
+            "enum": [
+              "custom",
+              "industry"
+            ],
+            "title": "Peer Source",
+            "type": "string"
+          },
+          "stock_code": {
+            "description": "Target stock code",
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code"
+        ],
+        "title": "PeerValuationCanvasRequest",
+        "type": "object"
+      },
+      "PeerValuationCanvasResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "currency_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Metrics"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "fx_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Stale"
+          },
+          "heatmap_cells": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heatmap Cells"
+          },
+          "medians": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medians"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "multiple_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiple Metrics"
+          },
+          "peer_set": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Set"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "relative_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Summary"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "valuation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Status"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status"
+        ],
+        "title": "PeerValuationCanvasResponse",
         "type": "object"
       },
       "PerformanceMetrics": {
@@ -18765,6 +20157,41 @@
         "title": "PortfolioImportCommitResponse",
         "type": "object"
       },
+      "PortfolioImportFailedRow": {
+        "description": "One source row rejected during spreadsheet parse (correctable).",
+        "properties": {
+          "reason": {
+            "description": "Human-readable rejection reason",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "description": "Stable machine code for the rejection reason",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "row_number": {
+            "description": "1-based line number in the source file (header is 1)",
+            "title": "Row Number",
+            "type": "integer"
+          },
+          "source": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Non-empty original cells from the rejected row for download/correction",
+            "title": "Source",
+            "type": "object"
+          }
+        },
+        "required": [
+          "row_number",
+          "reason_code",
+          "reason"
+        ],
+        "title": "PortfolioImportFailedRow",
+        "type": "object"
+      },
       "PortfolioImportParseResponse": {
         "properties": {
           "broker": {
@@ -18780,6 +20207,14 @@
               "type": "string"
             },
             "title": "Errors",
+            "type": "array"
+          },
+          "failed_rows": {
+            "description": "Structured rejected rows with original cells for client download",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioImportFailedRow"
+            },
+            "title": "Failed Rows",
             "type": "array"
           },
           "record_count": {
@@ -18879,6 +20314,875 @@
           "dedup_hash"
         ],
         "title": "PortfolioImportTradeItem",
+        "type": "object"
+      },
+      "PortfolioLevelAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As-of date for price history and synthetic snapshot; default today",
+            "title": "As Of"
+          },
+          "confidence": {
+            "default": 0.95,
+            "exclusiveMaximum": 1.0,
+            "exclusiveMinimum": 0.5,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "currency": {
+            "default": "CNY",
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Currency",
+            "type": "string"
+          },
+          "high_correlation_threshold": {
+            "default": 0.7,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "High Correlation Threshold",
+            "type": "number"
+          },
+          "horizon_days": {
+            "default": 1,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "include_stress": {
+            "default": true,
+            "description": "When true, overlay a deterministic stress scenario on the basket",
+            "title": "Include Stress",
+            "type": "boolean"
+          },
+          "lookback_trading_days": {
+            "default": 252,
+            "maximum": 1000.0,
+            "minimum": 60.0,
+            "title": "Lookback Trading Days",
+            "type": "integer"
+          },
+          "scenario_id": {
+            "default": "market_down_10",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Scenario Id",
+            "type": "string"
+          },
+          "sector_map": {
+            "anyOf": [
+              {
+                "patternProperties": {
+                  "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "propertyNames": {
+                  "maxLength": 16,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional caller-provided sector labels for shared-risk clustering",
+            "title": "Sector Map"
+          },
+          "stock_codes": {
+            "description": "Symbols to analyze as one basket (1..20). Duplicates are rejected.",
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Stock Codes",
+            "type": "array"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "patternProperties": {
+                  "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$": {
+                    "type": "number"
+                  }
+                },
+                "propertyNames": {
+                  "maxLength": 16,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional non-negative weights keyed by stock code. Usable symbols missing from the map receive an equal unit baseline, then all usable weights are renormalized to 1.0. Degraded (unpriced) symbols are excluded before weighting.",
+            "title": "Weights"
+          }
+        },
+        "required": [
+          "stock_codes"
+        ],
+        "title": "PortfolioLevelAnalysisRequest",
+        "type": "object"
+      },
+      "PortfolioLevelAnalysisResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_mode": {
+            "const": "portfolio_level_basket",
+            "title": "Analysis Mode",
+            "type": "string"
+          },
+          "annotations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Annotations",
+            "type": "array"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "additionalProperties": true,
+            "title": "Assumptions",
+            "type": "object"
+          },
+          "calculated_at": {
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/PortfolioConcentrationBlock"
+          },
+          "correlation": {
+            "$ref": "#/components/schemas/PortfolioCorrelationBlock"
+          },
+          "correlation_highlights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelCorrelationHighlight"
+            },
+            "maxItems": 32,
+            "title": "Correlation Highlights",
+            "type": "array"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "degraded_symbols": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelDegradedSymbol"
+            },
+            "maxItems": 20,
+            "title": "Degraded Symbols",
+            "type": "array"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "formula_version": {
+            "const": "portfolio_level_analysis_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "health": {
+            "$ref": "#/components/schemas/PortfolioLevelHealthBlock"
+          },
+          "max_symbols": {
+            "minimum": 1.0,
+            "title": "Max Symbols",
+            "type": "integer"
+          },
+          "requested_symbols": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Requested Symbols",
+            "type": "array"
+          },
+          "risk_history": {
+            "additionalProperties": true,
+            "title": "Risk History",
+            "type": "object"
+          },
+          "risk_metrics_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Metrics Status"
+          },
+          "shared_risk_exposures": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelSharedRisk"
+            },
+            "maxItems": 32,
+            "title": "Shared Risk Exposures",
+            "type": "array"
+          },
+          "snapshot_kind": {
+            "const": "synthetic_basket_v1",
+            "title": "Snapshot Kind",
+            "type": "string"
+          },
+          "stance_distribution": {
+            "$ref": "#/components/schemas/PortfolioLevelStanceDistribution"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "stress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioLevelStressBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbols_requested_count": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Symbols Requested Count",
+            "type": "integer"
+          },
+          "symbols_used": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Symbols Used",
+            "type": "array"
+          },
+          "symbols_used_count": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Symbols Used Count",
+            "type": "integer"
+          },
+          "var": {
+            "$ref": "#/components/schemas/PortfolioHistoricalVaRBlock"
+          },
+          "weighting_mode": {
+            "title": "Weighting Mode",
+            "type": "string"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelWeightItem"
+            },
+            "maxItems": 20,
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "formula_version",
+          "analysis_mode",
+          "snapshot_kind",
+          "as_of",
+          "currency",
+          "status",
+          "disclaimer",
+          "requested_symbols",
+          "symbols_requested_count",
+          "symbols_used_count",
+          "max_symbols",
+          "weighting_mode",
+          "correlation",
+          "concentration",
+          "var",
+          "stance_distribution",
+          "calculated_at"
+        ],
+        "title": "PortfolioLevelAnalysisResponse",
+        "type": "object"
+      },
+      "PortfolioLevelCorrelationHighlight": {
+        "additionalProperties": false,
+        "properties": {
+          "abs_correlation": {
+            "title": "Abs Correlation",
+            "type": "number"
+          },
+          "correlation": {
+            "title": "Correlation",
+            "type": "number"
+          },
+          "direction": {
+            "enum": [
+              "positive",
+              "negative"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "left": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Left",
+            "type": "string"
+          },
+          "right": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Right",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left",
+          "right",
+          "correlation",
+          "abs_correlation",
+          "direction"
+        ],
+        "title": "PortfolioLevelCorrelationHighlight",
+        "type": "object"
+      },
+      "PortfolioLevelDegradedSymbol": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "reason": {
+            "maxLength": 64,
+            "title": "Reason",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "reason"
+        ],
+        "title": "PortfolioLevelDegradedSymbol",
+        "type": "object"
+      },
+      "PortfolioLevelHealthBlock": {
+        "additionalProperties": true,
+        "description": "Projected health payload; extra fields allowed for forward compatibility.",
+        "properties": {
+          "band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "comparable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparable"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio"
+          },
+          "data_quality": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Quality"
+          },
+          "dimensions": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimensions"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "effective_weights": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Weights"
+          },
+          "formula_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula Version"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
+          "insights": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insights"
+          },
+          "partial_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partial Score"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unavailable_dimensions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Dimensions"
+          }
+        },
+        "title": "PortfolioLevelHealthBlock",
+        "type": "object"
+      },
+      "PortfolioLevelSharedRisk": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "maxLength": 64,
+            "title": "Kind",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "summary": {
+            "maxLength": 512,
+            "title": "Summary",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Symbols",
+            "type": "array"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          }
+        },
+        "required": [
+          "kind",
+          "summary"
+        ],
+        "title": "PortfolioLevelSharedRisk",
+        "type": "object"
+      },
+      "PortfolioLevelStanceDistribution": {
+        "additionalProperties": false,
+        "properties": {
+          "average_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Score"
+          },
+          "by_operation_advice": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Operation Advice",
+            "type": "object"
+          },
+          "formula_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula Version"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelStanceItem"
+            },
+            "maxItems": 20,
+            "title": "Items",
+            "type": "array"
+          },
+          "scored_count": {
+            "default": 0,
+            "title": "Scored Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unanalyzed_count": {
+            "default": 0,
+            "title": "Unanalyzed Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioLevelStanceDistribution",
+        "type": "object"
+      },
+      "PortfolioLevelStanceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          }
+        },
+        "title": "PortfolioLevelStanceItem",
+        "type": "object"
+      },
+      "PortfolioLevelStressBlock": {
+        "additionalProperties": true,
+        "description": "Stress overlay; reuses stress-test payload shape when available.",
+        "properties": {
+          "scenario": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioLevelStressBlock",
+        "type": "object"
+      },
+      "PortfolioLevelWeightItem": {
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "PortfolioLevelWeightItem",
         "type": "object"
       },
       "PortfolioPositionAnalysisRequest": {
@@ -20104,6 +22408,128 @@
           "value_bp"
         ],
         "title": "RateStressShock",
+        "type": "object"
+      },
+      "ReadinessCheckItem": {
+        "description": "One structured readiness dimension (ok | degraded | failed).",
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion"
+          },
+          "timed_out": {
+            "default": false,
+            "title": "Timed Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "reason_code",
+          "reason"
+        ],
+        "title": "ReadinessCheckItem",
+        "type": "object"
+      },
+      "ReadinessReportResponse": {
+        "description": "On-demand structured readiness/self-check report.\n\nComposes existing observational probes (setup status, data-provider runtime\nstatus, generation-backend cheap status, task-queue stats). Never mutates\nconfiguration and is not invoked automatically at process startup.\nFailures and timeouts are explicit and never reported as ready.",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessCheckItem"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "title": "Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status",
+          "generated_at",
+          "summary",
+          "timeout_seconds"
+        ],
+        "title": "ReadinessReportResponse",
         "type": "object"
       },
       "ReasoningTraceAgent": {
@@ -21387,7 +23813,7 @@
                 "type": "null"
               }
             ],
-            "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis"
+            "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, multi-strategy synthesis, and committee deliberation"
           }
         },
         "title": "ReportDetails",
@@ -21836,9 +24262,254 @@
         "title": "ReportStrategy",
         "type": "object"
       },
+      "ReportStructuredCommitteeConclusion": {
+        "description": "Authoritative committee conclusion projected from strategy_synthesis.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "conflict_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Conflict Count"
+          },
+          "conflict_severity": {
+            "title": "Conflict Severity",
+            "type": "string"
+          },
+          "consensus_level": {
+            "title": "Consensus Level",
+            "type": "string"
+          },
+          "final_signal": {
+            "title": "Final Signal",
+            "type": "string"
+          },
+          "weighted_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Weighted Score"
+          }
+        },
+        "title": "ReportStructuredCommitteeConclusion",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDeliberation": {
+        "description": "Bounded Investment Committee deliberation for report consumers.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeConclusion"
+          },
+          "dissenting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Dissenting Opinions",
+            "type": "array"
+          },
+          "divergence_points": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeDivergence"
+            },
+            "title": "Divergence Points",
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeMember"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "personas_invalid": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Invalid",
+            "type": "array"
+          },
+          "personas_truncated": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Truncated",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "supporting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Supporting Opinions",
+            "type": "array"
+          }
+        },
+        "title": "ReportStructuredCommitteeDeliberation",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDivergence": {
+        "description": "Divergence point aligned with multi-strategy conflict / #1205 records.",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "summary_key": {
+            "title": "Summary Key",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeDivergence",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeMember": {
+        "description": "One committee persona stance projected for report / Signal / History UI.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "invalid": {
+            "title": "Invalid",
+            "type": "boolean"
+          },
+          "invalid_reason": {
+            "title": "Invalid Reason",
+            "type": "string"
+          },
+          "lens_verdict": {
+            "title": "Lens Verdict",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeMember",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeOpinion": {
+        "description": "Supporting or dissenting persona opinion from real synthesis rows.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeOpinion",
+        "type": "object"
+      },
       "ReportStructuredInsights": {
         "description": "Versioned structured-insight projection returned by report APIs.",
         "properties": {
+          "committee_deliberation": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeDeliberation"
+          },
           "phase_decision": {
             "$ref": "#/components/schemas/ReportStructuredPhaseDecision"
           },
@@ -22640,6 +25311,407 @@
         "title": "ReportVersionRunListResponse",
         "type": "object"
       },
+      "ResearchConclusionBody": {
+        "additionalProperties": false,
+        "description": "Mode-density stratified conclusion body (no secrets, no raw_result dump).",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Label"
+          },
+          "analysis_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Summary"
+          },
+          "confidence_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Reason"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchGapItem"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "omitted_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Omitted Count",
+            "type": "integer"
+          },
+          "one_sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Sentence"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "position_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Advice"
+          },
+          "positive_catalysts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Catalysts"
+          },
+          "report_strata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mode-filtered report strata; null in brief mode",
+            "title": "Report Strata"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "signal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Type"
+          },
+          "time_sensitivity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Sensitivity"
+          },
+          "trend_prediction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend Prediction"
+          },
+          "truncation_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncation Notice"
+          }
+        },
+        "title": "ResearchConclusionBody",
+        "type": "object"
+      },
+      "ResearchConclusionMetadata": {
+        "additionalProperties": false,
+        "description": "Record-level metadata for embed/portal clients.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Best-effort data as-of timestamp from strata facts or record time",
+            "title": "As Of"
+          },
+          "confidence_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Level"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "evidence_counts": {
+            "$ref": "#/components/schemas/ResearchEvidenceCounts"
+          },
+          "evidence_refs": {
+            "description": "Bounded unique evidence reference ids (source_id values)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "minimum": 1.0,
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "report_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Language"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Type"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Name"
+          }
+        },
+        "required": [
+          "record_id",
+          "stock_code"
+        ],
+        "title": "ResearchConclusionMetadata",
+        "type": "object"
+      },
+      "ResearchConclusionResponse": {
+        "additionalProperties": false,
+        "description": "Compact stratified conclusion response for embed/portal use.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ResearchConclusionBody"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ResearchConclusionMetadata"
+          },
+          "mode": {
+            "enum": [
+              "brief",
+              "standard",
+              "research"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "research-conclusion-v1",
+            "default": "research-conclusion-v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "metadata",
+          "conclusion"
+        ],
+        "title": "ResearchConclusionResponse",
+        "type": "object"
+      },
+      "ResearchEvidenceCounts": {
+        "additionalProperties": false,
+        "description": "Counts derived from the mode-filtered strata projection.",
+        "properties": {
+          "evidence_refs": {
+            "default": 0,
+            "description": "Unique source_id / source_ids count",
+            "minimum": 0.0,
+            "title": "Evidence Refs",
+            "type": "integer"
+          },
+          "missing_or_conflicts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Missing Or Conflicts",
+            "type": "integer"
+          },
+          "model_inference": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Model Inference",
+            "type": "integer"
+          },
+          "risks_counter_evidence": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Risks Counter Evidence",
+            "type": "integer"
+          },
+          "verified_facts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Verified Facts",
+            "type": "integer"
+          }
+        },
+        "title": "ResearchEvidenceCounts",
+        "type": "object"
+      },
+      "ResearchGapItem": {
+        "additionalProperties": false,
+        "description": "One missing-data or conflict gap the client can render without full history.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "default": "missing",
+            "enum": [
+              "missing",
+              "conflict"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "ResearchGapItem",
+        "type": "object"
+      },
       "ResearchRequest": {
         "properties": {
           "question": {
@@ -22752,6 +25824,58 @@
           "stock_code"
         ],
         "title": "ResearchScheduledPayload",
+        "type": "object"
+      },
+      "ResearchStanceContent": {
+        "additionalProperties": false,
+        "description": "Optional research-tone stance on the personal investment framework.",
+        "properties": {
+          "custom_text": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Text"
+          },
+          "preferred_lens_skill_ids": {
+            "items": {
+              "enum": [
+                "persona_value_moat",
+                "persona_mental_models",
+                "persona_contrarian_deep_value",
+                "persona_disruptive_growth",
+                "persona_tail_risk"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Preferred Lens Skill Ids",
+            "type": "array"
+          },
+          "preset_id": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rational_analyst",
+                  "risk_guardian",
+                  "long_term_compounder"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Id"
+          }
+        },
+        "title": "ResearchStanceContent",
         "type": "object"
       },
       "ResearchTimelineLink": {
@@ -24419,8 +27543,9 @@
           },
           "process_mode": {
             "enum": [
-              "serve",
+              "serve+schedule",
               "desktop",
+              "cli-schedule",
               "not_attached"
             ],
             "title": "Process Mode",
@@ -26119,6 +29244,60 @@
           "skills"
         ],
         "title": "SkillsResponse",
+        "type": "object"
+      },
+      "StageBreakdown": {
+        "properties": {
+          "avg_latency_ms": {
+            "default": 0,
+            "title": "Avg Latency Ms",
+            "type": "integer"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "success_calls": {
+            "default": 0,
+            "title": "Success Calls",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "StageBreakdown",
         "type": "object"
       },
       "StockAnalysisScheduledPayload": {
@@ -30580,6 +33759,28 @@
       },
       "UsageCallRecord": {
         "properties": {
+          "agent_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Mode"
+          },
+          "call_success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Success"
+          },
           "call_type": {
             "title": "Call Type",
             "type": "string"
@@ -30593,17 +33794,105 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "cost_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Status"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
           },
           "model": {
             "title": "Model",
             "type": "string"
           },
+          "primary_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Model"
+          },
           "prompt_tokens": {
             "title": "Prompt Tokens",
             "type": "integer"
+          },
+          "route_attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Attempt"
+          },
+          "route_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Outcome"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
           },
           "stock_code": {
             "anyOf": [
@@ -30635,6 +33924,13 @@
       },
       "UsageDashboardResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30649,8 +33945,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30659,6 +33961,11 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
           "recent_calls": {
             "items": {
               "$ref": "#/components/schemas/UsageCallRecord"
@@ -30666,8 +33973,44 @@
             "title": "Recent Calls",
             "type": "array"
           },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30680,6 +34023,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30687,6 +34041,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },
@@ -30705,6 +34064,13 @@
       },
       "UsageSummaryResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30719,8 +34085,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30729,8 +34101,49 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30743,6 +34156,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30750,6 +34174,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },
@@ -33695,6 +37124,68 @@
           }
         },
         "summary": "触发大盘复盘",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/portfolio": {
+      "post": {
+        "description": "Analyze a list of symbols as one portfolio rather than stacking per-symbol conclusions. Returns correlation highlights, concentration/diversification, shared risk exposures, stance distribution from existing analyses, structural health, and an optional stress overlay. At most 20 symbols. Missing single-symbol price data degrades the result (status=partial) and never fails the whole request. Reuses the portfolio health and stress-test data planes via a synthetic equal/custom-weight snapshot — no separate holdings model.",
+        "operationId": "analyzePortfolioLevel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioLevelAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioLevelAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portfolio-level analysis failed"
+          }
+        },
+        "summary": "Run portfolio-level analysis for a multi-symbol basket",
         "tags": [
           "Analysis"
         ]
@@ -37421,6 +40912,213 @@
         "summary": "更新决策信号状态",
         "tags": [
           "DecisionSignals"
+        ]
+      }
+    },
+    "/api/v1/discover/screen": {
+      "post": {
+        "description": "Natural-language or criteria-driven candidate discovery over an explicit paginated universe. Quotes go through data_provider with a hard provider-call budget. Research screening only — not trade instructions.",
+        "operationId": "runCandidateDiscovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateDiscoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Run bounded AI candidate discovery",
+        "tags": [
+          "CandidateDiscovery"
+        ]
+      }
+    },
+    "/api/v1/discover/screen/tasks": {
+      "post": {
+        "operationId": "startCandidateDiscoveryTask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateDiscoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryTaskAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Submit bounded AI candidate discovery task",
+        "tags": [
+          "CandidateDiscovery"
+        ]
+      }
+    },
+    "/api/v1/discover/screen/tasks/{task_id}": {
+      "get": {
+        "operationId": "getCandidateDiscoveryTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get candidate discovery task status",
+        "tags": [
+          "CandidateDiscovery"
+        ]
+      }
+    },
+    "/api/v1/discover/screen/tasks/{task_id}/cancel": {
+      "post": {
+        "operationId": "cancelCandidateDiscoveryTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel a running candidate discovery task",
+        "tags": [
+          "CandidateDiscovery"
         ]
       }
     },
@@ -41490,6 +45188,134 @@
         ]
       }
     },
+    "/api/v1/portfolio/accounts/{account_id}/paper-decision-quality": {
+      "get": {
+        "description": "Returns explainable process scores for simulated trades on a paper account: analysis support, risk-gate compliance, and position discipline. This is not a return or win-rate evaluation. Outcome metrics remain owned by DecisionSignal post-hoc calibration (issue #987).",
+        "operationId": "getPaperDecisionQuality",
+        "parameters": [
+          {
+            "description": "Paper account ID",
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "description": "Paper account ID",
+              "minimum": 1,
+              "title": "Account Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional trade date from",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date from",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Optional trade date to",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional trade date to",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Max trades to score",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Max trades to score",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperDecisionQualityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Score paper-trading decisions on process quality (not PnL)",
+        "tags": [
+          "Portfolio"
+        ]
+      }
+    },
     "/api/v1/portfolio/accounts/{account_id}/paper-trades": {
       "post": {
         "operationId": "create_paper_trade_api_v1_portfolio_accounts__account_id__paper_trades_post",
@@ -42729,7 +46555,7 @@
             "description": "Internal Server Error"
           }
         },
-        "summary": "Parse broker CSV into normalized trade records",
+        "summary": "Parse broker CSV/XLSX into normalized trade records",
         "tags": [
           "Portfolio"
         ]
@@ -44364,6 +48190,298 @@
         "summary": "List analysis runs for version comparison",
         "tags": [
           "ReportVersionCompare"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions": {
+      "get": {
+        "description": "Returns the newest analysis history row for stock_code as a mode-filtered stratified conclusion. Same governance as GET by record id. Default-off.",
+        "operationId": "getLatestResearchConclusion",
+        "parameters": [
+          {
+            "description": "Stock code",
+            "in": "query",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "description": "Stock code",
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing stock_code or invalid mode"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or no history for stock_code"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get latest stratified research conclusion for a stock code",
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions/{record_id}": {
+      "get": {
+        "description": "Authenticated read-only projection of stratified conclusions (brief / standard / research) plus metadata (as-of, confidence, evidence counts and refs). Default-off via RESEARCH_API_ENABLED; no write methods; reuses session auth, security audit, and sliding-window rate limits on the main API port.",
+        "operationId": "getResearchConclusionByRecordId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid mode or record_id"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or analysis record not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get stratified research conclusion by history record id",
+        "tags": [
+          "Research"
         ]
       }
     },
@@ -48146,6 +52264,48 @@
         ]
       }
     },
+    "/api/v1/system/readiness": {
+      "get": {
+        "description": "On-demand structured readiness for data providers, LLM/generation backend, task queue, and selected setup dependencies. Reuses existing observational probes; does not write config, does not run model smoke tests, and is not invoked automatically at process startup. Probe failures and per-check timeouts are reported as failed or degraded and never as ready.",
+        "operationId": "getSystemReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReportResponse"
+                }
+              }
+            },
+            "description": "Structured readiness report loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal server error"
+          }
+        },
+        "summary": "Get structured readiness / self-check report",
+        "tags": [
+          "SystemConfig"
+        ]
+      }
+    },
     "/api/v1/system/scheduler/run-now": {
       "post": {
         "description": "Trigger one scheduled analysis run in the current process.",
@@ -48510,6 +52670,68 @@
           }
         },
         "summary": "Estimate stock valuation with body overrides",
+        "tags": [
+          "Valuation"
+        ]
+      }
+    },
+    "/api/v1/valuation/peer-canvas": {
+      "post": {
+        "description": "Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.",
+        "operationId": "buildPeerValuationCanvas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeerValuationCanvasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerValuationCanvasResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Peer canvas build failed"
+          }
+        },
+        "summary": "Build peer relative-value comparison canvas",
         "tags": [
           "Valuation"
         ]
