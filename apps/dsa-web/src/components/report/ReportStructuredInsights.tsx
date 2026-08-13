@@ -12,7 +12,9 @@ import type {
   ReportStrategySynthesisSkill,
   ReportStructuredInsights as ReportStructuredInsightsType,
 } from '../../types/analysis';
+import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
 import { Badge, Card, Progress } from '../common';
+import { HelpKeyButton } from '../help';
 import { DashboardPanelHeader } from '../dashboard';
 import { REPORT_STRUCTURED_INSIGHTS_TEXT } from '../../locales/reportStructuredInsights';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
@@ -167,10 +169,19 @@ const AttributionCard: React.FC<{
         <div className="space-y-3">
           {visibleWeights.map(([key, value]) => {
             const label = text.attributionLabels[key] ?? readableFallback(key);
+            const isTechnical = key === 'technicalIndicators';
             return (
               <div key={key}>
                 <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-medium text-foreground">{label}</span>
+                  <span className="inline-flex flex-wrap items-center gap-1 font-medium text-foreground">
+                    <span>{label}</span>
+                    {isTechnical ? (
+                      <HelpKeyButton
+                        helpKey={EDUCATION_HELP_KEYS.indicatorCommon}
+                        data-testid="report-attribution-indicator-help"
+                      />
+                    ) : null}
+                  </span>
                   <span className="tabular-nums text-muted-text">{Math.round(value)}%</span>
                 </div>
                 <Progress
