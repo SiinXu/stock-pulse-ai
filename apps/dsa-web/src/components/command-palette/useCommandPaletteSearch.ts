@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useMemo, useState } from 'react';
+import { agentApi, type SkillInfo } from '../../api/agent';
 import { historyApi } from '../../api/history';
 import { useStockIndex } from '../../hooks/useStockIndex';
 import type { HistorySearchItem } from '../../types/analysis';
@@ -19,11 +20,20 @@ type ReportState = {
   error: boolean;
 };
 
+type SkillCatalogState = {
+  items: SkillInfo[];
+  loading: boolean;
+  error: boolean;
+  loaded: boolean;
+};
+
 export type CommandPaletteSearchResult = {
   stocks: StockSuggestion[];
   reports: HistorySearchItem[];
+  skills: SkillInfo[];
   isLoading: boolean;
   hasError: boolean;
+  skillSearchError: boolean;
 };
 
 export function useCommandPaletteSearch(
@@ -38,7 +48,49 @@ export function useCommandPaletteSearch(
     loading: false,
     error: false,
   });
+  const [skillState, setSkillState] = useState<SkillCatalogState>({
+    items: [],
+    loading: false,
+    error: false,
+    loaded: false,
+  });
   const { index, loading: stockIndexLoading } = useStockIndex();
+
+  useEffect(() => {
+    if (!isOpen || skillState.loaded) return undefined;
+
+    let active = true;
+    // Kick off skill catalog fetch; state transitions happen only in async handlers.
+    // Do not list skillState.loading as a dependency: that re-run would cancel this fetch.
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setSkillState((current) => (
+        current.loaded || current.loading
+          ? current
+          : { ...current, loading: true, error: false }
+      ));
+    });
+    void agentApi.getSkills().then((response) => {
+      if (!active) return;
+      setSkillState({
+        items: response.skills,
+        loading: false,
+        error: false,
+        loaded: true,
+      });
+    }).catch(() => {
+      if (!active) return;
+      setSkillState({
+        items: [],
+        loading: false,
+        error: true,
+        loaded: true,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, skillState.loaded]);
 
   useEffect(() => {
     if (!isOpen || normalizedQuery.length < STOCK_SEARCH_MIN_LENGTH) {
@@ -93,13 +145,17 @@ export function useCommandPaletteSearch(
   return {
     stocks,
     reports,
+    skills: isOpen ? skillState.items : [],
     isLoading: isDebouncing || (
       normalizedQuery.length >= STOCK_SEARCH_MIN_LENGTH
       && stockIndexLoading
     ) || (
       reportState.query === normalizedQuery
       && reportState.loading
+    ) || (
+      isOpen && skillState.loading && normalizedQuery.length > 0
     ),
     hasError: reportState.query === normalizedQuery && reportState.error,
+    skillSearchError: isOpen && skillState.error,
   };
 }
