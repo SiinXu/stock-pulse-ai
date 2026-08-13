@@ -192,6 +192,7 @@ def test_concurrent_persistence_keeps_alert_delivery_intent_request_local() -> N
                 diagnostic_context_snapshot=None,
                 dashboard={
                     "disagreement_handling": {
+                        "schema_version": "disagreement-handling-v1",
                         "enabled": True,
                         "high_disagreement": True,
                         "disagreement_score": 0.9,

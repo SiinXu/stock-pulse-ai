@@ -26,6 +26,7 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 DEFAULT_HIGH_DISAGREEMENT_THRESHOLD = 0.6
+DISAGREEMENT_HANDLING_SCHEMA_VERSION = "disagreement-handling-v1"
 _MAX_ALERT_POINTS = 5
 _MAX_PARTICIPANTS = 12
 _MAX_LABEL_LENGTH = 96
@@ -104,6 +105,8 @@ def should_emit_high_disagreement_alert(
       so #1205 classifications without a numeric score are still consumable.
     """
     if not isinstance(record, Mapping) or not record:
+        return False
+    if record.get("schema_version") != DISAGREEMENT_HANDLING_SCHEMA_VERSION:
         return False
     if record.get("enabled") is not True:
         return False
@@ -195,7 +198,7 @@ def maybe_send_high_disagreement_alert(
     result: Any,
     *,
     history_id: Optional[int] = None,
-    config: Any = None,
+    config: Any,
     notifier: Any = None,
     outbound_notifications_enabled: bool = True,
 ) -> bool:
@@ -213,9 +216,7 @@ def maybe_send_high_disagreement_alert(
             return False
 
         if config is None:
-            from src.config import get_config
-
-            config = get_config()
+            return False
 
         if _static_config_value(
             config, "high_disagreement_alerts_enabled", True
@@ -314,7 +315,10 @@ def maybe_send_high_disagreement_alert(
 def _normalize_record(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, Mapping) or not value:
         return None
-    # Authoritative product record from #1205 always sets enabled=True when active.
+    # Only consume the versioned public contract from #1205. A same-named legacy
+    # mapping must not trigger outbound delivery.
+    if value.get("schema_version") != DISAGREEMENT_HANDLING_SCHEMA_VERSION:
+        return None
     if value.get("enabled") is not True:
         return None
     has_score = _safe_float(value.get("disagreement_score")) is not None
@@ -475,6 +479,7 @@ def _alert_labels(report_language: str) -> Dict[str, str]:
 
 __all__ = [
     "DEFAULT_HIGH_DISAGREEMENT_THRESHOLD",
+    "DISAGREEMENT_HANDLING_SCHEMA_VERSION",
     "build_high_disagreement_alert_text",
     "build_history_entry_href",
     "extract_disagreement_handling_record",

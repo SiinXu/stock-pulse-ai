@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
 from src.services.high_disagreement_alert import (
+    DISAGREEMENT_HANDLING_SCHEMA_VERSION,
     build_high_disagreement_alert_text,
     build_history_entry_href,
     extract_disagreement_handling_record,
@@ -24,6 +25,7 @@ def _sample_record(
     enabled: bool = True,
 ) -> Dict[str, Any]:
     return {
+        "schema_version": DISAGREEMENT_HANDLING_SCHEMA_VERSION,
         "enabled": enabled,
         "high_disagreement": high_disagreement,
         "verdict_mode": "split",
@@ -100,6 +102,15 @@ class ExtractRecordTests(unittest.TestCase):
         result = SimpleNamespace(dashboard={"disagreement_handling": record})
         self.assertIsNone(extract_disagreement_handling_record(result))
 
+    def test_unversioned_or_unknown_contract_is_not_authoritative(self) -> None:
+        record = _sample_record()
+        record.pop("schema_version")
+        result = SimpleNamespace(dashboard={"disagreement_handling": record})
+        self.assertIsNone(extract_disagreement_handling_record(result))
+
+        record["schema_version"] = "disagreement-handling-v2"
+        self.assertIsNone(extract_disagreement_handling_record(result))
+
     def test_bounded_raw_result_walk_handles_nested_and_cyclic_mappings(self) -> None:
         record = _sample_record(score=0.84)
         nested = {"raw_result": {"dashboard": {"disagreement_handling": record}}}
@@ -125,12 +136,14 @@ class ThresholdPolicyTests(unittest.TestCase):
 
     def test_high_flag_used_only_when_score_absent(self) -> None:
         record = {
+            "schema_version": DISAGREEMENT_HANDLING_SCHEMA_VERSION,
             "enabled": True,
             "high_disagreement": True,
             "points": [],
         }
         self.assertTrue(should_emit_high_disagreement_alert(record, threshold=0.6))
         record_low = {
+            "schema_version": DISAGREEMENT_HANDLING_SCHEMA_VERSION,
             "enabled": True,
             "high_disagreement": False,
             "points": [],
@@ -139,6 +152,11 @@ class ThresholdPolicyTests(unittest.TestCase):
 
     def test_missing_record_does_not_trigger(self) -> None:
         self.assertFalse(should_emit_high_disagreement_alert(None, threshold=0.6))
+
+    def test_unknown_contract_version_does_not_trigger(self) -> None:
+        record = _sample_record()
+        record["schema_version"] = "disagreement-handling-v2"
+        self.assertFalse(should_emit_high_disagreement_alert(record, threshold=0.6))
 
     def test_non_finite_values_use_deterministic_policy(self) -> None:
         record = _sample_record(score=0.59, high_disagreement=False)
@@ -350,6 +368,17 @@ class EmitAlertTests(unittest.TestCase):
             self._result(None),
             history_id=1,
             config=config,
+            notifier=notifier,
+        )
+        self.assertFalse(ok)
+        notifier.send_with_results.assert_not_called()
+
+    def test_skips_when_injected_config_is_missing(self) -> None:
+        notifier = MagicMock()
+        ok = maybe_send_high_disagreement_alert(
+            self._result(_sample_record()),
+            history_id=1,
+            config=None,
             notifier=notifier,
         )
         self.assertFalse(ok)
