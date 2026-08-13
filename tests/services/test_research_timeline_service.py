@@ -239,6 +239,105 @@ class ResearchTimelineServiceTestCase(unittest.TestCase):
         seen = {item.id for item in first.items + second.items + third.items}
         self.assertEqual(len(seen), 5)
 
+    def test_same_timestamp_numeric_ids_paginate_without_gaps(self) -> None:
+        """SQL uses numeric id desc; merge/cursor must not lexicographically skip 9 vs 10."""
+        same_second = datetime(2026, 7, 15, 10, 0, 0)
+        record_ids: list[int] = []
+        for index in range(15):
+            record_ids.append(
+                self._add_analysis(
+                    created_at=same_second,
+                    query_id=f"tie-{index}",
+                    advice=f"tie-{index}",
+                    summary=f"summary-{index}",
+                )
+            )
+        self.assertEqual(record_ids, list(range(1, 16)))
+
+        collected: list[str] = []
+        cursor = None
+        pages = 0
+        while pages < 10:
+            page = self.service.list_timeline(
+                "600519",
+                kinds=["analysis_run"],
+                limit=5,
+                cursor=cursor,
+            )
+            pages += 1
+            collected.extend(item.id for item in page.items)
+            if not page.has_more:
+                self.assertIsNone(page.next_cursor)
+                break
+            self.assertIsNotNone(page.next_cursor)
+            cursor = page.next_cursor
+
+        expected = [f"analysis_run:{record_id}" for record_id in range(15, 0, -1)]
+        self.assertEqual(collected, expected)
+
+    def test_signal_utc_naive_timestamps_are_not_shifted_to_local(self) -> None:
+        utc_naive = datetime(2026, 8, 13, 12, 0, 0)
+        older_utc = datetime(2026, 8, 13, 11, 0, 0)
+        self._add_signal(created_at=older_utc, reason="older-utc")
+        self._add_signal(created_at=utc_naive, reason="noon-utc")
+        page = self.service.list_timeline("600519", kinds=["signal"], limit=10)
+        self.assertEqual(len(page.items), 2)
+        occurred = datetime.fromisoformat(page.items[0].occurred_at)
+        self.assertEqual(
+            occurred.astimezone(timezone.utc),
+            utc_naive.replace(tzinfo=timezone.utc),
+        )
+        self.assertEqual(page.items[0].summary, "noon-utc")
+        self.assertEqual(page.items[1].summary, "older-utc")
+
+        first = self.service.list_timeline("600519", kinds=["signal"], limit=1)
+        self.assertEqual(first.items[0].summary, "noon-utc")
+        self.assertTrue(first.has_more)
+        second = self.service.list_timeline(
+            "600519",
+            kinds=["signal"],
+            limit=1,
+            cursor=first.next_cursor,
+        )
+        self.assertEqual(second.items[0].summary, "older-utc")
+        self.assertFalse(second.has_more)
+
+        naive = datetime(2026, 8, 13, 4, 0, 0)
+        as_utc = ResearchTimelineService._normalize_datetime(naive, naive_as_utc=True)
+        as_local = ResearchTimelineService._normalize_datetime(naive)
+        self.assertEqual(as_utc, naive.replace(tzinfo=timezone.utc))
+        self.assertEqual(as_local, naive.astimezone().astimezone(timezone.utc))
+
+    def test_chat_contains_false_positives_do_not_truncate_matching_turns(self) -> None:
+        """SQL LIMIT on loose CONTAINS must not exhaust the source before true matches."""
+        decoy_newer = datetime(2026, 8, 1, 12, 0, 1)
+        real_at = datetime(2026, 8, 1, 12, 0, 0)
+        with self.db.session_scope() as session:
+            for index in range(12):
+                session.add(
+                    ConversationMessage(
+                        session_id=f"sess-decoy-{index}",
+                        role="user",
+                        content=f"unrelated-{index}",
+                        turn_id=f"decoy-{index}",
+                        context_json='{"unrelated": true, "stock_code": "600519"',
+                        created_at=decoy_newer + timedelta(seconds=index),
+                    )
+                )
+            session.flush()
+        real_id = self._add_chat(
+            session_id="sess-real",
+            content="How is 600519 looking?",
+            turn_id="real-turn",
+            created_at=real_at,
+        )
+
+        page = self.service.list_timeline("600519", kinds=["chat"], limit=5)
+        self.assertEqual(len(page.items), 1)
+        self.assertEqual(page.items[0].id, f"chat:{real_id}")
+        self.assertFalse(page.has_more)
+        self.assertEqual(page.sources["chat"], "ok")
+
     def test_invalid_cursor_fails_closed(self) -> None:
         with self.assertRaises(ResearchTimelineValidationError) as raised:
             self.service.list_timeline("600519", cursor="not-a-cursor")

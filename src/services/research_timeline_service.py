@@ -335,35 +335,67 @@ class ResearchTimelineService:
         patterns = self._chat_context_patterns(code_candidates)
         if not patterns:
             return [], "empty"
+        nodes: List[ResearchTimelineNode] = []
         try:
             with self.db.get_session() as session:
-                pattern_clause = or_(
-                    *[ConversationMessage.context_json.contains(pattern) for pattern in patterns]
-                )
-                conditions = [
-                    ConversationMessage.role == "user",
-                    ConversationMessage.context_json.is_not(None),
-                    pattern_clause,
-                ]
-                if cursor_key is not None:
-                    conditions.append(
-                        self._sql_before_cursor(
-                            ConversationMessage.created_at,
-                            ConversationMessage.id,
-                            cursor_key,
-                            kind="chat",
+                # Loose JSON CONTAINS can over-match; keep scanning until we collect
+                # `limit` post-filter rows or the SQL window is exhausted.
+                scan_cursor = cursor_key
+                while len(nodes) < limit:
+                    pattern_clause = or_(
+                        *[
+                            ConversationMessage.context_json.contains(pattern)
+                            for pattern in patterns
+                        ]
+                    )
+                    conditions = [
+                        ConversationMessage.role == "user",
+                        ConversationMessage.context_json.is_not(None),
+                        pattern_clause,
+                    ]
+                    if scan_cursor is not None:
+                        conditions.append(
+                            self._sql_before_cursor(
+                                ConversationMessage.created_at,
+                                ConversationMessage.id,
+                                scan_cursor,
+                                kind="chat",
+                            )
                         )
+                    stmt = (
+                        select(ConversationMessage)
+                        .where(and_(*conditions))
+                        .order_by(
+                            desc(ConversationMessage.created_at),
+                            desc(ConversationMessage.id),
+                        )
+                        .limit(limit)
                     )
-                stmt = (
-                    select(ConversationMessage)
-                    .where(and_(*conditions))
-                    .order_by(
-                        desc(ConversationMessage.created_at),
-                        desc(ConversationMessage.id),
+                    rows = list(session.execute(stmt).scalars().all())
+                    if not rows:
+                        break
+                    for row in rows:
+                        node = self._chat_node_from_row(
+                            row,
+                            code_candidates=code_candidates,
+                            display_code=display_code,
+                            cursor_key=cursor_key,
+                        )
+                        if node is None:
+                            continue
+                        nodes.append(node)
+                        if len(nodes) >= limit:
+                            break
+                    if len(nodes) >= limit or len(rows) < limit:
+                        break
+                    last = rows[-1]
+                    next_scan = (
+                        self._normalize_datetime(last.created_at),
+                        f"chat:{int(last.id)}",
                     )
-                    .limit(limit)
-                )
-                rows = list(session.execute(stmt).scalars().all())
+                    if next_scan == scan_cursor:
+                        break
+                    scan_cursor = next_scan
         except Exception as exc:  # broad-exception: fallback_recorded - A failed source is logged and exposed as an error status while other timeline sources remain available.
             log_safe_exception(
                 logger,
@@ -374,53 +406,55 @@ class ResearchTimelineService:
             )
             return [], "error"
 
-        if not rows:
-            return [], "empty"
-
-        nodes: List[ResearchTimelineNode] = []
-        for row in rows:
-            context = self._load_json_object(row.context_json)
-            if not self._context_matches_stock(context, code_candidates):
-                continue
-            message_id = int(row.id)
-            node_id = f"chat:{message_id}"
-            occurred = self._normalize_datetime(row.created_at)
-            if cursor_key is not None and not self._is_before_cursor(
-                (occurred, node_id), cursor_key
-            ):
-                continue
-            content = " ".join(str(row.content or "").split())
-            summary = content[:240] + ("…" if len(content) > 240 else "") if content else None
-            title = "Chat turn"
-            if context and context.get("agent_mode") == "research":
-                title = "Deep research chat"
-            nodes.append(
-                ResearchTimelineNode(
-                    id=node_id,
-                    kind="chat",
-                    occurred_at=occurred.isoformat(),
-                    title=title,
-                    summary=summary,
-                    direction=None,
-                    confidence=None,
-                    status=None,
-                    link={
-                        "type": "chat_session",
-                        "session_id": row.session_id,
-                        "message_id": message_id,
-                        "turn_id": row.turn_id,
-                        "stock_code": display_code,
-                    },
-                    meta={
-                        "session_id": row.session_id,
-                        "turn_id": row.turn_id,
-                        "agent_mode": (
-                            context.get("agent_mode") if isinstance(context, dict) else None
-                        ),
-                    },
-                )
-            )
         return nodes, "ok" if nodes else "empty"
+
+    def _chat_node_from_row(
+        self,
+        row: ConversationMessage,
+        *,
+        code_candidates: Sequence[str],
+        display_code: str,
+        cursor_key: Optional[Tuple[datetime, str]],
+    ) -> Optional[ResearchTimelineNode]:
+        context = self._load_json_object(row.context_json)
+        if not self._context_matches_stock(context, code_candidates):
+            return None
+        message_id = int(row.id)
+        node_id = f"chat:{message_id}"
+        occurred = self._normalize_datetime(row.created_at)
+        if cursor_key is not None and not self._is_before_cursor(
+            (occurred, node_id), cursor_key
+        ):
+            return None
+        content = " ".join(str(row.content or "").split())
+        summary = content[:240] + ("…" if len(content) > 240 else "") if content else None
+        title = "Chat turn"
+        if context and context.get("agent_mode") == "research":
+            title = "Deep research chat"
+        return ResearchTimelineNode(
+            id=node_id,
+            kind="chat",
+            occurred_at=occurred.isoformat(),
+            title=title,
+            summary=summary,
+            direction=None,
+            confidence=None,
+            status=None,
+            link={
+                "type": "chat_session",
+                "session_id": row.session_id,
+                "message_id": message_id,
+                "turn_id": row.turn_id,
+                "stock_code": display_code,
+            },
+            meta={
+                "session_id": row.session_id,
+                "turn_id": row.turn_id,
+                "agent_mode": (
+                    context.get("agent_mode") if isinstance(context, dict) else None
+                ),
+            },
+        )
 
     def _load_signal_nodes(
         self,
@@ -469,7 +503,7 @@ class ResearchTimelineService:
         for row in rows:
             signal_id = int(row.id)
             node_id = f"signal:{signal_id}"
-            occurred = self._normalize_datetime(row.created_at)
+            occurred = self._normalize_datetime(row.created_at, naive_as_utc=True)
             if cursor_key is not None and not self._is_before_cursor(
                 (occurred, node_id), cursor_key
             ):
@@ -749,10 +783,16 @@ class ResearchTimelineService:
         return None
 
     @staticmethod
-    def _normalize_datetime(value: Optional[datetime]) -> datetime:
+    def _normalize_datetime(
+        value: Optional[datetime],
+        *,
+        naive_as_utc: bool = False,
+    ) -> datetime:
         if value is None:
             return datetime.now(timezone.utc)
         if value.tzinfo is None or value.utcoffset() is None:
+            if naive_as_utc:
+                return value.replace(tzinfo=timezone.utc)
             return value.astimezone().astimezone(timezone.utc)
         return value.astimezone(timezone.utc)
 
@@ -765,9 +805,13 @@ class ResearchTimelineService:
         kind: str,
     ) -> Any:
         cursor_at, cursor_id = cursor_key
-        # Analysis/chat/signal timestamps are stored as server-local naive values.
-        # Convert the cursor (always aware) into the same local-naive domain for SQL.
-        naive_at = cursor_at.astimezone().replace(tzinfo=None)
+        # Analysis/chat store server-local naive timestamps; decision signals store
+        # UTC-naive values via utc_naive_now. Convert the aware cursor into the
+        # same naive domain as the source column.
+        if kind == "signal":
+            naive_at = cursor_at.astimezone(timezone.utc).replace(tzinfo=None)
+        else:
+            naive_at = cursor_at.astimezone().replace(tzinfo=None)
         cursor_kind, _, cursor_raw_id = cursor_id.partition(":")
         if cursor_kind == kind and cursor_raw_id:
             try:
@@ -782,21 +826,48 @@ class ResearchTimelineService:
         return created_col <= naive_at
 
     @staticmethod
-    def _is_before_cursor(
-        node_key: Tuple[datetime, str],
-        cursor_key: Tuple[datetime, str],
-    ) -> bool:
-        return node_key < cursor_key
+    def _stable_id_key(node_id: str) -> Tuple[str, int, str]:
+        kind, _, raw_id = str(node_id).partition(":")
+        try:
+            return kind, int(raw_id), ""
+        except (TypeError, ValueError):
+            return kind, 0, str(node_id)
 
     @staticmethod
-    def _node_sort_key(node: ResearchTimelineNode) -> Tuple[datetime, str]:
+    def _comparable_sort_key(
+        key: Tuple[Any, ...],
+    ) -> Tuple[datetime, str, int, str]:
+        if len(key) == 4:
+            return key  # type: ignore[return-value]
+        occurred, node_id = key[0], key[1]
+        kind, numeric_id, raw_fallback = ResearchTimelineService._stable_id_key(
+            str(node_id)
+        )
+        return occurred, kind, numeric_id, raw_fallback
+
+    @staticmethod
+    def _is_before_cursor(
+        node_key: Tuple[Any, ...],
+        cursor_key: Tuple[Any, ...],
+    ) -> bool:
+        return (
+            ResearchTimelineService._comparable_sort_key(node_key)
+            < ResearchTimelineService._comparable_sort_key(cursor_key)
+        )
+
+    @staticmethod
+    def _node_sort_key(
+        node: ResearchTimelineNode,
+    ) -> Tuple[datetime, str, int, str]:
         try:
             occurred = datetime.fromisoformat(node.occurred_at)
         except ValueError:
             occurred = datetime.min.replace(tzinfo=timezone.utc)
         if occurred.tzinfo is None or occurred.utcoffset() is None:
             occurred = occurred.replace(tzinfo=timezone.utc)
-        return occurred.astimezone(timezone.utc), node.id
+        return ResearchTimelineService._comparable_sort_key(
+            (occurred.astimezone(timezone.utc), node.id)
+        )
 
     def _encode_cursor(self, node: ResearchTimelineNode) -> str:
         payload = json.dumps(
