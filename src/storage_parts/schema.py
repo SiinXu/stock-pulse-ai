@@ -813,6 +813,19 @@ class LLMUsage(Base):
     approx_common_prefix_chars = Column(Integer, nullable=True)
     approx_common_prefix_tokens = Column(Integer, nullable=True)
     known_dynamic_marker_positions = Column(Text, nullable=True)
+
+    # Cost attribution + routing quality (Refs #166 / #248).
+    run_id = Column(String(64), nullable=True, index=True)
+    stage = Column(String(64), nullable=True, index=True)
+    agent_mode = Column(String(32), nullable=True, index=True)
+    estimated_cost_usd = Column(Float, nullable=True)
+    cost_status = Column(String(32), nullable=True)
+    route_outcome = Column(String(32), nullable=True, index=True)
+    route_attempt = Column(Integer, nullable=True)
+    primary_model = Column(String(128), nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    call_success = Column(Integer, nullable=True)
+
     called_at = Column(DateTime, default=datetime.now, index=True)
 
 
@@ -859,6 +872,16 @@ _LLM_USAGE_TELEMETRY_COLUMN_SQL: Dict[str, str] = {
     "approx_common_prefix_chars": "INTEGER",
     "approx_common_prefix_tokens": "INTEGER",
     "known_dynamic_marker_positions": "TEXT",
+    "run_id": "VARCHAR(64)",
+    "stage": "VARCHAR(64)",
+    "agent_mode": "VARCHAR(32)",
+    "estimated_cost_usd": "FLOAT",
+    "cost_status": "VARCHAR(32)",
+    "route_outcome": "VARCHAR(32)",
+    "route_attempt": "INTEGER",
+    "primary_model": "VARCHAR(128)",
+    "latency_ms": "INTEGER",
+    "call_success": "INTEGER",
 }
 _LLM_USAGE_INTEGER_TELEMETRY_COLUMNS = {
     column
