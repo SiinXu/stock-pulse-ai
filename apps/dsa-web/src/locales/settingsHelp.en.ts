@@ -2408,6 +2408,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Bounds per-call analysis cost.',
     ],
   },
+  'settings.ai_model.TASK_ROUTING': {
+    title: 'Routing',
+    summary: 'Configure routing and overrides.',
+  },
   'settings.system.resume': {
     title: 'Resume & reproduce',
   },

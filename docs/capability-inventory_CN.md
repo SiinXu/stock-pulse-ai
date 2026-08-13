@@ -100,3 +100,7 @@ GET /api/v1/capabilities?domain=data&domain=tool
 消费者必须根据 `schema_version` 分支，容忍新增记录和可空状态，并把来源错误
 视为未知。中央写入注册、依赖解析、Stage/Skill/LLM/Persona 元数据、ToolSurface
 授权与预算评估、启动校验和迁移仍不属于该 API，继续由 issue #221 跟踪。
+
+## 写入侧注册表
+
+登记、依赖解析与任务感知路由见 [capability-write-registry_CN.md](capability-write-registry_CN.md)。本清单接口保持只读。

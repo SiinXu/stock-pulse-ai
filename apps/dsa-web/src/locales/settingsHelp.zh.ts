@@ -2450,6 +2450,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '限制单次分析成本。',
     ],
   },
+  'settings.ai_model.TASK_ROUTING': {
+    title: '任务路由',
+    summary: '配置模型路由与覆盖。',
+  },
   'settings.system.resume': {
     title: '续跑与复现',
   },
