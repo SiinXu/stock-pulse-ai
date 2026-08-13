@@ -120,6 +120,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('layout', 'session-continuity-guard', 'SessionContinuityGuard', 'components/routing/SessionContinuityGuard.tsx'),
   entry('layout', 'route-focus-coordinator', 'RouteFocusCoordinator', 'components/routing/RouteFocusCoordinator.tsx'),
   entry('layout', 'theme-toggle', 'ThemeToggle', 'components/theme/ThemeToggle.tsx', ['interactive']),
+  entry('layout', 'theme-appearance-provider', 'ThemeAppearanceProvider', 'components/theme/ThemeAppearanceProvider.tsx'),
+  entry('layout', 'theme-pack-select', 'ThemePackSelect', 'components/theme/ThemePackSelect.tsx', ['interactive']),
+  entry('layout', 'price-direction-sync', 'PriceDirectionSync', 'components/theme/PriceDirectionSync.tsx'),
   entry('layout', 'ui-language-toggle', 'UiLanguageToggle', 'components/i18n/UiLanguageToggle.tsx', ['interactive']),
 
   entry('dashboard', 'dashboard-panel-header', 'DashboardPanelHeader', 'components/dashboard/DashboardPanelHeader.tsx'),
