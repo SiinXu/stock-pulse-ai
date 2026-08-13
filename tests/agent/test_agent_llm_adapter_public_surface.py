@@ -64,7 +64,7 @@ EXPECTED_MESSAGE_METHODS = (
 EXPECTED_AST_HASHES = {
     "_SetupMethods": "845d1e5a610d932961f40e28a2393848c9ae278a2901355a0bb27dc4bd73bbe4",
     "_CallMethods": "9580907bc57d105dfa06ecdeab55f6e25bb3712319b3e981a8d06b462acab386",
-    "_TransportMethods": "b34c0ce96c0009f96cbb5495fbfec72b5b687c816d0e6c6fc28bd4f1a32c5aba",
+    "_TransportMethods": "90817136eeacf2f432d64d4b5f23cd2911f3d16e02bc1283b489afd8ad3dc5de",
     "_MessageMethods": "73d1ca4581569a97f57673013b2a370d9c108760caa55c0be5057856a215e5ee",
 }
 EXPECTED_RETAINED_COMPLETION_AST_HASH = (

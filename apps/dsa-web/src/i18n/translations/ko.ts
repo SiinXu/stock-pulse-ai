@@ -3,10 +3,14 @@
 import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
   ...DR.ko,
+  ...CP.ko,
+  ...DSC.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -673,7 +677,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "현재 통계는 전 세계적으로 검토된 결과 수준을 기반으로 하며, 이는 현재 종목와 가시적 신호나 필터의 수와 일치하지 않습니다.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "미상",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "없음",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "건수만 표시; 비율 비공개.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "부족",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "충분",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "{completed}/{total} 완료",
@@ -682,12 +685,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "시장",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "월",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "보정 그룹",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "그룹당 {count}건부터 공개.",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "기간·시장·신호 그룹별 독립 판정.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "사후 보정",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "부족",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "{count}건 미만: 건수만 표시.",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "과거 적중률은 수익 예측·보장·투자 조언 아님.",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "연구 안내",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "명중률",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "과정 통계",

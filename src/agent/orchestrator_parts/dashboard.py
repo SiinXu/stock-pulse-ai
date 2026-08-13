@@ -93,10 +93,27 @@ class _DashboardMethods:
             analysis_context_pack_summary = context.get("analysis_context_pack_summary")
             if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
                 ctx.meta["analysis_context_pack_summary"] = analysis_context_pack_summary
+            # Carry process-local stage checkpoint session for exact-replay resume.
+            from src.services.analysis_stage_checkpoint import (
+                META_ANNOTATION_KEY,
+                META_REPRO_KEY,
+                META_SESSION_KEY,
+            )
+
+            session = context.get(META_SESSION_KEY)
+            if session is not None:
+                ctx.meta[META_SESSION_KEY] = session
+            if context.get(META_ANNOTATION_KEY) is not None:
+                ctx.meta[META_ANNOTATION_KEY] = context.get(META_ANNOTATION_KEY)
+            if context.get(META_REPRO_KEY) is not None:
+                ctx.meta[META_REPRO_KEY] = context.get(META_REPRO_KEY)
+            analysis_context_snapshot_meta = context.get("analysis_context_snapshot")
+            if isinstance(analysis_context_snapshot_meta, dict) and analysis_context_snapshot_meta:
+                ctx.meta["analysis_context_snapshot"] = dict(analysis_context_snapshot_meta)
 
             # Pre-populate data fields that the caller already has
             for data_key in ("realtime_quote", "daily_history", "chip_distribution",
-                             "trend_result", "news_context"):
+                             "trend_result", "news_context", "fundamental_context"):
                 if context.get(data_key):
                     ctx.set_data(data_key, context[data_key])
 
@@ -129,6 +146,10 @@ class _DashboardMethods:
 
         if "report_language" not in ctx.meta:
             ctx.meta["report_language"] = "zh"
+
+        # Issue #182: seal market inputs + pack identity so multi-agent stages
+        # share one versioned snapshot and cannot mutate bars/news in place.
+        self._seal_agent_input_snapshot(ctx, context)
 
         # Investment Committee preset (#545): default-off; different seam from
         # pipeline weight aggregation. Injects persona skills_requested only.
@@ -169,6 +190,97 @@ class _DashboardMethods:
             )
 
         return ctx
+
+    def _seal_agent_input_snapshot(
+        self,
+        ctx: AgentContext,
+        request_context: Optional[Dict[str, Any]],
+    ) -> None:
+        """Seal AnalysisContextPack + market inputs onto the shared AgentContext."""
+        try:
+            from src.analysis_context_pack.snapshot import (
+                SNAPSHOT_DATA_KEYS,
+                seal_analysis_context_snapshot,
+            )
+            from src.schemas.analysis_context_pack import AnalysisContextPack
+
+            request = request_context if isinstance(request_context, dict) else {}
+            pack_payload = request.get("analysis_context_pack_audit")
+            if pack_payload is None:
+                pack_payload = request.get("analysis_context_pack")
+            pack: Any
+            if isinstance(pack_payload, AnalysisContextPack):
+                pack = pack_payload
+            elif isinstance(pack_payload, dict) and pack_payload.get("subject"):
+                pack = pack_payload
+            else:
+                subject_code = ctx.stock_code or "unknown"
+                pack = {
+                    "subject": {
+                        "code": subject_code,
+                        "stock_name": ctx.stock_name or None,
+                        "market": None,
+                    },
+                    "pack_version": "1.0",
+                    "blocks": {},
+                    "metadata": {
+                        "source": "agent_orchestrator_seed",
+                        "trigger_source": "multi_agent",
+                    },
+                }
+
+            data_bag: Dict[str, Any] = {}
+            for key in SNAPSHOT_DATA_KEYS:
+                if key in ctx.data and ctx.data.get(key) is not None:
+                    data_bag[key] = ctx.data[key]
+                elif key in request and request.get(key) is not None:
+                    data_bag[key] = request[key]
+
+            prior = request.get("analysis_context_snapshot")
+            if not isinstance(prior, dict):
+                prior = ctx.meta.get("analysis_context_snapshot")
+            snapshot_id = None
+            snapshot_revision = None
+            as_of = None
+            content_digest = None
+            if isinstance(prior, dict):
+                snapshot_id = prior.get("snapshot_id")
+                snapshot_revision = prior.get("snapshot_revision")
+                as_of = prior.get("as_of")
+                content_digest = prior.get("content_digest")
+            if snapshot_id is None and isinstance(pack, AnalysisContextPack):
+                snapshot_id = pack.snapshot_id
+                snapshot_revision = pack.snapshot_revision
+                as_of = pack.as_of
+                content_digest = (pack.metadata or {}).get("content_digest")
+            elif snapshot_id is None and isinstance(pack, dict):
+                snapshot_id = pack.get("snapshot_id")
+                snapshot_revision = pack.get("snapshot_revision")
+                as_of = pack.get("as_of")
+                meta = pack.get("metadata") if isinstance(pack.get("metadata"), dict) else {}
+                content_digest = content_digest or meta.get("content_digest")
+
+            snapshot = seal_analysis_context_snapshot(
+                pack,
+                data_bag,
+                snapshot_id=str(snapshot_id) if snapshot_id else None,
+                snapshot_revision=int(snapshot_revision) if snapshot_revision else None,
+                as_of=str(as_of) if as_of else None,
+                content_digest=str(content_digest) if content_digest else None,
+            )
+            ctx.seal_input_snapshot(snapshot)
+            ctx.meta["analysis_context_snapshot_sealed"] = True
+            ctx.meta.pop("analysis_context_snapshot_seal_failed", None)
+        except Exception as exc:  # broad-exception: fallback_recorded - Seal is best-effort; multi-agent continues without freeze.
+            ctx.meta["analysis_context_snapshot_sealed"] = False
+            ctx.meta["analysis_context_snapshot_seal_failed"] = True
+            log_safe_exception(
+                logger,
+                "[Orchestrator] analysis context snapshot seal failed",
+                exc,
+                error_code="agent_analysis_context_snapshot_seal_failed",
+                level=logging.WARNING,
+            )
 
     @staticmethod
     def _fallback_summary(ctx: AgentContext) -> str:

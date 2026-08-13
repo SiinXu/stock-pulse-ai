@@ -1,8 +1,13 @@
+---
+name: develop-feature
+description: Execute a development task end-to-end under this repository's rules — feasibility, minimal implementation, verification, PR, self-review, convergent fixes. Use for planned fix/feat/refactor/test/chore work.
+---
+
 # Develop Feature
 
 Execute a development task end-to-end under this repository's rules: feasibility analysis → minimal implementation → verification → PR → self-review → convergent fixes. Applies to fix / feat / refactor / test / chore tasks.
 
-**Source of truth**: repository root `AGENTS.md`. This skill only encodes the process order and repo-specific constraints; if it conflicts with `AGENTS.md`, `AGENTS.md` wins.
+**Source of truth**: repository root `AGENTS.md`. This skill only encodes the process order and repo-specific constraints; if it conflicts with `AGENTS.md`, `AGENTS.md` wins. Shared hard rules: `.claude/skills/references/hard-rules.md`.
 
 ## Usage
 
@@ -46,28 +51,30 @@ For defect tasks whose plan requires reproduction first: reproduce before touchi
 2. If a file boundary was given (`--boundary`), stop at the boundary: when the root cause lies outside it, produce a diagnostic report (symptom / evidence / suggested owner) instead of crossing.
 3. Repo-specific constraints:
    - Reuse existing modules, config entries, scripts, and tests; do not add parallel implementations.
-   - New config options must update `.env.example` and relevant docs.
+   - New config options must update `.env.example`, `src/core/config_registry_parts/`, bilingual env docs, and pass the **config registry guard** (hard-rules §2). Never expand the unregistered-debt baseline to green CI.
+   - If the task claims a user-facing capability is "wired", prove **reachability** (hard-rules §3); file existence alone is not delivery.
    - User-visible changes must update the relevant docs and `docs/CHANGELOG.md` (`[Unreleased]`, one flat line `- [Type] Description`, in English, no subheadings).
    - Web copy i18n: prefer reusing existing keys; a new key requires en/zh source entries plus all locale bundles, then `npm run i18n:resources -- --write`.
    - Never hardcode secrets, accounts, paths, model names, or ports.
 
 ### Step 4: Verification
 
-Run the `/run-verification` matrix (commands selected by change scope; red tests must be attributed against the origin/main baseline as pre-existing vs newly introduced). Do not proceed while verification fails; anything unverifiable goes into the delivery notes under "Not executed" with the reason.
+Run `/test-change` or `/run-verification` (same matrix; red tests attributed against `origin/main` as pre-existing vs newly introduced). Do not proceed while verification fails; anything unverifiable goes into the delivery notes under "Not executed" with the reason.
 
 ### Step 5: Commit and PR (requires authorization)
 
 1. Commit messages: English `<type>: <summary>`; no `Co-Authored-By`; do not trigger auto-tagging (no `#patch/#minor/#major`).
-2. PR: `gh pr create --base main`, body per `.github/PULL_REQUEST_TEMPLATE.md`, and it must include:
+2. PR: `gh pr create --base main`. Prefer `/pr-template-fill` for the English body. Body must include:
    - What changed / Why
    - Feasibility analysis (Step 2 conclusion and adjustments)
    - Verification status (each command + result) and Unverified items (including the list of pre-existing red tests on main, if applicable)
    - Risk points / Rollback method
    - Before/after screenshots for UI or report changes (hard repo rule; screenshots go in the PR, never into the repo).
+3. Run the **squash body check** (hard-rules §1) before calling the PR ready: body and title must match the final head.
 
 ### Step 6: Self-review and convergent fixes
 
-1. Review your own PR using the `/analyze-pr` order: necessity → relevance → title → description completeness → verification evidence → implementation correctness.
+1. Review your own PR using the `/review-pr` (or `/analyze-pr`) order: necessity → relevance → title → description completeness → verification evidence → implementation correctness.
 2. Check the task plan's acceptance criteria item by item; check for out-of-boundary files (`git diff --stat` against the boundary).
 3. Fixes follow `AGENTS.md` §8.1: no point patches — converge every path governed by the same business semantics (runtime / API / Web / CLI / docs / tests); re-run Step 4 after each fix round; iterate until a review round yields zero new findings.
 4. After fixing, update the PR body so it matches the final diff (a body inconsistent with the diff is an explicitly listed low-quality-PR trait in this repo).
@@ -75,6 +82,8 @@ Run the `/run-verification` matrix (commands selected by change scope; red tests
 ### Step 7: Delivery notes
 
 Output per `AGENTS.md` §9: What was changed / Why / Verification status / Unverified items / Risk points / Rollback method.
+
+When commenting on the linked issue (requires confirmation), use the **Delivered / Remaining / Verification** English format (hard-rules §4). Do not use `Fixes`/`Closes` while in-scope Remaining items remain.
 
 ### Step 8: External review feedback (later rounds)
 
@@ -84,7 +93,10 @@ When maintainer/review feedback arrives on the PR after this loop completes, do 
 
 - `analyze-issue`: evaluates an existing issue; this skill consumes its conclusions as task input.
 - `fix-issue`: single-issue fix workflow; this skill is its superset (adds the feasibility gate, boundary circuit-breaker, and the review-fix loop). Prefer this skill for tasks that come with a plan document.
-- `analyze-pr`: PR review; Step 6 reuses its review order rather than redefining review standards.
+- `test-change` / `run-verification`: Step 4 verification.
+- `pr-template-fill`: English PR body from diff + issue.
+- `review-pr` / `analyze-pr`: Step 6 self-review order and checklist.
+- Merge trains: workers delivering a single feature are not train conductors (hard-rules §5); **merging is never part of this skill**.
 
 ## Allowed Auto-Actions (No Confirmation Needed)
 
