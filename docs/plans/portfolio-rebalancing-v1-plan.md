@@ -1,6 +1,7 @@
 # Plan: Portfolio allocation & rebalancing recommendations (V1)
 
-**Status:** BLOCKED — waiting on risk metrics PR **#812** to merge  
+**Status:** IMPLEMENTED on main track (backend V1; Web still follow-up)
+
 **Issue:** [#237](https://github.com/SiinXu/stock-pulse-ai/issues/237)  
 **Branch:** `feat/portfolio-rebalancing-v1`  
 **Hard dependency:** [#812](https://github.com/SiinXu/stock-pulse-ai/pull/812) `feat: add portfolio risk metrics service` (must be **MERGED**; implement against its **merged** public surface, not a guessed API)
