@@ -1167,6 +1167,34 @@ class _ConfigLoadingMethods:
                 'AGENT_EVENT_IMPACT_CONTEXT_ENABLED',
                 'true',
             ).lower() == 'true',
+            event_triggered_analysis_enabled=parse_env_bool(
+                os.getenv('EVENT_TRIGGERED_ANALYSIS_ENABLED'),
+                default=False,
+            ),
+            event_trigger_cooldown_minutes=parse_env_int(
+                os.getenv('EVENT_TRIGGER_COOLDOWN_MINUTES'),
+                180,
+                field_name='EVENT_TRIGGER_COOLDOWN_MINUTES',
+                minimum=0,
+                maximum=10080,
+            ),
+            event_trigger_default_pipeline=(
+                os.getenv('EVENT_TRIGGER_DEFAULT_PIPELINE') or 'standard'
+            ).strip().lower() or 'standard',
+            event_trigger_max_per_hour=parse_env_int(
+                os.getenv('EVENT_TRIGGER_MAX_PER_HOUR'),
+                5,
+                field_name='EVENT_TRIGGER_MAX_PER_HOUR',
+                minimum=0,
+                maximum=10000,
+            ),
+            event_trigger_max_per_day=parse_env_int(
+                os.getenv('EVENT_TRIGGER_MAX_PER_DAY'),
+                20,
+                field_name='EVENT_TRIGGER_MAX_PER_DAY',
+                minimum=0,
+                maximum=10000,
+            ),
             wechat_webhook_url=os.getenv('WECHAT_WEBHOOK_URL'),
             feishu_webhook_url=os.getenv('FEISHU_WEBHOOK_URL'),
             feishu_webhook_secret=os.getenv('FEISHU_WEBHOOK_SECRET'),

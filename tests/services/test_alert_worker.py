@@ -310,6 +310,13 @@ class AlertWorkerTestCase(unittest.TestCase):
                 )
                 self.assertEqual(AlertWorker._cooldown_seconds(runtime_rule), expected)
 
+    def test_trigger_numeric_values_must_be_finite(self) -> None:
+        self.assertEqual(AlertWorker._optional_float("42.5"), 42.5)
+        with self.assertRaisesRegex(ValueError, "must be finite"):
+            AlertWorker._optional_float(float("nan"))
+        with self.assertRaisesRegex(ValueError, "must be finite"):
+            AlertWorker._optional_float(float("inf"))
+
     def _triggers(self, **filters) -> list[dict]:
         return self.service.list_triggers(page_size=100, **filters)["items"]
 
@@ -2119,6 +2126,117 @@ class AlertWorkerTestCase(unittest.TestCase):
         failed = [item for item in notifications if item["channel"] == "wechat"]
         self.assertTrue(failed)
         self.assertFalse(failed[0]["success"])
+
+    def _auto_analysis_eval_result(self, rule_id: int, *, observed_value: float) -> dict:
+        return {
+            "rule_id": rule_id,
+            "record_status": "triggered",
+            "triggered": True,
+            "observed_value": observed_value,
+            "threshold": 3.0,
+            "data_source": "unit-test",
+            "data_timestamp": None,
+            "reason": "pct up",
+            "message": "pct up",
+            "alert_type": "price_change_percent",
+        }
+
+    def test_non_finite_trigger_values_do_not_enqueue_auto_analysis(self) -> None:
+        rule = self._create_rule(
+            target="600519",
+            alert_type="price_change_percent",
+            parameters={"direction": "up", "change_pct": 3.0},
+            notification_policy={"auto_analysis": True},
+        )
+        analysis = MagicMock()
+        analysis.maybe_submit.return_value = SimpleNamespace(
+            submitted=True,
+            to_public_dict=lambda: {"status": "submitted", "submitted": True},
+        )
+        worker = AlertWorker(
+            config_provider=lambda: self._config(),
+            service=self.service,
+            event_triggered_analysis=analysis,
+            notifier=self._notifier(),
+        )
+        with patch.object(
+            self.service,
+            "_evaluate_rule",
+            new=AsyncMock(return_value=self._auto_analysis_eval_result(rule["id"], observed_value=float("nan"))),
+        ):
+            stats = worker.run_once()
+
+        analysis.maybe_submit.assert_not_called()
+        self.assertEqual(stats["triggered"], 1)
+        self.assertEqual(stats["recorded"], 0)
+        self.assertEqual(stats["auto_analysis_submitted"], 0)
+        self.assertEqual(stats["auto_analysis_skipped"], 1)
+        self.assertEqual(len(self._triggers()), 0)
+
+    def test_auto_analysis_enqueued_only_after_trigger_persist(self) -> None:
+        rule = self._create_rule(
+            target="600519",
+            alert_type="price_change_percent",
+            parameters={"direction": "up", "change_pct": 3.0},
+            notification_policy={"auto_analysis": True},
+        )
+        analysis = MagicMock()
+        analysis.maybe_submit.return_value = SimpleNamespace(
+            submitted=True,
+            to_public_dict=lambda: {"status": "submitted", "submitted": True, "task_ids": ["t1"]},
+        )
+        worker = AlertWorker(
+            config_provider=lambda: self._config(),
+            service=self.service,
+            event_triggered_analysis=analysis,
+            notifier=self._notifier(),
+        )
+        with patch.object(
+            self.service,
+            "_evaluate_rule",
+            new=AsyncMock(return_value=self._auto_analysis_eval_result(rule["id"], observed_value=5.0)),
+        ):
+            stats = worker.run_once()
+
+        analysis.maybe_submit.assert_called_once()
+        self.assertEqual(stats["recorded"], 1)
+        self.assertEqual(stats["auto_analysis_submitted"], 1)
+        triggers = self._triggers(status="triggered")
+        self.assertEqual(len(triggers), 1)
+        self.assertEqual(triggers[0]["auto_analysis"]["status"], "submitted")
+        self.assertEqual(triggers[0]["suggested_action"]["auto_analysis"]["status"], "submitted")
+
+    def test_trigger_persist_failure_does_not_enqueue_auto_analysis(self) -> None:
+        self._create_rule(
+            target="600519",
+            alert_type="price_change_percent",
+            parameters={"direction": "up", "change_pct": 3.0},
+            notification_policy={"auto_analysis": True},
+        )
+        analysis = MagicMock()
+        analysis.maybe_submit.return_value = SimpleNamespace(
+            submitted=True,
+            to_public_dict=lambda: {"status": "submitted", "submitted": True},
+        )
+        worker = AlertWorker(
+            config_provider=lambda: self._config(),
+            service=self.service,
+            event_triggered_analysis=analysis,
+            notifier=self._notifier(),
+        )
+        with patch.object(self.service.repo, "create_trigger", side_effect=RuntimeError("database locked")), \
+             patch(
+                 "src.agent.events.EventMonitor._get_realtime_quote",
+                 new=AsyncMock(return_value={"pct_chg": "5.00%"}),
+             ):
+            stats = worker.run_once()
+
+        analysis.maybe_submit.assert_not_called()
+        self.assertEqual(stats["triggered"], 1)
+        self.assertEqual(stats["recorded"], 0)
+        self.assertEqual(stats["auto_analysis_submitted"], 0)
+        self.assertEqual(stats["auto_analysis_skipped"], 1)
+        self.assertEqual(len(self._triggers()), 0)
 
 
 if __name__ == "__main__":
