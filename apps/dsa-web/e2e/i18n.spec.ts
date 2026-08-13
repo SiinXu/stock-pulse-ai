@@ -24,16 +24,16 @@ const BUILT_IN_PROVIDER_LABELS = {
 const CHINESE_SCRIPT = /[\u3400-\u9fff]/;
 const usageSettingsHref = buildSettingsSectionHref(SETTINGS_SECTION_IDS.usage);
 const HOME_NAV_LABELS: Record<UiLanguage, string> = {
-  zh: '首页',
-  'zh-TW': '首頁',
-  en: 'Home',
-  ja: 'ホーム',
-  ko: '홈',
-  de: 'Startseite',
-  es: 'Inicio',
-  ms: 'Laman Utama',
-  fr: 'Accueil',
-  id: 'Beranda',
+  zh: '今日',
+  'zh-TW': '今日',
+  en: 'Today',
+  ja: '今日',
+  ko: '오늘',
+  de: 'Heute',
+  es: 'Hoy',
+  ms: 'Hari ini',
+  fr: "Aujourd'hui",
+  id: 'Hari ini',
 };
 const STOCK_LIST_FIELD_LABELS: Record<Exclude<UiLanguage, 'zh' | 'en'>, string> = {
   'zh-TW': '自選股列表',
@@ -109,18 +109,19 @@ test.describe('complete UI i18n acceptance', () => {
     await loginAsE2eAdmin(page);
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN'); // 1
     await switchToEnglish(page); // 2
-    await expect(page.getByRole('link', { name: 'Home' })).toBeVisible(); // 3
+    await expect(page.getByRole('link', { name: 'Today' })).toBeVisible(); // 3
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible(); // 4
     await expect(uiLanguageSelector(page)).toBeVisible(); // 5
     expect(await page.evaluate(() => localStorage.getItem('dsa.uiLanguage'))).toBe('en'); // 6
 
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en'); // 7
-    await page.getByRole('link', { name: 'Agent' }).click();
+    await page.goto('/chat');
+    await expect(page.getByText(UI_TEXT.en['chat.title'], { exact: true }).first()).toBeVisible({ timeout: 30_000 }); // 9
     await page.goBack();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en'); // 8
     await page.goForward();
-    await expect(page.getByText(UI_TEXT.en['chat.title'], { exact: true }).first()).toBeVisible({ timeout: 30_000 }); // 9
+    await expect(page.getByText(UI_TEXT.en['chat.title'], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
 
     await page.setViewportSize({ width: 390, height: 844 });
     const openNavigation = page.getByRole('button', { name: /Open navigation|Menu/i });
