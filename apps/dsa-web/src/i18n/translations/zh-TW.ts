@@ -6204,4 +6204,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "分析內並行取數",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取數全域並行上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取數單源並行上限",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.impact.0": "在保留 Decision 預算的同時限制可選 Critic 修訂成本。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.notes.0": "達到輪次上限仍無明確 pass 時會維持 not_converged，並保留 Critic 限制項。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.summary": "Critic 發現重要證據缺口後，限制受控白名單修訂輪次。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.title": "Critic 最大修訂輪次",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.usage": "設為 1 執行一次保守修訂；設為 2 可在複查後允許第二個不同目標。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.0": "允許範圍為 1–2，預設為 1。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.1": "證據變更不代表收斂；只有修訂後的 Critic 明確 pass 才代表收斂。",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_MAX_ITERS": "Critic 最大修訂輪次",
 } as const;

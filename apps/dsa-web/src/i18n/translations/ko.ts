@@ -6204,4 +6204,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "시장 입력 병렬 수집",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.impact.0": "Decision 예산을 보존하면서 선택적 Critic 수정 비용을 제한합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.notes.0": "명시적 pass 없이 라운드 한도에 도달하면 not_converged를 유지하고 Critic 제한 사항을 보존합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.summary": "중요한 증거 공백 발견 후 제어된 허용 목록 수정 라운드를 제한합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.title": "Critic 최대 수정 라운드",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.usage": "보수적인 수정 한 번에는 1, 재검사 후 서로 다른 두 번째 대상까지 허용하려면 2를 사용하세요.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.0": "허용 범위는 1–2이며 기본값은 1입니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.1": "증거 변경은 수렴을 증명하지 않으며, 수정 후 명시적인 Critic pass만 수렴을 증명합니다.",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_MAX_ITERS": "Critic 최대 수정 라운드",
 } as const;

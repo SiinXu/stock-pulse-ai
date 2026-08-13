@@ -6204,4 +6204,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Extracción paralela de datos de mercado",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Tope global de extracción paralela",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Tope por proveedor de extracción paralela",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.impact.0": "Limita el coste opcional de revisión del Critic y preserva el presupuesto de Decision.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.notes.0": "Al alcanzar el límite sin un pass explícito, el estado sigue siendo not_converged y se conservan las limitaciones del Critic.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.summary": "Limita las rondas controladas de revisión permitida tras detectar brechas importantes de evidencia.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.title": "Máximo de rondas de revisión del Critic",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.usage": "Usa 1 para una revisión conservadora o 2 para permitir un segundo objetivo distinto tras la comprobación.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.0": "El rango permitido es 1–2; el valor predeterminado es 1.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.1": "Cambiar la evidencia no demuestra convergencia; solo un pass explícito del Critic después de revisar lo hace.",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_MAX_ITERS": "Máximo de rondas de revisión del Critic",
 } as const;

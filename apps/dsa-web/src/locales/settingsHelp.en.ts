@@ -1426,6 +1426,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
+    title: 'Critic Max Revision Rounds',
+    summary: 'Caps controlled whitelist revision rounds after the Critic finds material evidence gaps.',
+    usage: 'Use 1 for one conservative revision or 2 to allow one recheck and a second distinct target.',
+    valueNotes: [
+      'Allowed range is 1–2; the default is 1.',
+      'Changed evidence never proves convergence; only an explicit post-revision Critic pass does.',
+    ],
+    impact: ['Bounds optional Critic revision cost while preserving Decision budget.'],
+    notes: ['Reaching the round limit without an explicit pass remains not_converged and retains the Critic limitations.'],
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',

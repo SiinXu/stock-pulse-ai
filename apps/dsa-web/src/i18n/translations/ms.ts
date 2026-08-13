@@ -6204,4 +6204,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Tarikan data pasaran selari",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Had global tarikan selari",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Had per-pembekal tarikan selari",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.impact.0": "Mengehadkan kos semakan Critic pilihan sambil mengekalkan bajet Decision.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.notes.0": "Jika had pusingan dicapai tanpa pass yang jelas, status kekal not_converged dan batasan Critic dikekalkan.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.summary": "Mengehadkan pusingan semakan senarai putih terkawal selepas jurang bukti penting ditemui.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.title": "Pusingan maksimum semakan Critic",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.usage": "Gunakan 1 untuk satu semakan konservatif atau 2 bagi membenarkan sasaran kedua yang berbeza selepas semakan semula.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.0": "Julat yang dibenarkan ialah 1–2; lalai ialah 1.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.1": "Bukti yang berubah tidak membuktikan penumpuan; hanya pass Critic yang jelas selepas semakan membuktikannya.",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_MAX_ITERS": "Pusingan maksimum semakan Critic",
 } as const;

@@ -6204,4 +6204,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "市場入力の並行取得",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取得の全体上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取得のプロバイダ別上限",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.impact.0": "Decision の予算を確保しながら、任意の Critic 修正コストを制限します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.notes.0": "明示的な pass なしで上限に達した場合は not_converged のままとし、Critic の制限事項を保持します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.summary": "重要な証拠不足が見つかった後の、制御された許可リスト修正回数を制限します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.title": "Critic の最大修正回数",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.usage": "保守的な修正を 1 回だけ行う場合は 1、再確認後に別の 2 つ目の対象を許可する場合は 2 を使用します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.0": "許可範囲は 1–2 で、既定値は 1 です。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_CRITIC_MAX_ITERS.valueNotes.1": "証拠の変更は収束を証明しません。修正後の明示的な Critic pass だけが収束を示します。",
+  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_MAX_ITERS": "Critic の最大修正回数",
 } as const;

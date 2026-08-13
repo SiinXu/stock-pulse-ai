@@ -1812,6 +1812,24 @@ def test_converged_product_limitations_drop_gap_reasons() -> None:
     assert any("revision round" in line for line in lines)
 
 
+def test_zero_findings_pass_is_explicitly_complete_without_revision() -> None:
+    ctx = AgentContext(query="Analyze", stock_code="600519")
+    ctx.meta["critic_trace"] = critic.parse_critic_output(json.dumps({
+        "verdict": "pass",
+        "retry_targets": [],
+        "reasons": [],
+        "missing_evidence": [],
+    }), max_iters=2)
+
+    trace = critic.finalize_convergence(ctx)
+
+    assert trace["convergence_status"] == "pass"
+    assert trace["iteration_consumed"] == 0
+    assert trace["revision_rounds"] == []
+    assert trace["retry_status"] == "not_requested"
+    assert critic.project_critic_product_limitations(trace) == []
+
+
 def test_not_converged_product_limitations_keep_gap_reasons() -> None:
     ctx = AgentContext(query="Analyze", stock_code="600519")
     ctx.meta["critic_trace"] = critic.parse_critic_output(json.dumps({
