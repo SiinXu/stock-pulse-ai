@@ -36,6 +36,12 @@ describe('BeginnerReportSummary', () => {
     expect(screen.getByText('趋势走弱，先确认支撑是否有效。')).toBeInTheDocument();
     expect(screen.getByText('控制仓位并查看完整风险依据。')).toBeInTheDocument();
     expect(screen.getByText('Elevated')).toBeInTheDocument();
+    const riskHelp = screen.getByRole('button', { name: /view elevated beginner risk explanation/i });
+    fireEvent.mouseEnter(riskHelp.parentElement!);
+    const explanation = screen.getByRole('tooltip');
+    expect(explanation).toHaveTextContent('What it is');
+    expect(explanation).toHaveTextContent('What it means for you');
+    expect(explanation).toHaveTextContent(/smaller size|clearer stops|calmer setup/i);
     fireEvent.click(screen.getByRole('button', { name: 'View professional details' }));
     expect(onShowProfessional).toHaveBeenCalledTimes(1);
   });
