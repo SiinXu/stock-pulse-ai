@@ -17,7 +17,7 @@ function placeholders(value: string): string[] {
 describe('event calendar localized copy', () => {
   it('keeps the complete key and placeholder contract for every UI locale', () => {
     const english = new Map(flatten(EVENT_CALENDAR_TEXT.en));
-    expect(english.size).toBe(40);
+    expect(english.size).toBe(41);
 
     for (const language of UI_LANGUAGES) {
       const localized = new Map(flatten(EVENT_CALENDAR_TEXT[language]));
