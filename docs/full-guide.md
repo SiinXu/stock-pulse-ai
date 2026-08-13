@@ -118,6 +118,7 @@ stock-pulse-ai/
 | `REPORT_TYPE` | 报告类型：`simple`(精简)、`full`(完整)、`brief`(3-5句概括)，Docker环境推荐设为 `full` | 可选 |
 | `REPORT_LANGUAGE` | 报告与 Agent Chat 的默认输出语言：`zh`(默认中文) / `en`(英文) / `ko`(韩文)；会同步影响 Prompt、模板、通知 fallback、Web 报告页固定文案，以及未显式传入 `context.report_language` 的问股回复。`ko` 复用英文结构骨架并通过输出语言指令约束模型用韩文输出，通知按报告语言渲染本地化标签。仓库自带 `00-daily-analysis.yml` 已显式映射该变量，直接在 Actions Secrets/Variables 中配置即可生效 | 可选 |
 | `REPORT_MODE` | Jinja 报告呈现模式（`brief` / `standard` / `research`，默认 `standard`）。`brief` 仅 Decision Card + 关键风险；`standard` 为 Decision Card + 主要分析段落；`research` 为全量细节与更高 strata 上限。硬性上限永不丢弃 Decision Card。单次可通过 `extra_context.report_mode` 覆盖。仅 `REPORT_RENDERER_ENABLED=true` 时生效。 | 可选 |
+| `RESEARCH_PRESENTATION_PROFILE` | 研究呈现风险偏好（`conservative` / `balanced` / `aggressive`，默认 `balanced`）。仅调整排序与强调：保守先看风险、积极先看催化；**同一分析证据**，三种偏好风险披露完整度等同，不改变事实、评分或动作。与 `REPORT_MODE` 硬上限及 `RISK_GATE_PROFILE` 动作门槛正交。单次可通过 `extra_context.research_presentation_profile` 覆盖。仅 `REPORT_RENDERER_ENABLED=true` 时生效。 | 可选 |
 | `REPORT_SUMMARY_ONLY` | 仅分析结果摘要：设为 `true` 时只推送汇总，不含个股详情；多股时适合快速浏览（默认 false，Issue #262） | 可选 |
 | `REPORT_SHOW_LLM_MODEL` | 通知报告底部是否显示本次分析使用的 LLM 模型名称，默认 `true`；设为 `false` 可隐藏运行时模型信息。该变量仅调整展示，不影响 provider/model/Base URL、LiteLLM 路由或运行时模型保存/迁移/清理语义。 | 可选 |
 | `NOTIFICATION_DELTA_FIRST` | 是否在个股出站通知顶部增加确定性的“较上次分析变化”摘要，默认 `false`。首次分析、无实质变化和暂时无法对比会明确区分；只读取已持久化历史，不额外调用模型，也不修改本地保存的报告。 | 可选 |
@@ -1056,7 +1057,7 @@ P5 在个股分析报告的 `dashboard.phase_decision` 中追加阶段化决策�
 
 #### 报告三模式与 Decision Card（Issue #861）
 
-在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。分层阅读顺序：每股块内 **Decision Card 开篇 → 按模式密度的证据分层（none / compact / full）→ 长文分析段落**。`ReportType.BRIEF` 通知生成会强制 `report_mode=brief`，即使全局 `REPORT_MODE` 为 standard/research 也不突破推送长度预算。导出链路（`export_report`）消费已渲染 Markdown，不再二次套用模式。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
+在 `REPORT_RENDERER_ENABLED=true` 时，Jinja 个股报告支持 `REPORT_MODE`（或 `extra_context.report_mode`）三模式：`brief` / `standard`（默认）/ `research`。另支持 `RESEARCH_PRESENTATION_PROFILE`（或 `extra_context.research_presentation_profile`）三偏好：`conservative` / `balanced`（默认）/ `aggressive`——仅调整 Jinja 个股报告段落与列表的排序/强调（保守风险优先、积极催化优先），**不改变底层证据、不缩减风险披露**，也不影响 `RISK_GATE_PROFILE`。v1 范围是报告渲染 + Settings 配置；Agent chat 对话呈现不在本项内。`REPORT_MODE=brief` / brief 推送模板不输出长 framing banner，以免挤占推送字数预算。compact strata 在有风险反证时会展示（三种偏好完整度等同）。分层阅读顺序：每股块内 **Decision Card 开篇 → 按模式密度的证据分层（none / compact / full）→ 长文分析段落**。`ReportType.BRIEF` 通知生成会强制 `report_mode=brief`，即使全局 `REPORT_MODE` 为 standard/research 也不突破推送长度预算。导出链路（`export_report`）消费已渲染 Markdown，不再二次套用模式。Decision Card 沿用既有模板并使用已有 dashboard/result 字段；硬性上限永不丢弃决策卡；省略内容显式标注。`REPORT_RENDERER_ENABLED=false` 的硬编码 fallback 不变。
 
 #### 信号归因分析（Issue #1742）
 
