@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_WHAT_IF_MAX_TURNS,
   HYPOTHETICAL_RESULT_MARKER,
@@ -10,10 +10,19 @@ import {
   mergeWhatIfIntoContext,
   type WhatIfDraftState,
 } from '../whatIfScenario';
+import {
+  SCENARIO_LIBRARY_STORAGE_KEY,
+  SCENARIO_LIBRARY_VERSION,
+  applyScenarioToDraft,
+  getScenarioById,
+  listBuiltinScenarios,
+  projectClientSensitivity,
+  saveCustomScenario,
+} from '../scenarioLibrary';
 import { APP_ROUTE_PATHS } from '../../../routing/routes';
 
 const baseDraft: WhatIfDraftState = {
-  enabled: true, dimension: 'interest_rate', direction: 'down', magnitude: '50', currencyPair: 'USD/CNY', turnCount: 0,
+  enabled: true, dimension: 'interest_rate', direction: 'down', magnitude: '50', currencyPair: 'USD/CNY', turnCount: 0, scenarioId: null,
 };
 
 describe('whatIfScenario helpers', () => {
@@ -52,5 +61,50 @@ describe('whatIfScenario helpers', () => {
     expect(href).toBe(`${APP_ROUTE_PATHS.researchAnalysis}?stock=600519`);
     // Isolation: never encodes what-if assumptions into the formal analysis URL.
     expect(href).not.toMatch(/what[_-]?if/i);
+  });
+  it('attaches library scenario metadata only for built-in ids', () => {
+    expect(buildWhatIfContextPayload({ ...baseDraft, scenarioId: 'rate_hike_100bp' })).toMatchObject({
+      scenario_id: 'rate_hike_100bp',
+      catalog_version: SCENARIO_LIBRARY_VERSION,
+    });
+    const customOnly = buildWhatIfContextPayload({ ...baseDraft, scenarioId: 'my_custom_local_only' });
+    expect(customOnly).toMatchObject({
+      enabled: true,
+      assumptions: [{ dimension: 'interest_rate', direction: 'down', magnitude: 50 }],
+    });
+    expect(customOnly).not.toHaveProperty('scenario_id');
+  });
+});
+
+describe('scenario library helpers', () => {
+  beforeEach(() => {
+    window.localStorage.removeItem(SCENARIO_LIBRARY_STORAGE_KEY);
+  });
+
+  it('lists rate/fx/industry builtins and changes risk framing by scenario', () => {
+    const ids = listBuiltinScenarios().map((item) => item.id);
+    expect(ids).toEqual(expect.arrayContaining(['rate_hike_100bp', 'fx_usd_cny_up_5', 'industry_shock_down_15']));
+    const rate = projectClientSensitivity(getScenarioById('rate_hike_100bp')!);
+    const industry = projectClientSensitivity(getScenarioById('industry_shock_down_15')!);
+    expect(rate.catalog_version).toBe(SCENARIO_LIBRARY_VERSION);
+    expect(rate.hypothetical).toBe(true);
+    expect(rate.risk_framing.position_sizing).toBe('tighter');
+    expect(industry.risk_framing.position_sizing).toBe('defensive');
+    expect(rate.summary).toContain(HYPOTHETICAL_RESULT_MARKER);
+  });
+
+  it('applies preset to draft and saves custom for reuse', () => {
+    const preset = getScenarioById('fx_usd_cny_up_5')!;
+    const applied = applyScenarioToDraft(preset, baseDraft);
+    expect(applied.dimension).toBe('fx_rate');
+    expect(applied.scenarioId).toBe('fx_usd_cny_up_5');
+    expect(applied.magnitude).toBe('5');
+    const saved = saveCustomScenario({
+      id: 'my_custom_rate',
+      name: 'My custom rate',
+      assumptions: [{ dimension: 'interest_rate', direction: 'up', magnitude: 75 }],
+    });
+    expect(saved.source).toBe('custom');
+    expect(getScenarioById('my_custom_rate')?.assumptions[0]?.magnitude).toBe(75);
   });
 });
