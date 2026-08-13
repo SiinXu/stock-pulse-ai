@@ -33,4 +33,30 @@ describe('ChatThinkingDetails', () => {
     expect(screen.getByText(/"stock_code": "600519"/)).toBeVisible();
     expect(screen.getByText(/"close":1500/)).toBeVisible();
   });
+
+  it('expands a completed stage to show real status/duration/reason fields only', () => {
+    const t = (key: UiTextKey) => UI_TEXT.zh[key];
+    render(
+      <ChatThinkingDetails
+        t={t}
+        steps={[{
+          type: 'stage_done',
+          stage: 'agent_loop',
+          status: 'completed',
+          duration: 1.2,
+          reason: 'budget_guard',
+          message: 'Stage done',
+        }]}
+      />,
+    );
+
+    const detailToggle = screen.getByRole('button', { name: /查看详情/ });
+    expect(screen.getByTestId('chat-stage-detail')).not.toBeVisible();
+    fireEvent.click(detailToggle);
+    expect(screen.getByTestId('chat-stage-detail')).toBeVisible();
+    expect(screen.getByTestId('chat-stage-detail')).toHaveTextContent('"stage": "agent_loop"');
+    expect(screen.getByTestId('chat-stage-detail')).toHaveTextContent('"status": "completed"');
+    expect(screen.getByTestId('chat-stage-detail')).toHaveTextContent('"reason": "budget_guard"');
+  });
+
 });

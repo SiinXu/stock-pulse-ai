@@ -31,6 +31,32 @@ function getToolDetail(step: ProgressStep): {
   return Object.keys(detail).length > 0 ? detail : null;
 }
 
+
+function getStageDetail(step: ProgressStep): {
+  stage?: string;
+  status?: string;
+  duration?: number;
+  reason?: string;
+  remaining?: number;
+  timeout?: number;
+  minimum?: number;
+} | null {
+  if (step.type !== 'stage_start' && step.type !== 'stage_done'
+    && step.type !== 'pipeline_timeout' && step.type !== 'pipeline_budget_skipped') {
+    return null;
+  }
+  const detail = {
+    ...(typeof step.stage === 'string' ? { stage: step.stage } : {}),
+    ...(typeof step.status === 'string' ? { status: step.status } : {}),
+    ...(typeof step.duration === 'number' ? { duration: step.duration } : {}),
+    ...(typeof step.reason === 'string' ? { reason: step.reason } : {}),
+    ...(typeof step.remaining === 'number' ? { remaining: step.remaining } : {}),
+    ...(typeof step.timeout === 'number' ? { timeout: step.timeout } : {}),
+    ...(typeof step.minimum === 'number' ? { minimum: step.minimum } : {}),
+  };
+  return Object.keys(detail).length > 0 ? detail : null;
+}
+
 export function ChatThinkingDetails({
   steps,
   t,
@@ -122,6 +148,31 @@ export function ChatThinkingDetails({
                   ) : null}
                 </div>
               </div>
+            </details>
+          );
+        }
+        const stageDetail = getStageDetail(step);
+        if (stageDetail) {
+          return (
+            <details key={idx} className="group/stage">
+              <summary
+                role="button"
+                aria-label={`${text} · ${t('common.details')}`}
+                className={cn('chat-progress-item cursor-pointer list-none', statusClass)}
+              >
+                <span className={cn('chat-progress-dot', iconClass)} />
+                <span className="min-w-0 flex-1 leading-relaxed">{text}</span>
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 text-muted-text/70 transition-transform group-open/stage:rotate-90"
+                  aria-hidden="true"
+                />
+              </summary>
+              <pre
+                className="ml-6 mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap break-words border-l border-border/50 pl-3 pb-1 text-xs text-secondary-text"
+                data-testid="chat-stage-detail"
+              >
+                {JSON.stringify(stageDetail, null, 2)}
+              </pre>
             </details>
           );
         }
