@@ -41,6 +41,8 @@ StockPulse is a **local-first investment research workbench**: multi-market data
 | **Offline quality panel** | Deterministic fixtures + local runner (no live LLM scoring) | [CONTRIBUTING](docs/CONTRIBUTING_EN.md) |
 | **Open source licensing** | MIT (original portions) + AGPL-3.0 (StockPulse additions) | [LICENSE](LICENSE) |
 
+Honest peer comparison (upstream, go-stock, FinRobot Desktop, TradingAgents-class, and related local-first tools), with shipped vs planned labels and known gaps: [Competitive landscape](docs/competitive-landscape.md) ([中文](docs/competitive-landscape_CN.md)).
+
 ### Explicit non-claims
 
 - **Not** multi-tenant SaaS / RBAC after admin login ([AUTH-05](docs/security-baseline.md), [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230)).
