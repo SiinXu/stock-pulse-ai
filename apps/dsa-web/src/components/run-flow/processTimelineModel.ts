@@ -60,7 +60,7 @@ export interface ProcessTimelineModel {
   hasAgentEvents: boolean;
 }
 
-const SENSITIVE_KEY_PATTERN = /(?:api[_-]?key|apikey|authorization|token|secret|password|prompt|system_prompt|messages|raw_response|completion|input_text|output_text|cookie|credential)/i;
+const SENSITIVE_KEY_PATTERN = /(?:api[_-]?key|apikey|authorization|token(?!s)|secret|password|prompt|system_prompt|messages|raw_response|completion|input_text|output_text|cookie|credential)/i;
 
 const WHY_ATTR_KEYS = new Set([
   'reason',

@@ -108,15 +108,38 @@ describe('processTimeline', () => {
   it('redacts sensitive keys client-side', () => {
     expect(isSensitiveTraceKey('api_key')).toBe(true);
     expect(isSensitiveTraceKey('authorization')).toBe(true);
+    expect(isSensitiveTraceKey('token')).toBe(true);
+    expect(isSensitiveTraceKey('access_token')).toBe(true);
     expect(isSensitiveTraceKey('failure_reason')).toBe(false);
+    expect(isSensitiveTraceKey('total_tokens')).toBe(false);
+    expect(isSensitiveTraceKey('totalTokens')).toBe(false);
+    expect(isSensitiveTraceKey('planning_tokens')).toBe(false);
     const redacted = redactTraceRecord({
       failure_reason: 'timeout',
       token: 'secret-value',
+      total_tokens: 128,
       nested: { password: 'x', ok: 1 },
     });
     expect(redacted.failure_reason).toBe('timeout');
     expect(redacted.token).toBe('<redacted>');
+    expect(redacted.total_tokens).toBe(128);
     expect((redacted.nested as Record<string, unknown>).password).toBe('<redacted>');
     expect((redacted.nested as Record<string, unknown>).ok).toBe(1);
+  });
+
+  it('surfaces allowlisted token metrics in the why layer', () => {
+    const model = buildProcessTimeline(snapshot([
+      agentEvent('e1', 1, 'agent_model_end', '模型完成', {
+        attrs: {
+          total_tokens: 256,
+          totalTokens: 256,
+          planning_tokens: 64,
+        },
+      }),
+    ]));
+    expect(model.items).toHaveLength(1);
+    expect(model.items[0].why.some((field) => field.key === 'total_tokens' && field.value === '256')).toBe(true);
+    expect(model.items[0].why.some((field) => field.key === 'totalTokens' && field.value === '256')).toBe(true);
+    expect(model.items[0].why.some((field) => field.value === '<redacted>')).toBe(false);
   });
 });
