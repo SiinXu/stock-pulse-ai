@@ -1895,6 +1895,23 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '渲染关闭时的硬编码通知 fallback 路径不变。',
     ],
   },
+  'settings.report.RESEARCH_PRESENTATION_PROFILE': {
+    title: '研究呈现偏好',
+    summary: '证据不变。',
+    usage: '选择偏好。',
+    valueNotes: [
+      '保守：风险优先。',
+      '平衡：默认顺序。',
+      '积极：机会优先。',
+      '风险披露同等。',
+      '事实与判断不变。',
+    ],
+    impact: ['仅调整顺序与强调。'],
+    notes: [
+      '仅在渲染开启时生效。',
+      '不构成投资建议。',
+    ],
+  },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: '报告渲染引擎',
     summary: '启用 Jinja2 模板渲染引擎处理报告输出。',
