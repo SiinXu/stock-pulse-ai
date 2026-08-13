@@ -13,7 +13,10 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from math import isfinite
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from src.analysis_context_pack.snapshot import AnalysisContextSnapshot
 
 
 # ============================================================
@@ -156,6 +159,55 @@ def normalize_stage_failure_reason(reason: Any) -> StageFailureReason:
     return StageFailureReason.STAGE_FAILURE
 
 
+
+class _SealedAgentData(dict):
+    """Dict that rejects writes to sealed market-input keys (Issue #182)."""
+
+    def __init__(self, *args: Any, sealed_keys: Optional[Any] = None, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._sealed_keys = frozenset(sealed_keys or ())
+
+    def _reject_if_sealed(self, key: Any) -> None:
+        from src.analysis_context_pack.snapshot import SnapshotMutationError
+
+        if key in self._sealed_keys:
+            raise SnapshotMutationError(
+                f"cannot mutate sealed analysis context data key '{key}'"
+            )
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._reject_if_sealed(key)
+        super().__setitem__(key, value)
+
+    def __delitem__(self, key: Any) -> None:
+        self._reject_if_sealed(key)
+        super().__delitem__(key)
+
+    def pop(self, key: Any, *args: Any) -> Any:
+        self._reject_if_sealed(key)
+        return super().pop(key, *args)
+
+    def clear(self) -> None:
+        if self._sealed_keys:
+            from src.analysis_context_pack.snapshot import SnapshotMutationError
+
+            raise SnapshotMutationError(
+                "cannot clear sealed analysis context data bag"
+            )
+        super().clear()
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        pending = dict(*args, **kwargs)
+        for key in pending:
+            self._reject_if_sealed(key)
+        super().update(pending)
+
+    def setdefault(self, key: Any, default: Any = None) -> Any:
+        if key not in self:
+            self._reject_if_sealed(key)
+        return super().setdefault(key, default)
+
+
 # ============================================================
 # AgentContext — shared state bag for a single analysis run
 # ============================================================
@@ -164,9 +216,10 @@ def normalize_stage_failure_reason(reason: Any) -> StageFailureReason:
 class AgentContext:
     """Shared context carried across all agents in a single run.
 
-    Any agent can read from / write to this context.  The orchestrator
-    is responsible for seeding the initial fields and collecting
-    final results.
+    Stage *outputs* (opinions, risk flags, free-form meta) remain writable.
+    Sealed market-input keys from the AnalysisContextPack snapshot are
+    frozen after ``seal_input_snapshot`` so multi-agent stages cannot
+    silently drift by mutating shared bars/news in place (Issue #182).
     """
 
     # --- identity ---
@@ -193,6 +246,13 @@ class AgentContext:
     # --- timing ---
     created_at: float = field(default_factory=time.time)
 
+    # --- sealed shared input snapshot (Issue #182) ---
+    _input_snapshot: Optional["AnalysisContextSnapshot"] = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+
     # -----------------------------------------------------------------
     # Convenience helpers
     # -----------------------------------------------------------------
@@ -212,10 +272,77 @@ class AgentContext:
         })
 
     def get_data(self, key: str, default: Any = None) -> Any:
+        snapshot = self._input_snapshot
+        if snapshot is not None and key in snapshot.data:
+            # Detached copy: callers may mutate the returned object without
+            # changing the shared sealed snapshot observed by other stages.
+            return snapshot.read_data(key, default)
         return self.data.get(key, default)
 
     def set_data(self, key: str, value: Any) -> None:
+        from src.analysis_context_pack.snapshot import (
+            SNAPSHOT_DATA_KEYS,
+            SnapshotMutationError,
+        )
+
+        if self._input_snapshot is not None and key in SNAPSHOT_DATA_KEYS:
+            raise SnapshotMutationError(
+                f"cannot mutate sealed analysis context data key '{key}'"
+            )
         self.data[key] = value
+
+    def seal_input_snapshot(
+        self,
+        snapshot: "AnalysisContextSnapshot",
+        *,
+        replace_data: bool = True,
+    ) -> "AnalysisContextSnapshot":
+        """Attach a sealed pack/data snapshot and freeze market-input keys.
+
+        Stage outputs continue to use ``opinions`` / ``risk_flags`` / free
+        ``meta`` and non-snapshot ``data`` keys. Replacing an already sealed
+        snapshot with a different identity is rejected.
+        """
+        from src.analysis_context_pack.snapshot import (
+            SNAPSHOT_DATA_KEYS,
+            SnapshotMutationError,
+            freeze_market_data_mapping,
+        )
+
+        existing = self._input_snapshot
+        if existing is not None:
+            if (
+                existing.snapshot_id != snapshot.snapshot_id
+                or existing.snapshot_revision != snapshot.snapshot_revision
+                or existing.content_digest != snapshot.content_digest
+            ):
+                raise SnapshotMutationError(
+                    "analysis context snapshot is already sealed for this run"
+                )
+            return existing
+
+        self._input_snapshot = snapshot
+        if replace_data:
+            raw = dict(self.data)
+            for key in SNAPSHOT_DATA_KEYS:
+                if key in snapshot.data:
+                    raw[key] = snapshot.data[key]
+            raw = freeze_market_data_mapping(raw)
+            self.data = _SealedAgentData(
+                raw,
+                sealed_keys=frozenset(
+                    key for key in SNAPSHOT_DATA_KEYS if key in raw and raw[key] is not None
+                ),
+            )
+        audit = snapshot.audit_metadata()
+        self.meta["analysis_context_snapshot"] = dict(audit)
+        for key, value in audit.items():
+            self.meta[f"analysis_context_{key}"] = value
+        return snapshot
+
+    @property
+    def input_snapshot(self) -> Optional["AnalysisContextSnapshot"]:
+        return self._input_snapshot
 
     @property
     def has_risk_flags(self) -> bool:
