@@ -1513,6 +1513,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '保持自动检测开启；仅在受控诊断时使用支持的强制值。',
     notes: ['证据不明确时返回 unknown，不会强行判定方向。'],
   },
+  'settings.agent.REFLECTION_POSTMORTEM': {
+    title: '反思与预测复盘',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',

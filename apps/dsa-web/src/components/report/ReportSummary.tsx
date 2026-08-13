@@ -11,6 +11,7 @@ import { MarketReviewReportView } from './MarketReviewReportView';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 
 const ReportDiagnostics = React.lazy(() => import('./ReportDiagnostics'));
+const ReportProcessTimeline = React.lazy(() => import('./ReportProcessTimeline'));
 
 interface ReportSummaryProps {
   data: AnalysisResult | AnalysisReport;
@@ -92,6 +93,14 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
         overview={details?.analysisContextPackOverview}
         language={reportLanguage}
       />
+
+      {/* Analysis process timeline from real run-flow agent events (#124/#219). */}
+      <React.Suspense fallback={false}>
+        <ReportProcessTimeline
+          recordId={recordId}
+          onOpenRunFlow={onOpenRunFlow}
+        />
+      </React.Suspense>
 
       {/* Run diagnostic summary */}
       <React.Suspense fallback={false}>

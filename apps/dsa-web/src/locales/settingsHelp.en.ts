@@ -1490,6 +1490,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'Keep automatic detection enabled, or provide a supported override only for controlled diagnostics.',
     notes: ['Unclear evidence produces unknown instead of forcing a directional regime.'],
   },
+  'settings.agent.REFLECTION_POSTMORTEM': {
+    title: 'Reflection and Forecast Post-mortem',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',
