@@ -167,6 +167,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ALPHASIFT_SNAPSHOT_CALL_TIMEOUT_SEC` | `60` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHASIFT_SOURCE_CALL_TIMEOUT_SEC` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHAVANTAGE_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `ANALYSIS_CHECKPOINT_DIR` | `./data/checkpoints` | 是 | 模板中注释 |
+| `ANALYSIS_CHECKPOINT_ENABLED` | `true` | 是 | 模板中注释; --- Analysis stage checkpoints + reproducibility (Issues #121 / #136) --- Persist multi-agent stage state for exact-r... |
+| `ANALYSIS_CHECKPOINT_FORCE_FULL` | `false` | 是 | 模板中注释 |
+| `ANALYSIS_CHECKPOINT_TTL_HOURS` | `24` | 是 | 模板中注释 |
 | `ANALYSIS_DELAY` | `0` | 是 | 模板中注释; =================================== Analyze interval configuration (optional) =================================== Del... |
 | `ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS` | `0` | 是 | 模板中注释; Coordinator wall-clock budget in seconds; 0 disables (individual stage timeouts still apply). |
 | `ANALYSIS_PARALLEL_FETCH_ENABLED` | `true` | 是 | 模板中注释; Parallel dependency-free market-input pulls inside one stock analysis (realtime / chip / money-flow / fundamental) |
@@ -558,6 +562,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPORT_SUMMARY_ONLY` | `false` | 是 | 模板中注释; Only analyze the result summary: when set to true, it only pushes summaries, without individual stock details |
 | `REPORT_TEMPLATES_DIR` | `templates` | 是 | 模板中注释; Report Engine P0 (Jinja2 / integrity check / Historical comparison) |
 | `REPORT_TYPE` | `simple` | 是 | 模板中注释; Report type: simple (concise), full (complete), brief (3-5 sentence summary) In a Docker environment, if content is n... |
+| `REPRO_MODE_ENABLED` | `false` | 是 | 模板中注释; Request-scoped temperature=0 plus provider seed forwarding where supported. |
+| `REPRO_RECORD_CONFIG` | `true` | 是 | 模板中注释 |
+| `REPRO_SEED` | `0` | 是 | 模板中注释 |
 | `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; Read-only research API for stratified conclusions (Issue #1143; default off) Authenticated GET /api/v1/research/concl... |
 | `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释 |
 | `RESEARCH_PACK_EXPORT_ENABLED` | `false` | 是 | 模板中注释; One-click research asset pack (report + decision card + evidence refs + redacted trace) |
