@@ -45,7 +45,7 @@ The panel answers engineering trust questions. It does **not** claim market alph
 - Strategy returns, ranking quality, or market alpha
 - Live vendor SLA or free-data accuracy
 - Subjective LLM “quality scores” as a merge gate
-- Prediction-vs-actual tracking ([#449](https://github.com/SiinXu/stock-pulse-ai/issues/449) / [#466](https://github.com/SiinXu/stock-pulse-ai/issues/466))
+- Prediction-vs-actual tracking (Epic [#1107](https://github.com/SiinXu/stock-pulse-ai/issues/1107) A1–A10 delivery; planning [#449](https://github.com/SiinXu/stock-pulse-ai/issues/449) superseded for the framework; daily-brief accuracy [#466](https://github.com/SiinXu/stock-pulse-ai/issues/466))
 - Report evidence strata ([#616](https://github.com/SiinXu/stock-pulse-ai/issues/616)) until that contract lands; pre-strata public fields only
 - Agent self-improvement / training loops ([#215](https://github.com/SiinXu/stock-pulse-ai/issues/215), broader [#252](https://github.com/SiinXu/stock-pulse-ai/issues/252))
 

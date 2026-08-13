@@ -21,6 +21,7 @@ from src.config import Config
 from src.migrations import cli as migration_cli
 from src.migrations.engine import read_only_migration_connection
 from src.migrations.registry import (
+    AGENT_EPISODE_SCHEMA_MIGRATION,
     ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
     AGENT_PREDICTION_SCHEMA_MIGRATION,
     APPROVAL_GATE_SCHEMA_MIGRATION,
@@ -218,6 +219,7 @@ def test_pending_cli_subprocess_is_read_only(
         CHAT_TURN_IDENTITY_MIGRATION.id,
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
         LLM_USAGE_COST_ATTRIBUTION_MIGRATION.id,
+        AGENT_EPISODE_SCHEMA_MIGRATION.id,
         AGENT_PREDICTION_SCHEMA_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
@@ -294,6 +296,7 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         CHAT_TURN_IDENTITY_MIGRATION.id,
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
         LLM_USAGE_COST_ATTRIBUTION_MIGRATION.id,
+        AGENT_EPISODE_SCHEMA_MIGRATION.id,
         AGENT_PREDICTION_SCHEMA_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
