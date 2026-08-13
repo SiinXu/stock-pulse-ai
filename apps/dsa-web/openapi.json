@@ -15255,6 +15255,596 @@
         "title": "ModelPackImportStatus",
         "type": "object"
       },
+      "MoneyFlowSnapshotResponse": {
+        "additionalProperties": false,
+        "description": "Strict finite snapshot exposed by the Stock Details API.",
+        "properties": {
+          "amount_scale": {
+            "enum": [
+              "unknown",
+              "yuan",
+              "thousand_yuan",
+              "ten_thousand_yuan",
+              "million_yuan"
+            ],
+            "title": "Amount Scale",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "attitude": {
+            "enum": [
+              "inflow",
+              "outflow",
+              "neutral",
+              "unknown"
+            ],
+            "title": "Attitude",
+            "type": "string"
+          },
+          "bucket_definition": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Bucket Definition",
+            "type": "string"
+          },
+          "calibration_note": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Calibration Note",
+            "type": "string"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": -100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "maximum": 1000000000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "completeness": {
+            "enum": [
+              "complete",
+              "partial"
+            ],
+            "title": "Completeness",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "large_net_inflow": {
+            "anyOf": [
+              {
+                "maximum": 1e+18,
+                "minimum": -1e+18,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Large Net Inflow"
+          },
+          "large_net_inflow_ratio": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": -100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Large Net Inflow Ratio"
+          },
+          "main_net_inflow": {
+            "anyOf": [
+              {
+                "maximum": 1e+18,
+                "minimum": -1e+18,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Net Inflow"
+          },
+          "main_net_inflow_10d": {
+            "anyOf": [
+              {
+                "maximum": 1e+18,
+                "minimum": -1e+18,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Net Inflow 10D"
+          },
+          "main_net_inflow_5d": {
+            "anyOf": [
+              {
+                "maximum": 1e+18,
+                "minimum": -1e+18,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Net Inflow 5D"
+          },
+          "main_net_inflow_ratio": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": -100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Net Inflow Ratio"
+          },
+          "market": {
+            "enum": [
+              "cn",
+              "hk",
+              "us",
+              "jp",
+              "kr",
+              "tw"
+            ],
+            "title": "Market",
+            "type": "string"
+          },
+          "medium_net_inflow": {
+            "anyOf": [
+              {
+                "maximum": 1e+18,
+                "minimum": -1e+18,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medium Net Inflow"
+          },
+          "medium_net_inflow_ratio": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": -100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medium Net Inflow Ratio"
+          },
+          "observed_days": {
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Observed Days",
+            "type": "integer"
+          },
+          "requested_days": {
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Requested Days",
+            "type": "integer"
+          },
+          "small_net_inflow": {
+            "anyOf": [
+              {
+                "maximum": 1e+18,
+                "minimum": -1e+18,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Small Net Inflow"
+          },
+          "small_net_inflow_ratio": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": -100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Small Net Inflow Ratio"
+          },
+          "source": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "super_large_net_inflow": {
+            "anyOf": [
+              {
+                "maximum": 1e+18,
+                "minimum": -1e+18,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Super Large Net Inflow"
+          },
+          "super_large_net_inflow_ratio": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": -100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Super Large Net Inflow Ratio"
+          },
+          "unit": {
+            "pattern": "^(unknown|[A-Z]{3})$",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "date",
+          "source",
+          "market",
+          "unit",
+          "amount_scale",
+          "bucket_definition",
+          "as_of",
+          "requested_days",
+          "observed_days",
+          "completeness",
+          "attitude",
+          "calibration_note"
+        ],
+        "title": "MoneyFlowSnapshotResponse",
+        "type": "object"
+      },
+      "MoneyFlowSourceAttempt": {
+        "additionalProperties": false,
+        "description": "Bounded public projection of one provider attempt.",
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "maximum": 1000000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "provider": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Date"
+          },
+          "status": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "status"
+        ],
+        "title": "MoneyFlowSourceAttempt",
+        "type": "object"
+      },
+      "MoneyFlowViewResponse": {
+        "additionalProperties": false,
+        "description": "User-facing SmartMoney / main-force money-flow view (Issue #989).",
+        "properties": {
+          "age_days": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Session age in days",
+            "title": "Age Days"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Observation as-of timestamp",
+            "title": "As Of"
+          },
+          "cache_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "miss",
+                  "fresh",
+                  "stale"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache State"
+          },
+          "disclaimer": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Whether SMARTMONEY_ENABLED is on",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "fallback_from": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback From"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UTC fetch timestamp",
+            "title": "Fetched At"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "enum": [
+                  "cn",
+                  "hk",
+                  "us",
+                  "jp",
+                  "kr",
+                  "tw"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "provider_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider session date",
+            "title": "Provider Date"
+          },
+          "requested_days": {
+            "description": "Requested history window",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Requested Days",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "money_flow_view/1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneyFlowSnapshotResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_chain": {
+            "description": "Provider attempt chain",
+            "items": {
+              "$ref": "#/components/schemas/MoneyFlowSourceAttempt"
+            },
+            "maxItems": 16,
+            "title": "Source Chain",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "disabled",
+              "available",
+              "partial",
+              "not_supported",
+              "fetch_failed",
+              "empty",
+              "stale",
+              "fallback"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "description": "Canonical stock code",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "stock_code",
+          "enabled",
+          "status",
+          "requested_days",
+          "disclaimer"
+        ],
+        "title": "MoneyFlowViewResponse",
+        "type": "object"
+      },
       "NewsIntelItem": {
         "description": "新闻情报条目",
         "example": {
@@ -52950,6 +53540,83 @@
           }
         },
         "summary": "获取股票历史行情",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/{stock_code}/money-flow": {
+      "get": {
+        "description": "Returns main-force order-size bucket ratios (when available) with as-of, source, and explicit degradation. Gated by SMARTMONEY_ENABLED: when disabled the response is status=disabled with no provider network I/O. Decoupled from quote/history fetches. Research evidence only.",
+        "operationId": "getStockMoneyFlow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "History window in sessions (1–20)",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "History window in sessions (1–20)",
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyFlowViewResponse"
+                }
+              }
+            },
+            "description": "Money-flow / SmartMoney footprint view"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid stock code or days"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Get SmartMoney money-flow footprint for a stock",
         "tags": [
           "Stocks"
         ]
