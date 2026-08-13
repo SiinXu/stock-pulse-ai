@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Chore] Localize evidence-chain and audit-export Web copy and rebaseline affected gzip budgets (Refs #179).
 - [Added] Personal daily morning brief aggregates portfolio membership, overnight Today's Focus highlights, and observed earnings-event context with optional quiet notify; event research briefs ship bounded metrics and post-event checklists through the shared report notification route (Refs #149, #1131).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after observed-event Daily Brief and Event Research settings help (Refs #149, #1131).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
@@ -27,10 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Add bilingual engineering-efficiency playbook for parallel merge trains (batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, worktree safety) and link it from CONTRIBUTING and the docs index (Refs #891).
 - [Chore] Pin the desktop Electron runtime to 43.4.0 (supported 43-x-y) while keeping electron-builder 26.15.7, electron-updater 6.8.9, tar 7.5.22, and js-yaml 4.3.1 overrides for the #1060 / #615 security stack.
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
-- [Added] Evidence chain (conclusion→evidence with explicit missing markers) and redacted exportable audit package ZIP/JSON, reusing reasoning-trace export and the security-audit trail (Refs #986, #127).
-- [Fixed] Bound audit-package artifacts, include redacted raw intermediates only when enabled, keep ZIP/JSON artifact parity, and prevent failed source runs from supporting conclusions (Refs #986, #127).
-- [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
-- [Added] Analysis stage-level checkpoints for exact-replay resume after interrupt, plus run-configuration snapshots and optional repro mode (seed/temperature pin); resume refuses fingerprint mismatch instead of silently changing conclusions (Refs #121, Refs #136).
 - [Added] Structured readiness/self-check module (`src/core/readiness.py`) returns fail-closed `ok|degraded|failed` results for data providers, LLM, task queue, and setup dependencies, with per-check timeouts and `GET /api/v1/system/readiness` (Refs #1071).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Changed] Jinja stock reports use Decision Card-first layered reading (card → mode-density evidence strata → detail sections) for brief/standard/research, and `ReportType.BRIEF` notifications force `report_mode=brief` so push length budgets hold (Refs #861, #874).
