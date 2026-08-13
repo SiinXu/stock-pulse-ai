@@ -83,8 +83,10 @@ This is the entry point for project documentation. The README covers the project
 | [DecisionSignal Topic](decision-signals.md) <sub><sub>![P7 Badge](https://img.shields.io/badge/P7-orange?style=flat)</sub></sub> (Chinese-only) | AI signal fields, API, Web display, alert/notification/portfolio-risk linkage, outcome evaluation, redaction, migration, and rollback |
 | [Prediction resolve_after calendar policy](prediction-resolve-after_EN.md) | Horizon → UTC `resolve_after` via exchange sessions for CN/HK/US; holidays, half-days, cross-market rules; no natural-day approximation ([中文](prediction-resolve-after.md)) |
 | [Personal Investment Framework](personal-investment-framework_EN.md) | Minimal Settings editor, versioned API, single-stock read-only injection, and report framework_alignment slot |
+| [Portfolio-Level Multi-Symbol Analysis](portfolio-level-analysis_EN.md) | Basket analysis over a code list: correlation, concentration, shared risk, health/stress reuse, size limit and partial degradation; `POST /api/v1/analysis/portfolio` ([Chinese](portfolio-level-analysis.md)) |
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |
 | [Portfolio Stress Test (Deterministic Shocks)](portfolio-stress-test_EN.md) | Declarative scenarios, deterministic factor shocks, assumption checklist, and `partial` honesty; `/api/v1/portfolio/stress-test` ([Chinese](portfolio-stress-test.md)) |
+| [Investor Personas](investor-personas_EN.md) | Default-off research stances + investment-lens Skills (#119, #467) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
 | [Skill Opinion Outcome Evaluation](skill-opinion-outcome-evaluation.md) | Individual skill samples, offline forward outcomes, sample-sufficiency statistics, migration, and V0 boundaries |
 | [Prediction ActualsFetcher](prediction-actuals-fetcher.md) | Server-path actuals for prediction scoring: DataFetcherManager, short-TTL coalesce, provider_down/data_unavailable, non-finite rejection (#1110 / #1107) |
@@ -101,6 +103,8 @@ This is the entry point for project documentation. The README covers the project
 | [Cloud WebUI Deployment](deploy-webui-cloud.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Cloud server WebUI access and deployment notes |
 | [Zeabur Deployment](docker/zeabur-deployment.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Zeabur platform deployment |
 | [Desktop Packaging](desktop-package_EN.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> ([中文](desktop-package.md)) | Electron desktop first-run, local models, and packaging notes |
+| [Desktop vs Web capability matrix](desktop-capability-matrix_EN.md) ([中文](desktop-capability-matrix.md)) | Desktop/Web capability matrix, CLI diagnostics, and update retention |
+| [Desktop deep-link policy](desktop-deep-link-policy_EN.md) ([中文](desktop-deep-link-policy.md)) | `stockpulse://` allowlist, rejection semantics, and UX |
 
 ## Reference And Development
 
@@ -113,6 +117,7 @@ This is the entry point for project documentation. The README covers the project
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [OpenAPI Web Types And Runtime Validation](openapi-web-types.md) | Generated web API types, CI drift gate, and stocks runtime-validation pilot |
+| [API Error Taxonomy](api-error-taxonomy_EN.md) | Stable error codes mapped to category, severity, default user action, and Web remediation ([中文](api-error-taxonomy.md)) |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
 | [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md) | Operational guide for parallel fix/merge trains: batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, and worktree safety ([中文](engineering-efficiency-playbook.md); `AGENTS.md` remains the contract) |
 | [Offline Test Gate (timeouts, coverage floor, markers)](testing-ci-gate.md) | Per-test timeout, faulthandler, measured coverage floor, strict markers, and manual benchmarks |

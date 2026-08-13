@@ -121,6 +121,9 @@ class BuiltinAnalysisStrategyPlugin(Plugin):
             metadata={
                 "builtin": True,
                 "yaml_path": str(self._yaml_path),
+                "skill_version": str(getattr(skill, "version", "") or ""),
+                "skill_content_hash": str(getattr(skill, "content_hash", "") or ""),
+                "skill_lifecycle": str(getattr(skill, "lifecycle", "") or "active"),
             },
         )
         self._definition = skill
