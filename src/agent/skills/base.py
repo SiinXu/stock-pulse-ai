@@ -58,6 +58,8 @@ class Skill:
         default_router: Whether this skill participates in router fallback selection.
         default_priority: Ordering hint for defaults / selectors (lower comes first).
         market_regimes: Optional market regime tags used by the skill router.
+        market_scopes: Optional ``market/instrument`` scopes enforced by the
+            runtime router before a specialist consumes capacity or tools.
         execution_context: Inline/fork execution hint from frontmatter.
         subagent_type: Optional subagent type hint from frontmatter.
         preferred_model: Optional model hint from frontmatter.
@@ -84,6 +86,7 @@ class Skill:
     default_router: bool = False
     default_priority: int = 100
     market_regimes: List[str] = field(default_factory=list)
+    market_scopes: List[str] = field(default_factory=list)
     execution_context: str = "inline"
     subagent_type: str = ""
     preferred_model: str = ""
@@ -196,6 +199,10 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
             _coerce_string_list(data.get("market_regimes"))
             or _coerce_string_list(data.get("market-regimes"))
         ),
+        market_scopes=(
+            _coerce_string_list(data.get("market_scopes"))
+            or _coerce_string_list(data.get("market-scopes"))
+        ),
         execution_context=str(data.get("context", "inline")).strip() or "inline",
         subagent_type=str(data.get("agent", "")).strip(),
         preferred_model=str(data.get("model", "")).strip(),
@@ -274,6 +281,10 @@ def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
         market_regimes=(
             _coerce_string_list(metadata.get("market-regimes"))
             or _coerce_string_list(metadata.get("market_regimes"))
+        ),
+        market_scopes=(
+            _coerce_string_list(metadata.get("market-scopes"))
+            or _coerce_string_list(metadata.get("market_scopes"))
         ),
         execution_context=str(metadata.get("context", "inline")).strip() or "inline",
         subagent_type=str(metadata.get("agent", "")).strip(),

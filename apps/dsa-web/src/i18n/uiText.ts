@@ -1742,6 +1742,8 @@ const zh = {
   'settings.loadedExtensionsDesiredDisabled': '持久意图：禁用（重启后仍不加载）',
   'settings.loadedExtensionsFailureCode': '失败代码：{code}',
   'settings.loadedExtensionsFailureReasonUnavailable': '加载失败，但当前没有可用的稳定失败代码。请检查包路径、manifest 兼容性、安全策略拒绝记录与进程日志。',
+  'settings.loadedExtensionsOpenNotificationChannel': '打开通知渠道：{channel}',
+  'settings.loadedExtensionsNotificationInactive': '通知适配器当前未激活（插件未启用、加载失败或尚未注册渠道）。不会假装已连接。',
 
   'settings.configPresetsTitle': '推荐配置预设与配置档案',
   'settings.configPresetsDescription': '一键应用官方推荐配置，或导入/导出不含密钥的 stockpulse-profile YAML。',
@@ -3785,6 +3787,8 @@ const en: Record<UiTextKey, string> = {
   'settings.loadedExtensionsDesiredDisabled': 'Persisted intent: disabled (will not load across restarts)',
   'settings.loadedExtensionsFailureCode': 'Failure code: {code}',
   'settings.loadedExtensionsFailureReasonUnavailable': 'Load failed, but no stable failure code is currently available. Check the package path, manifest compatibility, security-policy denials, and process logs.',
+  'settings.loadedExtensionsOpenNotificationChannel': 'Open notification channel: {channel}',
+  'settings.loadedExtensionsNotificationInactive': 'Notification adapter is not active (plugin disabled, failed, or no channel registered). This panel never pretends it is connected.',
 
   'settings.configPresetsTitle': 'Recommended presets & profiles',
   'settings.configPresetsDescription': 'Apply official recommended configuration presets, or import/export secret-free stockpulse-profile YAML.',

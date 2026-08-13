@@ -90,6 +90,7 @@ This is the entry point for project documentation. The README covers the project
 | [Report Sensitivity Scenario Library](report-scenario-library_EN.md) | Versioned rate/FX/industry presets + custom save/reuse via Chat what-if channel; hypothetical risk framing for report sensitivity (#1136) ([Chinese](report-scenario-library.md)) |
 | [Investor Personas](investor-personas_EN.md) | Default-off research stances + investment-lens Skills (#119, #467) |
 | [Investment Committee Mode](investment-committee-mode_EN.md) | Default-off persona preset + specialist path and committee deliberation report section (#545) |
+| [A-share Specialist Roles](ashare-specialist-roles.md) | Default-off policy / capital-flow / microstructure Skills with fail-soft data deps (#192) |
 | [Skill Opinion Outcome Evaluation](skill-opinion-outcome-evaluation.md) | Individual skill samples, offline forward outcomes, sample-sufficiency statistics, migration, and V0 boundaries |
 | [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema and CAS store (Issue #1112) |
 | [Prediction ActualsFetcher](prediction-actuals-fetcher.md) | Server-path actuals for prediction scoring: DataFetcherManager, short-TTL coalesce, provider_down/data_unavailable, non-finite rejection (#1110 / #1107) |

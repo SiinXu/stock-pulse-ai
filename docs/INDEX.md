@@ -84,6 +84,7 @@
 | [报告敏感性情景库](report-scenario-library.md) | 版本化利率/汇率/行业预置 + 自定义保存复用，复用 Chat what-if 通道；假设风险表述用于报告敏感性（#1136）（[英文](report-scenario-library_EN.md)） |
 | [投资者 Persona](investor-personas.md) | 默认关闭的研究立场与投资视角 Skills（#119, #467） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
+| [A 股特化角色](ashare-specialist-roles.md) | 默认关闭的政策 / 资金流 / 微观结构 Skill，缺数据显式降级（#192） |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
 | [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema / CAS store (Issue #1112) |
 | [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
