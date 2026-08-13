@@ -115,11 +115,20 @@ export const TRADING_CALENDAR_DEPENDENCY = {
 
 const EMPTY_PRICE = '—';
 
-/** CSS design tokens for red/green paint (names follow CN convention; map by color token, not direction). */
+/**
+ * CSS design tokens for red/green paint (hue identity, not direction).
+ * Theme Contract v1 Layer 0: `--price-red` / `--price-green`.
+ * Legacy `--home-price-up/down` alias these hues in index.css.
+ */
 export const CHANGE_COLOR_CSS_VAR: Readonly<Record<Exclude<ChangeColor, 'neutral'>, string>> = {
-  // --home-price-up is the red hue; --home-price-down is the green hue (DESIGN_GUIDE §2.4).
-  red: 'var(--home-price-up)',
-  green: 'var(--home-price-down)',
+  red: 'var(--price-red)',
+  green: 'var(--price-green)',
+};
+
+/** Direction tokens remapped by `data-price-direction` (cn = red_up, us = green_up). */
+export const PRICE_DIRECTION_CSS_VAR: Readonly<Record<'up' | 'down', string>> = {
+  up: 'var(--price-up)',
+  down: 'var(--price-down)',
 };
 
 function isMarketId(value: string): value is MarketId {

@@ -242,10 +242,10 @@ describe('marketFormat contract', () => {
     });
 
     it('maps paint tokens to design-token CSS vars (hue, not direction name)', () => {
-      expect(CHANGE_COLOR_CSS_VAR.red).toBe('var(--home-price-up)');
-      expect(CHANGE_COLOR_CSS_VAR.green).toBe('var(--home-price-down)');
-      expect(changeColorCssVar('red')).toBe('var(--home-price-up)');
-      expect(changeColorCssVar('green')).toBe('var(--home-price-down)');
+      expect(CHANGE_COLOR_CSS_VAR.red).toBe('var(--price-red)');
+      expect(CHANGE_COLOR_CSS_VAR.green).toBe('var(--price-green)');
+      expect(changeColorCssVar('red')).toBe('var(--price-red)');
+      expect(changeColorCssVar('green')).toBe('var(--price-green)');
       expect(changeColorCssVar('neutral')).toBeUndefined();
     });
 
@@ -266,7 +266,7 @@ describe('marketFormat contract', () => {
         const { color } = changeSemantics(value, market, pref);
         const css = changeColorCssVar(color);
         expect(css).toBe(
-          color === 'red' ? 'var(--home-price-up)' : 'var(--home-price-down)',
+          color === 'red' ? 'var(--price-red)' : 'var(--price-green)',
         );
       },
     );
