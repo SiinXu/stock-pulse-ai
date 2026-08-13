@@ -38,6 +38,12 @@ from src.services.agent_eval_service import (  # noqa: E402
     AgentEvalService,
     load_eval_cases,
 )
+from src.services.prediction_eval_service import (  # noqa: E402
+    compare_prediction_to_baseline,
+    load_prediction_baseline,
+    run_prediction_eval_suite,
+    score_only_prediction_view,
+)
 
 
 def run_output_quality_comparison(
@@ -145,6 +151,7 @@ def run_benchmark(
         if output_quality_candidate_root is not None
         else None
     )
+    report["prediction_verification_evaluation"] = run_prediction_eval_suite()
     report["output_quality_evaluation"] = run_output_quality_comparison(
         candidate_cases,
         baseline_agent_version=baseline_agent_version,
@@ -199,10 +206,34 @@ def build_full_outputs(
     comparison = None
     if with_baseline and BASELINE_PATH.is_file():
         comparison = compare_to_baseline(score_only_view(report), load_baseline())
+    prediction_report = report.get("prediction_verification_evaluation") or {}
+    prediction_comparison = None
+    if with_baseline and prediction_report:
+        prediction_comparison = compare_prediction_to_baseline(
+            score_only_prediction_view(prediction_report),
+            load_prediction_baseline(),
+        )
     markdown = render_markdown_report(score_only_view(report), comparison)
+    if prediction_report:
+        pred_agg = prediction_report.get("aggregate") or {}
+        markdown += (
+            "\n\n## Prediction verification suite\n\n"
+            f"- Cases: **{pred_agg.get('cases')}**\n"
+            f"- Checks: **{pred_agg.get('checks_passed')}"
+            f"/{pred_agg.get('checks_total')}**\n"
+            f"- Score: **{float(pred_agg.get('score') or 0.0):.4f}**\n"
+            f"- Threshold: **{prediction_report.get('regression_threshold', 0.0)}** "
+            "(fixed; must not be relaxed for CI)\n"
+        )
+        if prediction_comparison is not None:
+            markdown += (
+                f"- Baseline delta: **{float(prediction_comparison.get('delta') or 0.0):+.4f}**\n"
+                f"- Regressed: **{bool(prediction_comparison.get('regressed'))}**\n"
+            )
     return {
         "report": report,
         "score_view": score_only_view(report),
         "comparison": comparison,
+        "prediction_comparison": prediction_comparison,
         "markdown": markdown,
     }
