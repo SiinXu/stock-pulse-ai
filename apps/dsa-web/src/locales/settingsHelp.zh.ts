@@ -1799,6 +1799,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 parse_financial_pdf 与 read_price_chart 的文件系统沙箱边界。'],
     notes: ['示例：/var/stockpulse/multimodal-uploads'],
   },
+  'settings.agent.CHART_READ_TIMEOUT_SECONDS': {
+    title: '图表阅读超时（秒）',
+    summary: 'read_price_chart 视觉调用的 1–120 秒硬超时；默认 30。',
+  },
   'settings.agent.OCR_AGENT_TOOL_ENABLED': {
     title: '启用离线 OCR Agent 工具',
     summary: '默认关闭的有界 Tesseract 文字提取。图片字节留在本机，但脱敏后的不可信文字会进入 Agent 上下文并可能发给远端模型；零远端出站需启用 LOCAL_ONLY_MODE。',

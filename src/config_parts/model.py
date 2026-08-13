@@ -111,9 +111,10 @@ class Config:
     kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
     kronos_weights_dir: Optional[str] = None
 
-    # === Optional multimodal PDF/chart Agent Tools (issue #253 phase 1) ===
+    # === Optional multimodal PDF/chart Agent Tools (issue #253) ===
     multimodal_agent_tools_enabled: bool = False
     multimodal_file_root: Optional[str] = None
+    chart_read_timeout_seconds: int = 30
     # === Optional offline OCR Agent Tool (issue #196) ===
     ocr_agent_tool_enabled: bool = False
     ocr_file_root: Optional[str] = None

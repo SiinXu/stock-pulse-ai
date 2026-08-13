@@ -1695,6 +1695,13 @@ class _ConfigLoadingMethods:
                 os.getenv('VALUATION_AGENT_TOOL_ENABLED'), default=False
             ),
             multimodal_file_root=os.getenv('MULTIMODAL_FILE_ROOT', '').strip() or None,
+            chart_read_timeout_seconds=parse_env_int(
+                os.getenv('CHART_READ_TIMEOUT_SECONDS'),
+                30,
+                field_name='CHART_READ_TIMEOUT_SECONDS',
+                minimum=1,
+                maximum=120,
+            ),
             ocr_agent_tool_enabled=parse_env_bool(
                 os.getenv('OCR_AGENT_TOOL_ENABLED'), default=False
             ),
