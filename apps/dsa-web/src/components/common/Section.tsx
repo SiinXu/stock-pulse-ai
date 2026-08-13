@@ -50,7 +50,7 @@ export const Section = forwardRef<HTMLElement, SectionProps>(({
       data-pattern="section"
       className={className}
     >
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col density-gap-stack sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           {eyebrow ? <div className="label-uppercase">{eyebrow}</div> : null}
           <Heading id={resolvedHeadingId} className={cn('text-base font-semibold text-foreground', eyebrow && 'mt-1')}>
@@ -58,7 +58,7 @@ export const Section = forwardRef<HTMLElement, SectionProps>(({
           </Heading>
           {description ? <div className="mt-1 text-sm leading-6 text-secondary-text">{description}</div> : null}
         </div>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex shrink-0 items-center density-gap-tools">{actions}</div> : null}
       </header>
       <div className={cn('mt-4', contentClassName)}>{children}</div>
     </Surface>

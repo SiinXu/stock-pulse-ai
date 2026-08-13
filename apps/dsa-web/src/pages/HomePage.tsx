@@ -417,7 +417,7 @@ const HomePage: React.FC = () => {
           <>
             <IconButton
               aria-label={t('home.refreshAttention')}
-              variant="outline"
+              variant="ghost"
               size="comfortable"
               isLoading={isLoading}
               onClick={handleRefresh}

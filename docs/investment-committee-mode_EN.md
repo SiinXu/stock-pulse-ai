@@ -49,7 +49,25 @@ When the mode is active and analysis completes, the dashboard may include:
 dashboard.committee_deliberation  # schema_version: committee-deliberation-v1
 ```
 
-The payload follows report-strata presentation conventions (gaps/conflicts, model inference, risks/counter-evidence, non-investment-advice disclaimer). Markdown / WeChat templates render it after `strategy_synthesis`. Historical reports without the field stay quiet.
+The payload is built **deterministically** from specialist opinions and
+`strategy_synthesis` (model-authored free text is stripped before attach).
+It follows report-strata presentation conventions and includes:
+
+| Field | Meaning |
+| --- | --- |
+| `members` | Per-persona stance (signal, confidence, reasoning excerpt) |
+| `conclusion` | Final signal + consensus level + confidence from `strategy_synthesis` |
+| `dissenting_opinions` | Reserved / opposing opinions (trace from opposing skills or opposing member signals) |
+| `divergence_points` | Canonical structured-disagreement rows: `source`, `kind`, `severity`, `participants`, and `summary_key`; legacy conflicts are mapped only when no versioned record exists |
+| `status` / `outcome` | Compact badges for export and UI |
+
+Markdown / WeChat / History / Notification render the section after
+`strategy_synthesis`. Historical reports without the field stay quiet.
+
+Report APIs also project a bounded copy into
+`details.structured_insights.committee_deliberation` for Web / Signal / History
+consumers. DecisionSignal `evidence.committee_deliberation` carries the same
+compact projection when committee mode produced a section.
 
 ## Cost and disclaimer
 
@@ -58,7 +76,9 @@ The payload follows report-strata presentation conventions (gaps/conflicts, mode
 
 ## Web UI
 
-Web settings / analysis UI for this mode is **out of scope for v1** (deferred). Config and API context fields ship first; a dedicated Web control is a follow-up.
+- **Settings / mode toggle**: still config / API context first (no new settings IA in this pass).
+- **Report / History**: `ReportStructuredInsights` renders committee conclusion, member stances, reserved opinions, and divergence when the payload is present.
+- **Signal Center**: signal detail reuses the same card from `evidence.committee_deliberation`.
 
 ## Rollback
 

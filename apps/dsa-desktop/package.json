@@ -20,7 +20,7 @@
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@types/node": "22.15.30",
-    "electron": "43.3.0",
+    "electron": "43.4.0",
     "electron-builder": "26.15.7",
     "eslint": "9.39.2",
     "globals": "16.4.0",
@@ -51,6 +51,7 @@
       "main.js",
       "backend-runtime.js",
       "desktop-env.js",
+      "cli-operator-guidance.js",
       "local-model-catalog.js",
       "assistant-preload.js",
       "model-pack.js",

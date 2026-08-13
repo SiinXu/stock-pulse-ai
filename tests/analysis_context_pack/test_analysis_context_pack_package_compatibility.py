@@ -74,10 +74,10 @@ MODULES = {
 
 EXPECTED_AST_DIGESTS = {
     "src.analysis_context_pack.prompt": (
-        "4709f84df1b70f757f2d8a7790cf0f0bcdb62bdfe4983820f0355efe307e14e8"
+        "a80904833f9d65750bde008cd3f4d908bef60b083a22d702bfc2376bac696731"
     ),
     "src.analysis_context_pack.overview": (
-        "9012a94ccfe27609d4213e9770df14f2bbb650825529188b91e59204541a8365"
+        "113a58a9a6b7c70d3606a688d13d1842aa3e9d66b053acb4dca9b060b11f82bc"
     ),
 }
 

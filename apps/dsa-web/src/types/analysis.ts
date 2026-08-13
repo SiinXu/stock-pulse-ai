@@ -485,6 +485,67 @@ export interface ReportStrategySynthesis {
   summaryParams?: ReportStrategySynthesisSummaryParams;
 }
 
+/** One committee persona stance from the real deliberation payload. */
+export interface ReportCommitteeMember {
+  personaId?: string;
+  displayName?: string;
+  agentName?: string;
+  signal?: string;
+  confidence?: number;
+  lensVerdict?: string;
+  reasoningExcerpt?: string;
+  invalid?: boolean;
+  invalidReason?: string;
+}
+
+/** Authoritative committee conclusion projected from strategy_synthesis. */
+export interface ReportCommitteeConclusion {
+  finalSignal?: string;
+  consensusLevel?: string;
+  conflictSeverity?: string;
+  confidence?: number;
+  conflictCount?: number;
+  weightedScore?: number;
+}
+
+/** Supporting or dissenting persona opinion. */
+export interface ReportCommitteeOpinion {
+  personaId?: string;
+  displayName?: string;
+  agentName?: string;
+  signal?: string;
+  confidence?: number;
+  reasoningExcerpt?: string;
+}
+
+/** Divergence point aligned with multi-strategy conflict records. */
+export interface ReportCommitteeDivergence {
+  source?: string;
+  conflictType?: string;
+  severity?: string;
+  participants?: string[];
+  descriptionKey?: string;
+}
+
+/**
+ * Investment Committee deliberation projected for report / Signal / History UI.
+ * Values are deterministic traces — never model-authored free text.
+ */
+export interface ReportCommitteeDeliberation {
+  schemaVersion?: string;
+  mode?: string;
+  source?: string;
+  status?: string;
+  outcome?: string;
+  members?: ReportCommitteeMember[];
+  conclusion?: ReportCommitteeConclusion;
+  supportingOpinions?: ReportCommitteeOpinion[];
+  dissentingOpinions?: ReportCommitteeOpinion[];
+  divergencePoints?: ReportCommitteeDivergence[];
+  personasInvalid?: string[];
+  personasTruncated?: string[];
+}
+
 /**
  * Optional additive contract shared by synchronous, task, and history reports.
  * Missing sections are expected for legacy, partial, or single-strategy runs.
@@ -494,6 +555,7 @@ export interface ReportStructuredInsights {
   phaseDecision?: ReportPhaseDecision;
   signalAttribution?: ReportSignalAttribution;
   strategySynthesis?: ReportStrategySynthesis;
+  committeeDeliberation?: ReportCommitteeDeliberation;
 }
 
 /** Details section */

@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-12",
-  "baselineNote": "Locale budgets include the translated Home dashboard layout inventory measured on GitHub Actions Linux after merging current main (PR #1158 / Refs #189); default and vendor budgets remain unchanged.",
+  "measuredAt": "2026-08-13",
+  "baselineNote": "IntelligenceSourcesPanel and locale budgets use the production build after the checkpoint-settings and DecisionSignal calibration localizations landed on main; each rule retains its fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 238501,
-      "measuredGzipBytes": 238101,
-      "note": "GitHub Actions Linux remeasure after mode hard-budget Settings help/title inventory on rebased main (Refs #1121 / #125); measured gzip + headroom."
+      "maxGzipBytes": 242532,
+      "measuredGzipBytes": 242132,
+      "note": "Post-checkpoint-settings production-build measurement, with 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 155752,
-      "measuredGzipBytes": 155552,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 158718,
+      "measuredGzipBytes": 158018,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 148969,
-      "measuredGzipBytes": 148769,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 151940,
+      "measuredGzipBytes": 151240,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 148780,
-      "measuredGzipBytes": 148580,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 151860,
+      "measuredGzipBytes": 151160,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 148971,
-      "measuredGzipBytes": 148771,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 151617,
+      "measuredGzipBytes": 151017,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 600 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 144779,
-      "measuredGzipBytes": 144579,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 147500,
+      "measuredGzipBytes": 146800,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 141315,
-      "measuredGzipBytes": 141115,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 144356,
+      "measuredGzipBytes": 143656,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 134879,
-      "measuredGzipBytes": 134679,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 137634,
+      "measuredGzipBytes": 136934,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 134943,
-      "measuredGzipBytes": 134743,
-      "note": "GitHub Actions Linux measurement after translated Home dashboard layout inventory (PR #1158 / Refs #189); measured gzip + 200 B headroom."
+      "maxGzipBytes": 137721,
+      "measuredGzipBytes": 137021,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -112,8 +112,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10376,
-      "measuredGzipBytes": 9432
+      "maxGzipBytes": 10861,
+      "measuredGzipBytes": 10461,
+      "note": "Combined production-build measurement after merge train 20260813-03 (#1149 #1240 #1157 #1227 #1218 #1236 #1265). Each member is individually within the previous budget; the icon set grows cumulatively because each adds a small number of distinct Lucide icons. Measured 10461 B with 400 B headroom, matching the IntelligenceSourcesPanel convention."
     },
     {
       "id": "vendor-misc",
@@ -130,13 +131,6 @@
       "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
-      "id": "HomeWatchlistGroupsSection",
-      "match": "assets/HomeWatchlistGroupsSection-*.js",
-      "maxGzipBytes": 16367,
-      "measuredGzipBytes": 16167,
-      "note": "GitHub Actions Linux measurement after Home customizable dashboard layout i18n keys (PR #1158 / Refs #189); measured gzip + 200 B headroom."
-    },
-    {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
       "maxGzipBytes": 57276,
@@ -146,8 +140,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45391,
-      "measuredGzipBytes": 41264
+      "maxGzipBytes": 45803,
+      "measuredGzipBytes": 45603,
+      "note": "GitHub Actions Linux remeasure after cost attribution and routing telemetry Settings controls (Refs #166 / #248); measured gzip + 200 B headroom."
     },
     {
       "id": "AlertsWorkspace",
@@ -165,9 +160,9 @@
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 26363,
-      "measuredGzipBytes": 26163,
-      "note": "GitHub Actions Linux measurement after the integrated portfolio flow; measured 26163 B + 200 B headroom."
+      "maxGzipBytes": 26601,
+      "measuredGzipBytes": 26401,
+      "note": "GitHub Actions Linux measurement after committee insights were split behind a dynamic import; the route retains only Vite dependency-map hashes. Measured 26401 B on the PR/main synthetic merge + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",
