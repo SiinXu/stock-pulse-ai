@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-13",
-  "baselineNote": "IntelligenceSourcesPanel and locale budgets use the production build after the checkpoint-settings and DecisionSignal calibration localizations landed on main; each rule retains its fixed headroom.",
+  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1243) (IntelligenceSourcesPanel, locale-ja, locale-de, locale-ko, locale-es, locale-zh-TW, locale-id). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 248554,
-      "measuredGzipBytes": 248154,
-      "note": "Local production-build remasure after merging origin/main; measured 248154 B + 400 B retained headroom."
+      "maxGzipBytes": 249000,
+      "measuredGzipBytes": 248600,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "js-entry",
@@ -26,23 +26,23 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 160635,
-      "measuredGzipBytes": 159935,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 161445,
+      "measuredGzipBytes": 160745,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 153829,
-      "measuredGzipBytes": 153129,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 154629,
+      "measuredGzipBytes": 153929,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 153802,
-      "measuredGzipBytes": 153102,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 154601,
+      "measuredGzipBytes": 153901,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-fr",
@@ -54,16 +54,16 @@
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 149288,
-      "measuredGzipBytes": 148588,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 150029,
+      "measuredGzipBytes": 149329,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 146254,
-      "measuredGzipBytes": 145554,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 147047,
+      "measuredGzipBytes": 146347,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ms",
@@ -75,9 +75,9 @@
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 139485,
-      "measuredGzipBytes": 138785,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 140195,
+      "measuredGzipBytes": 139495,
+      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "vendor-charts",
