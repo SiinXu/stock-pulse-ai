@@ -20,6 +20,59 @@ function toUrlPath(fileName: string): string {
   return normalized.startsWith('/') ? normalized : `/${normalized}`
 }
 
+type PrecacheBundleItem = {
+  type?: string
+  isEntry?: boolean
+  imports?: readonly string[]
+  viteMetadata?: { importedCss?: Iterable<string> }
+}
+
+/**
+ * Collect the entry chunk, its static import graph, and associated CSS.
+ * Lazy/dynamic route chunks stay out of the install precache.
+ */
+export function collectSyncShellAssetPaths(
+  bundle: Record<string, PrecacheBundleItem>,
+): string[] {
+  const urls = new Set<string>()
+  const visited = new Set<string>()
+
+  const visit = (fileName: string) => {
+    const normalized = fileName.replace(/\\/g, '/')
+    if (visited.has(normalized)) return
+    visited.add(normalized)
+
+    const base = path.posix.basename(normalized)
+    if (NEVER_PRECACHE_BASENAMES.has(base)) return
+    if (normalized.endsWith('.map')) return
+
+    urls.add(toUrlPath(normalized))
+
+    const item = bundle[fileName] ?? bundle[normalized]
+    if (!item || item.type !== 'chunk') return
+
+    const importedCss = item.viteMetadata?.importedCss
+    if (importedCss) {
+      for (const cssFile of importedCss) {
+        const cssNormalized = cssFile.replace(/\\/g, '/')
+        if (cssNormalized.endsWith('.map')) continue
+        urls.add(toUrlPath(cssNormalized))
+      }
+    }
+    for (const imported of item.imports ?? []) {
+      visit(imported)
+    }
+  }
+
+  for (const [fileName, item] of Object.entries(bundle)) {
+    if (item.type === 'chunk' && item.isEntry) {
+      visit(fileName)
+    }
+  }
+
+  return Array.from(urls)
+}
+
 function buildServiceWorkerSource(precacheUrls: string[], cacheVersion: string): string {
   const precacheLiteral = JSON.stringify(precacheUrls, null, 2)
   const cacheNameLiteral = JSON.stringify(`stockpulse-shell-${cacheVersion}`)
@@ -175,9 +228,10 @@ export function shellPwaPlugin(): Plugin {
       outDir = config.build.outDir
     },
     writeBundle(_options, bundle) {
-      // Precache only the install shell: HTML, entry CSS/JS, icons, manifest.
-      // Other hashed /assets/* are still cache-first on first network hit
-      // (see decideStrategy), never API or market index data.
+      // Precache the install shell: HTML, entry CSS/JS, sync vendor chunks
+      // required to boot the shell, icons, and manifest.
+      // Other hashed /assets/* (including lazy routes) stay cache-first on
+      // first network hit (see decideStrategy), never API or market index data.
       const urls = new Set<string>([
         '/',
         '/index.html',
@@ -189,16 +243,8 @@ export function shellPwaPlugin(): Plugin {
         '/vite.svg',
       ])
 
-      for (const fileName of Object.keys(bundle)) {
-        const normalized = fileName.replace(/\\/g, '/')
-        const base = path.posix.basename(normalized)
-        if (NEVER_PRECACHE_BASENAMES.has(base)) continue
-        if (normalized.endsWith('.map')) continue
-        // Entry chunks only (index-*.js / index-*.css); lazy route chunks stay
-        // cache-first at runtime when requested.
-        if (/^assets\/index-[^/]+\.(js|css)$/.test(normalized)) {
-          urls.add(toUrlPath(normalized))
-        }
+      for (const assetPath of collectSyncShellAssetPaths(bundle)) {
+        urls.add(assetPath)
       }
 
       // Explicitly ensure market autocomplete index is never precached even if
