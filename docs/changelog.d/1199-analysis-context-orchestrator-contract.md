@@ -1,0 +1,1 @@
+- [Fixed] Preserve orchestrator public-surface and committee-mode test contracts after synchronizing analysis-context snapshots with the latest baseline.

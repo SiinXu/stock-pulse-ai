@@ -43,9 +43,8 @@ class AuthApiTestCase(unittest.TestCase):
     """Integration tests for /api/v1/auth/* and API protection."""
 
     def setUp(self) -> None:
+        self.original_environ = dict(os.environ)
         _reset_auth_globals()
-        self.original_env_file = os.environ.get("ENV_FILE")
-        self.original_database_path = os.environ.get("DATABASE_PATH")
         self.temp_dir = tempfile.TemporaryDirectory()
         self.data_dir = Path(self.temp_dir.name)
         self.env_path = self.data_dir / ".env"
@@ -68,14 +67,11 @@ class AuthApiTestCase(unittest.TestCase):
         self.data_dir_patcher.stop()
         _reset_auth_globals()
         Config.reset_instance()
-        if self.original_env_file is None:
-            os.environ.pop("ENV_FILE", None)
-        else:
-            os.environ["ENV_FILE"] = self.original_env_file
-        if self.original_database_path is None:
-            os.environ.pop("DATABASE_PATH", None)
-        else:
-            os.environ["DATABASE_PATH"] = self.original_database_path
+        # Config loads the temporary dotenv file into process state. Restore
+        # the complete boundary so later tests cannot inherit auth settings or
+        # any other keys introduced by that file.
+        os.environ.clear()
+        os.environ.update(self.original_environ)
         self.temp_dir.cleanup()
 
     def _read_auth_enabled_from_env(self) -> bool:
