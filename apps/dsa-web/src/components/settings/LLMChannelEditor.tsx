@@ -80,6 +80,17 @@ import {
 } from './modelSourcesRoute';
 
 const ConnectionModal = lazy(() => import('./LLMConnectionModal'));
+const DesktopCliVisibilityPanel = lazy(() => import('./DesktopCliVisibilityPanel'));
+
+function isDesktopCliGuidanceAvailable() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const desktopWindow = window as Window & {
+    dsaDesktop?: { getEnvDiagnostics?: unknown };
+  };
+  return typeof desktopWindow.dsaDesktop?.getEnvDiagnostics === 'function';
+}
 
 export type {
   ModelReferenceReplacement,
@@ -1402,6 +1413,12 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
             </p>
           ) : null}
         </section>
+      ) : null}
+
+      {isDesktopCliGuidanceAvailable() ? (
+        <Suspense fallback={null}>
+          <DesktopCliVisibilityPanel language={language} />
+        </Suspense>
       ) : null}
 
       {!draftValid ? (

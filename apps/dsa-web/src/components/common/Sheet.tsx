@@ -65,12 +65,12 @@ export const Sheet: React.FC<SheetProps> = ({
         tabIndex={-1}
         data-overlay-dialog="true"
         data-sheet-variant="filter"
-        className="flex max-h-[calc(100dvh-0.5rem)] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-t-xl border border-b-0 border-border bg-elevated shadow-2xl focus:outline-none sm:max-h-[85dvh]"
+        className="flex max-h-[calc(100dvh-0.5rem)] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-t-xl border border-b-0 border-border bg-elevated shadow-elevation-overlay focus:outline-none sm:max-h-[85dvh]"
         onClick={(event) => event.stopPropagation()}
       >
         <header
           data-overlay-slot="header"
-          className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4"
+          className="flex shrink-0 items-start justify-between density-gap-header border-b border-border density-overlay-pad-x density-overlay-pad-y"
         >
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-foreground">{title}</h2>
@@ -89,7 +89,7 @@ export const Sheet: React.FC<SheetProps> = ({
             <X aria-hidden="true" />
           </IconButton>
         </header>
-        <div data-overlay-slot="body" className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div data-overlay-slot="body" className="min-h-0 flex-1 overflow-y-auto density-surface-pad-md">
           {children}
         </div>
         <footer

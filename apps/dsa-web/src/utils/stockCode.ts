@@ -13,10 +13,19 @@
  *   hk1810      → HK01810    1810.HK     → HK01810
  *   7203.T      → 7203.T     005930.KS   → 005930.KS
  *   AAPL        → AAPL       TSLA        → TSLA
+ *   crypto:BTC  → CRYPTO:BTC (explicit namespace only; bare BTC stays BTC)
  */
 export function normalizeStockCode(stockCode: string): string {
   const code = stockCode.trim();
   const upper = code.toUpperCase();
+
+  // Explicit crypto namespace — preserve ticker body after the separator.
+  if (upper.startsWith('CRYPTO:') && upper.length > 'CRYPTO:'.length) {
+    const ticker = upper.slice('CRYPTO:'.length);
+    if (/^[A-Z0-9][A-Z0-9._-]{0,31}$/.test(ticker)) {
+      return `CRYPTO:${ticker}`;
+    }
+  }
 
   // Normalize HK prefix to a canonical 5-digit form (e.g. hk1810 → HK01810)
   if (upper.startsWith('HK') && !upper.startsWith('HK.')) {

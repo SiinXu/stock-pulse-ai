@@ -223,6 +223,69 @@ export interface PaperTradeCreatedResponse {
   priceSource: 'manual' | 'latest_close' | string;
 }
 
+/** Process-only paper decision quality (Issue #1134); not a return score. */
+export interface PaperDecisionQualityReason {
+  dimension?: string | null;
+  code: string;
+  message: string;
+}
+
+export interface PaperDecisionQualityDimension {
+  status: 'ok' | 'unavailable';
+  score?: number | null;
+  reasons?: PaperDecisionQualityReason[];
+  inputs?: Record<string, number>;
+}
+
+export interface PaperDecisionQualityItem {
+  tradeId?: number | null;
+  symbol?: string | null;
+  market?: string | null;
+  side?: string | null;
+  tradeDate?: string | null;
+  quantity?: number | null;
+  price?: number | null;
+  linkedSignalId?: number | null;
+  processScore: number;
+  dimensions: Record<string, PaperDecisionQualityDimension>;
+  effectiveWeights?: Record<string, number>;
+  reasons?: PaperDecisionQualityReason[];
+  evidence?: Record<string, unknown>;
+  scoreKind?: 'process';
+  formulaVersion: string;
+}
+
+export interface PaperDecisionQualityAggregate {
+  sampleSize: number;
+  processScore?: number | null;
+  status: 'ok' | 'empty';
+  dimensions?: Record<string, { score?: number | null; status?: string; sampleSize?: number | null }>;
+  minProcessScore?: number | null;
+  maxProcessScore?: number | null;
+}
+
+export interface PaperDecisionQualityResponse {
+  scoreKind: 'process';
+  formulaVersion: string;
+  disclaimer: string;
+  accountId: number;
+  accountType: 'paper';
+  asOf: string;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  sampleSize: number;
+  totalTradeCount: number;
+  truncated: boolean;
+  aggregate: PaperDecisionQualityAggregate;
+  items: PaperDecisionQualityItem[];
+  divisionOfLabor: {
+    thisIssue: number;
+    owns: string;
+    doesNotOwn: string;
+    outcomeOwnerIssue: number;
+  };
+}
+
 export interface PortfolioCashLedgerCreateRequest {
   operationId: string;
   accountId: number;
