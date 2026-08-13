@@ -11,15 +11,18 @@ from __future__ import annotations
 import json
 import os
 from datetime import date, datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 
 from src.config import Config
 from src.agent.memory_isolation import assert_untrusted_isolation
+from src.core.config_registry import get_field_definition
 from src.services.decision_memory_service import (
     DecisionReflection,
     DecisionMemoryService,
     PastSignalRecall,
+    PatternCalibrationBucket,
     admit_decision_memory,
     format_decision_memory_prompt_section,
     render_decision_memory_report_section,
@@ -416,6 +419,36 @@ def test_prompt_and_report_include_signal_provenance(isolated_db) -> None:
     assert f"Source signal ids: {signal_id}" in report
 
 
+def test_real_analyzer_prompt_consumes_isolated_decision_memory(isolated_db) -> None:
+    """Prove the production prompt formatter consumes the admitted section."""
+    from src.analyzer import GeminiAnalyzer
+
+    reflection = _build_single(isolated_db)
+    memory_section = format_decision_memory_prompt_section(
+        reflection,
+        report_language="en",
+    )
+    analyzer = GeminiAnalyzer.__new__(GeminiAnalyzer)
+    analyzer._get_skill_prompt_sections = lambda: ("", "", False)
+    prompt = analyzer._format_prompt(
+        {
+            "code": "600519",
+            "stock_name": "Test Co",
+            "date": "2024-06-01",
+            "today": {},
+            "decision_memory_reflection_prompt": memory_section,
+        },
+        "Test Co",
+        report_language="en",
+    )
+
+    assert "BEGIN_UNTRUSTED_MEMORY_DATA" in prompt
+    assert f"signal_id={reflection.source_signal_ids[0]}" in prompt
+    assert prompt.index("Historical Decision Reflection") < prompt.index(
+        "技术面数据"
+    )
+
+
 def test_lookback_quota_caps_admitted_calls(isolated_db) -> None:
     for _ in range(6):
         _seed_signal_with_outcome(isolated_db, outcome="hit", stock_return_pct=3.0)
@@ -555,3 +588,195 @@ def test_prompt_never_includes_freeform_signal_reason(isolated_db) -> None:
     assert poison not in report
     assert "sell everything" not in prompt.lower()
 
+
+def test_renderers_revalidate_forged_admitted_flag_and_numeric_edges() -> None:
+    """The public dataclass flag is audit metadata, never a trust bypass."""
+    forged = DecisionReflection(
+        stock_code="600519",
+        market="cn",
+        lookback=40,
+        min_samples=5,
+        window_start=date(2024, 5, 1),
+        window_end=date(2024, 5, 2),
+        same_stock_total=999,
+        same_stock_hits=999,
+        same_stock_misses=0,
+        same_stock_neutrals=0,
+        same_stock_hit_rate_pct=100.0,
+        recent_calls=(
+            PastSignalRecall(
+                signal_id=7,
+                created_at=_FIXED_NOW,
+                action="buy",
+                horizon="3d",
+                outcome="hit",
+                stock_return_pct=float("inf"),
+            ),
+            PastSignalRecall(
+                signal_id=8,
+                created_at=_FIXED_NOW,
+                action="forged_action",
+                horizon="3d",
+                outcome="hit",
+                stock_return_pct=5.0,
+            ),
+        ),
+        pattern_calibration=(
+            PatternCalibrationBucket(
+                action="buy", hit_rate_pct=float("inf"), sample_size=5
+            ),
+            PatternCalibrationBucket(action="buy", hit_rate_pct=50.0, sample_size=1),
+            PatternCalibrationBucket(action="sell", hit_rate_pct=50.0, sample_size=10),
+        ),
+        source_signal_ids=(999,),
+        admitted=True,
+    )
+
+    prompt = format_decision_memory_prompt_section(forged, report_language="en")
+    report = render_decision_memory_report_section(forged, report_language="en")
+
+    for rendered in (prompt, report):
+        assert "signal_id=7" in rendered
+        assert "signal_id=8" not in rendered
+        assert "999" not in rendered
+        assert "forged_action" not in rendered
+        assert "inf" not in rendered.lower()
+        assert "Track record for these kinds of call" not in rendered
+
+
+def test_admission_hard_caps_hand_built_call_lists() -> None:
+    calls = tuple(
+        PastSignalRecall(
+            signal_id=signal_id,
+            created_at=_FIXED_NOW - timedelta(minutes=signal_id),
+            action="buy",
+            horizon="3d",
+            outcome="hit",
+            stock_return_pct=1.0,
+        )
+        for signal_id in range(1, 46)
+    )
+    raw = DecisionReflection(
+        stock_code="600519",
+        market="cn",
+        lookback=40,
+        min_samples=1,
+        window_start=date(2024, 5, 1),
+        window_end=date(2024, 5, 2),
+        same_stock_total=len(calls),
+        same_stock_hits=len(calls),
+        same_stock_misses=0,
+        same_stock_neutrals=0,
+        same_stock_hit_rate_pct=100.0,
+        recent_calls=calls,
+        admitted=True,
+    )
+
+    admitted = admit_decision_memory(raw)
+
+    assert admitted is not None
+    assert len(admitted.recent_calls) == 40
+    assert admitted.source_signal_ids == tuple(range(1, 41))
+
+
+@pytest.mark.parametrize(
+    ("lookback", "min_age_days", "min_samples"),
+    [
+        (True, 3, 5),
+        (1.5, 3, 5),
+        (41, 3, 5),
+        (5, 366, 5),
+        (5, 3, 1001),
+    ],
+)
+def test_builder_rejects_non_integer_and_out_of_registry_bounds(
+    lookback, min_age_days, min_samples
+) -> None:
+    assert (
+        DecisionMemoryService().build_reflection(
+            stock_code="600519",
+            market="cn",
+            lookback=lookback,
+            min_age_days=min_age_days,
+            min_samples=min_samples,
+            now=_FIXED_NOW,
+        )
+        is None
+    )
+
+
+def test_lookback_runtime_loader_and_registry_share_the_hard_cap() -> None:
+    field = get_field_definition("DECISION_MEMORY_LOOKBACK")
+    assert field["validation"] == {"min": 0, "max": 40}
+
+    with (
+        patch("src.config.setup_env"),
+        patch.object(Config, "_parse_litellm_yaml", return_value=[]),
+        patch.object(Config, "_parse_stock_email_groups", return_value=[]),
+        patch.dict(
+            os.environ,
+            {"STOCK_LIST": "600519", "DECISION_MEMORY_LOOKBACK": "41"},
+            clear=True,
+        ),
+    ):
+        config = Config._load_from_env()
+
+    assert config.decision_memory_lookback == 40
+
+
+def test_nonfinite_persisted_return_never_reaches_output(isolated_db) -> None:
+    _seed_signal_with_outcome(
+        isolated_db,
+        outcome="hit",
+        stock_return_pct=float("-inf"),
+    )
+
+    reflection = _build(isolated_db, min_samples=1)
+
+    assert reflection is not None
+    assert reflection.recent_calls[0].stock_return_pct is None
+    prompt = format_decision_memory_prompt_section(reflection, report_language="en")
+    report = render_decision_memory_report_section(reflection, report_language="en")
+    assert "inf" not in prompt.lower()
+    assert "inf" not in report.lower()
+
+
+def test_malformed_optional_pattern_stats_do_not_erase_same_stock_memory(
+    isolated_db,
+) -> None:
+    class MalformedOutcomeStats:
+        def get_stats(self):
+            return {
+                "breakdowns": {
+                    "action": [
+                        {
+                            "value": "buy",
+                            "hit": "not-an-int",
+                            "miss": 0,
+                            "hit_rate_pct": 100.0,
+                        },
+                        {
+                            "value": "buy",
+                            "hit": 5,
+                            "miss": 0,
+                            "hit_rate_pct": float("nan"),
+                        },
+                    ]
+                }
+            }
+
+    _seed_signal_with_outcome(isolated_db, outcome="hit")
+    reflection = DecisionMemoryService(
+        outcome_service=MalformedOutcomeStats()
+    ).build_reflection(
+        stock_code="600519",
+        market="cn",
+        lookback=5,
+        min_age_days=3,
+        min_samples=1,
+        now=_FIXED_NOW,
+    )
+
+    assert reflection is not None
+    assert reflection.source_signal_ids
+    assert reflection.pattern_calibration == tuple()

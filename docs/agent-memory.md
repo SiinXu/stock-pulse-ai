@@ -63,7 +63,9 @@ must:
 
 1. **Admit** only size-capped structured completed outcomes with `signal_id`
    provenance (`admit_decision_memory`); free-form signal reason text is excluded.
-   Same-stock hit-rate and listed calls use the same lookback admitted set.
+   Same-stock hit-rate and listed calls use the same lookback admitted set. Every
+   renderer re-runs admission (the dataclass `admitted` flag is not authority),
+   rejects non-finite numerics, and enforces the configured bounds and action enums.
 2. **Isolate** the prompt block via `isolate_untrusted_memory_body` so history is
    non-authoritative data.
 3. Remain **toggleable** (`DECISION_MEMORY_ENABLED` / per-request `use_memory`).

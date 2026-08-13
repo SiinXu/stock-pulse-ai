@@ -37,8 +37,9 @@ module reuses them and never re-derives what counts as a hit.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import logging
+import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger(__name__)
@@ -59,8 +60,18 @@ _PROMPT_GUARDRAIL_EN = (
 _MAX_SIGNAL_SCAN = 40
 _MAX_SCAN_MULTIPLIER = 8
 _MAX_PATTERN_BUCKETS = 3
+_MAX_LOOKBACK = 40
+_MAX_MIN_AGE_DAYS = 365
+_MAX_MIN_SAMPLES = 1_000
+_MAX_SIGNAL_ID = (2**63) - 1
+_MAX_PATTERN_SAMPLE_SIZE = 1_000_000_000
+_MAX_ABS_RETURN_PCT = 1_000_000.0
 _MAX_PROMPT_CHARS = 6_000
 _ADMITTED_OUTCOMES = frozenset({"hit", "miss", "neutral"})
+_ADMITTED_ACTIONS = frozenset(
+    {"buy", "add", "hold", "reduce", "sell", "watch", "avoid", "alert"}
+)
+_ADMITTED_HORIZONS = frozenset({"1d", "3d", "5d", "10d"})
 _SAFE_ACTION_RE_ALPHABET = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
 )
@@ -141,6 +152,27 @@ def _safe_token(value: Optional[str], alphabet: frozenset, *, max_len: int = 32)
     return "".join(ch for ch in text_value if ch in alphabet)[:max_len]
 
 
+def _bounded_plain_int(
+    value: Any,
+    *,
+    minimum: int,
+    maximum: int,
+) -> Optional[int]:
+    """Return a bounded real int, rejecting bools and coercion surprises."""
+
+    if type(value) is not int or value < minimum or value > maximum:
+        return None
+    return value
+
+
+def _valid_window(reflection: DecisionReflection) -> Optional[Tuple[date, date]]:
+    start = getattr(reflection, "window_start", None)
+    end = getattr(reflection, "window_end", None)
+    if type(start) is not date or type(end) is not date or start > end:
+        return None
+    return start, end
+
+
 def admit_decision_memory(
     reflection: Optional[DecisionReflection],
     *,
@@ -155,37 +187,74 @@ def admit_decision_memory(
     if reflection is None:
         return None
 
-    limit = max_calls if max_calls is not None else int(reflection.lookback)
-    if limit <= 0:
+    lookback = _bounded_plain_int(
+        getattr(reflection, "lookback", None),
+        minimum=1,
+        maximum=_MAX_LOOKBACK,
+    )
+    min_samples = _bounded_plain_int(
+        getattr(reflection, "min_samples", None),
+        minimum=1,
+        maximum=_MAX_MIN_SAMPLES,
+    )
+    if lookback is None or min_samples is None:
+        return None
+    limit = min(lookback, _MAX_SIGNAL_SCAN)
+    if max_calls is not None:
+        requested_limit = _bounded_plain_int(
+            max_calls,
+            minimum=1,
+            maximum=_MAX_LOOKBACK,
+        )
+        if requested_limit is None:
+            return None
+        limit = min(limit, requested_limit)
+
+    raw_calls = getattr(reflection, "recent_calls", None)
+    if not isinstance(raw_calls, (list, tuple)):
         return None
 
     admitted_calls: List[PastSignalRecall] = []
     seen_ids: set = set()
-    for call in reflection.recent_calls:
+    for call in raw_calls:
         if len(admitted_calls) >= limit:
             break
         signal_id = getattr(call, "signal_id", None)
-        if type(signal_id) is not int or signal_id <= 0:
+        if (
+            type(signal_id) is not int
+            or signal_id <= 0
+            or signal_id > _MAX_SIGNAL_ID
+        ):
             continue
         if signal_id in seen_ids:
             continue
         outcome = str(getattr(call, "outcome", "") or "")
         if outcome not in _ADMITTED_OUTCOMES:
             continue
-        action = _safe_token(getattr(call, "action", None), _SAFE_ACTION_RE_ALPHABET)
-        if not action:
+        action = _safe_token(
+            getattr(call, "action", None), _SAFE_ACTION_RE_ALPHABET
+        ).lower()
+        if action not in _ADMITTED_ACTIONS:
             continue
         horizon_raw = getattr(call, "horizon", None)
-        horizon = _safe_token(horizon_raw, _SAFE_HORIZON_RE_ALPHABET) or None
+        horizon = _safe_token(
+            horizon_raw, _SAFE_HORIZON_RE_ALPHABET
+        ).lower() or None
+        if horizon not in _ADMITTED_HORIZONS:
+            horizon = None
         ret = getattr(call, "stock_return_pct", None)
         if ret is not None:
             try:
                 ret_f = float(ret)
-                if ret_f != ret_f:
+                if (
+                    not math.isfinite(ret_f)
+                    or ret_f < -100.0
+                    or ret_f > _MAX_ABS_RETURN_PCT
+                ):
                     ret = None
                 else:
                     ret = ret_f
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 ret = None
         created = getattr(call, "created_at", None)
         if not isinstance(created, datetime):
@@ -203,20 +272,38 @@ def admit_decision_memory(
         )
         seen_ids.add(signal_id)
 
+    if not admitted_calls:
+        return None
+
+    admitted_actions = {call.action for call in admitted_calls}
+    raw_patterns = getattr(reflection, "pattern_calibration", None)
+    if not isinstance(raw_patterns, (list, tuple)):
+        raw_patterns = ()
     admitted_patterns: List[PatternCalibrationBucket] = []
-    for bucket in reflection.pattern_calibration[:_MAX_PATTERN_BUCKETS]:
-        action = _safe_token(getattr(bucket, "action", None), _SAFE_ACTION_RE_ALPHABET)
+    seen_pattern_actions: set = set()
+    for bucket in raw_patterns:
+        if len(admitted_patterns) >= _MAX_PATTERN_BUCKETS:
+            break
+        action = _safe_token(
+            getattr(bucket, "action", None), _SAFE_ACTION_RE_ALPHABET
+        ).lower()
         sample_size = getattr(bucket, "sample_size", 0)
         rate = getattr(bucket, "hit_rate_pct", None)
-        if not action or type(sample_size) is not int or sample_size < 1:
+        if (
+            action not in admitted_actions
+            or action in seen_pattern_actions
+            or type(sample_size) is not int
+            or sample_size < min_samples
+            or sample_size > _MAX_PATTERN_SAMPLE_SIZE
+        ):
             continue
         if rate is None:
             continue
         try:
             rate_f = float(rate)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             continue
-        if rate_f != rate_f:
+        if not math.isfinite(rate_f) or rate_f < 0.0 or rate_f > 100.0:
             continue
         admitted_patterns.append(
             PatternCalibrationBucket(
@@ -225,18 +312,13 @@ def admit_decision_memory(
                 sample_size=sample_size,
             )
         )
-
-    # No per-call provenance → do not inject. Aggregate-only blocks without
-    # source_signal_ids are rejected so every reflection stays auditable.
-    if not admitted_calls:
-        return None
+        seen_pattern_actions.add(action)
 
     source_ids = tuple(call.signal_id for call in admitted_calls)
     hits = sum(1 for call in admitted_calls if call.outcome == "hit")
     misses = sum(1 for call in admitted_calls if call.outcome == "miss")
     neutrals = sum(1 for call in admitted_calls if call.outcome == "neutral")
     decided = hits + misses
-    min_samples = max(1, int(reflection.min_samples))
     hit_rate: Optional[float]
     if decided >= min_samples:
         hit_rate = round(100.0 * hits / decided, 2)
@@ -248,8 +330,9 @@ def admit_decision_memory(
 
     # Keep builder window when the listed set is unchanged; otherwise fall back
     # to admitted call created_at dates.
-    if len(admitted_calls) == len(reflection.recent_calls):
-        window_start, window_end = reflection.window_start, reflection.window_end
+    trusted_window = _valid_window(reflection)
+    if len(admitted_calls) == len(raw_calls) and trusted_window is not None:
+        window_start, window_end = trusted_window
     else:
         dates = [
             call.created_at.date()
@@ -259,12 +342,14 @@ def admit_decision_memory(
         if dates:
             window_start, window_end = min(dates), max(dates)
         else:
-            window_start, window_end = reflection.window_start, reflection.window_end
+            if trusted_window is None:
+                return None
+            window_start, window_end = trusted_window
 
     return DecisionReflection(
         stock_code=str(reflection.stock_code or ""),
         market=str(reflection.market or ""),
-        lookback=int(reflection.lookback),
+        lookback=lookback,
         min_samples=min_samples,
         window_start=window_start,
         window_end=window_end,
@@ -421,13 +506,32 @@ class DecisionMemoryService:
         from src.services.decision_signal_service import DecisionSignalService
         from src.storage import utc_naive_now
 
-        if lookback <= 0:
+        lookback_n = _bounded_plain_int(
+            lookback,
+            minimum=0,
+            maximum=_MAX_LOOKBACK,
+        )
+        min_age = _bounded_plain_int(
+            min_age_days,
+            minimum=0,
+            maximum=_MAX_MIN_AGE_DAYS,
+        )
+        min_samples_n = _bounded_plain_int(
+            min_samples,
+            minimum=1,
+            maximum=_MAX_MIN_SAMPLES,
+        )
+        if lookback_n is None or min_age is None or min_samples_n is None:
+            return None
+        if lookback_n == 0:
+            return None
+        if now is not None and not isinstance(now, datetime):
             return None
 
         reference_now = now or utc_naive_now()
-        min_age = max(0, int(min_age_days))
+        if reference_now.tzinfo is not None:
+            reference_now = reference_now.astimezone(timezone.utc).replace(tzinfo=None)
         cutoff = reference_now - timedelta(days=min_age)
-        lookback_n = max(1, int(lookback))
         scan_size = min(
             _MAX_SIGNAL_SCAN,
             max(lookback_n * _MAX_SCAN_MULTIPLIER, lookback_n),
@@ -487,7 +591,6 @@ class DecisionMemoryService:
         misses = sum(1 for call in recent_calls if call.outcome == "miss")
         neutrals = sum(1 for call in recent_calls if call.outcome == "neutral")
         decided = hits + misses
-        min_samples_n = max(1, int(min_samples))
         # Guardrail 1: suppress the rate when decided samples are below threshold.
         hit_rate = (
             round(100.0 * hits / decided, 2) if decided >= min_samples_n else None
@@ -587,10 +690,13 @@ class DecisionMemoryService:
             signal = signal_by_id.get(sid)
             if signal is None:
                 continue
+            created_at = getattr(signal, "created_at", None)
+            if not isinstance(created_at, datetime):
+                continue
             calls.append(
                 PastSignalRecall(
                     signal_id=sid,
-                    created_at=getattr(signal, "created_at", None) or datetime.min,
+                    created_at=created_at,
                     action=str(getattr(signal, "action", "") or ""),
                     horizon=getattr(row, "horizon", None),
                     outcome=str(getattr(row, "outcome", "") or ""),
@@ -598,7 +704,13 @@ class DecisionMemoryService:
                     memorable=sid in memorable,
                 )
             )
-        calls.sort(key=lambda c: (not c.memorable, -c.created_at.timestamp()))
+        calls.sort(
+            key=lambda c: (
+                not c.memorable,
+                -c.created_at.timestamp(),
+                -c.signal_id,
+            )
+        )
         return tuple(calls)
 
     def _pattern_calibration(
@@ -629,20 +741,52 @@ class DecisionMemoryService:
             )
             return tuple()
 
-        threshold = max(1, int(min_samples))
+        threshold = _bounded_plain_int(
+            min_samples,
+            minimum=1,
+            maximum=_MAX_MIN_SAMPLES,
+        )
+        if threshold is None or not isinstance(stats, dict):
+            return tuple()
+        breakdowns = stats.get("breakdowns")
+        if not isinstance(breakdowns, dict):
+            return tuple()
+        action_rows = breakdowns.get("action")
+        if not isinstance(action_rows, (list, tuple)):
+            return tuple()
         buckets: List[PatternCalibrationBucket] = []
-        for bucket in stats.get("breakdowns", {}).get("action", []) or []:
+        for bucket in action_rows:
+            if not isinstance(bucket, dict):
+                continue
             action = str(bucket.get("value") or "")
             if action not in actions:
                 continue
-            decided = int(bucket.get("hit", 0)) + int(bucket.get("miss", 0))
+            hit = _bounded_plain_int(
+                bucket.get("hit", 0),
+                minimum=0,
+                maximum=_MAX_PATTERN_SAMPLE_SIZE,
+            )
+            miss = _bounded_plain_int(
+                bucket.get("miss", 0),
+                minimum=0,
+                maximum=_MAX_PATTERN_SAMPLE_SIZE,
+            )
+            if hit is None or miss is None:
+                continue
+            decided = hit + miss
             rate = bucket.get("hit_rate_pct")
             if decided < threshold or rate is None:
+                continue
+            try:
+                rate_f = float(rate)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if not math.isfinite(rate_f) or rate_f < 0.0 or rate_f > 100.0:
                 continue
             buckets.append(
                 PatternCalibrationBucket(
                     action=action,
-                    hit_rate_pct=float(rate),
+                    hit_rate_pct=rate_f,
                     sample_size=decided,
                 )
             )
@@ -727,7 +871,10 @@ def _reflection_lines(reflection: DecisionReflection, lang: str) -> List[str]:
                 f"call(s) — too few decided samples (< {reflection.min_samples}) for a reliable rate."
             )
         if reflection.recent_calls:
-            lines.append("- Recent evaluated calls (newest first; provenance in brackets):")
+            lines.append(
+                "- Recent evaluated calls (memorable first, then newest; "
+                "provenance in brackets):"
+            )
             for call in reflection.recent_calls:
                 horizon = f" / {call.horizon}" if call.horizon else ""
                 star = " *(memorable)*" if call.memorable else ""
@@ -750,7 +897,7 @@ def _reflection_lines(reflection: DecisionReflection, lang: str) -> List[str]:
         if reflection.truncated:
             lines.append(
                 f"- Note: same-stock rate and list both use the lookback={reflection.lookback} "
-                f"admitted set; older evaluated history was omitted by lookback."
+                f"admitted set; additional evaluated history was omitted by lookback."
             )
         return lines
 
@@ -768,7 +915,7 @@ def _reflection_lines(reflection: DecisionReflection, lang: str) -> List[str]:
             f"已判定样本不足（< {reflection.min_samples}），暂不给出胜率。"
         )
     if reflection.recent_calls:
-        lines.append("- 近期已评估的判断（由新到旧；方括号为来源）：")
+        lines.append("- 近期已评估的判断（重点优先，其余由新到旧；方括号为来源）：")
         for call in reflection.recent_calls:
             horizon = f" / {call.horizon}" if call.horizon else ""
             star = "（重点）" if call.memorable else ""
@@ -791,7 +938,7 @@ def _reflection_lines(reflection: DecisionReflection, lang: str) -> List[str]:
     if reflection.truncated:
         lines.append(
             f"- 说明：本股胜率与列表均只使用 lookback={reflection.lookback} "
-            f"准入集合；更早的已评估记录因 lookback 未纳入。"
+            f"准入集合；其余已评估记录因 lookback 未纳入。"
         )
     return lines
 
@@ -808,9 +955,9 @@ def format_decision_memory_prompt_section(
     (BEGIN/END markers + data-only directive).
     """
 
-    admitted = reflection if (reflection is not None and reflection.admitted) else (
-        admit_decision_memory(reflection)
-    )
+    # ``admitted`` is audit metadata, not an authority bit. Re-run admission on
+    # every public render so a hand-built dataclass cannot forge trusted status.
+    admitted = admit_decision_memory(reflection)
     if admitted is None:
         return ""
     lang = _lang(report_language)
@@ -830,9 +977,7 @@ def render_decision_memory_report_section(
 ) -> str:
     """Render the reflection as a user-facing report section, or ''."""
 
-    admitted = reflection if (reflection is not None and reflection.admitted) else (
-        admit_decision_memory(reflection)
-    )
+    admitted = admit_decision_memory(reflection)
     if admitted is None:
         return ""
     lang = _lang(report_language)

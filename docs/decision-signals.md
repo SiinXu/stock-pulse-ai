@@ -100,7 +100,7 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - 仅 `eval_status=completed` 且 `outcome∈{hit,miss,neutral}` 的权威后验可进入注入。
 - 每条复盘行必须带 `signal_id` 来源；`source_signal_ids` 可追溯。无 per-call provenance 时**不注入**。
 - **不**注入信号 `reason` 等自由文本，避免用户笔记/对抗文本作为事实进入 Prompt。
-- 扫描窗口可略大于 lookback 以发现已结算信号；**本股胜率与列表同源**，都只使用 lookback 准入集合。
+- 扫描窗口可略大于 lookback 以发现已结算信号；**本股胜率与列表同源**，都只使用 lookback 准入集合。`DECISION_MEMORY_LOOKBACK` 的运行时与 registry 硬上限均为 40。
 - `ignored` 标记的信号整条排除；`memorable` 优先排序。
 
 **不可信隔离与关闭**

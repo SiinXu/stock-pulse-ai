@@ -496,7 +496,7 @@ stock-pulse-ai/
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | 将当日大盘环境摘要注入个股分析 Prompt，并在高风险/退潮环境下软化激进买入建议；默认开启，设为 `false` 后仍可运行大盘复盘 | `true` |
 | `DECISION_MEMORY_ENABLED` | 将“历史决策复盘”（该股过往信号的命中战绩与同类判断校准）注入分析 Prompt 与个股报告；仅用于校准置信度，永不翻转方向；仅准入带 `signal_id` 来源的结构化已结算 outcome，并以不可信记忆数据隔离；关闭或无历史时零额外开销。可用请求参数 `use_memory` 单次覆盖 | `true` |
-| `DECISION_MEMORY_LOOKBACK` | 复盘注入时该股准入后的已评估信号条数上限 | `5` |
+| `DECISION_MEMORY_LOOKBACK` | 复盘注入时该股准入后的已评估信号条数上限（硬上限 40） | `5` |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | 仅复盘创建时间早于该天数的信号（确保其结果已结算） | `3` |
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据。可在 Web 设置 → 系统与安全 → 系统设置中编辑；运营预览使用同一公开路由，关闭时返回 404 | `false` |
