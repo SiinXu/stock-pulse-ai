@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-13",
-  "baselineNote": "PR #1158 remasured overflowing rules only after merging origin/main. js-entry and HomeWatchlistGroupsSection use measured gzip + 400 B; locale-fr + 600 B; other overflowing locales + 700 B. Unused budgets unchanged.",
+  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1158) (ChatSendFeedback). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -183,6 +183,13 @@
       "match": "assets/ChatPage-*.js",
       "maxGzipBytes": 18277,
       "measuredGzipBytes": 16615
+    },
+    {
+      "id": "ChatSendFeedback",
+      "match": "assets/ChatSendFeedback-*.js",
+      "maxGzipBytes": 13838,
+      "measuredGzipBytes": 13438,
+      "note": "Remeasured after merging origin/main (#1158); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "screening",
