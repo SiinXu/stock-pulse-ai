@@ -391,6 +391,13 @@ class Config:
     agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
     # Attach holdings/watchlist impact context to triggered alert notifications (managed data only).
     agent_event_impact_context_enabled: bool = True
+    # Event-triggered deep analysis (issues #129/#152). Master switch default off;
+    # rules must also set notification_policy.auto_analysis=true.
+    event_triggered_analysis_enabled: bool = False
+    event_trigger_cooldown_minutes: int = 180
+    event_trigger_default_pipeline: str = "standard"
+    event_trigger_max_per_hour: int = 5
+    event_trigger_max_per_day: int = 20
 
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)
