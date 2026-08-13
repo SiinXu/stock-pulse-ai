@@ -11,6 +11,7 @@ import { createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import ChatPage from '../ChatPage';
+import { SCENARIO_LIBRARY_STORAGE_KEY } from '../../components/chat/scenarioLibrary';
 import { extractStockCodeFromMessage, extractStockCodesFromMessage } from '../../utils/chatStockCode';
 import { UiLanguageProvider, useUiLanguage } from '../../contexts/UiLanguageContext';
 import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../../routing/routes';
@@ -192,6 +193,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.removeItem(SCENARIO_LIBRARY_STORAGE_KEY);
   vi.mocked(window.matchMedia).mockImplementation(defaultMatchMedia);
   mockStoreState.messages = [];
   mockStoreState.selectedSkillIds = null;
@@ -535,11 +537,34 @@ describe('ChatPage', () => {
     fireEvent.click(whatIfButton);
     expect(whatIfButton).toHaveAttribute('aria-pressed', 'true');
     const whatIfConfiguration = await screen.findByRole('region', { name: 'What-if 情景分析' });
-    expect(within(whatIfConfiguration).getByTestId('chat-what-if-panel')).toBeInTheDocument();
+    expect(await within(whatIfConfiguration).findByRole('switch', { name: '启用 what-if 情景模式' })).toBeInTheDocument();
     expect(screen.getByTestId('chat-composer-input').parentElement).toContainElement(whatIfConfiguration);
     expect(whatIfConfiguration).not.toHaveClass('absolute', 'fixed');
     expect(within(whatIfConfiguration).getByTestId('chat-what-if-fields')).toHaveClass('grid-cols-2');
-    expect(within(whatIfConfiguration).getAllByRole('combobox')).toHaveLength(2);
+    expect(await within(whatIfConfiguration).findByRole('combobox', { name: '预置 / 已保存情景' })).toBeInTheDocument();
+    expect(within(whatIfConfiguration).getByRole('combobox', { name: '假设维度' })).toBeInTheDocument();
+    expect(within(whatIfConfiguration).getByRole('combobox', { name: '方向' })).toBeInTheDocument();
+  });
+
+  it('lets a user reach, preview, and save a reusable report-sensitivity scenario', async () => {
+    renderChat(<ChatPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'What-if 情景分析' }));
+    const whatIfConfiguration = await screen.findByRole('region', { name: 'What-if 情景分析' });
+    const scenarioSelect = await within(whatIfConfiguration).findByRole('combobox', { name: '预置 / 已保存情景' });
+
+    fireEvent.click(scenarioSelect);
+    fireEvent.click(await screen.findByRole('option', { name: 'Policy rates +100bp' }));
+
+    expect(await within(whatIfConfiguration).findByRole('region', { name: '假设推演 · 报告敏感性预览' })).toBeInTheDocument();
+
+    fireEvent.change(within(whatIfConfiguration).getByRole('textbox', { name: '情景名称' }), {
+      target: { value: 'My rate case' },
+    });
+    fireEvent.click(within(whatIfConfiguration).getByRole('button', { name: '保存复用' }));
+
+    expect(await within(whatIfConfiguration).findByText('已保存，可在情景库中复用')).toBeInTheDocument();
+    expect(within(whatIfConfiguration).getByRole('button', { name: '删除自定义' })).toBeInTheDocument();
   });
 
   it('lets a user reach the analysis workbench handoff from a stock-scoped chat', async () => {
