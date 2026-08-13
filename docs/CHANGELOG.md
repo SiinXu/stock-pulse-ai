@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Docs] Complete AI collaboration skill toolkit alignment for #890: add test-change, review-pr, sync-ai-assets, pr-template-fill, regression-scout; encode squash-body, config-registry guard, reachability, Delivered/Remaining, and merge-train hard rules (Refs #890).
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
 - [Fixed] Convert portfolio risk-metrics position values into the response base currency before weight/VaR aggregation, reject non-finite numerics at the service and schema boundary, and surface `fx_stale` (Refs #239).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
