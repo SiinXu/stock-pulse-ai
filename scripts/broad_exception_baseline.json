@@ -71,7 +71,6 @@
     {"path":"bot/commands/history.py","scope":"<module>.HistoryCommand.execute","caught":["Exception"],"digest":"a230512e3dd2c349c2c50b435c28aa6b5b31e3bb9bc76f8e4fdd5436244bb925"},
     {"path":"bot/commands/history.py","scope":"<module>.HistoryCommand.execute","caught":["Exception"],"digest":"f57ec1fc8edb3346f7c2c63ef9d85d639e920858bda98ca652325ad57602f71c"},
     {"path":"bot/commands/market.py","scope":"<module>.MarketCommand._compute_market_review_override_region","caught":["Exception"],"digest":"caf394a801be016b67df89f5b121adb7467668be54dee6f35051a25915db5275"},
-    {"path":"bot/commands/market.py","scope":"<module>.MarketCommand._run_market_review","caught":["Exception"],"digest":"b4de3fbd215da40ece4ae7f1c4f22211e44c4c530024220ef5f930aa08e4bc31"},
     {"path":"bot/commands/market.py","scope":"<module>.MarketCommand.execute","caught":["Exception"],"digest":"326de47156644fe911c7f16b9f5b559c9e54a97ed96e3f460fdb6e0053dc1c64"},
     {"path":"bot/commands/market.py","scope":"<module>.MarketCommand.execute","caught":["Exception"],"digest":"9624090ac23a2940e7a65a34871352359844a1652238db4e9eda69915fb89e14"},
     {"path":"bot/commands/strategies.py","scope":"<module>.StrategiesCommand.execute","caught":["Exception"],"digest":"92e892fe36baab49cad2741de8febb84aedbc1b679fbd7fad3450b57c3bcfba9"},

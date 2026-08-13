@@ -140,6 +140,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
+| `AGENT_RESEARCH_PERSONA` | `空` | 是 | 模板中注释; 可选研究立场预设（默认关闭）：`rational_analyst`、`risk_guardian` 或 `long_term_compounder` |
+| `AGENT_RESEARCH_PERSONA_CUSTOM` | `空` | 是 | 模板中注释; 可选自定义研究立场；持久化内容优先使用个人投资框架的 `research_stance` |
 | `AGENT_RISK_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_RISK_OVERRIDE` | `true` | 是 | 模板中注释; Whether the risk-control agent may reject buy signals (enabled by default) |
 | `AGENT_SKILLS` | `空` | 是 |  |
