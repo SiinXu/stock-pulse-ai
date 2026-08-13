@@ -32,6 +32,7 @@ from api.v1.endpoints import (
     notification_inbox,
     plugins,
     onboarding,
+    paper_decision_quality,
     portfolio,
     portfolio_health,
     portfolio_risk_metrics,
@@ -146,6 +147,12 @@ router.include_router(
 
 router.include_router(
     portfolio.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
+    paper_decision_quality.router,
     prefix="/portfolio",
     tags=["Portfolio"]
 )

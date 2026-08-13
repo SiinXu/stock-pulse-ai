@@ -6224,4 +6224,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HANDLING": "構造化された不一致処理",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD": "高不一致のしきい値",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD": "交差検証のしきい値",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "プロセス品質",
 } as const;

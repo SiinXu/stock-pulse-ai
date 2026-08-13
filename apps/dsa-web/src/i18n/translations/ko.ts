@@ -6224,4 +6224,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HANDLING": "구조화된 이견 처리",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD": "높은 이견 임계값",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD": "교차 검증 임계값",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "과정 품질",
 } as const;

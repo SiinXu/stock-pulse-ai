@@ -6224,4 +6224,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HANDLING": "Gestión estructurada de desacuerdos",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD": "Umbral de alta discrepancia",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD": "Umbral de validación cruzada",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Calidad del proceso",
 } as const;

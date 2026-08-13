@@ -6224,4 +6224,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HANDLING": "Pengendalian percanggahan berstruktur",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD": "Ambang percanggahan tinggi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD": "Ambang pengesahan silang",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualiti proses",
 } as const;

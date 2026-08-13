@@ -6224,4 +6224,5 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HANDLING": "Strukturierte Konfliktbehandlung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD": "Schwelle für hohe Abweichung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD": "Schwelle für Kreuzvalidierung",
+  "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Prozesswert",
 } as const;
