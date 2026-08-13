@@ -1755,6 +1755,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响后台告警检测频率和通知推送时机。'],
     notes: ['需要配合告警规则使用。'],
   },
+  'settings.agent.prediction_resolve': {
+    title: '预测到期解析',
+    summary: '自动核验到期预测；数据源失败保持 data_unavailable，直至持久化退避到期。',
+  },
   'settings.agent.EVENT_ALERT_RULES_JSON': {
     title: '事件告警规则（Legacy JSON）',
     summary: '通过 JSON 数组配置基础价格和成交量告警规则。',
