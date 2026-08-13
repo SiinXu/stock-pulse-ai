@@ -3096,7 +3096,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.screening.SCREENING_TEXT.diagnosticTimeout": "요청 시간 초과",
   "locales.screening.SCREENING_TEXT.diagnosticWarning": "AlphaSift가 성능 저하 모드로 실행 중입니다",
   "locales.screening.SCREENING_TEXT.disabled": "스크리닝 비활성화됨",
-  "locales.screening.SCREENING_TEXT.documentTitle": "AlphaSift 종목 스크리닝 - StockPulse",
   "locales.screening.SCREENING_TEXT.dsaEnrichment": "StockPulse 보강: {enriched} / {requested}",
   "locales.screening.SCREENING_TEXT.dsaHints": "StockPulse 보강 메모",
   "locales.screening.SCREENING_TEXT.dsaNews": "StockPulse 뉴스",

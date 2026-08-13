@@ -10,6 +10,8 @@ type UseScreeningCapabilityArgs = {
   enableFailedText: string;
   loadStrategies: () => Promise<void>;
   loadHotspots: (refresh?: boolean) => Promise<void>;
+  /** When false, do not probe AlphaSift (used while AI discovery mode is active). */
+  active?: boolean;
 };
 
 export function useScreeningCapability({
@@ -17,10 +19,11 @@ export function useScreeningCapability({
   enableFailedText,
   loadStrategies,
   loadHotspots,
+  active = true,
 }: UseScreeningCapabilityArgs) {
   const mountedRef = useRef(true);
   const [capability, setCapability] = useState<ScreeningCapability>({
-    state: 'loading',
+    state: active ? 'loading' : 'disabled',
     error: null,
   });
   const [enabling, setEnabling] = useState(false);
@@ -86,11 +89,22 @@ export function useScreeningCapability({
 
   useEffect(() => {
     mountedRef.current = true;
-    void loadStatus();
     return () => {
       mountedRef.current = false;
     };
-  }, [loadStatus]);
+  }, []);
+
+  useEffect(() => {
+    if (!active) {
+      setCapability((current) => (
+        current.state === 'loading'
+          ? { state: 'disabled', error: null }
+          : current
+      ));
+      return;
+    }
+    void loadStatus();
+  }, [active, loadStatus]);
 
   return {
     capability,

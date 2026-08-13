@@ -3096,7 +3096,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.screening.SCREENING_TEXT.diagnosticTimeout": "Permintaan tamat masa",
   "locales.screening.SCREENING_TEXT.diagnosticWarning": "AlphaSift Operasi yang diturunkan taraf",
   "locales.screening.SCREENING_TEXT.disabled": "Saringan dilumpuhkan",
-  "locales.screening.SCREENING_TEXT.documentTitle": "AlphaSift Pemilihan Saham -StockPulse",
   "locales.screening.SCREENING_TEXT.dsaEnrichment": "StockPulse Pengayaan:{enriched} / {requested}",
   "locales.screening.SCREENING_TEXT.dsaHints": "StockPulse Nota pengayaan",
   "locales.screening.SCREENING_TEXT.dsaNews": "StockPulse Berita",
