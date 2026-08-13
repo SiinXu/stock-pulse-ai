@@ -90,3 +90,44 @@ Notification content appends a public impact excerpt after the existing phase an
 - The Web create/edit form round-trips `event_categories`, `lookback_hours`, and `min_items`.
 
 See the Chinese [alerts.md](alerts.md) for full P0–P8 contracts, storage, cooldown, and Market Light details.
+
+## Event-triggered deep analysis and contextual actions (issues #129 / #152)
+
+### Master switches (all default off / safe)
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | Master switch for enqueueing deep analysis after opted-in alert triggers |
+| `EVENT_TRIGGER_COOLDOWN_MINUTES` | `180` | Per rule+symbol debounce window |
+| `EVENT_TRIGGER_DEFAULT_PIPELINE` | `standard` | Maps to task-queue report type (`standard`/`detailed` → `detailed`, `simple` → `simple`) |
+| `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | Process-local hourly budget (`0` disables) |
+| `EVENT_TRIGGER_MAX_PER_DAY` | `20` | Process-local daily budget (`0` disables) |
+
+Rules must also set `notification_policy.auto_analysis=true`. Eligible alert types:
+`corporate_event`, `volume_spike`, `price_change_percent`.
+
+Analysis is enqueued through `AnalysisSubmissionService` (async task queue). The alert
+hot path never runs a full analysis inline.
+Only tasks accepted by the queue consume debounce and hourly/daily budget slots;
+duplicate, empty, and failed enqueue attempts release their provisional reservations.
+Rule values, NL-compiled numeric values, and persisted trigger values reject `NaN`,
+`+Inf`, and `-Inf`.
+
+### Contextual suggested actions
+
+On real triggers the worker attaches a bounded `suggested_action` (and optional
+`auto_analysis` status) to diagnostics. Public API projection follows the #957 event
+alert surface: no raw portfolio quantities/account IDs; deep links are in-app paths
+plus optional http(s) source URLs only.
+When the impact conclusion is absent, the Web UI explicitly shows “Not evaluated”
+and never presents the missing state as a pass.
+
+Quiet hours for alert **delivery** continue to use `NOTIFICATION_QUIET_HOURS` /
+`NOTIFICATION_TIMEZONE` on the notification alert route.
+
+### NL rule compiler (C5 / #1133)
+
+`POST /api/v1/alerts/rules/compile-nl` compiles whitelist-bounded natural-language
+phrases into Alert create payloads. Outcomes: `success` | `need_clarification` |
+`rejected`. No arbitrary code execution. Corporate-event compiles always include
+`event_categories`, `lookback_hours`, and `min_items` to prevent field-loss regressions.
