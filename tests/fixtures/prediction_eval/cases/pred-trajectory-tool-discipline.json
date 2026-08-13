@@ -1,0 +1,59 @@
+{
+  "id": "pred-trajectory-tool-discipline",
+  "profile": "tool_failure",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "type": "direction",
+      "confidence": 0.6,
+      "payload": {"direction": "sideways"}
+    }
+  ],
+  "actuals": {
+    "start_price": 50.0,
+    "end_price": 50.0
+  },
+  "resolution": {
+    "outcome": "hit",
+    "scorer_outcome": "hit",
+    "reason": "direction_match"
+  },
+  "expected": {
+    "outcome": "hit",
+    "require_trajectory": true,
+    "min_tool_recall": 1.0
+  },
+  "episode": {
+    "run_id": "run-pred-traj-1",
+    "symbol": "600519",
+    "market": "cn",
+    "success": true,
+    "soul_version": "v1",
+    "soul_hash": "abcdef0123456789",
+    "trajectory_summary": [
+      {
+        "step": 1,
+        "tool": "get_daily_history",
+        "success": true,
+        "duration_ms": 120,
+        "argument_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "step": 2,
+        "tool": "get_realtime_quote",
+        "success": true,
+        "duration_ms": 80,
+        "argument_fingerprint": "cccccccccccccccccccccccccccccccc"
+      }
+    ]
+  },
+  "trajectory_rubric": {
+    "required_tools": [
+      "get_daily_history",
+      "get_realtime_quote"
+    ],
+    "forbidden_tools": [
+      "execute_order"
+    ]
+  }
+}

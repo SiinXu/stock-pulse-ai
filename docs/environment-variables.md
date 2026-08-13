@@ -114,6 +114,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep-research tool token budget and timeout (seconds) for Agent analysis paths that enable deep research. |
 | `AGENT_DEEP_RESEARCH_TIMEOUT` | `180` | 是 | 模板中注释 |
+| `AGENT_EPISODE_LOG_ENABLED` | `false` | 是 | 模板中注释; Agent evolution episode log (Issue #1090) |
+| `AGENT_EPISODE_MAX_ROWS` | `50000` | 是 | 模板中注释 |
+| `AGENT_EPISODE_RETENTION_DAYS` | `90` | 是 | 模板中注释 |
 | `AGENT_EVENT_ALERT_RULES_JSON` | `[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800},{"stock_code":"300750","alert_type":"price_change_percent","direction":"down","change_pct":3.0},{"stock_code":"000858","alert_type":"volume_spike","multiplier":2.5}]` | 是 | 模板中注释 |
 | `AGENT_EVENT_IMPACT_CONTEXT_ENABLED` | `true` | 是 | 模板中注释; Attach holdings/watchlist impact context to triggered alert notifications (managed data only; default true). |
 | `AGENT_EVENT_MONITOR_ENABLED` | `false` | 是 | 模板中注释 |
