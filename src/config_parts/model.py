@@ -34,6 +34,9 @@ from src.config_parts.parsers import normalize_agent_context_compression_profile
 from src.config_parts.runtime import _ConfigRuntimeMethods
 from src.config_parts.share_image import ShareImageConfig
 from src.config_parts.validation import _ConfigValidationMethods
+from src.core.config.sources import (
+    WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS as _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS_CANONICAL,
+)
 from src.llm.backend_registry import AUTO_AGENT_BACKEND_ID, LITELLM_BACKEND_ID
 from src.llm.local_cli_backend import (
     DEFAULT_GENERATION_BACKEND_MAX_CONCURRENCY,
@@ -569,16 +572,8 @@ class Config:
         "volatile",
         "unknown",
     }
-    _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS = frozenset(
-        {
-            "STOCK_LIST",
-            "RUN_IMMEDIATELY",
-            "SCHEDULE_ENABLED",
-            "SCHEDULE_TIME",
-            "SCHEDULE_TIMES",
-            "SCHEDULE_RUN_IMMEDIATELY",
-        }
-    )
+    # Single source: src.core.config.sources.WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
+    _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS = _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS_CANONICAL
     _BOOTSTRAP_RUNTIME_ENV_OVERRIDES_CAPTURED = False
     _BOOTSTRAP_RUNTIME_ENV_OVERRIDES = frozenset()
     _BOOTSTRAP_RUNTIME_ENV_PRESENT_KEYS = frozenset()
@@ -702,6 +697,7 @@ _CONFIG_METHOD_GROUPS = (
             "_parse_report_mode",
             "_get_env_file_value",
             "_resolve_env_value",
+            "resolve_with_source",
             "_capture_bootstrap_runtime_env_overrides",
             "_has_bootstrap_runtime_env_override",
             "_had_bootstrap_runtime_env_key",

@@ -7,7 +7,7 @@
 | 我想要 | 先看 | 继续看 |
 | --- | --- | --- |
 | 快速了解项目能做什么 | [README](../README.md) | [完整配置与部署指南](full-guide.md) |
-| **了解 StockPulse 的定位与能力** | [English README · Why StockPulse](../README.md#why-stockpulse) | [简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
+| **了解 StockPulse 的定位与能力** | [English README · Why StockPulse](../README.md#why-stockpulse) | [竞品格局（本地优先金融 AI）](competitive-landscape_CN.md)（[English](competitive-landscape.md)）、[简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
 | 第一次把项目跑起来 | [小白客户端安装与配置](beginner-client-setup.md)（[English](beginner-client-setup_EN.md)） | [README · 定位与亮点](../README.md#why-stockpulse)、[安全基线 · 运维边界](security-baseline.md#operator-security-boundaries)、[完整配置与部署指南](full-guide.md) |
 | **学习 Web / 桌面界面怎么用** | [界面操作手册](ui-manual/README.md) | 各模块分册（分析、信号、持仓等） |
 | 配置大模型渠道 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | [LLM 服务商配置指南](llm-providers.md) |
@@ -29,6 +29,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [README（英文默认）](../README.md) | 项目定位、差异化、核心能力、快速开始（GitHub 首页） |
+| [竞品格局（本地优先金融 AI）](competitive-landscape_CN.md) | 诚实竞品对照、StockPulse 差异点、已交付/规划/缺口（[English](competitive-landscape.md)；Refs #799、#1063） |
 | [README（简体中文）](README_CN.md) | 同上中文版 |
 | [小白客户端安装与配置](beginner-client-setup.md) | 面向不会代码用户的客户端下载、Anspire Open / AIHubMix 模型配置、新闻源配置和常见问题；[English](beginner-client-setup_EN.md) |
 | [助手引导配置](agent-guided-onboarding.md) | 画像采集、规则配置计划、非密钥应用、L0–L3 路径；[English](agent-guided-onboarding_EN.md) |
@@ -73,6 +74,7 @@
 | [每日简报（个人晨报 + 准确率）](daily-brief.md) | 持仓、隔夜要点、近期财报事件上下文、昨日分析、自选与诚实准确率（[英文](daily-brief_EN.md)） |
 | [事件研究简报](event-research-brief.md) | 财报 EventBrief（指标、超预期定义、事后清单）（[英文](event-research-brief_EN.md)） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
+| [预测 resolve_after 交易日历策略](prediction-resolve-after.md) | horizon → UTC `resolve_after`（A/HK/US 交易 session、节假日/半日市/跨市场）；禁止自然日近似（[EN](prediction-resolve-after_EN.md)） |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
