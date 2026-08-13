@@ -14,6 +14,8 @@ from src.agent.bull_bear_debate import (
     DEBATE_SCHEMA_VERSION,
     DEBATE_STAGE_NAME,
     STATUS_DATA_UNAVAILABLE,
+    STATUS_DEGRADED,
+    STATUS_SKIPPED,
     BoundedBullBearDebateAgent,
     build_contention_point,
     decision_signal_debate_metadata,
@@ -27,7 +29,14 @@ from src.agent.bull_bear_debate import (
     synthesize_debate_deterministic,
 )
 from src.agent.orchestrator import AgentOrchestrator
-from src.agent.protocols import AgentContext, AgentOpinion, StageResult, StageStatus
+from src.agent.protocols import (
+    AgentContext,
+    AgentOpinion,
+    StageFailureReason,
+    StageResult,
+    StageStatus,
+)
+from src.agent.runtime.mode_budget import ModeBudgetAccount, ModeBudgetLimits
 from src.agent.tools.registry import ToolRegistry
 from src.core.config_registry import get_field_definition
 from src.services.decision_signal_payload import build_decision_signal_payload_from_report
@@ -394,10 +403,13 @@ def test_mode_budget_preflight_preserves_last_turn_for_decision():
     ctx.meta["mode_budget_account"] = _Account()
 
     result = agent.run(ctx)
+    record = ctx.meta["bull_bear_debate"]
 
     assert result.status == StageStatus.FAILED
+    assert result.failure_reason == StageFailureReason.BUDGET_SKIP
     assert adapter.calls == 0
-    assert ctx.meta["bull_bear_debate"]["budget"]["terminated_reason"] == "budget_turns"
+    assert record["status"] == STATUS_SKIPPED
+    assert record["budget"]["terminated_reason"] == "budget_skip"
 
 
 def test_synthesis_preflight_preserves_decision_turn_after_two_sides():
@@ -434,12 +446,43 @@ def test_synthesis_preflight_preserves_decision_turn_after_two_sides():
     result = agent.run(ctx)
 
     record = ctx.meta["bull_bear_debate"]
-    assert result.status == StageStatus.FAILED
+    assert result.status == StageStatus.COMPLETED
+    assert result.failure_reason is None
     assert adapter.calls == 2
     assert account.used == 9
-    assert record["budget"]["terminated_reason"] == "budget_turns"
+    assert record["status"] == STATUS_DEGRADED
+    assert record["budget"]["terminated_reason"] == "budget_skip"
     assert record["synthesis"] is None
     assert not any(op.agent_name == DEBATE_STAGE_NAME for op in ctx.opinions)
+
+
+def test_mode_budget_exhausted_without_decision_capacity_stays_hard_fail():
+    class _Account:
+        def check(self):
+            return None
+
+        def snapshot(self):
+            return {
+                "limits": {"max_llm_turns": 10},
+                "used": {"llm_turns": 10},
+            }
+
+    adapter = _ScriptedAdapter([])
+    agent = BoundedBullBearDebateAgent(
+        tool_registry=SimpleNamespace(),
+        llm_adapter=adapter,
+        debate_config=adapter._config,
+    )
+    ctx = AgentContext(query="x", stock_code="AAPL")
+    ctx.meta["mode_budget_account"] = _Account()
+
+    result = agent.run(ctx)
+    record = ctx.meta["bull_bear_debate"]
+
+    assert result.status == StageStatus.FAILED
+    assert result.failure_reason == StageFailureReason.BUDGET_TURNS
+    assert adapter.calls == 0
+    assert record["budget"]["terminated_reason"] == "budget_turns"
 
 
 def test_disabled_mode_budget_does_not_block_debate_calls():
@@ -515,6 +558,107 @@ def test_real_orchestrator_preserves_data_unavailable_record_and_runs_decision(
     assert ctx.data["final_dashboard_raw"] == "primary decision"
     assert ctx.meta["bull_bear_debate"]["status"] == STATUS_DATA_UNAVAILABLE
     assert ctx.meta["bull_bear_debate"]["synthesis"] is None
+
+
+def test_real_orchestrator_debate_reserve_skip_still_runs_decision(monkeypatch):
+    class _Decision:
+        agent_name = "decision"
+        max_steps = 1
+        tool_names: List[str] = []
+
+        def run(self, ctx, **_kwargs):
+            ctx.set_data("final_dashboard_raw", "primary decision")
+            return StageResult(
+                stage_name="decision",
+                status=StageStatus.COMPLETED,
+                meta={"raw_text": "primary decision"},
+            )
+
+    adapter = _ScriptedAdapter([])
+    config = SimpleNamespace(
+        agent_critic_enabled=False,
+        agent_mode_budget_enabled=True,
+        agent_orchestrator_timeout_s=0,
+        agent_risk_override=True,
+        debate_enabled=True,
+        debate_max_rounds=1,
+        debate_temperature=0.4,
+        debate_model="",
+    )
+    orchestrator = AgentOrchestrator(
+        tool_registry=ToolRegistry(),
+        llm_adapter=adapter,
+        config=config,
+    )
+    monkeypatch.setattr(orchestrator, "_build_agent_chain", lambda _ctx: [_Decision()])
+    ctx = AgentContext(query="Analyze AAPL", stock_code="AAPL")
+    ctx.meta["mode_budget_account"] = ModeBudgetAccount(
+        limits=ModeBudgetLimits(mode="standard", enabled=True, max_llm_turns=10),
+        llm_turns=9,
+    )
+
+    result = orchestrator._execute_pipeline(ctx, parse_dashboard=False)
+
+    assert result.success is True
+    assert result.failure_reason is None
+    assert ctx.data["final_dashboard_raw"] == "primary decision"
+    assert adapter.calls == 0
+    record = ctx.meta["bull_bear_debate"]
+    assert record["status"] == STATUS_SKIPPED
+    assert record["budget"]["terminated_reason"] == "budget_skip"
+    assert record["synthesis"] is None
+
+
+def test_real_orchestrator_synthesis_reserve_skip_still_runs_decision(monkeypatch):
+    class _Decision:
+        agent_name = "decision"
+        max_steps = 1
+        tool_names: List[str] = []
+
+        def run(self, ctx, **_kwargs):
+            ctx.set_data("final_dashboard_raw", "primary decision")
+            return StageResult(
+                stage_name="decision",
+                status=StageStatus.COMPLETED,
+                meta={"raw_text": "primary decision"},
+            )
+
+    bull_json = '{"stance":"buy","confidence":0.8,"arguments":["a"],"evidence_refs":[],"contention_topics":[]}'
+    bear_json = '{"stance":"sell","confidence":0.7,"arguments":["b"],"evidence_refs":[],"contention_topics":[]}'
+    adapter = _ScriptedAdapter([bull_json, bear_json])
+    config = SimpleNamespace(
+        agent_critic_enabled=False,
+        agent_mode_budget_enabled=True,
+        agent_orchestrator_timeout_s=0,
+        agent_risk_override=True,
+        debate_enabled=True,
+        debate_max_rounds=1,
+        debate_temperature=0.4,
+        debate_model="",
+    )
+    orchestrator = AgentOrchestrator(
+        tool_registry=ToolRegistry(),
+        llm_adapter=adapter,
+        config=config,
+    )
+    monkeypatch.setattr(orchestrator, "_build_agent_chain", lambda _ctx: [_Decision()])
+    ctx = AgentContext(query="Analyze AAPL", stock_code="AAPL")
+    ctx.meta["mode_budget_account"] = ModeBudgetAccount(
+        limits=ModeBudgetLimits(mode="standard", enabled=True, max_llm_turns=10),
+        llm_turns=7,
+    )
+
+    result = orchestrator._execute_pipeline(ctx, parse_dashboard=False)
+
+    assert result.success is True
+    assert result.failure_reason is None
+    assert ctx.data["final_dashboard_raw"] == "primary decision"
+    assert adapter.calls == 2
+    record = ctx.meta["bull_bear_debate"]
+    assert record["status"] == STATUS_DEGRADED
+    assert record["budget"]["terminated_reason"] == "budget_skip"
+    assert record["synthesis"] is None
+    assert ctx.meta["mode_budget_account"].llm_turns == 9
 
 
 def test_mode_budget_turn_accounting_when_present():

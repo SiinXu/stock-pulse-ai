@@ -917,6 +917,8 @@ def _resolve_status(*, rounds, degradation_reasons, terminated_reason):
     complete_rounds = [item for item in rounds if not item.get("incomplete")]
     if terminated_reason in {"budget_turns", "budget_tools", "budget_cost", "budget_tokens"}:
         return STATUS_BUDGET_EXHAUSTED
+    if terminated_reason == "budget_skip":
+        return STATUS_DEGRADED if complete_rounds else STATUS_SKIPPED
     if any(str(reason).endswith("_failed") for reason in degradation_reasons):
         return STATUS_DATA_UNAVAILABLE
     if not complete_rounds:
@@ -948,15 +950,14 @@ def _mode_budget_block_reason(
                 return None
             max_turns = _safe_nonnegative_int((limits or {}).get("max_llm_turns"))
             used_turns = _safe_nonnegative_int((used or {}).get("llm_turns"))
-            required_with_decision = (
-                max(1, int(required_turns or 1))
-                + _DECISION_LLM_TURN_RESERVE
-            )
-            if (
-                max_turns > 0
-                and used_turns + required_with_decision > max_turns
-            ):
-                return "budget_turns"
+            required = max(1, int(required_turns or 1))
+            required_with_decision = required + _DECISION_LLM_TURN_RESERVE
+            if max_turns > 0 and used_turns + required_with_decision > max_turns:
+                # Yield remaining capacity to Decision instead of fail-fasting
+                # the pipeline with a hard budget_turns breach.
+                if used_turns + _DECISION_LLM_TURN_RESERVE > max_turns:
+                    return "budget_turns"
+                return "budget_skip"
         return None
     except Exception as exc:  # broad-exception: fallback_recorded - An unreadable shared budget must stop the optional provider work.
         log_safe_exception(
@@ -1004,6 +1005,7 @@ def _stage_failure_reason(reason: Any) -> StageFailureReason:
         "budget_tools": StageFailureReason.BUDGET_TOOLS,
         "budget_cost": StageFailureReason.BUDGET_COST,
         "budget_tokens": StageFailureReason.BUDGET_TOKENS,
+        "budget_skip": StageFailureReason.BUDGET_SKIP,
         "timeout": StageFailureReason.TIMEOUT,
     }
     return mapping.get(str(reason or ""), StageFailureReason.STAGE_FAILURE)
