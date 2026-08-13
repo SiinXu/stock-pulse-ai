@@ -6,6 +6,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "zh-TW": {
     page: {
       "affectedScope": "影響範圍",
+      "suggestedAction": "建議動作",
+      "autoAnalysisStatus": "自動分析",
+      "openAnalysis": "打開分析",
+      "openStock": "打開個股",
       "degradedNote": "上下文部分降級（託管資料不完整）",
       "description": "查看已觸發的企業事件告警，包括事件分類、為何重要與影響上下文。說明文案由後端生成，前端僅展示。",
       "detailTitle": "告警詳情",
@@ -19,7 +23,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "僅未分類",
       "gradeMajor": "重大",
       "gradeRoutine": "常規",
-      "gradeUnclassified": "未分類",
+      "gradeUnclassified": "未評估",
       "impactContext": "影響上下文",
       "inPortfolio": "在持倉中",
       "inWatchlist": "在自選中",
@@ -59,6 +63,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "ja": {
     page: {
       "affectedScope": "影響範囲",
+      "suggestedAction": "推奨アクション",
+      "autoAnalysisStatus": "自動分析",
+      "openAnalysis": "分析を開く",
+      "openStock": "銘柄を開く",
       "degradedNote": "コンテキストは部分的に劣化しています（管理データ不完全）",
       "description": "発火した企業イベントアラートを、分類・重要理由・影響コンテキスト付きで確認します。説明文はバックエンド生成で、フロントは表示のみです。",
       "detailTitle": "アラート詳細",
@@ -72,7 +80,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "未分類のみ",
       "gradeMajor": "重大",
       "gradeRoutine": "通常",
-      "gradeUnclassified": "未分類",
+      "gradeUnclassified": "未評価",
       "impactContext": "影響コンテキスト",
       "inPortfolio": "保有中",
       "inWatchlist": "ウォッチリスト内",
@@ -112,6 +120,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "ko": {
     page: {
       "affectedScope": "영향 범위",
+      "suggestedAction": "권장 조치",
+      "autoAnalysisStatus": "자동 분석",
+      "openAnalysis": "분석 열기",
+      "openStock": "종목 열기",
       "degradedNote": "컨텍스트 일부 저하(관리 데이터 불완전)",
       "description": "발생한 기업 이벤트 알림을 분류, 중요 이유, 영향 컨텍스트와 함께 확인합니다. 설명 문구는 백엔드에서 생성되며 웹은 표시만 합니다.",
       "detailTitle": "알림 상세",
@@ -125,7 +137,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "미분류만",
       "gradeMajor": "중대",
       "gradeRoutine": "일반",
-      "gradeUnclassified": "미분류",
+      "gradeUnclassified": "평가되지 않음",
       "impactContext": "영향 컨텍스트",
       "inPortfolio": "보유 중",
       "inWatchlist": "관심목록에 있음",
@@ -165,6 +177,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "de": {
     page: {
       "affectedScope": "Betroffen",
+      "suggestedAction": "Empfohlene Aktion",
+      "autoAnalysisStatus": "Auto-Analyse",
+      "openAnalysis": "Analyse öffnen",
+      "openStock": "Titel öffnen",
       "degradedNote": "Teilkontext (verwaltete Daten unvollständig)",
       "description": "Ausgelöste Unternehmensereignis-Alarme mit Kategorie, Begründung und Wirkungskontext prüfen. Erklärtexte stammen vom Backend; das Web rendert sie nur.",
       "detailTitle": "Alarmdetails",
@@ -178,7 +194,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "Nur nicht klassifiziert",
       "gradeMajor": "Wesentlich",
       "gradeRoutine": "Regulär",
-      "gradeUnclassified": "Nicht klassifiziert",
+      "gradeUnclassified": "Nicht bewertet",
       "impactContext": "Wirkungskontext",
       "inPortfolio": "Im Bestand",
       "inWatchlist": "Auf der Watchlist",
@@ -218,6 +234,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "es": {
     page: {
       "affectedScope": "Afectado",
+      "suggestedAction": "Acción sugerida",
+      "autoAnalysisStatus": "Análisis automático",
+      "openAnalysis": "Abrir análisis",
+      "openStock": "Abrir acción",
       "degradedNote": "Contexto parcial (datos gestionados incompletos)",
       "description": "Revise alertas de eventos corporativos disparadas con categoría, por qué importa y contexto de impacto. El texto explicativo lo genera el backend; la web solo lo muestra.",
       "detailTitle": "Detalle de alerta",
@@ -231,7 +251,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "Solo sin clasificar",
       "gradeMajor": "Mayor",
       "gradeRoutine": "Rutinaria",
-      "gradeUnclassified": "Sin clasificar",
+      "gradeUnclassified": "No evaluado",
       "impactContext": "Contexto de impacto",
       "inPortfolio": "En cartera",
       "inWatchlist": "En lista de seguimiento",
@@ -271,6 +291,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "ms": {
     page: {
       "affectedScope": "Terjejas",
+      "suggestedAction": "Tindakan dicadangkan",
+      "autoAnalysisStatus": "Analisis auto",
+      "openAnalysis": "Buka analisis",
+      "openStock": "Buka saham",
       "degradedNote": "Konteks separa (data terurus tidak lengkap)",
       "description": "Semak amaran peristiwa korporat yang dicetuskan dengan kategori, sebab penting dan konteks impak. Teks penjelasan dimiliki backend; web hanya memaparkannya.",
       "detailTitle": "Butiran amaran",
@@ -284,7 +308,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "Belum dikelaskan sahaja",
       "gradeMajor": "Utama",
       "gradeRoutine": "Rutin",
-      "gradeUnclassified": "Belum dikelaskan",
+      "gradeUnclassified": "Belum dinilai",
       "impactContext": "Konteks impak",
       "inPortfolio": "Dalam portfolio",
       "inWatchlist": "Dalam senarai pantau",
@@ -324,6 +348,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "fr": {
     page: {
       "affectedScope": "Impacté",
+      "suggestedAction": "Action suggérée",
+      "autoAnalysisStatus": "Analyse automatique",
+      "openAnalysis": "Ouvrir l’analyse",
+      "openStock": "Ouvrir le titre",
       "degradedNote": "Contexte partiel (données gérées incomplètes)",
       "description": "Consultez les alertes d’événements d’entreprise déclenchées avec catégorie, importance et contexte d’impact. Les textes d’explication viennent du backend ; le Web ne fait que les afficher.",
       "detailTitle": "Détail de l’alerte",
@@ -337,7 +365,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "Non classés uniquement",
       "gradeMajor": "Majeur",
       "gradeRoutine": "Courant",
-      "gradeUnclassified": "Non classé",
+      "gradeUnclassified": "Non évalué",
       "impactContext": "Contexte d’impact",
       "inPortfolio": "Dans le portefeuille",
       "inWatchlist": "Dans la liste de suivi",
@@ -377,6 +405,10 @@ export const EVENT_ALERT_TRANSLATIONS = {
   "id": {
     page: {
       "affectedScope": "Terdampak",
+      "suggestedAction": "Tindakan disarankan",
+      "autoAnalysisStatus": "Analisis otomatis",
+      "openAnalysis": "Buka analisis",
+      "openStock": "Buka saham",
       "degradedNote": "Konteks parsial (data terkelola tidak lengkap)",
       "description": "Tinjau peringatan peristiwa korporat yang terpicu beserta kategori, alasan penting, dan konteks dampak. Teks penjelasan dimiliki backend; web hanya menampilkannya.",
       "detailTitle": "Detail peringatan",
@@ -390,7 +422,7 @@ export const EVENT_ALERT_TRANSLATIONS = {
       "filterUnclassified": "Hanya belum diklasifikasi",
       "gradeMajor": "Utama",
       "gradeRoutine": "Rutin",
-      "gradeUnclassified": "Belum diklasifikasi",
+      "gradeUnclassified": "Belum dinilai",
       "impactContext": "Konteks dampak",
       "inPortfolio": "Di portofolio",
       "inWatchlist": "Di daftar pantau",

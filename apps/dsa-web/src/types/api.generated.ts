@@ -247,6 +247,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alerts/rules/compile-nl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compile natural-language text into a whitelist-bounded alert rule payload
+         * @description C5 / issue #1133: compile NL monitor phrases without executing user code.
+         *
+         *     Returns success | need_clarification | rejected. Does not persist rules.
+         *     Callers may POST the returned rule payload to /rules when outcome=success.
+         */
+        post: operations["compile_rule_nl_api_v1_alerts_rules_compile_nl_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/alerts/rules/{rule_id}": {
         parameters: {
             query?: never;
@@ -3493,6 +3516,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocks/{stock_code}/money-flow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get SmartMoney money-flow footprint for a stock
+         * @description Returns main-force order-size bucket ratios (when available) with as-of, source, and explicit degradation. Gated by SMARTMONEY_ENABLED: when disabled the response is status=disabled with no provider network I/O. Decoupled from quote/history fetches. Research evidence only.
+         */
+        get: operations["getStockMoneyFlow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/{stock_code}/quote": {
         parameters: {
             query?: never;
@@ -4183,6 +4226,22 @@ export interface components {
             /** Soul Version */
             soul_version: string;
         };
+        /** AlertAutoAnalysisStatus */
+        AlertAutoAnalysisStatus: {
+            /** Pipeline */
+            pipeline?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Status */
+            status: string;
+            /** Stock Code */
+            stock_code?: string | null;
+            /**
+             * Submitted
+             * @default false
+             */
+            submitted: boolean;
+        };
         /** AlertDeleteResponse */
         AlertDeleteResponse: {
             /** Deleted */
@@ -4246,6 +4305,7 @@ export interface components {
             source_name?: string | null;
             /** Source Url */
             source_url?: string | null;
+            suggested_action?: components["schemas"]["AlertSuggestedAction"] | null;
             /** What Happened */
             what_happened?: string | null;
             /** Why It Matters */
@@ -4390,6 +4450,52 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** AlertRuleNlCompileRequest */
+        AlertRuleNlCompileRequest: {
+            /**
+             * Auto Analysis
+             * @description When true, attach notification_policy.auto_analysis=true to a successful compile.
+             */
+            auto_analysis?: boolean | null;
+            /**
+             * Default Enabled
+             * @default true
+             */
+            default_enabled: boolean;
+            /**
+             * Default Severity
+             * @default warning
+             * @enum {string}
+             */
+            default_severity: "info" | "warning" | "critical";
+            /** Text */
+            text: string;
+        };
+        /** AlertRuleNlCompileResponse */
+        AlertRuleNlCompileResponse: {
+            /** Clarifications */
+            clarifications?: string[];
+            /** Matched Metric */
+            matched_metric?: string | null;
+            /** Matched Symbols */
+            matched_symbols?: string[];
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "success" | "need_clarification" | "rejected";
+            /** Rejected Reason */
+            rejected_reason?: string | null;
+            /** Rule */
+            rule?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** AlertRuleTargetResult */
         AlertRuleTargetResult: {
             /** Display Target */
@@ -4479,6 +4585,22 @@ export interface components {
             /** Target Scope */
             target_scope?: ("single_symbol" | "watchlist" | "portfolio_holdings" | "portfolio_account" | "market") | null;
         };
+        /** AlertSuggestedAction */
+        AlertSuggestedAction: {
+            /** Action Code */
+            action_code: string;
+            auto_analysis?: components["schemas"]["AlertAutoAnalysisStatus"] | null;
+            /** Deep Links */
+            deep_links?: {
+                [key: string]: string;
+            } | null;
+            /** Label */
+            label?: string | null;
+            /** Rationale */
+            rationale?: string | null;
+            /** Relevance */
+            relevance?: string[];
+        };
         /** AlertTriggerItem */
         AlertTriggerItem: {
             /** Alert Type */
@@ -4489,6 +4611,7 @@ export interface components {
              * @description 公开摘要来源：alert_trigger_market_context / analysis_history_snapshot / evaluator_snapshot / legacy_text / null
              */
             analysis_visibility_source?: string | null;
+            auto_analysis?: components["schemas"]["AlertAutoAnalysisStatus"] | null;
             /** Data Source */
             data_source?: string | null;
             /** Data Timestamp */
@@ -4515,6 +4638,7 @@ export interface components {
             severity?: ("info" | "warning" | "critical") | null;
             /** Status */
             status: string;
+            suggested_action?: components["schemas"]["AlertSuggestedAction"] | null;
             /** Target */
             target: string;
             /** Threshold */
@@ -9975,6 +10099,173 @@ export interface components {
             status: components["schemas"]["TaskStatusEnum"];
             /** Task Id */
             task_id: string;
+        };
+        /**
+         * MoneyFlowSnapshotResponse
+         * @description Strict finite snapshot exposed by the Stock Details API.
+         */
+        MoneyFlowSnapshotResponse: {
+            /**
+             * Amount Scale
+             * @enum {string}
+             */
+            amount_scale: "unknown" | "yuan" | "thousand_yuan" | "ten_thousand_yuan" | "million_yuan";
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /**
+             * Attitude
+             * @enum {string}
+             */
+            attitude: "inflow" | "outflow" | "neutral" | "unknown";
+            /** Bucket Definition */
+            bucket_definition: string;
+            /** Calibration Note */
+            calibration_note: string;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Close */
+            close?: number | null;
+            /** Code */
+            code: string;
+            /**
+             * Completeness
+             * @enum {string}
+             */
+            completeness: "complete" | "partial";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Large Net Inflow */
+            large_net_inflow?: number | null;
+            /** Large Net Inflow Ratio */
+            large_net_inflow_ratio?: number | null;
+            /** Main Net Inflow */
+            main_net_inflow?: number | null;
+            /** Main Net Inflow 10D */
+            main_net_inflow_10d?: number | null;
+            /** Main Net Inflow 5D */
+            main_net_inflow_5d?: number | null;
+            /** Main Net Inflow Ratio */
+            main_net_inflow_ratio?: number | null;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "cn" | "hk" | "us" | "jp" | "kr" | "tw";
+            /** Medium Net Inflow */
+            medium_net_inflow?: number | null;
+            /** Medium Net Inflow Ratio */
+            medium_net_inflow_ratio?: number | null;
+            /** Observed Days */
+            observed_days: number;
+            /** Requested Days */
+            requested_days: number;
+            /** Small Net Inflow */
+            small_net_inflow?: number | null;
+            /** Small Net Inflow Ratio */
+            small_net_inflow_ratio?: number | null;
+            /** Source */
+            source: string;
+            /** Super Large Net Inflow */
+            super_large_net_inflow?: number | null;
+            /** Super Large Net Inflow Ratio */
+            super_large_net_inflow_ratio?: number | null;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * MoneyFlowSourceAttempt
+         * @description Bounded public projection of one provider attempt.
+         */
+        MoneyFlowSourceAttempt: {
+            /** Error Code */
+            error_code?: string | null;
+            /** Latency Ms */
+            latency_ms?: number | null;
+            /** Provider */
+            provider: string;
+            /** Provider Date */
+            provider_date?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * MoneyFlowViewResponse
+         * @description User-facing SmartMoney / main-force money-flow view (Issue #989).
+         */
+        MoneyFlowViewResponse: {
+            /**
+             * Age Days
+             * @description Session age in days
+             */
+            age_days?: number | null;
+            /**
+             * As Of
+             * @description Observation as-of timestamp
+             */
+            as_of?: string | null;
+            /** Cache State */
+            cache_state?: ("miss" | "fresh" | "stale") | null;
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Enabled
+             * @description Whether SMARTMONEY_ENABLED is on
+             */
+            enabled: boolean;
+            /** Error Code */
+            error_code?: string | null;
+            /** Fallback From */
+            fallback_from?: string | null;
+            /**
+             * Fetched At
+             * @description UTC fetch timestamp
+             */
+            fetched_at?: string | null;
+            /** Market */
+            market?: ("cn" | "hk" | "us" | "jp" | "kr" | "tw") | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Provider Date
+             * @description Provider session date
+             */
+            provider_date?: string | null;
+            /**
+             * Requested Days
+             * @description Requested history window
+             */
+            requested_days: number;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "money_flow_view/1.0";
+            snapshot?: components["schemas"]["MoneyFlowSnapshotResponse"] | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * Source Chain
+             * @description Provider attempt chain
+             */
+            source_chain?: components["schemas"]["MoneyFlowSourceAttempt"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disabled" | "available" | "partial" | "not_supported" | "fetch_failed" | "empty" | "stale" | "fallback";
+            /**
+             * Stock Code
+             * @description Canonical stock code
+             */
+            stock_code: string;
+            /** Warnings */
+            warnings?: string[];
         };
         /**
          * NewsIntelItem
@@ -18667,6 +18958,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertRuleItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compile_rule_nl_api_v1_alerts_rules_compile_nl_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleNlCompileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleNlCompileResponse"];
                 };
             };
             /** @description Bad Request */
@@ -29043,6 +29385,58 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getStockMoneyFlow: {
+        parameters: {
+            query?: {
+                /** @description History window in sessions (1–20) */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Money-flow / SmartMoney footprint view */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoneyFlowViewResponse"];
+                };
+            };
+            /** @description Invalid stock code or days */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
             500: {
                 headers: {
                     [name: string]: unknown;

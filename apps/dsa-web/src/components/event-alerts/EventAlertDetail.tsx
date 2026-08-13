@@ -56,6 +56,28 @@ const EventAlertDetail: React.FC<EventAlertDetailProps> = ({ item = null }) => {
             <div><dt className="text-xs text-muted-text">{text.triggeredAt}</dt><dd>{item.triggeredAt ? formatUiDateTime(item.triggeredAt, language, { dateStyle: 'medium', timeStyle: 'short' }) : '--'}</dd></div>
           </dl>
         </section>
+        {(item.suggestedActionLabel || item.suggestedActionRationale || item.autoAnalysisStatus) ? (
+          <section className="space-y-2 rounded-md border border-border bg-surface-muted/40 p-3" data-testid="event-alert-suggested-action">
+            <h3 className="text-sm font-medium text-primary-text">{text.suggestedAction}</h3>
+            {item.suggestedActionLabel ? <p className="text-sm text-secondary-text">{item.suggestedActionLabel}</p> : null}
+            {item.suggestedActionRationale ? <p className="text-sm text-secondary-text">{item.suggestedActionRationale}</p> : null}
+            {item.autoAnalysisStatus ? (
+              <p className="text-xs text-muted-text" data-testid="event-alert-auto-analysis-status">
+                {text.autoAnalysisStatus}: {item.autoAnalysisStatus}
+              </p>
+            ) : null}
+            {item.suggestedActionLinks?.analysis || item.suggestedActionLinks?.stock_detail ? (
+              <div className="flex flex-wrap gap-2 text-sm">
+                {item.suggestedActionLinks?.analysis ? (
+                  <a className="text-primary underline" href={item.suggestedActionLinks.analysis}>{text.openAnalysis}</a>
+                ) : null}
+                {item.suggestedActionLinks?.stock_detail ? (
+                  <a className="text-primary underline" href={item.suggestedActionLinks.stock_detail}>{text.openStock}</a>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         {item.degraded ? <InlineAlert title={text.impactContext} message={text.degradedNote} variant="warning" /> : null}
       </div>
     </Card>
