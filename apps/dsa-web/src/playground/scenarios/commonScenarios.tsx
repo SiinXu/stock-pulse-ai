@@ -3,6 +3,8 @@ import { useRef, useState, type ReactNode } from 'react';
 import { Bell, Check, Copy, Info, Save, Search, Trash2 } from 'lucide-react';
 import { createParsedApiError } from '../../api/error';
 import { AnalysisPhaseSelect } from '../../components/analysis';
+import { HelpKeyButton } from '../../components/help';
+import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
 import {
   AdvancedFilterSheet,
   Alert,
@@ -1065,12 +1067,24 @@ const ModalStory = () => {
   return <><Button variant="primary" onClick={() => setOpen(true)}>{text.details}</Button><Modal isOpen={open} onClose={() => setOpen(false)} title={text.details} description={text.fieldHint}><p className="text-sm text-secondary-text">{text.preview}</p></Modal></>;
 };
 
+
+const HelpKeyButtonStory = () => {
+  const text = useSampleText();
+  return (
+    <Surface className="flex min-h-24 items-center justify-center gap-2 p-4">
+      <span className="text-sm text-secondary-text">{text.preview}</span>
+      <HelpKeyButton helpKey={EDUCATION_HELP_KEYS.riskLevelHigh} data-testid="playground-help-key-button" />
+    </Surface>
+  );
+};
+
 export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'analysis-phase-select': AnalysisPhaseSelectStory,
   button: ButtonStory,
   pressable: PressableStory,
   'selection-chip': SelectionChipStory,
   'icon-button': IconButtonStory,
+  'help-key-button': HelpKeyButtonStory,
   spinner: SpinnerStory,
   progress: ProgressStory,
   'file-input': FileInputStory,
