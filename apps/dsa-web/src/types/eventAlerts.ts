@@ -32,4 +32,8 @@ export interface EventAlertDisplayItem {
   degraded: boolean; inWatchlist: boolean; inPortfolio: boolean; weightPct?: number | null;
   relatedAnalysis?: string | null; matchedCount?: number | null;
   impactContext?: EventAlertImpactContext | null; eventContext?: EventAlertEventContext | null;
+  suggestedActionLabel?: string | null;
+  suggestedActionRationale?: string | null;
+  suggestedActionLinks?: Record<string, string> | null;
+  autoAnalysisStatus?: string | null;
 }
