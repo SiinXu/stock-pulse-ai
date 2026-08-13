@@ -2,9 +2,11 @@ import type React from 'react';
 import { ListTree } from 'lucide-react';
 import type { AnalysisReport, AnalysisResult, DecisionAction } from '../../types/analysis';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { beginnerRiskHelpKey } from '../../locales/educationHelpKeys';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, Button, Surface } from '../common';
+import { HelpKeyButton } from '../help';
 import { ReportRiskGateBanner } from './ReportRiskGateBanner';
 import { buildRiskGatePresentation } from './reportRiskGateUtils';
 
@@ -66,6 +68,10 @@ const BeginnerReportSummary: React.FC<BeginnerReportSummaryProps> = ({
           <Badge variant={risk === 'elevated' ? 'danger' : risk === 'moderate' ? 'warning' : 'default'}>
             {riskLabel}
           </Badge>
+          <HelpKeyButton
+            helpKey={beginnerRiskHelpKey(risk)}
+            data-testid="beginner-risk-help"
+          />
         </div>
       </header>
 
