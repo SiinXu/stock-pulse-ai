@@ -1390,6 +1390,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects agent orchestration depth and report committee sections.'],
     notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
   },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: 'Research Persona Preset',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: 'Custom Research Stance',
+  },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
     summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
@@ -2414,6 +2420,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: [
       'Bounds per-call analysis cost.',
     ],
+  },
+  'settings.system.resume': {
+    title: 'Resume & reproduce',
   },
 };
 

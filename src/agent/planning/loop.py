@@ -34,6 +34,7 @@ from src.agent.planning.observations import (
     compact_observation_summary,
     interpret_tool_payload,
 )
+from src.agent.planning.trace import PlanningTraceRecorder
 from src.agent.planning.types import AgentPlan, PlanStep
 from src.utils.sanitize import log_safe_exception
 
@@ -116,6 +117,7 @@ def execute_plan_loop(
     build_args = argument_builder or default_argument_builder
     started = time.perf_counter()
     deadline = time.monotonic() + float(resolved.timeout_seconds)
+    tracer = PlanningTraceRecorder()
 
     if not callable(tool_invoker):
         return _terminal(
@@ -125,6 +127,9 @@ def execute_plan_loop(
             error_code="invalid_invoker",
             plan=plan,
             started=started,
+            tracer=tracer,
+            max_total_tool_calls=resolved.max_total_tool_calls,
+            max_observation_replans=resolved.max_observation_replans,
         )
 
     tools = [name.strip() for name in available_tools if isinstance(name, str) and name.strip()]
@@ -144,7 +149,20 @@ def execute_plan_loop(
             "plan_id": initial_plan_id,
             "step_count": plan.step_count,
             "max_total_tool_calls": resolved.max_total_tool_calls,
+            "planning_run_id": tracer.run_id,
         },
+    )
+    tracer.emit_plan(
+        plan_id=initial_plan_id,
+        step_count=plan.step_count,
+        role="initial",
+        budget=tracer.budget_attrs(
+            tool_call_count=0,
+            max_total_tool_calls=resolved.max_total_tool_calls,
+            observation_replans=0,
+            max_observation_replans=resolved.max_observation_replans,
+            planning_tokens=0,
+        ),
     )
 
     try:
@@ -166,6 +184,9 @@ def execute_plan_loop(
                     started=started,
                     cancelled=True,
                     phase_status="cancelled",
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
             if time.monotonic() >= deadline:
                 return _finish(
@@ -183,6 +204,9 @@ def execute_plan_loop(
                     started=started,
                     timed_out=True,
                     phase_status="timed_out",
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
             step = current_plan.steps[step_index]
@@ -204,8 +228,29 @@ def execute_plan_loop(
                 max_summary_chars=resolved.max_result_summary_chars,
                 deadline=deadline,
                 cancelled_check=cancelled_check,
+                tracer=tracer,
+                plan_id=current_plan.plan_id,
+                observation_replans=observation_replans,
+                max_observation_replans=resolved.max_observation_replans,
+                planning_tokens=planning_tokens,
             )
             observations.append(step_obs)
+            budget_snapshot = tracer.budget_attrs(
+                tool_call_count=tool_call_count,
+                max_total_tool_calls=resolved.max_total_tool_calls,
+                observation_replans=observation_replans,
+                max_observation_replans=resolved.max_observation_replans,
+                planning_tokens=planning_tokens,
+            )
+            tracer.emit_observation(
+                step=step.id,
+                status=step_obs.status,
+                error_type=step_obs.failure_reason,
+                failure_reason=step_obs.failure_reason,
+                tool_count=len(step_obs.tool_calls),
+                plan_id=current_plan.plan_id,
+                budget=budget_snapshot,
+            )
             emit_phase_end(
                 "plan_step",
                 status=step_obs.status,
@@ -229,6 +274,9 @@ def execute_plan_loop(
                     started=started,
                     cancelled=True,
                     phase_status="cancelled",
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
             if budget_hit == "timed_out":
                 return _finish(
@@ -246,6 +294,9 @@ def execute_plan_loop(
                     started=started,
                     timed_out=True,
                     phase_status="timed_out",
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
             if budget_hit == "max_tool_calls_exceeded":
                 return _finish(
@@ -262,6 +313,9 @@ def execute_plan_loop(
                     plans_trace=plans_trace,
                     started=started,
                     phase_status="failed",
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
             if step_obs.status == "succeeded":
@@ -298,8 +352,12 @@ def execute_plan_loop(
                     plans_trace=plans_trace,
                     started=started,
                     phase_status="failed",
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
+            replan_reason = step_obs.failure_reason or "step_failed"
             replan_outcome = _replan(
                 task=task or current_plan.goal,
                 available_tools=tools,
@@ -311,16 +369,35 @@ def execute_plan_loop(
             )
             observation_replans += 1
             planning_tokens += int(getattr(replan_outcome, "planning_tokens", 0) or 0)
+            replan_budget = tracer.budget_attrs(
+                tool_call_count=tool_call_count,
+                max_total_tool_calls=resolved.max_total_tool_calls,
+                observation_replans=observation_replans,
+                max_observation_replans=resolved.max_observation_replans,
+                planning_tokens=planning_tokens,
+            )
 
             if (
                 not getattr(replan_outcome, "applied", False)
                 or getattr(replan_outcome, "plan", None) is None
             ):
+                fail_reason = (
+                    getattr(replan_outcome, "fallback_reason", None) or "replan_failed"
+                )
+                tracer.emit_replan(
+                    reason=replan_reason,
+                    previous_plan_id=current_plan.plan_id,
+                    new_plan_id=None,
+                    failed_step=step.id,
+                    observation_replans=observation_replans,
+                    budget=replan_budget,
+                    error_type=getattr(replan_outcome, "error_code", None)
+                    or fail_reason,
+                )
                 return _finish(
                     success=False,
                     status="replan_failed",
-                    reason=getattr(replan_outcome, "fallback_reason", None)
-                    or "replan_failed",
+                    reason=fail_reason,
                     error_code=getattr(replan_outcome, "error_code", None)
                     or "replan_failed",
                     plan=current_plan,
@@ -332,6 +409,9 @@ def execute_plan_loop(
                     plans_trace=plans_trace,
                     started=started,
                     phase_status="failed",
+                    tracer=tracer,
+                    max_total_tool_calls=resolved.max_total_tool_calls,
+                    max_observation_replans=resolved.max_observation_replans,
                 )
 
             new_plan: AgentPlan = replan_outcome.plan
@@ -344,6 +424,21 @@ def execute_plan_loop(
                     "replan_index": observation_replans,
                 }
             )
+            tracer.emit_replan(
+                reason=replan_reason,
+                previous_plan_id=current_plan.plan_id,
+                new_plan_id=new_plan.plan_id,
+                failed_step=step.id,
+                observation_replans=observation_replans,
+                budget=replan_budget,
+            )
+            tracer.emit_plan(
+                plan_id=new_plan.plan_id,
+                step_count=new_plan.step_count,
+                role="replan",
+                step=step.id,
+                budget=replan_budget,
+            )
             emit_decision(
                 "plan_replan",
                 attrs={
@@ -351,6 +446,7 @@ def execute_plan_loop(
                     "new_plan_id": new_plan.plan_id,
                     "observation_replans": observation_replans,
                     "failed_step_id": step.id,
+                    "planning_run_id": tracer.run_id,
                 },
             )
             # Replace the active plan and restart from the first step of the
@@ -361,7 +457,7 @@ def execute_plan_loop(
         return _finish(
             success=True,
             status="succeeded",
-            reason=None,
+            reason="completed",
             error_code=None,
             plan=current_plan,
             initial_plan_id=initial_plan_id,
@@ -372,6 +468,9 @@ def execute_plan_loop(
             plans_trace=plans_trace,
             started=started,
             phase_status="success",
+            tracer=tracer,
+            max_total_tool_calls=resolved.max_total_tool_calls,
+            max_observation_replans=resolved.max_observation_replans,
         )
     except Exception as exc:  # broad-exception: fallback_recorded - loop must never raise into callers as fake success
         log_safe_exception(
@@ -395,6 +494,9 @@ def execute_plan_loop(
             plans_trace=plans_trace,
             started=started,
             phase_status="failed",
+            tracer=tracer,
+            max_total_tool_calls=resolved.max_total_tool_calls,
+            max_observation_replans=resolved.max_observation_replans,
         )
 
 
@@ -409,6 +511,11 @@ def _execute_step(
     max_summary_chars: int,
     deadline: float,
     cancelled_check: Optional[CancelledCheck],
+    tracer: Optional[PlanningTraceRecorder] = None,
+    plan_id: Optional[str] = None,
+    observation_replans: int = 0,
+    max_observation_replans: int = 0,
+    planning_tokens: int = 0,
 ) -> tuple[StepObservation, int, Optional[str]]:
     """Run one step's expected tools; return observation, new count, optional fence."""
     calls: List[ToolCallObservation] = []
@@ -494,12 +601,27 @@ def _execute_step(
         args = build_args(tool_name, step, context)
         if not isinstance(args, dict):
             args = {}
+        argument_keys = sorted(str(k) for k in args.keys())[:16]
+        if tracer is not None:
+            tracer.emit_action(
+                tool_name=tool_name,
+                step=step.id,
+                argument_keys=argument_keys,
+                plan_id=plan_id,
+                budget=tracer.budget_attrs(
+                    tool_call_count=tool_call_count,
+                    max_total_tool_calls=max_total_tool_calls,
+                    observation_replans=observation_replans,
+                    max_observation_replans=max_observation_replans,
+                    planning_tokens=planning_tokens,
+                ),
+            )
         emit_tool_start(
             tool_name,
             step=step.id,
             attrs={
                 "plan_step_id": step.id,
-                "argument_keys": sorted(str(k) for k in args.keys())[:16],
+                "argument_keys": argument_keys,
             },
         )
         call_started = time.perf_counter()
@@ -654,16 +776,38 @@ def _terminal(
     error_code: Optional[str],
     plan: Optional[AgentPlan],
     started: float,
+    tracer: Optional[PlanningTraceRecorder] = None,
+    max_total_tool_calls: int = 0,
+    max_observation_replans: int = 0,
 ) -> PlanExecutionResult:
-    return PlanExecutionResult(
+    active = tracer or PlanningTraceRecorder(enabled=False)
+    if reason and plan is not None:
+        active.emit_plan(
+            plan_id=plan.plan_id,
+            step_count=plan.step_count,
+            role="initial",
+            budget=active.budget_attrs(
+                max_total_tool_calls=max_total_tool_calls,
+                max_observation_replans=max_observation_replans,
+            ),
+        )
+    return _finish(
         success=success,
         status=status,
-        plan=plan,
-        initial_plan_id=plan.plan_id if plan is not None else None,
-        final_plan_id=plan.plan_id if plan is not None else None,
         reason=reason,
         error_code=error_code,
-        duration_ms=max(0, int((time.perf_counter() - started) * 1000)),
+        plan=plan,
+        initial_plan_id=plan.plan_id if plan is not None else None,
+        observations=[],
+        tool_call_count=0,
+        observation_replans=0,
+        planning_tokens=0,
+        plans_trace=[],
+        started=started,
+        phase_status="failed" if not success else "success",
+        tracer=active,
+        max_total_tool_calls=max_total_tool_calls,
+        max_observation_replans=max_observation_replans,
     )
 
 
@@ -684,8 +828,30 @@ def _finish(
     cancelled: bool = False,
     timed_out: bool = False,
     phase_status: str = "success",
+    tracer: Optional[PlanningTraceRecorder] = None,
+    max_total_tool_calls: int = 0,
+    max_observation_replans: int = 0,
 ) -> PlanExecutionResult:
     duration_ms = max(0, int((time.perf_counter() - started) * 1000))
+    # Terminate reason is always present on stop (#1078 acceptance).
+    terminal_reason = (reason or "").strip() or ("completed" if success else status or "failed")
+    active = tracer
+    if active is not None:
+        budget = active.budget_attrs(
+            tool_call_count=tool_call_count,
+            max_total_tool_calls=max_total_tool_calls,
+            observation_replans=observation_replans,
+            max_observation_replans=max_observation_replans,
+            planning_tokens=planning_tokens,
+        )
+        active.emit_terminate(
+            reason=terminal_reason,
+            status=status,
+            success=success,
+            error_type=error_code,
+            plan_id=plan.plan_id if plan is not None else initial_plan_id,
+            budget=budget,
+        )
     result = PlanExecutionResult(
         success=success,
         status=status,
@@ -696,12 +862,14 @@ def _finish(
         tool_call_count=tool_call_count,
         observation_replans=observation_replans,
         planning_tokens=planning_tokens,
-        reason=reason,
+        reason=reason if reason is not None else (terminal_reason if success else None),
         error_code=error_code,
         cancelled=cancelled,
         timed_out=timed_out,
         duration_ms=duration_ms,
         plans=list(plans_trace),
+        trace_events=active.events if active is not None else [],
+        planning_run_id=active.run_id if active is not None else None,
     )
     emit_phase_end(
         "plan_execution",
@@ -712,7 +880,8 @@ def _finish(
             "status": status,
             "tool_call_count": tool_call_count,
             "observation_replans": observation_replans,
-            "reason": reason or "",
+            "reason": terminal_reason,
+            "planning_run_id": active.run_id if active is not None else "",
         },
     )
     emit_decision(
@@ -723,6 +892,8 @@ def _finish(
             "plan_id": plan.plan_id if plan is not None else "",
             "tool_call_count": tool_call_count,
             "observation_replans": observation_replans,
+            "reason": terminal_reason,
+            "planning_run_id": active.run_id if active is not None else "",
         },
     )
     return result

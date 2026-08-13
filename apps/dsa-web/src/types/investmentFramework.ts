@@ -13,7 +13,22 @@ export interface InvestmentFrameworkContent {
   riskRules?: string[];
   trackingCriteria?: string[];
   freeFormRules?: string | null;
+  researchStance?: InvestmentFrameworkResearchStance | null;
 }
+
+export interface InvestmentFrameworkResearchStance {
+  [key: string]: unknown;
+  presetId?: 'rational_analyst' | 'risk_guardian' | 'long_term_compounder' | null;
+  customText?: string | null;
+  preferredLensSkillIds?: InvestmentFrameworkPersonaSkillId[];
+}
+
+export type InvestmentFrameworkPersonaSkillId =
+  | 'persona_value_moat'
+  | 'persona_mental_models'
+  | 'persona_contrarian_deep_value'
+  | 'persona_disruptive_growth'
+  | 'persona_tail_risk';
 
 export interface InvestmentFrameworkDecisionBranch {
   [key: string]: unknown;
