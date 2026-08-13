@@ -13,6 +13,10 @@ from unittest.mock import MagicMock, patch
 from src.analyzer import AnalysisResult
 from src.config import Config
 from src.core.pipeline import StockAnalysisPipeline
+from src.core.outbound_delivery import (
+    reset_outbound_notifications_enabled,
+    set_outbound_notifications_enabled,
+)
 from src.core.pipeline_stage_results import (
     PipelineStageName,
     PipelineStageResult,
@@ -145,6 +149,83 @@ def test_persist_retry_does_not_duplicate_committed_history() -> None:
     assert pipeline.db.save_analysis_history.call_count == 2
     assert snapshots.call_count == 2
     pipeline._extract_decision_signal_after_history_save.assert_called_once()
+
+
+def test_concurrent_persistence_keeps_alert_delivery_intent_request_local() -> None:
+    """Opposite API delivery intents must not leak through a shared pipeline."""
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    pipeline.save_context_snapshot = True
+    pipeline.config = SimpleNamespace(
+        high_disagreement_alerts_enabled=True,
+        high_disagreement_threshold=0.6,
+        report_language="en",
+    )
+    pipeline._extract_decision_signal_after_history_save = MagicMock()
+
+    class _Database:
+        def save_analysis_history(self, *, result, **kwargs):
+            _ = kwargs
+            return 101 if result.code == "SEND" else 102
+
+    sent_content: list[str] = []
+
+    class _Notifier:
+        def send_with_results(self, content: str, **kwargs):
+            _ = kwargs
+            sent_content.append(content)
+            return SimpleNamespace(success=True, status="sent")
+
+    pipeline.db = _Database()
+    pipeline.notifier = _Notifier()
+    barrier = threading.Barrier(2)
+
+    def _persist(code: str, enabled: bool) -> PipelineStageResult:
+        token = set_outbound_notifications_enabled(enabled)
+        try:
+            barrier.wait(timeout=2)
+            result = SimpleNamespace(
+                code=code,
+                name=code,
+                query_id=f"query-{code}",
+                report_language="en",
+                diagnostic_context_snapshot=None,
+                dashboard={
+                    "disagreement_handling": {
+                        "schema_version": "disagreement-handling-v1",
+                        "enabled": True,
+                        "high_disagreement": True,
+                        "disagreement_score": 0.9,
+                        "points": [],
+                    }
+                },
+            )
+            return pipeline._persist_analysis_history_stage(
+                result=result,
+                query_id=f"query-{code}",
+                report_type="simple",
+                news_content=None,
+                context_snapshot_factory=dict,
+                portfolio_context=None,
+                failure_reason="not saved",
+                failure_message="persistence failed",
+                failure_error_code="persistence_failed",
+            )
+        finally:
+            reset_outbound_notifications_enabled(token)
+
+    with patch(
+        "src.services.skill_opinion_sample_service.SkillOpinionSampleService.maybe_materialize_after_history_save"
+    ):
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            enabled = executor.submit(_persist, "SEND", True)
+            disabled = executor.submit(_persist, "SKIP", False)
+            assert enabled.result(timeout=3).status == PipelineStageStatus.SUCCESS
+            assert disabled.result(timeout=3).status == PipelineStageStatus.SUCCESS
+
+    assert len(sent_content) == 1
+    assert "SEND" in sent_content[0]
+    assert "SKIP" not in sent_content[0]
 
 
 class _PartialNotifier:

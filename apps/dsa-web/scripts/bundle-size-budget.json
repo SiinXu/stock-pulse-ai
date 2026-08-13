@@ -162,7 +162,7 @@
       "match": "assets/PortfolioPage-*.js",
       "maxGzipBytes": 26601,
       "measuredGzipBytes": 26401,
-      "note": "GitHub Actions Linux measurement after committee insights were split behind a dynamic import; the route retains only Vite dependency-map hashes. Measured 26401 B on the PR/main synthetic merge + 200 B headroom."
+      "note": "GitHub Actions Linux measurement after committee insights were split behind a dynamic import; route code unchanged on this PR; Vite dependency-map hashes; measured 26401 B + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",
