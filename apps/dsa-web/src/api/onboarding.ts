@@ -15,6 +15,24 @@ import type {
 } from '../types/onboarding';
 
 const BASE_PATH = '/api/v1/onboarding';
+import type { components } from '../types/api.generated';
+type OpenApiOnboardingState = components['schemas']['OnboardingStateResponse'];
+type OpenApiOnboardingPlan = components['schemas']['OnboardingPlanResponse'];
+type OpenApiOnboardingApply = components['schemas']['OnboardingApplyResponse'];
+type OpenApiOnboardingReset = components['schemas']['OnboardingResetResponse'];
+type _AssertState = keyof OpenApiOnboardingState;
+type _AssertPlan = keyof OpenApiOnboardingPlan;
+type _AssertApply = keyof OpenApiOnboardingApply;
+type _AssertReset = keyof OpenApiOnboardingReset;
+const _stateAnchor: _AssertState = 'exists';
+const _planAnchor: _AssertPlan = 'week_plan';
+const _applyAnchor: _AssertApply = 'applied_keys';
+const _resetAnchor: _AssertReset = 'reset';
+void _stateAnchor;
+void _planAnchor;
+void _applyAnchor;
+void _resetAnchor;
+
 
 const reportLanguageSchema = z.enum(['zh', 'en', 'ko']);
 const stringRecordSchema = z.record(z.string(), z.string());
