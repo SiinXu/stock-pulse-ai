@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -314,3 +316,158 @@ def test_audit_completion_failure_after_write_is_distinct(tmp_path: Path) -> Non
         service.register(_llm_payload(capability_id="llm:written"))
     # Mutation must have persisted even though completion audit failed.
     assert store.get("llm:written") is not None
+
+
+def test_update_and_retire_audit_completion_failure_after_write_is_distinct(
+    tmp_path: Path,
+) -> None:
+    service, _ = _service(tmp_path)
+    service.register(_llm_payload(capability_id="llm:written"))
+
+    class BoomRecorder:
+        def record_attempt(self, **fields):
+            return None
+
+        def record_completion(self, **fields):
+            raise RuntimeError("completion down")
+
+    from src.capability_registry.write_service import (
+        CapabilityWriteAuditCompletionUnavailable,
+    )
+
+    service._auditor = CapabilityWriteAuditor(recorder=BoomRecorder())
+    with pytest.raises(CapabilityWriteAuditCompletionUnavailable):
+        service.update("llm:written", {"cost_tier": "low"})
+    updated = service.store.get("llm:written")
+    assert updated is not None
+    assert updated.cost_tier == "low"
+
+    with pytest.raises(CapabilityWriteAuditCompletionUnavailable):
+        service.retire("llm:written")
+    retired = service.store.get("llm:written")
+    assert retired is not None
+    assert retired.status == "retired"
+
+
+def test_failure_audit_does_not_mask_domain_error(tmp_path: Path) -> None:
+    store = CapabilityWriteStore(tmp_path / "registry.json", clock=lambda: FIXED_NOW)
+
+    class BoomRecorder:
+        def record_attempt(self, **fields):
+            return None
+
+        def record_completion(self, **fields):
+            raise RuntimeError("completion down")
+
+    from src.capability_registry.write_service import (
+        CapabilityWriteAuditCompletionUnavailable,
+    )
+
+    service = CapabilityWriteService(
+        store=store,
+        auditor=CapabilityWriteAuditor(recorder=BoomRecorder()),
+        clock=lambda: FIXED_NOW,
+    )
+    with pytest.raises(CapabilityWriteAuditCompletionUnavailable):
+        service.register(_llm_payload(capability_id="llm:written"))
+    with pytest.raises(CapabilityWriteError) as missing:
+        service.update("llm:missing", {"display_name": "gone"})
+    assert missing.value.error_code == "capability_not_found"
+    with pytest.raises(CapabilityWriteError) as duplicate:
+        service.register(_llm_payload(capability_id="llm:written"))
+    assert duplicate.value.error_code == "capability_already_exists"
+
+
+def test_store_mutate_serializes_concurrent_writers(tmp_path: Path) -> None:
+    store = CapabilityWriteStore(tmp_path / "registry.json", clock=lambda: FIXED_NOW)
+    now = FIXED_NOW.isoformat()
+    started = threading.Event()
+    release = threading.Event()
+    errors: list[BaseException] = []
+
+    def _entry(capability_id: str) -> WriteCapabilityEntry:
+        return WriteCapabilityEntry(
+            capability_id=capability_id,
+            domain="llm",
+            capability_type="llm_model",
+            version="1",
+            status="active",
+            provider=capability_id,
+            display_name=capability_id,
+            model_route="openai/gpt",
+            registered_at=now,
+            updated_at=now,
+            generation=1,
+        )
+
+    def writer_a() -> None:
+        try:
+            def add_a(snapshot: WriteRegistrySnapshot):
+                started.set()
+                assert release.wait(timeout=2)
+                return snapshot.entries + (_entry("llm:a"),)
+
+            store.mutate(add_a)
+        except BaseException as exc:
+            errors.append(exc)
+
+    def writer_b() -> None:
+        try:
+            assert started.wait(timeout=2)
+
+            def add_b(snapshot: WriteRegistrySnapshot):
+                return snapshot.entries + (_entry("llm:b"),)
+
+            store.mutate(add_b)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread_a = threading.Thread(target=writer_a)
+    thread_b = threading.Thread(target=writer_b)
+    thread_a.start()
+    assert started.wait(timeout=2)
+    thread_b.start()
+    time.sleep(0.05)
+    release.set()
+    thread_a.join(timeout=2)
+    thread_b.join(timeout=2)
+    assert errors == []
+    ids = {item.capability_id for item in store.load().entries}
+    assert ids == {"llm:a", "llm:b"}
+
+
+def test_replace_entries_rejects_stale_generation(tmp_path: Path) -> None:
+    store = CapabilityWriteStore(tmp_path / "registry.json", clock=lambda: FIXED_NOW)
+    store.replace_entries((), generation=1)
+    with pytest.raises(WriteRegistryStoreError) as exc:
+        store.replace_entries((), generation=1)
+    assert exc.value.error_code == "write_registry_generation_conflict"
+
+
+def test_api_route_uses_live_config_pins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, _ = _service(tmp_path)
+    monkeypatch.setattr(capabilities_endpoint, "get_capability_write_service", lambda: service)
+
+    from src.config import Config
+
+    pins = _empty_pins(
+        task_routing_enabled=True, litellm_model="openai/gpt-pinned",
+    )
+    monkeypatch.setattr(Config, "get_instance", classmethod(lambda cls: pins))
+
+    app = FastAPI()
+    app.include_router(capabilities_endpoint.router, prefix="/api/v1/capabilities")
+    client = TestClient(app)
+
+    routed = client.post(
+        "/api/v1/capabilities/route",
+        json={"task_class": "report"},
+    )
+    assert routed.status_code == 200, routed.text
+    body = routed.json()
+    assert body["reason_code"] == "manual_pin"
+    assert body["selected_model"] == "openai/gpt-pinned"
+    assert body["pin_source"] == "LITELLM_MODEL"
+    assert body["routing_enabled"] is True

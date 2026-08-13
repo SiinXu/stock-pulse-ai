@@ -145,6 +145,7 @@ def _map_write_error(exc: CapabilityWriteError) -> HTTPException:
         "write_registry_too_large": 503,
         "write_registry_schema_unsupported": 503,
         "write_registry_persist_failed": 503,
+        "write_registry_generation_conflict": 409,
     }.get(exc.error_code, 400)
     return HTTPException(
         status_code=status,
@@ -446,7 +447,7 @@ def route_task_model(request: TaskRouteRequest) -> TaskRouteDecisionResponse:
         ) from exc
 
     try:
-        config = Config()
+        config = Config.get_instance()
     except Exception as exc:  # broad-exception: fallback_recorded - routing still returns explicit decision
         log_safe_exception(
             logger, "Config unavailable for task routing", exc,

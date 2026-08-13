@@ -179,6 +179,28 @@ class CapabilityWriteStore:
             except FileNotFoundError:
                 pass
 
+    def mutate(
+        self,
+        mutator: Callable[
+            [WriteRegistrySnapshot],
+            Optional[Iterable[WriteCapabilityEntry]],
+        ],
+    ) -> WriteRegistrySnapshot:
+        """Load, apply ``mutator``, and persist under one lock.
+
+        Returning ``None`` leaves the on-disk snapshot unchanged. Concurrent
+        writers serialize here so a later persist cannot drop an earlier entry.
+        """
+
+        with self._lock:
+            snapshot = self._load_locked()
+            result = mutator(snapshot)
+            if result is None:
+                return snapshot
+            return self.replace_entries(
+                result, generation=snapshot.generation + 1,
+            )
+
     def replace_entries(
         self,
         entries: Iterable[WriteCapabilityEntry],
@@ -201,6 +223,12 @@ class CapabilityWriteStore:
             entries=ordered,
         )
         with self._lock:
+            current = self._load_locked()
+            if generation != current.generation + 1:
+                raise WriteRegistryStoreError(
+                    "write_registry_generation_conflict",
+                    "capability write registry was updated concurrently",
+                )
             self._write_locked(snapshot)
             return snapshot
 

@@ -102,6 +102,41 @@ class CapabilityWriteService:
                 raise CapabilityWriteAuditCompletionUnavailable(entry) from None
             raise CapabilityWriteAuditCompletionUnavailable(entry) from exc
 
+    def _complete_failure(
+        self,
+        *,
+        capability_id: str,
+        operation: str,
+        correlation_id: str,
+        error_code: str,
+        metadata: Mapping[str, Any] | None = None,
+        actor_type: str,
+        actor_id: str,
+    ) -> None:
+        """Best-effort failure audit; never mask the original domain error."""
+
+        try:
+            self._auditor.complete(
+                capability_id=capability_id,
+                operation=operation,
+                success=False,
+                correlation_id=correlation_id,
+                error_code=error_code,
+                metadata=metadata,
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - preserve domain error
+            log_safe_exception(
+                logger,
+                "Capability write failure audit completion unavailable",
+                exc,
+                error_code="capability_write_failure_audit_unavailable",
+                context={
+                    "capability_id": capability_id,
+                    "operation": operation,
+                },
+            )
 
     def list_entries(
         self,
@@ -144,21 +179,20 @@ class CapabilityWriteService:
         )
         try:
             entry = self._build_new_entry(payload, existing=None)
-            snapshot = self._store.load()
-            if any(item.capability_id == entry.capability_id for item in snapshot.entries):
-                raise CapabilityWriteError(
-                    "capability_already_exists",
-                    f"capability {entry.capability_id!r} is already registered",
-                )
-            self._store.replace_entries(
-                snapshot.entries + (entry,),
-                generation=snapshot.generation + 1,
-            )
+
+            def _apply(snapshot: WriteRegistrySnapshot) -> tuple[WriteCapabilityEntry, ...]:
+                if any(item.capability_id == entry.capability_id for item in snapshot.entries):
+                    raise CapabilityWriteError(
+                        "capability_already_exists",
+                        f"capability {entry.capability_id!r} is already registered",
+                    )
+                return snapshot.entries + (entry,)
+
+            self._store.mutate(_apply)
         except CapabilityWriteError as exc:
-            self._auditor.complete(
+            self._complete_failure(
                 capability_id=capability_id or "unknown",
                 operation="register",
-                success=False,
                 correlation_id=correlation_id,
                 error_code=exc.error_code,
                 actor_type=actor_type,
@@ -166,10 +200,9 @@ class CapabilityWriteService:
             )
             raise
         except WriteRegistryStoreError as exc:
-            self._auditor.complete(
+            self._complete_failure(
                 capability_id=capability_id or "unknown",
                 operation="register",
-                success=False,
                 correlation_id=correlation_id,
                 error_code=exc.error_code,
                 actor_type=actor_type,
@@ -177,10 +210,9 @@ class CapabilityWriteService:
             )
             raise CapabilityWriteError(exc.error_code, str(exc)) from exc
         except ValueError as exc:
-            self._auditor.complete(
+            self._complete_failure(
                 capability_id=capability_id or "unknown",
                 operation="register",
-                success=False,
                 correlation_id=correlation_id,
                 error_code="capability_validation_failed",
                 metadata={"detail": str(exc)[:200]},
@@ -189,10 +221,9 @@ class CapabilityWriteService:
             )
             raise CapabilityWriteError("capability_validation_failed", str(exc)) from exc
         except Exception:
-            self._auditor.complete(
+            self._complete_failure(
                 capability_id=capability_id or "unknown",
                 operation="register",
-                success=False,
                 correlation_id=correlation_id,
                 error_code="capability_register_failed",
                 actor_type=actor_type,
@@ -225,91 +256,98 @@ class CapabilityWriteService:
             actor_type=actor_type,
             actor_id=actor_id,
         )
+        produced: list[WriteCapabilityEntry] = []
         try:
-            snapshot = self._store.load()
-            existing = next(
-                (item for item in snapshot.entries if item.capability_id == capability_id),
-                None,
-            )
-            if existing is None:
-                raise CapabilityWriteError(
-                    "capability_not_found",
-                    f"capability {capability_id!r} is not registered",
+            def _apply(snapshot: WriteRegistrySnapshot) -> tuple[WriteCapabilityEntry, ...]:
+                existing = next(
+                    (item for item in snapshot.entries if item.capability_id == capability_id),
+                    None,
                 )
-            if existing.status == "retired":
-                raise CapabilityWriteError(
-                    "capability_retired",
-                    f"capability {capability_id!r} is retired and cannot be updated",
-                )
-            for field_name, message in (
-                ("domain", "domain cannot be changed after registration"),
-                ("capability_type", "capability_type cannot be changed after registration"),
-                ("capability_id", "capability_id cannot be changed after registration"),
-            ):
-                if field_name in payload and str(payload[field_name]).strip() != str(
-                    getattr(existing, field_name)
+                if existing is None:
+                    raise CapabilityWriteError(
+                        "capability_not_found",
+                        f"capability {capability_id!r} is not registered",
+                    )
+                if existing.status == "retired":
+                    raise CapabilityWriteError(
+                        "capability_retired",
+                        f"capability {capability_id!r} is retired and cannot be updated",
+                    )
+                for field_name, message in (
+                    ("domain", "domain cannot be changed after registration"),
+                    ("capability_type", "capability_type cannot be changed after registration"),
+                    ("capability_id", "capability_id cannot be changed after registration"),
                 ):
-                    raise CapabilityWriteError("capability_identity_immutable", message)
-            merged = {
-                "capability_id": existing.capability_id,
-                "domain": existing.domain,
-                "capability_type": existing.capability_type,
-                "version": existing.version,
-                "provider": existing.provider,
-                "display_name": existing.display_name,
-                "dependencies": list(existing.dependencies),
-                "tags": list(existing.tags),
-                "scopes": list(existing.scopes),
-                "markets": list(existing.markets),
-                "model_route": existing.model_route,
-                "cost_tier": existing.cost_tier,
-                "latency_class": existing.latency_class,
-            }
-            for key in (
-                "version", "provider", "display_name", "dependencies", "tags",
-                "scopes", "markets", "model_route", "cost_tier", "latency_class",
-            ):
-                if key in payload:
-                    merged[key] = payload[key]
-            entry = self._build_new_entry(merged, existing=existing)
-            new_entries = tuple(
-                entry if item.capability_id == capability_id else item
-                for item in snapshot.entries
-            )
-            self._store.replace_entries(new_entries, generation=snapshot.generation + 1)
+                    if field_name in payload and str(payload[field_name]).strip() != str(
+                        getattr(existing, field_name)
+                    ):
+                        raise CapabilityWriteError("capability_identity_immutable", message)
+                merged = {
+                    "capability_id": existing.capability_id,
+                    "domain": existing.domain,
+                    "capability_type": existing.capability_type,
+                    "version": existing.version,
+                    "provider": existing.provider,
+                    "display_name": existing.display_name,
+                    "dependencies": list(existing.dependencies),
+                    "tags": list(existing.tags),
+                    "scopes": list(existing.scopes),
+                    "markets": list(existing.markets),
+                    "model_route": existing.model_route,
+                    "cost_tier": existing.cost_tier,
+                    "latency_class": existing.latency_class,
+                }
+                for key in (
+                    "version", "provider", "display_name", "dependencies", "tags",
+                    "scopes", "markets", "model_route", "cost_tier", "latency_class",
+                ):
+                    if key in payload:
+                        merged[key] = payload[key]
+                entry = self._build_new_entry(merged, existing=existing)
+                produced.append(entry)
+                return tuple(
+                    entry if item.capability_id == capability_id else item
+                    for item in snapshot.entries
+                )
+
+            self._store.mutate(_apply)
         except CapabilityWriteError as exc:
-            self._auditor.complete(
-                capability_id=capability_id, operation="update", success=False,
+            self._complete_failure(
+                capability_id=capability_id, operation="update",
                 correlation_id=correlation_id, error_code=exc.error_code,
                 actor_type=actor_type, actor_id=actor_id,
             )
             raise
         except WriteRegistryStoreError as exc:
-            self._auditor.complete(
-                capability_id=capability_id, operation="update", success=False,
+            self._complete_failure(
+                capability_id=capability_id, operation="update",
                 correlation_id=correlation_id, error_code=exc.error_code,
                 actor_type=actor_type, actor_id=actor_id,
             )
             raise CapabilityWriteError(exc.error_code, str(exc)) from exc
         except ValueError as exc:
-            self._auditor.complete(
-                capability_id=capability_id, operation="update", success=False,
+            self._complete_failure(
+                capability_id=capability_id, operation="update",
                 correlation_id=correlation_id, error_code="capability_validation_failed",
                 metadata={"detail": str(exc)[:200]}, actor_type=actor_type, actor_id=actor_id,
             )
             raise CapabilityWriteError("capability_validation_failed", str(exc)) from exc
         except Exception:
-            self._auditor.complete(
-                capability_id=capability_id, operation="update", success=False,
+            self._complete_failure(
+                capability_id=capability_id, operation="update",
                 correlation_id=correlation_id, error_code="capability_update_failed",
                 actor_type=actor_type, actor_id=actor_id,
             )
             raise
-        self._auditor.complete(
-            capability_id=entry.capability_id, operation="update", success=True,
+        entry = produced[0]
+        self._complete_success(
+            capability_id=entry.capability_id,
+            operation="update",
             correlation_id=correlation_id,
+            entry=entry,
             metadata={"version": entry.version, "generation": entry.generation},
-            actor_type=actor_type, actor_id=actor_id,
+            actor_type=actor_type,
+            actor_id=actor_id,
         )
         return entry
 
@@ -324,58 +362,78 @@ class CapabilityWriteService:
             capability_id=capability_id, operation="retire",
             actor_type=actor_type, actor_id=actor_id,
         )
+        produced: list[WriteCapabilityEntry] = []
+        already_retired = False
         try:
-            snapshot = self._store.load()
-            existing = next(
-                (item for item in snapshot.entries if item.capability_id == capability_id),
-                None,
-            )
-            if existing is None:
-                raise CapabilityWriteError(
-                    "capability_not_found",
-                    f"capability {capability_id!r} is not registered",
+            def _apply(
+                snapshot: WriteRegistrySnapshot,
+            ) -> tuple[WriteCapabilityEntry, ...] | None:
+                nonlocal already_retired
+                existing = next(
+                    (item for item in snapshot.entries if item.capability_id == capability_id),
+                    None,
                 )
-            if existing.status == "retired":
-                self._auditor.complete(
-                    capability_id=capability_id, operation="retire", success=True,
-                    correlation_id=correlation_id, metadata={"already_retired": True},
-                    actor_type=actor_type, actor_id=actor_id,
+                if existing is None:
+                    raise CapabilityWriteError(
+                        "capability_not_found",
+                        f"capability {capability_id!r} is not registered",
+                    )
+                if existing.status == "retired":
+                    already_retired = True
+                    produced.append(existing)
+                    return None
+                now = self._now_iso()
+                entry = replace(
+                    existing, status="retired", retired_at=now, updated_at=now,
+                    generation=existing.generation + 1,
                 )
-                return existing
-            now = self._now_iso()
-            entry = replace(
-                existing, status="retired", retired_at=now, updated_at=now,
-                generation=existing.generation + 1,
-            )
-            new_entries = tuple(
-                entry if item.capability_id == capability_id else item
-                for item in snapshot.entries
-            )
-            self._store.replace_entries(new_entries, generation=snapshot.generation + 1)
+                produced.append(entry)
+                return tuple(
+                    entry if item.capability_id == capability_id else item
+                    for item in snapshot.entries
+                )
+
+            self._store.mutate(_apply)
         except CapabilityWriteError as exc:
-            self._auditor.complete(
-                capability_id=capability_id, operation="retire", success=False,
+            self._complete_failure(
+                capability_id=capability_id, operation="retire",
                 correlation_id=correlation_id, error_code=exc.error_code,
                 actor_type=actor_type, actor_id=actor_id,
             )
             raise
         except WriteRegistryStoreError as exc:
-            self._auditor.complete(
-                capability_id=capability_id, operation="retire", success=False,
+            self._complete_failure(
+                capability_id=capability_id, operation="retire",
                 correlation_id=correlation_id, error_code=exc.error_code,
                 actor_type=actor_type, actor_id=actor_id,
             )
             raise CapabilityWriteError(exc.error_code, str(exc)) from exc
         except Exception:
-            self._auditor.complete(
-                capability_id=capability_id, operation="retire", success=False,
+            self._complete_failure(
+                capability_id=capability_id, operation="retire",
                 correlation_id=correlation_id, error_code="capability_retire_failed",
                 actor_type=actor_type, actor_id=actor_id,
             )
             raise
-        self._auditor.complete(
-            capability_id=entry.capability_id, operation="retire", success=True,
-            correlation_id=correlation_id, actor_type=actor_type, actor_id=actor_id,
+        entry = produced[0]
+        if already_retired:
+            self._complete_success(
+                capability_id=entry.capability_id,
+                operation="retire",
+                correlation_id=correlation_id,
+                entry=entry,
+                metadata={"already_retired": True},
+                actor_type=actor_type,
+                actor_id=actor_id,
+            )
+            return entry
+        self._complete_success(
+            capability_id=entry.capability_id,
+            operation="retire",
+            correlation_id=correlation_id,
+            entry=entry,
+            actor_type=actor_type,
+            actor_id=actor_id,
         )
         return entry
 
