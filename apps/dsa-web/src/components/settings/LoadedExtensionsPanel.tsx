@@ -147,8 +147,12 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
       setItems(response.items);
       setTotal(response.total);
     } catch (error: unknown) {
-      setItems([]);
-      setTotal(0);
+      // Keep a previously loaded roster on refresh so a transient GET
+      // failure cannot wipe rows after a completed lifecycle change.
+      if (mode === 'initial') {
+        setItems([]);
+        setTotal(0);
+      }
       setLoadError(getParsedApiError(error));
     } finally {
       setIsLoading(false);

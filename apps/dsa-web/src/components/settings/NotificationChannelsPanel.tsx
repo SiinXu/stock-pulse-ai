@@ -234,8 +234,13 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     const builtin = NOTIFICATION_CHANNELS.some((channel) => channel.id === focusedChannelId);
     if (builtin) {
       setOpenChannelId(focusedChannelId);
-      return;
     }
+  }, [focusedChannelId]);
+
+  useEffect(() => {
+    if (!focusedChannelId) return;
+    const builtin = NOTIFICATION_CHANNELS.some((channel) => channel.id === focusedChannelId);
+    if (builtin) return;
     const card = document.querySelector(
       `[data-testid="notification-plugin-channel-card-${CSS.escape(focusedChannelId)}"]`,
     );

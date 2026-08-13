@@ -266,6 +266,61 @@ describe('LoadedExtensionsPanel', () => {
     });
   });
 
+  it('keeps the roster after a successful toggle when the follow-up refresh fails', async () => {
+    vi.mocked(pluginsApi.list)
+      .mockResolvedValueOnce({
+        total: 1,
+        items: [{
+          id: 'toggle-demo',
+          name: 'Toggle Demo',
+          version: '1.0.0',
+          source: 'external',
+          state: 'disabled',
+          desiredEnabled: false,
+          reloadable: true,
+          packageRoot: '/opt/plugins/toggle-demo',
+          extensionPoints: [],
+          notificationChannels: [],
+          description: '',
+          author: '',
+          settingsCount: 0,
+        }],
+      })
+      .mockRejectedValueOnce(
+        createParsedApiError({
+          title: 'Unavailable',
+          message: 'Roster unavailable',
+          status: 503,
+          code: 'unavailable',
+          category: 'http_error',
+        }),
+      );
+    vi.mocked(pluginsApi.updateLifecycle).mockResolvedValue({
+      pluginId: 'toggle-demo',
+      action: 'enable',
+      success: true,
+      state: 'enabled',
+      reloaded: false,
+      restartRequired: false,
+      plugin: null,
+    });
+
+    renderPanel();
+    const toggle = await screen.findByRole('switch', { name: /Enabled: Toggle Demo/i });
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(pluginsApi.updateLifecycle).toHaveBeenCalledWith('toggle-demo', 'enable');
+      expect(pluginsApi.list).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Refresh extensions list' })).toBeEnabled();
+    });
+    expect(screen.getByTestId('loaded-extension-row-toggle-demo')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByText('No extensions registered')).not.toBeInTheDocument();
+  });
+
   it('generates a settings form from the plugin schema and saves typed values', async () => {
     vi.mocked(pluginsApi.list).mockResolvedValue({
       total: 1,

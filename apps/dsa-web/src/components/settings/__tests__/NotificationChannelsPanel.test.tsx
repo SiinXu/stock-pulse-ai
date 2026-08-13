@@ -453,6 +453,34 @@ describe('NotificationChannelsPanel', () => {
     );
   });
 
+  it('does not reopen a dismissed builtin channel editor when the plugin roster settles', async () => {
+    let resolvePlugins: (value: { total: number; items: never[] }) => void = () => {};
+    listPlugins.mockImplementation(() => new Promise((resolve) => {
+      resolvePlugins = resolve;
+    }));
+
+    renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+      '/settings?section=notifications&view=channels&channel=feishu',
+    );
+
+    expect(await screen.findByRole('dialog', { name: '飞书' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog', { name: '飞书' })).not.toBeInTheDocument();
+
+    resolvePlugins({ total: 0, items: [] });
+    expect(await screen.findByText(
+      /No plugin notification channels loaded|当前没有已加载的插件通知渠道/,
+    )).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '飞书' })).not.toBeInTheDocument();
+  });
+
   it('does not invent plugin channels when the plugins list fails', async () => {
     listPlugins.mockRejectedValue(new Error('plugins down'));
 
