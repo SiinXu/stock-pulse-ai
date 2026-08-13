@@ -19,6 +19,7 @@ from .analysis_strategies import (
 )
 from .kronos import KronosAgentToolPlugin
 from .ocr import OcrAgentToolPlugin
+from .web_search import WebSearchAgentToolPlugin
 
 
 logger = logging.getLogger(__name__)
@@ -29,10 +30,15 @@ def get_configured_builtin_plugins(config: Any = None) -> tuple:
 
     Built-in analysis strategies are always included (YAML content under
     ``strategies/``, packaged as first-class ``analysis_strategy`` plugins).
-    Optional tools such as Kronos and OCR remain configuration-gated.
+    Agent Web Search tools are always included (issue #432; same default as the
+    former direct ToolRegistry registration). Optional tools such as Kronos and
+    OCR remain configuration-gated.
     """
 
     plugins: list[Any] = list(get_builtin_analysis_strategy_plugins())
+
+    # Always-on Agent Web Search tools (former direct ToolRegistry path; #432).
+    plugins.append(WebSearchAgentToolPlugin())
 
     if config is None:
         kronos_enabled = parse_env_bool(os.getenv("KRONOS_ENABLED"), default=False)
@@ -69,6 +75,7 @@ __all__ = [
     "BuiltinAnalysisStrategyPlugin",
     "KronosAgentToolPlugin",
     "OcrAgentToolPlugin",
+    "WebSearchAgentToolPlugin",
     "builtin_analysis_strategy_plugin_id",
     "get_builtin_analysis_strategy_plugins",
     "get_configured_builtin_plugins",

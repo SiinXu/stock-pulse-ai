@@ -28,6 +28,10 @@ from src.agent.public_contract import (
     AGENT_EXECUTION_FAILURE_MESSAGE,
 )
 from src.agent.runner import RunLoopResult, run_agent_loop
+from src.agent.runtime.mode_budget import (
+    get_or_create_context_budget_account,
+    store_budget_snapshot,
+)
 from src.agent.soul import (
     compose_agent_soul_prompt,
     record_agent_soul_composition,
@@ -130,17 +134,21 @@ class BaseAgent(ABC):
             # Restrict tools if the agent declares a subset
             registry = self._filtered_registry()
 
+            budget_account = get_or_create_context_budget_account(ctx)
+            effective_max_steps = budget_account.limits.effective_max_steps(self.max_steps)
+
             loop_result: RunLoopResult = run_agent_loop(
                 messages=messages,
                 tool_registry=registry,
                 llm_adapter=self.llm_adapter,
-                max_steps=self.max_steps,
+                max_steps=effective_max_steps,
                 progress_callback=progress_callback,
                 max_wall_clock_seconds=timeout_seconds,
                 stock_scope=ctx.meta.get("stock_scope"),
                 emit_stage_events=False,
                 cancelled_check=cancelled_check,
                 runtime_guard_policy=getattr(self, "runtime_guard_policy", None),
+                mode_budget_account=budget_account,
             )
 
             result.tokens_used = loop_result.total_tokens
@@ -148,6 +156,11 @@ class BaseAgent(ABC):
             result.meta["raw_text"] = loop_result.content
             result.meta["models_used"] = loop_result.models_used
             result.meta["tool_calls_log"] = loop_result.tool_calls_log
+            budget_snapshot = (
+                getattr(loop_result, "budget_snapshot", None)
+                or store_budget_snapshot(ctx, budget_account)
+            )
+            result.meta["mode_budget"] = budget_snapshot
             failure_reason = getattr(loop_result, "failure_reason", None)
             result.failure_reason = failure_reason
 

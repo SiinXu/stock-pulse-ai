@@ -166,6 +166,10 @@ class UnifiedRealtimeQuote:
     change_60d: Optional[float] = None      # 60-day percentage change (%)
     high_52w: Optional[float] = None        # Highest price in 52 weeks
     low_52w: Optional[float] = None         # 52 weeks low
+
+    # === ETF reference values (optional; used for premium/discount semantics) ===
+    iopv: Optional[float] = None            # Intraday indicative NAV / IOPV
+    nav: Optional[float] = None             # Fund unit NAV when provided by the source
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典（过滤 None 值）"""
@@ -183,7 +187,8 @@ class UnifiedRealtimeQuote:
             'volume_ratio', 'turnover_rate', 'amplitude',
             'open_price', 'high', 'low', 'pre_close',
             'pe_ratio', 'pb_ratio', 'total_mv', 'circ_mv',
-            'change_60d', 'high_52w', 'low_52w'
+            'change_60d', 'high_52w', 'low_52w',
+            'iopv', 'nav',
         ]
         for f in optional_fields:
             val = getattr(self, f, None)

@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "symbol": "159001",
+    "market": "cn",
+    "instrument_type": "etf",
+    "note": "Suspended/illiquid ETF: zero volume/amount with flat OHLC is valid."
+  },
+  "bar": {
+    "date": "2026-05-06",
+    "open": 1.0,
+    "high": 1.0,
+    "low": 1.0,
+    "close": 1.0,
+    "volume": 0,
+    "amount": 0,
+    "pct_chg": 0.0,
+    "pre_close": 1.0
+  },
+  "valuation": {
+    "pe_ratio": null,
+    "pb_ratio": null
+  }
+}
