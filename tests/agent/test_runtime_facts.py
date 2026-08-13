@@ -758,7 +758,7 @@ def test_runner_failure_sources_propagate_through_base_agent():
     for loop_result, expected_reason in (
         (timeout_result, StageFailureReason.TIMEOUT),
         (budget_result, StageFailureReason.BUDGET_SKIP),
-        (max_steps_result, StageFailureReason.STAGE_FAILURE),
+        (max_steps_result, StageFailureReason.BUDGET_TURNS),
     ):
         with patch("src.agent.agents.base_agent.run_agent_loop", return_value=loop_result):
             stage_result = agent.run(AgentContext())

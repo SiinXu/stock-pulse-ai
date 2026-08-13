@@ -187,7 +187,7 @@ def build_daily_brief_scheduler_background_tasks(
     *,
     config_provider: Callable[[], Config],
 ) -> List[Dict[str, Any]]:
-    """Build the config-gated daily brief background task (Issue #466)."""
+    """Build the config-gated daily brief background task (Issue #466 / #149)."""
     if not getattr(config, "daily_brief_enabled", False):
         return []
     try:
@@ -206,6 +206,30 @@ def build_daily_brief_scheduler_background_tasks(
             level=logging.WARNING,
         )
         return []
+
+
+
+def build_event_research_brief_scheduler_background_tasks(
+    config: Config,
+    *,
+    config_provider: Callable[[], Config],
+) -> List[Dict[str, Any]]:
+    """Build the config-gated event research brief background task (#1131)."""
+    if not getattr(config, "event_research_brief_enabled", False):
+        return []
+    try:
+        from src.services.event_research_brief_service import (
+            build_event_research_brief_background_tasks,
+        )
+        return build_event_research_brief_background_tasks(config, config_provider=config_provider)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional task does not block scheduler
+        log_safe_exception(
+            logger, "Event research brief background task initialization failed", exc,
+            error_code="event_research_brief_background_task_init_failed", level=logging.WARNING,
+        )
+        return []
+
+
 
 
 class RuntimeSchedulerService:
@@ -398,6 +422,7 @@ class RuntimeSchedulerService:
         else:
             tasks = self._current_agent_event_monitor_background_tasks(config)
             tasks.extend(self._current_daily_brief_background_tasks(config))
+            tasks.extend(self._current_event_research_brief_background_tasks(config))
         if self._scheduled_task_service is not None and self._personalized_schedule_enabled:
             from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
 
@@ -470,6 +495,49 @@ class RuntimeSchedulerService:
             from src.services.daily_brief_service import DAILY_BRIEF_POLL_INTERVAL_SECONDS
 
             interval_seconds = int(DAILY_BRIEF_POLL_INTERVAL_SECONDS)
+
+        run_immediately = (
+            bool(cached.get("run_immediately", False))
+            and name not in self._background_task_registered_names
+        )
+        self._background_task_registered_names.add(name)
+        return [{
+            "task": cached["task"],
+            "interval_seconds": interval_seconds,
+            "run_immediately": run_immediately,
+            "name": name,
+        }]
+
+    def _current_event_research_brief_background_tasks(
+        self,
+        config: Config,
+    ) -> List[Dict[str, Any]]:
+        name = "event_research_brief"
+        if not getattr(config, "event_research_brief_enabled", False):
+            self._background_task_cache.pop(name, None)
+            self._background_task_registered_names.discard(name)
+            return []
+
+        cached = self._background_task_cache.get(name)
+        if cached is None:
+            entries = build_event_research_brief_scheduler_background_tasks(
+                config,
+                config_provider=self._reload_config,
+            )
+            if not entries:
+                self._background_task_cache.pop(name, None)
+                self._background_task_registered_names.discard(name)
+                return []
+            cached = dict(entries[0])
+            cached["name"] = name
+            self._background_task_cache[name] = cached
+            interval_seconds = int(cached["interval_seconds"])
+        else:
+            from src.services.event_research_brief_service import (
+                EVENT_RESEARCH_BRIEF_POLL_INTERVAL_SECONDS,
+            )
+
+            interval_seconds = int(EVENT_RESEARCH_BRIEF_POLL_INTERVAL_SECONDS)
 
         run_immediately = (
             bool(cached.get("run_immediately", False))

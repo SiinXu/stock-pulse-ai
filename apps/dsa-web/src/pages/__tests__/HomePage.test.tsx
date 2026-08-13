@@ -684,7 +684,15 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open local model setup' }));
+    // Wait for the setup-gap first-run shell, then readiness CTA (async fetch).
+    expect(await screen.findByTestId('home-first-run-entry')).toBeInTheDocument();
+    expect(await screen.findByTestId('zero-config-first-run-panel')).toBeInTheDocument();
+    const localSetup = await screen.findByRole(
+      'button',
+      { name: 'Open local model setup' },
+      { timeout: 5000 },
+    );
+    fireEvent.click(localSetup);
     expect(screen.getByTestId('location')).toHaveTextContent(
       `${APP_ROUTE_PATHS.settings}?section=ai_models&view=local_models&from=onboarding`,
     );

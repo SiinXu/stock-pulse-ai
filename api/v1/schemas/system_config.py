@@ -363,6 +363,38 @@ class SetupStatusResponse(BaseModel):
     checks: List[SetupStatusCheck] = Field(default_factory=list)
 
 
+class ReadinessCheckItem(BaseModel):
+    """One structured readiness dimension (ok | degraded | failed)."""
+
+    key: str
+    status: Literal["ok", "degraded", "failed"]
+    reason_code: str
+    reason: str
+    suggestion: Optional[str] = None
+    required: bool = True
+    details: Dict[str, Any] = Field(default_factory=dict)
+    duration_ms: Optional[float] = None
+    timed_out: bool = False
+
+
+class ReadinessReportResponse(BaseModel):
+    """On-demand structured readiness/self-check report.
+
+    Composes existing observational probes (setup status, data-provider runtime
+    status, generation-backend cheap status, task-queue stats). Never mutates
+    configuration and is not invoked automatically at process startup.
+    Failures and timeouts are explicit and never reported as ready.
+    """
+
+    schema_version: str
+    status: Literal["ok", "degraded", "failed"]
+    generated_at: str
+    summary: str
+    partial: bool = False
+    timeout_seconds: float
+    checks: List[ReadinessCheckItem] = Field(default_factory=list)
+
+
 class GenerationBackendStatus(BaseModel):
     """Cheap status for one generation backend.
 

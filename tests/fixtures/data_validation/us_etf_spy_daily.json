@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "symbol": "SPY",
+    "market": "us",
+    "instrument_type": "etf",
+    "note": "SPDR S&P 500 ETF style daily bars. Missing valuation must not flag."
+  },
+  "rows": [
+    {
+      "date": "2026-05-06",
+      "open": 512.4,
+      "high": 515.1,
+      "low": 510.8,
+      "close": 514.25,
+      "volume": 62341200,
+      "amount": 32015442100.0,
+      "pct_chg": 0.42,
+      "pre_close": 512.1
+    },
+    {
+      "date": "2026-05-07",
+      "open": 514.0,
+      "high": 516.55,
+      "low": 512.9,
+      "close": 515.8,
+      "volume": 58112400,
+      "amount": 29901330500.0,
+      "pct_chg": 0.301,
+      "pre_close": 514.25
+    }
+  ],
+  "valuation": {
+    "pe_ratio": null,
+    "pb_ratio": null
+  }
+}
