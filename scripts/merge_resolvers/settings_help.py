@@ -44,8 +44,17 @@ def matches(rel_path: str) -> bool:
 
 def _blocks(
     rel_path: str, hunk: Hunk, side: str, lines: list[str]
-) -> list[tuple[str, list[str]]]:
+) -> tuple[list[tuple[str, list[str]]], tuple[str, list[str]] | None]:
+    """Split hunk lines into complete entry blocks plus one trailing open block.
+
+    Git often cuts a hunk at the first differing line *inside* an appended
+    block, so both sides can end with an entry whose closing brace lives in the
+    shared context after the hunk. That shape is still purely additive, so it is
+    supported explicitly rather than merged by accident.
+    """
+
     blocks: list[tuple[str, list[str]]] = []
+    open_block: tuple[str, list[str]] | None = None
     index = 0
     while index < len(lines):
         line = lines[index]
@@ -65,11 +74,14 @@ def _blocks(
                 if depth <= 0:
                     break
             if depth > 0:
-                raise Refusal(
-                    rel_path,
-                    f"hunk at line {hunk.line_number} ({side} side) ends inside the "
-                    f"entry block for {key!r}",
-                )
+                if depth != 1 or index < len(lines):
+                    raise Refusal(
+                        rel_path,
+                        f"hunk at line {hunk.line_number} ({side} side) ends inside "
+                        f"the entry block for {key!r} at brace depth {depth}",
+                    )
+                open_block = (key, body)
+                continue
             if not body[-1].rstrip().endswith(("},", "}")):
                 raise Refusal(
                     rel_path,
@@ -88,12 +100,32 @@ def _blocks(
             f"hunk at line {hunk.line_number} ({side} side) is not a settings-help "
             f"entry block: {line.strip()[:100]!r}",
         )
-    return blocks
+    return blocks, open_block
 
 
-def _merge_hunk(rel_path: str, hunk: Hunk) -> list[str]:
-    ours = _blocks(rel_path, hunk, "ours", hunk.ours)
-    theirs = _blocks(rel_path, hunk, "theirs", hunk.theirs)
+def _merge_hunk(rel_path: str, hunk: Hunk, closer: str | None) -> list[str]:
+    ours, our_open = _blocks(rel_path, hunk, "ours", hunk.ours)
+    theirs, their_open = _blocks(rel_path, hunk, "theirs", hunk.theirs)
+
+    if (our_open is None) != (their_open is None):
+        raise Refusal(
+            rel_path,
+            f"hunk at line {hunk.line_number}: only one side ends inside an entry "
+            "block, so the shared closing brace cannot serve both",
+        )
+    if our_open is not None and their_open is not None:
+        if our_open[0] == their_open[0]:
+            raise Refusal(
+                rel_path,
+                f"both sides open the entry {our_open[0]!r} with different bodies; "
+                "this is an edit conflict, not two additions",
+            )
+        if closer is None:
+            raise Refusal(
+                rel_path,
+                f"hunk at line {hunk.line_number} ends inside an entry block but the "
+                "next shared line is not a closing brace",
+            )
 
     merged: list[str] = []
     by_key: dict[str, list[str]] = {}
@@ -109,7 +141,29 @@ def _merge_hunk(rel_path: str, hunk: Hunk) -> list[str]:
                 f"both sides define the settings-help entry {key!r} differently; "
                 "this is an edit conflict, not two additions",
             )
+
+    if our_open is not None and their_open is not None and closer is not None:
+        # Ours gets a copy of the shared closing brace; theirs is closed by the
+        # shared brace that already follows the hunk.
+        merged.extend(our_open[1])
+        merged.append(closer)
+        merged.extend(their_open[1])
     return merged
+
+
+_CLOSER = re.compile(r"^\s*\},?\s*$")
+
+
+def _closer_after(segments: list, position: int) -> str | None:
+    """The shared closing-brace line that immediately follows a hunk."""
+
+    for segment in segments[position + 1 :]:
+        if isinstance(segment, Hunk):
+            return None
+        if not segment.strip():
+            continue
+        return segment if _CLOSER.match(segment) else None
+    return None
 
 
 def resolve(ctx: Context, rel_path: str) -> Resolution:
@@ -123,9 +177,9 @@ def resolve(ctx: Context, rel_path: str) -> Resolution:
 
     merged: dict[int, list[str]] = {}
     entries = 0
-    for segment in segments:
+    for position, segment in enumerate(segments):
         if isinstance(segment, Hunk):
-            lines = _merge_hunk(rel_path, segment)
+            lines = _merge_hunk(rel_path, segment, _closer_after(segments, position))
             merged[id(segment)] = lines
             entries += sum(1 for line in lines if _BLOCK_START.match(line))
 
