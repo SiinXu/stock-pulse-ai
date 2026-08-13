@@ -86,6 +86,9 @@ class _DashboardMethods:
                 ctx.meta["enable_debate"] = context.get("enable_debate")
             if "debate_max_rounds" in context:
                 ctx.meta["debate_max_rounds"] = context.get("debate_max_rounds")
+            instrument_type = context.get("instrument_type") or context.get("asset_type")
+            if isinstance(instrument_type, str) and instrument_type.strip():
+                ctx.meta["instrument_type"] = instrument_type.strip()
             if context.get("market_phase_context"):
                 ctx.meta["market_phase_context"] = context["market_phase_context"]
             daily_market_context = context.get("daily_market_context")
