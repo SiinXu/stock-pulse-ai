@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Changed] Extract data_provider typed errors, chip helpers, and manager daily-cache methods behind the base ADR-006 facade (Refs #1067).
-- [Added] CI shrink-only layer-direction ratchet bans new reverse imports against `api → services → pipeline/stages → data_provider`, with a documented exception inventory and cleanup plan (Refs #1082).
-- [Added] CI shrink-only hot-path module size soft budget (1500 lines) for `data_provider/`, `src/services/`, `src/agent/`, and `src/market/`, pinning oversized inventory so gravity modules cannot re-inflate silently (Refs #1087).
 - [Fixed] Refine the research chat workspace with borderless messages and tool progress, reliable hover actions, compact icon controls, portal-based strategy guidance, inline scenario configuration with shared form controls, and collapsible conversation history.
 - [Fixed] Chat and readiness deep links open Agent Behavior essentials-first, nesting Behavior/Governance under progressive disclosure without hiding expert fields (Refs #868).
 - [Fixed] Register page H1 route-focus targets on primary Web routes (Portfolio, Discover, Backtest, Market Review, Settings, Chat, Stock Details, Alerts, Approvals, Notifications, Token Usage) so cross-page navigation can focus the landmark (#879 F3).
