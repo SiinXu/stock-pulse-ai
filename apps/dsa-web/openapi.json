@@ -23797,7 +23797,7 @@
                 "type": "null"
               }
             ],
-            "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis"
+            "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, multi-strategy synthesis, and committee deliberation"
           }
         },
         "title": "ReportDetails",
@@ -24246,9 +24246,254 @@
         "title": "ReportStrategy",
         "type": "object"
       },
+      "ReportStructuredCommitteeConclusion": {
+        "description": "Authoritative committee conclusion projected from strategy_synthesis.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "conflict_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Conflict Count"
+          },
+          "conflict_severity": {
+            "title": "Conflict Severity",
+            "type": "string"
+          },
+          "consensus_level": {
+            "title": "Consensus Level",
+            "type": "string"
+          },
+          "final_signal": {
+            "title": "Final Signal",
+            "type": "string"
+          },
+          "weighted_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Weighted Score"
+          }
+        },
+        "title": "ReportStructuredCommitteeConclusion",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDeliberation": {
+        "description": "Bounded Investment Committee deliberation for report consumers.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeConclusion"
+          },
+          "dissenting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Dissenting Opinions",
+            "type": "array"
+          },
+          "divergence_points": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeDivergence"
+            },
+            "title": "Divergence Points",
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeMember"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "personas_invalid": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Invalid",
+            "type": "array"
+          },
+          "personas_truncated": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Truncated",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "supporting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Supporting Opinions",
+            "type": "array"
+          }
+        },
+        "title": "ReportStructuredCommitteeDeliberation",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDivergence": {
+        "description": "Divergence point aligned with multi-strategy conflict / #1205 records.",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "summary_key": {
+            "title": "Summary Key",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeDivergence",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeMember": {
+        "description": "One committee persona stance projected for report / Signal / History UI.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "invalid": {
+            "title": "Invalid",
+            "type": "boolean"
+          },
+          "invalid_reason": {
+            "title": "Invalid Reason",
+            "type": "string"
+          },
+          "lens_verdict": {
+            "title": "Lens Verdict",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeMember",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeOpinion": {
+        "description": "Supporting or dissenting persona opinion from real synthesis rows.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeOpinion",
+        "type": "object"
+      },
       "ReportStructuredInsights": {
         "description": "Versioned structured-insight projection returned by report APIs.",
         "properties": {
+          "committee_deliberation": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeDeliberation"
+          },
           "phase_decision": {
             "$ref": "#/components/schemas/ReportStructuredPhaseDecision"
           },
