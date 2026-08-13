@@ -86,6 +86,29 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 
 这些接口继承现有 `/api/v1/*` 管理员鉴权；`ADMIN_AUTH_ENABLED=true` 时需要有效管理员会话 Cookie。
 
+## 历史决策记忆注入（Decision Memory / #118）
+
+个股分析在生成最终报告前，可把**同标的、已结算 outcome** 的结构化复盘注入 Prompt 与报告「历史决策复盘」小节。实现入口：
+
+- 检索与准入：`src/services/decision_memory_service.py`（`DecisionMemoryService.build_reflection` → `admit_decision_memory`）
+- 管线挂载：`src/core/stages/analysis_stock.py`（`decision_memory_enabled` 关闭时零开销）
+- Prompt 拼接：`src/analyzer_parts/analysis.py`（读取 `decision_memory_reflection_prompt`）
+- 报告渲染：`src/notification_parts/rendering.py`
+
+**准入（对齐 #1119 情节记忆 size-cap，不得绕过）**
+
+- 仅 `eval_status=completed` 且 `outcome∈{hit,miss,neutral}` 的权威后验可进入注入。
+- 每条复盘行必须带 `signal_id` 来源；`source_signal_ids` 可追溯。无 per-call provenance 时**不注入**。
+- **不**注入信号 `reason` 等自由文本，避免用户笔记/对抗文本作为事实进入 Prompt。
+- 扫描窗口可略大于 lookback 以发现已结算信号；**本股胜率与列表同源**，都只使用 lookback 准入集合。`DECISION_MEMORY_LOOKBACK` 的运行时与 registry 硬上限均为 40。
+- `ignored` 标记的信号整条排除；`memorable` 优先排序。
+
+**不可信隔离与关闭**
+
+- Prompt 块经 `isolate_untrusted_memory_body` 包裹（`BEGIN_UNTRUSTED_MEMORY_DATA` / data-only 指令），与分层记忆隔离契约一致（#1017）。
+- 复盘仅校准置信度与风险提示，**不得**翻转方向（文案与数据结构均无方向建议字段）。
+- 全局 `DECISION_MEMORY_ENABLED`（默认 `true`）或请求 `use_memory=false` 可关闭。
+
 ## 决策风格历史表现（profile calibration）
 
 [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) 在现有

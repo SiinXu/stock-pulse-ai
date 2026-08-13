@@ -427,8 +427,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `MAX_WORKERS` | Concurrent threads | `3` |
 | `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | Inject the daily market context into stock-analysis prompts and soften aggressive buy advice in high-risk/risk-off markets; enabled by default, and market review can still run when this is set to `false` | `true` |
-| `DECISION_MEMORY_ENABLED` | Inject a Historical Decision Reflection (the stock's past signal hit-rate plus pattern-level calibration) into analysis prompts and single-stock reports; calibrates confidence only and never flips direction; zero overhead when disabled or without history. Override per request with `use_memory` | `true` |
-| `DECISION_MEMORY_LOOKBACK` | Maximum number of the stock's most recent signals that already have outcomes to include in the reflection | `5` |
+| `DECISION_MEMORY_ENABLED` | Inject a Historical Decision Reflection (the stock's past signal hit-rate plus pattern-level calibration) into analysis prompts and single-stock reports; calibrates confidence only and never flips direction; admitted structured outcomes only with `signal_id` provenance, wrapped as untrusted memory data; zero overhead when disabled or without history. Override per request with `use_memory` | `true` |
+| `DECISION_MEMORY_LOOKBACK` | Maximum admitted evaluated signals per stock to inject into the reflection (hard cap 40) | `5` |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | Only reflect on signals created at least this many days ago (so their outcomes have settled) | `3` |
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
