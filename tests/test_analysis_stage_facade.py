@@ -19,7 +19,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     DailyMarketContextService Dict FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
     List MarketHotspotService MarketStructureService Optional PipelineStageName
     PipelineStageObservation PipelineStageResult ReportType SearchService
-    SimpleNamespace StockAnalysisPipeline TrendAnalysisResult Tuple
+    SentimentPipelineService SimpleNamespace StockAnalysisPipeline
+    TrendAnalysisResult Tuple
     apply_daily_market_context_guardrail apply_phase_decision_guardrails
     build_market_phase_context current_diagnostic_snapshot date datetime
     fill_price_position_if_needed format_daily_market_context_prompt_section
@@ -37,6 +38,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
 
 EXPECTED_ANALYSIS_METHODS = (
     "analyze_stock",
+    "_fetch_dependency_free_market_inputs",
     "_enhance_context",
     "_attach_belong_boards_to_fundamental_context",
     "_attach_concept_rankings_to_fundamental_context",
@@ -78,22 +80,22 @@ IMPLEMENTATION_GROUPS = (
     (
         "src.core.stages.analysis_stock",
         "_StockAnalysisStageMixin",
-        EXPECTED_ANALYSIS_METHODS[:1],
+        EXPECTED_ANALYSIS_METHODS[:2],
     ),
     (
         "src.core.stages.analysis_context",
         "_AnalysisContextStageMixin",
-        EXPECTED_ANALYSIS_METHODS[1:6],
+        EXPECTED_ANALYSIS_METHODS[2:7],
     ),
     (
         "src.core.stages.analysis_agent",
         "_AgentAnalysisStageMixin",
-        EXPECTED_ANALYSIS_METHODS[6:16],
+        EXPECTED_ANALYSIS_METHODS[7:17],
     ),
     (
         "src.core.stages.analysis_results",
         "_AnalysisResultStageMixin",
-        EXPECTED_ANALYSIS_METHODS[16:],
+        EXPECTED_ANALYSIS_METHODS[17:],
     ),
 )
 

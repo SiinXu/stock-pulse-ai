@@ -96,6 +96,7 @@ class PortfolioRiskMetricsApiTests(unittest.TestCase):
             "status_message": "Risk metrics computed from stored daily history.",
             "portfolio_value": 10000.0,
             "positions_used": 2,
+            "fx_stale": False,
             "assumptions": {
                 "var_method": "historical",
                 "confidence": 0.95,
@@ -104,9 +105,14 @@ class PortfolioRiskMetricsApiTests(unittest.TestCase):
                 "min_return_observations": 60,
                 "min_correlation_observations": 30,
                 "return_definition": "simple_close_to_close",
-                "portfolio_aggregation": "static_current_market_value_weights",
+                "portfolio_aggregation": "static_current_response_base_weights",
                 "cash_excluded": True,
-                "weight_basis": "market_value_base",
+                "weight_basis": "response_base_market_value",
+                "fx_policy": (
+                    "each position market_value_base is converted from account base "
+                    "currency into snapshot response currency before weight and VaR "
+                    "aggregation; never sum mixed currency units"
+                ),
                 "horizon_scaling": "none",
                 "distribution_assumption": "empirical",
                 "correlation_method": "pearson",
@@ -174,6 +180,7 @@ class PortfolioRiskMetricsApiTests(unittest.TestCase):
             "status_message": "Insufficient aligned trading-day history (10 < 60 required).",
             "portfolio_value": 10000.0,
             "positions_used": 2,
+            "fx_stale": False,
             "assumptions": {
                 "var_method": "historical",
                 "confidence": 0.95,
@@ -182,9 +189,14 @@ class PortfolioRiskMetricsApiTests(unittest.TestCase):
                 "min_return_observations": 60,
                 "min_correlation_observations": 30,
                 "return_definition": "simple_close_to_close",
-                "portfolio_aggregation": "static_current_market_value_weights",
+                "portfolio_aggregation": "static_current_response_base_weights",
                 "cash_excluded": True,
-                "weight_basis": "market_value_base",
+                "weight_basis": "response_base_market_value",
+                "fx_policy": (
+                    "each position market_value_base is converted from account base "
+                    "currency into snapshot response currency before weight and VaR "
+                    "aggregation; never sum mixed currency units"
+                ),
                 "horizon_scaling": "none",
                 "distribution_assumption": "empirical",
                 "correlation_method": "pearson",
