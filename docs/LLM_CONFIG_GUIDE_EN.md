@@ -433,6 +433,8 @@ model_list:
 
 P0a usage telemetry creates HMAC-SHA256 fingerprints for the actual messages sent to the model. This only writes local `llm_usage` telemetry. It does not change prompts, provider parameters, cache hints, model output, or fallback order.
 
+Cost attribution and routing quality telemetry (`LLM_USAGE_ATTRIBUTION_ENABLED`, default on) appends run/stage/mode cost estimates and `route_outcome` on the same `llm_usage` row; metering is shared with #1213 per-mode budgets via `src/llm/cost.py`. See [LLM cost attribution](llm-cost-attribution_EN.md).
+
 Usage is read in three tiers:
 
 - Prefer the provider / LiteLLM public `usage` response field.
