@@ -107,8 +107,18 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         pipeline = self._build_batch_pipeline()
         worker_calls = []
 
-        def _process(code, skip_analysis=False, single_stock_notify=False, report_type=None, analysis_query_id=None, current_time=None):
-            worker_calls.append((code, single_stock_notify, threading.current_thread().name))
+        def _process(
+            code,
+            skip_analysis=False,
+            single_stock_notify=False,
+            report_type=None,
+            analysis_query_id=None,
+            current_time=None,
+            send_notification=None,
+        ):
+            worker_calls.append(
+                (code, single_stock_notify, threading.current_thread().name, send_notification)
+            )
             if single_stock_notify:
                 pipeline.notifier.send(f"worker:{code}", email_stock_codes=[code])
             return _make_result(code)
@@ -122,7 +132,8 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         )
 
         self.assertEqual(len(results), 2)
-        self.assertTrue(all(not single_stock_notify for _, single_stock_notify, _ in worker_calls))
+        self.assertTrue(all(not single_stock_notify for _, single_stock_notify, _, _ in worker_calls))
+        self.assertTrue(all(send_notification is True for _, _, _, send_notification in worker_calls))
         self.assertEqual(
             pipeline.notifier.thread_names,
             [threading.current_thread().name, threading.current_thread().name],

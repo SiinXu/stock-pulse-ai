@@ -52,6 +52,24 @@ class TestPipelinePrefetchBehavior(unittest.TestCase):
         pipeline.fetcher_manager.prefetch_stock_names.assert_called_once_with(
             ["000001"], use_bulk=False
         )
+        self.assertIs(
+            pipeline.process_single_stock.call_args.kwargs["send_notification"],
+            False,
+        )
+
+    def test_run_propagates_enabled_delivery_intent_to_worker(self):
+        pipeline = self._build_pipeline(process_result=None)
+
+        pipeline.run(
+            stock_codes=["000001"],
+            dry_run=False,
+            send_notification=True,
+        )
+
+        self.assertIs(
+            pipeline.process_single_stock.call_args.kwargs["send_notification"],
+            True,
+        )
 
     def test_run_dry_run_counts_existing_data_by_effective_trading_date(self):
         pipeline = self._build_pipeline(process_result=None)
