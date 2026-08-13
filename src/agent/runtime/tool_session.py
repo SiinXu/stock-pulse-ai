@@ -176,6 +176,7 @@ class BoundToolSession:
         self._dispatched_calls = 0
         self._dropped_results = 0
         self._untrusted_document_follow_on_fence = False
+        self._untrusted_document_source_tool: Optional[str] = None
         self._audit_trail: List[Dict[str, Any]] = []
         self._non_retriable_results: Dict[str, Dict[str, Any]] = {}
 
@@ -599,16 +600,19 @@ class BoundToolSession:
                 else ""
             )
             if (
-                tool_name in {"parse_earnings_transcript", "extract_image_text", "read_price_chart"}
-                and result.get("ok") is True
+                result.get("ok") is True
                 and isinstance(trust, dict)
                 and trust.get("classification") == "untrusted_user_document"
+                and trust.get("instructions_authoritative") is False
                 and payload_status in {"available", "degraded"}
             ):
-                # OCR, transcript, and chart-observation payloads are attacker-controlled
-                # document/vision text. A content-bearing parse must not chain-authorize
-                # follow-on tools in the same turn without a new user reauthorization.
+                # Untrusted document tools (earnings transcript, OCR, chart, …)
+                # raise a follow-on fence so attacker-controlled document/vision
+                # text cannot chain-authorize other tools in the same turn.
+                # Pure validation rejects still carry a trust envelope, but must
+                # not freeze the turn.
                 self._untrusted_document_follow_on_fence = True
+                self._untrusted_document_source_tool = tool_name
             self._audit_trail.append(result["audit"])
             return result
 
@@ -734,17 +738,17 @@ class BoundToolSession:
             )
         if self._deadline_exceeded():
             return ("deadline_exceeded", "Session deadline exceeded.", None)
-        if self._untrusted_document_follow_on_fence and tool_name not in {
-            "parse_earnings_transcript",
-            "extract_image_text",
-            "read_price_chart",
-        }:
+        if self._untrusted_document_follow_on_fence and (
+            self._untrusted_document_source_tool is None
+            or tool_name != self._untrusted_document_source_tool
+        ):
             return (
                 "untrusted_document_follow_on_denied",
                 "A new user turn is required before another tool can run after untrusted document parsing.",
                 {
                     "reason": "untrusted_document_cannot_trigger_follow_on_tool",
                     "user_reauthorization_required": True,
+                    "source_tool": self._untrusted_document_source_tool,
                 },
             )
         if not tool_name.strip():
