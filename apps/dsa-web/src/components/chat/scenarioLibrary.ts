@@ -136,12 +136,13 @@ function readStorage(): LibraryScenario[] {
   }
 }
 
-function writeStorage(items: LibraryScenario[]): void {
-  if (typeof window === 'undefined') return;
+function writeStorage(items: LibraryScenario[]): boolean {
+  if (typeof window === 'undefined') return false;
   try {
     window.localStorage.setItem(SCENARIO_LIBRARY_STORAGE_KEY, JSON.stringify(items));
+    return true;
   } catch {
-    // Best-effort persistence; in-memory still works for the session.
+    return false;
   }
 }
 
@@ -224,7 +225,9 @@ export function saveCustomScenario(input: {
     version: 1,
   };
   const existing = readStorage().filter((item) => item.id !== id);
-  writeStorage([...existing, scenario]);
+  if (!writeStorage([...existing, scenario])) {
+    throw new Error('storage_write_failed');
+  }
   return scenario;
 }
 
@@ -232,8 +235,7 @@ export function deleteCustomScenario(id: string): boolean {
   const before = readStorage();
   const next = before.filter((item) => item.id !== id);
   if (next.length === before.length) return false;
-  writeStorage(next);
-  return true;
+  return writeStorage(next);
 }
 
 export function applyScenarioToDraft(

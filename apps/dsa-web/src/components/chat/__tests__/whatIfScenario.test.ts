@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_WHAT_IF_MAX_TURNS,
   HYPOTHETICAL_RESULT_MARKER,
@@ -106,5 +106,21 @@ describe('scenario library helpers', () => {
     });
     expect(saved.source).toBe('custom');
     expect(getScenarioById('my_custom_rate')?.assumptions[0]?.magnitude).toBe(75);
+  });
+
+  it('throws when custom scenario cannot be persisted', () => {
+    const storagePrototype = Object.getPrototypeOf(window.localStorage) as Storage;
+    const setItem = vi.spyOn(storagePrototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage full', 'QuotaExceededError');
+    });
+    expect(() =>
+      saveCustomScenario({
+        id: 'quota_fail_rate',
+        name: 'Quota fail',
+        assumptions: [{ dimension: 'interest_rate', direction: 'up', magnitude: 75 }],
+      }),
+    ).toThrow('storage_write_failed');
+    setItem.mockRestore();
+    expect(getScenarioById('quota_fail_rate')).toBeNull();
   });
 });
