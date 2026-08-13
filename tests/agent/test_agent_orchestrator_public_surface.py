@@ -93,6 +93,7 @@ EXPECTED_PIPELINE_METHODS = (
 
 EXPECTED_DASHBOARD_METHODS = (
     '_build_context',
+    '_seal_agent_input_snapshot',
     '_fallback_summary',
     '_resolve_final_output',
     '_resolve_dashboard_payload',
@@ -112,7 +113,7 @@ EXPECTED_DASHBOARD_METHODS = (
 
 EXPECTED_AST_HASHES = {
     '_ChatMethods': '1867bcb587354b0bceb7003e8fa522d2b25e1bd9b29fa9552987c8507ad8366d',
-    '_DashboardMethods': '3ca97d6ec44cafb6cfb420444855d5624e107fc879d9eb24547f4e7b5cca977a',
+    '_DashboardMethods': '26f0f605c5b042fc9d5aa7ccf6703470bd15de095c2fd7f1799a8da6f5d52d1f',
     '_ExecutionMethods': '03b1befb5752d439b5d2aeb35bcee5d50300c89eedb1ebd2aa7564c51f778e25',
     '_PipelineMethods': '694258d443a161a17f8b72f63ec29b223d6c2c5894c6cf4909dfc4991b2f790e',
 }

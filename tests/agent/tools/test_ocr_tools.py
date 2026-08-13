@@ -70,6 +70,10 @@ def test_build_and_register_ocr_tool_when_enabled(tmp_path: Path) -> None:
     assert tool is not None
     assert tool.name == OCR_TOOL_NAME
     assert validate_tool_capability_contract(tool) is None
+    kind_param = next(p for p in tool.parameters if p.name == "document_kind")
+    assert set(kind_param.enum or []) >= {
+        "screenshot", "filing_page", "table_statement", "chart_annotation", "pdf_page"
+    }
     registry = ToolRegistry()
     names = register_ocr_tools(
         registry,
@@ -78,10 +82,12 @@ def test_build_and_register_ocr_tool_when_enabled(tmp_path: Path) -> None:
         require_engine_at_register=False,
     )
     assert names == [OCR_TOOL_NAME]
-    payload = tool.handler(file_path="statement.png")
+    payload = tool.handler(file_path="statement.png", document_kind="table_statement")
     assert payload["schema_version"] == OCR_SCHEMA_VERSION
     assert payload["status"] == "available"
     assert "AAPL" in payload["text"]
+    assert payload["trust"]["instructions_authoritative"] is False
+    assert payload["document_kind"] == "table_statement"
     assert payload["content"]["instructions_authoritative"] is False
     assert payload["trust"]["classification"] == "untrusted_user_document"
     assert payload["trust"]["authoritative_for_decisions"] is False
