@@ -44,6 +44,7 @@ const SAMPLE_ESTIMATE: ValuationEstimate = {
 };
 
 const EMPTY_ESTIMATE: ValuationEstimate = {
+  schemaVersion: 'valuation-estimate-v1',
   status: 'insufficient_fundamentals',
   stockCode: 'EMPTY',
   dcf: {

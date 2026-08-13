@@ -8,6 +8,24 @@ import type {
   NotificationInboxUnreadCount,
 } from '../types/notificationInbox';
 import apiClient from './index';
+import type { components } from '../types/api.generated';
+type OpenApiInboxPage = components['schemas']['NotificationInboxListResponse'];
+type OpenApiInboxItem = components['schemas']['NotificationInboxItem'];
+type OpenApiUnread = components['schemas']['NotificationInboxUnreadCountResponse'];
+type OpenApiMarkRead = components['schemas']['NotificationInboxMarkReadResponse'];
+type _AssertPage = keyof OpenApiInboxPage;
+type _AssertItem = keyof OpenApiInboxItem;
+type _AssertUnread = keyof OpenApiUnread;
+type _AssertMark = keyof OpenApiMarkRead;
+const _pageAnchor: _AssertPage = 'unread_total';
+const _itemAnchor: _AssertItem = 'title_key';
+const _unreadAnchor: _AssertUnread = 'unread_total';
+const _markAnchor: _AssertMark = 'marked_count';
+void _pageAnchor;
+void _itemAnchor;
+void _unreadAnchor;
+void _markAnchor;
+
 import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 

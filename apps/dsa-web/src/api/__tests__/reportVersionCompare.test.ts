@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getParsedApiError, isApiRequestError } from '../error';
 import apiClient from '../index';
 import { reportVersionCompareApi } from '../reportVersionCompare';
 
@@ -157,5 +158,50 @@ describe('reportVersionCompareApi', () => {
     expect(result.delta?.baseRecordId).toBe(1);
     expect(result.delta?.baseQueryId).toBe('shared-query');
     expect(result.delta?.conclusionChanges[0]?.baseValue).toBe('buy');
+  });
+
+  it('surfaces list shape mismatches through ParsedApiError', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        stock_code: '600519',
+        total: 1,
+        items: [],
+      },
+    });
+    await expect(
+      reportVersionCompareApi.listRuns({ stockCode: '600519' }),
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
+  });
+
+  it('rejects non-finite sentiment scores on run items', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        stock_code: '600519',
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [
+          {
+            run_id: '12',
+            query_id: 'q1',
+            stock_code: '600519',
+            sentiment_score: Number.NaN,
+            config_components: {},
+            config_complete: true,
+            config_missing_keys: [],
+          },
+        ],
+      },
+    });
+    await expect(
+      reportVersionCompareApi.listRuns({ stockCode: '600519' }),
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
   });
 });

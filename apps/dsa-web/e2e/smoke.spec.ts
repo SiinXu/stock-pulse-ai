@@ -261,7 +261,9 @@ test.describe('web smoke', () => {
 
     const input = page.getByPlaceholder(/分析 600519/);
     await expect(input).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('button', { name: '展开策略选择' })).toBeVisible();
+    const skillPicker = page.getByRole('button', { name: '展开策略选择' });
+    await expect(skillPicker).toBeVisible();
+    await expect(skillPicker).toHaveAttribute('aria-expanded', 'false');
 
     const prompt = '请简要分析 600519';
     await input.fill(prompt);

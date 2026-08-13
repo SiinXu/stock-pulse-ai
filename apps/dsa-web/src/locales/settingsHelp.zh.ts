@@ -2055,6 +2055,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT、PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT、PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT 为百分比；PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO 为止损阈值的近距比例（0–1）；PORTFOLIO_RISK_LOOKBACK_DAYS 为交易日回看窗口（默认 180）。',
     impact: ['影响组合风险告警与 Agent 风险快照。'],
   },
+  'settings.system.portfolio_aware_sizing': {
+    title: '组合感知仓位计算',
+    summary: '使用当前组合权重控制确定性仓位区间。',
+    usage: '需要组合感知区间时保持开启。单一标的权重上限为 0 到 1 的小数，默认 0.15。',
+    notes: ['没有组合数据时，仓位计算仍会以明确的单股降级模式运行。'],
+  },
   'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
     title: '启用组合汇率更新',
     summary: '多币种持仓估值是否允许刷新汇率。',

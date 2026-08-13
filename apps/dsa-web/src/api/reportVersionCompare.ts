@@ -2,9 +2,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Client for `/api/v1/report-version-compare` (issue #188 / T18).
+ * Response boundaries use OpenAPI-generated anchors + Zod fail-closed validation.
  */
+import { z } from 'zod';
+import type { components } from '../types/api.generated';
 import apiClient from './index';
+import { assertCamelCasePayload } from './parseCamelCasePayload';
 import { toCamelCase } from './utils';
+
+type OpenApiRunItem = components['schemas']['ReportVersionRunItem'];
+type OpenApiRunList = components['schemas']['ReportVersionRunListResponse'];
+type OpenApiCompare = components['schemas']['ReportVersionCompareResponse'];
+type _AssertRunItem = keyof OpenApiRunItem;
+type _AssertRunList = keyof OpenApiRunList;
+type _AssertCompare = keyof OpenApiCompare;
+const _runItemAnchor: _AssertRunItem = 'run_id';
+const _runListAnchor: _AssertRunList = 'stock_code';
+const _compareAnchor: _AssertCompare = 'engine_status';
+void _runItemAnchor;
+void _runListAnchor;
+void _compareAnchor;
 
 export type ReportVersionSeverity = 'major' | 'moderate' | 'minor' | 'none' | 'unknown';
 
@@ -143,6 +160,151 @@ export type CompareReportVersionsParams = {
   signal?: AbortSignal;
 };
 
+
+const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
+  message: 'non-finite number rejected',
+});
+
+const reportVersionRunItemSchema = z
+  .object({
+    runId: z.string(),
+    queryId: z.string(),
+    stockCode: z.string(),
+    stockName: z.string().nullable().optional(),
+    reportType: z.string().nullable().optional(),
+    createdAt: z.string().nullable().optional(),
+    modelUsed: z.string().nullable().optional(),
+    reportLanguage: z.string().nullable().optional(),
+    action: z.string().nullable().optional(),
+    actionLabel: z.string().nullable().optional(),
+    operationAdvice: z.string().nullable().optional(),
+    sentimentScore: finiteNumber.nullable().optional(),
+    trendPrediction: z.string().nullable().optional(),
+    analysisSummary: z.string().nullable().optional(),
+    configFingerprint: z.string().nullable().optional(),
+    configComponents: z.record(z.string(), z.string()).optional(),
+    configComplete: z.boolean().optional(),
+    configMissingKeys: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
+const reportVersionRunListResponseSchema = z
+  .object({
+    stockCode: z.string(),
+    total: z.number().int(),
+    page: z.number().int(),
+    limit: z.number().int(),
+    items: z.array(reportVersionRunItemSchema).optional(),
+  })
+  .passthrough();
+
+const configComponentDiffSchema = z
+  .object({
+    key: z.string(),
+    baseValue: z.string().nullable().optional(),
+    targetValue: z.string().nullable().optional(),
+    changed: z.boolean().optional(),
+  })
+  .passthrough();
+
+const configFingerprintDiffSchema = z
+  .object({
+    baseFingerprint: z.string().nullable().optional(),
+    targetFingerprint: z.string().nullable().optional(),
+    identical: z.boolean().optional(),
+    hasDifferences: z.boolean().optional(),
+    comparisonStatus: z.string().optional(),
+    baseComplete: z.boolean().optional(),
+    targetComplete: z.boolean().optional(),
+    baseMissingKeys: z.array(z.string()).optional(),
+    targetMissingKeys: z.array(z.string()).optional(),
+    components: z.array(configComponentDiffSchema).optional(),
+  })
+  .passthrough();
+
+const reportFieldDiffSchema = z
+  .object({
+    field: z.string(),
+    baseValue: z.unknown().optional(),
+    targetValue: z.unknown().optional(),
+    changed: z.boolean().optional(),
+    severity: z.string().optional(),
+  })
+  .passthrough();
+
+const analysisValueChangeSchema = z
+  .object({
+    field: z.string(),
+    baseValue: z.unknown().optional(),
+    targetValue: z.unknown().optional(),
+    delta: z.unknown().optional(),
+    direction: z.string().optional(),
+    comparable: z.boolean().optional(),
+    unavailability: z
+      .object({
+        base: z.string().nullable().optional(),
+        target: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+  })
+  .passthrough();
+
+const analysisListChangeSchema = z
+  .object({
+    field: z.string(),
+    added: z.array(z.string()).optional(),
+    removed: z.array(z.string()).optional(),
+    unchanged: z.array(z.string()).optional(),
+    addedTotal: z.number().int().optional(),
+    removedTotal: z.number().int().optional(),
+    unchangedTotal: z.number().int().optional(),
+    outputTruncated: z.boolean().optional(),
+  })
+  .passthrough();
+
+const analysisDeltaPayloadSchema = z
+  .object({
+    hasBaseline: z.boolean().optional(),
+    baselineStatus: z.string(),
+    baselineReason: z.string().nullable().optional(),
+    stockCode: z.string().nullable().optional(),
+    baseRecordId: z.number().int(),
+    targetRecordId: z.number().int(),
+    baseQueryId: z.string().nullable().optional(),
+    targetQueryId: z.string().nullable().optional(),
+    reportType: z.string().nullable().optional(),
+    hasMaterialChanges: z.boolean().optional(),
+    conclusionChanges: z.array(analysisValueChangeSchema).optional(),
+    scoreChanges: z.array(analysisValueChangeSchema).optional(),
+    evidenceChanges: z.array(analysisListChangeSchema).optional(),
+    riskChanges: z.array(analysisListChangeSchema).optional(),
+  })
+  .passthrough();
+
+const reportVersionCompareResponseSchema = z
+  .object({
+    status: z.string(),
+    stockCode: z.string(),
+    baseRun: reportVersionRunItemSchema,
+    targetRun: reportVersionRunItemSchema,
+    configDiff: configFingerprintDiffSchema,
+    fieldDiffs: z.array(reportFieldDiffSchema).optional(),
+    delta: analysisDeltaPayloadSchema.nullable().optional(),
+    engineStatus: z.string(),
+  })
+  .passthrough();
+
+function normalizeRunItem(item: ReportVersionRunItem): ReportVersionRunItem {
+  return {
+    ...item,
+    configComponents: item.configComponents ?? {},
+    configComplete: item.configComplete ?? false,
+    configMissingKeys: item.configMissingKeys ?? [],
+  };
+}
+
 export const reportVersionCompareApi = {
   listRuns: async (
     params: ListReportVersionRunsParams,
@@ -159,10 +321,16 @@ export const reportVersionCompareApi = {
       { params: queryParams, signal: params.signal },
     );
     const data = toCamelCase<ReportVersionRunListResponse>(response.data);
-    return {
+    const shaped: ReportVersionRunListResponse = {
       ...data,
-      items: (data.items ?? []).map((item) => toCamelCase<ReportVersionRunItem>(item)),
+      items: (data.items ?? []).map((item) => normalizeRunItem(toCamelCase<ReportVersionRunItem>(item))),
     };
+    return assertCamelCasePayload<ReportVersionRunListResponse>(
+      shaped,
+      reportVersionRunListResponseSchema,
+      'ReportVersionRunListResponse',
+      'reportVersionCompare',
+    );
   },
 
   compare: async (
@@ -180,18 +348,31 @@ export const reportVersionCompareApi = {
       },
     );
     const data = toCamelCase<ReportVersionCompareResponse>(response.data);
-    return {
+    const shaped: ReportVersionCompareResponse = {
       ...data,
-      baseRun: toCamelCase<ReportVersionRunItem>(data.baseRun),
-      targetRun: toCamelCase<ReportVersionRunItem>(data.targetRun),
+      baseRun: normalizeRunItem(toCamelCase<ReportVersionRunItem>(data.baseRun)),
+      targetRun: normalizeRunItem(toCamelCase<ReportVersionRunItem>(data.targetRun)),
       configDiff: {
         ...toCamelCase<ConfigFingerprintDiff>(data.configDiff),
         components: (data.configDiff?.components ?? []).map((item) =>
           toCamelCase<ConfigComponentDiff>(item),
         ),
+        baseMissingKeys: data.configDiff?.baseMissingKeys ?? [],
+        targetMissingKeys: data.configDiff?.targetMissingKeys ?? [],
+        identical: data.configDiff?.identical ?? false,
+        hasDifferences: data.configDiff?.hasDifferences ?? false,
+        comparisonStatus: data.configDiff?.comparisonStatus ?? 'unknown',
+        baseComplete: data.configDiff?.baseComplete ?? false,
+        targetComplete: data.configDiff?.targetComplete ?? false,
       },
       fieldDiffs: (data.fieldDiffs ?? []).map((item) => toCamelCase<ReportFieldDiff>(item)),
       delta: data.delta ? toCamelCase<AnalysisDeltaPayload>(data.delta) : data.delta,
     };
+    return assertCamelCasePayload<ReportVersionCompareResponse>(
+      shaped,
+      reportVersionCompareResponseSchema,
+      'ReportVersionCompareResponse',
+      'reportVersionCompare',
+    );
   },
 };
