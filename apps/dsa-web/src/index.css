@@ -341,17 +341,6 @@
   --login-input-toggle-ring: hsl(var(--primary) / 0.22);
 }
 
-/* Theme Contract v1 — market price-direction (A-share default is cn / red_up). */
-[data-price-direction="cn"] {
-  --price-up: var(--price-red);
-  --price-down: var(--price-green);
-}
-
-[data-price-direction="us"] {
-  --price-up: var(--price-green);
-  --price-down: var(--price-red);
-}
-
 /*
  * Theme pack: slate (Layer 1 only). Validates pack recolor without touching
  * --home-* micro-tokens or Layer 0 price paint.
@@ -547,8 +536,7 @@
   --price-green-hsl: 149 100% 44%;
   --price-red: hsl(var(--price-red-hsl));
   --price-green: hsl(var(--price-green-hsl));
-  --price-up: var(--price-red);
-  --price-down: var(--price-green);
+  /* Direction tokens are owned by [data-price-direction]; do not reassign here. */
   --home-price-up: var(--price-red);
   --home-price-down: var(--price-green);
   --report-strategy-buy: hsl(149 100% 44%);
@@ -661,6 +649,21 @@
   --login-hint-text: hsl(75 5% 62%);
   --login-input-icon: hsl(var(--primary) / 0.88);
   --login-input-toggle-ring: hsl(var(--primary) / 0.24);
+}
+
+/*
+ * Theme Contract v1 — market price-direction (A-share default is cn / red_up).
+ * Declared after :root and .dark so equal-specificity direction mapping wins
+ * source order and is not reset by theme-mode hue updates.
+ */
+[data-price-direction="cn"] {
+  --price-up: var(--price-red);
+  --price-down: var(--price-green);
+}
+
+[data-price-direction="us"] {
+  --price-up: var(--price-green);
+  --price-down: var(--price-red);
 }
 
 /* =========================================

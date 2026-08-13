@@ -4,8 +4,17 @@
 import { useEffect, useRef } from 'react';
 import { systemConfigApi } from '../../api/systemConfig';
 import { useThemeAppearanceOptional } from '../../contexts/ThemeAppearanceContext';
+import {
+  readDocumentPriceDirection,
+  readStoredPriceDirection,
+} from './themeRuntime';
 
 const COLOR_SCHEME_KEY = 'MARKET_REVIEW_COLOR_SCHEME';
+
+/** Session-only Settings preview: document attr changed without writing storage. */
+function hasUnpersistedPriceDirectionPreview(): boolean {
+  return readDocumentPriceDirection() !== readStoredPriceDirection();
+}
 
 /** Mirror MARKET_REVIEW_COLOR_SCHEME onto data-price-direction when config loads. */
 export function PriceDirectionSync(): null {
@@ -24,6 +33,9 @@ export function PriceDirectionSync(): null {
         const value = item?.value;
         if (value === undefined || value === null || String(value).trim() === '') return;
         ranRef.current = true;
+        // A Settings draft may have already previewed a different convention
+        // with persist: false; do not revert the document or write storage.
+        if (hasUnpersistedPriceDirectionPreview()) return;
         appearance.syncPriceDirectionFromChangeColorPref(String(value));
       })
       .catch(() => {

@@ -157,6 +157,25 @@ function findMissingPriceDirectionSelectors(indexCss: string): string[] {
   return missing;
 }
 
+/** `.dark { }` (not `.dark .child` / `.dark[attr]`) must not reassign direction tokens. */
+function findDarkThemeDirectionOverrides(indexCss: string): Finding[] {
+  const source = maskComments(indexCss);
+  const findings: Finding[] = [];
+  const match = source.match(/^\.dark\s*\{([\s\S]*?)^\}/m);
+  if (!match) return findings;
+  const body = match[1] ?? '';
+  for (const token of ['--price-up', '--price-down'] as const) {
+    const tokenIndex = body.search(new RegExp(`${token}\\s*:`));
+    if (tokenIndex < 0) continue;
+    findings.push({
+      file: INDEX_CSS,
+      line: lineOf(source, (match.index ?? 0) + tokenIndex),
+      token,
+    });
+  }
+  return findings;
+}
+
 describe('theme contract guard', () => {
   const indexCss = fs.readFileSync('src/index.css', 'utf8');
   const productionCssAndTsx = {
@@ -199,6 +218,15 @@ describe('theme contract guard', () => {
     expect(THEME_PACKS.classic.modes.light).toEqual({});
   });
 
+  it('keeps data-price-direction after .dark so US mapping is not reset', () => {
+    const source = maskComments(indexCss);
+    const darkIdx = source.search(/^\.dark\s*\{/m);
+    const usIdx = source.indexOf('[data-price-direction="us"]');
+    expect(darkIdx).toBeGreaterThanOrEqual(0);
+    expect(usIdx).toBeGreaterThan(darkIdx);
+    expect(findDarkThemeDirectionOverrides(indexCss)).toEqual([]);
+  });
+
   it('ratchets hardcoded --home-price-* production references downward only', () => {
     const refs = findHardcodedHomePriceRefs(productionCssAndTsx);
     expect(refs.length).toBeLessThanOrEqual(MAX_HARDCODED_HOME_PRICE_CSS_VAR_REFS);
@@ -233,5 +261,13 @@ describe('theme contract guard', () => {
       '../../components/report/ReportOverview.tsx': "return { color: 'var(--home-price-up)' };",
     });
     expect(homeRefs.map(({ token }) => token)).toContain('--home-price-up');
+
+    const darkOverride = findDarkThemeDirectionOverrides(`
+.dark {
+  --price-up: var(--price-red);
+  --price-down: var(--price-green);
+}
+`);
+    expect(darkOverride.map(({ token }) => token)).toEqual(['--price-up', '--price-down']);
   });
 });
