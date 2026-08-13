@@ -8,6 +8,7 @@ import { prepareInitialUiLanguage } from './i18n/prepareUiLanguage'
 import { QueryProvider } from './query/QueryProvider'
 import { applyUiLanguageToDocument, getRuntimeInitialLanguage } from './utils/uiLanguage'
 import { installApiMockIfEnabled } from './dev/apiMock/apiMockSwitch'
+import { registerServiceWorker } from './pwa/registerServiceWorker'
 
 const initialUiLanguage = await prepareInitialUiLanguage(getRuntimeInitialLanguage())
 applyUiLanguageToDocument(initialUiLanguage)
@@ -26,6 +27,16 @@ if (import.meta.env.DEV) {
   } catch {
     // no-op: optional dependency not present in this environment
   }
+}
+
+// Production shell PWA only: caches app shell + static assets, never API/market data.
+if (import.meta.env.PROD) {
+  void registerServiceWorker({
+    enabled: true,
+    onError: (error) => {
+      console.warn('[pwa] service worker registration failed', error)
+    },
+  })
 }
 
 createRoot(document.getElementById('root')!).render(
