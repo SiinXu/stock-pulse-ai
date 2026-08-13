@@ -6270,6 +6270,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.title": "Puerta de calidad del análisis",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.summary": "Elige annotate (predeterminado) o intercept al encontrar hechos sin respaldo.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.title": "Política de fallo de la puerta de calidad",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.notes.0": "Si la evidencia no es clara, devuelve unknown en vez de forzar una dirección.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.summary": "Añade a la analítica un contexto explicable de régimen de mercado basado en reglas.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.title": "Detección del régimen de mercado",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.usage": "Mantén activa la detección automática y usa una anulación admitida solo para diagnósticos controlados.",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ENABLED": "Puerta de calidad del análisis",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ON_FAILURE": "Política de fallo de la puerta de calidad",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Detección del régimen de mercado",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Anulación del régimen de mercado",
 } as const;

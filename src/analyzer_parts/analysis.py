@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         check_content_integrity,
         format_daily_market_context_prompt_section,
         format_market_phase_prompt_section,
+        format_market_regime_prompt_section,
         format_market_structure_prompt_section,
         get_chip_unavailable_text,
         get_no_data_text,
@@ -560,6 +561,12 @@ class GeminiAnalyzer:
         )
         if market_structure_section:
             prompt += market_structure_section
+        market_regime_section = format_market_regime_prompt_section(
+            context.get("market_regime_context"),
+            report_language=report_language,
+        )
+        if market_regime_section:
+            prompt += market_regime_section
         if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
             prompt += analysis_context_pack_summary
         decision_memory_prompt = context.get("decision_memory_reflection_prompt")

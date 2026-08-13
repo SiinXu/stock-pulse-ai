@@ -6270,6 +6270,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.title": "Porte de qualité de l’analyse",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.summary": "Choisit annotate (par défaut) ou intercept lorsque des faits non étayés sont trouvés.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.title": "Politique d’échec de la porte de qualité",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.notes.0": "Lorsque les preuves sont ambiguës, unknown est renvoyé au lieu d’imposer une direction.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.summary": "Ajoute à l’analyse un contexte explicable de régime de marché fondé sur des règles.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.title": "Détection du régime de marché",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.usage": "Laissez la détection automatique active et utilisez une valeur forcée prise en charge uniquement pour un diagnostic contrôlé.",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ENABLED": "Porte de qualité de l’analyse",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ON_FAILURE": "Politique d’échec de la porte de qualité",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Détection du régime de marché",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Forçage du régime de marché",
 } as const;

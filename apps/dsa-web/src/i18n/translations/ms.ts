@@ -6270,6 +6270,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.title": "Gerbang kualiti analisis",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.summary": "Pilih annotate (lalai) atau intercept apabila fakta tanpa bukti ditemui.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.title": "Dasar kegagalan gerbang kualiti",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.notes.0": "Jika bukti tidak jelas, sistem mengembalikan unknown tanpa memaksa arah.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.summary": "Menambah konteks rejim pasaran berasaskan peraturan yang boleh diterangkan kepada analisis.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.title": "Pengesanan rejim pasaran",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.usage": "Kekalkan pengesanan automatik dan gunakan penggantian yang disokong hanya untuk diagnostik terkawal.",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ENABLED": "Gerbang kualiti analisis",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ON_FAILURE": "Dasar kegagalan gerbang kualiti",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Pengesanan rejim pasaran",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Penggantian rejim pasaran",
 } as const;

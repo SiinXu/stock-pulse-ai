@@ -1,0 +1,1 @@
+- [Fixed] Preserve market-regime prompt and configuration logging bindings after synchronizing with the latest analysis baseline.

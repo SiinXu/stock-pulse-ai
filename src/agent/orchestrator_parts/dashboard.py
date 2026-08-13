@@ -90,6 +90,9 @@ class _DashboardMethods:
             market_structure_context = context.get("market_structure_context")
             if isinstance(market_structure_context, dict) and market_structure_context:
                 ctx.meta["market_structure_context"] = dict(market_structure_context)
+            market_regime_context = context.get("market_regime_context")
+            if isinstance(market_regime_context, dict) and market_regime_context:
+                ctx.meta["market_regime_context"] = dict(market_regime_context)
             analysis_context_pack_summary = context.get("analysis_context_pack_summary")
             if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
                 ctx.meta["analysis_context_pack_summary"] = analysis_context_pack_summary

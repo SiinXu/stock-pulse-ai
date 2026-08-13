@@ -6270,6 +6270,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.title": "Analyse-Qualitätsgate",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.summary": "Wählt bei unbelegten Fakten annotate (Standard) oder intercept.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.title": "Fehlerrichtlinie des Qualitätsgates",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.notes.0": "Bei unklarer Evidenz wird unknown ausgegeben, statt eine Richtung zu erzwingen.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.summary": "Ergänzt die Analyse um einen erklärbaren regelbasierten Marktregime-Kontext.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.title": "Marktregime-Erkennung",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.usage": "Automatische Erkennung aktiviert lassen; eine unterstützte Vorgabe nur für kontrollierte Diagnosen setzen.",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ENABLED": "Analyse-Qualitätsgate",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ON_FAILURE": "Fehlerrichtlinie des Qualitätsgates",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Marktregime-Erkennung",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Marktregime-Vorgabe",
 } as const;

@@ -82,26 +82,46 @@ class SkillRouter:
         return self.select_skills(ctx, max_count=max_count)
 
     def _detect_regime(self, ctx: AgentContext) -> Optional[str]:
-        for op in ctx.opinions:
-            if op.agent_name != "technical":
-                continue
-            raw = op.raw_data or {}
+        """Return an actionable regime label, or None when unknown/unavailable.
 
-            ma_alignment = str(raw.get("ma_alignment", "")).lower()
-            try:
-                trend_score = float(raw.get("trend_score", 50))
-            except (TypeError, ValueError):
-                trend_score = 50.0
-            volume_status = str(raw.get("volume_status", "")).lower()
+        Uses the shared explainable MarketRegimeService so routing and analysis
+        share the same rule evidence. ``unknown`` never forces a skill route.
+        ``sector_hot`` remains a soft meta hint for skill tags when present.
+        """
+        try:
+            from src.services.market_regime_service import (
+                MARKET_REGIME_CONTEXT_KEY,
+                MarketRegimeService,
+                is_actionable_regime,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Router must still function if regime import fails.
+            log_safe_exception(
+                logger,
+                "Market regime service unavailable for skill routing",
+                exc,
+                error_code="agent_regime_service_import_failed",
+                level=logging.WARNING,
+            )
+            if ctx.meta.get("sector_hot"):
+                return "sector_hot"
+            return None
 
-            if ma_alignment == "bullish" and trend_score >= 70:
-                return "trending_up"
-            if ma_alignment == "bearish" and trend_score <= 30:
-                return "trending_down"
-            if ma_alignment == "neutral" or 35 <= trend_score <= 65:
-                return "sideways"
-            if volume_status == "heavy" and 30 < trend_score < 70:
-                return "volatile"
+        try:
+            service = MarketRegimeService(config=self._config)
+            regime_context = service.build_from_agent_context(ctx)
+            if isinstance(regime_context, dict):
+                ctx.meta[MARKET_REGIME_CONTEXT_KEY] = regime_context
+                regime = str(regime_context.get("regime") or "").strip().lower()
+                if is_actionable_regime(regime):
+                    return regime
+        except Exception as exc:  # broad-exception: fallback_recorded - Regime detection must not break routing.
+            log_safe_exception(
+                logger,
+                "Market regime detection failed during skill routing",
+                exc,
+                error_code="agent_regime_detect_failed",
+                level=logging.WARNING,
+            )
 
         if ctx.meta.get("sector_hot"):
             return "sector_hot"

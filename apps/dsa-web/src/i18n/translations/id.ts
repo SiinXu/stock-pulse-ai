@@ -6270,6 +6270,12 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ENABLED.title": "Gerbang kualitas analisis",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.summary": "Pilih annotate (bawaan) atau intercept saat fakta tanpa bukti ditemukan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE.title": "Kebijakan kegagalan gerbang kualitas",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.notes.0": "Jika bukti tidak jelas, sistem mengembalikan unknown tanpa memaksakan arah.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.summary": "Menambahkan konteks rezim pasar berbasis aturan yang dapat dijelaskan ke analisis.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.title": "Deteksi rezim pasar",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.usage": "Pertahankan deteksi otomatis dan gunakan override yang didukung hanya untuk diagnostik terkontrol.",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ENABLED": "Gerbang kualitas analisis",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_QUALITY_GATE_ON_FAILURE": "Kebijakan kegagalan gerbang kualitas",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Deteksi rezim pasar",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Override rezim pasar",
 } as const;

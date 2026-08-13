@@ -362,6 +362,8 @@ class Config:
     agent_planning_on_step_failure: str = "replan"  # replan | terminate
     agent_skill_autoweight: bool = True  # Auto-weight skills by backtest performance
     agent_skill_routing: str = "auto"  # Skill routing: 'auto' (regime-based) or 'manual'
+    market_regime_enabled: bool = True  # Explainable market-regime detection (Issue #220)
+    market_regime_override: str = ""  # Optional forced regime label; empty = auto
     agent_context_compression_enabled: bool = False  # Compress visible chat history before Agent calls
     agent_context_compression_profile: str = AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE
     agent_context_compression_trigger_tokens: int = 12000
@@ -584,6 +586,14 @@ class Config:
     _VALID_AGENT_ARCH = {"single", "multi"}
     _VALID_ORCHESTRATOR_MODES = {"quick", "standard", "full", "specialist"}
     _VALID_SKILL_ROUTING = {"auto", "manual"}
+    _VALID_MARKET_REGIME_OVERRIDES = {
+        "",
+        "trending_up",
+        "trending_down",
+        "sideways",
+        "volatile",
+        "unknown",
+    }
     # Single source: src.core.config.sources.WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
     _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS = _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS_CANONICAL
     _BOOTSTRAP_RUNTIME_ENV_OVERRIDES_CAPTURED = False
@@ -631,6 +641,16 @@ class Config:
                 self.agent_skill_routing, self._VALID_SKILL_ROUTING,
             )
             object.__setattr__(self, "agent_skill_routing", "auto")
+        override = str(self.market_regime_override or "").strip().lower()
+        if override not in self._VALID_MARKET_REGIME_OVERRIDES:
+            _log.warning(
+                "Invalid MARKET_REGIME_OVERRIDE=%r, ignoring. Valid: %s",
+                self.market_regime_override,
+                sorted(self._VALID_MARKET_REGIME_OVERRIDES - {""}),
+            )
+            object.__setattr__(self, "market_regime_override", "")
+        else:
+            object.__setattr__(self, "market_regime_override", override)
         normalized_profile = normalize_agent_context_compression_profile(
             self.agent_context_compression_profile
         )
