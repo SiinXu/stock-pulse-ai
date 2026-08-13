@@ -38,7 +38,8 @@ export const PLAYGROUND_CATEGORIES: readonly PlaygroundCategoryId[] = [
   'watchlist',
 ];
 
-export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button', 'Button', ['variants', 'sizes', 'states']),
+export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
+  common('button', 'Button', ['variants', 'sizes', 'states']),
   common('pressable', 'Pressable', ['interactive', 'states']),
   common('selection-chip', 'SelectionChip', ['interactive', 'states']),
   common('icon-button', 'IconButton', ['variants', 'sizes', 'states']),
@@ -104,6 +105,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   common('pagination', 'Pagination', ['interactive']),
   common('confirm-dialog', 'ConfirmDialog', ['interactive', 'error']),
   common('modal', 'Modal', ['interactive']),
+
   entry('layout', 'shell', 'Shell', 'components/layout/Shell.tsx', ['default'], 'full'),
   entry('layout', 'command-palette', 'CommandPalette', 'components/command-palette/CommandPalette.tsx', ['interactive']),
   entry('layout', 'notification-bell', 'NotificationBell', 'components/notifications/NotificationBell.tsx', ['interactive', 'empty', 'error']),
@@ -122,6 +124,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('layout', 'theme-pack-select', 'ThemePackSelect', 'components/theme/ThemePackSelect.tsx', ['interactive']),
   entry('layout', 'price-direction-sync', 'PriceDirectionSync', 'components/theme/PriceDirectionSync.tsx'),
   entry('layout', 'ui-language-toggle', 'UiLanguageToggle', 'components/i18n/UiLanguageToggle.tsx', ['interactive']),
+
   entry('dashboard', 'dashboard-panel-header', 'DashboardPanelHeader', 'components/dashboard/DashboardPanelHeader.tsx'),
   entry('dashboard', 'dashboard-state-block', 'DashboardStateBlock', 'components/dashboard/DashboardStateBlock.tsx', ['default', 'loading', 'empty']),
   entry('dashboard', 'home-readiness-card', 'HomeReadinessCard', 'components/home/HomeReadinessCard.tsx', ['default', 'loading', 'empty', 'error']),
@@ -130,6 +133,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('dashboard', 'onboarding-today-plan-card', 'OnboardingTodayPlanCard', 'components/onboarding/OnboardingTodayPlanCard.tsx', ['default']),
   entry('dashboard', 'agent-onboarding-wizard', 'AgentOnboardingWizard', 'components/onboarding/AgentOnboardingWizard.tsx', ['interactive']),
   entry('dashboard', 'zero-config-first-run-panel', 'ZeroConfigFirstRunPanel', 'components/onboarding/ZeroConfigFirstRunPanel.tsx', ['default', 'empty']),
+
   entry('alerts', 'alert-rule-form', 'AlertRuleForm', 'components/alerts/AlertRuleForm.tsx', ['interactive', 'states']),
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alert-trigger-history', 'AlertTriggerHistory', 'components/alerts/AlertTriggerHistory.tsx', ['default', 'loading', 'empty']),
@@ -156,6 +160,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('signals', 'skill-outcome-performance-table', 'SkillOutcomePerformanceTable', 'components/skill-outcomes/SkillOutcomePerformanceTable.tsx', ['default', 'empty']),
   entry('signals', 'skill-outcome-recent-lists', 'SkillOutcomeRecentLists', 'components/skill-outcomes/SkillOutcomeRecentLists.tsx', ['default', 'empty']),
   entry('signals', 'skill-outcome-run-panel', 'SkillOutcomeRunPanel', 'components/skill-outcomes/SkillOutcomeRunPanel.tsx', ['interactive', 'empty', 'error']),
+
   entry('reports', 'analysis-context-summary', 'AnalysisContextSummary', 'components/report/AnalysisContextSummary.tsx', ['default', 'empty']),
   entry('reports', 'market-review-report-view', 'MarketReviewReportView', 'components/report/MarketReviewReportView.tsx', ['default', 'loading', 'error']),
   entry('reports', 'market-structure-card', 'MarketStructureCard', 'components/report/MarketStructureCard.tsx', ['default', 'empty']),
@@ -174,6 +179,13 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('reports', 'report-strategy', 'ReportStrategy', 'components/report/ReportStrategy.tsx', ['default', 'empty']),
   entry('reports', 'report-structured-insights', 'ReportStructuredInsights', 'components/report/ReportStructuredInsights.tsx', ['default', 'empty']),
   entry('reports', 'report-summary', 'ReportSummary', 'components/report/ReportSummary.tsx', ['default', 'loading', 'error']),
+  entry(
+    'reports',
+    'report-version-compare-view',
+    'ReportVersionCompareView',
+    'components/report-version-compare/ReportVersionCompareView.tsx',
+    ['default', 'empty', 'states'],
+  ),
   entry('reports', 'share-image-button', 'ShareImageButton', 'components/report/ShareImageButton.tsx', ['default', 'states']),
   entry('reports', 'market-review-region-selector', 'MarketReviewRegionSelector', 'components/market-review/MarketReviewRegionSelector.tsx', ['interactive', 'states']),
   entry('reports', 'deep-research-panel', 'DeepResearchPanel', 'components/chat/DeepResearchPanel.tsx', ['interactive', 'empty', 'error']),
@@ -185,6 +197,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('reports', 'chat-session-sidebar', 'ChatSessionSidebar', 'components/chat/ChatSessionSidebar.tsx', ['default', 'loading', 'empty', 'error']),
   entry('reports', 'chat-thinking-details', 'ChatThinkingDetails', 'components/chat/ChatThinkingDetails.tsx', ['default']),
   entry('reports', 'chat-thinking-toggle', 'ChatThinkingToggle', 'components/chat/ChatThinkingDetails.tsx', ['interactive']),
+
   entry('runFlow', 'run-flow-event-list', 'RunFlowEventList', 'components/run-flow/RunFlowEventList.tsx', ['default', 'empty']),
   entry('runFlow', 'run-flow-graph', 'RunFlowGraph', 'components/run-flow/RunFlowGraph.tsx', ['default', 'interactive']),
   entry('runFlow', 'run-flow-node-details', 'RunFlowNodeDetails', 'components/run-flow/RunFlowNodeDetails.tsx', ['default', 'empty']),
@@ -192,6 +205,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('runFlow', 'run-flow-summary-bar', 'RunFlowSummaryBar', 'components/run-flow/RunFlowSummaryBar.tsx'),
   entry('runFlow', 'process-timeline', 'ProcessTimeline', 'components/run-flow/ProcessTimeline.tsx', ['default', 'empty']),
   entry('reports', 'report-process-timeline', 'ReportProcessTimeline', 'components/report/ReportProcessTimeline.tsx', ['default', 'empty']),
+
   entry('settings', 'ai-overview-matrix', 'AiOverviewMatrix', 'components/settings/AiOverviewMatrix.tsx', ['default', 'states']),
   entry('settings', 'agent-behavior-panel', 'AgentBehaviorPanel', 'components/settings/AgentBehaviorPanel.tsx', ['interactive', 'states', 'empty', 'error']),
   entry('settings', 'auth-settings-card', 'AuthSettingsCard', 'components/settings/AuthSettingsCard.tsx', ['interactive', 'error']),
@@ -231,10 +245,12 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('settings', 'settings-view-tabs', 'SettingsViewTabs', 'components/settings/SettingsNavigation.tsx', ['interactive']),
   entry('settings', 'settings-panel-error-boundary', 'SettingsPanelErrorBoundary', 'components/settings/SettingsPanelErrorBoundary.tsx', ['default', 'error']),
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
+
   entry('reports', 'dcf-sensitivity-panel', 'DcfSensitivityPanel', 'components/valuation/DcfSensitivityPanel.tsx', ['default', 'empty', 'interactive']),
   entry('reports', 'peer-valuation-canvas', 'PeerValuationCanvas', 'components/valuation/PeerValuationCanvas.tsx', ['default', 'empty', 'interactive']),
   entry('stockSearch', 'kline-chart', 'KlineChart', 'components/charts/KlineChart.tsx', ['default', 'empty', 'states']),
   entry('stockSearch', 'risk-heatmap', 'RiskHeatmap', 'components/charts/RiskHeatmap.tsx', ['default', 'empty']),
+
   entry('stockSearch', 'mini-sparkline', 'MiniSparkline', 'components/screening/MiniSparkline.tsx'),
   entry('stockSearch', 'screen-alert-message', 'ScreenAlertMessage', 'components/screening/ScreenAlertMessage.tsx'),
   entry('stockSearch', 'screening-configuration-modal', 'ScreeningConfigurationModal', 'components/screening/ScreeningConfigurationModal.tsx', ['interactive']),
@@ -242,6 +258,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [  common('button'
   entry('stockSearch', 'screening-results-section', 'ScreeningResultsSection', 'components/screening/ScreeningResultsSection.tsx', ['default', 'empty']),
   entry('stockSearch', 'screening-run-status-card', 'ScreeningRunStatusCard', 'components/screening/ScreeningRunStatusCard.tsx', ['default', 'loading']),
   entry('stockSearch', 'screening-strategy-bar', 'ScreeningStrategyBar', 'components/screening/ScreeningStrategyBar.tsx', ['interactive']),
+
   entry('stockSearch', 'stock-autocomplete', 'StockAutocomplete', 'components/StockAutocomplete/StockAutocomplete.tsx', ['interactive', 'states']),
   entry('stockSearch', 'suggestions-list', 'SuggestionsList', 'components/StockAutocomplete/SuggestionsList.tsx', ['default', 'empty']),
   entry('tasks', 'analysis-phase-select', 'AnalysisPhaseSelect', 'components/analysis/AnalysisPhaseSelect.tsx', ['interactive', 'states']),
