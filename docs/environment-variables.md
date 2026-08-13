@@ -192,6 +192,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `BACKTEST_EVAL_WINDOW_DAYS` | `10` | 是 | Backtesting evaluation window (trading days) |
 | `BACKTEST_MIN_AGE_DAYS` | `14` | 是 | Only retrieve historical analysis records of N days ago (to avoid incomplete data for that day/recently) |
 | `BACKTEST_NEUTRAL_BAND_PCT` | `2.0` | 是 | Neutral-band threshold (%); for example, 2 treats -2% through +2% as neutral/sideways. |
+| `BACKTEST_COMMISSION_BPS` | `0` | 是 | Explicit commission in basis points per side for long simulated returns. Default 0 is zero friction, not hidden costs. |
+| `BACKTEST_SLIPPAGE_BPS` | `0` | 是 | Explicit slippage in basis points per side. Round-trip cost % = 2 × (commission_bps + slippage_bps) / 100. |
 | `BAOSTOCK_PRIORITY` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `BIAS_THRESHOLD` | `5.0` | 是 | 模板中注释; Bias-ratio threshold (%); when deviation from MA5 exceeds this value, strong-trend stocks use a 1.5x threshold before... |
 | `BOCHA_API_KEYS` | `your_bocha_key_here` | 是 | 模板中注释; =================================== Search engine configuration (for fetching stock news) |

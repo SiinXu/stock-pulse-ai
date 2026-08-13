@@ -1333,6 +1333,18 @@ class _ConfigLoadingMethods:
                 field_name='BACKTEST_NEUTRAL_BAND_PCT',
                 minimum=0.0,
             ),
+            backtest_commission_bps=parse_env_float(
+                os.getenv('BACKTEST_COMMISSION_BPS'),
+                0.0,
+                field_name='BACKTEST_COMMISSION_BPS',
+                minimum=0.0,
+            ),
+            backtest_slippage_bps=parse_env_float(
+                os.getenv('BACKTEST_SLIPPAGE_BPS'),
+                0.0,
+                field_name='BACKTEST_SLIPPAGE_BPS',
+                minimum=0.0,
+            ),
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),

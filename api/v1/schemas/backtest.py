@@ -32,8 +32,56 @@ class BacktestAppliedConfig(BaseModel):
     limit: int = Field(..., description="Maximum candidate analysis rows processed")
     engine_version: str = Field(..., description="Effective backtest engine version label")
     neutral_band_pct: float = Field(..., description="Neutral outcome band percentage")
+    commission_bps: float = Field(
+        0.0,
+        description="Commission cost in basis points per side applied to simulated long returns",
+    )
+    slippage_bps: float = Field(
+        0.0,
+        description="Slippage cost in basis points per side applied to simulated long returns",
+    )
+    round_trip_cost_pct: float = Field(
+        0.0,
+        description="Total round-trip cost percentage deducted from long simulated returns",
+    )
     analysis_date_from: Optional[date] = Field(None, description="Analysis date start filter (inclusive)")
     analysis_date_to: Optional[date] = Field(None, description="Analysis date end filter (inclusive)")
+
+
+class BacktestMethodology(BaseModel):
+    """Research-honesty methodology block. Never a return promise."""
+
+    version: str = Field("v1", description="Methodology contract version")
+    engine_version: str = Field(..., description="Engine version label for the run/summary")
+    metric_source: str = Field(
+        "analysis_advice",
+        description="analysis_advice | skill_opinion_outcomes",
+    )
+    eval_window_days: Optional[int] = Field(None, description="Evaluation window when known")
+    is_return_promise: bool = Field(
+        False,
+        description="Always false. Metrics must not be presented as guaranteed future returns.",
+    )
+    disclaimer: str = Field(
+        ...,
+        description="Primary user-facing limitation statement (historical simulation only)",
+    )
+    disclaimer_codes: List[str] = Field(default_factory=list)
+    look_ahead_policy: str = Field(
+        "forward_only_after_resolved_start_session",
+        description="Look-ahead bias protection policy",
+    )
+    survivorship_policy: str = Field(
+        "analyzed_universe_only",
+        description="Survivorship bias disclosure policy",
+    )
+    cost_model: Dict[str, Any] = Field(default_factory=dict)
+    sample_split: Dict[str, Any] = Field(default_factory=dict)
+    return_units: str = Field("percent_relative")
+    currency_policy: str = Field(
+        "percent_returns_currency_agnostic;absolute_prices_not_aggregated_across_currencies"
+    )
+    limitations: List[str] = Field(default_factory=list)
 
 
 class BacktestRunResponse(BaseModel):
@@ -49,6 +97,10 @@ class BacktestRunResponse(BaseModel):
     applied_config: Optional[BacktestAppliedConfig] = Field(
         None,
         description="Echo of the effective run configuration (window, universe limit, engine, dates)",
+    )
+    methodology: Optional[BacktestMethodology] = Field(
+        None,
+        description="Methodology limitations; historical simulation only, not a return promise",
     )
     message: Optional[str] = Field(None, description="空结果或降级时的诊断说明")
     diagnostics: Dict[str, Any] = Field(default_factory=dict, description="回测筛选与诊断信息")
@@ -110,6 +162,10 @@ class BacktestResultsResponse(BaseModel):
 class PerformanceMetrics(BaseModel):
     scope: str
     code: Optional[str] = None
+    skill_id: Optional[str] = Field(
+        None,
+        description="Present when scope=skill (YAML skill / strategy metrics)",
+    )
     eval_window_days: int
     engine_version: str
     computed_at: Optional[str] = None
@@ -136,3 +192,7 @@ class PerformanceMetrics(BaseModel):
 
     advice_breakdown: Dict[str, Any] = Field(default_factory=dict)
     diagnostics: Dict[str, Any] = Field(default_factory=dict)
+    methodology: Optional[BacktestMethodology] = Field(
+        None,
+        description="Methodology limitations; never a return promise",
+    )
