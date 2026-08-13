@@ -228,7 +228,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | 是 | 模板中注释; Separate final aggregated-fundamental policy: warn or reject |
 | `DEBUG` | `false` | 是 | Enable debugging logs |
 | `DECISION_MEMORY_ENABLED` | `true` | 是 | 模板中注释; Historical decision memory & reflection (Issue #118; default on, no config needed) Injects a "Historical Decision Ref... |
-| `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max recent evaluated signals per stock to reflect on |
+| `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max admitted evaluated signals per stock to inject (rate and list use this set; hard cap 40) |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | `3` | 是 | 模板中注释; Only reflect on signals at least this many days old (so outcomes exist) |
 | `DECISION_MEMORY_MIN_SAMPLES` | `5` | 是 | 模板中注释; Min decided outcomes (hit+miss) before a hit-rate is shown; smaller buckets are noise |
 | `DECISION_PROFILE_CALIBRATION_ENABLED` | `false` | 是 | 模板中注释 |
@@ -501,7 +501,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PAPER_PORTFOLIO_INITIAL_CASH` | `1000000` | 是 | 模板中注释; Paper trading portfolio (Issue #370; forward simulation with persistent positions) Initial paper cash seeded as a dep... |
 | `PERF_COLLECTION_ENABLED` | `false` | 是 | 模板中注释; Performance baseline collection / offline profiling (Issue #227) |
 | `PERF_PROFILE_ENABLED` | `false` | 是 | 模板中注释; PERF_PROFILE_ENABLED only documents intent for offline tooling; production request paths are never auto-wrapped in cP... |
-| `PLUGINS_DIR` | `/absolute/path/to/reviewed/plugins` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `PLUGINS_DIR` | `/absolute/path/to/reviewed/plugins` | 否 | 模板中注释; 受信外部插件（默认关闭）。另类数据示例：`examples/plugins/example-alternative-data` 需要 `alt_data:read`（见 alternative-data-plugin-contract_zh.md；Issues #139/#1144） |
 | `PLUGIN_DATA_PROVIDER_AUTO_BIND` | `false` | 是 | 模板中注释; Opt-in Data Provider auto-bind (default off) |
 | `PLUGIN_STATE_PATH` | `./data/plugin_lifecycle_state.json` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PORTFOLIO_FX_UPDATE_ENABLED` | `true` | 是 | 模板中注释 |
