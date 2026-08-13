@@ -132,6 +132,9 @@ class _AnalysisContextStageMixin:
                 'total_mv': getattr(realtime_quote, 'total_mv', None),
                 'circ_mv': getattr(realtime_quote, 'circ_mv', None),
                 'change_60d': getattr(realtime_quote, 'change_60d', None),
+                # ETF premium path (Issue #173): optional IOPV / NAV when the provider supplies them.
+                'iopv': getattr(realtime_quote, 'iopv', None),
+                'nav': getattr(realtime_quote, 'nav', None),
                 'source': quote_source_name,
                 'fetched_at': getattr(realtime_quote, 'fetched_at', None),
                 'provider_timestamp': getattr(realtime_quote, 'provider_timestamp', None),
@@ -142,7 +145,7 @@ class _AnalysisContextStageMixin:
             # Remove None values to reduce context size
             enhanced['realtime'] = {k: v for k, v in enhanced['realtime'].items() if v is not None}
 
-        # Add chip-distribution data.
+        # Add chip-distribution data (equity-only; ETF/index path marks chip not_applicable).
         if chip_data:
             current_price = getattr(realtime_quote, 'price', 0) if realtime_quote else 0
             enhanced['chip'] = {
@@ -338,6 +341,40 @@ class _AnalysisContextStageMixin:
         enhanced['is_index_etf'] = SearchService.is_index_or_etf(
             context.get('code', ''), enhanced.get('stock_name', stock_name)
         )
+
+        # ETF/index analysis semantics (Issue #173): tracking, premium, N/A equity metrics
+        try:
+            from src.services.etf_analysis import build_etf_analysis_context
+
+            etf_analysis_context = build_etf_analysis_context(
+                context.get("code", ""),
+                enhanced.get("stock_name", stock_name),
+                realtime=enhanced.get("realtime")
+                if isinstance(enhanced.get("realtime"), dict)
+                else None,
+                is_index_etf=bool(enhanced.get("is_index_etf")),
+            )
+            enhanced["etf_analysis_context"] = etf_analysis_context
+            if isinstance(etf_analysis_context, dict):
+                instrument_type = str(etf_analysis_context.get("instrument_type") or "").strip()
+                if instrument_type in {"etf", "index"}:
+                    enhanced["instrument_type"] = instrument_type
+                    enhanced["is_index_etf"] = True
+                    # Equity chip distribution does not apply; drop if a provider still returned it.
+                    enhanced.pop("chip", None)
+                else:
+                    enhanced.setdefault("instrument_type", "equity")
+            else:
+                enhanced.setdefault("instrument_type", "equity")
+        except Exception as exc:  # broad-exception: fallback_recorded - ETF semantics fail-open
+            log_safe_exception(
+                logger,
+                "ETF analysis context build failed",
+                exc,
+                error_code="pipeline_etf_analysis_context_failed",
+                level=logging.DEBUG,
+            )
+            enhanced.setdefault("instrument_type", "equity")
 
         # P0: append unified fundamental block; keep as additional context only
         enhanced["fundamental_context"] = (

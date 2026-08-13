@@ -281,12 +281,14 @@ const outcomeStats: DecisionSignalOutcomeStatsResponse = {
   engineVersion: 'decision-signal-v1',
   horizons: null,
   statuses: ['active', 'expired', 'invalidated', 'closed'],
-  total: 3,
-  completed: 2,
+  total: 31,
+  completed: 30,
   unable: 1,
-  hit: 1,
-  miss: 1,
+  hit: 15,
+  miss: 15,
   neutral: 0,
+  sampleSufficient: true,
+  minimumCompletedSampleSize: 30,
   hitRatePct: 50,
   avgStockReturnPct: 2.5,
   unableReasons: { missing_anchor_price: 1 },
@@ -1243,6 +1245,35 @@ describe('DecisionSignalsPage', () => {
       .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.history);
     expect(targetParams.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId)).toBe('3001');
     expect(targetParams.get(HOME_ROUTE_QUERY_KEYS.stock)).toBe('600519');
+  });
+
+  it('offers create-rule navigation from the selected signal detail drawer (#879 A3)', async () => {
+    // #879 A3 residual: open-source-report already lands as a Link; create-rule must also be a
+    // durable navigation command from the detail drawer (same contract as Stock Details).
+    renderPage();
+    await screen.findByText('贵州茅台');
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    const createRuleHref = buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+      createRule: true,
+      stock: signal.stockCode,
+    });
+    const createRuleLink = await screen.findByRole('link', { name: '从此信号创建规则' });
+    expect(createRuleLink).toHaveAttribute('href', createRuleHref);
+    expect(createRuleLink).toHaveAttribute('data-testid', 'decision-signal-create-rule');
+
+    fireEvent.click(createRuleLink);
+
+    const dialog = await screen.findByRole('dialog', { name: '创建告警规则' });
+    expect(within(dialog).getByLabelText('标的代码')).toHaveValue(signal.stockCode);
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab)).toBe(SIGNAL_CENTER_TAB_VALUES.rules);
+      expect(params.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock)).toBe(signal.stockCode);
+      // createRule is a one-shot request flag; owner clears it after opening the form.
+      expect(params.has(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule)).toBe(false);
+    });
   });
 
   it('reassesses from an existing source report id filter without a selected signal', async () => {

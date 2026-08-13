@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.analyzer import AnalysisResult
 from src.config import get_config as _get_config_impl
+from src.core.contracts import RenderStageInput, RenderStageOutput
 from src.core.pipeline_stage_results import (
     PipelineStageName,
     PipelineStageResult,
@@ -233,25 +234,37 @@ class _DeliveryStageMixin:
                     setattr(self, "_single_stock_notify_lock", notify_lock)
 
         with notify_lock:
+            render_input = RenderStageInput(
+                report_type=report_type,
+                result_count=1,
+                route="single_stock",
+                stock_code=stock_code,
+                run=getattr(self, "_current_run_context", None),
+            )
             render_stage = observe_pipeline_stage(
                 "render",
-                input_summary={
-                    "stock_code": stock_code,
-                    "report_type": report_type.value,
-                    "result_count": 1,
-                },
+                input_summary=render_input.to_input_summary(),
                 retryable=False,
             )
             dispatch_stage: Optional[PipelineStageObservation] = None
             try:
                 if report_type == ReportType.FULL:
-                    report_content = self.notifier.generate_dashboard_report([result])
+                    report_content = self.notifier.generate_dashboard_report(
+                        [result],
+                        report_type=report_type,
+                    )
                     logger.info("[%s] Using full report format", stock_code)
                 elif report_type == ReportType.BRIEF:
-                    report_content = self.notifier.generate_brief_report([result])
+                    report_content = self.notifier.generate_brief_report(
+                        [result],
+                        report_type=report_type,
+                    )
                     logger.info("[%s] Using brief report format", stock_code)
                 else:
-                    report_content = self.notifier.generate_single_stock_report(result)
+                    report_content = self.notifier.generate_single_stock_report(
+                        result,
+                        report_type=report_type,
+                    )
                     logger.info("[%s] Using simple report format", stock_code)
                 report_content = self._format_delta_first_notification(
                     report_content,
@@ -259,21 +272,18 @@ class _DeliveryStageMixin:
                     report_type,
                 )
 
+                render_output = RenderStageOutput.from_content(
+                    report_content,
+                    route="single_stock",
+                )
                 render_result = PipelineStageResult.success(
                     PipelineStageName.RENDER,
-                    report_content,
+                    render_output.as_legacy_value(),
                 )
                 self._finish_pipeline_stage(
                     render_stage,
                     render_result,
-                    output_summary={
-                        "content_length": (
-                            len(report_content)
-                            if isinstance(report_content, (str, bytes))
-                            else None
-                        ),
-                        "route": "single_stock",
-                    },
+                    output_summary=render_output.to_output_summary(),
                 )
 
                 dispatch_stage = observe_pipeline_stage(
@@ -375,9 +385,22 @@ class _DeliveryStageMixin:
                             if channel_results
                             else True
                         )
+                    channel_summaries = None
+                    if dispatch_result is not None:
+                        summaries_fn = getattr(
+                            dispatch_result,
+                            "channel_summaries",
+                            None,
+                        )
+                        if callable(summaries_fn):
+                            try:
+                                channel_summaries = list(summaries_fn())
+                            except Exception:  # broad-exception: optional_metadata - stage payload keeps raw attempts when summary projection fails
+                                channel_summaries = None
                     stage_value = {
                         "dispatch_result": dispatch_result,
                         "channel_results": channel_results,
+                        "channel_summaries": channel_summaries,
                         "dispatch_result_status": dispatch_result_status,
                         "dispatched": dispatched,
                         "sent": sent,
@@ -428,6 +451,7 @@ class _DeliveryStageMixin:
                 cached_failure_count = int(
                     dispatch_value.get("delivery_failure_count") or 0
                 )
+                stage_channels = dispatch_value.get("channel_summaries")
                 self._finish_pipeline_stage(
                     dispatch_stage,
                     dispatch_execution,
@@ -453,6 +477,10 @@ class _DeliveryStageMixin:
                             cached_failure_count if cached_dispatch else 0
                         ),
                         "reused": cached_dispatch,
+                        # Queryable per-channel shape for diagnostics/API (Issue #1081).
+                        "channels": (
+                            None if cached_dispatch else stage_channels
+                        ),
                     },
                 )
                 dispatch_execution.unwrap()
@@ -611,22 +639,29 @@ class _DeliveryStageMixin:
         report_type: ReportType = ReportType.SIMPLE,
     ) -> None:
         """保存分析报告到本地文件（与通知推送解耦）"""
+        render_input = RenderStageInput(
+            report_type=report_type,
+            result_count=len(results),
+            route="local_report",
+            run=getattr(self, "_current_run_context", None),
+        )
         render_stage = observe_pipeline_stage(
             "render",
-            input_summary={
-                "report_type": report_type.value,
-                "result_count": len(results),
-                "route": "local_report",
-            },
+            input_summary=render_input.to_input_summary(),
             retryable=False,
         )
         try:
             def _render_local_report() -> PipelineStageResult[Tuple[Any, Any]]:
                 report_content = self._generate_aggregate_report(results, report_type)
                 saved_path = self.notifier.save_report_to_file(report_content)
+                render_output = RenderStageOutput.from_content(
+                    report_content,
+                    route="local_report",
+                    saved_path=saved_path,
+                )
                 return PipelineStageResult.success(
                     PipelineStageName.RENDER,
-                    (report_content, saved_path),
+                    render_output.as_legacy_value(),
                     side_effect_committed=True,
                 )
 
@@ -641,10 +676,20 @@ class _DeliveryStageMixin:
                 ),
             )
             render_value = render_result.value
-            self._finish_pipeline_stage(
-                render_stage,
-                render_result,
-                output_summary={
+            if isinstance(render_value, tuple) and len(render_value) == 2:
+                content, saved_path = render_value
+                summary_output = RenderStageOutput.from_content(
+                    content,
+                    route="local_report",
+                    saved_path=saved_path,
+                )
+                output_summary = summary_output.to_output_summary(
+                    reused=render_result.reused,
+                )
+                # Preserve historical report_saved semantics (stage successful).
+                output_summary["report_saved"] = render_result.successful
+            else:
+                output_summary = {
                     "content_length": (
                         len(render_value[0])
                         if render_value is not None
@@ -654,7 +699,11 @@ class _DeliveryStageMixin:
                     "route": "local_report",
                     "report_saved": render_result.successful,
                     "reused": render_result.reused,
-                },
+                }
+            self._finish_pipeline_stage(
+                render_stage,
+                render_result,
+                output_summary=output_summary,
             )
             _, filepath = render_result.unwrap()
             logger.info("Decision dashboard saved: %s", filepath)
@@ -687,13 +736,15 @@ class _DeliveryStageMixin:
             dispatch_aggregate_with_results,
         )
 
+        render_input = RenderStageInput(
+            report_type=report_type,
+            result_count=len(results),
+            route="aggregate_notification",
+            run=getattr(self, "_current_run_context", None),
+        )
         render_stage = observe_pipeline_stage(
             "render",
-            input_summary={
-                "report_type": report_type.value,
-                "result_count": len(results),
-                "route": "aggregate_notification",
-            },
+            input_summary=render_input.to_input_summary(),
             retryable=False,
         )
         dispatch_stage: Optional[PipelineStageObservation] = None
@@ -708,20 +759,17 @@ class _DeliveryStageMixin:
                     results,
                     report_type,
                 )
+            render_output = RenderStageOutput.from_content(
+                report,
+                route="aggregate_notification",
+            )
             self._finish_pipeline_stage(
                 render_stage,
                 PipelineStageResult.success(
                     PipelineStageName.RENDER,
-                    report,
+                    render_output.as_legacy_value(),
                 ),
-                output_summary={
-                    "content_length": (
-                        len(report)
-                        if isinstance(report, (str, bytes))
-                        else None
-                    ),
-                    "route": "aggregate_notification",
-                },
+                output_summary=render_output.to_output_summary(),
             )
             dispatch_stage = observe_pipeline_stage(
                 "dispatch",
@@ -945,6 +993,17 @@ class _DeliveryStageMixin:
                     "reason": "notification_not_configured",
                 }
             else:
+                aggregate_channels = None
+                summaries_fn = getattr(
+                    dispatch_result,
+                    "channel_summaries",
+                    None,
+                )
+                if callable(summaries_fn):
+                    try:
+                        aggregate_channels = list(summaries_fn())
+                    except Exception:  # broad-exception: optional_metadata - aggregate stage summary stays count-only when projection fails
+                        aggregate_channels = None
                 output_summary = {
                     "delivered": bool(dispatch_result.success),
                     "channel_count": execution.target_channel_count,
@@ -956,6 +1015,8 @@ class _DeliveryStageMixin:
                     "attempt_count": execution.attempt_count,
                     "failure_count": execution.failure_count,
                     "reused_count": execution.reused_count,
+                    # Queryable per-channel shape for diagnostics/API (Issue #1081).
+                    "channels": aggregate_channels,
                 }
 
             self._finish_pipeline_stage(

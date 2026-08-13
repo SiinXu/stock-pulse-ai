@@ -94,6 +94,21 @@ class ErrorResponse(ErrorDetailsCompatibilityModel):
         json_schema_extra={"example": "Invalid request parameters"},
     )
     params: Dict[str, Any] = Field(default_factory=dict, description="Localization interpolation parameters")
+    category: Optional[str] = Field(
+        None,
+        description=(
+            "Taxonomy category for the stable error code "
+            "(auth, credential, rate_quota, provider_network, timeout, validation, "
+            "busy, config_conflict, capability, notification, not_found, "
+            "outbound_policy, internal)"
+        ),
+        json_schema_extra={"example": "not_found"},
+    )
+    severity: Optional[str] = Field(
+        None,
+        description="Taxonomy severity: info | warning | error | critical",
+        json_schema_extra={"example": "warning"},
+    )
     trace_id: Optional[str] = Field(None, description="Diagnostic trace ID")
     
     model_config = ConfigDict(json_schema_extra={
@@ -103,6 +118,8 @@ class ErrorResponse(ErrorDetailsCompatibilityModel):
             "params": {},
             "details": None,
             "detail": None,
+            "category": "not_found",
+            "severity": "warning",
             "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         }
     })

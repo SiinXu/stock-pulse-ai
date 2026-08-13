@@ -264,6 +264,8 @@ export interface DecisionSignalOutcomeStatsBucket {
   hit: number;
   miss: number;
   neutral: number;
+  /** True when completed samples meet the publication floor (default 30). */
+  sampleSufficient: boolean;
   hitRatePct?: number | null;
   avgStockReturnPct?: number | null;
   unableReasons: Record<string, number>;
@@ -309,9 +311,14 @@ export interface DecisionSignalOutcomeStatsResponse {
   hit: number;
   miss: number;
   neutral: number;
+  /** True when completed samples meet the publication floor. */
+  sampleSufficient: boolean;
+  /** Server floor for publishing rates (default 30). */
+  minimumCompletedSampleSize: number;
   hitRatePct?: number | null;
   avgStockReturnPct?: number | null;
   unableReasons: Record<string, number>;
+  /** Includes action/market/period plus legacy dimensions. */
   breakdowns: Record<string, DecisionSignalOutcomeStatsBucket[]>;
   /** Present only when DECISION_PROFILE_CALIBRATION_ENABLED is true on the server. */
   profileCalibration?: DecisionSignalProfileCalibration;

@@ -32,7 +32,7 @@ flowchart LR
   DESKTOP[Electron shell<br/>apps/dsa-desktop] -->|starts backend and loads Web UI| API
   BOT[Bot adapters<br/>bot/] -->|/analyze| QUEUE
   BOT -->|/batch| PIPE
-  API[FastAPI<br/>server.py and api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue.py]
+  API[FastAPI<br/>server.py and api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue]
   API -->|synchronous use case| SERVICES[Application services<br/>src/services/]
   API -->|scheduled-task CRUD| SCHEDULES[(Definitions and occurrence audit<br/>scheduled_tasks and scheduled_task_runs)]
   SCHEDULES -->|due occurrence via existing runtime scheduler| QUEUE
@@ -98,7 +98,7 @@ path-filter, container-smoke, and reference-update coverage.
 | --- | --- | --- |
 | `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection. New/touched code should prefer constructor injection or `get_application_services().config` over bare `get_config()`; growth is ratcheted by [config-access ratchet](config-access-ratchet.md) / [ADR-011](adr/ADR-011-config-access-ratchet.md). | Full dependency injection for every caller; adoption is currently incremental. |
 | `src/services/` | Application use cases, task queue adapter, scheduling, analysis, history, portfolio, alerts, intelligence, and rendering services | HTTP transport schemas or provider-specific normalization. |
-| `src/core/pipeline.py` and `src/core/stages/` | Analysis orchestration, typed stage outcomes, analysis stages, rendering, and dispatch sequencing | Transport lifecycle or persistent query APIs. |
+| `src/core/pipeline.py`, `src/core/stages/`, and `src/core/contracts/` | Analysis orchestration facade, stage implementations, typed stage outcomes, and formal stage IO contracts (`RunContext`, fetch/analyze/render IO, stage errors). `pipeline.py` is orchestration-only; business rules stay in stages/services. | Transport lifecycle or persistent query APIs. |
 | `data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control | Product task lifecycle or report presentation. |
 | `src/search_service.py` and intelligence/context services | News and intelligence retrieval, context assembly, and source diagnostics | Market-price provider ownership or HTTP presentation. |
 | `src/agent/` and `src/llm/` | Native Agent execution, tools, skills, conversation/runtime contracts, and model invocation adapters | Provider configuration source of truth, task lifecycle, or public report persistence. |

@@ -1,5 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
   APP_ROUTE_PATHS,
@@ -129,6 +133,11 @@ const openScreeningConfiguration = () => {
   return screen.getByRole('dialog', { name: '参数设置' });
 };
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 describe('StockScreeningPage', () => {
   beforeEach(() => {
     enableAlphaSift.mockReset();
@@ -172,6 +181,30 @@ describe('StockScreeningPage', () => {
     window.history.pushState({}, '', APP_ROUTE_PATHS.researchDiscover);
   });
 
+  it('lets users reach bounded AI discovery from the production Research Discover page', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
+
+    const discoveryMode = screen.getByRole('button', { name: 'AI 发现' });
+    expect(discoveryMode).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('heading', { name: 'AI 候选发现（有界）' })).not.toBeInTheDocument();
+
+    fireEvent.click(discoveryMode);
+
+    expect(discoveryMode).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('heading', { name: 'AI 候选发现（有界）' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '运行发现' })).toBeInTheDocument();
+  });
+
   it('offers a primary run action from the never-run empty results state', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({
       enabled: true,
@@ -179,7 +212,11 @@ describe('StockScreeningPage', () => {
       installSpecIsDefault: true,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     const enabledStatus = await screen.findByText('选股已开启');
     expect(enabledStatus.closest('[data-surface-level="interactive"]')).toHaveClass(
@@ -201,7 +238,11 @@ describe('StockScreeningPage', () => {
   it('shows adjust-filters CTAs when a completed run returns no candidates', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: true, installSpecIsDefault: true });
     screenStocks.mockResolvedValueOnce({ enabled: true, candidates: [], candidateCount: 0, snapshotCount: 120, afterFilterCount: 0 });
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -216,7 +257,11 @@ describe('StockScreeningPage', () => {
   it('links full data-source failure empty state to Settings data sources', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: true, installSpecIsDefault: true });
     screenStocks.mockResolvedValueOnce({ enabled: true, candidates: [], candidateCount: 0, snapshotCount: 0, afterFilterCount: 0, sourceErrors: ['tushare: timeout', 'akshare_em: network'] });
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -244,7 +289,11 @@ describe('StockScreeningPage', () => {
         sourceErrors: ['tushare: timeout'],
       });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -262,7 +311,11 @@ describe('StockScreeningPage', () => {
 
   it('shows adapter-unavailable once with a data-sources CTA and neutral empty results', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: true });
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('适配层不可用')).toBeInTheDocument();
     expect(screen.getAllByText('AlphaSift 适配层不可用')).toHaveLength(1);
     expect(screen.getByRole('button', { name: '打开数据源设置' })).toBeInTheDocument();
@@ -312,7 +365,11 @@ describe('StockScreeningPage', () => {
   }) => {
     getAlphaSiftStatus.mockRejectedValueOnce(statusError);
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     const statusErrorTitle = await screen.findByText('无法确认选股状态');
     expect(statusErrorTitle).toBeInTheDocument();
@@ -353,7 +410,11 @@ describe('StockScreeningPage', () => {
       'AlphaSift 适配层不可用。请执行 python -m pip install --build-constraint build-constraints.txt -r requirements.txt',
     ));
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股未开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -408,7 +469,11 @@ describe('StockScreeningPage', () => {
         hotspotCount: 1,
       });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
@@ -461,7 +526,11 @@ describe('StockScreeningPage', () => {
       message: 'No cached AlphaSift hotspot snapshot. Click refresh to fetch live hotspots.',
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('暂无缓存热点题材，展开后可点击刷新拉取实时数据。')).toBeInTheDocument();
     expect(screen.queryByText(/No cached AlphaSift hotspot snapshot/)).not.toBeInTheDocument();
@@ -483,7 +552,11 @@ describe('StockScreeningPage', () => {
       message: '热点源连接中断，暂无可用缓存。',
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('热点源连接中断，暂无可用缓存。')).toBeInTheDocument();
     expect(screen.queryByText(/RemoteDisconnected/)).not.toBeInTheDocument();
@@ -514,7 +587,11 @@ describe('StockScreeningPage', () => {
       stockCount: 0,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
     fireEvent.click(screen.getByRole('button', { name: /展开热点题材/ }));
@@ -552,7 +629,11 @@ describe('StockScreeningPage', () => {
       },
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
     fireEvent.click(screen.getByRole('button', { name: /展开热点题材/ }));
@@ -591,7 +672,11 @@ describe('StockScreeningPage', () => {
       hotspotCount: 2,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
@@ -656,7 +741,11 @@ describe('StockScreeningPage', () => {
         return Promise.reject(new Error(`unexpected topic: ${topic}`));
       });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /展开热点题材/ }));
@@ -730,7 +819,11 @@ describe('StockScreeningPage', () => {
       return Promise.reject(new Error(`unexpected topic: ${topic}`));
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /展开热点题材/ }));
@@ -839,7 +932,11 @@ describe('StockScreeningPage', () => {
         stockCount: 1,
       });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /展开热点题材/ }));
@@ -883,7 +980,11 @@ describe('StockScreeningPage', () => {
       })
       .mockRejectedValueOnce(new Error('manual refresh failed'));
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /展开热点题材/ }));
@@ -912,7 +1013,11 @@ describe('StockScreeningPage', () => {
       candidateCount: 0,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     expect(screen.queryByLabelText('策略参数')).not.toBeInTheDocument();
@@ -957,7 +1062,11 @@ describe('StockScreeningPage', () => {
       candidateCount: 0,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
 
@@ -998,7 +1107,11 @@ describe('StockScreeningPage', () => {
       installSpecIsDefault: true,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     const dialog = openScreeningConfiguration();
@@ -1079,7 +1192,11 @@ describe('StockScreeningPage', () => {
       },
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     await waitFor(() => expect(getScreenTask).toHaveBeenCalled());
@@ -1128,7 +1245,11 @@ describe('StockScreeningPage', () => {
       },
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -1164,7 +1285,11 @@ describe('StockScreeningPage', () => {
       hotspotCount: 1,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
 
     navigate.mockClear();
@@ -1215,7 +1340,11 @@ describe('StockScreeningPage', () => {
       candidateCount: 0,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     expect(screen.queryByLabelText('市场')).not.toBeInTheDocument();
@@ -1274,7 +1403,11 @@ describe('StockScreeningPage', () => {
       result: null,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     await waitFor(() => expect(getScreenTask).toHaveBeenCalledWith('stored-screen-task'));
@@ -1308,7 +1441,11 @@ describe('StockScreeningPage', () => {
       available: true,
       installSpecIsDefault: true,
     });
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     await waitFor(() => expect(getStrategies).toHaveBeenCalledTimes(1));
@@ -1350,7 +1487,11 @@ describe('StockScreeningPage', () => {
       result: null,
     });
 
-    const firstLoad = render(<StockScreeningPage />);
+    const firstLoad = render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     await waitFor(() => expect(getScreenTask).toHaveBeenCalledWith('stored-default-task'));
@@ -1362,7 +1503,11 @@ describe('StockScreeningPage', () => {
     firstLoad.unmount();
     window.history.pushState({}, '', explicitHref);
     navigate.mockClear();
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1378,7 +1523,11 @@ describe('StockScreeningPage', () => {
       installSpecIsDefault: true,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1400,7 +1549,11 @@ describe('StockScreeningPage', () => {
     });
     startScreenTask.mockRejectedValueOnce(new Error('raw task submission failure'));
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1427,9 +1580,11 @@ describe('StockScreeningPage', () => {
     });
 
     render(
-      <UiLanguageProvider>
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <UiLanguageProvider>
         <StockScreeningPage />
-      </UiLanguageProvider>,
+      </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>,
     );
 
     expect(await screen.findByText('Dual-low selection')).toBeInTheDocument();
@@ -1467,7 +1622,11 @@ describe('StockScreeningPage', () => {
       candidateCount: 1,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1495,7 +1654,11 @@ describe('StockScreeningPage', () => {
       snapshotSource: 'tushare',
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -1539,7 +1702,11 @@ describe('StockScreeningPage', () => {
       candidateCount: 1,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -1569,7 +1736,11 @@ describe('StockScreeningPage', () => {
       candidateCount: 1,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -1602,7 +1773,11 @@ describe('StockScreeningPage', () => {
       candidateCount: 1,
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
@@ -1673,7 +1848,11 @@ describe('StockScreeningPage', () => {
         },
       });
 
-    const firstRender = render(<StockScreeningPage />);
+    const firstRender = render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1686,7 +1865,11 @@ describe('StockScreeningPage', () => {
     expect(window.sessionStorage.getItem('dsa.alphasift.activeScreenTask.v1')).toContain('screen-task-1');
 
     firstRender.unmount();
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('恢复后的候选')).toBeInTheDocument();
     expect(screen.getByText('选股完成')).toBeInTheDocument();
@@ -1711,7 +1894,11 @@ describe('StockScreeningPage', () => {
       code: 'ECONNABORTED',
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(screen.getByText('选股任务运行中')).toBeInTheDocument();
     await act(async () => {
@@ -1756,7 +1943,11 @@ describe('StockScreeningPage', () => {
       warnings: ['LLM ranking failed, falling back to screen_score: Missing gemini_api_key'],
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1805,7 +1996,11 @@ describe('StockScreeningPage', () => {
       llmParseErrors: ['alphasift_llm_parse_error'],
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1844,7 +2039,11 @@ describe('StockScreeningPage', () => {
       sourceErrors: ['tushare: tushare trade_cal returned no open trading days'],
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1880,7 +2079,11 @@ describe('StockScreeningPage', () => {
       ],
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();
@@ -1928,7 +2131,11 @@ describe('StockScreeningPage', () => {
       },
     });
 
-    render(<StockScreeningPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     openScreeningConfiguration();

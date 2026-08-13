@@ -86,13 +86,64 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 
 这些接口继承现有 `/api/v1/*` 管理员鉴权；`ADMIN_AUTH_ENABLED=true` 时需要有效管理员会话 Cookie。
 
+## 历史决策记忆注入（Decision Memory / #118）
+
+个股分析在生成最终报告前，可把**同标的、已结算 outcome** 的结构化复盘注入 Prompt 与报告「历史决策复盘」小节。实现入口：
+
+- 检索与准入：`src/services/decision_memory_service.py`（`DecisionMemoryService.build_reflection` → `admit_decision_memory`）
+- 管线挂载：`src/core/stages/analysis_stock.py`（`decision_memory_enabled` 关闭时零开销）
+- Prompt 拼接：`src/analyzer_parts/analysis.py`（读取 `decision_memory_reflection_prompt`）
+- 报告渲染：`src/notification_parts/rendering.py`
+
+**准入（对齐 #1119 情节记忆 size-cap，不得绕过）**
+
+- 仅 `eval_status=completed` 且 `outcome∈{hit,miss,neutral}` 的权威后验可进入注入。
+- 每条复盘行必须带 `signal_id` 来源；`source_signal_ids` 可追溯。无 per-call provenance 时**不注入**。
+- **不**注入信号 `reason` 等自由文本，避免用户笔记/对抗文本作为事实进入 Prompt。
+- 扫描窗口可略大于 lookback 以发现已结算信号；**本股胜率与列表同源**，都只使用 lookback 准入集合。`DECISION_MEMORY_LOOKBACK` 的运行时与 registry 硬上限均为 40。
+- `ignored` 标记的信号整条排除；`memorable` 优先排序。
+
+**不可信隔离与关闭**
+
+- Prompt 块经 `isolate_untrusted_memory_body` 包裹（`BEGIN_UNTRUSTED_MEMORY_DATA` / data-only 指令），与分层记忆隔离契约一致（#1017）。
+- 复盘仅校准置信度与风险提示，**不得**翻转方向（文案与数据结构均无方向建议字段）。
+- 全局 `DECISION_MEMORY_ENABLED`（默认 `true`）或请求 `use_memory=false` 可关闭。
+
+## 事后命中统计与过程质量校准（#987）
+
+`GET /api/v1/decision-signals/outcomes/stats` 消费已落库的
+`decision_signal_outcomes` 行（`engine_version=decision-signal-v1`），不重新拉行情、
+不自建核验引擎。响应在原有聚合与单维 breakdown 之上：
+
+- 顶层增加 `sample_sufficient` 与 `minimum_completed_sample_size`（固定 `30`，与
+  profile calibration 门槛一致）。
+- 每个 breakdown bucket 同样带 `sample_sufficient`。
+- 当 `sample_sufficient=false` 时，`hit_rate_pct` / `avg_stock_return_pct` 为
+  `null`（计数仍返回）；`completed >= 30` 后才公布比率。
+- `breakdowns.period` 仅按已冻结 `anchor_date` 的 `YYYY-MM` 分月；缺少 anchor 的历史行
+  归入 `unknown`，不会用核验写入时间伪造信号月份。该维度与既有 `action`（信号类型）、
+  `market` 一起构成 Web 校准视图的三组维度。
+
+`aggregate_outcome_rows()` 与显式 `get_stats(publish=False)` 返回未门控的原始比率，供
+decision memory 等内部调用方自行应用阈值；API 使用默认 `get_stats(publish=True)`，仅该
+发布路径对比率做样本门控。
+
+Web 在信号中心 `/signals?tab=review` 的过程质量卡片中：
+
+- 展示研究工具定位声明：命中率描述过程一致性，不是收益承诺或投资建议。
+- 样本不足时显式标注，并隐藏比率。
+- 提供按时间 / 市场 / 信号类型切换的校准分桶视图。
+- 可选 `profile_calibration`（需 `DECISION_PROFILE_CALIBRATION_ENABLED=true`）仍挂在
+  同一卡片下方。
+
 ## 决策风格历史表现（profile calibration）
 
 [#715](https://github.com/SiinXu/stock-pulse-ai/issues/715) 在现有
 `GET /api/v1/decision-signals/outcomes/stats` 响应中追加可选字段
 `profile_calibration`。实现为独立服务模块
 `src/services/decision_profile_calibration_service.py`，不新增 endpoint、数据库表
-或行情请求。全局统计字段和八类单维 breakdown 保持原口径。
+或行情请求。全局统计字段在原八类单维 breakdown 之外增加 `period` 分月桶；过程质量
+公布门控见上一节。
 
 默认关闭配置项 `DECISION_PROFILE_CALIBRATION_ENABLED`（registry + `.env.example`）。
 关闭时 stats 响应不填充 `profile_calibration`，与开启前兼容；开启时才返回校准分组。

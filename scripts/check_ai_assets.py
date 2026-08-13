@@ -26,6 +26,17 @@ REQUIRED_SKILL_FILES = {
     "analyze-issue/SKILL.md",
     "analyze-pr/SKILL.md",
     "fix-issue/SKILL.md",
+    "develop-feature/SKILL.md",
+    "draft-issue/SKILL.md",
+    "run-verification/SKILL.md",
+    "handle-review-feedback/SKILL.md",
+    "test-change/SKILL.md",
+    "review-pr/SKILL.md",
+    "sync-ai-assets/SKILL.md",
+    "pr-template-fill/SKILL.md",
+    "regression-scout/SKILL.md",
+    "references/hard-rules.md",
+    "references/test-command-recipes.md",
 }
 
 REQUIRED_GITIGNORE_SNIPPETS = (

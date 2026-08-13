@@ -152,7 +152,12 @@ def test_outcome_run_list_stats_signal_outcomes_and_feedback(client_and_db) -> N
     stats = stats_resp.json()
     assert stats["total"] == 1
     assert stats["hit"] == 1
+    assert stats["minimum_completed_sample_size"] == 30
+    assert stats["sample_sufficient"] is False
+    assert stats["hit_rate_pct"] is None
     assert stats["breakdowns"]["action"][0]["value"] == "buy"
+    assert stats["breakdowns"]["action"][0]["sample_sufficient"] is False
+    assert "period" in stats["breakdowns"]
     assert stats.get("profile_calibration") in (None, {})
 
     signal_outcomes_resp = client.get(f"/api/v1/decision-signals/{signal_id}/outcomes")

@@ -64,6 +64,49 @@ const completeInsights: ReportStructuredInsightsType = {
       invalidOpinionCount: 1,
     },
   },
+  committeeDeliberation: {
+    status: 'split',
+    outcome: 'buy',
+    members: [
+      {
+        personaId: 'persona_value_moat',
+        displayName: 'Value & Moat',
+        signal: 'buy',
+        confidence: 0.8,
+        reasoningExcerpt: 'Moat durable',
+      },
+      {
+        personaId: 'persona_tail_risk',
+        displayName: 'Tail Risk',
+        signal: 'sell',
+        confidence: 0.7,
+        reasoningExcerpt: 'Fragile balance sheet',
+      },
+    ],
+    conclusion: {
+      finalSignal: 'buy',
+      consensusLevel: 'medium',
+      conflictSeverity: 'medium',
+      confidence: 0.74,
+      conflictCount: 1,
+    },
+    dissentingOpinions: [
+      {
+        personaId: 'persona_tail_risk',
+        displayName: 'Tail Risk',
+        signal: 'sell',
+        confidence: 0.7,
+      },
+    ],
+    divergencePoints: [
+      {
+        source: 'strategy_conflict',
+        conflictType: 'directional_opposition',
+        severity: 'medium',
+        participants: ['persona_value_moat', 'persona_tail_risk'],
+      },
+    ],
+  },
 };
 
 describe('ReportStructuredInsights', () => {
@@ -90,6 +133,14 @@ describe('ReportStructuredInsights', () => {
     );
     expect(screen.getByTestId('report-strategy-conflicts')).toHaveTextContent(
       'volume_breakout, box_oscillation',
+    );
+
+    const committee = screen.getByTestId('report-committee-deliberation');
+    expect(committee).toHaveTextContent('Committee Conclusion');
+    expect(screen.getByTestId('report-committee-members')).toHaveTextContent('Value & Moat');
+    expect(screen.getByTestId('report-committee-dissent')).toHaveTextContent('Tail Risk');
+    expect(screen.getByTestId('report-committee-divergence')).toHaveTextContent(
+      'Opposing strategy directions',
     );
   });
 
@@ -159,6 +210,32 @@ describe('ReportStructuredInsights', () => {
           },
         ],
       },
+      committee_deliberation: {
+        status: 'deliberated',
+        members: [
+          {
+            persona_id: 'persona_value_moat',
+            display_name: 'Value & Moat',
+            signal: 'buy',
+            confidence: 0.8,
+          },
+          'bad',
+        ],
+        conclusion: {
+          final_signal: 'buy',
+          consensus_level: 'medium',
+        },
+        dissenting_opinions: [
+          { persona_id: 'persona_tail_risk', signal: 'sell' },
+        ],
+        divergence_points: [
+          {
+            kind: 'directional_opposition',
+            summary_key: 'disagreement.point.strategy.directional_opposition',
+            participants: ['persona_value_moat', '', 9],
+          },
+        ],
+      },
     });
 
     expect(normalized?.phaseDecision?.watchConditions).toEqual(['Review after close']);
@@ -168,5 +245,64 @@ describe('ReportStructuredInsights', () => {
     expect(normalized?.strategySynthesis?.conflicts?.[0].participants).toEqual([
       'event_driven',
     ]);
+    expect(normalized?.committeeDeliberation?.members).toEqual([
+      {
+        personaId: 'persona_value_moat',
+        displayName: 'Value & Moat',
+        signal: 'buy',
+        confidence: 0.8,
+      },
+    ]);
+    expect(normalized?.committeeDeliberation?.conclusion?.finalSignal).toBe('buy');
+    expect(normalized?.committeeDeliberation?.dissentingOpinions?.[0].personaId).toBe(
+      'persona_tail_risk',
+    );
+    expect(normalized?.committeeDeliberation?.divergencePoints?.[0].participants).toEqual([
+      'persona_value_moat',
+    ]);
+    expect(normalized?.committeeDeliberation?.divergencePoints?.[0].conflictType).toBe(
+      'directional_opposition',
+    );
+    expect(normalized?.committeeDeliberation?.divergencePoints?.[0].descriptionKey).toBe(
+      'disagreement.point.strategy.directional_opposition',
+    );
+  });
+
+  it('renders a committee-only payload for Signal/History review', () => {
+    render(
+      <ReportStructuredInsights
+        insights={{
+          schemaVersion: 'report-structured-insights-v1',
+          committeeDeliberation: {
+            conclusion: {
+              finalSignal: 'hold',
+              consensusLevel: 'low',
+            },
+            members: [
+              {
+                personaId: 'persona_value_moat',
+                displayName: 'Value & Moat',
+                signal: 'buy',
+              },
+            ],
+            dissentingOpinions: [
+              {
+                personaId: 'persona_tail_risk',
+                displayName: 'Tail Risk',
+                signal: 'sell',
+              },
+            ],
+          },
+        }}
+        language="en"
+      />,
+    );
+
+    expect(screen.getByTestId('report-committee-deliberation')).toHaveTextContent(
+      'Committee Conclusion',
+    );
+    expect(screen.getByTestId('report-committee-members')).toHaveTextContent('Value & Moat');
+    expect(screen.getByTestId('report-committee-dissent')).toHaveTextContent('Tail Risk');
+    expect(screen.queryByTestId('report-phase-decision')).not.toBeInTheDocument();
   });
 });

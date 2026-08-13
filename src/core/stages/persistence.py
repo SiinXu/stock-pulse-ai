@@ -118,6 +118,7 @@ class _PersistenceStageMixin:
         news_result_count: Optional[int] = None,
         analysis_context_pack_overview: Optional[Dict[str, Any]] = None,
         market_phase_summary: Optional[Dict[str, Any]] = None,
+        sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         构建分析上下文快照
@@ -136,14 +137,61 @@ class _PersistenceStageMixin:
         if news_result_count is not None:
             snapshot["news_result_count"] = news_result_count
         if analysis_context_pack_overview is not None:
-            snapshot["analysis_context_pack_overview"] = analysis_context_pack_overview
+            overview = dict(analysis_context_pack_overview)
+            overview.pop("_pack_audit", None)
+            snapshot["analysis_context_pack_overview"] = overview
+            analysis_context_pack_overview = overview
+            # Issue #182: surface low-sensitivity snapshot identity at the
+            # context_snapshot top level for audit/diagnostics consumers.
+            snapshot_identity = {
+                key: analysis_context_pack_overview.get(key)
+                for key in (
+                    "snapshot_id",
+                    "snapshot_revision",
+                    "as_of",
+                    "pack_version",
+                    "created_at",
+                )
+                if analysis_context_pack_overview.get(key) is not None
+            }
+            overview_meta = analysis_context_pack_overview.get("metadata")
+            if isinstance(overview_meta, dict):
+                digest = overview_meta.get("content_digest")
+                if digest:
+                    snapshot_identity["content_digest"] = digest
+            if snapshot_identity:
+                snapshot["analysis_context_snapshot"] = snapshot_identity
         if market_phase_summary is not None:
             snapshot[MARKET_PHASE_SUMMARY_KEY] = market_phase_summary
+        if isinstance(sentiment_snapshot, dict) and sentiment_snapshot:
+            # Evidence-only package for auditability; not a trading conclusion.
+            snapshot["sentiment_snapshot"] = dict(sentiment_snapshot)
         diagnostic_snapshot = current_diagnostic_snapshot()
         if diagnostic_snapshot is not None:
             snapshot["diagnostics"] = diagnostic_snapshot
         if self.analysis_skills is not None:
             snapshot["skills"] = list(self.analysis_skills)
+        from src.services.analysis_stage_checkpoint import current_checkpoint_session
+
+        checkpoint_session = current_checkpoint_session()
+        if checkpoint_session is not None:
+            try:
+                metadata = checkpoint_session.metadata_for_snapshot()
+                if isinstance(metadata, dict):
+                    if metadata.get("checkpoint"):
+                        snapshot["analysis_checkpoint"] = metadata["checkpoint"]
+                    if metadata.get("run_configuration"):
+                        snapshot["run_configuration"] = metadata["run_configuration"]
+                    if metadata.get("repro_status"):
+                        snapshot["repro_status"] = metadata["repro_status"]
+            except Exception as exc:  # broad-exception: optional_metadata - Checkpoint audit metadata is optional and failures are recorded without changing analysis persistence.
+                log_safe_exception(
+                    logger,
+                    "Failed to attach analysis checkpoint metadata to context snapshot",
+                    exc,
+                    error_code="analysis_checkpoint_snapshot_attach_failed",
+                    level=logging.DEBUG,
+                )
         return snapshot
 
     def _persist_analysis_history_stage(
@@ -211,6 +259,8 @@ class _PersistenceStageMixin:
                             context={"analysis_history_id": saved_history_id},
                         )
             except Exception as exc:  # broad-exception: fallback_recorded - History failure remains isolated after the side-effect fence records whether a write committed.
+                from src.agent.sandbox.effects import SandboxExternalEffectBlocked
+
                 persistence_error = exc
                 valid_saved_history_id = False
                 record_history_run(
@@ -218,14 +268,30 @@ class _PersistenceStageMixin:
                     metadata_saved=False,
                     error_message=exc,
                 )
-                log_safe_exception(
-                    logger,
-                    failure_message,
-                    exc,
-                    error_code=failure_error_code,
-                    level=logging.WARNING,
-                    context={"stock_code": getattr(result, "code", None)},
-                )
+                # Preserve sandbox semantics: do not mislabel a refused simulation
+                # write as a generic history storage failure.
+                if isinstance(exc, SandboxExternalEffectBlocked):
+                    log_safe_exception(
+                        logger,
+                        "Sandbox refused production analysis-history write",
+                        exc,
+                        error_code="sandbox_analysis_history_write_blocked",
+                        level=logging.WARNING,
+                        context={
+                            "stock_code": getattr(result, "code", None),
+                            "effect": getattr(exc, "effect", None),
+                            "sandbox_run_id": getattr(exc, "sandbox_run_id", None),
+                        },
+                    )
+                else:
+                    log_safe_exception(
+                        logger,
+                        failure_message,
+                        exc,
+                        error_code=failure_error_code,
+                        level=logging.WARNING,
+                        context={"stock_code": getattr(result, "code", None)},
+                    )
 
             persistence_succeeded = bool(saved_history_id)
             value = PipelinePersistValue(
@@ -647,6 +713,7 @@ class _PersistenceStageMixin:
         query_id: str,
         portfolio_context: Optional[Dict[str, Any]] = None,
         money_flow_data: Optional[Any] = None,
+        sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> PipelineAnalysisArtifacts:
         return PipelineAnalysisArtifacts(
             code=code,
@@ -672,6 +739,7 @@ class _PersistenceStageMixin:
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
             money_flow_data=money_flow_data,
+            sentiment_snapshot=dict(sentiment_snapshot) if isinstance(sentiment_snapshot, dict) else None,
         )
 
     def _build_agent_analysis_artifacts(
@@ -686,6 +754,7 @@ class _PersistenceStageMixin:
         query_id: str,
         base_context: Optional[Dict[str, Any]] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> PipelineAnalysisArtifacts:
         context_candidate = base_context
         if not isinstance(context_candidate, dict):
@@ -722,6 +791,7 @@ class _PersistenceStageMixin:
                 "trigger_source": self.query_source,
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
+            sentiment_snapshot=dict(sentiment_snapshot) if isinstance(sentiment_snapshot, dict) else None,
         )
 
     def _build_analysis_context_pack_outputs(
@@ -758,6 +828,37 @@ class _PersistenceStageMixin:
                 pack,
                 report_language=report_language,
             )
+            # Issue #182: attach value-stripped pack audit for multi-agent reseal
+            # under the same snapshot identity (not public overview fields).
+            try:
+                from src.analysis_context_pack.snapshot import strip_pack_item_values
+                from src.services.run_diagnostics import get_current_diagnostic_context
+
+                identity = pack.audit_identity()
+                if isinstance(overview, dict):
+                    overview_meta = overview.get("metadata")
+                    if not isinstance(overview_meta, dict):
+                        overview_meta = {}
+                        overview["metadata"] = overview_meta
+                    # Keep digest on public metadata; pack audit is internal only.
+                    if identity.get("content_digest") and not overview_meta.get("content_digest"):
+                        overview_meta["content_digest"] = identity["content_digest"]
+                    overview["_pack_audit"] = strip_pack_item_values(pack.model_dump(mode="json"))
+                diag = get_current_diagnostic_context()
+                if diag is not None:
+                    diag.record_agent_event(
+                        {
+                            "type": "analysis_context_snapshot",
+                            "stage": "context",
+                            **{
+                                key: value
+                                for key, value in identity.items()
+                                if value is not None
+                            },
+                        }
+                    )
+            except Exception:  # broad-exception: optional_metadata - audit identity is best-effort
+                pass
             return summary, overview
         except Exception as exc:  # broad-exception: fallback_recorded - Context-pack failures are logged and fall back to empty optional context.
             log_safe_exception(

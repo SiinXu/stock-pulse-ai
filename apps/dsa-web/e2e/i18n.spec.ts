@@ -230,7 +230,8 @@ test.describe('complete UI i18n acceptance', () => {
     await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
     await expect(page.getByRole('heading', { name: 'Model sources' })).toBeVisible({ timeout: 15_000 }); // 26
     await page.getByRole('button', { name: /Add model source/ }).first().click();
-    const dialog = page.getByRole('dialog', { name: 'Add model service' });
+    await page.getByTestId('source-type-cloud').click();
+    const dialog = page.getByRole('region', { name: 'Add model service' });
     await expect(dialog).toBeVisible(); // 27
     await dialog.getByLabel('Choose model provider').click();
     await page.locator('[role="option"][data-value="custom"]').click();
@@ -243,7 +244,7 @@ test.describe('complete UI i18n acceptance', () => {
     await dialog.getByLabel('Base URL').fill(`http://127.0.0.1:${fakeProviderPort}/missing`);
     await dialog.getByRole('button', { name: 'Get models' }).click();
     await expect(dialog.getByText(/Model discovery|failed|Request/i).last()).toBeVisible({ timeout: 20_000 }); // 29
-    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible(); // 30
+    await expect(dialog.getByRole('button', { name: 'Back to model sources' })).toBeVisible(); // 30
   });
 
   test('English Connection Modal renders all built-in Provider labels without Chinese script', async ({ page }) => {
@@ -251,11 +252,12 @@ test.describe('complete UI i18n acceptance', () => {
     await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
     await expect(page.getByRole('heading', { name: 'Model sources' })).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: /Add model source/ }).first().click();
-    const dialog = page.getByRole('dialog', { name: 'Add model service' });
+    await page.getByTestId('source-type-cloud').click();
+    const dialog = page.getByRole('region', { name: 'Add model service' });
     await dialog.getByLabel('Choose model provider').click();
 
     for (const [providerId, labels] of Object.entries(BUILT_IN_PROVIDER_LABELS)) {
-      const option = dialog.locator(`[role="option"][data-value="${providerId}"]`);
+      const option = page.locator(`[role="option"][data-value="${providerId}"]`);
       await expect(option).toContainText(labels.en);
       expect(await option.innerText()).not.toMatch(CHINESE_SCRIPT);
     }
@@ -266,11 +268,12 @@ test.describe('complete UI i18n acceptance', () => {
     await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
     await expect(page.getByRole('heading', { name: '模型来源' })).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: /添加模型来源/ }).first().click();
-    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+    await page.getByTestId('source-type-cloud').click();
+    const dialog = page.getByRole('region', { name: '添加模型服务' });
     await dialog.getByLabel('选择模型服务商').click();
 
     for (const [providerId, labels] of Object.entries(BUILT_IN_PROVIDER_LABELS)) {
-      await expect(dialog.locator(`[role="option"][data-value="${providerId}"]`)).toContainText(labels.zh);
+      await expect(page.locator(`[role="option"][data-value="${providerId}"]`)).toContainText(labels.zh);
     }
   });
 
@@ -281,14 +284,15 @@ test.describe('complete UI i18n acceptance', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('heading', { name: 'Model sources' })).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: /Add model source/ }).first().click();
-    const dialog = page.getByRole('dialog', { name: 'Add model service' });
+    await page.getByTestId('source-type-cloud').click();
+    const dialog = page.getByRole('region', { name: 'Add model service' });
     const localizedSelect = dialog.getByLabel('Choose model provider');
     await localizedSelect.click();
-    await dialog.locator('[role="option"][data-value="openai"]').click();
+    await page.locator('[role="option"][data-value="openai"]').click();
     await expect(localizedSelect).toHaveAttribute('data-value', 'openai');
     await expect(localizedSelect).toContainText('OpenAI Official');
     await localizedSelect.click();
-    const openAiOption = dialog.locator('[role="option"][data-value="openai"]');
+    const openAiOption = page.locator('[role="option"][data-value="openai"]');
     await expect(openAiOption).toContainText('OpenAI Official');
     expect(await openAiOption.innerText()).not.toMatch(CHINESE_SCRIPT);
   });

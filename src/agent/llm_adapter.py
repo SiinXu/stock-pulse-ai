@@ -367,6 +367,26 @@ class LLMToolAdapter:
         self._register_custom_model_pricing()
         self._init_litellm()
 
+    @staticmethod
+    def _attach_route_telemetry(
+        response: "LLMResponse",
+        *,
+        attempt_index: int,
+        primary_model: Optional[str],
+        latency_ms: int,
+        success: bool,
+    ) -> "LLMResponse":
+        from src.llm.attribution import classify_route_outcome
+        usage = dict(response.usage or {})
+        usage["route_outcome"] = classify_route_outcome(attempt_index=attempt_index, success=success)
+        usage["route_attempt"] = int(attempt_index) + 1
+        if primary_model:
+            usage["primary_model"] = str(primary_model)
+        usage["latency_ms"] = int(latency_ms)
+        usage["call_success"] = bool(success)
+        response.usage = usage
+        return response
+
     def call_completion(
         self,
         messages: List[Dict[str, Any]],
@@ -430,6 +450,7 @@ class LLMToolAdapter:
             return LLMResponse(content=error_msg, provider="error")
         started_at = time.time()
         providers = [self._get_model_provider(model) for model in models_to_try]
+        primary_model = models_to_try[0] if models_to_try else None
 
         last_diagnostic = "unknown"
         hit_rate_limit = False
@@ -443,13 +464,20 @@ class LLMToolAdapter:
                     ))
                     break
             try:
-                return self._call_litellm_model(
+                response = self._call_litellm_model(
                     messages,
                     tools or [],
                     model,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     timeout=remaining_timeout,
+                )
+                return self._attach_route_telemetry(
+                    response,
+                    attempt_index=idx,
+                    primary_model=primary_model,
+                    latency_ms=max(0, int((time.time() - started_at) * 1000)),
+                    success=True,
                 )
             except Exception as exc:  # broad-exception: fallback_recorded - each failed route is logged before bounded fallback selection
                 diagnostic = sanitize_agent_diagnostic(exc)
@@ -515,7 +543,14 @@ class LLMToolAdapter:
             public_message,
             last_diagnostic,
         )
-        return LLMResponse(content=public_message, provider="error")
+        failed = LLMResponse(content=public_message, provider="error")
+        return self._attach_route_telemetry(
+            failed,
+            attempt_index=max(0, len(models_to_try) - 1),
+            primary_model=primary_model,
+            latency_ms=max(0, int((time.time() - started_at) * 1000)),
+            success=False,
+        )
 
 
 def register_fallback_model_pricing(models: Iterable[str]) -> None:
