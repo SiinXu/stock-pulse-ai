@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "2bc1fb0c8fdcaf42ebdc46d8d347da783c3bf3b046fe3f8dfa6eee7a4e297629"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "9fe7ea2bce2ab6f20bf5d99b813df5b155e21f94646d34b46f4fca59d418ee18"
+    "e50ed0cd96e971d53672e4dbc1eb722b93862b2ec2ec90dbebfd79e7b74bba5d"
 )
 
 
