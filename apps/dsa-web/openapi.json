@@ -9774,12 +9774,27 @@
       "ErrorResponse": {
         "description": "Stable API error envelope.",
         "example": {
+          "category": "not_found",
           "error": "not_found",
           "message": "Resource not found",
           "params": {},
+          "severity": "warning",
           "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         },
         "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)",
+            "example": "not_found",
+            "title": "Category"
+          },
           "detail": {
             "anyOf": [
               {},
@@ -9819,6 +9834,19 @@
             "description": "Localization interpolation parameters",
             "title": "Params",
             "type": "object"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taxonomy severity: info | warning | error | critical",
+            "example": "warning",
+            "title": "Severity"
           },
           "trace_id": {
             "anyOf": [
@@ -14624,7 +14652,10 @@
               "analysis_complete",
               "alert_triggered",
               "scheduled_task_result",
-              "decision_signal"
+              "decision_signal",
+              "daily_brief",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Kind",
             "type": "string"
@@ -14657,7 +14688,10 @@
               "analysisCompleteTitle",
               "alertTriggeredTitle",
               "scheduledTaskResultTitle",
-              "decisionSignalTitle"
+              "decisionSignalTitle",
+              "dailyBriefTitle",
+              "highDisagreementTitle",
+              "portfolioHealthTitle"
             ],
             "title": "Title Key",
             "type": "string"
@@ -14890,7 +14924,10 @@
               "analysis",
               "alerts",
               "scheduled_tasks",
-              "decision_signals"
+              "decision_signals",
+              "daily_briefs",
+              "high_disagreement",
+              "portfolio_health"
             ],
             "title": "Source",
             "type": "string"
@@ -16125,6 +16162,261 @@
           "price_source"
         ],
         "title": "PaperTradeCreatedResponse",
+        "type": "object"
+      },
+      "PeerValuationCanvasRequest": {
+        "description": "Request body for the constrained peer relative-value canvas (issue #1139).",
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Base currency for cross-market estimate normalization (default: target listing currency)",
+            "title": "Base Currency"
+          },
+          "industry_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional industry label override when peer_source=industry",
+            "title": "Industry Label"
+          },
+          "peer_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Peer stock codes (required for comparison; never invented server-side)",
+            "title": "Peer Codes"
+          },
+          "peer_source": {
+            "default": "custom",
+            "description": "Explainable peer-set source: custom codes or industry-constrained set",
+            "enum": [
+              "custom",
+              "industry"
+            ],
+            "title": "Peer Source",
+            "type": "string"
+          },
+          "stock_code": {
+            "description": "Target stock code",
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code"
+        ],
+        "title": "PeerValuationCanvasRequest",
+        "type": "object"
+      },
+      "PeerValuationCanvasResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "currency_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Metrics"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "fx_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Stale"
+          },
+          "heatmap_cells": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heatmap Cells"
+          },
+          "medians": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medians"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "multiple_metrics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiple Metrics"
+          },
+          "peer_set": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Set"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "relative_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Summary"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "valuation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Status"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status"
+        ],
+        "title": "PeerValuationCanvasResponse",
         "type": "object"
       },
       "PerformanceMetrics": {
@@ -49940,6 +50232,68 @@
           }
         },
         "summary": "Estimate stock valuation with body overrides",
+        "tags": [
+          "Valuation"
+        ]
+      }
+    },
+    "/api/v1/valuation/peer-canvas": {
+      "post": {
+        "description": "Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.",
+        "operationId": "buildPeerValuationCanvas",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeerValuationCanvasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerValuationCanvasResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Peer canvas build failed"
+          }
+        },
+        "summary": "Build peer relative-value comparison canvas",
         "tags": [
           "Valuation"
         ]

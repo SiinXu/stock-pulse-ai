@@ -14,7 +14,7 @@ describe('notification center localized copy', () => {
   it('keeps the complete key and placeholder contract for every UI locale', () => {
     const english = NOTIFICATION_CENTER_TEXT.en;
     const keys = Object.keys(english) as Array<keyof typeof english>;
-    expect(keys).toHaveLength(23);
+    expect(keys).toHaveLength(26);
 
     for (const language of UI_LANGUAGES) {
       const localized = NOTIFICATION_CENTER_TEXT[language];

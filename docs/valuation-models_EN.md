@@ -128,6 +128,29 @@ python -m pytest tests -k "valuation or dcf" -m "not network and not benchmark"
 - Market-specific model packs beyond shared DCF / PE-PB / EV-EBITDA
 - Auto-attach valuation into default analysis dashboard during pipeline runs
 
+
+
+## Peer relative-value canvas (issue #1139)
+
+Constrained comparison grid for a selected name plus a peer set:
+
+- **Reuses** `ValuationService.estimate` multiples, peer details, and medians (no DCF recompute).
+- **Peer set source** is explainable: `custom` (caller codes) or `industry` (resolved industry label + caller-supplied peers under that label; constituents are never invented).
+- **Missing peer data** stays on the grid and is annotated (`status=missing`, `missing_metrics`) instead of silent drop.
+- **Cross-market estimates**: absolute fields (`market_cap`, `current_price`, `ebitda`, `net_debt`, `equity_value`) normalize into `base_currency` via portfolio FX conversion with stale provenance; unitless multiples are never FX-converted.
+- 
+- Industry peer membership is **caller-asserted**: the service resolves and displays the industry label but does not invent or auto-validate constituents.
+- Metric cells use `not_applicable` (for example peer DCF equity when not recomputed) vs `missing` (looked up but unavailable). Completeness ignores `not_applicable`.
+- Relative-claim policy library: `evaluate_relative_claims` (unit-tested). Canvas payloads include `claim_policy` guidance; Agent valuation tool description points agents to canvas citations. Full automatic runtime gating of free-form agent prose is available via the library for consumers.
+
+API: `POST /api/v1/valuation/peer-canvas`
+- Web: `PeerValuationCanvas` on Stock Details (reuses `DataTable` + `RiskHeatmap` chart cells).
+- Relative-claim policy: `evaluate_relative_claims` downgrades free-text peer/relative language unless a usable canvas is present **and** the text cites canvas fields (`canvas.…`, `cite:…`, `cell:…`).
+
+```bash
+python -m pytest tests/services/test_peer_valuation_canvas.py -m "not network"
+```
+
 ## Rollback
 
 1. Set `VALUATION_AGENT_TOOL_ENABLED=false` (or remove the variable)
