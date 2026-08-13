@@ -273,29 +273,11 @@ def maybe_send_high_disagreement_alert(
         if callable(send_with_results):
             dispatch_result = send_with_results(alert_text, **send_kwargs)
             success = bool(getattr(dispatch_result, "success", False))
-            status = str(getattr(dispatch_result, "status", "") or "")
-            logger.info(
-                "High-disagreement alert dispatch finished",
-                extra={
-                    "stock_code": stock_code,
-                    "history_id": history_id,
-                    "success": success,
-                    "status": status,
-                    "disagreement_score": record.get("disagreement_score"),
-                },
-            )
+            logger.info("High-disagreement alert dispatch finished")
             return success
 
         sent = bool(notification_service.send(alert_text, **send_kwargs))
-        logger.info(
-            "High-disagreement alert send finished",
-            extra={
-                "stock_code": stock_code,
-                "history_id": history_id,
-                "success": sent,
-                "disagreement_score": record.get("disagreement_score"),
-            },
-        )
+        logger.info("High-disagreement alert send finished")
         return sent
     except Exception as exc:  # broad-exception: fallback_recorded - alert must not interrupt analysis
         log_safe_exception(

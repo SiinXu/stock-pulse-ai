@@ -63,7 +63,15 @@ class TestTickFlowPipelinePrefetch(unittest.TestCase):
             analysis_delay=0,
         )
 
-        def _process(code, skip_analysis=False, single_stock_notify=False, report_type=None, analysis_query_id=None, current_time=None):
+        def _process(
+            code,
+            skip_analysis=False,
+            single_stock_notify=False,
+            report_type=None,
+            analysis_query_id=None,
+            current_time=None,
+            send_notification=None,
+        ):
             events.append(("process", code))
             return _make_result(code)
 
@@ -76,6 +84,12 @@ class TestTickFlowPipelinePrefetch(unittest.TestCase):
         )
 
         self.assertEqual(len(results), 5)
+        self.assertTrue(
+            all(
+                call.kwargs.get("send_notification") is False
+                for call in pipeline.process_single_stock.call_args_list
+            )
+        )
         self.assertEqual(events[0][0], "daily_prefetch")
         self.assertEqual(
             events[0][2],
