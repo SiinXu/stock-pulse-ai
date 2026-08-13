@@ -93,12 +93,20 @@ class _TransportMethods:
             if keys:
                 call_kwargs["api_key"] = keys[0]
             call_kwargs.update(extra_litellm_params(model, self._config))
+        from src.services.analysis_stage_checkpoint import resolve_repro_generation_params
+
+        effective_temperature, repro_seed = resolve_repro_generation_params(
+            self._config,
+            self._get_temperature() if temperature is None else temperature,
+        )
         call_kwargs = apply_litellm_generation_params(
             call_kwargs,
             model,
-            self._get_temperature() if temperature is None else temperature,
+            effective_temperature,
             model_list=recovery_model_list,
         )
+        if repro_seed is not None:
+            call_kwargs["seed"] = repro_seed
         diagnostics_level = normalize_prompt_cache_diagnostics_level(
             getattr(self._config, "llm_prompt_cache_diagnostics_level", "off")
         )
