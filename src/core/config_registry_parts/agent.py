@@ -1740,7 +1740,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "MULTIMODAL_AGENT_TOOLS_ENABLED": {
         "title": "Enable Multimodal Agent Tools",
         "description": (
-            "Opt-in PDF parsing and chart-reading Agent Tools (issue #253 phase 1). "
+            "Opt-in PDF parsing and chart-reading Agent Tools (issue #253). "
             "Default is off. When enabled with MULTIMODAL_FILE_ROOT, Agents may call "
             "parse_financial_pdf and read_price_chart after a process restart. "
             "PDF parsing is local-first; chart reading uses VISION_MODEL and degrades "
@@ -1802,6 +1802,40 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "examples": [
             "MULTIMODAL_FILE_ROOT=",
             "MULTIMODAL_FILE_ROOT=/var/stockpulse/multimodal",
+        ],
+        "docs": [
+            {
+                "label": "Multimodal parsing guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multimodal-parsing_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+    },
+    "CHART_READ_TIMEOUT_SECONDS": {
+        "title": "Chart Read Timeout Seconds",
+        "description": (
+            "Per-call vision timeout for read_price_chart in seconds (clamped 1-120). "
+            "Default 30. Aligns chart reading with OCR-style time bounds. "
+            "See docs/multimodal-parsing_EN.md."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 1, "max": 120},
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+        "display_order": 783,
+        "help_key": "settings.agent.CHART_READ_TIMEOUT_SECONDS",
+        "examples": [
+            "CHART_READ_TIMEOUT_SECONDS=30",
+            "CHART_READ_TIMEOUT_SECONDS=60",
         ],
         "docs": [
             {
