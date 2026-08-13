@@ -68,7 +68,7 @@ const ToastItem: React.FC<{
 
   return (
     <div
-      role={toast.tone === 'danger' ? 'alert' : 'status'}
+      role={toast.role ?? (toast.tone === 'danger' ? 'alert' : 'status')}
       aria-atomic="true"
       data-toast-id={toast.id}
       data-toast-tone={toast.tone}

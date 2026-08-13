@@ -17,6 +17,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT as _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
     logger,
     normalize_tickflow_kline_adjust,
     parse_prompt_cache_diagnostics_level,
@@ -754,6 +755,10 @@ class _ConfigLoadingMethods:
             llm_prompt_cache_diagnostics_level=parse_prompt_cache_diagnostics_level(
                 os.getenv("LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL")
             ),
+            llm_usage_attribution_enabled=parse_env_bool(
+                os.getenv("LLM_USAGE_ATTRIBUTION_ENABLED"),
+                default=True,
+            ),
             gemini_api_keys=gemini_api_keys,
             anthropic_api_keys=anthropic_api_keys,
             openai_api_keys=openai_api_keys,
@@ -949,6 +954,12 @@ class _ConfigLoadingMethods:
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
+            ),
+            agent_research_persona=(
+                (os.getenv('AGENT_RESEARCH_PERSONA') or '').strip().lower()
+            ),
+            agent_research_persona_custom=(
+                (os.getenv('AGENT_RESEARCH_PERSONA_CUSTOM') or '').strip()
             ),
             skill_opinion_recording_enabled=parse_env_bool(
                 os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
@@ -1307,6 +1318,12 @@ class _ConfigLoadingMethods:
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),
+            readiness_check_timeout_seconds=parse_env_float(
+                os.getenv('READINESS_CHECK_TIMEOUT_SECONDS'),
+                _READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
+                field_name='READINESS_CHECK_TIMEOUT_SECONDS',
+                minimum=0.1,
+            ),
             analysis_parallel_fetch_enabled=parse_env_bool(
                 os.getenv('ANALYSIS_PARALLEL_FETCH_ENABLED'),
                 default=True,
@@ -1590,6 +1607,16 @@ class _ConfigLoadingMethods:
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
             ),
+            research_api_enabled=parse_env_bool(
+                os.getenv('RESEARCH_API_ENABLED'), default=False
+            ),
+            research_api_rate_limit_per_minute=parse_env_int(
+                os.getenv('RESEARCH_API_RATE_LIMIT_PER_MINUTE'),
+                60,
+                field_name='RESEARCH_API_RATE_LIMIT_PER_MINUTE',
+                minimum=1,
+                maximum=10_000,
+            ),
             reasoning_trace_export_enabled=parse_env_bool(
                 os.getenv('REASONING_TRACE_EXPORT_ENABLED'), default=False
             ),
@@ -1777,20 +1804,54 @@ class _ConfigLoadingMethods:
         default: Optional[str] = None,
         prefer_env_file: bool = False,
     ) -> Optional[str]:
-        """Resolve one env value, optionally preferring the persisted `.env` copy."""
+        """Resolve one env value, optionally preferring the persisted `.env` copy.
+
+        Value selection is delegated to
+        :func:`src.core.config.resolve.resolve_config_value` so runtime and the
+        public resolve path share one precedence algorithm. Source metadata is
+        available via :meth:`resolve_with_source`.
+        """
+        from src.core.config.resolve import resolve_config_value
+
         env_value = os.getenv(key)
         file_value = cls._get_env_file_value(key)
+        resolved = resolve_config_value(
+            key,
+            env_value=env_value,
+            file_value=file_value,
+            default=default,
+            prefer_env_file=prefer_env_file,
+            has_bootstrap_override=cls._has_bootstrap_runtime_env_override(key),
+            webui_file_priority=key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS,
+        )
+        return resolved.value
 
-        should_prefer_file = prefer_env_file or key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
-        if should_prefer_file and file_value is not None:
-            if env_value is not None and cls._has_bootstrap_runtime_env_override(key):
-                return env_value
-            return file_value
-        if env_value is not None:
-            return env_value
-        if file_value is not None:
-            return file_value
-        return default
+    @classmethod
+    def resolve_with_source(
+        cls,
+        key: str,
+        *,
+        default: Optional[str] = None,
+        prefer_env_file: bool = False,
+    ):
+        """Resolve one key through the single path and return value + source.
+
+        Thin facade for diagnostics and gradual call-site migration. Value is
+        identical to :meth:`_resolve_env_value`.
+        """
+        from src.core.config.resolve import resolve_config_value
+
+        env_value = os.getenv(key)
+        file_value = cls._get_env_file_value(key)
+        return resolve_config_value(
+            key,
+            env_value=env_value,
+            file_value=file_value,
+            default=default,
+            prefer_env_file=prefer_env_file,
+            has_bootstrap_override=cls._has_bootstrap_runtime_env_override(key),
+            webui_file_priority=key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS,
+        )
 
     @classmethod
     def _capture_bootstrap_runtime_env_overrides(cls) -> None:

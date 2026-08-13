@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-12",
-  "baselineNote": "Locale/IntelligenceSourcesPanel budgets cover event-triggered analysis (#1243) and observed-event Daily/Event Research briefs on main; failed artifacts use measured gzip + headroom.",
+  "baselineNote": "Combined local production build after current main API/UI additions and event-triggered analysis (PR #1243); each remeasured rule retains its documented fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 242701,
-      "measuredGzipBytes": 240298,
-      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
+      "maxGzipBytes": 243132,
+      "measuredGzipBytes": 242732,
+      "note": "Combined local production-build measurement after current main inventory additions and event-triggered analysis (PR #1243), with 400 B headroom."
     },
     {
       "id": "js-entry",
@@ -27,58 +27,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 157957,
-      "measuredGzipBytes": 156393,
-      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
+      "maxGzipBytes": 159365,
+      "measuredGzipBytes": 158665,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151185,
-      "measuredGzipBytes": 149688,
-      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
+      "maxGzipBytes": 152563,
+      "measuredGzipBytes": 151863,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151009,
-      "measuredGzipBytes": 149513,
-      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
+      "maxGzipBytes": 152491,
+      "measuredGzipBytes": 151791,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 151067,
-      "measuredGzipBytes": 149571,
-      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
+      "maxGzipBytes": 152267,
+      "measuredGzipBytes": 151667,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 600 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 145395,
-      "measuredGzipBytes": 144695,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=145395."
+      "maxGzipBytes": 148082,
+      "measuredGzipBytes": 147382,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 143469,
-      "measuredGzipBytes": 142048,
-      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
+      "maxGzipBytes": 144995,
+      "measuredGzipBytes": 144295,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 135435,
-      "measuredGzipBytes": 134735,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=135435."
+      "maxGzipBytes": 138162,
+      "measuredGzipBytes": 137462,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 136882,
-      "measuredGzipBytes": 135526,
-      "note": "GitHub Actions Linux remeasure after event-triggered alerts sync (PR #1243); measured gzip + ~1% headroom."
+      "maxGzipBytes": 138275,
+      "measuredGzipBytes": 137575,
+      "note": "Combined local production-build measurement after current main locale additions and event-triggered analysis (PR #1243), with 700 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -118,9 +118,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10376,
-      "measuredGzipBytes": 9432,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=10376."
+      "maxGzipBytes": 10861,
+      "measuredGzipBytes": 10461,
+      "note": "Combined local production-build measurement after current main and event-triggered analysis (PR #1243). Measured 10461 B with 400 B headroom."
     },
     {
       "id": "vendor-misc",
@@ -146,16 +146,16 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45391,
-      "measuredGzipBytes": 41264,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=45391."
+      "maxGzipBytes": 45526,
+      "measuredGzipBytes": 45326,
+      "note": "Combined local production-build measurement after current main settings additions and event-triggered analysis (PR #1243), with 200 B headroom."
     },
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
-      "maxGzipBytes": 46602,
-      "measuredGzipBytes": 42365,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=46602."
+      "maxGzipBytes": 47114,
+      "measuredGzipBytes": 46714,
+      "note": "Combined local production-build measurement after current main alert surfaces and event-triggered analysis (PR #1243), with 400 B headroom."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -167,9 +167,9 @@
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 26363,
-      "measuredGzipBytes": 26163,
-      "note": "Merged headroom for PR #1243 event-trigger locale inventory and concurrent main observed-event help; maxGzipBytes=26363."
+      "maxGzipBytes": 26595,
+      "measuredGzipBytes": 26395,
+      "note": "Combined local production-build measurement after current main portfolio additions and event-triggered analysis (PR #1243), with 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",
