@@ -67,6 +67,9 @@ from src.migrations.versions.v202608100002_analysis_history_search_fts import (
 from src.migrations.versions.v202608120001_llm_usage_cost_attribution import (
     MIGRATION as LLM_USAGE_COST_ATTRIBUTION_MIGRATION,
 )
+from src.migrations.versions.v202608120002_agent_episode_schema import (
+    MIGRATION as AGENT_EPISODE_SCHEMA_MIGRATION,
+)
 from src.migrations.versions.v202608130001_agent_prediction_schema import (
     MIGRATION as AGENT_PREDICTION_SCHEMA_MIGRATION,
 )
@@ -94,6 +97,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         CHAT_TURN_IDENTITY_MIGRATION,
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
         LLM_USAGE_COST_ATTRIBUTION_MIGRATION,
+        AGENT_EPISODE_SCHEMA_MIGRATION,
         AGENT_PREDICTION_SCHEMA_MIGRATION,
     )
 )
