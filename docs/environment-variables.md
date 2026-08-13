@@ -226,7 +226,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `INFO_QUALITY_GRADING_ENABLED` | `true` | 是 | 模板中注释; A/B/C information quality grade from validation evidence (Issue #123) |
 | `DEBUG` | `false` | 是 | Enable debugging logs |
 | `DECISION_MEMORY_ENABLED` | `true` | 是 | 模板中注释; Historical decision memory & reflection (Issue #118; default on, no config needed) Injects a "Historical Decision Ref... |
-| `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max recent evaluated signals per stock to reflect on |
+| `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max admitted evaluated signals per stock to inject (rate and list use this set; hard cap 40) |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | `3` | 是 | 模板中注释; Only reflect on signals at least this many days old (so outcomes exist) |
 | `DECISION_MEMORY_MIN_SAMPLES` | `5` | 是 | 模板中注释; Min decided outcomes (hit+miss) before a hit-rate is shown; smaller buckets are noise |
 | `DECISION_PROFILE_CALIBRATION_ENABLED` | `false` | 是 | 模板中注释 |
