@@ -1,9 +1,17 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.ms,
+  ...DR.ms,
+  ...CP.ms,
+  ...DSC.ms,
   ...S.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
@@ -671,7 +679,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "Statistik ini merangkumi hasil semakan global. Ia bukan bilangan isyarat yang kelihatan dan tidak mengikut penapis saham semasa.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "Tidak diketahui",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "Tidak tersedia",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "Kiraan sahaja; kadar disembunyikan.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "Tidak mencukupi",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "Mencukupi",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "Selesai {completed} / jumlah {total}",
@@ -680,12 +687,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "Mengikut pasaran",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "Mengikut tempoh (bulan)",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "Pengumpulan penentukuran",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "Kadar diterbitkan mulai {count} hasil setiap kumpulan.",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "Mengikut masa, pasaran dan isyarat; ambang berasingan setiap kumpulan.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "Penentukuran ketepatan pascapenilaian",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "Tidak mencukupi",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "Di bawah {count}: kiraan sahaja.",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "Kadar sejarah; bukan ramalan, jaminan atau nasihat pelaburan.",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "Kedudukan sebagai alat penyelidikan",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "Kadar hit",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "Statistik kualiti proses",

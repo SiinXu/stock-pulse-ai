@@ -1,9 +1,17 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.de,
+  ...DR.de,
+  ...CP.de,
+  ...DSC.de,
   ...S.de,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktiviere den Agentenmodus und versuche es erneut.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agentenmodus ist nicht aktiviert",
@@ -671,7 +679,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "Dies sind globale Statistiken zu geprüften Ergebnissen. Sie entsprechen weder der aktuell sichtbaren Signalanzahl noch dem aktuellen Aktienfilter.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "Unbekannt",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "Nicht verfügbar",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "Nur Anzahlen; keine Quoten.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "Unzureichend",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "Ausreichend",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "{completed}/{total} abgeschlossen",
@@ -680,12 +687,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "Markt",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "Monat",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "Gruppen",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "Quoten ab {count} Abschlüssen je Gruppe.",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "Nach Zeit, Markt und Signal; eigener Schwellenwert je Gruppe.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "Kalibrierung",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "Unzureichend",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "Unter {count}: nur Anzahlen.",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "Historische Treffer: keine Prognose, Garantie oder Beratung.",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "Forschungshinweis",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "Trefferquote",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "Prozessqualität",

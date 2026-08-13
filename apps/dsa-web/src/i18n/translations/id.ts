@@ -1,9 +1,17 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTranslationKey } from './en';
+import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
+import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
+import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
+import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
+  ...M.id,
+  ...DR.id,
+  ...CP.id,
+  ...DSC.id,
   ...S.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
@@ -671,7 +679,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.statsGlobalScope": "Statistik ini mencakup hasil yang ditinjau secara global. Angka tersebut bukan jumlah sinyal yang terlihat dan tidak mengikuti filter saham saat ini.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationUnknownValue": "Tidak diketahui",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationRateUnavailable": "Tidak tersedia",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationInsufficientNotice": "Hanya hitungan; tingkat disembunyikan.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleInsufficient": "Tidak cukup",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleSufficient": "Cukup",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationSampleCounts": "Selesai {completed} / total {total}",
@@ -680,12 +687,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByMarket": "Menurut pasar",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationByPeriod": "Menurut periode (bulan)",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationGroupLabel": "Pengelompokan kalibrasi",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationThreshold": "Tingkat tampil mulai {count} hasil per kelompok.",
-  "i18n.uiText.UI_TEXT.decisionSignals.calibrationDescription": "Menurut waktu, pasar, dan sinyal; ambang terpisah tiap kelompok.",
   "i18n.uiText.UI_TEXT.decisionSignals.calibrationTitle": "Kalibrasi ketepatan pascaevaluasi",
   "i18n.uiText.UI_TEXT.decisionSignals.statsRateHidden": "Tidak cukup",
-  "i18n.uiText.UI_TEXT.decisionSignals.statsInsufficientNotice": "Di bawah {count}: hanya hitungan.",
-  "i18n.uiText.UI_TEXT.decisionSignals.researchPositionBody": "Tingkat historis; bukan prediksi, jaminan, atau saran investasi.",
   "i18n.uiText.UI_TEXT.decisionSignals.researchPositionTitle": "Posisi sebagai alat riset",
   "i18n.uiText.UI_TEXT.decisionSignals.statsHitRate": "Tingkat hit",
   "i18n.uiText.UI_TEXT.decisionSignals.statsTitle": "Statistik kualitas proses",

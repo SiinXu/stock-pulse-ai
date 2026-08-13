@@ -1253,6 +1253,42 @@ class _ConfigLoadingMethods:
             report_integrity_retry=parse_env_int(os.getenv('REPORT_INTEGRITY_RETRY'), 1, field_name='REPORT_INTEGRITY_RETRY', minimum=0),
             report_history_compare_n=parse_env_int(os.getenv('REPORT_HISTORY_COMPARE_N'), 0, field_name='REPORT_HISTORY_COMPARE_N', minimum=0),
             analysis_delay=parse_env_float(os.getenv('ANALYSIS_DELAY'), 0.0, field_name='ANALYSIS_DELAY', minimum=0.0),
+            analysis_checkpoint_enabled=parse_env_bool(
+                os.getenv('ANALYSIS_CHECKPOINT_ENABLED'),
+                True,
+            ),
+            analysis_checkpoint_dir=(
+                (os.getenv('ANALYSIS_CHECKPOINT_DIR') or '').strip()
+                or './data/checkpoints'
+            ),
+            analysis_checkpoint_ttl_hours=parse_env_int(
+                os.getenv('ANALYSIS_CHECKPOINT_TTL_HOURS'),
+                24,
+                field_name='ANALYSIS_CHECKPOINT_TTL_HOURS',
+                minimum=0,
+            ),
+            analysis_checkpoint_force_full=parse_env_bool(
+                os.getenv('ANALYSIS_CHECKPOINT_FORCE_FULL'),
+                False,
+            ),
+            repro_mode_enabled=parse_env_bool(
+                os.getenv('REPRO_MODE_ENABLED'),
+                False,
+            ),
+            repro_record_config=parse_env_bool(
+                os.getenv('REPRO_RECORD_CONFIG'),
+                True,
+            ),
+            repro_seed=(
+                parse_env_int(
+                    os.getenv('REPRO_SEED'),
+                    0,
+                    field_name='REPRO_SEED',
+                    minimum=0,
+                )
+                if os.getenv('REPRO_SEED') is not None
+                else None
+            ),
             merge_email_notification=os.getenv('MERGE_EMAIL_NOTIFICATION', 'false').lower() == 'true',
             feishu_max_bytes=parse_env_int(os.getenv('FEISHU_MAX_BYTES'), 20000, field_name='FEISHU_MAX_BYTES', minimum=1),
             feishu_send_as_file=os.getenv('FEISHU_SEND_AS_FILE', '').lower() in ('true', '1', 'yes'),
@@ -1591,7 +1627,11 @@ class _ConfigLoadingMethods:
             ),
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
-                os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
+                os.getenv('DECISION_MEMORY_LOOKBACK'),
+                5,
+                field_name='DECISION_MEMORY_LOOKBACK',
+                minimum=0,
+                maximum=40,
             ),
             decision_memory_min_age_days=parse_env_int(
                 os.getenv('DECISION_MEMORY_MIN_AGE_DAYS'), 3, field_name='DECISION_MEMORY_MIN_AGE_DAYS', minimum=0
