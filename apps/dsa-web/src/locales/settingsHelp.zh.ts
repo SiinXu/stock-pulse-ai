@@ -1611,6 +1611,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     title: 'Agent episode 最大行数',
     summary: 'episode 行数上限；优先删除最旧行。',
   },
+  'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
+    title: '错误模式百科',
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent 规划循环',
     summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',
