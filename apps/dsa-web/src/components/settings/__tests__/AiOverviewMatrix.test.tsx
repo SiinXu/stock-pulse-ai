@@ -38,14 +38,36 @@ describe('AiOverviewMatrix', () => {
     expect(table.tBodies[0]).toHaveClass('divide-inherit');
     expect(table.parentElement).toHaveAttribute('data-data-table', 'ready');
     expect(table.parentElement?.parentElement).toHaveClass(
-      'overflow-hidden',
+      'min-w-0',
+      'max-w-full',
+      'overflow-x-auto',
       'border-[var(--settings-border)]',
     );
+    expect(table.parentElement?.parentElement).not.toHaveClass('overflow-hidden');
     expect(screen.getByTestId('ai-task-report')).toContainElement(
       screen.getByRole('rowheader', { name: 'Stock report' }),
     );
     expect(screen.getByTestId('ai-task-market_review')).toBeInTheDocument();
     expect(screen.getByTestId('ai-task-agent')).toBeInTheDocument();
     expect(screen.getByTestId('ai-task-vision')).toBeInTheDocument();
+  });
+
+  it('keeps overview table overflow reachable at narrow content widths (#879 B3)', () => {
+    render(
+      <AiOverviewMatrix
+        getValue={(key) => (
+          key === 'LITELLM_MODEL' ? 'openai/gpt-test-model-with-a-very-long-identifier' : ''
+        )}
+        language="en"
+        availableRoutes={new Set(['openai/gpt-test-model-with-a-very-long-identifier'])}
+      />,
+    );
+
+    const table = screen.getByRole('table', { name: 'Task routing overview' });
+    const frame = table.parentElement?.parentElement as HTMLElement;
+    expect(frame).toHaveClass('min-w-0', 'overflow-x-auto');
+    // DataTable already owns an inner scroll region; the frame must not clip it closed.
+    expect(table.parentElement).toHaveAttribute('data-data-table-scroll', 'true');
+    expect(table.parentElement).toHaveClass('overflow-x-auto');
   });
 });

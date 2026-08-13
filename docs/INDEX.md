@@ -48,6 +48,7 @@
 | --- | --- |
 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | 模型服务商与连接、三层配置、Web 设置页和常见模型配置 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | 市场感知的 provider 顺序、健康评分、自适应排序、熔断、stale 降级与推荐配置 |
+| [分析内无依赖并行取数](parallel-data-fetch.md) | 单股分析内 realtime/chip/money-flow/fundamental 并行拉取、并发护栏与串行回退（Issue #1126） |
 | [LLM 服务商配置指南](llm-providers.md) | Provider 预设、Actions 映射、错误分类和诊断建议 |
 | [LiteLLM YAML 示例](examples/litellm_config.example.yaml) | LiteLLM 多渠道配置示例 |
 | [通知能力基线](notifications.md) | 企业微信、飞书、Telegram、Discord、Slack、邮件等通知渠道配置 |
@@ -69,6 +70,7 @@
 | [Alert Center English companion](alerts_EN.md) | Issue #241 后端 V0 英文摘要（企业事件告警与 impact context） |
 | [定时任务 API 与执行契约（英文）](scheduled-tasks.md) | 版本化每日分析/研究任务、今日只读视图、交易日策略、运行记录、重试与 local/Docker/API 调度所有权边界 |
 | [每日简报（历史准确率复盘）](daily-brief.md) | 配置门控的晨间简报：昨日分析、关注列表与基于既有 outcome 存储的诚实准确率复盘（[英文](daily-brief_EN.md)） |
+| [预测到期解析器](prediction-resolver.md) | 系统驱动到期解析：既有调度器 / CLI cron；Provider 失败 → data_unavailable（[英文](prediction-resolver_EN.md)） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |

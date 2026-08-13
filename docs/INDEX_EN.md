@@ -55,6 +55,7 @@ This is the entry point for project documentation. The README covers the project
 | [Local Model Catalog](local-model-catalog.md) | Curated local models, verified artifacts and licenses, RAM tiers, distribution status, and Ollama packaging guidance |
 | [StockPulse Model Packs](model-packs.md) | Versioned GGUF pack format, offline import, validation failures, build tooling, and release limits |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Market-aware provider order, bounded health learning, circuit control, stale degradation, and production/zero-cost profiles |
+| [Parallel dependency-free data pulls](parallel-data-fetch.md) | Single-stock parallel realtime/chip/money-flow/fundamental pulls with concurrency caps and serial fallback (Issue #1126) |
 | [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Provider presets, GitHub Actions mapping, error categories, and diagnostics |
 | [LiteLLM YAML Example](examples/litellm_config.example.yaml) | Example LiteLLM multi-provider configuration |
 | [Notification Baseline](notifications.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | WeChat Work, Feishu, Telegram, Discord, Slack, Email, and other notification channels |
@@ -76,6 +77,7 @@ This is the entry point for project documentation. The README covers the project
 | [Alert Center — Issue #241 EN companion](alerts_EN.md) | English companion for context-aware corporate event alerts (backend V0) |
 | [Scheduled Tasks](scheduled-tasks.md) | Versioned daily analysis/research tasks, a read-only today view, trading-day policy, durable run records, bounded retry, and local/Docker/API ownership |
 | [Daily Brief (historical accuracy)](daily-brief_EN.md) | Config-gated morning brief: yesterday's analyses, watchlist context, and honesty-first accuracy from existing outcome stores ([Chinese](daily-brief.md)) |
+| [Prediction Horizon Resolver](prediction-resolver_EN.md) | System-driven due prediction resolve via existing scheduler / CLI cron; provider failure → data_unavailable ([Chinese](prediction-resolver.md)) |
 | [DecisionSignal Topic](decision-signals.md) <sub><sub>![P7 Badge](https://img.shields.io/badge/P7-orange?style=flat)</sub></sub> (Chinese-only) | AI signal fields, API, Web display, alert/notification/portfolio-risk linkage, outcome evaluation, redaction, migration, and rollback |
 | [Personal Investment Framework](personal-investment-framework_EN.md) | Minimal Settings editor, versioned API, single-stock read-only injection, and report framework_alignment slot |
 | [Portfolio Risk Metrics (VaR / Correlation / Diversification)](portfolio-risk-metrics_EN.md) | Historical VaR, correlation matrix, HHI/diversification formulas and assumptions; `GET /api/v1/portfolio/risk-metrics` V0 boundary |

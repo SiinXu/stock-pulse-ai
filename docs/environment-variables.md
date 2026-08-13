@@ -118,6 +118,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MAX_STEPS` | `10` | 是 | 模板中注释; Agent maximum inference step limit (default 10, each sub-agent runs according to its preset value; higher than the de... |
 | `AGENT_MEMORY_ENABLED` | `false` | 是 | 模板中注释; Memory and calibration system (tracks historical accuracy and automatically adjusts confidence) |
 | `AGENT_MODE` | `true` | 是 | 模板中注释; =================================== Agent strategy dialogue configuration (Web dialogue page) =======================... |
+| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | 模板中注释; Hard per-mode budgets (LLM turns / tool calls / estimated USD cost / optional tokens) |
+| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
@@ -161,6 +166,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ALPHASIFT_SOURCE_CALL_TIMEOUT_SEC` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHAVANTAGE_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ANALYSIS_DELAY` | `0` | 是 | 模板中注释; =================================== Analyze interval configuration (optional) =================================== Del... |
+| `ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS` | `0` | 是 | 模板中注释; Coordinator wall-clock budget in seconds; 0 disables (individual stage timeouts still apply). |
+| `ANALYSIS_PARALLEL_FETCH_ENABLED` | `true` | 是 | 模板中注释; Parallel dependency-free market-input pulls inside one stock analysis (realtime / chip / money-flow / fundamental) |
+| `ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT` | `3` | 是 | 模板中注释 |
+| `ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT` | `1` | 是 | 模板中注释 |
 | `ANSPIRE_API_KEYS` | `空` | 是 | Anspire Open API keys (supports multiple comma-separated values) Get keys from: https://open.anspire.cn/ When no high... |
 | `ANSPIRE_LLM_BASE_URL` | `https://open-gateway.anspire.cn/v6` | 是 | 模板中注释 |
 | `ANSPIRE_LLM_ENABLED` | `true` | 是 | 模板中注释 |
@@ -198,7 +207,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DAILY_BRIEF_TIMEZONE` | `Asia/Shanghai` | 是 | 模板中注释 |
 | `DAILY_MARKET_CONTEXT_ENABLED` | `true` | 是 | Should the market summary be injected into individual stock analysis prompts and should conservative barriers be enab... |
 | `DATABASE_PATH` | `./data/stock_analysis.db` | 否 | 注册表缺口（见清单文档 / 跟踪 issue） |
+| `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | `0.05` | 是 | 模板中注释; Multi-provider relative divergence threshold (default 0.05 = 5%) |
 | `DATA_VALIDATION_ENABLED` | `true` | 是 | 模板中注释; Financial data validation layer at provider candidate and synthesis boundaries |
+| `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | `50` | 是 | 模板中注释 |
+| `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | `200` | 是 | 模板中注释; Soft PE/PB plausibility bounds: values beyond these are marked suspect (warn) and kept; hard feed extremes still reject. |
 | `DATA_VALIDATION_INSTRUMENT_OVERRIDES` | `空` | 是 | 模板中注释; Optional authoritative identities for symbols whose instrument type cannot be inferred safely from their market code,... |
 | `DATA_VALIDATION_STRICT` | `false` | 是 | 模板中注释; Reject invalid daily/realtime provider candidates before acceptance/cache so the existing bounded provider loop can c... |
 | `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | 是 | 模板中注释; Comma-separated market/instrument selectors; supported instruments are equity, etf, and index |
@@ -490,6 +502,17 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT` | `10.0` | 是 | 模板中注释 |
 | `PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO` | `0.8` | 是 | 模板中注释 |
 | `PORTFOLIO_STRESS_SCENARIOS_PATH` | `空` | 是 | 模板中注释; Optional YAML path (maximum 1,024 characters) that adds/overrides bounded portfolio stress scenarios by id |
+| `PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_ENABLED` | `false` | 是 | 模板中注释; Prediction horizon resolver (Issues #1102 / #1116, Epic #1107; default off) Existing process scheduler runs Predictio... |
+| `PREDICTION_RESOLVE_FETCH_CONCURRENCY` | `4` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_INTERVAL_SECONDS` | `60` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS` | `60` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD` | `5` | 是 | 模板中注释 |
+| `PREDICTION_RESOLVE_RETRY_JITTER_RATIO` | `0.1` | 是 | 模板中注释 |
 | `PREFETCH_REALTIME_QUOTES` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_ENABLED` | `true` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES` | `3` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -600,24 +623,3 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `YFINANCE_PRIORITY` | `0` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 
 <!-- config-env-inventory:end -->
-
-## Prediction batch resolution (Issue #1104)
-
-Operational concurrency caps for the agent prediction verification batch layer. Research/quality-ops only; scheduler gate defaults off. See `docs/agent-prediction-resolution.md`.
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PREDICTION_RESOLVE_ENABLED` | `false` | Scheduler enable gate for the resolve loop |
-| `PREDICTION_RESOLVE_MAX_PER_TICK` | `50` | Max due rows claimed per tick (backpressure) |
-| `PREDICTION_RESOLVE_FETCH_CONCURRENCY` | `4` | Parallel actuals-fetch groups |
-| `PREDICTION_RESOLVE_POSTMORTEM_CONCURRENCY` | `1` | Documented LLM post-mortem drain concurrency |
-| `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | Max miss post-mortems enqueued per tick |
-| `PREDICTION_RESOLVE_LEASE_SECONDS` | `120` | Exclusive resolving lease TTL |
-| `PREDICTION_RESOLVE_MAX_ATTEMPTS` | `5` | Bound for data_unavailable retries |
-| `PREDICTION_RESOLVE_RETRY_BASE_SECONDS` | `30` | Exponential backoff base |
-| `PREDICTION_RESOLVE_RETRY_MAX_SECONDS` | `3600` | Exponential backoff cap |
-| `PREDICTION_RESOLVE_RETRY_JITTER_RATIO` | `0.1` | Retry jitter fraction |
-| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD` | `5` | Provider errors before circuit opens |
-| `PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS` | `60` | Circuit open duration |
-| `PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK` | `5` | Claim cap while circuit is open |
-

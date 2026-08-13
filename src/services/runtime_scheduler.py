@@ -175,6 +175,36 @@ def build_daily_brief_scheduler_background_tasks(
         return []
 
 
+
+
+def build_prediction_resolver_scheduler_background_tasks(
+    config: Config,
+    *,
+    config_provider: Callable[[], Config],
+) -> List[Dict[str, Any]]:
+    """Build the config-gated prediction resolver background task (#1102 / #1116)."""
+    if not getattr(config, "prediction_resolve_enabled", False):
+        return []
+    try:
+        from src.services.prediction_resolver import (
+            build_prediction_resolver_background_tasks,
+        )
+
+        return build_prediction_resolver_background_tasks(
+            config,
+            config_provider=config_provider,
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        log_safe_exception(
+            logger,
+            "Prediction resolver background task initialization failed",
+            exc,
+            error_code="prediction_resolver_background_task_init_failed",
+            level=logging.WARNING,
+        )
+        return []
+
+
 class RuntimeSchedulerService:
     """Manage scheduled analysis inside the current API/Web/Desktop process."""
 
@@ -370,6 +400,7 @@ class RuntimeSchedulerService:
         else:
             tasks = self._current_agent_event_monitor_background_tasks(config)
             tasks.extend(self._current_daily_brief_background_tasks(config))
+            tasks.extend(self._current_prediction_resolver_background_tasks(config))
         if self._scheduled_task_service is not None and self._personalized_schedule_enabled:
             from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
 
@@ -442,6 +473,57 @@ class RuntimeSchedulerService:
             from src.services.daily_brief_service import DAILY_BRIEF_POLL_INTERVAL_SECONDS
 
             interval_seconds = int(DAILY_BRIEF_POLL_INTERVAL_SECONDS)
+
+        run_immediately = (
+            bool(cached.get("run_immediately", False))
+            and name not in self._background_task_registered_names
+        )
+        self._background_task_registered_names.add(name)
+        return [{
+            "task": cached["task"],
+            "interval_seconds": interval_seconds,
+            "run_immediately": run_immediately,
+            "name": name,
+        }]
+
+
+    def _current_prediction_resolver_background_tasks(self, config: Config) -> List[Dict[str, Any]]:
+        name = "prediction_resolver"
+        if not getattr(config, "prediction_resolve_enabled", False):
+            self._background_task_cache.pop(name, None)
+            self._background_task_registered_names.discard(name)
+            return []
+
+        cached = self._background_task_cache.get(name)
+        if cached is None:
+            entries = build_prediction_resolver_scheduler_background_tasks(
+                config,
+                config_provider=self._reload_config,
+            )
+            if not entries:
+                self._background_task_cache.pop(name, None)
+                self._background_task_registered_names.discard(name)
+                return []
+            cached = dict(entries[0])
+            cached["name"] = name
+            self._background_task_cache[name] = cached
+            interval_seconds = int(cached["interval_seconds"])
+        else:
+            from src.services.prediction_resolver import (
+                PREDICTION_RESOLVER_DEFAULT_INTERVAL_SECONDS,
+            )
+
+            try:
+                interval_seconds = int(
+                    getattr(
+                        config,
+                        "prediction_resolve_interval_seconds",
+                        PREDICTION_RESOLVER_DEFAULT_INTERVAL_SECONDS,
+                    )
+                )
+            except (TypeError, ValueError):
+                interval_seconds = int(PREDICTION_RESOLVER_DEFAULT_INTERVAL_SECONDS)
+            interval_seconds = max(30, interval_seconds)
 
         run_immediately = (
             bool(cached.get("run_immediately", False))
@@ -540,9 +622,13 @@ class RuntimeSchedulerService:
         run_immediately: bool = False,
         clear_enabled_override: bool = False,
         include_legacy: bool = True,
+        refresh_background_tasks: Optional[Set[str]] = None,
     ) -> None:
         if clear_enabled_override:
             self._force_enabled = False
+        for name in refresh_background_tasks or ():
+            self._background_task_cache.pop(name, None)
+            self._background_task_registered_names.discard(name)
         if not self._owns_schedule:
             self.stop()
             return
