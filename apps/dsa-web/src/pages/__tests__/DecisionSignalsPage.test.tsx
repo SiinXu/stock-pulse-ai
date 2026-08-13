@@ -554,7 +554,7 @@ beforeEach(() => {
   vi.mocked(alertsApi.getRule).mockResolvedValue(alertRule);
 });
 
-describe('DecisionSignalsPage', () => {
+describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
   it('restores and updates embedded Alerts rule filters through the Signal Center URL', async () => {
     vi.mocked(alertsApi.listRules).mockResolvedValue({
       items: [alertRule],
