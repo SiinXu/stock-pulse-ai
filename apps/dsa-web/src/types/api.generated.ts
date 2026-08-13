@@ -510,6 +510,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run portfolio-level analysis for a multi-symbol basket
+         * @description Analyze a list of symbols as one portfolio rather than stacking per-symbol conclusions. Returns correlation highlights, concentration/diversification, shared risk exposures, stance distribution from existing analyses, structural health, and an optional stress overlay. At most 20 symbols. Missing single-symbol price data degrades the result (status=partial) and never fails the whole request. Reuses the portfolio health and stress-test data planes via a synthetic equal/custom-weight snapshot — no separate holdings model.
+         */
+        post: operations["analyzePortfolioLevel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis/status/{task_id}": {
         parameters: {
             query?: never;
@@ -1260,6 +1280,77 @@ export interface paths {
          * @description 只更新合法状态和可选 metadata；省略 metadata 时保留原值，null 时清空调用方 metadata，object 时按整包替换调用方 metadata；两种替换都保持正式 decision_profile 身份和已持久化的 presentation report_language provenance，且不会从替换 metadata 提升正式值。expired/invalidated/closed/archived 等 terminal 状态不能直接 PATCH 回 active。
          */
         patch: operations["updateDecisionSignalStatus"];
+        trace?: never;
+    };
+    "/api/v1/discover/screen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run bounded AI candidate discovery
+         * @description Natural-language or criteria-driven candidate discovery over an explicit paginated universe. Quotes go through data_provider with a hard provider-call budget. Research screening only — not trade instructions.
+         */
+        post: operations["runCandidateDiscovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit bounded AI candidate discovery task */
+        post: operations["startCandidateDiscoveryTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get candidate discovery task status */
+        get: operations["getCandidateDiscoveryTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a running candidate discovery task */
+        post: operations["cancelCandidateDiscoveryTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/focus/today": {
@@ -5868,6 +5959,244 @@ export interface components {
             /** Total Tokens */
             total_tokens: number;
         };
+        /** CandidateDiscoveryCandidate */
+        CandidateDiscoveryCandidate: {
+            /** Amount */
+            amount?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Factor Scores */
+            factor_scores?: {
+                [key: string]: number;
+            };
+            /** Industry */
+            industry?: string | null;
+            /** Llm Thesis */
+            llm_thesis?: string | null;
+            /** Market */
+            market?: string | null;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Price */
+            price?: number | null;
+            /** Provider */
+            provider?: string | null;
+            /** Rank */
+            rank: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Reason Codes */
+            reason_codes?: string[];
+            /** Risk Level */
+            risk_level?: string | null;
+            /** Score */
+            score?: number | null;
+            /** Selection Source */
+            selection_source?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryCriteria */
+        CandidateDiscoveryCriteria: {
+            /**
+             * Exclude St
+             * @default true
+             */
+            exclude_st: boolean;
+            /** Keywords */
+            keywords?: string[];
+            /** Markets */
+            markets?: string[];
+            /** Max Change Pct */
+            max_change_pct?: number | null;
+            /** Min Amount */
+            min_amount?: number | null;
+            /** Min Change Pct */
+            min_change_pct?: number | null;
+        };
+        /** CandidateDiscoveryRequest */
+        CandidateDiscoveryRequest: {
+            /** Account Id */
+            account_id?: number | null;
+            /** Codes */
+            codes?: string[];
+            criteria?: components["schemas"]["CandidateDiscoveryCriteria"] | null;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Markets */
+            markets?: string[];
+            /**
+             * Max Provider Calls
+             * @default 20
+             */
+            max_provider_calls: number;
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 50
+             */
+            page_size: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /**
+             * Universe
+             * @description watchlist | portfolio | index | codes
+             * @default watchlist
+             */
+            universe: string;
+            /**
+             * Use Llm
+             * @default false
+             */
+            use_llm: boolean;
+        };
+        /** CandidateDiscoveryResponse */
+        CandidateDiscoveryResponse: {
+            /** Candidate Count */
+            candidate_count: number;
+            /** Candidates */
+            candidates?: components["schemas"]["CandidateDiscoveryCandidate"][];
+            /** Cost Contract */
+            cost_contract?: {
+                [key: string]: unknown;
+            };
+            /** Criteria */
+            criteria?: {
+                [key: string]: unknown;
+            };
+            /** Empty Message */
+            empty_message?: string | null;
+            /** Empty Reason */
+            empty_reason?: string | null;
+            /**
+             * Market
+             * @default cn
+             */
+            market: string;
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /** Pack Version */
+            pack_version: string;
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 50
+             */
+            page_size: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /**
+             * Research Disclaimer
+             * @default Research screening only. Not investment advice or trade instructions.
+             */
+            research_disclaimer: string;
+            /** Run Id */
+            run_id: string;
+            /** Status */
+            status: string;
+            /** Universe */
+            universe: string;
+            /** Universe Contract */
+            universe_contract?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryTaskAccepted */
+        CandidateDiscoveryTaskAccepted: {
+            /** Max Provider Calls */
+            max_provider_calls: number;
+            /** Max Results */
+            max_results: number;
+            /** Message */
+            message: string;
+            /**
+             * Message Code
+             * @default task.discovery.queued
+             */
+            message_code: string;
+            /** Message Params */
+            message_params?: {
+                [key: string]: unknown;
+            };
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string;
+            /** Trace Id */
+            trace_id: string;
+            /** Universe */
+            universe: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryTaskStatus */
+        CandidateDiscoveryTaskStatus: {
+            /** Error */
+            error?: string | null;
+            /** Message */
+            message?: string | null;
+            /** Message Code */
+            message_code?: string | null;
+            /** Message Params */
+            message_params?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Progress
+             * @default 0
+             */
+            progress: number;
+            result?: components["schemas"]["CandidateDiscoveryResponse"] | null;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string;
+            /** Trace Id */
+            trace_id?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /**
          * CapabilityListResponse
          * @description Versioned GET /api/v1/capabilities inventory snapshot.
@@ -6958,6 +7287,11 @@ export interface components {
             miss: number;
             /** Neutral */
             neutral: number;
+            /**
+             * Sample Sufficient
+             * @default false
+             */
+            sample_sufficient: boolean;
             /** Total */
             total: number;
             /** Unable */
@@ -6987,11 +7321,21 @@ export interface components {
             hit_rate_pct?: number | null;
             /** Horizons */
             horizons?: string[] | null;
+            /**
+             * Minimum Completed Sample Size
+             * @default 30
+             */
+            minimum_completed_sample_size: number;
             /** Miss */
             miss: number;
             /** Neutral */
             neutral: number;
             profile_calibration?: components["schemas"]["DecisionSignalProfileCalibration"] | null;
+            /**
+             * Sample Sufficient
+             * @default false
+             */
+            sample_sufficient: boolean;
             /** Statuses */
             statuses?: string[];
             /** Total */
@@ -8267,6 +8611,7 @@ export interface components {
             evaluation_dimensions?: components["schemas"]["InvestmentFrameworkEvaluationDimension"][];
             /** Free Form Rules */
             free_form_rules?: string | null;
+            research_stance?: components["schemas"]["ResearchStanceContent"] | null;
             /** Risk Rules */
             risk_rules?: string[];
             /** Root Node Id */
@@ -11454,6 +11799,288 @@ export interface components {
             /** Trade Uid */
             trade_uid?: string | null;
         };
+        /** PortfolioLevelAnalysisRequest */
+        PortfolioLevelAnalysisRequest: {
+            /**
+             * As Of
+             * @description As-of date for price history and synthetic snapshot; default today
+             */
+            as_of?: string | null;
+            /**
+             * Confidence
+             * @default 0.95
+             */
+            confidence: number;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency: string;
+            /**
+             * High Correlation Threshold
+             * @default 0.7
+             */
+            high_correlation_threshold: number;
+            /**
+             * Horizon Days
+             * @default 1
+             */
+            horizon_days: number;
+            /**
+             * Include Stress
+             * @description When true, overlay a deterministic stress scenario on the basket
+             * @default true
+             */
+            include_stress: boolean;
+            /**
+             * Lookback Trading Days
+             * @default 252
+             */
+            lookback_trading_days: number;
+            /**
+             * Scenario Id
+             * @default market_down_10
+             */
+            scenario_id: string;
+            /**
+             * Sector Map
+             * @description Optional caller-provided sector labels for shared-risk clustering
+             */
+            sector_map?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Stock Codes
+             * @description Symbols to analyze as one basket (1..20). Duplicates are rejected.
+             */
+            stock_codes: string[];
+            /**
+             * Weights
+             * @description Optional non-negative weights keyed by stock code. Usable symbols missing from the map receive an equal unit baseline, then all usable weights are renormalized to 1.0. Degraded (unpriced) symbols are excluded before weighting.
+             */
+            weights?: {
+                [key: string]: number;
+            } | null;
+        };
+        /** PortfolioLevelAnalysisResponse */
+        PortfolioLevelAnalysisResponse: {
+            /**
+             * Analysis Mode
+             * @constant
+             */
+            analysis_mode: "portfolio_level_basket";
+            /** Annotations */
+            annotations?: string[];
+            /** As Of */
+            as_of: string;
+            /** Assumptions */
+            assumptions?: {
+                [key: string]: unknown;
+            };
+            /** Calculated At */
+            calculated_at: string;
+            concentration: components["schemas"]["PortfolioConcentrationBlock"];
+            correlation: components["schemas"]["PortfolioCorrelationBlock"];
+            /** Correlation Highlights */
+            correlation_highlights?: components["schemas"]["PortfolioLevelCorrelationHighlight"][];
+            /** Currency */
+            currency: string;
+            /** Degraded Symbols */
+            degraded_symbols?: components["schemas"]["PortfolioLevelDegradedSymbol"][];
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "portfolio_level_analysis_v1";
+            health?: components["schemas"]["PortfolioLevelHealthBlock"];
+            /** Max Symbols */
+            max_symbols: number;
+            /** Requested Symbols */
+            requested_symbols: string[];
+            /** Risk History */
+            risk_history?: {
+                [key: string]: unknown;
+            };
+            /** Risk Metrics Status */
+            risk_metrics_status?: string | null;
+            /** Shared Risk Exposures */
+            shared_risk_exposures?: components["schemas"]["PortfolioLevelSharedRisk"][];
+            /**
+             * Snapshot Kind
+             * @constant
+             */
+            snapshot_kind: "synthetic_basket_v1";
+            stance_distribution: components["schemas"]["PortfolioLevelStanceDistribution"];
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            stress?: components["schemas"]["PortfolioLevelStressBlock"] | null;
+            /** Symbols Requested Count */
+            symbols_requested_count: number;
+            /** Symbols Used */
+            symbols_used?: string[];
+            /** Symbols Used Count */
+            symbols_used_count: number;
+            var: components["schemas"]["PortfolioHistoricalVaRBlock"];
+            /** Weighting Mode */
+            weighting_mode: string;
+            /** Weights */
+            weights?: components["schemas"]["PortfolioLevelWeightItem"][];
+        };
+        /** PortfolioLevelCorrelationHighlight */
+        PortfolioLevelCorrelationHighlight: {
+            /** Abs Correlation */
+            abs_correlation: number;
+            /** Correlation */
+            correlation: number;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "positive" | "negative";
+            /** Left */
+            left: string;
+            /** Right */
+            right: string;
+        };
+        /** PortfolioLevelDegradedSymbol */
+        PortfolioLevelDegradedSymbol: {
+            /** Detail */
+            detail?: string | null;
+            /** Reason */
+            reason: string;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /**
+         * PortfolioLevelHealthBlock
+         * @description Projected health payload; extra fields allowed for forward compatibility.
+         */
+        PortfolioLevelHealthBlock: {
+            /** Band */
+            band?: string | null;
+            /** Comparable */
+            comparable?: boolean | null;
+            /** Coverage Ratio */
+            coverage_ratio?: number | null;
+            /** Data Quality */
+            data_quality?: {
+                [key: string]: unknown;
+            } | null;
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: unknown;
+            } | null;
+            /** Disclaimer */
+            disclaimer?: string | null;
+            /** Effective Weights */
+            effective_weights?: {
+                [key: string]: unknown;
+            } | null;
+            /** Formula Version */
+            formula_version?: string | null;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            } | null;
+            /** Insights */
+            insights?: unknown[] | null;
+            /** Partial Score */
+            partial_score?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Status Message */
+            status_message?: string | null;
+            /** Unavailable Dimensions */
+            unavailable_dimensions?: string[] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** PortfolioLevelSharedRisk */
+        PortfolioLevelSharedRisk: {
+            /** Kind */
+            kind: string;
+            /** Rank */
+            rank?: number | null;
+            /** Sector */
+            sector?: string | null;
+            /** Size */
+            size?: number | null;
+            /** Summary */
+            summary: string;
+            /** Symbols */
+            symbols?: string[];
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+        };
+        /** PortfolioLevelStanceDistribution */
+        PortfolioLevelStanceDistribution: {
+            /** Average Score */
+            average_score?: number | null;
+            /** By Operation Advice */
+            by_operation_advice?: {
+                [key: string]: number;
+            };
+            /** Formula Version */
+            formula_version?: string | null;
+            /** Items */
+            items?: components["schemas"]["PortfolioLevelStanceItem"][];
+            /**
+             * Scored Count
+             * @default 0
+             */
+            scored_count: number;
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /**
+             * Unanalyzed Count
+             * @default 0
+             */
+            unanalyzed_count: number;
+        };
+        /** PortfolioLevelStanceItem */
+        PortfolioLevelStanceItem: {
+            /** Freshness */
+            freshness?: string | null;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Stock Code */
+            stock_code?: string | null;
+        };
+        /**
+         * PortfolioLevelStressBlock
+         * @description Stress overlay; reuses stress-test payload shape when available.
+         */
+        PortfolioLevelStressBlock: {
+            /** Scenario */
+            scenario?: {
+                [key: string]: unknown;
+            } | null;
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** PortfolioLevelWeightItem */
+        PortfolioLevelWeightItem: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
+        };
         /** PortfolioPositionAnalysisRequest */
         PortfolioPositionAnalysisRequest: {
             /**
@@ -12338,7 +12965,7 @@ export interface components {
              * @description 板块涨跌榜（结构 {top, bottom}）
              */
             sector_rankings?: unknown | null;
-            /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis */
+            /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, multi-strategy synthesis, and committee deliberation */
             structured_insights?: components["schemas"]["ReportStructuredInsights"] | null;
         };
         /**
@@ -12528,10 +13155,116 @@ export interface components {
             take_profit?: string | null;
         };
         /**
+         * ReportStructuredCommitteeConclusion
+         * @description Authoritative committee conclusion projected from strategy_synthesis.
+         */
+        ReportStructuredCommitteeConclusion: {
+            /** Confidence */
+            confidence?: number;
+            /** Conflict Count */
+            conflict_count?: number;
+            /** Conflict Severity */
+            conflict_severity?: string;
+            /** Consensus Level */
+            consensus_level?: string;
+            /** Final Signal */
+            final_signal?: string;
+            /** Weighted Score */
+            weighted_score?: number;
+        };
+        /**
+         * ReportStructuredCommitteeDeliberation
+         * @description Bounded Investment Committee deliberation for report consumers.
+         */
+        ReportStructuredCommitteeDeliberation: {
+            conclusion?: components["schemas"]["ReportStructuredCommitteeConclusion"];
+            /** Dissenting Opinions */
+            dissenting_opinions?: components["schemas"]["ReportStructuredCommitteeOpinion"][];
+            /** Divergence Points */
+            divergence_points?: components["schemas"]["ReportStructuredCommitteeDivergence"][];
+            /** Members */
+            members?: components["schemas"]["ReportStructuredCommitteeMember"][];
+            /** Mode */
+            mode?: string;
+            /** Outcome */
+            outcome?: string;
+            /** Personas Invalid */
+            personas_invalid?: string[];
+            /** Personas Truncated */
+            personas_truncated?: string[];
+            /** Schema Version */
+            schema_version?: string;
+            /** Source */
+            source?: string;
+            /** Status */
+            status?: string;
+            /** Supporting Opinions */
+            supporting_opinions?: components["schemas"]["ReportStructuredCommitteeOpinion"][];
+        };
+        /**
+         * ReportStructuredCommitteeDivergence
+         * @description Divergence point aligned with multi-strategy conflict / #1205 records.
+         */
+        ReportStructuredCommitteeDivergence: {
+            /** Kind */
+            kind?: string;
+            /** Participants */
+            participants?: string[];
+            /** Severity */
+            severity?: string;
+            /** Source */
+            source?: string;
+            /** Summary Key */
+            summary_key?: string;
+        };
+        /**
+         * ReportStructuredCommitteeMember
+         * @description One committee persona stance projected for report / Signal / History UI.
+         */
+        ReportStructuredCommitteeMember: {
+            /** Agent Name */
+            agent_name?: string;
+            /** Confidence */
+            confidence?: number;
+            /** Display Name */
+            display_name?: string;
+            /** Invalid */
+            invalid?: boolean;
+            /** Invalid Reason */
+            invalid_reason?: string;
+            /** Lens Verdict */
+            lens_verdict?: string;
+            /** Persona Id */
+            persona_id?: string;
+            /** Reasoning Excerpt */
+            reasoning_excerpt?: string;
+            /** Signal */
+            signal?: string;
+        };
+        /**
+         * ReportStructuredCommitteeOpinion
+         * @description Supporting or dissenting persona opinion from real synthesis rows.
+         */
+        ReportStructuredCommitteeOpinion: {
+            /** Agent Name */
+            agent_name?: string;
+            /** Confidence */
+            confidence?: number;
+            /** Display Name */
+            display_name?: string;
+            /** Persona Id */
+            persona_id?: string;
+            /** Reasoning Excerpt */
+            reasoning_excerpt?: string;
+            /** Signal */
+            signal?: string;
+        };
+        /**
          * ReportStructuredInsights
          * @description Versioned structured-insight projection returned by report APIs.
          */
         ReportStructuredInsights: {
+            committee_deliberation?: components["schemas"]["ReportStructuredCommitteeDeliberation"];
             phase_decision?: components["schemas"]["ReportStructuredPhaseDecision"];
             /**
              * Schema Version
@@ -13062,6 +13795,18 @@ export interface components {
             notify: boolean;
             /** Stock Code */
             stock_code: string;
+        };
+        /**
+         * ResearchStanceContent
+         * @description Optional research-tone stance on the personal investment framework.
+         */
+        ResearchStanceContent: {
+            /** Custom Text */
+            custom_text?: string | null;
+            /** Preferred Lens Skill Ids */
+            preferred_lens_skill_ids?: ("persona_value_moat" | "persona_mental_models" | "persona_contrarian_deep_value" | "persona_disruptive_growth" | "persona_tail_risk")[];
+            /** Preset Id */
+            preset_id?: ("rational_analyst" | "risk_guardian" | "long_term_compounder") | null;
         };
         /**
          * RollbackSystemConfigRequest
@@ -18033,6 +18778,57 @@ export interface operations {
             };
         };
     };
+    analyzePortfolioLevel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioLevelAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioLevelAnalysisResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Portfolio-level analysis failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_analysis_status_api_v1_analysis_status__task_id__get: {
         parameters: {
             query?: never;
@@ -20386,6 +21182,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    runCandidateDiscovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    startCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskAccepted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskStatus"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancelCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskStatus"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

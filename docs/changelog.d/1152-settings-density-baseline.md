@@ -1,0 +1,1 @@
+- [Fixed] Align settings section card spacing with the shared surface density contract.

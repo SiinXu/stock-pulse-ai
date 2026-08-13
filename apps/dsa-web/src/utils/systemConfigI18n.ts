@@ -1,6 +1,7 @@
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
+import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
 
 const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
@@ -57,6 +58,7 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
 });
 
 const fieldTitleMapZh = {
+  ...REFLECTION_FIELD_TITLE_MAP_ZH,
   STOCK_LIST: '自选股列表',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API 地址',
@@ -257,12 +259,6 @@ const fieldTitleMapZh = {
   SKILL_OPINION_RECORDING_ENABLED: '技能观点样本记录',
   SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED: '技能观点后验加权',
   DECISION_PROFILE_CALIBRATION_ENABLED: '决策风格后验校准',
-  AGENT_CRITIC_ENABLED: '有界 Multi-Agent Critic',
-  AGENT_STEP_CRITIQUE_ENABLED: '步骤批评',
-  AGENT_REFLECTION_ENABLED: '反思',
-  AGENT_REFLECTION_LLM_BUDGET: '反思 LLM 预算',
-  AGENT_META_REVIEW_ENABLED: '元审查',
-  AGENT_META_REVIEW_MIN_EPISODES: '元审查样本',
   AGENT_MULTI_STRATEGY_DELIBERATION: '多策略合议',
   AGENT_RISK_OVERRIDE: '风控 Agent 否决',
   RISK_GATE_PROFILE: '风控经理档位',
@@ -354,6 +350,8 @@ const fieldTitleMapZh = {
   ANTHROPIC_TEMPERATURE: 'Anthropic 温度参数',
   ANTHROPIC_MAX_TOKENS: 'Anthropic 最大输出 Token 数',
   AGENT_INVESTMENT_COMMITTEE_MODE: '投委会模式',
+  AGENT_RESEARCH_PERSONA: '研究立场预设',
+  AGENT_RESEARCH_PERSONA_CUSTOM: '自定义研究立场',
   FEISHU_CHAT_ID: '飞书会话 ID',
   FEISHU_RECEIVE_ID_TYPE: '飞书接收 ID 类型',
   FEISHU_DOMAIN: '飞书 API 域名',
@@ -441,6 +439,7 @@ type SystemConfigFieldTitleKey = keyof typeof fieldTitleMapZh;
 // the translation source inventory, while the Settings UI still prefers the
 // live backend schema title when the selected UI language is English.
 const fieldTitleMapEn = {
+  ...REFLECTION_FIELD_TITLE_MAP_EN,
   STOCK_LIST: 'Stock List',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API URL',
@@ -641,12 +640,6 @@ const fieldTitleMapEn = {
   SKILL_OPINION_RECORDING_ENABLED: 'Skill Opinion Recording',
   SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED: 'Skill Opinion Outcome Weights',
   DECISION_PROFILE_CALIBRATION_ENABLED: 'Decision Profile Outcome Calibration',
-  AGENT_CRITIC_ENABLED: 'Bounded Multi-Agent Critic',
-  AGENT_STEP_CRITIQUE_ENABLED: 'Immediate Step Critique',
-  AGENT_REFLECTION_ENABLED: 'Trajectory Reflection',
-  AGENT_REFLECTION_LLM_BUDGET: 'Trajectory Reflection LLM Budget',
-  AGENT_META_REVIEW_ENABLED: 'Cross-run Meta Review',
-  AGENT_META_REVIEW_MIN_EPISODES: 'Meta Review Sample Threshold',
   AGENT_MULTI_STRATEGY_DELIBERATION: 'Multi-Strategy Deliberation',
   AGENT_RISK_OVERRIDE: 'Risk Agent Override',
   RISK_GATE_PROFILE: 'Risk Manager Profile',
@@ -738,6 +731,8 @@ const fieldTitleMapEn = {
   ANTHROPIC_TEMPERATURE: 'Anthropic Temperature',
   ANTHROPIC_MAX_TOKENS: 'Anthropic Max Tokens',
   AGENT_INVESTMENT_COMMITTEE_MODE: 'Investment Committee Mode',
+  AGENT_RESEARCH_PERSONA: 'Research Persona Preset',
+  AGENT_RESEARCH_PERSONA_CUSTOM: 'Custom Research Stance',
   FEISHU_CHAT_ID: 'Feishu Chat ID',
   FEISHU_RECEIVE_ID_TYPE: 'Feishu Receive ID Type',
   FEISHU_DOMAIN: 'Feishu Domain',

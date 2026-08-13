@@ -5339,6 +5339,575 @@
         "title": "CallTypeBreakdown",
         "type": "object"
       },
+      "CandidateDiscoveryCandidate": {
+        "additionalProperties": true,
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "factor_scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Factor Scores",
+            "type": "object"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "llm_thesis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Thesis"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "selection_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Source"
+          }
+        },
+        "required": [
+          "rank",
+          "code"
+        ],
+        "title": "CandidateDiscoveryCandidate",
+        "type": "object"
+      },
+      "CandidateDiscoveryCriteria": {
+        "properties": {
+          "exclude_st": {
+            "default": true,
+            "title": "Exclude St",
+            "type": "boolean"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "max_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Change Pct"
+          },
+          "min_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Amount"
+          },
+          "min_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Change Pct"
+          }
+        },
+        "title": "CandidateDiscoveryCriteria",
+        "type": "object"
+      },
+      "CandidateDiscoveryRequest": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Codes",
+            "type": "array"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateDiscoveryCriteria"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "default": "en",
+            "pattern": "^(en|zh)$",
+            "title": "Language",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "max_provider_calls": {
+            "default": 20,
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Max Provider Calls",
+            "type": "integer"
+          },
+          "max_results": {
+            "default": 10,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "page": {
+            "default": 1,
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 50,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "query": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Query",
+            "type": "string"
+          },
+          "universe": {
+            "default": "watchlist",
+            "description": "watchlist | portfolio | index | codes",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Universe",
+            "type": "string"
+          },
+          "use_llm": {
+            "default": false,
+            "title": "Use Llm",
+            "type": "boolean"
+          }
+        },
+        "title": "CandidateDiscoveryRequest",
+        "type": "object"
+      },
+      "CandidateDiscoveryResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "candidate_count": {
+            "title": "Candidate Count",
+            "type": "integer"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateDiscoveryCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "cost_contract": {
+            "additionalProperties": true,
+            "title": "Cost Contract",
+            "type": "object"
+          },
+          "criteria": {
+            "additionalProperties": true,
+            "title": "Criteria",
+            "type": "object"
+          },
+          "empty_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Message"
+          },
+          "empty_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Reason"
+          },
+          "market": {
+            "default": "cn",
+            "title": "Market",
+            "type": "string"
+          },
+          "max_results": {
+            "default": 10,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "pack_version": {
+            "title": "Pack Version",
+            "type": "string"
+          },
+          "page": {
+            "default": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 50,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "research_disclaimer": {
+            "default": "Research screening only. Not investment advice or trade instructions.",
+            "title": "Research Disclaimer",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "universe": {
+            "title": "Universe",
+            "type": "string"
+          },
+          "universe_contract": {
+            "additionalProperties": true,
+            "title": "Universe Contract",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pack_version",
+          "run_id",
+          "status",
+          "universe",
+          "candidate_count"
+        ],
+        "title": "CandidateDiscoveryResponse",
+        "type": "object"
+      },
+      "CandidateDiscoveryTaskAccepted": {
+        "additionalProperties": true,
+        "properties": {
+          "max_provider_calls": {
+            "title": "Max Provider Calls",
+            "type": "integer"
+          },
+          "max_results": {
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "message_code": {
+            "default": "task.discovery.queued",
+            "title": "Message Code",
+            "type": "string"
+          },
+          "message_params": {
+            "additionalProperties": true,
+            "title": "Message Params",
+            "type": "object"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "universe": {
+            "title": "Universe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "trace_id",
+          "status",
+          "message",
+          "universe",
+          "page",
+          "page_size",
+          "max_results",
+          "max_provider_calls"
+        ],
+        "title": "CandidateDiscoveryTaskAccepted",
+        "type": "object"
+      },
+      "CandidateDiscoveryTaskStatus": {
+        "additionalProperties": true,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "message_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Code"
+          },
+          "message_params": {
+            "additionalProperties": true,
+            "title": "Message Params",
+            "type": "object"
+          },
+          "progress": {
+            "default": 0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateDiscoveryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "task_id",
+          "status"
+        ],
+        "title": "CandidateDiscoveryTaskStatus",
+        "type": "object"
+      },
       "CapabilityListResponse": {
         "additionalProperties": false,
         "description": "Versioned GET /api/v1/capabilities inventory snapshot.",
@@ -8561,6 +9130,11 @@
             "title": "Neutral",
             "type": "integer"
           },
+          "sample_sufficient": {
+            "default": false,
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
           "total": {
             "title": "Total",
             "type": "integer"
@@ -8654,6 +9228,12 @@
             ],
             "title": "Horizons"
           },
+          "minimum_completed_sample_size": {
+            "default": 30,
+            "minimum": 1.0,
+            "title": "Minimum Completed Sample Size",
+            "type": "integer"
+          },
           "miss": {
             "title": "Miss",
             "type": "integer"
@@ -8671,6 +9251,11 @@
                 "type": "null"
               }
             ]
+          },
+          "sample_sufficient": {
+            "default": false,
+            "title": "Sample Sufficient",
+            "type": "boolean"
           },
           "statuses": {
             "items": {
@@ -11861,6 +12446,16 @@
               }
             ],
             "title": "Free Form Rules"
+          },
+          "research_stance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchStanceContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "risk_rules": {
             "items": {
@@ -19721,6 +20316,875 @@
         "title": "PortfolioImportTradeItem",
         "type": "object"
       },
+      "PortfolioLevelAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As-of date for price history and synthetic snapshot; default today",
+            "title": "As Of"
+          },
+          "confidence": {
+            "default": 0.95,
+            "exclusiveMaximum": 1.0,
+            "exclusiveMinimum": 0.5,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "currency": {
+            "default": "CNY",
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Currency",
+            "type": "string"
+          },
+          "high_correlation_threshold": {
+            "default": 0.7,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "High Correlation Threshold",
+            "type": "number"
+          },
+          "horizon_days": {
+            "default": 1,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Horizon Days",
+            "type": "integer"
+          },
+          "include_stress": {
+            "default": true,
+            "description": "When true, overlay a deterministic stress scenario on the basket",
+            "title": "Include Stress",
+            "type": "boolean"
+          },
+          "lookback_trading_days": {
+            "default": 252,
+            "maximum": 1000.0,
+            "minimum": 60.0,
+            "title": "Lookback Trading Days",
+            "type": "integer"
+          },
+          "scenario_id": {
+            "default": "market_down_10",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Scenario Id",
+            "type": "string"
+          },
+          "sector_map": {
+            "anyOf": [
+              {
+                "patternProperties": {
+                  "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "propertyNames": {
+                  "maxLength": 16,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional caller-provided sector labels for shared-risk clustering",
+            "title": "Sector Map"
+          },
+          "stock_codes": {
+            "description": "Symbols to analyze as one basket (1..20). Duplicates are rejected.",
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Stock Codes",
+            "type": "array"
+          },
+          "weights": {
+            "anyOf": [
+              {
+                "patternProperties": {
+                  "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$": {
+                    "type": "number"
+                  }
+                },
+                "propertyNames": {
+                  "maxLength": 16,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional non-negative weights keyed by stock code. Usable symbols missing from the map receive an equal unit baseline, then all usable weights are renormalized to 1.0. Degraded (unpriced) symbols are excluded before weighting.",
+            "title": "Weights"
+          }
+        },
+        "required": [
+          "stock_codes"
+        ],
+        "title": "PortfolioLevelAnalysisRequest",
+        "type": "object"
+      },
+      "PortfolioLevelAnalysisResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_mode": {
+            "const": "portfolio_level_basket",
+            "title": "Analysis Mode",
+            "type": "string"
+          },
+          "annotations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Annotations",
+            "type": "array"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "additionalProperties": true,
+            "title": "Assumptions",
+            "type": "object"
+          },
+          "calculated_at": {
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/PortfolioConcentrationBlock"
+          },
+          "correlation": {
+            "$ref": "#/components/schemas/PortfolioCorrelationBlock"
+          },
+          "correlation_highlights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelCorrelationHighlight"
+            },
+            "maxItems": 32,
+            "title": "Correlation Highlights",
+            "type": "array"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "degraded_symbols": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelDegradedSymbol"
+            },
+            "maxItems": 20,
+            "title": "Degraded Symbols",
+            "type": "array"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "formula_version": {
+            "const": "portfolio_level_analysis_v1",
+            "title": "Formula Version",
+            "type": "string"
+          },
+          "health": {
+            "$ref": "#/components/schemas/PortfolioLevelHealthBlock"
+          },
+          "max_symbols": {
+            "minimum": 1.0,
+            "title": "Max Symbols",
+            "type": "integer"
+          },
+          "requested_symbols": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Requested Symbols",
+            "type": "array"
+          },
+          "risk_history": {
+            "additionalProperties": true,
+            "title": "Risk History",
+            "type": "object"
+          },
+          "risk_metrics_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Metrics Status"
+          },
+          "shared_risk_exposures": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelSharedRisk"
+            },
+            "maxItems": 32,
+            "title": "Shared Risk Exposures",
+            "type": "array"
+          },
+          "snapshot_kind": {
+            "const": "synthetic_basket_v1",
+            "title": "Snapshot Kind",
+            "type": "string"
+          },
+          "stance_distribution": {
+            "$ref": "#/components/schemas/PortfolioLevelStanceDistribution"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "stress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioLevelStressBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbols_requested_count": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Symbols Requested Count",
+            "type": "integer"
+          },
+          "symbols_used": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Symbols Used",
+            "type": "array"
+          },
+          "symbols_used_count": {
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Symbols Used Count",
+            "type": "integer"
+          },
+          "var": {
+            "$ref": "#/components/schemas/PortfolioHistoricalVaRBlock"
+          },
+          "weighting_mode": {
+            "title": "Weighting Mode",
+            "type": "string"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelWeightItem"
+            },
+            "maxItems": 20,
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "formula_version",
+          "analysis_mode",
+          "snapshot_kind",
+          "as_of",
+          "currency",
+          "status",
+          "disclaimer",
+          "requested_symbols",
+          "symbols_requested_count",
+          "symbols_used_count",
+          "max_symbols",
+          "weighting_mode",
+          "correlation",
+          "concentration",
+          "var",
+          "stance_distribution",
+          "calculated_at"
+        ],
+        "title": "PortfolioLevelAnalysisResponse",
+        "type": "object"
+      },
+      "PortfolioLevelCorrelationHighlight": {
+        "additionalProperties": false,
+        "properties": {
+          "abs_correlation": {
+            "title": "Abs Correlation",
+            "type": "number"
+          },
+          "correlation": {
+            "title": "Correlation",
+            "type": "number"
+          },
+          "direction": {
+            "enum": [
+              "positive",
+              "negative"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "left": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Left",
+            "type": "string"
+          },
+          "right": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Right",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left",
+          "right",
+          "correlation",
+          "abs_correlation",
+          "direction"
+        ],
+        "title": "PortfolioLevelCorrelationHighlight",
+        "type": "object"
+      },
+      "PortfolioLevelDegradedSymbol": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "reason": {
+            "maxLength": 64,
+            "title": "Reason",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "reason"
+        ],
+        "title": "PortfolioLevelDegradedSymbol",
+        "type": "object"
+      },
+      "PortfolioLevelHealthBlock": {
+        "additionalProperties": true,
+        "description": "Projected health payload; extra fields allowed for forward compatibility.",
+        "properties": {
+          "band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "comparable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparable"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio"
+          },
+          "data_quality": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Quality"
+          },
+          "dimensions": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimensions"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "effective_weights": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Weights"
+          },
+          "formula_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula Version"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs"
+          },
+          "insights": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insights"
+          },
+          "partial_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partial Score"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unavailable_dimensions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Dimensions"
+          }
+        },
+        "title": "PortfolioLevelHealthBlock",
+        "type": "object"
+      },
+      "PortfolioLevelSharedRisk": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "maxLength": 64,
+            "title": "Kind",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "summary": {
+            "maxLength": 512,
+            "title": "Summary",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "maxLength": 16,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Symbols",
+            "type": "array"
+          },
+          "top_weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Pct"
+          }
+        },
+        "required": [
+          "kind",
+          "summary"
+        ],
+        "title": "PortfolioLevelSharedRisk",
+        "type": "object"
+      },
+      "PortfolioLevelStanceDistribution": {
+        "additionalProperties": false,
+        "properties": {
+          "average_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Score"
+          },
+          "by_operation_advice": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Operation Advice",
+            "type": "object"
+          },
+          "formula_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula Version"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLevelStanceItem"
+            },
+            "maxItems": 20,
+            "title": "Items",
+            "type": "array"
+          },
+          "scored_count": {
+            "default": 0,
+            "title": "Scored Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "unanalyzed_count": {
+            "default": 0,
+            "title": "Unanalyzed Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioLevelStanceDistribution",
+        "type": "object"
+      },
+      "PortfolioLevelStanceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          }
+        },
+        "title": "PortfolioLevelStanceItem",
+        "type": "object"
+      },
+      "PortfolioLevelStressBlock": {
+        "additionalProperties": true,
+        "description": "Stress overlay; reuses stress-test payload shape when available.",
+        "properties": {
+          "scenario": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioLevelStressBlock",
+        "type": "object"
+      },
+      "PortfolioLevelWeightItem": {
+        "additionalProperties": false,
+        "properties": {
+          "symbol": {
+            "maxLength": 16,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9^][A-Za-z0-9.^_-]{0,15}$",
+            "title": "Symbol",
+            "type": "string"
+          },
+          "weight_pct": {
+            "title": "Weight Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "weight_pct"
+        ],
+        "title": "PortfolioLevelWeightItem",
+        "type": "object"
+      },
       "PortfolioPositionAnalysisRequest": {
         "properties": {
           "account_id": {
@@ -22349,7 +23813,7 @@
                 "type": "null"
               }
             ],
-            "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis"
+            "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, multi-strategy synthesis, and committee deliberation"
           }
         },
         "title": "ReportDetails",
@@ -22798,9 +24262,254 @@
         "title": "ReportStrategy",
         "type": "object"
       },
+      "ReportStructuredCommitteeConclusion": {
+        "description": "Authoritative committee conclusion projected from strategy_synthesis.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "conflict_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Conflict Count"
+          },
+          "conflict_severity": {
+            "title": "Conflict Severity",
+            "type": "string"
+          },
+          "consensus_level": {
+            "title": "Consensus Level",
+            "type": "string"
+          },
+          "final_signal": {
+            "title": "Final Signal",
+            "type": "string"
+          },
+          "weighted_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Weighted Score"
+          }
+        },
+        "title": "ReportStructuredCommitteeConclusion",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDeliberation": {
+        "description": "Bounded Investment Committee deliberation for report consumers.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeConclusion"
+          },
+          "dissenting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Dissenting Opinions",
+            "type": "array"
+          },
+          "divergence_points": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeDivergence"
+            },
+            "title": "Divergence Points",
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeMember"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "personas_invalid": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Invalid",
+            "type": "array"
+          },
+          "personas_truncated": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Personas Truncated",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "supporting_opinions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredCommitteeOpinion"
+            },
+            "title": "Supporting Opinions",
+            "type": "array"
+          }
+        },
+        "title": "ReportStructuredCommitteeDeliberation",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeDivergence": {
+        "description": "Divergence point aligned with multi-strategy conflict / #1205 records.",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "summary_key": {
+            "title": "Summary Key",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeDivergence",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeMember": {
+        "description": "One committee persona stance projected for report / Signal / History UI.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "invalid": {
+            "title": "Invalid",
+            "type": "boolean"
+          },
+          "invalid_reason": {
+            "title": "Invalid Reason",
+            "type": "string"
+          },
+          "lens_verdict": {
+            "title": "Lens Verdict",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeMember",
+        "type": "object"
+      },
+      "ReportStructuredCommitteeOpinion": {
+        "description": "Supporting or dissenting persona opinion from real synthesis rows.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "reasoning_excerpt": {
+            "title": "Reasoning Excerpt",
+            "type": "string"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "title": "ReportStructuredCommitteeOpinion",
+        "type": "object"
+      },
       "ReportStructuredInsights": {
         "description": "Versioned structured-insight projection returned by report APIs.",
         "properties": {
+          "committee_deliberation": {
+            "$ref": "#/components/schemas/ReportStructuredCommitteeDeliberation"
+          },
           "phase_decision": {
             "$ref": "#/components/schemas/ReportStructuredPhaseDecision"
           },
@@ -24115,6 +25824,58 @@
           "stock_code"
         ],
         "title": "ResearchScheduledPayload",
+        "type": "object"
+      },
+      "ResearchStanceContent": {
+        "additionalProperties": false,
+        "description": "Optional research-tone stance on the personal investment framework.",
+        "properties": {
+          "custom_text": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Text"
+          },
+          "preferred_lens_skill_ids": {
+            "items": {
+              "enum": [
+                "persona_value_moat",
+                "persona_mental_models",
+                "persona_contrarian_deep_value",
+                "persona_disruptive_growth",
+                "persona_tail_risk"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "title": "Preferred Lens Skill Ids",
+            "type": "array"
+          },
+          "preset_id": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rational_analyst",
+                  "risk_guardian",
+                  "long_term_compounder"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Id"
+          }
+        },
+        "title": "ResearchStanceContent",
         "type": "object"
       },
       "RollbackSystemConfigRequest": {
@@ -35075,6 +36836,68 @@
         ]
       }
     },
+    "/api/v1/analysis/portfolio": {
+      "post": {
+        "description": "Analyze a list of symbols as one portfolio rather than stacking per-symbol conclusions. Returns correlation highlights, concentration/diversification, shared risk exposures, stance distribution from existing analyses, structural health, and an optional stress overlay. At most 20 symbols. Missing single-symbol price data degrades the result (status=partial) and never fails the whole request. Reuses the portfolio health and stress-test data planes via a synthetic equal/custom-weight snapshot — no separate holdings model.",
+        "operationId": "analyzePortfolioLevel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioLevelAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioLevelAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portfolio-level analysis failed"
+          }
+        },
+        "summary": "Run portfolio-level analysis for a multi-symbol basket",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
     "/api/v1/analysis/status/{task_id}": {
       "get": {
         "description": "根据 task_id 查询单个任务的状态",
@@ -38796,6 +40619,213 @@
         "summary": "更新决策信号状态",
         "tags": [
           "DecisionSignals"
+        ]
+      }
+    },
+    "/api/v1/discover/screen": {
+      "post": {
+        "description": "Natural-language or criteria-driven candidate discovery over an explicit paginated universe. Quotes go through data_provider with a hard provider-call budget. Research screening only — not trade instructions.",
+        "operationId": "runCandidateDiscovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateDiscoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Run bounded AI candidate discovery",
+        "tags": [
+          "CandidateDiscovery"
+        ]
+      }
+    },
+    "/api/v1/discover/screen/tasks": {
+      "post": {
+        "operationId": "startCandidateDiscoveryTask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateDiscoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryTaskAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Submit bounded AI candidate discovery task",
+        "tags": [
+          "CandidateDiscovery"
+        ]
+      }
+    },
+    "/api/v1/discover/screen/tasks/{task_id}": {
+      "get": {
+        "operationId": "getCandidateDiscoveryTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get candidate discovery task status",
+        "tags": [
+          "CandidateDiscovery"
+        ]
+      }
+    },
+    "/api/v1/discover/screen/tasks/{task_id}/cancel": {
+      "post": {
+        "operationId": "cancelCandidateDiscoveryTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDiscoveryTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel a running candidate discovery task",
+        "tags": [
+          "CandidateDiscovery"
         ]
       }
     },

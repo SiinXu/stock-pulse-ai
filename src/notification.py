@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 import threading as _threading
 import time
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
@@ -34,6 +33,10 @@ from src.notification_routing import (
     split_notification_route_channels,
 )
 from src.notification_contracts import is_feishu_static_configured
+from src.notification_parts.contracts import (
+    ChannelAttemptResult,
+    NotificationDispatchResult,
+)
 from src.notification_noise import (
     NotificationNoiseDecision,
     evaluate_notification_noise,
@@ -41,6 +44,7 @@ from src.notification_noise import (
     release_notification_noise,
 )
 from src.report_language import (
+    append_committee_deliberation_lines as _append_committee_deliberation_lines,
     format_strategy_skill_items,
     get_localized_stock_name,
     get_report_labels,
@@ -232,6 +236,23 @@ def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, 
     lines.append("")
 
 
+def _append_committee_deliberation_block(
+    lines: List[str],
+    committee: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    compact: bool = False,
+) -> None:
+    """Append the Investment Committee block from the real deliberation payload."""
+    _append_committee_deliberation_lines(
+        lines,
+        committee,
+        labels,
+        report_language,
+        compact=compact,
+    )
+
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
 
@@ -286,29 +307,6 @@ class NotificationChannel(Enum):
     SLACK = "slack"        # Slack
     ASTRBOT = "astrbot"
     UNKNOWN = "unknown"    # Unknown.
-
-
-@dataclass
-class ChannelAttemptResult:
-    """One static notification channel send attempt."""
-
-    channel: str
-    success: bool
-    error_code: Optional[str] = None
-    retryable: bool = False
-    latency_ms: Optional[int] = None
-    diagnostics: Optional[str] = None
-
-
-@dataclass
-class NotificationDispatchResult:
-    """Structured result for notification dispatch diagnostics."""
-
-    dispatched: bool
-    success: bool
-    status: str
-    channel_results: List[ChannelAttemptResult] = field(default_factory=list)
-    message: Optional[str] = None
 
 
 class ChannelDetector:
@@ -404,6 +402,10 @@ class NotificationService(
         self._request_context = request_context
         self._context_channels: List[str] = []
         self._notification_channel_registry = notification_channel_registry
+        # Latest structured multi-channel result for post-send query. Last-writer
+        # wins if the same service instance is shared across concurrent sends;
+        # prefer the return value of send_with_results() under concurrency.
+        self._last_dispatch_result: Optional[NotificationDispatchResult] = None
 
         # Markdown Convert to image(Issue #289)
         self._markdown_to_image_channels = set(
@@ -546,6 +548,7 @@ class NotificationService(
     _send_to_plugin_channel = None
     send_with_results = None
     _send_with_results_under_lease = None
+    get_last_dispatch_result = None
     send = None
     save_report_to_file = None
     save_and_send_feishu_file = None

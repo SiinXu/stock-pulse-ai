@@ -1,6 +1,8 @@
 import type { SettingsHelpMap } from './settingsHelpTypes';
+import { REFLECTION_SETTINGS_HELP_ZH } from '../i18n/reflectionSettingsCopy';
 
 const settingsHelpZhCN: SettingsHelpMap = {
+  ...REFLECTION_SETTINGS_HELP_ZH,
   'settings.base.STOCK_LIST': {
     title: '自选股列表',
     summary: '配置需要分析的股票代码列表，是手动分析、定时任务和通知报告的基础输入。',
@@ -1444,21 +1446,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
     notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
   },
-  'settings.agent.AGENT_CRITIC_ENABLED': {
-    title: '有界 Multi-Agent Critic',
-    summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
-    usage: '仅在运行预算能够承担额外 Critic 调用及可能的一次白名单阶段重试时开启。',
-    valueNotes: [
-      '默认关闭；Single 与 Chat 行为不变。',
-      '重试只能指向已经进入过的 intelligence 或目录中存在的 skill 阶段。',
-    ],
-    impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
-    notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
-  },
-  'settings.agent.multi_level_reflection': {
-    title: '多层反思',
-    summary: '控制步骤、运行与离线反思。',
-  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
@@ -2240,6 +2227,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['关闭时保持既有单路径分析行为。'],
     impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
     notes: ['需要 Agent multi 能力。'],
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: '研究立场预设',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: '自定义研究立场',
   },
 
 

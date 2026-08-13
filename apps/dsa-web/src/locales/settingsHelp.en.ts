@@ -1,6 +1,8 @@
 import type { SettingsHelpMap } from './settingsHelpTypes';
+import { REFLECTION_SETTINGS_HELP_EN } from '../i18n/reflectionSettingsCopy';
 
 const settingsHelpEnUS: SettingsHelpMap = {
+  ...REFLECTION_SETTINGS_HELP_EN,
   'settings.base.STOCK_LIST': {
     title: 'Watchlist',
     summary: 'Defines the stock codes used by analysis jobs and notification reports.',
@@ -1382,6 +1384,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects agent orchestration depth and report committee sections.'],
     notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
   },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: 'Research Persona Preset',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: 'Custom Research Stance',
+  },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
     summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
@@ -1414,21 +1422,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Every estimate includes assumptions and a sensitivity range; missing fundamentals return insufficient_fundamentals rather than a fabricated number.',
       'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
     ],
-  },
-  'settings.agent.AGENT_CRITIC_ENABLED': {
-    title: 'Bounded Multi-Agent Critic',
-    summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
-    usage: 'Enable only when the extra Critic call and a possible single whitelist-stage retry fit the run budget.',
-    valueNotes: [
-      'Disabled by default; Single and Chat behavior is unchanged.',
-      'A retry can target only an already-entered intelligence or catalog-backed skill stage.',
-    ],
-    impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
-    notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
-  },
-  'settings.agent.multi_level_reflection': {
-    title: 'Multi-Level Reflection',
-    summary: 'Step, run, and offline reflection controls.',
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',

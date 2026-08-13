@@ -171,10 +171,42 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
 
         market_review_module.run_market_review.assert_not_called()
         runtime_module.build_market_review_runtime.assert_not_called()
-        notify_notifier.send.assert_called_once()
-        sent = notify_notifier.send.call_args.args[0]
+        notify_notifier.send_with_results.assert_called_once()
+        sent = notify_notifier.send_with_results.call_args.args[0]
         self.assertIn("休市", sent)
-        self.assertEqual(notify_notifier.send.call_args.kwargs["route_type"], "report")
+        self.assertEqual(
+            notify_notifier.send_with_results.call_args.kwargs["route_type"],
+            "report",
+        )
+
+    def test_closed_market_partial_dispatch_is_logged_without_running_review(self) -> None:
+        """A failed channel is observable and does not restart the skipped review."""
+        message = _make_message()
+        config, _, _, _, market_review_module, runtime_module, notify_notifier = (
+            self._patch_dependencies(
+                market_review_region="cn",
+                open_markets=set(),
+            )
+        )
+        notify_notifier.send_with_results.return_value = SimpleNamespace(
+            status="partial_failed",
+            channel_summaries=lambda: [
+                {"channel": "email", "ok": False, "error": "send_failed"},
+                {"channel": "webhook", "ok": True, "error": None},
+            ],
+        )
+
+        cmd = MarketCommand()
+        with self.assertLogs("bot.commands.market", level="WARNING") as logs:
+            cmd._run_market_review(
+                to_analysis_request_context(message),
+                config,
+                None,
+            )
+
+        market_review_module.run_market_review.assert_not_called()
+        runtime_module.build_market_review_runtime.assert_not_called()
+        self.assertTrue(any("partial_failed" in line for line in logs.output))
 
     def test_trading_day_check_disabled_does_not_pass_override(self) -> None:
         """When TRADING_DAY_CHECK_ENABLED=false, override_region stays None."""

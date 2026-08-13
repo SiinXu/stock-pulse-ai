@@ -17,6 +17,8 @@ from pydantic import (
 )
 from pydantic_core import InitErrorDetails, PydanticCustomError
 
+from src.schemas.investor_persona import ResearchStanceContent
+
 
 INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION: Literal[
     "investment-framework-content-v1"
@@ -340,6 +342,7 @@ class InvestmentFrameworkContent(BaseModel):
             StringConstraints(strip_whitespace=True, min_length=1, max_length=10000),
         ]
     ] = None
+    research_stance: Optional[ResearchStanceContent] = None
 
     model_config = ConfigDict(
         extra="forbid",
@@ -372,6 +375,7 @@ class InvestmentFrameworkContent(BaseModel):
                 self.risk_rules,
                 self.tracking_criteria,
                 self.free_form_rules,
+                self.research_stance,
             )
         ):
             add_error(

@@ -217,6 +217,35 @@ def test_reflection_boundaries_are_explicit_for_zero_lessons_and_revision_cap() 
     assert revision_calls == 1
     assert [name for name, _payload in events].count("reflect_revise") == 1
 
+    capped_calls = 0
+    capped_events = []
+
+    def exhaust_revision_cap(_ctx, _lessons):
+        nonlocal capped_calls
+        capped_calls += 1
+        return False
+
+    capped = run_reflection_loop(
+        _Ctx(run_id="run-cap-exhausted"),
+        config=config,
+        llm_complete=lambda _system, _user: json.dumps(
+            {
+                "lessons": [{"kind": "evidence_gap", "severity": "medium"}],
+                "revised": False,
+            }
+        ),
+        revise_fn=exhaust_revision_cap,
+        budget=LlmCallBudget(total=1),
+        max_revise=1,
+        event_sink=lambda name, payload: capped_events.append((name, payload)),
+    )
+
+    assert capped.status == "completed"
+    assert capped.terminate_reason == "ok"
+    assert capped.revised is False
+    assert capped_calls == 1
+    assert [name for name, _payload in capped_events].count("reflect_revise") == 0
+
 
 def test_meta_review_sample_threshold_and_actions(tmp_path):
     config = SimpleNamespace(

@@ -625,7 +625,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "AGENT_STEP_CRITIQUE_ENABLED": {
-        "title": "Immediate Step Critique",
+        "title": "Step Critique",
         "description": (
             "Default-off immediate (in-loop) step critique after tool failure or "
             "contradictory observations. Emits typed ReflectionLesson values and "
@@ -647,7 +647,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "AGENT_REFLECTION_ENABLED": {
-        "title": "Trajectory Reflection",
+        "title": "Reflection",
         "description": (
             "Default-off end-of-run trajectory reflection. Emits typed "
             "ReflectionLesson values for episode storage. Never mutates Soul/ToolSurface."
@@ -668,7 +668,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "AGENT_REFLECTION_LLM_BUDGET": {
-        "title": "Trajectory Reflection LLM Budget",
+        "title": "Reflection Budget",
         "description": "Maximum LLM calls for one trajectory reflection loop (default 1).",
         "category": "agent",
         "data_type": "integer",
@@ -686,7 +686,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "AGENT_META_REVIEW_ENABLED": {
-        "title": "Cross-run Meta Review",
+        "title": "Meta Review",
         "description": (
             "Default-off offline meta-review that aggregates episode lessons into a "
             "human-readable report. Never auto-edits Soul, ToolSurface, or runtime config."
@@ -707,7 +707,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "AGENT_META_REVIEW_MIN_EPISODES": {
-        "title": "Meta Review Sample Threshold",
+        "title": "Review Minimum",
         "description": (
             "Minimum episode samples before meta-review emits recommended actions "
             "(default 30). Below threshold records threshold_not_met."
@@ -759,6 +759,70 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "投资委员会模式",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investment-committee-mode.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_RESEARCH_PERSONA": {
+        "title": "Research Persona Preset",
+        "description": (
+            "Default-off research-stance preset that shapes Agent tone, risk framing, "
+            "and conclusion style (rational_analyst | risk_guardian | long_term_compounder). "
+            "Empty keeps default behavior. The active personal investment framework "
+            "research_stance field takes precedence. Style labels are not performance claims."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"value": "", "label": "Off (default)"},
+            {"value": "rational_analyst", "label": "Rational Analyst"},
+            {"value": "risk_guardian", "label": "Risk Guardian"},
+            {"value": "long_term_compounder", "label": "Long-term Compounder"},
+        ],
+        "validation": {},
+        "display_order": 641,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA",
+        "examples": [
+            "AGENT_RESEARCH_PERSONA=",
+            "AGENT_RESEARCH_PERSONA=rational_analyst",
+        ],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_RESEARCH_PERSONA_CUSTOM": {
+        "title": "Custom Research Stance",
+        "description": (
+            "Optional free-form research-stance text used when no personal investment "
+            "framework research_stance is active. Leave empty by default. Prefer the "
+            "versioned framework field for durable custom stance persistence. The value "
+            "is untrusted preference data and cannot alter Agent Soul, ToolSurface, or permissions."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"max_length": 2000},
+        "display_order": 642,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM",
+        "examples": ["AGENT_RESEARCH_PERSONA_CUSTOM="],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
             },
         ],
         "warning_codes": [],

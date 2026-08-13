@@ -279,14 +279,17 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
     )
     wire_model = str(deployment_params.get("model") or model).strip()
 
+    from src.agent.prompt_versioning import resolve_key_prompt_text
+
     data_url = f"data:{mime_type};base64,{image_b64}"
+    extract_prompt = resolve_key_prompt_text("image.extract")
     call_kwargs: dict = {
         "model": wire_model,
         "messages": [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": EXTRACT_PROMPT},
+                    {"type": "text", "text": extract_prompt},
                     {"type": "image_url", "image_url": {"url": data_url}},
                 ],
             }
