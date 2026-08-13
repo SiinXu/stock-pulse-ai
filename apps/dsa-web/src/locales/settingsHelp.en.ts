@@ -2190,6 +2190,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'Leave empty (auto) to notify only when NOTIFICATION_SYSTEM_ERROR_CHANNELS is configured. Set true to force on, false to force off.',
     impact: ['Affects whether failed daily/Actions runs attempt failure push notifications.'],
   },
+  'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
+    title: 'High Disagreement Alerts',
+    summary: 'On by default; routes disagreement alerts and honors no-notify.',
+  },
+  'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
+    title: 'High Disagreement Alert Threshold',
+    summary: 'Alert threshold (0–1); default 0.6.',
+  },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: 'Paper Portfolio Initial Cash',
     summary: 'Starting cash for a newly created paper portfolio.',
