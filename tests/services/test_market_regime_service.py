@@ -166,6 +166,69 @@ class TestMarketRegimeService(unittest.TestCase):
             "",
         )
 
+    def test_unknown_prebuilt_does_not_block_technical_redetect(self):
+        """Pipeline-seeded unknown must not short-circuit later technical recovery."""
+        ctx = AgentContext()
+        ctx.meta[MARKET_REGIME_KEY] = self.service.build_unavailable(
+            stock_code="600519",
+            reason="pipeline_seed",
+        )
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="technical",
+                signal="buy",
+                confidence=0.8,
+                raw_data={
+                    "ma_alignment": "bullish",
+                    "trend_score": 80,
+                    "volume_status": "normal",
+                },
+            )
+        )
+        artifact = self.service.build_from_agent_context(ctx)
+        self.assertEqual(artifact["regime"], "trending_up")
+        self.assertEqual(artifact["source"], "rules")
+
+    def test_unknown_trend_falls_through_to_technical_opinion(self):
+        """Conflicting trend stays unknown unless technical data is actionable."""
+        ctx = AgentContext()
+        ctx.set_data("trend_result", _trend(status=TrendStatus.BULL, strength=20))
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="technical",
+                signal="buy",
+                confidence=0.8,
+                raw_data={
+                    "ma_alignment": "bullish",
+                    "trend_score": 80,
+                    "volume_status": "normal",
+                },
+            )
+        )
+        artifact = self.service.build_from_agent_context(ctx)
+        self.assertEqual(artifact["regime"], "trending_up")
+
+    def test_actionable_prebuilt_is_still_preferred(self):
+        prebuilt = self.service.build_from_trend(
+            _trend(status=TrendStatus.STRONG_BULL, strength=90),
+        )
+        ctx = AgentContext()
+        ctx.meta[MARKET_REGIME_KEY] = prebuilt
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="technical",
+                signal="sell",
+                confidence=0.8,
+                raw_data={
+                    "ma_alignment": "bearish",
+                    "trend_score": 10,
+                    "volume_status": "normal",
+                },
+            )
+        )
+        artifact = self.service.build_from_agent_context(ctx)
+        self.assertEqual(artifact["regime"], "trending_up")
+
 
 class TestSkillRouterRegimeIntegration(unittest.TestCase):
     def test_router_uses_explainable_regime_and_stores_artifact(self):
@@ -222,6 +285,29 @@ class TestSkillRouterRegimeIntegration(unittest.TestCase):
         regime = router._detect_regime(ctx)
         self.assertIsNone(regime)
         self.assertEqual(ctx.meta[MARKET_REGIME_KEY]["regime"], "unknown")
+
+    def test_router_redetects_when_prebuilt_regime_is_unknown(self):
+        router = SkillRouter(config=SimpleNamespace(agent_skill_routing="auto"))
+        ctx = AgentContext()
+        ctx.meta[MARKET_REGIME_KEY] = MarketRegimeService().build_unavailable(
+            stock_code="600519",
+            reason="pipeline_seed",
+        )
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="technical",
+                signal="buy",
+                confidence=0.8,
+                raw_data={
+                    "ma_alignment": "bullish",
+                    "trend_score": 80,
+                    "volume_status": "normal",
+                },
+            )
+        )
+        regime = router._detect_regime(ctx)
+        self.assertEqual(regime, "trending_up")
+        self.assertEqual(ctx.meta[MARKET_REGIME_KEY]["regime"], "trending_up")
 
 
 if __name__ == "__main__":

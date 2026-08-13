@@ -156,7 +156,12 @@ class MarketRegimeService:
         *,
         override: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Detect from AgentContext: prefer prebuilt context, then trend, then technical opinion."""
+        """Detect from AgentContext: prefer prebuilt context, then trend, then technical opinion.
+
+        ``unknown`` is not treated as a reusable snapshot. Skill routing runs after
+        the technical stage, so a pipeline-seeded unknown artifact must not block
+        redetection from ``trend_result`` or the technical opinion.
+        """
         if not self.is_enabled():
             stock_code = str(getattr(ctx, "stock_code", "") or "").strip() or None
             return self.build_unavailable(
@@ -167,9 +172,12 @@ class MarketRegimeService:
         meta = getattr(ctx, "meta", None) or {}
         if isinstance(meta, Mapping):
             existing = meta.get(MARKET_REGIME_CONTEXT_KEY)
-            if isinstance(existing, Mapping) and existing.get("regime") in KNOWN_REGIME_LABELS:
-                if existing.get("schema_version") == MARKET_REGIME_SCHEMA_VERSION:
-                    return dict(existing)
+            if (
+                isinstance(existing, Mapping)
+                and existing.get("schema_version") == MARKET_REGIME_SCHEMA_VERSION
+                and is_actionable_regime(existing.get("regime"))
+            ):
+                return dict(existing)
 
         stock_code = str(getattr(ctx, "stock_code", "") or "").strip() or None
         trend = None
@@ -179,19 +187,25 @@ class MarketRegimeService:
         if trend is None and isinstance(getattr(ctx, "data", None), Mapping):
             trend = ctx.data.get("trend_result")
 
+        from_trend: Optional[Dict[str, Any]] = None
         if trend is not None:
-            return self.build_from_trend(
+            from_trend = self.build_from_trend(
                 trend,
                 stock_code=stock_code,
                 override=override,
             )
+            if is_actionable_regime(from_trend.get("regime")):
+                return from_trend
 
         technical_raw = self._latest_technical_raw(ctx)
-        return self.build_from_technical_raw(
+        from_technical = self.build_from_technical_raw(
             technical_raw,
             stock_code=stock_code,
             override=override,
         )
+        if from_trend is None or is_actionable_regime(from_technical.get("regime")):
+            return from_technical
+        return from_trend
 
     def build_unavailable(
         self,
