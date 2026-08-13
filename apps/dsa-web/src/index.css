@@ -176,8 +176,21 @@
   --home-accent-text: hsl(var(--primary));
   --home-secondary-accent-text: hsl(var(--secondary-text));
   --home-title-accent: hsl(var(--foreground));
-  --home-price-up: hsl(0 88% 62%);
-  --home-price-down: hsl(149 100% 42%);
+  /*
+   * Layer 0 — market paint (Theme Contract v1 / #880).
+   * --price-red / --price-green are hue identity (never alias to --primary / --success).
+   * --price-up / --price-down are direction tokens; remapped by data-price-direction.
+   * Default (no attribute or cn): A-share red-up / green-down.
+   */
+  --price-red-hsl: 0 88% 62%;
+  --price-green-hsl: 149 100% 42%;
+  --price-red: hsl(var(--price-red-hsl));
+  --price-green: hsl(var(--price-green-hsl));
+  --price-up: var(--price-red);
+  --price-down: var(--price-green);
+  /* Legacy aliases — hue identity, not direction (marketFormat maps red/green paint). */
+  --home-price-up: var(--price-red);
+  --home-price-down: var(--price-green);
   --report-strategy-buy: hsl(149 100% 42%);
   --report-strategy-secondary: hsl(var(--primary));
   --report-strategy-stop: hsl(346 100% 63%);
@@ -328,6 +341,62 @@
   --login-input-toggle-ring: hsl(var(--primary) / 0.22);
 }
 
+/* Theme Contract v1 — market price-direction (A-share default is cn / red_up). */
+[data-price-direction="cn"] {
+  --price-up: var(--price-red);
+  --price-down: var(--price-green);
+}
+
+[data-price-direction="us"] {
+  --price-up: var(--price-green);
+  --price-down: var(--price-red);
+}
+
+/*
+ * Theme pack: slate (Layer 1 only). Validates pack recolor without touching
+ * --home-* micro-tokens or Layer 0 price paint.
+ */
+[data-theme-pack="slate"] {
+  --primary: 215 16% 42%;
+  --ring: 215 16% 42%;
+  --background: 210 12% 97%;
+  --secondary: 210 12% 95%;
+  --secondary-foreground: 220 12% 16%;
+  --muted: 210 12% 95%;
+  --muted-foreground: 215 10% 42%;
+  --accent: 210 12% 94%;
+  --accent-foreground: 220 12% 16%;
+  --border: 210 10% 90%;
+  --input: 210 10% 90%;
+  --hover: 210 12% 95%;
+  --secondary-text: 215 10% 38%;
+  --muted-text: 215 8% 50%;
+  --color-success: 152 40% 38%;
+  --color-emerald-400: 152 40% 38%;
+  --success: var(--color-success);
+}
+
+.dark[data-theme-pack="slate"] {
+  --primary: 215 18% 68%;
+  --primary-foreground: 220 14% 10%;
+  --ring: 215 18% 68%;
+  --background: 220 10% 8%;
+  --secondary: 220 8% 14%;
+  --secondary-foreground: 210 12% 96%;
+  --muted: 220 8% 14%;
+  --muted-foreground: 215 10% 62%;
+  --accent: 220 8% 16%;
+  --accent-foreground: 210 12% 96%;
+  --border: 220 8% 20%;
+  --input: 220 8% 20%;
+  --hover: 220 8% 16%;
+  --secondary-text: 215 10% 72%;
+  --muted-text: 215 8% 55%;
+  --color-success: 152 36% 58%;
+  --color-emerald-400: 152 36% 58%;
+  --success: var(--color-success);
+}
+
 /* Compact density override (opt-in via data-density on a region or document). */
 [data-density="compact"] {
   --density-space-1: 0.125rem;
@@ -474,8 +543,14 @@
   --home-accent-text: hsl(var(--primary));
   --home-secondary-accent-text: hsl(var(--secondary-text));
   --home-title-accent: hsl(var(--foreground));
-  --home-price-up: hsl(0 88% 64%);
-  --home-price-down: hsl(149 100% 44%);
+  --price-red-hsl: 0 88% 64%;
+  --price-green-hsl: 149 100% 44%;
+  --price-red: hsl(var(--price-red-hsl));
+  --price-green: hsl(var(--price-green-hsl));
+  --price-up: var(--price-red);
+  --price-down: var(--price-green);
+  --home-price-up: var(--price-red);
+  --home-price-down: var(--price-green);
   --report-strategy-buy: hsl(149 100% 44%);
   --report-strategy-secondary: hsl(var(--primary));
   --report-strategy-stop: hsl(346 100% 66%);
@@ -2099,16 +2174,20 @@ a {
   border-radius: var(--radius-dot);
 }
 
+/*
+ * Trend badges consume Layer 0 direction tokens so they follow
+ * data-price-direction (CN red-up by default).
+ */
 .badge-trend-up {
-  border-color: rgb(var(--trend-up-border));
-  background: rgb(var(--trend-up-bg));
-  color: rgb(var(--trend-up-text));
+  border-color: color-mix(in srgb, var(--price-up) 40%, transparent);
+  background: color-mix(in srgb, var(--price-up) 12%, transparent);
+  color: var(--price-up);
 }
 
 .badge-trend-down {
-  border-color: rgb(var(--trend-down-border));
-  background: rgb(var(--trend-down-bg));
-  color: rgb(var(--trend-down-text));
+  border-color: color-mix(in srgb, var(--price-down) 40%, transparent);
+  background: color-mix(in srgb, var(--price-down) 12%, transparent);
+  color: var(--price-down);
 }
 
 .settings-panel-muted {

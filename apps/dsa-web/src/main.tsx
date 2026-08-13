@@ -4,6 +4,8 @@ import '@fontsource-variable/geist/index.css'
 import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from './components/theme/ThemeProvider'
+import { ThemeAppearanceProvider } from './components/theme/ThemeAppearanceProvider'
+import { PriceDirectionSync } from './components/theme/PriceDirectionSync'
 import { prepareInitialUiLanguage } from './i18n/prepareUiLanguage'
 import { QueryProvider } from './query/QueryProvider'
 import { applyUiLanguageToDocument, getRuntimeInitialLanguage } from './utils/uiLanguage'
@@ -32,7 +34,10 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryProvider>
       <ThemeProvider>
-        <App initialUiLanguage={initialUiLanguage} />
+        <ThemeAppearanceProvider>
+          <PriceDirectionSync />
+          <App initialUiLanguage={initialUiLanguage} />
+        </ThemeAppearanceProvider>
       </ThemeProvider>
     </QueryProvider>
   </StrictMode>,
