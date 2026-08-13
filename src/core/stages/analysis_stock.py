@@ -21,6 +21,13 @@ from src.analyzer import (
     stabilize_decision_with_structure,
 )
 from src.config import FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
+from src.core.contracts import (
+    AnalyzeStageInput,
+    AnalyzeStageOutput,
+    FetchMarketInputsOutput,
+    FetchStageInput,
+    build_run_context,
+)
 from src.core.pipeline_stage_results import (
     PipelineStageName,
     PipelineStageResult,
@@ -103,21 +110,40 @@ class _StockAnalysisStageMixin:
         active_stage: Optional[PipelineStageObservation] = None
         try:
             daily_market_context_enabled = self._is_daily_market_context_enabled()
+            run_context = getattr(self, "_current_run_context", None)
+            if run_context is None or getattr(run_context, "stock_code", None) != code:
+                run_context = build_run_context(
+                    query_id=query_id,
+                    trace_id=getattr(self, "trace_id", None) or query_id,
+                    stock_code=code,
+                    report_type=report_type,
+                    query_source=getattr(self, "query_source", None),
+                    current_time=current_time,
+                    analysis_phase=str(getattr(self, "analysis_phase", "auto") or "auto"),
+                    portfolio_context=getattr(self, "portfolio_context", None),
+                    save_context_snapshot=bool(
+                        getattr(self, "save_context_snapshot", False)
+                    ),
+                )
+            fetch_input = FetchStageInput(
+                stock_code=code,
+                operation="assemble_market_inputs",
+                current_time=current_time,
+                realtime_enabled=bool(self.config.enable_realtime_quote),
+                chip_enabled=bool(self.config.enable_chip_distribution),
+                daily_market_context_enabled=daily_market_context_enabled,
+                run=run_context,
+            )
             active_stage = observe_pipeline_stage(
                 "fetch",
-                input_summary={
-                    "stock_code": code,
-                    "operation": "assemble_market_inputs",
-                    "realtime_enabled": bool(self.config.enable_realtime_quote),
-                    "chip_enabled": bool(self.config.enable_chip_distribution),
-                    "daily_market_context_enabled": daily_market_context_enabled,
-                },
+                input_summary=fetch_input.to_input_summary(),
                 retryable=True,
             )
             portfolio_context = getattr(self, "portfolio_context", None)
             if not isinstance(portfolio_context, dict):
                 portfolio_context = None
             market = get_market_for_stock(normalize_stock_code(code))
+            run_context = run_context.with_market(market)
             market_phase_context = build_market_phase_context(
                 market=market,
                 current_time=current_time,
@@ -296,16 +322,17 @@ class _StockAnalysisStageMixin:
                     and daily_market_context is None
                 )
             )
+            market_inputs = FetchMarketInputsOutput(
+                realtime_quote=realtime_quote,
+                chip_data=chip_data,
+                fundamental_context=fundamental_context,
+                trend_result=trend_result,
+                daily_market_context=daily_market_context,
+            )
             fetch_result = (
                 PipelineStageResult.degraded(
                     PipelineStageName.FETCH,
-                    {
-                        "realtime_quote": realtime_quote,
-                        "chip_data": chip_data,
-                        "fundamental_context": fundamental_context,
-                        "trend_result": trend_result,
-                        "daily_market_context": daily_market_context,
-                    },
+                    market_inputs,
                     reason=(
                         "One or more market inputs were unavailable; "
                         "analysis continued with existing fallbacks."
@@ -315,28 +342,29 @@ class _StockAnalysisStageMixin:
                 if fetch_degraded
                 else PipelineStageResult.success(
                     PipelineStageName.FETCH,
-                    {
-                        "realtime_quote": realtime_quote,
-                        "chip_data": chip_data,
-                        "fundamental_context": fundamental_context,
-                        "trend_result": trend_result,
-                        "daily_market_context": daily_market_context,
-                    },
+                    market_inputs,
                 )
             )
             self._finish_pipeline_stage(
                 active_stage,
                 fetch_result,
-                output_summary={
-                    "realtime_available": realtime_quote is not None,
-                    "chip_available": chip_data is not None,
-                    "fundamental_status": fundamental_status or "available",
-                    "trend_available": trend_result is not None,
-                    "daily_market_context_enabled": daily_market_context_enabled,
-                    "daily_market_context_available": daily_market_context is not None,
-                },
+                output_summary=market_inputs.to_output_summary(
+                    fundamental_status=fundamental_status or "available",
+                    daily_market_context_enabled=daily_market_context_enabled,
+                ),
             )
             active_stage = None
+            analyze_input = AnalyzeStageInput(
+                stock_code=code,
+                report_type=report_type,
+                query_id=query_id,
+                current_time=current_time,
+                stock_name=stock_name,
+                market_inputs=market_inputs,
+                run=run_context.with_stock_name(stock_name),
+            )
+            # Retain for later stage diagnostics without changing control flow.
+            self._current_analyze_input = analyze_input
 
             if use_agent:
                 logger.info("%s(%s) running analysis in Agent mode", stock_name, code)
@@ -939,18 +967,23 @@ class _StockAnalysisStageMixin:
                         quality_gate.action_taken,
                     )
 
-            analysis_succeeded = bool(result and getattr(result, "success", True))
+            analyze_output = AnalyzeStageOutput.from_result(result)
+            analysis_succeeded = analyze_output.analysis_success
             analysis_degradation_reason = (
                 getattr(result, "error_message", None)
                 if result is not None and not analysis_succeeded
                 else ("Analysis returned no result." if result is None else None)
             )
+            # Keep historical value shape (AnalysisResult) for zero behavior change.
             analysis_stage_result = (
-                PipelineStageResult.success(PipelineStageName.ANALYZE, result)
+                PipelineStageResult.success(
+                    PipelineStageName.ANALYZE,
+                    analyze_output.as_legacy_value(),
+                )
                 if analysis_succeeded
                 else PipelineStageResult.failed(
                     PipelineStageName.ANALYZE,
-                    value=result,
+                    value=analyze_output.as_legacy_value(),
                     retryable=True,
                     reason=analysis_degradation_reason,
                 )
@@ -958,11 +991,7 @@ class _StockAnalysisStageMixin:
             self._finish_pipeline_stage(
                 active_stage,
                 analysis_stage_result,
-                output_summary={
-                    "analysis_result_available": result is not None,
-                    "analysis_success": analysis_succeeded,
-                    "model": getattr(result, "model_used", None) if result else None,
-                },
+                output_summary=analyze_output.to_output_summary(),
             )
             active_stage = None
 
