@@ -9528,7 +9528,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "analysis_complete" | "alert_triggered" | "scheduled_task_result" | "decision_signal";
+            kind: "analysis_complete" | "alert_triggered" | "scheduled_task_result" | "decision_signal" | "daily_brief" | "high_disagreement" | "portfolio_health";
             /** Metadata */
             metadata?: {
                 [key: string]: unknown;
@@ -9547,7 +9547,7 @@ export interface components {
              * Title Key
              * @enum {string}
              */
-            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle";
+            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle" | "dailyBriefTitle" | "highDisagreementTitle" | "portfolioHealthTitle";
             /** Title Params */
             title_params?: {
                 [key: string]: string;
@@ -9641,7 +9641,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals";
+            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals" | "daily_briefs" | "high_disagreement" | "portfolio_health";
         };
         /**
          * NotificationInboxUnreadCountResponse
