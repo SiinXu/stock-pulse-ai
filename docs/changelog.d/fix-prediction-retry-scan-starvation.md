@@ -1,0 +1,1 @@
+- [Fixed] Scan a bounded data-unavailable window before retry filtering so exhausted A3 rows cannot starve ready backoff requeues (Refs #1102).
