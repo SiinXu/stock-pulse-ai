@@ -1445,6 +1445,18 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 分析的最大等待时间。'],
     notes: ['超时不影响其他股票的分析流程。'],
   },
+  'settings.agent.PREDICTION_EXTRACT_ENABLED': {
+    title: '预测记录抽取',
+    summary: '从类型化决策生成记录草稿。',
+    usage: '仅供研究；散文不是声明。',
+    valueNotes: [
+      '默认关闭。',
+      '草稿仅存于内存。',
+      '散文返回 status=no_verifiable_claim。',
+    ],
+    impact: ['不改变投资建议。'],
+    notes: ['失败不中止分析；不保证收益。'],
+  },
   'settings.agent.SKILL_OPINION_RECORDING_ENABLED': {
     title: '技能观点样本记录',
     summary: '将个体技能观点写入离线后验评估存储。',
