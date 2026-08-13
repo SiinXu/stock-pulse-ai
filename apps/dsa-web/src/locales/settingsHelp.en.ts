@@ -1555,6 +1555,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'Agent Episode Max Rows',
     summary: 'Episode row cap; oldest rows are removed first.',
   },
+  'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
+    title: 'Error Pattern Encyclopedia',
+  },
   'settings.agent.AGENT_PLANNING_ENABLED': {
     title: 'Agent Planning Loop',
     summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',

@@ -313,6 +313,30 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertIn("盘前", prompt)
         self.assertIn("不得描述“今日走势已经发生”", prompt)
 
+    def test_format_prompt_consumes_error_pattern_checklist(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+
+        prompt = analyzer._format_prompt(
+            {
+                "code": "600519",
+                "stock_name": "贵州茅台",
+                "today": {},
+                "error_pattern_checklist_prompt": (
+                    "BEGIN_ERROR_PATTERN_CHECKLIST\n"
+                    "pattern:tool_failure\n"
+                    "END_ERROR_PATTERN_CHECKLIST"
+                ),
+            },
+            "贵州茅台",
+            news_context=None,
+        )
+
+        checklist_index = prompt.index("BEGIN_ERROR_PATTERN_CHECKLIST")
+        technical_index = prompt.index("技术面数据")
+        self.assertLess(checklist_index, technical_index)
+        self.assertIn("pattern:tool_failure", prompt)
+
     def test_format_prompt_omits_market_phase_section_without_context(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer()
