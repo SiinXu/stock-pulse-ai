@@ -1,15 +1,22 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { analysisApi } from '../api/analysis';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { HistoryListResponse, MarketReviewRegion } from '../types/analysis';
 import {
+  isActiveTaskStatus,
+  isLaunchBlockingError,
+  isTerminalTaskStatus,
+  normalizeTaskProgress,
+} from '../utils/asyncTaskUx';
+import {
   formatMarketReviewRegionLabels,
   MARKET_REVIEW_REGION_UI_TEXT_KEYS,
 } from '../utils/marketReviewRegion';
+import { formatTaskMessage } from '../utils/taskMessage';
 
 export type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -46,6 +53,7 @@ export function useMarketReviewRunner({
   );
   const [notice, setNotice] = useState<MarketReviewNotice>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const pollTimerRef = useRef<number | null>(null);
   const pollGenerationRef = useRef(0);
   const activeRef = useRef(true);
@@ -69,6 +77,7 @@ export function useMarketReviewRunner({
     stopPolling();
     setNotice(null);
     setError(null);
+    setActiveTaskId(null);
   }, [stopPolling]);
 
   useEffect(() => {
@@ -79,8 +88,30 @@ export function useMarketReviewRunner({
     };
   }, [stopPolling]);
 
+  const buildActiveNoticeMessage = useCallback((status: {
+    status?: string | null;
+    progress?: number | null;
+    region?: string | null;
+    message?: string | null;
+    messageCode?: string | null;
+    messageParams?: Record<string, unknown> | null;
+  }) => {
+    const phaseMessage = formatTaskMessage({
+      status: status.status,
+      message: status.message,
+      messageCode: status.messageCode,
+      messageParams: status.messageParams,
+    }, language);
+    const progressPart = typeof status.progress === 'number'
+      ? `${normalizeTaskProgress(status.progress)}%`
+      : t('home.progressActive');
+    const regionPart = status.region ? formatRegionToken(status.region) : '';
+    return [phaseMessage, progressPart, regionPart].filter(Boolean).join(' · ');
+  }, [formatRegionToken, language, t]);
+
   const pollStatus = useCallback(async (taskId: string) => {
     stopPolling();
+    setActiveTaskId(taskId);
     const generation = pollGenerationRef.current;
     const isCurrent = () => (
       activeRef.current && generation === pollGenerationRef.current
@@ -95,6 +126,7 @@ export function useMarketReviewRunner({
           title: t('home.marketReviewTimeout'),
           message: t('home.marketReviewTimeoutMessage'),
         });
+        setActiveTaskId(null);
         onFeedbackRef.current?.();
         return false;
       }
@@ -104,20 +136,11 @@ export function useMarketReviewRunner({
         const status = await analysisApi.getStatus(taskId);
         if (!isCurrent()) return false;
 
-        if (status.status === 'pending' || status.status === 'processing') {
-          const progress = typeof status.progress === 'number'
-            ? `${status.progress}%`
-            : t('home.progressActive');
+        if (isActiveTaskStatus(status.status)) {
           setNotice({
             variant: 'warning',
             title: t('home.marketReviewInProgress'),
-            message: status.region
-              ? t('home.taskStatusWithRegion', {
-                status: status.status,
-                progress,
-                region: formatRegionToken(status.region),
-              })
-              : t('home.taskStatus', { status: status.status, progress }),
+            message: buildActiveNoticeMessage(status),
           });
           return true;
         }
@@ -136,6 +159,7 @@ export function useMarketReviewRunner({
               : t('home.marketReviewCompletedWithoutReport'),
           });
           setError(null);
+          setActiveTaskId(null);
           if (persistedItem) onPersistedReportRef.current(persistedItem.id);
           onFeedbackRef.current?.();
           return false;
@@ -152,6 +176,24 @@ export function useMarketReviewRunner({
             },
           }));
           setNotice(null);
+          setActiveTaskId(null);
+          onFeedbackRef.current?.();
+          return false;
+        }
+
+        if (isTerminalTaskStatus(status.status)) {
+          setNotice({
+            variant: 'warning',
+            title: formatTaskMessage({ status: status.status }, language),
+            message: formatTaskMessage({
+              status: status.status,
+              message: status.message,
+              messageCode: status.messageCode,
+              messageParams: status.messageParams,
+            }, language),
+          });
+          setError(null);
+          setActiveTaskId(null);
           onFeedbackRef.current?.();
           return false;
         }
@@ -161,6 +203,7 @@ export function useMarketReviewRunner({
           title: t('home.marketReviewUnknownStatus'),
           message: t('home.unknownTaskStatus', { status: status.status }),
         });
+        setActiveTaskId(null);
         onFeedbackRef.current?.();
         return false;
       } catch (pollError: unknown) {
@@ -168,6 +211,7 @@ export function useMarketReviewRunner({
         if (attempts >= MARKET_REVIEW_POLL_MAX_ATTEMPTS) {
           setError(getParsedApiError(pollError));
           setNotice(null);
+          setActiveTaskId(null);
           onFeedbackRef.current?.();
           return false;
         }
@@ -184,10 +228,8 @@ export function useMarketReviewRunner({
     };
 
     await runPoll();
-  }, [formatRegionToken, refreshMarketReviewHistory, stopPolling, t]);
+  }, [buildActiveNoticeMessage, language, refreshMarketReviewHistory, stopPolling, t]);
 
-  // Trigger submit is a TanStack mutation; task status polling stays custom to
-  // preserve domain notice/timeout semantics (not a list-query refetch).
   const triggerMutation = useMutation({
     mutationFn: () => analysisApi.triggerMarketReview({
       sendNotification: notify,
@@ -197,6 +239,7 @@ export function useMarketReviewRunner({
     onMutate: () => {
       setNotice(null);
       setError(null);
+      setActiveTaskId(null);
       onFeedbackRef.current?.();
     },
     onSuccess: (result) => {
@@ -216,6 +259,7 @@ export function useMarketReviewRunner({
       if (!activeRef.current) return;
       setError(getParsedApiError(triggerError));
       setNotice(null);
+      setActiveTaskId(null);
       onFeedbackRef.current?.();
     },
   });
@@ -228,10 +272,17 @@ export function useMarketReviewRunner({
     }
   }, [triggerMutation]);
 
+  const isLaunchBlocked = useMemo(
+    () => triggerMutation.isPending || isLaunchBlockingError(error) || Boolean(activeTaskId),
+    [activeTaskId, error, triggerMutation.isPending],
+  );
+
   return {
+    activeTaskId,
     clear,
     dismissError: () => setError(null),
     error,
+    isLaunchBlocked,
     isSubmitting: triggerMutation.isPending,
     notice,
     triggerMarketReview,

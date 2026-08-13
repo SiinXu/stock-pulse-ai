@@ -494,9 +494,61 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
     const outcomes = profile === 'empty' ? [] : richDecisionOutcomes;
     const completed = outcomes.filter((item) => item.evalStatus === 'completed');
     const hit = completed.filter((item) => item.outcome === 'hit').length;
+    const miss = completed.filter((item) => item.outcome === 'miss').length;
+    const neutral = completed.filter((item) => item.outcome === 'neutral').length;
     const returns = completed.flatMap((item) => (
       typeof item.stockReturnPct === 'number' ? [item.stockReturnPct] : []
     ));
+    const minSamples = 30;
+    const sampleSufficient = completed.length >= minSamples;
+    const decided = hit + miss;
+    const rawHitRate = decided > 0 ? (hit / decided) * 100 : null;
+    const rawAvgReturn = returns.length > 0
+      ? returns.reduce((sum, value) => sum + value, 0) / returns.length
+      : null;
+    const bucket = (
+      dimension: string,
+      value: string,
+      rows: typeof outcomes,
+    ) => {
+      const done = rows.filter((item) => item.evalStatus === 'completed');
+      const bucketHit = done.filter((item) => item.outcome === 'hit').length;
+      const bucketMiss = done.filter((item) => item.outcome === 'miss').length;
+      const bucketNeutral = done.filter((item) => item.outcome === 'neutral').length;
+      const bucketDecided = bucketHit + bucketMiss;
+      const sufficient = done.length >= minSamples;
+      return {
+        dimension,
+        value,
+        total: rows.length,
+        completed: done.length,
+        unable: rows.length - done.length,
+        hit: bucketHit,
+        miss: bucketMiss,
+        neutral: bucketNeutral,
+        sample_sufficient: sufficient,
+        hit_rate_pct: sufficient && bucketDecided > 0
+          ? (bucketHit / bucketDecided) * 100
+          : null,
+        avg_stock_return_pct: null,
+        unable_reasons: {},
+      };
+    };
+    const byAction = new Map<string, typeof outcomes>();
+    const byMarket = new Map<string, typeof outcomes>();
+    const byPeriod = new Map<string, typeof outcomes>();
+    for (const item of outcomes) {
+      const action = String((item as { action?: string }).action || 'unknown');
+      const market = String((item as { market?: string }).market || 'unknown');
+      const period = String(
+        (item as { anchorDate?: string }).anchorDate?.slice(0, 7)
+        || (item as { updatedAt?: string }).updatedAt?.slice(0, 7)
+        || 'unknown',
+      );
+      byAction.set(action, [...(byAction.get(action) || []), item]);
+      byMarket.set(market, [...(byMarket.get(market) || []), item]);
+      byPeriod.set(period, [...(byPeriod.get(period) || []), item]);
+    }
     return [200, {
       engine_version: 'fixture-v2',
       horizons: null,
@@ -505,16 +557,20 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
       completed: completed.length,
       unable: outcomes.length - completed.length,
       hit,
-      miss: completed.filter((item) => item.outcome === 'miss').length,
-      neutral: completed.filter((item) => item.outcome === 'neutral').length,
-      hit_rate_pct: completed.length > 0 ? (hit / completed.length) * 100 : null,
-      avg_stock_return_pct: returns.length > 0
-        ? returns.reduce((sum, value) => sum + value, 0) / returns.length
-        : null,
+      miss,
+      neutral,
+      sample_sufficient: sampleSufficient,
+      minimum_completed_sample_size: minSamples,
+      hit_rate_pct: sampleSufficient ? rawHitRate : null,
+      avg_stock_return_pct: sampleSufficient ? rawAvgReturn : null,
       unable_reasons: outcomes.length > completed.length
         ? { insufficient_price_history: outcomes.length - completed.length }
         : {},
-      breakdowns: {},
+      breakdowns: {
+        action: [...byAction.entries()].map(([value, rows]) => bucket('action', value, rows)),
+        market: [...byMarket.entries()].map(([value, rows]) => bucket('market', value, rows)),
+        period: [...byPeriod.entries()].map(([value, rows]) => bucket('period', value, rows)),
+      },
     }];
   });
   mock.onGet(/\/api\/v1\/decision-signals\/\d+$/).reply((config) => {

@@ -8,17 +8,21 @@ import base64
 import binascii
 import json
 import logging
+import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from datetime import date, datetime, timedelta, timezone, tzinfo
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 from src.repositories.alert_repo import AlertRepository
 from src.repositories.base import RepositoryError
 from src.repositories.decision_signal_repo import DecisionSignalRepository
 from src.repositories.notification_inbox_repo import NotificationInboxRepository
+from src.repositories.portfolio_health_repo import PortfolioHealthRepository
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
+from src.report_language import normalize_strategy_synthesis_payload
 from src.schemas.notification_inbox import (
     INBOX_KIND_VALUES,
+    INBOX_SPECIALIZED_ANALYSIS_REPORT_TYPES,
     NOTIFICATION_INBOX_MAX_CURSOR_LENGTH,
     NOTIFICATION_INBOX_MAX_ITEMS_DEFAULT,
     NOTIFICATION_INBOX_MAX_PAGE_SIZE,
@@ -55,7 +59,16 @@ _KIND_TO_SOURCE: dict[str, NotificationInboxSource] = {
     "alert_triggered": "alerts",
     "scheduled_task_result": "scheduled_tasks",
     "decision_signal": "decision_signals",
+    "daily_brief": "daily_briefs",
+    "high_disagreement": "high_disagreement",
+    "portfolio_health": "portfolio_health",
 }
+
+_PORTFOLIO_HEALTH_SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+_HIGH_DISAGREEMENT_CONFLICT_SEVERITY = "high"
+# Keep aligned with DailyBriefService.DAILY_BRIEF_REPORT_TYPE without importing
+# the full daily-brief service graph into the inbox read model.
+_DAILY_BRIEF_REPORT_TYPE = "daily_brief"
 
 
 class NotificationInboxValidationError(ValueError):
@@ -104,6 +117,7 @@ class NotificationInboxService:
         alert_repository: Optional[AlertRepository] = None,
         scheduled_task_repository: Optional[ScheduledTaskRepository] = None,
         decision_signal_repository: Optional[DecisionSignalRepository] = None,
+        portfolio_health_repository: Optional[PortfolioHealthRepository] = None,
         retention_days: Optional[int] = None,
         max_items: Optional[int] = None,
         clock: Optional[Callable[[], datetime]] = None,
@@ -117,6 +131,9 @@ class NotificationInboxService:
         )
         self.decision_signal_repository = (
             decision_signal_repository or DecisionSignalRepository(self.db)
+        )
+        self.portfolio_health_repository = (
+            portfolio_health_repository or PortfolioHealthRepository(self.db)
         )
         self.retention_days = self._resolve_bounded_int(
             retention_days,
@@ -333,6 +350,18 @@ class NotificationInboxService:
                 "decision_signals",
                 lambda: self._project_decision_signals(cutoff_utc=cutoff_utc),
             ),
+            (
+                "daily_briefs",
+                lambda: self._project_daily_briefs(cutoff_utc=cutoff_utc),
+            ),
+            (
+                "high_disagreement",
+                lambda: self._project_high_disagreement(cutoff_utc=cutoff_utc),
+            ),
+            (
+                "portfolio_health",
+                lambda: self._project_portfolio_health(cutoff_utc=cutoff_utc),
+            ),
         ]
 
         projected: list[_ProjectedItem] = []
@@ -394,6 +423,10 @@ class NotificationInboxService:
         )
         items: List[_ProjectedItem] = []
         for row in rows:
+            report_type = str(getattr(row, "report_type", None) or "").strip().lower()
+            if report_type in INBOX_SPECIALIZED_ANALYSIS_REPORT_TYPES:
+                # Dedicated projectors own these durable report shapes.
+                continue
             created_at = self._local_naive_to_utc(row.created_at)
             if created_at < cutoff_utc:
                 continue
@@ -556,6 +589,284 @@ class NotificationInboxService:
                 )
             )
         return items
+
+    def _project_daily_briefs(self, *, cutoff_utc: datetime) -> List[_ProjectedItem]:
+        """Project only durable daily-brief history rows.
+
+        When no persisted ``report_type=daily_brief`` rows exist, this returns
+        an empty list rather than fabricating ephemeral occurrences. Source
+        projection failures are recorded as temporarily unavailable by the
+        shared best-effort loader.
+        """
+        rows: List[AnalysisHistory] = self.db.get_analysis_history(
+            days=self.retention_days,
+            limit=self.max_items,
+            report_type=_DAILY_BRIEF_REPORT_TYPE,
+        )
+        items: List[_ProjectedItem] = []
+        for row in rows:
+            report_type = str(getattr(row, "report_type", None) or "").strip().lower()
+            if report_type and report_type != _DAILY_BRIEF_REPORT_TYPE:
+                continue
+            created_at = self._local_naive_to_utc(row.created_at)
+            if created_at < cutoff_utc:
+                continue
+            record_id = int(row.id)
+            name = (row.name or "").strip() or "Daily Brief"
+            summary = (
+                (row.analysis_summary or "").strip()
+                or (row.operation_advice or "").strip()
+                or "Daily brief"
+            )
+            items.append(
+                _ProjectedItem(
+                    kind="daily_brief",
+                    source_id=str(record_id),
+                    title_key="dailyBriefTitle",
+                    title_params={"label": name},
+                    summary=summary[:280],
+                    severity="info",
+                    created_at=created_at,
+                    href=f"/research/analysis?segment=history&recordId={record_id}",
+                    metadata={
+                        "record_id": record_id,
+                        "report_type": _DAILY_BRIEF_REPORT_TYPE,
+                        "query_id": row.query_id,
+                        "stock_code": (row.code or "").strip() or None,
+                    },
+                )
+            )
+        return items
+
+    def _project_high_disagreement(self, *, cutoff_utc: datetime) -> List[_ProjectedItem]:
+        """Project analyses whose durable strategy synthesis records high conflict.
+
+        Only rows with an authoritative persisted ``raw_result.dashboard.strategy_synthesis``
+        and ``conflict_severity == high`` become occurrences. Missing or
+        unparsable synthesis is skipped — never invented.
+        """
+        fetch_limit = min(self.max_items * 3, 5000)
+        rows: List[AnalysisHistory] = self.db.get_analysis_history(
+            days=self.retention_days,
+            limit=fetch_limit,
+        )
+        items: List[_ProjectedItem] = []
+        for row in rows:
+            if len(items) >= self.max_items:
+                break
+            report_type = str(getattr(row, "report_type", None) or "").strip().lower()
+            if report_type in INBOX_SPECIALIZED_ANALYSIS_REPORT_TYPES:
+                continue
+            created_at = self._local_naive_to_utc(row.created_at)
+            if created_at < cutoff_utc:
+                continue
+            synthesis = self._extract_strategy_synthesis(row)
+            if not synthesis:
+                continue
+            conflict_severity = str(synthesis.get("conflict_severity") or "").strip().lower()
+            if conflict_severity != _HIGH_DISAGREEMENT_CONFLICT_SEVERITY:
+                continue
+            record_id = int(row.id)
+            code = (row.code or "").strip() or "unknown"
+            name = (row.name or "").strip()
+            label = name or code
+            consensus = str(synthesis.get("consensus_level") or "").strip() or "unknown"
+            conflict_count = synthesis.get("conflict_count")
+            try:
+                conflict_count_text = str(int(conflict_count))
+            except (TypeError, ValueError):
+                conflict_count_text = "0"
+            summary = (
+                f"conflict_severity=high · consensus={consensus} · "
+                f"conflicts={conflict_count_text}"
+            )
+            items.append(
+                _ProjectedItem(
+                    kind="high_disagreement",
+                    source_id=str(record_id),
+                    title_key="highDisagreementTitle",
+                    title_params={"label": label},
+                    summary=summary[:280],
+                    severity="warning",
+                    created_at=created_at,
+                    href=f"/research/analysis?segment=history&recordId={record_id}",
+                    metadata={
+                        "record_id": record_id,
+                        "stock_code": code,
+                        "stock_name": name or None,
+                        "report_type": row.report_type,
+                        "query_id": row.query_id,
+                        "conflict_severity": conflict_severity,
+                        "consensus_level": consensus,
+                        "conflict_count": conflict_count,
+                        "final_signal": synthesis.get("final_signal"),
+                    },
+                )
+            )
+        return items
+
+    def _project_portfolio_health(self, *, cutoff_utc: datetime) -> List[_ProjectedItem]:
+        """Project durable portfolio-health snapshot rows only.
+
+        Missing migration / repository failure is raised so the shared loader
+        can mark the source temporarily unavailable without fabricating rows.
+        """
+        rows = self.portfolio_health_repository.list_recent_snapshots(
+            updated_from=cutoff_utc.replace(tzinfo=None),
+            limit=self.max_items,
+        )
+        items: List[_ProjectedItem] = []
+        for row in rows:
+            source_id = self._portfolio_health_source_id(row)
+            if source_id is None:
+                continue
+            occurred_at = self._portfolio_health_occurred_at(row)
+            if occurred_at < cutoff_utc:
+                continue
+            account_key = str(row.get("account_key") or "all").strip() or "all"
+            snapshot_date = self._coerce_snapshot_date_text(row.get("snapshot_date"))
+            band = str(row.get("band") or "").strip().lower() or None
+            status = str(row.get("status") or "").strip().lower() or "unknown"
+            score = row.get("score")
+            score_text = self._format_optional_score(score)
+            if band in {"poor"}:
+                severity: NotificationInboxSeverity = "error"
+            elif band in {"caution"} or status in {"partial", "unavailable"}:
+                severity = "warning"
+            else:
+                severity = "info"
+            summary_bits = [
+                bit
+                for bit in (
+                    f"status={status}",
+                    f"band={band}" if band else None,
+                    f"score={score_text}" if score_text else None,
+                    f"date={snapshot_date}" if snapshot_date else None,
+                )
+                if bit
+            ]
+            summary = " · ".join(summary_bits) or "Portfolio health snapshot"
+            label = account_key if account_key != "all" else "all accounts"
+            items.append(
+                _ProjectedItem(
+                    kind="portfolio_health",
+                    source_id=source_id,
+                    title_key="portfolioHealthTitle",
+                    title_params={"label": label},
+                    summary=summary[:280],
+                    severity=severity,
+                    created_at=occurred_at,
+                    href="/portfolio",
+                    metadata={
+                        "snapshot_id": row.get("id"),
+                        "account_key": account_key,
+                        "snapshot_date": snapshot_date,
+                        "cost_method": str(row.get("cost_method") or "fifo"),
+                        "status": status,
+                        "band": band,
+                        "score": score,
+                    },
+                )
+            )
+        return items
+
+    @staticmethod
+    def _extract_strategy_synthesis(row: Any) -> Dict[str, Any]:
+        raw = getattr(row, "raw_result", None)
+        payload: Any = raw
+        if isinstance(raw, str):
+            text_value = raw.strip()
+            if not text_value:
+                return {}
+            try:
+                payload = json.loads(text_value)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return {}
+        if not isinstance(payload, dict):
+            return {}
+        dashboard = payload.get("dashboard")
+        if not isinstance(dashboard, dict):
+            return {}
+        return normalize_strategy_synthesis_payload(dashboard.get("strategy_synthesis"))
+
+    @staticmethod
+    def _portfolio_health_source_id(row: Mapping[str, Any]) -> Optional[str]:
+        account_key = re.sub(
+            r"[^A-Za-z0-9._-]+",
+            "_",
+            str(row.get("account_key") or "all").strip(),
+        ) or "all"
+        snapshot_date = NotificationInboxService._coerce_snapshot_date_text(
+            row.get("snapshot_date")
+        )
+        if not snapshot_date:
+            return None
+        cost_method = re.sub(
+            r"[^A-Za-z0-9._-]+",
+            "_",
+            str(row.get("cost_method") or "fifo").strip().lower(),
+        ) or "fifo"
+        source_id = f"{account_key}.{snapshot_date}.{cost_method}"
+        if not _PORTFOLIO_HEALTH_SOURCE_ID_PATTERN.fullmatch(source_id):
+            return None
+        return source_id
+
+    @staticmethod
+    def _coerce_snapshot_date_text(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        text_value = str(value).strip()
+        if not text_value:
+            return None
+        try:
+            if "T" in text_value or " " in text_value:
+                return datetime.fromisoformat(
+                    text_value.replace(" ", "T")
+                ).date().isoformat()
+            return date.fromisoformat(text_value[:10]).isoformat()
+        except ValueError:
+            return text_value[:10] if len(text_value) >= 10 else None
+
+    def _portfolio_health_occurred_at(self, row: Mapping[str, Any]) -> datetime:
+        """Stable day-bound occurrence time for same-key health upserts."""
+        snapshot_date = self._coerce_snapshot_date_text(row.get("snapshot_date"))
+        if snapshot_date:
+            try:
+                day = date.fromisoformat(snapshot_date)
+                return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+            except ValueError:
+                pass
+        for key in ("calculated_at", "updated_at", "created_at"):
+            value = row.get(key)
+            if value is None:
+                continue
+            if isinstance(value, datetime):
+                return self._utc_naive_to_utc(value)
+            text_value = str(value).strip()
+            if not text_value:
+                continue
+            try:
+                parsed = datetime.fromisoformat(text_value.replace(" ", "T"))
+            except ValueError:
+                continue
+            return self._utc_naive_to_utc(parsed)
+        return datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+    @staticmethod
+    def _format_optional_score(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        if number != number:  # NaN
+            return None
+        return f"{number:.1f}"
 
     @staticmethod
     def _to_item(row: _ProjectedItem, *, is_read: bool) -> NotificationInboxItem:

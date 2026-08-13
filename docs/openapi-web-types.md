@@ -181,23 +181,38 @@ edit `api.generated.ts`.
 
 `apps/dsa-web/src/api/error.ts` is the compatibility facade for existing Web
 imports. Parsing, heuristic categorization, stable display copy, formatting,
-and public exports live under `apps/dsa-web/src/api/error/`; callers should not
-import those implementation modules directly.
+taxonomy classification, and public exports live under `apps/dsa-web/src/api/error/`;
+callers should not import those implementation modules directly.
+
+The version-one API envelope keeps `error` as the stable machine code and
+adds optional `category` / `severity` taxonomy fields derived from that code
+(see [API Error Taxonomy](api-error-taxonomy_EN.md)). Clients must not replace
+or ignore `error` when taxonomy fields are present.
 
 `ApiErrorAlert` presents errors through the shared persistent Toast. A caller
 action is rendered only when it has both a label and a handler. The remediation
-catalog may supply an existing localized label for a caller-provided handler,
-or a localized label plus an in-app destination; entries without either a
-handler or destination remain guidance-only and never render a dead button.
-Raw diagnostic messages are intentionally not rendered in the Toast.
+catalog and taxonomy may supply an existing localized label for a
+caller-provided retry handler, a localized label plus an in-app Settings/login
+destination, or a Related-docs link that opens repository documentation.
+Retry is never inferred without an operation-owned handler (clearing the error
+alone is not a retry). Entries without either a handler or destination remain
+guidance-only and never render a dead button. Raw diagnostic messages are
+intentionally not rendered in the Toast.
 
-This is the Web V0 contract. CLI and desktop-native error presentation are not
-covered by the catalog or Toast remediation in this phase.
+This is the Web V0+taxonomy contract. CLI and desktop-native error presentation
+are not covered by the catalog or Toast remediation in this phase.
+
+Long-running work, 409 busy/duplicate, queue/in-progress/terminal presentation,
+and launch-block recovery are documented separately in the
+[async task UX contract](async-task-ux-contract.md) (issue #885). That contract
+consumes this parse/catalog surface; it does not replace it.
 
 ## Related documents
+
 
 - Historical OpenAPI snapshot: [`architecture/api_spec.json`](architecture/api_spec.json)
   (not the CI-gated artifact; prefer `apps/dsa-web/openapi.json` for typegen).
 - Web API modules: `apps/dsa-web/src/api/`
 - Error compatibility facade: `apps/dsa-web/src/api/error.ts`
 - Error implementation modules: `apps/dsa-web/src/api/error/`
+- Async task / busy UX: [`async-task-ux-contract.md`](async-task-ux-contract.md)

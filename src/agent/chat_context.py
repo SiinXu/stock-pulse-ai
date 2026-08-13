@@ -424,6 +424,8 @@ def build_summary_messages(
     messages: Sequence[VisibleMessage],
 ) -> List[Dict[str, str]]:
     """Build the text-only summary request messages."""
+    from src.agent.prompt_versioning import resolve_key_prompt_text
+
     sections: List[str] = []
     if previous_summary.strip():
         sections.append("已有滚动摘要：\n" + previous_summary.strip())
@@ -431,7 +433,10 @@ def build_summary_messages(
     sections.append(_render_visible_messages(messages))
     user_payload = "\n\n".join(sections).strip()
     return [
-        {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+        {
+            "role": "system",
+            "content": resolve_key_prompt_text("agent.chat.summary"),
+        },
         {"role": "user", "content": user_payload},
     ]
 

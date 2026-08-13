@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Schemas for valuation estimate API (issue #238 remaining scope)."""
+"""Schemas for valuation estimate API (issue #238 remaining scope).
+
+Peer relative-value canvas request/response contracts live here for issue #1139.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +27,50 @@ class ValuationEstimateResponse(BaseModel):
     dcf: Dict[str, Any] = Field(default_factory=dict)
     relative: Dict[str, Any] = Field(default_factory=dict)
     fundamentals_snapshot: Optional[Dict[str, Any]] = None
+    disclaimer: Optional[str] = None
+    reason: Optional[str] = None
+    message: Optional[str] = None
+
+    model_config = {"extra": "allow"}
+
+
+class PeerValuationCanvasRequest(BaseModel):
+    """Request body for the constrained peer relative-value canvas (issue #1139)."""
+
+    stock_code: str = Field(..., min_length=1, description="Target stock code")
+    peer_source: Literal["custom", "industry"] = Field(
+        "custom",
+        description="Explainable peer-set source: custom codes or industry-constrained set",
+    )
+    peer_codes: Optional[List[str]] = Field(
+        None,
+        description="Peer stock codes (required for comparison; never invented server-side)",
+    )
+    industry_label: Optional[str] = Field(
+        None,
+        description="Optional industry label override when peer_source=industry",
+    )
+    base_currency: Optional[str] = Field(
+        None,
+        description="Base currency for cross-market estimate normalization (default: target listing currency)",
+    )
+
+
+class PeerValuationCanvasResponse(BaseModel):
+    schema_version: str
+    status: str
+    stock_code: Optional[str] = None
+    base_currency: Optional[str] = None
+    fx_stale: Optional[bool] = None
+    peer_set: Optional[Dict[str, Any]] = None
+    metrics: List[str] = Field(default_factory=list)
+    multiple_metrics: Optional[List[str]] = None
+    currency_metrics: Optional[List[str]] = None
+    rows: List[Dict[str, Any]] = Field(default_factory=list)
+    medians: Optional[Dict[str, Any]] = None
+    relative_summary: Optional[Dict[str, Any]] = None
+    heatmap_cells: Optional[List[Dict[str, Any]]] = None
+    valuation_status: Optional[str] = None
     disclaimer: Optional[str] = None
     reason: Optional[str] = None
     message: Optional[str] = None
