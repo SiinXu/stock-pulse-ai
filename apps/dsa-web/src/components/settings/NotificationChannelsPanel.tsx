@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type React from 'react';
-import { Bell, Send } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Bell, Puzzle, Send } from 'lucide-react';
 import type {
   ConfigValidationIssue,
   NotificationTestAttempt,
   NotificationTestChannel,
   SystemConfigItem,
 } from '../../types/systemConfig';
-import { Badge, Button, Checkbox, InlineAlert, Modal } from '../common';
+import { Badge, Button, Checkbox, EmptyState, InlineAlert, Modal, StatePanel } from '../common';
 import { cn } from '../../utils/cn';
 import { SettingsField } from './SettingsField';
 import {
@@ -41,8 +42,15 @@ import {
   type NotificationChannelTestOutcome,
 } from './notificationChannelTestStatus';
 import { systemConfigApi } from '../../api/systemConfig';
+import { pluginsApi, type PluginInfo } from '../../api/plugins';
 import { createParsedApiError, getParsedApiError } from '../../api/error';
 import { mapApiErrorToActionable } from '../../utils/apiReasonMapper';
+import { SETTINGS_ROUTE_QUERY_KEYS } from '../../routing/routes';
+import {
+  buildExtensionsHref,
+  buildExtensionsPluginHref,
+  collectPluginNotificationChannelLinks,
+} from './extensionNotificationLinks';
 import type { SettingsSaveStatus } from './autosaveMachine';
 
 interface NotificationChannelsPanelProps {
@@ -107,6 +115,8 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
 }) => {
   const { language, t } = useUiLanguage();
   const text = SETTINGS_NOTIFICATION_TEXT[language];
+  const [searchParams] = useSearchParams();
+  const focusedChannelId = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.channel);
   const testStatusVersion = useChannelTestStatusVersion();
   const [statusNow, setStatusNow] = useState(() => Date.now());
   const [openChannelId, setOpenChannelId] = useState<string | null>(null);
@@ -114,6 +124,9 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
   const [configurationFingerprints, setConfigurationFingerprints] = useState<ReadonlyMap<string, string>>(new Map());
   const [selectedBindEvents, setSelectedBindEvents] = useState<NotificationEventKind[]>([]);
   const [bindFeedback, setBindFeedback] = useState<string | null>(null);
+  const [pluginItems, setPluginItems] = useState<PluginInfo[]>([]);
+  const [pluginsLoading, setPluginsLoading] = useState(true);
+  const [pluginsLoadFailed, setPluginsLoadFailed] = useState(false);
   const [modalFeedback, setModalFeedback] = useState<{
     outcome: NotificationChannelTestOutcome;
     title: string;
@@ -121,6 +134,33 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     technical?: string;
     attempts?: NotificationTestAttempt[];
   } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPluginsLoading(true);
+    setPluginsLoadFailed(false);
+    void pluginsApi.list()
+      .then((response) => {
+        if (cancelled) return;
+        setPluginItems(response.items);
+        setPluginsLoadFailed(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Fail closed: never invent plugin channels when the roster cannot be read.
+        setPluginItems([]);
+        setPluginsLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setPluginsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const pluginChannelLinks = useMemo(
+    () => collectPluginNotificationChannelLinks(pluginItems),
+    [pluginItems],
+  );
 
   const configuredChannelValues = useMemo(
     () => (configuredChannels === null ? null : new Set(configuredChannels)),
@@ -188,6 +228,26 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     const timer = globalThis.setInterval(() => setStatusNow(Date.now()), 30_000);
     return () => globalThis.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!focusedChannelId) return;
+    const builtin = NOTIFICATION_CHANNELS.some((channel) => channel.id === focusedChannelId);
+    if (builtin) {
+      setOpenChannelId(focusedChannelId);
+    }
+  }, [focusedChannelId]);
+
+  useEffect(() => {
+    if (!focusedChannelId) return;
+    const builtin = NOTIFICATION_CHANNELS.some((channel) => channel.id === focusedChannelId);
+    if (builtin) return;
+    const card = document.querySelector(
+      `[data-testid="notification-plugin-channel-card-${CSS.escape(focusedChannelId)}"]`,
+    );
+    if (card instanceof HTMLElement) {
+      card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [focusedChannelId, pluginChannelLinks]);
 
   const renderFields = (fieldItems: SystemConfigItem[]) => fieldItems.map((item) => (
     <SettingsField
@@ -463,6 +523,81 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
           );
         })}
       </div>
+
+      <section
+        aria-labelledby="notification-plugin-channels-heading"
+        className="space-y-3"
+        data-testid="notification-plugin-channels"
+      >
+        <div>
+          <h3 id="notification-plugin-channels-heading" className="text-sm font-semibold text-foreground">
+            {text.pluginChannelsTitle}
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-secondary-text">{text.pluginChannelsDescription}</p>
+        </div>
+        {pluginsLoading ? (
+          <StatePanel state="loading" title={t('common.loading')} />
+        ) : pluginsLoadFailed ? (
+          <InlineAlert
+            variant="warning"
+            title={text.pluginChannelsUnavailableTitle}
+            message={text.pluginChannelsUnavailableDescription}
+          />
+        ) : pluginChannelLinks.length === 0 ? (
+          <EmptyState
+            title={text.pluginChannelsEmptyTitle}
+            description={text.pluginChannelsEmptyDescription}
+            action={(
+              <Link
+                to={buildExtensionsHref()}
+                className="inline-flex h-7 items-center justify-center rounded-md border border-border bg-transparent px-3 text-sm text-foreground hover:bg-hover"
+                data-testid="notification-plugin-channels-open-extensions"
+              >
+                {text.pluginChannelsOpenExtensions}
+              </Link>
+            )}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {pluginChannelLinks.map((entry) => {
+              const focused = focusedChannelId === entry.channelId;
+              return (
+                <div
+                  key={`${entry.pluginId}:${entry.channelId}`}
+                  data-testid={`notification-plugin-channel-card-${entry.channelId}`}
+                  data-plugin-id={entry.pluginId}
+                  className={cn(
+                    'flex flex-col gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left',
+                    focused && 'ring-1 ring-inset ring-primary/35 bg-primary/10',
+                  )}
+                >
+                  <span className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Puzzle className="h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {entry.channelId}
+                      </span>
+                    </span>
+                    <Badge variant="success" size="sm" className="shrink-0">
+                      {text.pluginChannelLoaded}
+                    </Badge>
+                  </span>
+                  <p className="text-xs leading-5 text-muted-text">
+                    {text.pluginChannelProvidedBy.replace('{plugin}', entry.pluginName)}
+                  </p>
+                  <Link
+                    to={buildExtensionsPluginHref(entry.pluginId)}
+                    className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                    data-testid={`notification-plugin-channel-open-extension-${entry.channelId}`}
+                  >
+                    {text.pluginChannelOpenExtension}
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {openChannel ? (
         <Modal
