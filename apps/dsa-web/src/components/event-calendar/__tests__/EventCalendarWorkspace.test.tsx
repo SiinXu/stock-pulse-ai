@@ -132,6 +132,6 @@ describe('EventCalendarWorkspace', () => {
     renderWorkspace();
     const link = await screen.findByTestId('event-calendar-open-event-alerts');
     expect(link).toHaveAttribute('href', APP_ROUTE_PATHS.eventAlerts);
-    expect(link).toHaveAccessibleName('Open event alerts');
+    expect(link).toHaveAccessibleName('Event-driven alerts');
   });
 });
