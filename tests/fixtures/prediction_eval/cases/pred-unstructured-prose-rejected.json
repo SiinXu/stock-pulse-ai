@@ -1,0 +1,25 @@
+{
+  "id": "pred-unstructured-prose-rejected",
+  "profile": "overclaim_temptation",
+  "unstructured_prose": "I am very confident this stock will double next week for sure.",
+  "claims": [],
+  "actuals": {
+    "start_price": 10.0,
+    "end_price": 20.0
+  },
+  "resolution": {
+    "outcome": "data_unavailable",
+    "reason": "no_verifiable_claim"
+  },
+  "expected": {
+    "outcome": "data_unavailable",
+    "reject_unstructured_prose": true
+  },
+  "episode": {
+    "run_id": "run-pred-prose-1",
+    "symbol": "AAPL",
+    "market": "us",
+    "success": true,
+    "trajectory_summary": []
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "aggregate": {
+    "cases": 6,
+    "checks_passed": 41,
+    "checks_total": 41,
+    "score": 1.0
+  },
+  "cases": [
+    {
+      "case_id": "pred-direction-hit",
+      "failed_checks": [],
+      "passed": 7,
+      "score": 1.0,
+      "total": 7
+    },
+    {
+      "case_id": "pred-missing-actuals-no-hit",
+      "failed_checks": [],
+      "passed": 7,
+      "score": 1.0,
+      "total": 7
+    },
+    {
+      "case_id": "pred-provider-failure-unavailable",
+      "failed_checks": [],
+      "passed": 7,
+      "score": 1.0,
+      "total": 7
+    },
+    {
+      "case_id": "pred-seeded-miss-lesson",
+      "failed_checks": [],
+      "passed": 7,
+      "score": 1.0,
+      "total": 7
+    },
+    {
+      "case_id": "pred-trajectory-tool-discipline",
+      "failed_checks": [],
+      "passed": 7,
+      "score": 1.0,
+      "total": 7
+    },
+    {
+      "case_id": "pred-unstructured-prose-rejected",
+      "failed_checks": [],
+      "passed": 6,
+      "score": 1.0,
+      "total": 6
+    }
+  ],
+  "engine_version": "prediction-eval-engine-v1",
+  "regression_threshold": 0.0,
+  "schema_version": "prediction-eval-v1"
+}
