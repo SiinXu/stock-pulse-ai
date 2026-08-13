@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "description": "Allowlisted reverse layer-import edges (module-level imports only). New reverse edges are banned; shrink this list after breaking a dependency and running --write-baseline. Growth is refused. Never raise hard_ceiling to green CI \u2014 fix the reverse import.",
+  "rules": [
+    [
+      "data_provider",
+      "src.services"
+    ],
+    [
+      "data_provider",
+      "api"
+    ],
+    [
+      "data_provider",
+      "src.core"
+    ],
+    [
+      "data_provider",
+      "src.agent"
+    ],
+    [
+      "src.services",
+      "api"
+    ],
+    [
+      "src.core",
+      "api"
+    ],
+    [
+      "src.agent",
+      "api"
+    ],
+    [
+      "src.market",
+      "api"
+    ],
+    [
+      "src.analyzer",
+      "api"
+    ],
+    [
+      "src.core",
+      "src.services"
+    ]
+  ],
+  "hard_ceiling": 12,
+  "exception_count": 12,
+  "exceptions": [
+    {
+      "path": "data_provider/futu_position_fetcher.py",
+      "from_package": "data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "data_provider/symbol_normalization.py",
+      "from_package": "data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "data_provider/yfinance_fetcher.py",
+      "from_package": "data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/pipeline.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/analysis.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/analysis_agent.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/analysis_context.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/analysis_results.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/analysis_stock.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/delivery.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/orchestration.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/core/stages/persistence.py",
+      "from_package": "src.core",
+      "to_package": "src.services"
+    }
+  ],
+  "cleanup_plan": [
+    "data_provider \u2192 src.services: move market/symbol helpers used by providers into a leaf module (for example src.utils or data_provider-local) so providers no longer import services.",
+    "src.core pipeline/stages \u2192 src.services: inject service ports from the services layer (or leaf adapters) instead of importing application services from orchestration stages.",
+    "Any * \u2192 api edge: keep HTTP transport one-way; share DTOs via src.schemas or dedicated contracts, never import api from below."
+  ]
+}
