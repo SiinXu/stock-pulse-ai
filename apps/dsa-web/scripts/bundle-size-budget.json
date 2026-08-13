@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 247604,
-      "measuredGzipBytes": 247204,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 248554,
+      "measuredGzipBytes": 248154,
+      "note": "Local production-build remasure after merging origin/main; measured 248154 B + 400 B retained headroom."
     },
     {
       "id": "js-entry",
@@ -47,9 +47,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 153531,
-      "measuredGzipBytes": 152931,
-      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 154181,
+      "measuredGzipBytes": 153581,
+      "note": "Local production-build remasure after merging origin/main; measured 153581 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
@@ -147,8 +147,9 @@
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
-      "maxGzipBytes": 46602,
-      "measuredGzipBytes": 42365
+      "maxGzipBytes": 47198,
+      "measuredGzipBytes": 46798,
+      "note": "Local production-build remasure after merging origin/main; measured 46798 B + 400 B retained headroom."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
