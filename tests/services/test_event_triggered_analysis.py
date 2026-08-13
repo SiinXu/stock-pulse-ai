@@ -151,6 +151,50 @@ class TestEventTriggeredAnalysisGates:
         assert second.status == "submitted"
         assert second.task_ids == ("accepted",)
 
+    def test_failed_release_keeps_other_same_timestamp_budget_slot(self) -> None:
+        submission = MagicMock()
+        submission.submit.side_effect = [
+            SimpleNamespace(accepted_tasks=(SimpleNamespace(task_id="kept"),)),
+            SimpleNamespace(accepted_tasks=()),
+        ]
+        state = EventTriggerBudgetState()
+        now = 1_000_000.0
+        service = EventTriggeredAnalysisService(
+            state=state,
+            submission_service=submission,
+            now_provider=lambda: now,
+            security_audit_factory=lambda: MagicMock(),
+        )
+        config = _config(
+            event_triggered_analysis_enabled=True,
+            event_trigger_cooldown_minutes=0,
+            event_trigger_max_per_hour=2,
+            event_trigger_max_per_day=2,
+        )
+
+        first = service.maybe_submit(
+            config=config,
+            stock_code="600519",
+            alert_type="corporate_event",
+            rule_id=9,
+            notification_policy={"auto_analysis": True},
+        )
+        second = service.maybe_submit(
+            config=config,
+            stock_code="000001",
+            alert_type="volume_spike",
+            rule_id=10,
+            notification_policy={"auto_analysis": True},
+        )
+
+        assert first.status == "submitted"
+        assert second.status == "duplicate_or_empty"
+        assert len(state.hourly) == 1
+        assert len(state.daily) == 1
+        kept_token = state.last_submission_tokens["9:600519:corporate_event"]
+        assert state.hourly[0] == (now, kept_token)
+        assert state.daily[0] == (now, kept_token)
+
 
 class TestSuggestedAction:
     def test_corporate_event_links_and_relevance(self) -> None:

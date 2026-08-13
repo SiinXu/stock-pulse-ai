@@ -53,8 +53,8 @@ class EventTriggerBudgetState:
     lock: threading.Lock = field(default_factory=threading.Lock)
     last_submitted_at: Dict[str, float] = field(default_factory=dict)
     last_submission_tokens: Dict[str, object] = field(default_factory=dict)
-    hourly: List[float] = field(default_factory=list)
-    daily: List[float] = field(default_factory=list)
+    hourly: List[Tuple[float, object]] = field(default_factory=list)
+    daily: List[Tuple[float, object]] = field(default_factory=list)
 
 
 _GLOBAL_STATE = EventTriggerBudgetState()
@@ -400,8 +400,9 @@ class EventTriggeredAnalysisService:
                 )
             self.state.last_submitted_at[debounce_key] = now
             self.state.last_submission_tokens[debounce_key] = reservation_token
-            self.state.hourly.append(now)
-            self.state.daily.append(now)
+            budget_slot = (now, reservation_token)
+            self.state.hourly.append(budget_slot)
+            self.state.daily.append(budget_slot)
 
         try:
             task_ids = self._enqueue(
@@ -502,8 +503,8 @@ class EventTriggeredAnalysisService:
     def _prune_windows(self, now: float) -> None:
         hour_cut = now - 3600.0
         day_cut = now - 86400.0
-        self.state.hourly = [ts for ts in self.state.hourly if ts >= hour_cut]
-        self.state.daily = [ts for ts in self.state.daily if ts >= day_cut]
+        self.state.hourly = [slot for slot in self.state.hourly if slot[0] >= hour_cut]
+        self.state.daily = [slot for slot in self.state.daily if slot[0] >= day_cut]
         stale = [key for key, ts in self.state.last_submitted_at.items() if ts < now - 7 * 86400]
         for key in stale:
             self.state.last_submitted_at.pop(key, None)
@@ -516,13 +517,14 @@ class EventTriggeredAnalysisService:
         reservation_token: object,
     ) -> None:
         """Release only this attempt's provisional cooldown and budget slots."""
+        budget_slot = (reserved_at, reservation_token)
         with self.state.lock:
             if self.state.last_submission_tokens.get(debounce_key) is reservation_token:
                 self.state.last_submitted_at.pop(debounce_key, None)
                 self.state.last_submission_tokens.pop(debounce_key, None)
             for window in (self.state.hourly, self.state.daily):
                 try:
-                    window.remove(reserved_at)
+                    window.remove(budget_slot)
                 except ValueError:
                     pass
 

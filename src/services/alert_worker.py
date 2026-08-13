@@ -88,6 +88,7 @@ class DBCooldownDecision:
 class TriggerWriteResult:
     trigger_id: Optional[int] = None
     created: bool = False
+    persisted: bool = False
 
 
 class AlertWorker:
@@ -201,14 +202,6 @@ class AlertWorker:
                         config=config,
                         report_language=report_language,
                     )
-                auto_stats = self._attach_suggested_action_and_auto_analysis_safely(
-                    runtime_rule,
-                    result,
-                    config=config,
-                    report_language=report_language,
-                )
-                stats["auto_analysis_submitted"] += int(auto_stats.get("submitted") or 0)
-                stats["auto_analysis_skipped"] += int(auto_stats.get("skipped") or 0)
             if record_status in WRITABLE_TRIGGER_STATUSES:
                 trigger_write = self._record_trigger_safely(runtime_rule, result, record_status)
                 trigger_id = trigger_write.trigger_id
@@ -217,9 +210,28 @@ class AlertWorker:
                 if record_status in stats and record_status != "triggered":
                     stats[record_status] += 1
             else:
+                trigger_write = TriggerWriteResult()
                 trigger_id = None
 
             if record_status == "triggered":
+                # Persist first so NaN/Inf or DB write failures cannot enqueue
+                # analysis or consume debounce/budget without a durable trigger row.
+                auto_stats = self._attach_suggested_action_and_auto_analysis_safely(
+                    runtime_rule,
+                    result,
+                    config=config,
+                    report_language=report_language,
+                    allow_submit=trigger_write.persisted,
+                )
+                if trigger_write.persisted and trigger_id is not None:
+                    self._refresh_trigger_diagnostics_safely(
+                        trigger_id,
+                        runtime_rule,
+                        result,
+                        record_status,
+                    )
+                stats["auto_analysis_submitted"] += int(auto_stats.get("submitted") or 0)
+                stats["auto_analysis_skipped"] += int(auto_stats.get("skipped") or 0)
                 stats["triggered"] += 1
                 if runtime_rule.source == "db":
                     cooldown_decision = self._check_db_cooldown(runtime_rule, trigger_id)
@@ -388,7 +400,7 @@ class AlertWorker:
             row = self.service.repo.create_trigger(fields)
             created = True
         trigger_id = int(row.id) if row and row.id is not None else None
-        return TriggerWriteResult(trigger_id=trigger_id, created=created)
+        return TriggerWriteResult(trigger_id=trigger_id, created=created, persisted=True)
 
     def _record_trigger_safely(
         self,
@@ -407,7 +419,7 @@ class AlertWorker:
                 level=logging.WARNING,
                 context={"target": self._display_target(runtime_rule)},
             )
-            return TriggerWriteResult()
+            return TriggerWriteResult(persisted=False)
 
     @staticmethod
     def _should_deduplicate_trigger(runtime_rule: RuntimeAlertRule, fields: Dict[str, Any]) -> bool:
@@ -543,11 +555,13 @@ class AlertWorker:
         *,
         config: Any,
         report_language: str = "zh",
+        allow_submit: bool = True,
     ) -> Dict[str, int]:
         """Attach suggested action / deep links and optionally enqueue deep analysis.
 
         Auto-analysis is off by default: both the master config switch and
         notification_policy.auto_analysis must be explicitly enabled.
+        Enqueue only after the trigger row has been persisted.
         """
         stats = {"submitted": 0, "skipped": 0}
         try:
@@ -558,19 +572,28 @@ class AlertWorker:
             )
             stock_code = self._effective_target(runtime_rule)
             rule_id = self.service._runtime_rule_id(getattr(runtime_rule, "rule", runtime_rule))
-            auto_decision = self.event_triggered_analysis.maybe_submit(
-                config=config,
-                stock_code=stock_code,
-                alert_type=alert_type,
-                rule_id=rule_id or None,
-                notification_policy=runtime_rule.notification_policy,
-                trigger_reason=result.get("reason") or result.get("message"),
-            )
-            auto_public = auto_decision.to_public_dict()
-            payload["auto_analysis"] = auto_public
-            if auto_decision.submitted:
-                stats["submitted"] = 1
+            if allow_submit:
+                auto_decision = self.event_triggered_analysis.maybe_submit(
+                    config=config,
+                    stock_code=stock_code,
+                    alert_type=alert_type,
+                    rule_id=rule_id or None,
+                    notification_policy=runtime_rule.notification_policy,
+                    trigger_reason=result.get("reason") or result.get("message"),
+                )
+                auto_public = auto_decision.to_public_dict()
+                payload["auto_analysis"] = auto_public
+                if auto_decision.submitted:
+                    stats["submitted"] = 1
+                else:
+                    stats["skipped"] = 1
             else:
+                auto_public = {
+                    "status": "skipped",
+                    "submitted": False,
+                    "reason": "alert trigger was not persisted",
+                }
+                payload["auto_analysis"] = auto_public
                 stats["skipped"] = 1
 
             impact_context = payload.get("impact_context") if isinstance(payload.get("impact_context"), dict) else None
@@ -600,6 +623,29 @@ class AlertWorker:
             )
             stats["skipped"] = 1
         return stats
+
+    def _refresh_trigger_diagnostics_safely(
+        self,
+        trigger_id: int,
+        runtime_rule: RuntimeAlertRule,
+        result: Dict[str, Any],
+        status: str,
+    ) -> None:
+        """Write post-persist enrichments (suggested action / auto-analysis) onto the row."""
+        try:
+            self.service.repo.update_trigger_diagnostics(
+                trigger_id,
+                self._diagnostics_for_status(status, result, runtime_rule),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(
+                logger,
+                "Alert trigger diagnostics refresh failed",
+                exc,
+                error_code="alert_trigger_diagnostics_refresh_failed",
+                level=logging.WARNING,
+                context={"trigger_id": trigger_id},
+            )
 
     def _resolve_impact_context(
         self,
