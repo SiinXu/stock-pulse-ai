@@ -55,4 +55,20 @@ describe('stock code validation', () => {
     });
     expect(isObviouslyInvalidStockQuery(input)).toBe(false);
   });
+
+  test.each([
+    ['crypto:BTC', 'CRYPTO:BTC'],
+    ['CRYPTO:ETH', 'CRYPTO:ETH'],
+    ['crypto:sol', 'CRYPTO:SOL'],
+  ])('accepts explicit crypto identity %s', (input, normalized) => {
+    expect(looksLikeStockCode(input)).toBe(true);
+    expect(validateStockCode(input)).toEqual({ valid: true, normalized });
+    expect(isObviouslyInvalidStockQuery(input)).toBe(false);
+  });
+
+  test('rejects incomplete crypto namespace and keeps bare BTC as US-shaped', () => {
+    expect(validateStockCode('BTC')).toEqual({ valid: true, normalized: 'BTC' });
+    expect(looksLikeStockCode('crypto:')).toBe(false);
+    expect(validateStockCode('crypto:').valid).toBe(false);
+  });
 });

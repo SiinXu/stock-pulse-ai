@@ -78,12 +78,51 @@ class _PipelineMethods:
         ctx.meta["_approval_deadline_epoch"] = (
             t0 + timeout_s if timeout_s else None
         )
+        ctx.meta["orchestrator_mode"] = self.mode
+        from src.agent.runtime.mode_budget import (
+            get_or_create_context_budget_account,
+            store_budget_snapshot,
+        )
+
+        budget_account = get_or_create_context_budget_account(
+            ctx,
+            self.config,
+            mode=self.mode,
+            chat=ctx.meta.get("response_mode") == "chat",
+        )
+        store_budget_snapshot(ctx, budget_account)
 
         agents = self._build_agent_chain(ctx)
         specialist_agents_inserted = False
         critic_inserted = False
         stage_entry_counts: Dict[str, int] = {}
         index = 0
+
+        # Stage-level exact-replay resume (Issues #121 / #136).
+        from src.services.analysis_stage_checkpoint import (
+            agent_stage_name,
+            build_agent_input_fingerprint,
+            capture_agent_stage_payload,
+            restore_agent_context_from_session,
+            session_from_agent_context,
+        )
+
+        checkpoint_session = session_from_agent_context(ctx)
+        restored_agent_stages: set = set()
+        if checkpoint_session is not None and checkpoint_session.enabled:
+            ctx.meta["_checkpoint_agent_input_fingerprint"] = (
+                build_agent_input_fingerprint(ctx)
+            )
+            restored_agent_stages = set(
+                restore_agent_context_from_session(checkpoint_session, ctx)
+            )
+            if restored_agent_stages:
+                logger.info(
+                    "[Orchestrator] exact-replay resume restored agent stages: %s",
+                    ",".join(sorted(restored_agent_stages)),
+                )
+            if "specialist_batch" in restored_agent_stages:
+                specialist_agents_inserted = True
 
         # Minimum seconds required for a stage to do useful work.  Starting
         # a stage with less budget virtually guarantees a timeout that wastes
@@ -104,6 +143,34 @@ class _PipelineMethods:
         while index < len(agents):
             agent = agents[index]
             elapsed_s = time.time() - t0
+            stage_name_for_resume = str(getattr(agent, "agent_name", "") or "")
+
+            # Exact-replay: skip agent stages already restored from checkpoint.
+            if stage_name_for_resume in restored_agent_stages:
+                logger.info(
+                    "[Orchestrator] skipping restored agent stage '%s' (exact-replay)",
+                    stage_name_for_resume,
+                )
+                skip_result = StageResult(
+                    stage_name=stage_name_for_resume,
+                    status=StageStatus.SKIPPED,
+                    duration_s=0.0,
+                    meta={
+                        "checkpoint_restored": True,
+                        "consistency": "exact_replay",
+                    },
+                )
+                stats.record_stage(skip_result)
+                if progress_callback:
+                    progress_callback(stream_event(
+                        "stage_done",
+                        stage=stage_name_for_resume,
+                        status=StageStatus.SKIPPED.value,
+                        duration=0.0,
+                        checkpoint_restored=True,
+                    ))
+                index += 1
+                continue
 
             # Cancellation wins over timeout / degradation: probe before any
             # other pre-stage gate so a cancelled run terminates as CANCELLED
@@ -186,6 +253,8 @@ class _PipelineMethods:
                     remaining_budget,
                     stage_min_budget_s,
                 )
+                budget_account.record_wall_clock_skip()
+                store_budget_snapshot(ctx, budget_account)
                 self._record_degraded_event(
                     ctx,
                     stage=agent.agent_name,
@@ -259,6 +328,31 @@ class _PipelineMethods:
                             "completed_skill_count": sum(1 for item in batch.stage_results if item.success),
                             "invalid_skill_count": len(batch.invalid_records),
                         }
+                        if (
+                            checkpoint_session is not None
+                            and checkpoint_session.enabled
+                            and batch.stage_results
+                            and all(
+                                item.status == StageStatus.COMPLETED
+                                for item in batch.stage_results
+                            )
+                        ):
+                            try:
+                                checkpoint_session.save_stage(
+                                    agent_stage_name("specialist_batch"),
+                                    capture_agent_stage_payload(
+                                        ctx,
+                                        stage_name="specialist_batch",
+                                    ),
+                                )
+                            except Exception as exc:  # broad-exception: fallback_recorded - Checkpoint failure is logged and disables only optional resume state.
+                                log_safe_exception(
+                                    logger,
+                                    "[Orchestrator] specialist batch checkpoint save failed",
+                                    exc,
+                                    error_code="agent_specialist_checkpoint_save_failed",
+                                    level=logging.WARNING,
+                                )
                         continue
                     agents[index:index] = specialist_agents
                     continue
@@ -321,16 +415,20 @@ class _PipelineMethods:
                     reason=StageFailureReason.LOOP_DETECTED,
                     boundary=DegradationBoundary.BEFORE_STAGE,
                 )
-                return OrchestratorResult(
-                    success=False,
-                    error=f"Stage '{stage_name}' exceeded the re-entry limit",
-                    stats=stats,
-                    total_steps=stats.total_stages,
-                    total_tokens=stats.total_tokens,
-                    tool_calls_log=all_tool_calls,
-                    provider=stats.models_used[0] if stats.models_used else "",
-                    model=", ".join(stats.models_used),
-                    runtime_facts=build_agent_runtime_facts(ctx),
+                return self._with_budget_snapshot(
+                    OrchestratorResult(
+                        success=False,
+                        error=f"Stage '{stage_name}' exceeded the re-entry limit",
+                        stats=stats,
+                        total_steps=stats.total_stages,
+                        total_tokens=stats.total_tokens,
+                        tool_calls_log=all_tool_calls,
+                        provider=stats.models_used[0] if stats.models_used else "",
+                        model=", ".join(stats.models_used),
+                        runtime_facts=build_agent_runtime_facts(ctx),
+                        failure_reason=StageFailureReason.LOOP_DETECTED.value,
+                    ),
+                    ctx,
                 )
             stage_entry_counts[stage_name] = observed_entries
 
@@ -375,6 +473,25 @@ class _PipelineMethods:
                     raise TypeError("Stage agent returned an invalid result")
                 if result.status == StageStatus.COMPLETED:
                     self._commit_stage_context(ctx, staged_ctx)
+                    if checkpoint_session is not None and checkpoint_session.enabled:
+                        try:
+                            checkpoint_session.save_stage(
+                                agent_stage_name(stage_name),
+                                capture_agent_stage_payload(
+                                    ctx,
+                                    stage_name=stage_name,
+                                    stage_result=result,
+                                ),
+                            )
+                        except Exception as exc:  # broad-exception: fallback_recorded - Checkpoint failure is logged and disables only optional resume state.
+                            log_safe_exception(
+                                logger,
+                                "[Orchestrator] stage checkpoint save failed",
+                                exc,
+                                error_code="agent_stage_checkpoint_save_failed",
+                                level=logging.WARNING,
+                                context={"stage": stage_name},
+                            )
             except TimeoutError as exc:
                 log_safe_exception(
                     logger,
@@ -805,13 +922,26 @@ class _PipelineMethods:
                     continue
 
             # Isolate eligible support-stage failures unless fail-fast is explicit.
+            # Mode hard-budget breaches never isolate: terminate with explicit reason.
             if result.status == StageStatus.FAILED:
+                hard_budget_failure = failure_reason in {
+                    StageFailureReason.BUDGET_TURNS,
+                    StageFailureReason.BUDGET_TOOLS,
+                    StageFailureReason.BUDGET_COST,
+                    StageFailureReason.BUDGET_TOKENS,
+                }
                 should_isolate = (
-                    self.runtime_guard_policy.stage_failure_policy
+                    not hard_budget_failure
+                    and self.runtime_guard_policy.stage_failure_policy
                     == StageFailurePolicy.ISOLATE
                     and self._is_non_critical_stage(stage_name)
                 )
                 if not should_isolate:
+                    stop_error = (
+                        result.error
+                        if hard_budget_failure and result.error
+                        else f"Stage '{stage_name}' failed"
+                    )
                     log_runtime_guard_event(
                         logger,
                         "stage_failure_fail_fast",
@@ -821,14 +951,23 @@ class _PipelineMethods:
                         reason=failure_reason.value,
                         policy=self.runtime_guard_policy.stage_failure_policy.value,
                         action="stop",
+                        hard_budget=hard_budget_failure,
                     )
-                    return OrchestratorResult(
-                        success=False,
-                        error=f"Stage '{stage_name}' failed",
-                        stats=stats,
-                        total_tokens=stats.total_tokens,
-                        tool_calls_log=all_tool_calls,
-                        runtime_facts=build_agent_runtime_facts(ctx),
+                    return self._with_budget_snapshot(
+                        OrchestratorResult(
+                            success=False,
+                            error=stop_error,
+                            stats=stats,
+                            total_tokens=stats.total_tokens,
+                            tool_calls_log=all_tool_calls,
+                            runtime_facts=build_agent_runtime_facts(ctx),
+                            failure_reason=(
+                                failure_reason.value
+                                if failure_reason is not None
+                                else StageFailureReason.STAGE_FAILURE.value
+                            ),
+                        ),
+                        ctx,
                     )
                 else:
                     self._record_degraded_stage(ctx, stage_name, result)
@@ -902,31 +1041,37 @@ class _PipelineMethods:
             )
 
         if parse_dashboard and dashboard is None:
-            return OrchestratorResult(
-                success=False,
+            return self._with_budget_snapshot(
+                OrchestratorResult(
+                    success=False,
+                    content=content,
+                    dashboard=None,
+                    tool_calls_log=all_tool_calls,
+                    total_steps=stats.total_stages,
+                    total_tokens=stats.total_tokens,
+                    provider=provider,
+                    model=model_str,
+                    error="Failed to parse dashboard JSON from agent response",
+                    stats=stats,
+                    runtime_facts=build_agent_runtime_facts(ctx),
+                ),
+                ctx,
+            )
+
+        return self._with_budget_snapshot(
+            OrchestratorResult(
+                success=bool(content),
                 content=content,
-                dashboard=None,
+                dashboard=dashboard,
                 tool_calls_log=all_tool_calls,
                 total_steps=stats.total_stages,
                 total_tokens=stats.total_tokens,
                 provider=provider,
                 model=model_str,
-                error="Failed to parse dashboard JSON from agent response",
                 stats=stats,
                 runtime_facts=build_agent_runtime_facts(ctx),
-            )
-
-        return OrchestratorResult(
-            success=bool(content),
-            content=content,
-            dashboard=dashboard,
-            tool_calls_log=all_tool_calls,
-            total_steps=stats.total_stages,
-            total_tokens=stats.total_tokens,
-            provider=provider,
-            model=model_str,
-            stats=stats,
-            runtime_facts=build_agent_runtime_facts(ctx),
+            ),
+            ctx,
         )
 
     # -----------------------------------------------------------------

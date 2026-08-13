@@ -4,7 +4,8 @@ interface ValidationResult {
   normalized: string;
 }
 
-const SUPPORTED_QUERY_CHARACTERS = /^[A-Z0-9.\u3400-\u9FFF\s]+$/;
+// Colon allowed for crypto:TICKER identities.
+const SUPPORTED_QUERY_CHARACTERS = /^[A-Z0-9.:\u3400-\u9FFF\s_-]+$/;
 
 const STOCK_CODE_PATTERNS = [
   /^\d{6}$/, // A-share 6-digit code
@@ -18,6 +19,7 @@ const STOCK_CODE_PATTERNS = [
   /^\d{6}\.(KS|KQ)$/, // Korea Yahoo suffix format, for example 005930.KS or 035720.KQ
   /^\d{4,6}\.(TW|TWO)$/, // Taiwan Yahoo suffix formats
   /^[A-Z]{1,5}(?:\.(?:US|[A-Z]))?$/, // Common US ticker format
+  /^CRYPTO:[A-Z0-9][A-Z0-9._-]{0,31}$/, // Explicit crypto namespace only
 ];
 
 /**
@@ -29,7 +31,7 @@ export const looksLikeStockCode = (value: string): boolean => {
 };
 
 /**
- * Validate common A-share, HK, US, JP, and KR stock code formats.
+ * Validate common A-share, HK, US, JP, KR, TW, and crypto stock code formats.
  *
  * Bare 4-digit codes are accepted as Hong Kong stocks and rewritten to the
  * explicit ``HKxxxxx`` form so API/watchlist callers that only consume the

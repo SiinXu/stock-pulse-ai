@@ -19,7 +19,7 @@ from src.migrations.registry import (
     get_migrations,
 )
 from src.migrations.runner import MigrationRunner
-from src.migrations.versions import v202608120001_agent_prediction_schema as migration_mod
+from src.migrations.versions import v202608130001_agent_prediction_schema as migration_mod
 from src.repositories.agent_prediction_repo import (
     AgentPredictionRepository,
     _is_unique_or_primary_key_conflict,

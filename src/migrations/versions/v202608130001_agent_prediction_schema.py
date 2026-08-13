@@ -5,7 +5,7 @@
 from src.migrations.types import Migration, MigrationExecution
 
 
-MIGRATION_ID = "202608120001_agent_prediction_schema"
+MIGRATION_ID = "202608130001_agent_prediction_schema"
 DESCRIPTION = "Create agent_predictions table with due-scan and status indexes"
 
 # Status set covers Issue #1112 (pending/resolved/data_unavailable + resolving)

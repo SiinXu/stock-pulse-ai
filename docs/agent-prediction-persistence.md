@@ -29,13 +29,13 @@ This slice is **schema + repository CAS** only. It does not extract claims, fetc
 
 | Path | Role |
 | --- | --- |
-| `src/migrations/versions/v202608120001_agent_prediction_schema.py` | Additive table, indexes, resolved immutability trigger, downgrade |
+| `src/migrations/versions/v202608130001_agent_prediction_schema.py` | Additive table, indexes, resolved immutability trigger, downgrade |
 | `src/repositories/agent_prediction_tables.py` | SQLAlchemy table projection |
 | `src/repositories/agent_prediction_repo.py` | Insert / due list / claim / resolve CAS |
 | `src/schemas/agent_prediction.py` | Status constants and detached record types |
 | `tests/repositories/test_agent_prediction_repo.py` | Real SQLite coverage including concurrent writes |
 
-Migration id: `202608120001_agent_prediction_schema`.
+Migration id: `202608130001_agent_prediction_schema`.
 
 ## Table: `agent_predictions`
 

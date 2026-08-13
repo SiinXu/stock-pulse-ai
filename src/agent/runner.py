@@ -36,6 +36,9 @@ parse_dashboard_json = _runner_parsing.parse_dashboard_json
 parse_dashboard_json_result = _runner_parsing.parse_dashboard_json_result
 run_agent_loop = _runner_loop.run_agent_loop
 _NATIVE_TOOL_RESULT_MAX_BYTES = _runner_loop._NATIVE_TOOL_RESULT_MAX_BYTES
+_record_usage_with_optional_attribution = (
+    _runner_loop._record_usage_with_optional_attribution
+)
 
 from src.agent.dashboard_payload import (
     has_reserved_explanation_field,
@@ -70,6 +73,11 @@ from src.agent.runtime.guards import (
     RuntimeGuardPolicy,
     log_runtime_guard_event,
     runtime_guard_fingerprint,
+)
+from src.agent.runtime.mode_budget import (
+    ModeBudgetAccount,
+    budget_breach_from_max_steps,
+    estimate_usage_cost_usd,
 )
 from src.agent.stock_scope import StockScope
 from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
@@ -138,6 +146,8 @@ class RunLoopResult:
     messages: List[Dict[str, Any]] = field(default_factory=list)
     cancelled: bool = False
     timed_out: bool = False
+    # Unified mode-budget diagnostic snapshot (limits / used / breach).
+    budget_snapshot: Optional[Dict[str, Any]] = None
 
     @property
     def model(self) -> str:
@@ -323,6 +333,7 @@ _RESULT_FUNCTION_NAMES = (
     "_build_timeout_result",
     "_build_cancelled_result",
     "_build_budget_guard_result",
+    "_build_mode_budget_result",
     "_build_tool_loop_result",
 )
 _LOOP_FUNCTION_NAMES = ("run_agent_loop",)
@@ -368,6 +379,9 @@ _RUNNER_COMPAT_EXPORTS = (
     ToolCall,
     ToolRegistry,
     UsageRecorder,
+    ModeBudgetAccount,
+    budget_breach_from_max_steps,
+    estimate_usage_cost_usd,
     _THINKING_TOOL_LABELS,
     _ToolCompletionFence,
     _build_tool_cache_key,

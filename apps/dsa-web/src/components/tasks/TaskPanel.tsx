@@ -3,6 +3,11 @@ import { ChevronDown, RefreshCw, Workflow, X } from 'lucide-react';
 import { Badge, Card, IconButton, Progress, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
+import {
+  isActiveTaskStatus,
+  isTerminalTaskStatus,
+  normalizeTaskProgress,
+} from '../../utils/asyncTaskUx';
 import { getRequestedPhaseLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatTaskMessage } from '../../utils/taskMessage';
@@ -24,7 +29,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
   const isInterrupted = task.status === 'interrupted';
-  const isTerminal = isCompleted || isFailed || isCancelled || isInterrupted;
+  const isTerminal = isTerminalTaskStatus(task.status);
   const statusLabel = isCompleted
     ? t('taskPanel.completed')
     : isFailed
@@ -46,7 +51,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
     : isFailed
       ? 'danger'
       : isInterrupted || isCancelRequested ? 'warning' : isProcessing ? 'info' : 'neutral';
-  const progress = Math.max(0, Math.min(100, task.progress || 0));
+  const progress = normalizeTaskProgress(task.progress);
   const traceId = (task.traceId || '').trim();
   const requestedPhaseLabel = getRequestedPhaseLabel(task.analysisPhase, language);
   const requestedPhaseVariant = task.analysisPhase === 'auto' ? 'default' : 'info';
@@ -207,15 +212,8 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
   const { t } = useUiLanguage();
   // Keep active tasks first and recently terminal tasks after them so users can
   // see the latest result before dismissing it.
-  const activeTasks = tasks.filter(
-    (t) => t.status === 'pending' || t.status === 'processing' || t.status === 'cancel_requested'
-  );
-  const terminalTasks = tasks.filter(
-    (t) => t.status === 'completed'
-      || t.status === 'failed'
-      || t.status === 'cancelled'
-      || t.status === 'interrupted'
-  );
+  const activeTasks = tasks.filter((task) => isActiveTaskStatus(task.status));
+  const terminalTasks = tasks.filter((task) => isTerminalTaskStatus(task.status));
   const orderedTasks = [...activeTasks, ...terminalTasks];
 
   // Avoid mounting an empty or hidden panel.
