@@ -1337,6 +1337,63 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertIn("另有 1 个策略解析失败", wechat)
 
     @mock.patch("src.notification.get_config")
+    def test_committee_deliberation_renders_through_public_notification_entries(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="AAPL",
+            name="Apple",
+            sentiment_score=50,
+            trend_prediction="Sideways",
+            operation_advice="Hold",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Committee remains split"},
+                "committee_deliberation": {
+                    "schema_version": "committee-deliberation-v1",
+                    "status": "split",
+                    "outcome": "hold",
+                    "conclusion": {
+                        "final_signal": "hold",
+                        "consensus_level": "low",
+                        "conflict_severity": "high",
+                        "confidence": 0.6594,
+                        "conflict_count": 2,
+                    },
+                    "members": [
+                        {
+                            "persona_id": "persona_value_moat",
+                            "display_name": "Value & Moat",
+                            "signal": "buy",
+                            "confidence": 0.8,
+                        },
+                        {
+                            "persona_id": "persona_tail_risk",
+                            "display_name": "Tail Risk",
+                            "signal": "sell",
+                            "confidence": 0.75,
+                        },
+                    ],
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report(
+            [result], report_date="2026-08-13"
+        )
+        wechat = service.generate_wechat_dashboard([result])
+
+        for rendered in (markdown, wechat):
+            self.assertIn("Investment Committee Deliberation", rendered)
+            self.assertIn("Value & Moat", rendered)
+            self.assertIn("Tail Risk", rendered)
+        self.assertIn("Committee Conclusion", markdown)
+        self.assertIn("Final Signal: Hold", markdown)
+        self.assertIn("Consensus: Low", markdown)
+
+    @mock.patch("src.notification.get_config")
     def test_strategy_synthesis_uses_english_empty_labels_in_fallback_reports(
         self, mock_get_config: mock.MagicMock
     ):
