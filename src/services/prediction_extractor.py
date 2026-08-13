@@ -50,6 +50,10 @@ logger = logging.getLogger(__name__)
 PREDICTION_EXTRACTOR_VERSION = "prediction-extractor-v1"
 DEFAULT_DECISION_HORIZON: PredictionHorizon = "5d"
 
+# Set by dashboard finalization when confidence_level comes from the 0.5
+# presentation fallback rather than a model/opinion claim. Must not mint claims.
+PRESENTATION_CONFIDENCE_FLAG = "_prediction_confidence_is_presentation"
+
 # Strict enum maps only — no phrase / prose matching.
 _DECISION_TYPE_DIRECTION = {
     "buy": "up",
@@ -438,11 +442,33 @@ def _unverifiable(
     )
 
 
+def drop_presentation_confidence(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """Remove finalizer presentation confidence so it cannot mint a claim."""
+    out = dict(payload)
+    out.pop("confidence", None)
+    out.pop("confidence_level", None)
+    out.pop(PRESENTATION_CONFIDENCE_FLAG, None)
+    nested = out.get("dashboard")
+    if isinstance(nested, Mapping):
+        nested = dict(nested)
+        nested.pop("confidence", None)
+        nested.pop("confidence_level", None)
+        nested.pop(PRESENTATION_CONFIDENCE_FLAG, None)
+        out["dashboard"] = nested
+    return out
+
+
+def _apply_presentation_confidence_policy(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if payload.pop(PRESENTATION_CONFIDENCE_FLAG, False):
+        return drop_presentation_confidence(payload)
+    return payload
+
+
 def _coerce_source_mapping(source: ExtractionSource) -> Dict[str, Any]:
     if source is None:
         return {}
     if isinstance(source, Mapping):
-        return dict(source)
+        return _apply_presentation_confidence_policy(dict(source))
 
     # AnalysisResult carries normalized presentation defaults (for example
     # action=hold and confidence_level=medium). Trust only its preserved raw
@@ -457,7 +483,7 @@ def _coerce_source_mapping(source: ExtractionSource) -> Dict[str, Any]:
         dashboard = getattr(source, "dashboard", None)
         if isinstance(dashboard, Mapping):
             out.setdefault("dashboard", dict(dashboard))
-        return out
+        return _apply_presentation_confidence_policy(out)
 
     # Duck-typed AnalysisResult / similar objects.
     out: Dict[str, Any] = {}
@@ -513,7 +539,7 @@ def _coerce_source_mapping(source: ExtractionSource) -> Dict[str, Any]:
                     out.setdefault(key, value)
         except Exception:  # broad-exception: optional_metadata - to_dict optional for duck-typed sources
             pass
-    return out
+    return _apply_presentation_confidence_policy(out)
 
 
 def _normalize_symbol_token(raw: Any) -> Optional[str]:
@@ -1096,7 +1122,9 @@ def _compute_resolve_after(
 __all__ = [
     "DEFAULT_DECISION_HORIZON",
     "PREDICTION_EXTRACTOR_VERSION",
+    "PRESENTATION_CONFIDENCE_FLAG",
     "PredictionExtractionResult",
+    "drop_presentation_confidence",
     "extract_prediction_record",
     "is_prediction_extract_enabled",
     "maybe_extract_prediction_on_finalize",

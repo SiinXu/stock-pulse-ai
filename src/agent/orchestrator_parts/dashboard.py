@@ -36,6 +36,10 @@ from src.services.approval_service import ApprovalService as _ApprovalService
 from src.utils.sanitize import log_safe_exception
 from src.agent.runner import parse_dashboard_json
 from src.report_language import normalize_report_language
+from src.services.prediction_extractor import (
+    PRESENTATION_CONFIDENCE_FLAG as _PRESENTATION_CONFIDENCE_FLAG,
+    drop_presentation_confidence as _drop_presentation_confidence,
+)
 
 if TYPE_CHECKING:
     from src.agent.orchestrator import (
@@ -60,6 +64,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("src.agent.orchestrator")
 _PREPARED_DECISION_TYPE_INSERTED = "_prepared_dashboard_decision_type_inserted"
+
+
+def _dashboard_content_json(dashboard: Dict[str, Any]) -> str:
+    """Serialize a dashboard without leaking the internal presentation flag."""
+    public = dict(dashboard)
+    public.pop(_PRESENTATION_CONFIDENCE_FLAG, None)
+    return json.dumps(public, ensure_ascii=False, indent=2)
 
 
 class _DashboardMethods:
@@ -319,7 +330,7 @@ class _DashboardMethods:
         if parse_dashboard:
             dashboard = self._resolve_dashboard_payload(ctx, final_dashboard, final_raw)
             if dashboard is not None:
-                return dashboard, json.dumps(dashboard, ensure_ascii=False, indent=2)
+                return dashboard, _dashboard_content_json(dashboard)
             if ctx.opinions:
                 return None, self._fallback_summary(ctx)
             return None, ""
@@ -331,7 +342,7 @@ class _DashboardMethods:
         if isinstance(final_dashboard, dict):
             dashboard = self._finalize_dashboard_payload(final_dashboard, ctx)
             if dashboard is not None:
-                return dashboard, json.dumps(dashboard, ensure_ascii=False, indent=2)
+                return dashboard, _dashboard_content_json(dashboard)
         if ctx.opinions:
             return None, self._fallback_summary(ctx)
         return None, ""
@@ -397,8 +408,7 @@ class _DashboardMethods:
             if base_opinion is None:
                 # Dashboard finalization supplies a presentation-only 0.5
                 # fallback. It is not model confidence and must not mint a claim.
-                source.pop("confidence", None)
-                source.pop("confidence_level", None)
+                source = _drop_presentation_confidence(source)
             else:
                 source["confidence"] = base_opinion.confidence
             extraction = maybe_extract_prediction_on_finalize(
@@ -495,6 +505,8 @@ class _DashboardMethods:
             )
         )
         confidence = float(base_opinion.confidence if base_opinion is not None else 0.5)
+        if base_opinion is None:
+            payload[_PRESENTATION_CONFIDENCE_FLAG] = True
         sentiment_score = payload.get("sentiment_score")
         try:
             sentiment_score = int(sentiment_score)

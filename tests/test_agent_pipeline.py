@@ -677,6 +677,43 @@ class TestAgentResultConversion(unittest.TestCase):
         self.assertEqual(result.prediction_source["confidence_level"], "高")
         self.assertNotIn("risk_manager", result.prediction_source)
 
+    def test_convert_keeps_presentation_confidence_flag_on_prediction_source_only(self):
+        """Finalizer presentation fallback must stay on prediction_source, not the live dashboard."""
+        pipeline = self._make_pipeline()
+
+        from src.agent.executor import AgentResult
+        from src.enums import ReportType
+        from src.services.prediction_extractor import PRESENTATION_CONFIDENCE_FLAG
+
+        dashboard = {
+            "stock_name": "贵州茅台",
+            "sentiment_score": 80,
+            "trend_prediction": "看多",
+            "operation_advice": "买入",
+            "decision_type": "hold",
+            "action": "buy",
+            "confidence_level": "中",
+            PRESENTATION_CONFIDENCE_FLAG: True,
+            "dashboard": {"core_conclusion": {"one_sentence": "看好"}},
+            "analysis_summary": "Testing",
+        }
+
+        agent_result = AgentResult(
+            success=True,
+            content="",
+            dashboard=dashboard,
+            provider="gemini",
+        )
+
+        result = pipeline._agent_result_to_analysis_result(
+            agent_result, "600519", "贵州茅台", ReportType.SIMPLE, "q-presentation"
+        )
+
+        self.assertTrue(result.prediction_source[PRESENTATION_CONFIDENCE_FLAG])
+        self.assertEqual(result.prediction_source["confidence_level"], "中")
+        self.assertNotIn(PRESENTATION_CONFIDENCE_FLAG, result.dashboard)
+        self.assertNotIn(PRESENTATION_CONFIDENCE_FLAG, dashboard)
+
     def test_convert_preserves_top_level_phase_decision_with_nested_dashboard(self):
         """Agent top-level phase_decision should survive nested dashboard unwrapping."""
         pipeline = self._make_pipeline()

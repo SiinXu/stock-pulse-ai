@@ -421,6 +421,8 @@ class _PersistenceStageMixin:
         """
         try:
             from src.services.prediction_extractor import (
+                PRESENTATION_CONFIDENCE_FLAG,
+                drop_presentation_confidence,
                 maybe_extract_prediction_on_finalize,
             )
 
@@ -431,6 +433,8 @@ class _PersistenceStageMixin:
             dashboard = getattr(result, "dashboard", None)
             if isinstance(dashboard, dict):
                 source.setdefault("dashboard", dict(dashboard))
+            if source.pop(PRESENTATION_CONFIDENCE_FLAG, False):
+                source = drop_presentation_confidence(source)
 
             extraction = maybe_extract_prediction_on_finalize(
                 source,

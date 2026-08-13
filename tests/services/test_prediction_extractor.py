@@ -477,6 +477,168 @@ class TestReviewConvergence:
         assert extraction["record"]["status"] == "no_verifiable_claim"
         assert extraction["record"]["claims"] == []
 
+    def test_presentation_confidence_flag_does_not_mint_agent_action_claim(
+        self, mock_resolve_after
+    ) -> None:
+        from src.services.prediction_extractor import PRESENTATION_CONFIDENCE_FLAG
+
+        result = extract_prediction_record(
+            {
+                "code": "600519",
+                "action": "buy",
+                "decision_type": "hold",
+                "confidence_level": "中",
+                PRESENTATION_CONFIDENCE_FLAG: True,
+            },
+            run_id="run-presentation-flag",
+            created_at=CREATED,
+            as_of=AS_OF,
+            mode="agent",
+        )
+        assert result.verifiable is False
+        assert result.record is not None
+        assert result.record.claims == []
+        assert result.record.status == "no_verifiable_claim"
+
+    def test_history_save_hook_strips_presentation_confidence(
+        self, mock_resolve_after
+    ) -> None:
+        from src.core.stages.persistence import _PersistenceStageMixin
+        from src.services.prediction_extractor import PRESENTATION_CONFIDENCE_FLAG
+
+        pipeline = _PersistenceStageMixin()
+        pipeline.config = SimpleNamespace(prediction_extract_enabled=True)
+        result = SimpleNamespace(
+            code="600519",
+            name="Test",
+            model_used="test-model",
+            prediction_source={
+                "code": "600519",
+                "action": "buy",
+                "decision_type": "hold",
+                "confidence_level": "中",
+                PRESENTATION_CONFIDENCE_FLAG: True,
+            },
+            dashboard={"core_conclusion": {"one_sentence": "display only"}},
+        )
+
+        pipeline._extract_prediction_after_history_save(
+            result=result,
+            query_id="query-presentation",
+            source_report_id=41,
+            mode="agent",
+        )
+
+        extraction = result.prediction_extraction
+        assert extraction["verifiable"] is False
+        assert extraction["record"]["status"] == "no_verifiable_claim"
+        assert extraction["record"]["claims"] == []
+
+    def test_history_save_hook_keeps_real_structured_confidence(
+        self, mock_resolve_after
+    ) -> None:
+        from src.core.stages.persistence import _PersistenceStageMixin
+
+        pipeline = _PersistenceStageMixin()
+        pipeline.config = SimpleNamespace(prediction_extract_enabled=True)
+        result = SimpleNamespace(
+            code="600519",
+            name="Test",
+            model_used="test-model",
+            prediction_source={
+                "code": "600519",
+                "action": "buy",
+                "confidence": 0.8,
+            },
+            dashboard={},
+        )
+
+        pipeline._extract_prediction_after_history_save(
+            result=result,
+            query_id="query-real-confidence",
+            source_report_id=41,
+            mode="agent",
+        )
+
+        extraction = result.prediction_extraction
+        assert extraction["verifiable"] is True
+        assert extraction["record"]["claims"][0]["payload"]["direction"] == "up"
+        assert extraction["record"]["claims"][0]["confidence"] == 0.8
+
+    def test_agent_finalize_sets_presentation_flag_without_base_opinion(self) -> None:
+        from unittest.mock import MagicMock
+
+        from src.agent.orchestrator import AgentOrchestrator
+        from src.agent.orchestrator_parts.dashboard import _dashboard_content_json
+        from src.agent.protocols import AgentContext
+        from src.services.prediction_extractor import PRESENTATION_CONFIDENCE_FLAG
+
+        orchestrator = AgentOrchestrator(
+            tool_registry=MagicMock(),
+            llm_adapter=MagicMock(),
+        )
+        ctx = AgentContext(query="test", stock_code="600519", stock_name="Test")
+        dashboard = orchestrator._finalize_dashboard_payload(
+            {"action": "buy", "analysis_summary": "No opinions"},
+            ctx,
+        )
+
+        assert dashboard is not None
+        assert dashboard[PRESENTATION_CONFIDENCE_FLAG] is True
+        assert dashboard["confidence_level"] == "中"
+        content = _dashboard_content_json(dashboard)
+        assert PRESENTATION_CONFIDENCE_FLAG not in content
+
+    def test_agent_finalize_does_not_mark_real_opinion_confidence(self) -> None:
+        from unittest.mock import MagicMock
+
+        from src.agent.orchestrator import AgentOrchestrator
+        from src.agent.protocols import AgentContext, AgentOpinion
+        from src.services.prediction_extractor import PRESENTATION_CONFIDENCE_FLAG
+
+        orchestrator = AgentOrchestrator(
+            tool_registry=MagicMock(),
+            llm_adapter=MagicMock(),
+        )
+        ctx = AgentContext(query="test", stock_code="600519", stock_name="Test")
+        ctx.add_opinion(AgentOpinion(agent_name="decision", signal="buy", confidence=0.8))
+        dashboard = orchestrator._finalize_dashboard_payload(
+            {"action": "buy", "analysis_summary": "Has opinion"},
+            ctx,
+        )
+
+        assert dashboard is not None
+        assert PRESENTATION_CONFIDENCE_FLAG not in dashboard
+        assert dashboard["confidence_level"] == "高"
+
+    def test_agent_finalize_hook_rejects_action_with_presentation_confidence(
+        self,
+    ) -> None:
+        from src.agent.orchestrator_parts.dashboard import _DashboardMethods
+        from src.agent.protocols import AgentContext
+
+        orchestrator = _DashboardMethods()
+        orchestrator.config = SimpleNamespace(prediction_extract_enabled=True)
+        ctx = AgentContext(
+            stock_code="600519",
+            stock_name="Test",
+            session_id="agent-session-action",
+        )
+
+        orchestrator._maybe_extract_prediction_on_finalize(
+            {
+                "action": "buy",
+                "confidence_level": "中",
+                "analysis_summary": "Finalizer fallback",
+            },
+            ctx,
+        )
+
+        extraction = ctx.meta["prediction_extraction"]
+        assert extraction["verifiable"] is False
+        assert extraction["record"]["status"] == "no_verifiable_claim"
+        assert extraction["record"]["claims"] == []
+
     def test_agent_finalize_hook_does_not_truncate_overlong_run_id(self) -> None:
         from src.agent.orchestrator_parts.dashboard import _DashboardMethods
         from src.agent.protocols import AgentContext
