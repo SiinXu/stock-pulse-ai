@@ -135,6 +135,14 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--rebaseline-collateral",
+        action="store_true",
+        help=(
+            "with --remeasure, also record the measured size of chunks that "
+            "neither side changed but that the merged build pushed over budget"
+        ),
+    )
+    parser.add_argument(
         "--no-stage",
         action="store_true",
         help="write the resolved files but do not `git add` them",
@@ -160,7 +168,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"merge-resolvers: {exc}", file=sys.stderr)
         return EXIT_INTERNAL_ERROR
 
-    ctx = Context(repo_root=repo, remeasure=args.remeasure)
+    if args.rebaseline_collateral and not args.remeasure:
+        parser.error("--rebaseline-collateral requires --remeasure")
+
+    ctx = Context(
+        repo_root=repo,
+        remeasure=args.remeasure,
+        rebaseline_collateral=args.rebaseline_collateral,
+    )
 
     try:
         paths = [_normalise(repo, argument) for argument in args.paths]

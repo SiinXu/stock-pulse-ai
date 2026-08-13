@@ -54,6 +54,7 @@ class Context:
 
     repo_root: Path
     remeasure: bool = False
+    rebaseline_collateral: bool = False
 
     def git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         proc = subprocess.run(

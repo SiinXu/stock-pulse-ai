@@ -438,19 +438,41 @@ def _apply_measurements(
         )
         notes.append(f"{rule_id}: measured {actual} B, budget {actual + headroom} B")
 
-    regressions = []
-    for rule_id, actual in measured.items():
+    collateral = []
+    for rule_id, actual in sorted(measured.items()):
         if rule_id in ambiguous or rule_id not in merged_rules:
             continue
         cap = merged_rules[rule_id].get("maxGzipBytes")
         if isinstance(cap, int) and actual > cap:
-            regressions.append(f"{rule_id} ({actual} B > {cap} B)")
-    if regressions:
+            collateral.append((rule_id, actual, cap))
+    if collateral and not ctx.rebaseline_collateral:
         raise Refusal(
             rel_path,
-            "the merged build exceeds budgets that neither side touched: "
-            + ", ".join(sorted(regressions))
-            + "; this is a real regression, not a merge artefact",
+            "the merged build exceeds budgets that neither side changed: "
+            + ", ".join(
+                f"{rule_id} ({actual} B > {cap} B)"
+                for rule_id, actual, cap in collateral
+            )
+            + ". Each side is individually within budget, so this is cumulative "
+            "growth of a shared chunk. Re-run with --rebaseline-collateral to "
+            "record the measured merged size, or review whether the growth is "
+            "acceptable first.",
+        )
+    for rule_id, actual, cap in collateral:
+        rule = merged_rules[rule_id]
+        headroom = max(_headroom(rule) or 0, DEFAULT_HEADROOM_BYTES)
+        rule["measuredGzipBytes"] = actual
+        rule["maxGzipBytes"] = actual + headroom
+        rule["note"] = (
+            f"Collateral rebaseline from the merged-tree production build "
+            f"({context_label}): neither side changed this rule and each side is "
+            f"individually within the previous {cap} B budget, but the shared "
+            f"chunk grows cumulatively. Measured {actual} B with {headroom} B "
+            "headroom."
+        )
+        notes.append(
+            f"{rule_id}: collateral growth {cap} B -> measured {actual} B, "
+            f"budget {actual + headroom} B"
         )
     return notes
 
