@@ -47,8 +47,11 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 ### Manifest `permissions`（声明 ≠ 沙箱）
 
-- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read`）。
+- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read` 或 `alt_data:read`）。
 - 加载/启用时若工具要求未声明能力，将以稳定错误码 `manifest_permissions_undeclared` 拒绝该插件（失败隔离，不影响核心与其它插件）。
+- 另类 / 支持性数据工具使用能力 `alt_data:read`，契约见
+  [另类数据插件契约](alternative-data-plugin-contract_zh.md)
+  （默认关闭、非权威、失败为缺口而非编造）。
 - 允许声明多余权限；空列表表示工具不得要求任何能力。
 - **声明 ≠ 沙箱隔离**：插件代码仍以进程同等权限运行。
 

@@ -1,8 +1,15 @@
+---
+name: analyze-pr
+description: Analyze a GitHub pull request for necessity, description completeness, verification evidence, risks, and merge readiness. Pairs with review-pr for the blocking-vs-nit checklist.
+---
+
 # Analyze PR
 
 分析 GitHub Pull Request，评估必要性、描述完整性、验证证据、主要风险与是否可直接合入。
 
 **Repository**: https://github.com/SiinXu/stock-pulse-ai/pulls
+
+**Source of truth**: repository root `AGENTS.md`. Issue #890 review entry: `/review-pr`. Hard rules: `.claude/skills/references/hard-rules.md`.
 
 ## Usage
 
@@ -95,6 +102,12 @@ gh run view <run_id> --log-failed
 - 是否破坏 API / Schema / Web / Desktop 兼容性
 - 是否破坏 fallback、降级路径、通知链路或发布流程
 - 是否存在明显逻辑错误、异常吞没、安全问题、配置语义变化未同步文档
+- **Config registry**：新增 `.env.example` 键是否已注册（hard-rules §2）
+- **Reachability**：用户可达性证据（hard-rules §3）
+- **Squash 正文体检**：标题/正文是否与最终 head 一致（hard-rules §1）
+- **Merge train**（若适用）：无产品代码编辑、Cancelled 不算通过（hard-rules §5）
+
+区分 **Blocker** 与 **Nit**（完整表见 `/review-pr`）。任一 Blocker → 不可建议合入。
 
 ### Step 6: 生成评审文档
 
