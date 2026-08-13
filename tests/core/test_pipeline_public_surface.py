@@ -76,6 +76,7 @@ EXPECTED_ANALYSIS_METHODS = (
     "_attach_daily_market_context",
     "_agent_result_to_analysis_result",
     "_refresh_decision_action_for_final_result",
+    "_apply_info_quality_constraints",
     "_agent_dashboard_value",
     "_extract_advice_text_from_dict",
     "_is_agent_placeholder_text",

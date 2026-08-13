@@ -318,6 +318,51 @@ def test_invalid_dashboard_risk_evidence_fails_closed_without_truthy_coercion():
     assert "invalid_risk_evidence" in result.evidence_codes
 
 
+def test_grade_c_is_real_risk_evidence_only_when_forced_conclusion_is_enabled():
+    dashboard = {
+        "decision_type": "buy",
+        "info_quality": {
+            "schema_version": "info-quality-v1",
+            "grade": "C",
+        },
+    }
+
+    enabled = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        dashboard=dashboard,
+        info_quality_risk_enabled=True,
+    )
+    disabled = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        dashboard=dashboard,
+        info_quality_risk_enabled=False,
+    )
+
+    enabled_result = evaluate_risk_manager_gate(
+        enabled,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile="balanced",
+    )
+    assert enabled.get_data("info_quality_grade") == "C"
+    assert enabled_result.final_action == "hold"
+    assert "info_quality_grade_c" in enabled_result.evidence_codes
+    assert disabled.get_data("info_quality_grade") is None
+    assert all(flag.get("category") != "info_quality" for flag in disabled.risk_flags)
+
+
+def test_info_quality_risk_flag_rejects_truthy_string_coercion():
+    with pytest.raises(TypeError, match="info_quality_risk_enabled"):
+        build_risk_context_for_exit(
+            stock_code="AAPL",
+            current_signal="buy",
+            dashboard={},
+            info_quality_risk_enabled="false",
+        )
+
+
 def test_stale_runtime_evidence_is_preserved_and_blocks_bullish_publication():
     from src.agent.runtime_facts import AgentRuntimeFacts, RiskEvidenceFact
 

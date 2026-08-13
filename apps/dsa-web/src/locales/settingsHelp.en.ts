@@ -652,6 +652,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Controls when cross-source WARN evidence is written to run diagnostics.'],
     notes: ['Comparison is observational and fail-open on comparison errors.'],
   },
+  'settings.data_source.INFO_QUALITY_GRADING_ENABLED': {
+    title: 'Information Quality Grading',
+    summary: 'Derive A/B/C grades from validation evidence and context-pack block statuses.',
+  },
+  'settings.data_source.FORCED_CONCLUSION_ENABLED': {
+    title: 'Forced Conclusion Structure',
+    summary: 'Require an explicit Pass / Fail / Watch conclusion constrained by information quality.',
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
     summary: 'Sends analysis reports to a Feishu group through a custom bot webhook.',

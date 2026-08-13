@@ -380,6 +380,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | Soft absolute PE bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `200` | Optional |
 | `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | Soft absolute PB bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `50` | Optional |
 | `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | Relative multi-provider field divergence threshold; excess difference records a warn with attribution while keeping values. | `0.05` | Optional |
+| `INFO_QUALITY_GRADING_ENABLED` | Derive A/B/C grades from validation evidence and context-pack statuses; disabling it removes grade metadata and grade-driven prompt rules. | `true` | Optional |
+| `FORCED_CONCLUSION_ENABLED` | Attach Pass/Fail/Watch conclusions and enable grade-driven action/Risk Manager constraints; disabling it keeps grades visible without changing actions. | `true` | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `8.0` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call; market-structure industry/concept rankings share this budget | `8.0` | Optional |
