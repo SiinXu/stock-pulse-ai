@@ -206,6 +206,7 @@ class _PersistenceStageMixin:
         failure_reason: str,
         failure_message: str,
         failure_error_code: str,
+        prediction_mode: str = "analysis",
     ) -> PipelineStageResult[PipelinePersistValue]:
         """Persist one analysis once for a stable query and return its stage result."""
 
@@ -237,6 +238,12 @@ class _PersistenceStageMixin:
                         report_type=report_type,
                         context_snapshot=context_snapshot,
                         portfolio_context=portfolio_context,
+                    )
+                    self._extract_prediction_after_history_save(
+                        result=result,
+                        query_id=query_id,
+                        source_report_id=saved_history_id,
+                        mode=prediction_mode,
                     )
                     # Config-gated skill-opinion sample materialization from the
                     # just-saved report (samples require analysis_history_id FK).
@@ -390,6 +397,62 @@ class _PersistenceStageMixin:
                 "Decision signal extraction failed after history save",
                 exc,
                 error_code="pipeline_decision_signal_extraction_failed",
+                level=logging.WARNING,
+                context={
+                    "query_id": query_id,
+                    "stock_code": getattr(result, "code", None),
+                },
+            )
+
+
+    def _extract_prediction_after_history_save(
+        self,
+        *,
+        result: AnalysisResult,
+        query_id: str,
+        source_report_id: int,
+        mode: str = "analysis",
+    ) -> None:
+        """Best-effort PredictionRecord extraction after analysis history is saved.
+
+        Default-off via ``PREDICTION_EXTRACT_ENABLED``. Drafts are attached to the
+        in-memory result only; durable persistence is owned by later issues.
+        Failures never block history persistence or user-visible analysis.
+        """
+        try:
+            from src.services.prediction_extractor import (
+                PRESENTATION_CONFIDENCE_FLAG,
+                drop_presentation_confidence,
+                maybe_extract_prediction_on_finalize,
+            )
+
+            structured_source = getattr(result, "prediction_source", None)
+            source = dict(structured_source) if isinstance(structured_source, dict) else {}
+            source.setdefault("code", getattr(result, "code", None))
+            source.setdefault("stock_name", getattr(result, "name", None))
+            dashboard = getattr(result, "dashboard", None)
+            if isinstance(dashboard, dict):
+                source.setdefault("dashboard", dict(dashboard))
+            if source.pop(PRESENTATION_CONFIDENCE_FLAG, False):
+                source = drop_presentation_confidence(source)
+
+            extraction = maybe_extract_prediction_on_finalize(
+                source,
+                config=getattr(self, "config", None),
+                run_id=str(query_id or ""),
+                source_decision_id=str(source_report_id),
+                mode=mode,
+                model_id=getattr(result, "model_used", None),
+            )
+            if extraction is None:
+                return
+            setattr(result, "prediction_extraction", extraction.to_dict())
+        except Exception as exc:  # broad-exception: fallback_recorded - Prediction extraction must never fail history persistence.
+            log_safe_exception(
+                logger,
+                "Prediction extraction failed after history save",
+                exc,
+                error_code="pipeline_prediction_extraction_failed",
                 level=logging.WARNING,
                 context={
                     "query_id": query_id,
