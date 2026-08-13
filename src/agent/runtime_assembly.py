@@ -723,6 +723,7 @@ def build_agent_executor(
             0,
             field_name="agent_orchestrator_timeout_s",
         ),
+        config=config,
     )
 
 

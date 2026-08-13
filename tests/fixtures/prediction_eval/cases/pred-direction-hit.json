@@ -1,0 +1,45 @@
+{
+  "id": "pred-direction-hit",
+  "profile": "success",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "type": "direction",
+      "confidence": 0.8,
+      "payload": {"direction": "up"}
+    }
+  ],
+  "actuals": {
+    "start_price": 100.0,
+    "end_price": 108.0
+  },
+  "resolution": {
+    "outcome": "hit",
+    "reason": "direction_match"
+  },
+  "expected": {
+    "outcome": "hit",
+    "scorer_outcome": "hit"
+  },
+  "episode": {
+    "run_id": "run-pred-hit-1",
+    "symbol": "AAPL",
+    "market": "us",
+    "success": true,
+    "soul_version": "v1",
+    "soul_hash": "abcdef0123456789",
+    "trajectory_summary": [
+      {
+        "step": 1,
+        "tool": "get_realtime_quote",
+        "success": true,
+        "argument_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  "trajectory_rubric": {
+    "required_tools": [
+      "get_realtime_quote"
+    ]
+  }
+}
