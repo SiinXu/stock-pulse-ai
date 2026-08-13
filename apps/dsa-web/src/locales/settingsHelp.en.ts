@@ -1376,15 +1376,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
     title: 'Structured Disagreement Handling',
-    summary: 'Record conflicts; split means hold.',
+    summary: 'Record conflicts; split holds.',
   },
   'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
     title: 'Disagreement High-Confidence Threshold',
-    summary: 'Opposing confidence: split',
+    summary: 'Split threshold.',
   },
   'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
     title: 'Disagreement Medium-Confidence Threshold',
-    summary: 'Level for role/strategy cross-check.',
+    summary: 'Cross-check threshold.',
   },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
     title: 'Investment Committee Mode',

@@ -1417,15 +1417,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
     title: '结构化分歧处理',
-    summary: '记录角色与策略冲突，并把未收敛的分裂裁决强制降为保守观望。',
+    summary: '记录冲突；未收敛时观望。',
   },
   'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
     title: '高分歧置信度阈值',
-    summary: '对立角色观点触发分裂裁决所需的置信度。',
+    summary: '分裂裁决置信度阈值。',
   },
   'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
     title: '交叉校验置信度阈值',
-    summary: '请求角色层与策略层确定性交叉校验的分歧阈值。',
+    summary: '角色与策略交叉校验阈值。',
   },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',
