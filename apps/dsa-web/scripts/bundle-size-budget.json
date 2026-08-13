@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 245304,
-      "measuredGzipBytes": 244904,
-      "note": "Local production-build remasure after merging origin/main; measured 244904 B + 400 B retained headroom."
+      "maxGzipBytes": 247604,
+      "measuredGzipBytes": 247204,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 161015,
-      "measuredGzipBytes": 160315,
-      "note": "Local production-build remasure after merging origin/main; measured 160315 B + 700 B retained headroom."
+      "maxGzipBytes": 160635,
+      "measuredGzipBytes": 159935,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 154190,
-      "measuredGzipBytes": 153490,
-      "note": "Local production-build remasure after merging origin/main; measured 153490 B + 700 B retained headroom."
+      "maxGzipBytes": 153829,
+      "measuredGzipBytes": 153129,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 154174,
-      "measuredGzipBytes": 153474,
-      "note": "Local production-build remasure after merging origin/main; measured 153474 B + 700 B retained headroom."
+      "maxGzipBytes": 153802,
+      "measuredGzipBytes": 153102,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 153867,
-      "measuredGzipBytes": 153267,
-      "note": "Local production-build remasure after merging origin/main; measured 153267 B + 600 B retained headroom."
+      "maxGzipBytes": 153531,
+      "measuredGzipBytes": 152931,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 149645,
-      "measuredGzipBytes": 148945,
-      "note": "Local production-build remasure after merging origin/main; measured 148945 B + 700 B retained headroom."
+      "maxGzipBytes": 149288,
+      "measuredGzipBytes": 148588,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 146679,
-      "measuredGzipBytes": 145979,
-      "note": "Local production-build remasure after merging origin/main; measured 145979 B + 700 B retained headroom."
+      "maxGzipBytes": 146254,
+      "measuredGzipBytes": 145554,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 139724,
-      "measuredGzipBytes": 139024,
-      "note": "Local production-build remasure after merging origin/main; measured 139024 B + 700 B retained headroom."
+      "maxGzipBytes": 139365,
+      "measuredGzipBytes": 138665,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 139822,
-      "measuredGzipBytes": 139122,
-      "note": "Local production-build remasure after merging origin/main; measured 139122 B + 700 B retained headroom."
+      "maxGzipBytes": 139485,
+      "measuredGzipBytes": 138785,
+      "note": "Remeasured after merging origin/main (#1263); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "vendor-charts",

@@ -10965,6 +10965,11 @@ export interface components {
             /** Name */
             name: string;
             /**
+             * Notification Channels
+             * @description Canonical notification channel IDs from active notification_channel registrations; empty when the adapter is not loaded or not active
+             */
+            notification_channels?: string[];
+            /**
              * Package Root
              * @description Absolute package directory for external plugins when known
              */
