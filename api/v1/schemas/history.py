@@ -291,7 +291,7 @@ class ReportDetails(BaseModel):
         None,
         description=(
             "Optional report-structured-insights-v1 projection containing phase decision, "
-            "signal attribution, and multi-strategy synthesis"
+            "signal attribution, multi-strategy synthesis, and committee deliberation"
         ),
     )
 

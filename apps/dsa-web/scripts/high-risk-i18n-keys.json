@@ -1,0 +1,3271 @@
+{
+  "schemaVersion": 1,
+  "description": "Annotated high-risk Web i18n key inventory for issue #882. nativeReviewStatus is a provenance marker, not a CI gate. PRODUCT_SOURCE locales (zh/en) are product provenance; translated locales stay PENDING_NATIVE_REVIEW until a named native financial reviewer + date are recorded in languageReview.",
+  "generatedAt": "2026-08-12",
+  "source": "apps/dsa-web/scripts/high-risk-i18n-audit.json category selectors against live UI_TRANSLATION_KEYS",
+  "count": 359,
+  "sha256": "27b27520ae82fa614a844836bad550d30f03a14335cc34f7009009819c2e9160",
+  "keySetSha256": "a7e8cb353bb8949f95b8f813b26bcdde3c813bbc7c8810853a9120f9b8b709e8",
+  "categoryCounts": {
+    "trading_action": 18,
+    "risk": 75,
+    "authentication": 90,
+    "credential": 43,
+    "error": 150,
+    "disclaimer": 3
+  },
+  "decisionLinkedCount": 95,
+  "keys": [
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.agent_disabled.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.agent_disabled.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.http_error.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.http_error.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.invalid_tool_call.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.invalid_tool_call.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.llm_not_configured.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.llm_not_configured.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.local_connection_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.local_connection_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.missing_params.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.missing_params.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.model_tool_incompatible.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.model_tool_incompatible.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.portfolio_busy.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.portfolio_busy.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.portfolio_oversell.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.portfolio_oversell.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.unknown.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.unknown.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.upstream_llm_400.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.upstream_llm_400.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.upstream_network.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.upstream_network.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.upstream_timeout.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.GENERIC_ERROR_TEXT.upstream_timeout.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_chat_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_chat_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_disabled.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_disabled.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_research_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_research_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_stream_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_stream_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_disabled.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_disabled.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.analysis_batch_limit_exceeded.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.analysis_batch_limit_exceeded.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.analysis_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.analysis_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.api_response_validation_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.approval_auth_required.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.approval_auth_required.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.auth_disabled.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.auth_disabled.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.config_conflict.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.config_conflict.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.config_version_conflict.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.config_version_conflict.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.conflict.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.conflict.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.current_required.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.current_required.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.duplicate_market_review.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.duplicate_market_review.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.duplicate_task.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.duplicate_task.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.empty_stock_code.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.empty_stock_code.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.file_too_large.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.file_too_large.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.idempotency_conflict.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.idempotency_conflict.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.internal_error.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.internal_error.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_import_file.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_import_file.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_params.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_params.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_password.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_password.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "invalid_password_is_a_localized_error",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_stock_code.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_stock_code.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_stock_or_name.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_stock_or_name.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.llm_not_configured.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.llm_not_configured.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.missing_import_text.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.missing_import_text.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.missing_stock_params.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.missing_stock_params.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.missing_upload_file.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.missing_upload_file.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.no_channels.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.no_channels.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.not_changeable.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.not_changeable.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.not_found.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.not_found.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.password_already_set.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.password_already_set.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.password_mismatch.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.password_mismatch.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.password_required.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_f16339f7d8f0",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.password_required.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.portfolio_busy.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.portfolio_busy.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.rate_limited.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_7b974bd73af9",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.rate_limited.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_d1824688f53f",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.research_pack_limit_exceeded.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.research_pack_limit_exceeded.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.rollback_unavailable.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "rollback_unavailable_message_locale_candidates",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.rollback_unavailable.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "rollback_unavailable_title_locale_candidates",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.scheduler_busy.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.scheduler_busy.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.share_image_content_too_large.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.sync_mode_batch_unsupported.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.sync_mode_batch_unsupported.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unauthorized.message",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "expired_session_is_authentication_state",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unauthorized.title",
+      "categories": [
+        "authentication",
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unsupported_content_type.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unsupported_content_type.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unsupported_type.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.unsupported_type.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.validation_error.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.validation_error.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.validation_failed.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.validation_failed.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.action",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.confidence",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "confidence_is_model_confidence",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.score",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "score_is_not_rank",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.stopLoss",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.targetPrice",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionAdd",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionAlert",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_785865f9fe75",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionAvoid",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "avoid_is_a_signal_label",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionBuy",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_8dca72329d68",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionHold",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_b0304e457f98",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionReduce",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionSell",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_d580618cb03a",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.history.actionWatch",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.adminLogin",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.adminPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.brandTagline",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.confirmPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.confirmPasswordPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.confirmPasswordRequired",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.insecureConnection",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.localConnection",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.loginDescription",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_77c89f710287",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.loginFailed",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.loginPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.loginPasswordPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.loginSubmit",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.loginSubmitting",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.pageTitle",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.passwordMismatch",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.passwordRequired",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.secureConnection",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.setupDescription",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.setupFailed",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.setupPasswordPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.setupSubmit",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.setupSubmitting",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.setupTitle",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.systemBadge",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.login.validationFailed",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.alphaSiftRisk",
+      "categories": [
+        "disclaimer"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authCurrentPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authDescription",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authDisabled",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authDisableRequiredCurrentPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authEnabled",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authFailure",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authHelperDefault",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authHelperEnabled",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authHelperNoPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authHelperPasswordRetained",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authHelperTurnOff",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authPasswordHintOff",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authPasswordHintRetained",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authPasswordPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authRequiredPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authSetPassword",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authSetPasswordPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authStatus",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authSuccessDisabled",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authSuccessUpdated",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.authTitle",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordConfirm",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordConfirmPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordCurrent",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordCurrentPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordDescription",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordFailure",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordNew",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordNewHint",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordNewPlaceholder",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordRequiredCurrent",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordRequiredNew",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordSave",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordShort",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordSuccess",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordSuccessMessage",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.changePasswordTitle",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.settings.llmAccessDescription",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_a55e9e24cf16",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "i18n.uiText.UI_TEXT.stockTrend.turnoverRate",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "turnover_rate_is_explicit",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_DIRECTION_LABELS.stopLossBreach",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_DIRECTION_LABELS.stopLossNear",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_FORM_TEXT.severity",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_LIST_TEXT.childTargetCooldown",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_90be4dad3dd3",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_LIST_TEXT.cooldown",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_cc6945344572",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_LIST_TEXT.deleteMessage",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_48e1dc337934",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_LIST_TEXT.disabled",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_d815162e5dc4",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SCOPE_LABELS.watchlist",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_c21d32503975",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SEVERITY_LABELS.critical",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SEVERITY_LABELS.info",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_cbadb00eee55",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SEVERITY_LABELS.warning",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SEVERITY_OPTIONS.0.label",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_4cdcfb9a65df",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SEVERITY_OPTIONS.1.label",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SEVERITY_OPTIONS.2.label",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.2.label",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_bc0f7b35b301",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TARGET_SCOPE_OPTIONS.1.label",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_ad21e97d17c0",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TRIGGER_TEXT.emptyTitle",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_eb4a8ba41a28",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TRIGGER_TEXT.loading",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_c64d0638bc3d",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TRIGGER_TEXT.title",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_bac984475922",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.3.label",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_aeb0e9023746",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TYPE_LABELS.portfolio_concentration",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TYPE_LABELS.portfolio_drawdown",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.alerts.ALERT_TYPE_LABELS.volume_spike",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "volume_spike_uses_trading_volume",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_SIDE_LABELS.buy",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_SIDE_LABELS.sell",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.aiRiskSignals",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.aiRiskTotal",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.aiRiskUnavailable",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.avg",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_af76ea880d20",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.buy",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.costMethod",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_af20bba0f26e",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.costMethodShort",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.currentDrawdown",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.drawdownMonitor",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.maxDrawdown",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.noAiRiskSignals",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.noConcentrationDescription",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.noConcentrationTitle",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.positionConcentrationFallback",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.riskDegraded",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.riskFallback",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.sectorConcentration",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.sell",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.side",
+      "categories": [
+        "trading_action"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "trade_side_has_transaction_context",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.portfolio.PORTFOLIO_TEXT.stopLossWarning",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.confidence",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_42f4dbf18c14",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.diagnosticMissingKey",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_9fde279b321d",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.heat",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "theme_interest_is_not_temperature",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.leader",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "leader_is_a_leading_stock",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.risk",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.riskMessage",
+      "categories": [
+        "disclaimer"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "screening_notice_retains_three_risk_layers",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.riskTags",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.riskTitle",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.score",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_d0d406ad5b64",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.sectorThemeConfidence",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_2a8174319075",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.screening.SCREENING_TEXT.turnover",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "turnover_value_is_not_turnover_rate",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.impact.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.notes.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_7957d3a64d8f",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.summary",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_dd7ffa89da3d",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.title",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.usage",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_a56b762d93d0",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.valueNotes.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.valueNotes.1",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_5f6f28d124c0",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.impact.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.notes.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.notes.1",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.summary",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "risk_agent_veto_preserves_critical_flag_semantics",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.title",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.usage",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "legacy_risk_override_preserves_mandatory_profile_authority",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.valueNotes.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "legacy_override_cannot_skip_final_action_evaluation",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.valueNotes.1",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.AGENT_LITELLM_MODEL.notes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "model_reachability_preserves_provider_key_path",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.anspire_llm.summary",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_de4c459ef3c6",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.notes.2",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_914ae2d5a7b8",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.valueNotes.1",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "cli_login_state_is_not_stockpulse_credential_access",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_CONFIG.valueNotes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "litellm_config_priority_names_legacy_keys",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.notes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_54180af80ac0",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.valueNotes.1",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_d716b8c9d4f5",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_CHANNELS.notes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "channels_and_legacy_keys_are_not_concurrent",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL.valueNotes.1",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_ae79e5ea8e2f",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.impact.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "usage_hmac_secret_controls_fingerprint_comparability",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.notes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "usage_hmac_secret_is_not_the_login_session_secret",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.summary",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "usage_hmac_secret_signs_message_fingerprints",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.title",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "usage_hmac_secret_title_names_the_secret",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.usage",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "usage_hmac_secret_explains_generation_and_cross_deployment_scope",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.valueNotes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.valueNotes.1",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "usage_hmac_rotation_updates_the_key_version",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENAI_BASE_URL.valueNotes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_02ca964173d5",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.provider_keys.title",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_0df4702ccb20",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.1",
+      "categories": [
+        "disclaimer"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.impact.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "bias_threshold_impacts_chase_risk_warnings",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.notes.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "bias_threshold_balances_noise_and_chase_risk",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.summary",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.title",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.usage",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "bias_threshold_warns_on_chasing_and_mean_reversion",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.valueNotes.0",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.search_api_keys.title",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_8d5d45375b0e",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.title",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_ffc293b1dad4",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.usage",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_9ddff50ba2de",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.title",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_87ffd164412a",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.usage",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_4c2db4ad8d76",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.protocol.notes.0",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_5b6e0ee8eef5",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.impact.0",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "admin_auth_impacts_login_settings_and_admin_operations",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.notes.0",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "admin_auth_data_requires_deployment_persistence",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.summary",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "admin_auth_enables_webui_password_protection",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.title",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.usage",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "admin_auth_uses_the_settings_flow_and_reset_command",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.valueNotes.0",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.valueNotes.1",
+      "categories": [
+        "authentication"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.market_review.valueNotes.2",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "daily_market_context_controls_analysis_guardrails_not_report_generation",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.MAX_WORKERS.valueNotes.1",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_ee8ac11fdf38",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_a0f9b8eed435",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_dfb9c6ce7b5c",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "api_key_rejection_names_the_credential",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_7a333ff6a06a",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.apiKey",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.apiKeyOptional",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.chooseProviderDescription",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.localKeyOptional",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_68a691f4dd1a",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.multipleKeys",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_9701db50ac0a",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.runtimeSecret",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.auth",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_8373633ab99a",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.invalid_config",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_ab41935d1a24",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKey",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_ecbe5b4d5661",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyOptional",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_5a6a2f1de827",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyPlaceholder",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_61c710107893",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localKeyPlaceholder",
+      "categories": [
+        "credential"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_753878efca9e",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "utils.strategyDisplay.copy.bottom_volume.description",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_b8ed9b3a13d9",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "utils.strategyDisplay.copy.bottom_volume.name",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "REVISED_IN_DECISIONS",
+      "decisionId": "complete_revision_80f1229ba5fa",
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "utils.strategyDisplay.copy.event_driven.description",
+      "categories": [
+        "risk"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    }
+  ]
+}

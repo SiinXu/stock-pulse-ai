@@ -1,0 +1,1 @@
+- [Fixed] Preserve notification compatibility and consume the canonical versioned disagreement contract when rendering committee deliberation (Refs #985).

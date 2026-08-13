@@ -428,8 +428,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(historyPopover.parentElement).toHaveClass(
       'w-80',
       'rounded-2xl',
-      'shadow-2xl',
-      'shadow-black/30',
+      'shadow-elevation-popper',
     );
     expect(historyPopover.parentElement).toHaveAttribute('role', 'dialog');
     const closeHistoryButton = within(historyPopover).getByRole('button', { name: '关闭' });

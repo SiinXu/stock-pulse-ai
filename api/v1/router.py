@@ -21,6 +21,7 @@ from api.v1.endpoints import (
     backtest,
     calculators,
     capabilities,
+    candidate_discovery,
     config_profiles,
     decision_signals,
     health,
@@ -32,13 +33,16 @@ from api.v1.endpoints import (
     notification_inbox,
     plugins,
     onboarding,
+    paper_decision_quality,
     portfolio,
     portfolio_health,
+    portfolio_level_analysis,
     portfolio_risk_metrics,
     portfolio_stress_test,
     reasoning_trace,
     report_export,
     research_pack,
+    research,
     report_version_compare,
     scheduled_tasks,
     scorecard,
@@ -79,6 +83,12 @@ router.include_router(
     analysis.router,
     prefix="/analysis",
     tags=["Analysis"]
+)
+
+router.include_router(
+    portfolio_level_analysis.router,
+    prefix="/analysis",
+    tags=["Analysis"],
 )
 
 router.include_router(
@@ -157,6 +167,12 @@ router.include_router(
 )
 
 router.include_router(
+    paper_decision_quality.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
     portfolio_risk_metrics.router,
     prefix="/portfolio",
     tags=["Portfolio"]
@@ -211,6 +227,12 @@ router.include_router(
 )
 
 router.include_router(
+    candidate_discovery.router,
+    prefix="/discover",
+    tags=["CandidateDiscovery"],
+)
+
+router.include_router(
     intelligence.router,
     prefix="/intelligence",
     tags=["Intelligence"]
@@ -238,6 +260,12 @@ router.include_router(
     scorecard.router,
     prefix="/scorecard",
     tags=["Scorecard"]
+)
+
+router.include_router(
+    research.router,
+    prefix="/research",
+    tags=["Research"],
 )
 
 router.include_router(
