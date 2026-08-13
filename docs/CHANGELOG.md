@@ -8,8 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Added] Event-triggered deep analysis with explicit opt-in, accepted-task-only debounce/budget accounting, and finite numeric boundaries; contextual alert suggested actions/deep links reuse the corporate-event alert surface; whitelist-bounded NL rule compiler endpoint (Refs #129, #152, #1133).
-- [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets for event-triggered analysis Settings help and alert action strings (Refs #129, #152, #1133).
 - [Added] Personal daily morning brief aggregates portfolio membership, overnight Today's Focus highlights, and observed earnings-event context with optional quiet notify; event research briefs ship bounded metrics and post-event checklists through the shared report notification route (Refs #149, #1131).
 - [Chore] Rebaseline Web locale and IntelligenceSourcesPanel gzip budgets after observed-event Daily Brief and Event Research settings help (Refs #149, #1131).
 - [Added] Upstream drift inventory script (`scripts/inventory_upstream_drift.py`) plus governance cadence in bilingual upstream-parity docs for #1002 / #1061 triage.
