@@ -650,4 +650,3 @@ python scripts/check_config_doc_consistency.py --fail-on all
 - `EVENT_TRIGGER_MAX_PER_DAY` (default `20`)
 
 See [alerts](alerts.md) / [alerts_EN](alerts_EN.md).
-
