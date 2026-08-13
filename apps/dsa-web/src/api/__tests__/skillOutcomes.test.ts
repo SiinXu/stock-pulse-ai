@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getParsedApiError, isApiRequestError } from '../error';
 import apiClient from '../index';
 import { skillOutcomesApi } from '../skillOutcomes';
 
@@ -92,5 +93,47 @@ describe('skillOutcomesApi', () => {
     );
     expect(result.processedKeys).toBe(4);
     expect(result.historiesScanned).toBe(3);
+  });
+
+  it('surfaces stats shape mismatches through ParsedApiError', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        engine_version: 'skill-opinion-outcome-v1',
+        buckets: [],
+      },
+    });
+    await expect(skillOutcomesApi.getStats()).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
+  });
+
+  it('rejects non-finite bucket rates', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        engine_version: 'skill-opinion-outcome-v1',
+        minimum_evaluated_sample_size: 30,
+        buckets: [{
+          skill_id: 'momentum',
+          horizon: '5d',
+          engine_version: 'skill-opinion-outcome-v1',
+          total: 12,
+          pending: 2,
+          evaluated: 8,
+          observational: 1,
+          unable: 1,
+          hit: 5,
+          miss: 3,
+          sample_sufficient: false,
+          sample_status: 'insufficient',
+          hit_rate_pct: Number.POSITIVE_INFINITY,
+        }],
+      },
+    });
+    await expect(skillOutcomesApi.getStats()).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
   });
 });

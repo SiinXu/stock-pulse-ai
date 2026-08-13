@@ -6,6 +6,16 @@ import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type { WatchlistScoreResponse, WatchlistScoreSortMode } from '../types/watchlistScore';
 
+import type { components } from '../types/api.generated';
+type OpenApiScoreResponse = components['schemas']['WatchlistScoreResponse'];
+type OpenApiScoreItem = components['schemas']['WatchlistScoreItem'];
+type _AssertScoreResponse = keyof OpenApiScoreResponse;
+type _AssertScoreItem = keyof OpenApiScoreItem;
+const _scoreResponseAnchor: _AssertScoreResponse = 'formula_version';
+const _scoreItemAnchor: _AssertScoreItem = 'stock_code';
+void _scoreResponseAnchor;
+void _scoreItemAnchor;
+
 const degradationReasonSchema = z.enum([
   'invalid_sentiment',
   'inactive_signal',
