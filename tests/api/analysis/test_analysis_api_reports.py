@@ -182,6 +182,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "params": {},
                 "details": None,
                 "detail": None,
+                "category": "internal",
+                "severity": "error",
                 "trace_id": None,
             },
         )

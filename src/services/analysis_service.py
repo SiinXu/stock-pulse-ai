@@ -170,6 +170,9 @@ class AnalysisService:
                 analysis_phase=analysis_phase,
                 portfolio_context=portfolio_context,
             )
+            # force_refresh also forces a full stage-checkpoint bypass.
+            if force_refresh:
+                pipeline.analysis_checkpoint_force_full = True
             
             # Determine report type (API: simple/detailed/full/brief -> ReportType)
             rt = ReportType.from_str(report_type)
@@ -182,6 +185,7 @@ class AnalysisService:
                 single_stock_notify=send_notification,
                 report_type=rt,
                 send_notification=send_notification,
+                analysis_query_id=query_id,
             )
             
             if result is None:
