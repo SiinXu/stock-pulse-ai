@@ -614,6 +614,7 @@ class AgentExecutor:
         use_legacy_default_prompt: bool = False,
         max_steps: int = 10,
         timeout_seconds: Optional[float] = None,
+        config: Any = None,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
@@ -622,6 +623,9 @@ class AgentExecutor:
         self.use_legacy_default_prompt = use_legacy_default_prompt
         self.max_steps = max_steps
         self.timeout_seconds = timeout_seconds
+        # Optional injected Config for feature flags (e.g. episode log). Prefer
+        # factory injection over bare get_config() in run paths.
+        self.config = config
 
 
 _RUN_METHOD_NAMES = _bind_facade_methods(

@@ -1093,6 +1093,24 @@ class _ConfigLoadingMethods:
                 os.getenv('LAYERED_MEMORY_AUDIT_ENABLED'),
                 default=True,
             ),
+            agent_episode_log_enabled=parse_env_bool(
+                os.getenv('AGENT_EPISODE_LOG_ENABLED'),
+                default=False,
+            ),
+            agent_episode_retention_days=parse_env_int(
+                os.getenv('AGENT_EPISODE_RETENTION_DAYS'),
+                90,
+                field_name='AGENT_EPISODE_RETENTION_DAYS',
+                minimum=1,
+                maximum=3650,
+            ),
+            agent_episode_max_rows=parse_env_int(
+                os.getenv('AGENT_EPISODE_MAX_ROWS'),
+                50_000,
+                field_name='AGENT_EPISODE_MAX_ROWS',
+                minimum=100,
+                maximum=1_000_000,
+            ),
             agent_planning_enabled=parse_env_bool(
                 os.getenv('AGENT_PLANNING_ENABLED'),
                 False,

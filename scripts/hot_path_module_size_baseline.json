@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "description": "Allowlisted hot-path modules that currently exceed the soft line budget. Values are maximum permitted physical line counts (only decrease). New oversized hot-path files and growth past a path's budget are banned. Never raise soft_budget_lines, hard_ceiling_count, or hard_ceiling_max_lines to green CI \u2014 split the module instead.",
+  "scopes": [
+    "data_provider",
+    "src/services",
+    "src/agent",
+    "src/market"
+  ],
+  "soft_budget_lines": 1500,
+  "extraction_preference_lines": 2000,
+  "hard_ceiling_count": 10,
+  "hard_ceiling_max_lines": 4659,
+  "module_count": 10,
+  "modules": {
+    "data_provider/base.py": 4659,
+    "data_provider/data_validation.py": 1715,
+    "src/agent/orchestrator_parts/pipeline.py": 1575,
+    "src/market/analyzer.py": 2079,
+    "src/services/history_service.py": 1620,
+    "src/services/local_model_service.py": 1548,
+    "src/services/reasoning_trace_export_service.py": 1730,
+    "src/services/run_diagnostics.py": 2584,
+    "src/services/run_flow.py": 1759,
+    "src/services/scheduled_task_service.py": 2090
+  },
+  "cleanup_plan": [
+    "Prefer extracting cohesive helpers/packages when a hot-path file exceeds 2000 lines (soft review budget is 1500).",
+    "Priority gravity modules at introduction: data_provider/base.py, src/services/run_diagnostics.py, src/services/scheduled_task_service.py, src/market/analyzer.py.",
+    "After a successful split, re-run `python scripts/check_hot_path_module_size.py --write-baseline` to shrink recorded line caps or drop retired paths."
+  ],
+  "threshold_rationale": {
+    "soft_budget_lines": "Issue #1087 suggests encouraging review when a hot-path file exceeds ~1200\u20131500 lines; 1500 is the upper end of that band and matches the repository's historical gravity-module split targets without allowlisting every mid-size service module.",
+    "extraction_preference_lines": "Issue #1087 strongly prefers extraction above ~2000 lines on the primary analyze path; cleanup work should prioritize those files first while the soft budget still ratchets all >1500 debt.",
+    "hard_ceilings": "hard_ceiling_count and hard_ceiling_max_lines pin the measured inventory at guard introduction so CI cannot be greened by raising either limit."
+  }
+}
