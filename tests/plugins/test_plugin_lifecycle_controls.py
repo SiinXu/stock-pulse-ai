@@ -357,6 +357,7 @@ def test_plugins_api_list_and_toggle(tmp_path: Path) -> None:
         assert body["items"][0]["id"] == "api-plugin"
         assert body["items"][0]["state"] == "enabled"
         assert body["items"][0]["last_error_code"] is None
+        assert body["items"][0]["notification_channels"] == []
 
         health = client.get("/api/v1/plugins/health")
         assert health.status_code == 200
@@ -390,6 +391,49 @@ def test_plugins_api_list_and_toggle(tmp_path: Path) -> None:
         )
         assert restart.status_code == 200
         assert "restart_required" in restart.json()
+    finally:
+        reset_application_services()
+
+
+def test_plugins_api_exposes_active_notification_channels(tmp_path: Path) -> None:
+    from src.application_services import (
+        ApplicationServices,
+        reset_application_services,
+        set_application_services,
+    )
+
+    reset_application_services()
+    store = PluginLifecycleStateStore(tmp_path / "state.json", persist=True)
+    manager, _ = _manager(state_store=store)
+    plugin = _RecordingPlugin(
+        _manifest("notify-plugin"),
+        points=("notification_channel",),
+        registration_id="channel",
+    )
+    manager.register(plugin, source="external", package_root=tmp_path)
+    assert manager.load("notify-plugin").success is True
+    manager.bind_lifecycle_auditor(SecurityAuditRecorderStub())
+
+    services = ApplicationServices(plugin_manager=manager, plugins_dir="")
+    set_application_services(services)
+    try:
+        app = FastAPI()
+        app.include_router(plugins_endpoint.router, prefix="/api/v1/plugins")
+        client = TestClient(app)
+        listed = client.get("/api/v1/plugins")
+        assert listed.status_code == 200
+        item = listed.json()["items"][0]
+        assert item["id"] == "notify-plugin"
+        assert item["extension_points"] == ["notification_channel"]
+        assert item["notification_channels"] == ["channel"]
+
+        disabled = client.post(
+            "/api/v1/plugins/notify-plugin/lifecycle",
+            json={"action": "disable"},
+        )
+        assert disabled.status_code == 200
+        disabled_item = disabled.json()["plugin"]
+        assert disabled_item["notification_channels"] == []
     finally:
         reset_application_services()
 
