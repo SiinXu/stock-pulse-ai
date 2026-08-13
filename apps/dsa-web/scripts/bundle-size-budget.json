@@ -179,6 +179,13 @@
       "measuredGzipBytes": 16615
     },
     {
+      "id": "settingsTranslations",
+      "match": "assets/settingsTranslations-*.js",
+      "maxGzipBytes": 15119,
+      "measuredGzipBytes": 14919,
+      "note": "Restored PR-owned named rule after taking origin/main budget; prior local remasure 14919 B + 200 B retained headroom."
+    },
+    {
       "id": "ChatSendFeedback",
       "match": "assets/ChatSendFeedback-*.js",
       "maxGzipBytes": 14348,
