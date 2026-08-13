@@ -130,9 +130,21 @@ def export_openapi_dict() -> dict:
     return app.openapi()
 
 
+def _normalize_openapi_schema(schema: dict) -> dict:
+    """Apply environment-independent wording for CI/local artifact parity.
+
+    FastAPI/Starlette versions have historically differed on the default 422
+    description ("Unprocessable Content" vs "Unprocessable Entity"). Normalize
+    to the Entity form so checked-in openapi.json + typegen stay stable.
+    """
+    text = json.dumps(schema, ensure_ascii=False)
+    text = text.replace("Unprocessable Content", "Unprocessable Entity")
+    return json.loads(text)
+
+
 def dump_openapi(output: Path) -> Path:
     """Write a stable, sorted-key OpenAPI JSON document."""
-    schema = export_openapi_dict()
+    schema = _normalize_openapi_schema(export_openapi_dict())
     output.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(schema, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     output.write_text(text, encoding="utf-8")

@@ -5,7 +5,7 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { GenerationBackendStatus, GenerationBackendStatusResponse, SystemConfigUpdateItem, TestGenerationBackendResponse } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button, Surface } from '../common';
+import { ApiErrorAlert, Badge, Button, IconButton, Surface } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 
 type Translate = ReturnType<typeof useUiLanguage>['t'];
@@ -197,10 +197,10 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
   }, [maskToken, requestItems]);
 
   return (
-    <div data-testid="generation-backend-status-panel" className="space-y-3 rounded-xl border settings-border bg-card/70 p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div data-testid="generation-backend-status-panel" className="space-y-3 rounded-xl border settings-border bg-card/70 density-surface-pad-sm">
+      <div className="flex flex-col density-gap-stack md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center density-gap-tools">
             <p className="text-sm font-semibold text-foreground">{t('settings.generationBackendStatus')}</p>
             <Badge variant={hasDraft ? 'warning' : 'history'} size="sm">
               {hasDraft ? t('settings.generationBackendDraftPreview') : t('settings.generationBackendSavedRuntime')}
@@ -210,11 +210,18 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
             {t('settings.generationBackendStatusDescription')}
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" size="default" disabled={disabled || isLoading} isLoading={isLoading} loadingText={t('settings.generationBackendRefreshing')} onClick={() => void refresh()}>
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            {t('settings.generationBackendRefresh')}
-          </Button>
+        <div className="flex shrink-0 flex-wrap items-center density-gap-tools">
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="default"
+            disabled={disabled || isLoading}
+            isLoading={isLoading}
+            aria-label={isLoading ? t('settings.generationBackendRefreshing') : t('settings.generationBackendRefresh')}
+            onClick={() => void refresh()}
+          >
+            <RefreshCw aria-hidden="true" />
+          </IconButton>
           <Button type="button" variant="secondary" size="default" disabled={disabled || isSmoking} isLoading={isSmoking} loadingText={t('settings.generationBackendSmokeTesting')} onClick={() => void runSmoke()}>
             <FlaskConical className="h-4 w-4" aria-hidden="true" />
             {t('settings.generationBackendSmokeTest')}

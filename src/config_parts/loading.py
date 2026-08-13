@@ -955,6 +955,12 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
             ),
+            agent_research_persona=(
+                (os.getenv('AGENT_RESEARCH_PERSONA') or '').strip().lower()
+            ),
+            agent_research_persona_custom=(
+                (os.getenv('AGENT_RESEARCH_PERSONA_CUSTOM') or '').strip()
+            ),
             skill_opinion_recording_enabled=parse_env_bool(
                 os.getenv('SKILL_OPINION_RECORDING_ENABLED'),
                 False,
@@ -1770,20 +1776,54 @@ class _ConfigLoadingMethods:
         default: Optional[str] = None,
         prefer_env_file: bool = False,
     ) -> Optional[str]:
-        """Resolve one env value, optionally preferring the persisted `.env` copy."""
+        """Resolve one env value, optionally preferring the persisted `.env` copy.
+
+        Value selection is delegated to
+        :func:`src.core.config.resolve.resolve_config_value` so runtime and the
+        public resolve path share one precedence algorithm. Source metadata is
+        available via :meth:`resolve_with_source`.
+        """
+        from src.core.config.resolve import resolve_config_value
+
         env_value = os.getenv(key)
         file_value = cls._get_env_file_value(key)
+        resolved = resolve_config_value(
+            key,
+            env_value=env_value,
+            file_value=file_value,
+            default=default,
+            prefer_env_file=prefer_env_file,
+            has_bootstrap_override=cls._has_bootstrap_runtime_env_override(key),
+            webui_file_priority=key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS,
+        )
+        return resolved.value
 
-        should_prefer_file = prefer_env_file or key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
-        if should_prefer_file and file_value is not None:
-            if env_value is not None and cls._has_bootstrap_runtime_env_override(key):
-                return env_value
-            return file_value
-        if env_value is not None:
-            return env_value
-        if file_value is not None:
-            return file_value
-        return default
+    @classmethod
+    def resolve_with_source(
+        cls,
+        key: str,
+        *,
+        default: Optional[str] = None,
+        prefer_env_file: bool = False,
+    ):
+        """Resolve one key through the single path and return value + source.
+
+        Thin facade for diagnostics and gradual call-site migration. Value is
+        identical to :meth:`_resolve_env_value`.
+        """
+        from src.core.config.resolve import resolve_config_value
+
+        env_value = os.getenv(key)
+        file_value = cls._get_env_file_value(key)
+        return resolve_config_value(
+            key,
+            env_value=env_value,
+            file_value=file_value,
+            default=default,
+            prefer_env_file=prefer_env_file,
+            has_bootstrap_override=cls._has_bootstrap_runtime_env_override(key),
+            webui_file_priority=key in cls._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS,
+        )
 
     @classmethod
     def _capture_bootstrap_runtime_env_overrides(cls) -> None:
