@@ -871,10 +871,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect(await page.evaluate((key) => localStorage.getItem(key), uiLanguageStorageKey)).toBe('en');
     await page.reload();
-    await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();
-    await page.getByRole('link', { name: 'Agent' }).click();
+    await expect(page.getByRole('link', { name: 'Today' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Signal Center' })).toBeVisible();
+    await page.goto('/chat');
+    await expect(page.getByText('Ask Stock', { exact: true }).first()).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Today' })).toBeVisible();
     await page.goForward();
     await expect(page.getByText('Ask Stock', { exact: true }).first()).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -944,7 +946,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const signalChild = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
     const homeToggle = navigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] });
     await expect(homeParent).not.toHaveAttribute('aria-current', 'page');
-    await expect(signalChild).toHaveCount(0);
+    // #873: Signals is first-class primary chrome (not a Home child).
+    await expect(signalChild).toBeVisible();
+    await expect(signalChild).toHaveAttribute('href', APP_ROUTE_PATHS.signals);
+    await expect(signalChild).toHaveAttribute('aria-current', 'page');
     await expect(homeToggle).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -954,7 +959,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const drawerHome = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.home'] });
     const drawerSignal = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
     await expect(drawerHome).not.toHaveAttribute('aria-current', 'page');
-    await expect(drawerSignal).toHaveCount(0);
+    await expect(drawerSignal).toBeVisible();
+    await expect(drawerSignal).toHaveAttribute('aria-current', 'page');
     await expect(drawerNavigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] })).toHaveCount(0);
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -1298,7 +1304,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       ]));
     }).toEqual({ stock: 'AAPL', name: 'Apple', recordId: '1', context: 'active' });
 
-    const homeLink = page.getByRole('link', { name: '首页' });
+    const homeLink = page.getByRole('link', { name: '今日' });
     await expect(homeLink).toHaveAttribute('href', APP_ROUTE_PATHS.home);
     await homeLink.click();
     await expect.poll(() => {
@@ -1989,7 +1995,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await editConnectionAddModel(page, 'alpha_conn', 'local-retry-model');
     await expect(page.getByText(/AI 模型: 自动保存失败/)).toBeVisible();
     await expect(page.getByTestId('connection-card-alpha_conn')).toContainText('local-retry-model');
-    await page.getByRole('link', { name: '首页' }).click();
+    await page.getByRole('link', { name: '今日' }).click();
     const leaveDialog = page.getByRole('dialog', { name: '离开设置页？' });
     await expect(leaveDialog).toBeVisible();
     await leaveDialog.getByRole('button', { name: '取消' }).click();
