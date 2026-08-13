@@ -200,6 +200,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `BIAS_THRESHOLD` | `5.0` | 是 | 模板中注释; Bias-ratio threshold (%); when deviation from MA5 exceeds this value, strong-trend stocks use a 1.5x threshold before... |
 | `BOCHA_API_KEYS` | `your_bocha_key_here` | 是 | 模板中注释; =================================== Search engine configuration (for fetching stock news) |
 | `BRAVE_API_KEYS` | `空` | 是 | Brave Search API Keys(Supports multiple, Comma-separated) Get: https://brave.com/search/api/ |
+| `CAPABILITY_WRITE_REGISTRY_PATH` | `./data/capability_write_registry.json` | 是 | 模板中注释; =========================================== Capability write registry + task-aware routing (Issues #221, #204) ======... |
 | `COINGECKO_API_BASE` | `空` | 是 | 模板中注释; Optional custom HTTPS base for keyless mode only; credentials are never sent to it. |
 | `COINGECKO_API_KEY` | `空` | 是 | 模板中注释; Optional CoinGecko key; leave empty in keyless mode. |
 | `COINGECKO_API_PLAN` | `keyless` | 是 | 模板中注释; Authentication mode: keyless, demo, or pro |
@@ -613,6 +614,15 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `STOCK_GROUP_2` | `002594,AAPL` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `STOCK_INDEX_REMOTE_UPDATE_ENABLED` | `true` | 是 | Stock Auto-completion Index Remote Update (default enabled; falls back to local built-in index if GitHub is inaccessi... |
 | `STOCK_LIST` | `600519,300750,002594` | 是 | Watchlist stocks list (comma-separated, supports Shanghai and Shenzhen stock codes) Shanghai stocks: 600xxx, 601xxx, ... |
+| `TASK_ROUTING_ENABLED` | `false` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_AGENT` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_CHEAP_SCAN` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_CODING` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_DEEP_REASONING` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_MARKET_REVIEW` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_REPORT` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_PIN_VISION` | `空` | 是 | 模板中注释 |
+| `TASK_ROUTING_POLICY` | `quality` | 是 | 模板中注释 |
 | `TAVILY_API_KEYS` | `空` | 是 | Tavily API Keys (supports multiple, comma-separated) |
 | `TELEGRAM_BOT_TOKEN` | `123456789:ABCdefGHIjklMNOpqrsTUVwxyz` | 是 | 模板中注释; Method Three: Telegram Robot (Requires configuring both items simultaneously) 1 |
 | `TELEGRAM_CHAT_ID` | `123456789` | 是 | 模板中注释 |

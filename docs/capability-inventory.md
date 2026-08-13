@@ -159,7 +159,83 @@ manager before a registration becomes active; this inventory does not perform
 a second compatibility decision.
 
 Consumers must branch on `schema_version`, tolerate new records and nullable
-states, and treat source errors as unknown. Central write-side registration,
-dependency resolution, Stage/Skill/LLM/Persona metadata, ToolSurface grant and
-budget evaluation, startup validation, and migration remain outside this API
-and open under issue #221.
+states, and treat source errors as unknown.
+
+
+## Write-side registry (control plane)
+
+In addition to the read-only inventory, the process exposes a durable
+**write-side** capability control plane (schema
+`capability-write-registry/v1`) for operator-declared metadata used by
+dependency resolution and task-aware routing. It does **not** replace live
+owners: registration here does not install tools, plugins, or models into the
+execution path by itself.
+
+| Operation | Endpoint | Notes |
+| --- | --- | --- |
+| List declarations | `GET /api/v1/capabilities/registry` | Optional `domain`, `include_retired` |
+| Register | `POST /api/v1/capabilities/registry` | Privileged; security-audit attempt/completion required |
+| Update | `PUT /api/v1/capabilities/registry/{capability_id}` | Identity fields immutable |
+| Retire | `POST /api/v1/capabilities/registry/{capability_id}/retire` | Idempotent for already-retired ids |
+| Resolve dependencies | `POST /api/v1/capabilities/resolve` | Fail-closed ready flags + reason codes |
+| Task-aware route | `POST /api/v1/capabilities/route` | Explainable decision for diagnostics |
+
+Write domains: `data`, `tool`, `skill`, `pipeline`, `llm`, `persona`.
+
+Hard rules:
+
+- Mutations require the privileged-operation security audit chain
+  (`event_type=capability.write`). Audit unavailability returns `503` with
+  `security_audit_unavailable` and **does not** apply the write.
+- Validation, identity conflicts, and store corruption return explicit error
+  codes. The API never returns a fabricated success snapshot for a failed
+  registration.
+- Storage defaults to
+  `<dir-of-DATABASE_PATH>/capability_write_registry.json`
+  (override with `CAPABILITY_WRITE_REGISTRY_PATH`). Corrupt files fail closed.
+
+### Dependency resolution
+
+`POST /api/v1/capabilities/resolve` evaluates declared dependencies against the
+write registry and, optionally, the live inventory. Supported dependency tokens:
+
+- `capability_id`
+- `capability_id@1.2.3` / `capability_id==1.2.3` (exact)
+- `capability_id>=1.0.0`
+- `capability_id~=1.2` (compatible release)
+
+Missing, retired, non-executable, or version-incompatible dependencies yield
+`ready=false` with an explicit `reason_code` (never fail-open ready).
+
+### Task-aware model routing
+
+`POST /api/v1/capabilities/route` returns a versioned
+`task-route-decision/v1` decision for task classes:
+`report`, `agent`, `vision`, `market_review`, `cheap_scan`, `deep_reasoning`,
+`coding`.
+
+Selection order:
+
+1. Explicit task pin (`TASK_ROUTING_PIN_*`) when set
+2. Existing shared model pin (`LITELLM_MODEL` / `AGENT_LITELLM_MODEL` /
+   `VISION_MODEL` as applicable)
+3. When `TASK_ROUTING_ENABLED=true`, score active write-side `llm` capabilities
+   by tags + `TASK_ROUTING_POLICY` (`quality` | `cost` | `local_first`)
+4. Otherwise return an empty selection with `reason_code` such as
+   `routing_disabled` or `no_matching_candidate`
+
+Every decision includes `reason_code`, `explain[]`, scored `candidates[]`, and
+`pin_source` so operators can audit routing in diagnostics without opaque
+behavior. Manual pins always win.
+
+Optional multi-model ensemble remains out of this slice and is still tracked
+under issue #204.
+
+## Still open (issues #221 / #204)
+
+- ToolSurface grant/budget policy enforcement on every execution path
+- Full migration of every extension class onto the write-side contract at
+  startup/enable/reload
+- Product UI for capability installation, enablement, and governance
+- Optional budget-limited ensemble/vote mode
+

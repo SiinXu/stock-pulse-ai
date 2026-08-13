@@ -1,11 +1,15 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
   BarChart3,
+  BellRing,
   BriefcaseBusiness,
   Calculator,
   CalendarDays,
+  ClipboardCheck,
   FlaskConical,
   Gauge,
   Home,
@@ -42,6 +46,13 @@ export type ApplicationNavigationItem =
   | ApplicationNavigationLink
   | ApplicationNavigationGroup;
 
+export type CommandPalettePageDescriptor = {
+  id: string;
+  labelKey: UiTextKey;
+  href: string;
+  icon: LucideIcon;
+};
+
 export function shouldDelegateCurrentDocumentNavigation(
   event: ReactMouseEvent<HTMLAnchorElement>,
 ): boolean {
@@ -58,8 +69,13 @@ export function shouldDelegateCurrentDocumentNavigation(
   );
 }
 
-// Keep the five primary domains stable while secondary routes remain discoverable
-// in collapsible expanded groups and the compact flyout.
+/**
+ * Primary sidebar / mobile drawer graph for the #873 experience spine:
+ * Today → Research → Signals → Portfolio → Settings.
+ *
+ * Paths come only from `routes.ts` (`APP_ROUTE_PATHS`). Command palette pages
+ * must be derived via `listCommandPalettePages` so membership cannot drift.
+ */
 export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] = [
   {
     kind: 'link',
@@ -88,7 +104,85 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
       { kind: 'link', key: 'research-skill-outcomes', labelKey: 'layout.nav.skillOutcomes', to: APP_ROUTE_PATHS.researchSkillOutcomes, icon: Gauge },
     ],
   },
+  {
+    kind: 'link',
+    key: 'signals',
+    labelKey: 'layout.nav.decisionSignals',
+    to: APP_ROUTE_PATHS.signals,
+    icon: BellRing,
+  },
   { kind: 'link', key: 'portfolio', labelKey: 'layout.nav.portfolio', to: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
-  { kind: 'link', key: 'agent', labelKey: 'layout.nav.agent', to: APP_ROUTE_PATHS.agent, icon: MessageSquareQuote, badge: 'completion' },
   { kind: 'link', key: 'settings', labelKey: 'layout.nav.settings', to: APP_ROUTE_PATHS.settings, icon: Settings2 },
 ];
+
+/**
+ * Reachable product pages indexed by Cmd+K but intentionally outside primary sidebar.
+ * Agent is demoted from the #873 top-level spine; Approvals stay Home/palette entry.
+ */
+export const COMMAND_PALETTE_SECONDARY_PAGES: readonly ApplicationNavigationLink[] = [
+  {
+    kind: 'link',
+    key: 'agent',
+    labelKey: 'layout.nav.agent',
+    to: APP_ROUTE_PATHS.agent,
+    icon: MessageSquareQuote,
+  },
+  {
+    kind: 'link',
+    key: 'approvals',
+    labelKey: 'layout.nav.approvals',
+    to: APP_ROUTE_PATHS.approvals,
+    icon: ClipboardCheck,
+  },
+];
+
+function resolvePaletteHref(
+  item: ApplicationNavigationLink | ApplicationNavigationGroup,
+  analysisHref: string,
+): string {
+  if (item.key === 'research-analysis' || item.to === APP_ROUTE_PATHS.researchAnalysis) {
+    return analysisHref;
+  }
+  return item.to;
+}
+
+/**
+ * Single flattened page list for the command palette.
+ * Primary items expand Research children; secondary pages append after Settings.
+ */
+export function listCommandPalettePages(
+  options: { analysisHref?: string } = {},
+): readonly CommandPalettePageDescriptor[] {
+  const analysisHref = options.analysisHref ?? APP_ROUTE_PATHS.researchAnalysis;
+  const pages: CommandPalettePageDescriptor[] = [];
+
+  for (const item of APPLICATION_NAVIGATION_ITEMS) {
+    pages.push({
+      id: item.key,
+      labelKey: item.labelKey,
+      href: resolvePaletteHref(item, analysisHref),
+      icon: item.icon,
+    });
+    if (item.kind === 'group') {
+      for (const child of item.children) {
+        pages.push({
+          id: child.key,
+          labelKey: child.labelKey,
+          href: resolvePaletteHref(child, analysisHref),
+          icon: child.icon,
+        });
+      }
+    }
+  }
+
+  for (const item of COMMAND_PALETTE_SECONDARY_PAGES) {
+    pages.push({
+      id: item.key,
+      labelKey: item.labelKey,
+      href: resolvePaletteHref(item, analysisHref),
+      icon: item.icon,
+    });
+  }
+
+  return pages;
+}
