@@ -142,6 +142,10 @@
 {% endfor %}
 {% endif %}
 
+{% if scenario_sensitivity_markdown %}
+{{ scenario_sensitivity_markdown }}
+{% endif %}
+
 {{ report_disclaimer_line() }}
 
 *{{ labels.report_time_label }}: {{ report_timestamp[11:16] }}*
