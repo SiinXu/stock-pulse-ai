@@ -407,6 +407,19 @@ class Config:
     event_trigger_max_per_hour: int = 5
     event_trigger_max_per_day: int = 20
 
+    # === Prediction horizon resolver (Issues #1102 / #1116, Epic #1107; default off) ===
+    prediction_resolve_enabled: bool = False
+    prediction_resolve_interval_seconds: int = 60
+    prediction_resolve_max_per_tick: int = 50
+    prediction_resolve_lease_seconds: int = 120
+    prediction_resolve_max_attempts: int = 5
+    prediction_resolve_fetch_concurrency: int = 4
+    prediction_resolve_postmortem_max_per_tick: int = 10
+    prediction_resolve_provider_error_circuit_threshold: int = 5
+    prediction_resolve_provider_error_circuit_cooldown_seconds: int = 60
+    prediction_resolve_circuit_open_max_per_tick: int = 5
+    prediction_resolve_retry_jitter_ratio: float = 0.1
+
     # === Notification + share-image domain sub-configs (flat attrs via facade) ===
     notification: NotificationConfig = field(default_factory=NotificationConfig)
     share_image: ShareImageConfig = field(default_factory=ShareImageConfig)
