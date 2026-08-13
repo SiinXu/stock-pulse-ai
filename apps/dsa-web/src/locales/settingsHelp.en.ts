@@ -1426,6 +1426,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.REFLECTION_POSTMORTEM': {
+    title: 'Reflection and Forecast Post-mortem',
+    summary: 'Controls bounded run-local reflection and resolved-forecast lessons.',
+    usage: 'Keep both features off unless their explicit call and revision budgets fit the workflow.',
+    valueNotes: [
+      'Reflection runs after analysis and decision; post-mortem runs on resolved miss or partial forecasts.',
+      'A zero call budget records an explicit budget skip, and clean hits can bypass post-mortem calls.',
+    ],
+    notes: ['Neither path mutates Agent Soul or ToolSurface denials.'],
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',

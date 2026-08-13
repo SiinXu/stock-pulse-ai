@@ -641,7 +641,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 64,
-        "help_key": "settings.agent.AGENT_REFLECTION_ENABLED",
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_ENABLED=false",
             "AGENT_REFLECTION_ENABLED=true",
@@ -671,7 +671,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 0},
         "display_order": 65,
-        "help_key": "settings.agent.AGENT_REFLECTION_LLM_BUDGET",
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_LLM_BUDGET=1",
             "AGENT_REFLECTION_LLM_BUDGET=0",
@@ -700,7 +700,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 0},
         "display_order": 66,
-        "help_key": "settings.agent.AGENT_REFLECTION_MAX_REVISE",
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_MAX_REVISE=1",
             "AGENT_REFLECTION_MAX_REVISE=0",
@@ -730,7 +730,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 67,
-        "help_key": "settings.agent.AGENT_POSTMORTEM_ENABLED",
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_ENABLED=false",
             "AGENT_POSTMORTEM_ENABLED=true",
@@ -759,7 +759,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 0},
         "display_order": 68,
-        "help_key": "settings.agent.AGENT_POSTMORTEM_LLM_BUDGET",
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_LLM_BUDGET=8",
             "AGENT_POSTMORTEM_LLM_BUDGET=1",
@@ -788,7 +788,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 69,
-        "help_key": "settings.agent.AGENT_POSTMORTEM_SKIP_CLEAN_HITS",
+        "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true",
             "AGENT_POSTMORTEM_SKIP_CLEAN_HITS=false",
