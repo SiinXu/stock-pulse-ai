@@ -7400,6 +7400,11 @@ export interface components {
             miss: number;
             /** Neutral */
             neutral: number;
+            /**
+             * Sample Sufficient
+             * @default false
+             */
+            sample_sufficient: boolean;
             /** Total */
             total: number;
             /** Unable */
@@ -7429,11 +7434,21 @@ export interface components {
             hit_rate_pct?: number | null;
             /** Horizons */
             horizons?: string[] | null;
+            /**
+             * Minimum Completed Sample Size
+             * @default 30
+             */
+            minimum_completed_sample_size: number;
             /** Miss */
             miss: number;
             /** Neutral */
             neutral: number;
             profile_calibration?: components["schemas"]["DecisionSignalProfileCalibration"] | null;
+            /**
+             * Sample Sufficient
+             * @default false
+             */
+            sample_sufficient: boolean;
             /** Statuses */
             statuses?: string[];
             /** Total */

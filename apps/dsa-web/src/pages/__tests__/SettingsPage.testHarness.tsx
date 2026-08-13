@@ -1072,6 +1072,7 @@ const SettingsPageTestHarness = {
   refreshAfterExternalSave,
   refreshStatus,
   settingsPanelErrorBoundary,
+  usageNavigate,
   useAuthMock,
   useSystemConfigMock,
   webBuildInfoMock,

@@ -9314,6 +9314,11 @@
             "type": "integer",
             "title": "Neutral"
           },
+          "sample_sufficient": {
+            "type": "boolean",
+            "title": "Sample Sufficient",
+            "default": false
+          },
           "hit_rate_pct": {
             "anyOf": [
               {
@@ -9423,6 +9428,17 @@
           },
           "neutral": {
             "title": "Neutral",
+            "type": "integer"
+          },
+          "sample_sufficient": {
+            "default": false,
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
+          "minimum_completed_sample_size": {
+            "default": 30,
+            "minimum": 1.0,
+            "title": "Minimum Completed Sample Size",
             "type": "integer"
           },
           "profile_calibration": {

@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import type React from 'react';
 import { CheckCircle2, CircleAlert, CircleDashed, Play, RefreshCw, WandSparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { ParsedApiError } from '../../api/error';
+import ActionableApiErrorInline from '../analysis/ActionableApiErrorInline';
+import type { SetupSmokeOutcome } from '../../utils/setupSmokeTask';
 import type {
   SetupStatusCheck,
   SetupStatusResponse,
@@ -23,8 +26,7 @@ type FirstRunSetupCardProps = {
   firstStockCode: string;
   isSaving: boolean;
   isRunningSmoke: boolean;
-  smokeError: ParsedApiError | null;
-  smokeSuccess: string;
+  smokeOutcome: SetupSmokeOutcome | null;
   onRefresh: () => void | Promise<void>;
   onSelectCategory: (category: SystemConfigCategory) => void;
   onRunSmoke: () => void | Promise<void>;
@@ -53,8 +55,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
   firstStockCode,
   isSaving,
   isRunningSmoke,
-  smokeError,
-  smokeSuccess,
+  smokeOutcome,
   onRefresh,
   onSelectCategory,
   onRunSmoke,
@@ -65,6 +66,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
   listSeparator,
   t,
 }) => {
+  const navigate = useNavigate();
   const [isHidden, setIsHidden] = useState(false);
   const requiredMissing = status?.checks.filter((check) => check.required && check.status === 'needs_action') || [];
   const isComplete = Boolean(status?.isComplete);
@@ -215,9 +217,29 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             {firstStockCode ? t('settings.setupGuideSmokeNotReady') : t('settings.setupGuideSmokeNeedsStock')}
           </p>
         ) : null}
-        {smokeError ? <ApiErrorAlert error={smokeError} /> : null}
-        {!smokeError && smokeSuccess ? (
-          <SettingsAlert title={t('settings.actionSuccess')} message={smokeSuccess} variant="success" />
+        {smokeOutcome?.status !== 'accepted' ? (
+          smokeOutcome?.status === 'failed' && smokeOutcome.tasksHref ? (
+            <ActionableApiErrorInline
+              error={smokeOutcome.error}
+              actions={[{
+                label: t('analysisWorkbench.tasks'),
+                onClick: () => navigate(smokeOutcome.tasksHref!),
+              }]}
+            />
+          ) : smokeOutcome ? (
+            <ApiErrorAlert error={smokeOutcome.error} />
+          ) : (
+            null
+          )
+        ) : null}
+        {smokeOutcome?.status === 'accepted' ? (
+          <SettingsAlert
+            title={t('settings.actionSuccess')}
+            message={smokeOutcome.successMessage}
+            variant="success"
+            actionLabel={t('analysisWorkbench.tasks')}
+            onAction={() => navigate(smokeOutcome.tasksHref)}
+          />
         ) : null}
       </div>
     </SettingsSectionCard>

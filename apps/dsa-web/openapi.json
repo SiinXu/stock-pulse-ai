@@ -9256,6 +9256,11 @@
             "title": "Neutral",
             "type": "integer"
           },
+          "sample_sufficient": {
+            "default": false,
+            "title": "Sample Sufficient",
+            "type": "boolean"
+          },
           "total": {
             "title": "Total",
             "type": "integer"
@@ -9349,6 +9354,12 @@
             ],
             "title": "Horizons"
           },
+          "minimum_completed_sample_size": {
+            "default": 30,
+            "minimum": 1.0,
+            "title": "Minimum Completed Sample Size",
+            "type": "integer"
+          },
           "miss": {
             "title": "Miss",
             "type": "integer"
@@ -9366,6 +9377,11 @@
                 "type": "null"
               }
             ]
+          },
+          "sample_sufficient": {
+            "default": false,
+            "title": "Sample Sufficient",
+            "type": "boolean"
           },
           "statuses": {
             "items": {
