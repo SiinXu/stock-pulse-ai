@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
   ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
@@ -21,11 +23,13 @@ import {
 } from '../../../routing/routes';
 import {
   APPLICATION_NAVIGATION_ITEMS,
+  COMMAND_PALETTE_SECONDARY_PAGES,
+  listCommandPalettePages,
   shouldDelegateCurrentDocumentNavigation,
 } from '../navigation';
 
 describe('application navigation descriptor', () => {
-  it('converges to five primary domains with approved secondary routes', () => {
+  it('converges to the #873 primary spine with Signals first-class and Agent demoted', () => {
     expect(APPLICATION_NAVIGATION_ITEMS.map((item) => [
       item.key,
       item.kind,
@@ -33,8 +37,8 @@ describe('application navigation descriptor', () => {
     ])).toEqual([
       ['home', 'link', APP_ROUTE_PATHS.home],
       ['research', 'group', APP_ROUTE_PATHS.research],
+      ['signals', 'link', APP_ROUTE_PATHS.signals],
       ['portfolio', 'link', APP_ROUTE_PATHS.portfolio],
-      ['agent', 'link', APP_ROUTE_PATHS.agent],
       ['settings', 'link', APP_ROUTE_PATHS.settings],
     ]);
     expect(APPLICATION_NAVIGATION_ITEMS[1]).toEqual(expect.objectContaining({
@@ -49,6 +53,10 @@ describe('application navigation descriptor', () => {
       ['research-event-calendar', APP_ROUTE_PATHS.eventCalendar, 'layout.nav.eventCalendar'],
       ['research-calculators', APP_ROUTE_PATHS.calculators, 'layout.nav.calculators'],
       ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes, 'layout.nav.skillOutcomes'],
+    ]);
+    expect(COMMAND_PALETTE_SECONDARY_PAGES.map(({ key, to }) => [key, to])).toEqual([
+      ['agent', APP_ROUTE_PATHS.agent],
+      ['approvals', APP_ROUTE_PATHS.approvals],
     ]);
   });
 
@@ -68,12 +76,51 @@ describe('application navigation descriptor', () => {
     expect(new Set(targets).size).toBe(targets.length);
     expect(keys).not.toContain('more');
     expect(keys).not.toContain('usage');
+    expect(keys).not.toContain('agent');
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.usage);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.screening);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.backtest);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.decisionSignals);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.alerts);
     expect(targets).not.toContain('/more');
+    expect(targets).toContain(APP_ROUTE_PATHS.signals);
+    expect(targets).not.toContain(APP_ROUTE_PATHS.agent);
+  });
+
+  it('derives command-palette pages from the same graph with secondary demoted surfaces', () => {
+    const analysisHref = `${APP_ROUTE_PATHS.researchAnalysis}?segment=tasks`;
+    const pages = listCommandPalettePages({ analysisHref });
+    expect(pages.map((page) => [page.id, page.href])).toEqual([
+      ['home', APP_ROUTE_PATHS.home],
+      ['research', APP_ROUTE_PATHS.research],
+      ['research-market', APP_ROUTE_PATHS.researchMarket],
+      ['research-discover', APP_ROUTE_PATHS.researchDiscover],
+      ['research-analysis', analysisHref],
+      ['research-backtest', APP_ROUTE_PATHS.researchBacktest],
+      ['research-event-calendar', APP_ROUTE_PATHS.eventCalendar],
+      ['research-calculators', APP_ROUTE_PATHS.calculators],
+      ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes],
+      ['signals', APP_ROUTE_PATHS.signals],
+      ['portfolio', APP_ROUTE_PATHS.portfolio],
+      ['settings', APP_ROUTE_PATHS.settings],
+      ['agent', APP_ROUTE_PATHS.agent],
+      ['approvals', APP_ROUTE_PATHS.approvals],
+    ]);
+    const sidebarTargets = new Set(
+      APPLICATION_NAVIGATION_ITEMS.flatMap((item) => [
+        item.to,
+        ...(item.children?.map((child) => child.to) ?? []),
+      ]),
+    );
+    for (const page of pages) {
+      if (page.id === 'agent' || page.id === 'approvals') {
+        expect(sidebarTargets.has(page.href)).toBe(false);
+      } else if (page.id === 'research-analysis') {
+        expect(page.href).toBe(analysisHref);
+      } else {
+        expect(sidebarTargets.has(page.href) || page.href === analysisHref).toBe(true);
+      }
+    }
   });
 
   it('centralizes Research and shared report URL state names and legal values', () => {
