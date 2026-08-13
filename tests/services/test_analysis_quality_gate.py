@@ -402,6 +402,92 @@ def test_runtime_dashboard_invented_number_is_quarantined() -> None:
     )
 
 
+def test_project_facts_emits_quote_volume_ratio_from_snapshot() -> None:
+    facts = project_facts_from_evidence(
+        market_snapshot={"volume_ratio": 1.17, "price": 10.0},
+    )
+    by_path = {fact["field_path"]: fact["value"] for fact in facts}
+    assert by_path["quote.volume_ratio"] == 1.17
+
+
+def test_dashboard_volume_ratio_binds_quote_not_volume_ratio_5d() -> None:
+    result = _result(verified_facts=[], claims=None, price=10.0)
+    result.dashboard["data_perspective"] = {
+        "price_position": {"current_price": 10.0},
+        "volume_analysis": {"volume_ratio": 1.17},
+    }
+    gate = apply_analysis_quality_gate(
+        result,
+        market_snapshot={"volume_ratio": 1.17, "price": 10.0},
+        technical_context=SimpleNamespace(volume_ratio_5d=0.4, current_price=10.0),
+    )
+    assert gate.verdict is QualityGateVerdict.PASS
+    assert (
+        result.dashboard["data_perspective"]["volume_analysis"]["volume_ratio"]
+        == 1.17
+    )
+
+
+def test_dashboard_volume_ratio_does_not_bind_to_volume_ratio_5d() -> None:
+    result = _result(verified_facts=[], claims=None, price=10.0)
+    result.dashboard["data_perspective"] = {
+        "price_position": {"current_price": 10.0},
+        "volume_analysis": {"volume_ratio": 1.17},
+    }
+    gate = apply_analysis_quality_gate(
+        result,
+        technical_context=SimpleNamespace(volume_ratio_5d=1.17, current_price=10.0),
+    )
+    assert gate.verdict is QualityGateVerdict.ANNOTATE
+    assert (
+        result.dashboard["data_perspective"]["volume_analysis"]["volume_ratio"]
+        is None
+    )
+    assert "dashboard:data_perspective.volume_analysis.volume_ratio" in (
+        gate.ungrounded_claim_ids
+    )
+
+
+def test_dashboard_display_rounded_values_bind_to_full_precision_evidence() -> None:
+    result = _result(verified_facts=[], claims=None, price=10.123)
+    result.dashboard["data_perspective"] = {
+        "price_position": {
+            "current_price": round(10.123, 2),
+            "ma5": round(9.555, 2),
+            "bias_ma5": round(1.234, 2),
+        }
+    }
+    gate = apply_analysis_quality_gate(
+        result,
+        technical_context=SimpleNamespace(
+            current_price=10.123,
+            ma5=9.555,
+            bias_ma5=1.234,
+        ),
+    )
+    assert gate.verdict is QualityGateVerdict.PASS
+    price_position = result.dashboard["data_perspective"]["price_position"]
+    assert price_position["current_price"] == round(10.123, 2)
+    assert price_position["ma5"] == round(9.555, 2)
+    assert price_position["bias_ma5"] == round(1.234, 2)
+
+
+def test_strata_display_rounded_price_binds_to_full_precision_evidence() -> None:
+    facts = project_facts_from_evidence(
+        current_price=10.123,
+        as_of="2026-08-08",
+        source_id="pipeline",
+    )
+    result = _result(
+        verified_facts=["Current price is 10.12 in the session."],
+        price=10.123,
+    )
+    claims, ungrounded, _statements = project_claims_from_result(result, facts=facts)
+    assert claims
+    assert not ungrounded
+    assert all(claim["source_fact_id"] != "__missing__" for claim in claims)
+
+
 def test_ambiguous_equal_values_do_not_bind_by_insertion_order() -> None:
     facts = [
         {

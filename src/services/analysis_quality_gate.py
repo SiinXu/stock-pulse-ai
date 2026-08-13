@@ -118,7 +118,7 @@ _DASHBOARD_NUMERIC_CLAIMS: Tuple[Tuple[str, Tuple[str, ...], str], ...] = (
     ),
     (
         "data_perspective.volume_analysis.volume_ratio",
-        ("technical.volume_ratio_5d",),
+        ("quote.volume_ratio",),
         "ratio",
     ),
 )
@@ -408,6 +408,7 @@ def project_facts_from_evidence(
             ("close", "quote.close", "price"),
             ("change_pct", "quote.change_pct", "percent"),
             ("pct_chg", "quote.change_pct", "percent"),
+            ("volume_ratio", "quote.volume_ratio", "ratio"),
         ),
         prefix="snapshot",
     )
@@ -510,6 +511,23 @@ def _extract_numbers(text: str) -> List[Tuple[float, str]]:
     return found
 
 
+def _numeric_values_match(left: float, right: float) -> bool:
+    """True when values are identical or agree after 2-decimal display rounding.
+
+    Dashboard builders round prices, MAs, and bias with ``round(..., 2)`` before
+    publishing claims. Exact ``abs_tol=1e-9`` would treat those grounded
+    display values as ungrounded against full-precision evidence.
+    """
+    if math.isclose(left, right, rel_tol=0.0, abs_tol=1e-9):
+        return True
+    return math.isclose(
+        round(left, 2),
+        round(right, 2),
+        rel_tol=0.0,
+        abs_tol=1e-9,
+    )
+
+
 def _statement_has_marker(statement: str, marker: str) -> bool:
     if not marker:
         return False
@@ -530,7 +548,7 @@ def _find_matching_fact(
         fact
         for fact in facts
         if _finite_float(fact.get("value")) is not None
-        and math.isclose(float(fact["value"]), value, rel_tol=0.0, abs_tol=1e-9)
+        and _numeric_values_match(float(fact["value"]), value)
     ]
     if not candidates:
         return None
@@ -574,12 +592,7 @@ def _find_dashboard_fact(
 ) -> Optional[Mapping[str, Any]]:
     for fact in facts:
         fact_value = _finite_float(fact.get("value"))
-        if fact_value is None or not math.isclose(
-            fact_value,
-            value,
-            rel_tol=0.0,
-            abs_tol=1e-9,
-        ):
+        if fact_value is None or not _numeric_values_match(fact_value, value):
             continue
         field_path = _bounded_text(fact.get("field_path"))
         if any(

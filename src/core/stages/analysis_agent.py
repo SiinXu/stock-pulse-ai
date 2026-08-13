@@ -652,13 +652,16 @@ class _AgentAnalysisStageMixin:
                     apply_analysis_quality_gate,
                 )
 
+                snapshot = getattr(result, "market_snapshot", None)
+                if not isinstance(snapshot, dict):
+                    snapshot = realtime_data if isinstance(realtime_data, dict) else None
                 quality_gate = apply_analysis_quality_gate(
                     result,
                     config=self.config,
                     analysis_context_pack_overview=analysis_context_pack_overview
                     if isinstance(analysis_context_pack_overview, dict)
                     else None,
-                    market_snapshot=getattr(result, "market_snapshot", None),
+                    market_snapshot=snapshot,
                     fundamental_context=fundamental_context
                     if isinstance(fundamental_context, dict)
                     else None,
