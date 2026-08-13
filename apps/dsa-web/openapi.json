@@ -4329,6 +4329,46 @@
         "title": "AuthSettingsRequest",
         "type": "object"
       },
+      "AuthStatusResponse": {
+        "additionalProperties": false,
+        "description": "Wire-stable auth status payload (camelCase aliases, Issue #549).",
+        "properties": {
+          "authEnabled": {
+            "title": "Authenabled",
+            "type": "boolean"
+          },
+          "loggedIn": {
+            "title": "Loggedin",
+            "type": "boolean"
+          },
+          "passwordChangeable": {
+            "title": "Passwordchangeable",
+            "type": "boolean"
+          },
+          "passwordSet": {
+            "title": "Passwordset",
+            "type": "boolean"
+          },
+          "setupState": {
+            "enum": [
+              "enabled",
+              "password_retained",
+              "no_password"
+            ],
+            "title": "Setupstate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authEnabled",
+          "loggedIn",
+          "passwordSet",
+          "passwordChangeable",
+          "setupState"
+        ],
+        "title": "AuthStatusResponse",
+        "type": "object"
+      },
       "BacktestAppliedConfig": {
         "description": "Echo of the effective run configuration used for evaluation honesty.",
         "properties": {
@@ -39075,7 +39115,7 @@
     },
     "/api/v1/auth/settings": {
       "post": {
-        "description": "Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie.",
+        "description": "Enable or disable password login. When enabling without an existing password, password + passwordConfirm are required. When re-enabling with a stored password, currentPassword is required. Disabling authentication always requires currentPassword, even when the request has a valid session cookie. Successful responses use AuthStatusResponse (same camelCase wire shape as GET /status). Error paths still return JSONResponse error envelopes.",
         "operationId": "auth_update_settings_api_v1_auth_settings_post",
         "requestBody": {
           "content": {
@@ -39091,7 +39131,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -39121,7 +39163,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             },
             "description": "Successful Response"

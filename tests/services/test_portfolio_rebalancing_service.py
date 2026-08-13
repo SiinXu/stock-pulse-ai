@@ -236,6 +236,35 @@ class PureMathRebalancingTests(unittest.TestCase):
         self.assertGreater(band["target_weight_pct_high"], 0.0)
         self.assertIn("not investment advice", DISCLAIMER.lower())
 
+    def test_position_band_cap_applies_soft_max_when_sizing_disabled(self) -> None:
+        band = compute_position_band(
+            symbol="AAA",
+            current_weight_pct_value=20.0,
+            risk_tolerance="moderate",
+            signal="hold",
+            soft_max_weight=0.15,
+            portfolio_aware_enabled=False,
+            has_portfolio=True,
+        )
+        self.assertEqual(band["mode"], "sizing_disabled")
+        self.assertAlmostEqual(band["effective_cap_pct"], 15.0, places=6)
+        self.assertLessEqual(band["target_weight_pct_high"], 15.0 + 1e-9)
+        self.assertIn("min(risk_band, soft_max)", band["assumptions"][-1])
+
+    def test_position_band_cap_applies_soft_max_in_stock_only_fallback(self) -> None:
+        band = compute_position_band(
+            symbol="AAA",
+            current_weight_pct_value=0.0,
+            risk_tolerance="moderate",
+            signal="hold",
+            soft_max_weight=0.15,
+            portfolio_aware_enabled=True,
+            has_portfolio=False,
+        )
+        self.assertEqual(band["mode"], "stock_only_fallback")
+        self.assertAlmostEqual(band["effective_cap_pct"], 15.0, places=6)
+        self.assertLessEqual(band["target_weight_pct_high"], 15.0 + 1e-9)
+
     def test_position_band_rejects_non_finite_current(self) -> None:
         with self.assertRaises(ValueError):
             compute_position_band(
@@ -316,6 +345,8 @@ class PortfolioRebalancingServiceTests(unittest.TestCase):
         )
         self.assertFalse(result["has_portfolio"])
         self.assertEqual(result["mode"], "stock_only_fallback")
+        self.assertAlmostEqual(result["effective_cap_pct"], 15.0, places=6)
+        self.assertLessEqual(result["target_weight_pct_high"], 15.0 + 1e-9)
         self.assertIn("not investment advice", result["disclaimer"].lower())
         self.assertFalse(result["auto_execute"])
 
