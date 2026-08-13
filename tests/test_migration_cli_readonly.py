@@ -23,6 +23,7 @@ from src.migrations.engine import read_only_migration_connection
 from src.migrations.registry import (
     AGENT_EPISODE_SCHEMA_MIGRATION,
     ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION,
+    AGENT_PREDICTION_SCHEMA_MIGRATION,
     APPROVAL_GATE_SCHEMA_MIGRATION,
     CHAT_TURN_IDENTITY_MIGRATION,
     DECISION_SIGNAL_PROFILE_MIGRATION,
@@ -219,6 +220,7 @@ def test_pending_cli_subprocess_is_read_only(
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
         LLM_USAGE_COST_ATTRIBUTION_MIGRATION.id,
         AGENT_EPISODE_SCHEMA_MIGRATION.id,
+        AGENT_PREDICTION_SCHEMA_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -295,6 +297,7 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         ANALYSIS_HISTORY_SEARCH_FTS_MIGRATION.id,
         LLM_USAGE_COST_ATTRIBUTION_MIGRATION.id,
         AGENT_EPISODE_SCHEMA_MIGRATION.id,
+        AGENT_PREDICTION_SCHEMA_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}
