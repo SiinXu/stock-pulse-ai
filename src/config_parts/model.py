@@ -361,6 +361,10 @@ class Config:
     layered_memory_vector_enabled: bool = False
     layered_memory_max_records_per_principal: int = 200
     layered_memory_audit_enabled: bool = True
+    # Evolution episode log (trajectories / lessons / outcomes). Default off; fail-soft.
+    agent_episode_log_enabled: bool = False
+    agent_episode_retention_days: int = 90
+    agent_episode_max_rows: int = 50_000
     # Error-pattern encyclopedia from lessons (Issue #1138); default off
     agent_error_pattern_enabled: bool = False
     agent_error_pattern_inject_top_k: int = 3

@@ -1,0 +1,1 @@
+- [Fixed] Register the Agent evaluation CI job's read-only checkout permission in the workflow supply-chain contract.
