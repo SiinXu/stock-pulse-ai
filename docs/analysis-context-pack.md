@@ -316,3 +316,41 @@ P0 只记录历史消费面。完整 pack 不应默认公开到历史详情或�
 - pack、日志、历史快照和 API 响应不得记录 API key、token、cookie、完整 webhook URL、邮箱密码、私有环境变量或其他密钥。
 - `source`、`timestamp`、`fallback`、`stale`、`partial` 等质量元数据只用于解释输入限制，不用于阻断分析；除非现有核心路径本来就是 fail-fast。
 - #1386 的盘前 / 盘中 phase 感知是后续 `phase` / `data_quality` 字段的重要背景；P0 只记录关系，不接入 runtime。
+
+
+## Issue #182 Shared Snapshot Seal (Multi-Agent Data Consistency)
+
+Issue #182 extends the existing AnalysisContextPack projection with a **per-run sealed snapshot**, without introducing a second context system.
+
+What is added:
+
+| Field / helper | Meaning |
+| --- | --- |
+| `snapshot_id` | Opaque id for one sealed input snapshot within a run |
+| `snapshot_revision` | Monotone revision (>= 1); schema contract remains `pack_version=1.0` |
+| `as_of` | Pack-level ISO-8601 as-of derived from block/item timestamps or `created_at` |
+| `metadata.content_digest` | SHA-256 of pack-only audit projection (subject/blocks without item values/data_quality/as_of); stable across multi-agent market reseal |
+| `market_digest` | SHA-256 of sealed multi-agent market inputs only (runtime seal) |
+| `analysis_context_snapshot_sealed` / `..._seal_failed` | AgentContext meta flags; seal remains fail-open but is always observable |
+| `src/analysis_context_pack/snapshot.py` | `seal_analysis_context_snapshot`, freeze helpers, consistency asserts |
+| `AgentContext.seal_input_snapshot` | Freezes market-input keys; stage outputs stay writable |
+
+Identity contract: `content_digest` is pack-only and must match between pipeline overview/history and multi-agent runtime for the same `snapshot_id`. Market bags use a separate `market_digest` and never rewrite pack `content_digest`.
+
+Runtime contract:
+
+1. `AnalysisContextBuilder.build()` stamps snapshot identity after assembling blocks.
+2. Pipeline overview / prompt summaries surface `snapshot_id` / `snapshot_revision` / `as_of` (low-sensitivity).
+3. Multi-agent path passes snapshot identity via `initial_context["analysis_context_snapshot"]`.
+4. `AgentOrchestrator._build_context()` seals market bags (`realtime_quote`, `trend_result`, `news_context`, …) so concurrent stages read the same digest-addressable snapshot.
+5. In-place writes to sealed market keys raise `SnapshotMutationError`; nested frozen containers reject item assignment.
+6. Diagnostics record an `analysis_context_snapshot` agent event and `context_snapshot.analysis_context_snapshot` for audit.
+
+Non-goals for #182:
+
+- No second pack schema / no `PACK_VERSION` bump.
+- No public API exposure of full pack item values.
+- No DB migration; identity lives in overview metadata and context_snapshot only.
+- Stage opinions / risk flags / free-form meta remain mutable stage outputs.
+
+Rollback: remove the snapshot seal helpers and stop stamping `snapshot_*` fields; existing `pack_version=1.0` consumers ignore unknown optional fields.
