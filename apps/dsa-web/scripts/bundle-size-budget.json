@@ -47,9 +47,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 152676,
-      "measuredGzipBytes": 152076,
-      "note": "Local production-build remasure after merging origin/main; measured 152076 B + 600 B retained headroom."
+      "maxGzipBytes": 153333,
+      "measuredGzipBytes": 152733,
+      "note": "Local production-build remasure after merging origin/main; measured 152733 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
