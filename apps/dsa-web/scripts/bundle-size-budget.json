@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-12",
-  "baselineNote": "Settings, locale, and IntelligenceSourcesPanel budgets use a combined production build after landing Daily Brief/Event Research, research API, and cost-attribution inventory changes (Refs #149 / #1131 / #1143 / #166 / #248); each rule retains its fixed headroom.",
+  "measuredAt": "2026-08-13",
+  "baselineNote": "Train 20260813-10 remasured after merging origin/main (#1314). Overlapping IntelligenceSourcesPanel and locale rules were rebuilt locally; each retains its previous fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 242812,
-      "measuredGzipBytes": 242412,
-      "note": "Combined local production-build measurement after current main API/UI additions and research asset pack (PR #1262), with 400 B headroom."
+      "maxGzipBytes": 244071,
+      "measuredGzipBytes": 243671,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "js-entry",
@@ -26,58 +26,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 159523,
-      "measuredGzipBytes": 158823,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 160307,
+      "measuredGzipBytes": 159607,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 152707,
-      "measuredGzipBytes": 152007,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 153449,
+      "measuredGzipBytes": 152749,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 152666,
-      "measuredGzipBytes": 151966,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 153430,
+      "measuredGzipBytes": 152730,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 152483,
-      "measuredGzipBytes": 151783,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 153222,
+      "measuredGzipBytes": 152522,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 148286,
-      "measuredGzipBytes": 147586,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 148893,
+      "measuredGzipBytes": 148193,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 145202,
-      "measuredGzipBytes": 144502,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 145952,
+      "measuredGzipBytes": 145252,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 138385,
-      "measuredGzipBytes": 137685,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 139067,
+      "measuredGzipBytes": 138367,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 138464,
-      "measuredGzipBytes": 137764,
-      "note": "Combined local production-build measurement after current main locale additions and research asset pack (PR #1262), with 700 B headroom."
+      "maxGzipBytes": 139163,
+      "measuredGzipBytes": 138463,
+      "note": "Train 20260813-10 local production-build measurement after merging #1314; fixed headroom retained."
     },
     {
       "id": "vendor-charts",
