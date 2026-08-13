@@ -10,7 +10,8 @@
 
 ## HTTP
 
-`GET /api/v1/portfolio/rebalancing-recommendations`  
+`GET /api/v1/portfolio/rebalancing-recommendations`
+
 `operation_id=getPortfolioRebalancingRecommendations`
 
 只读；消费组合快照 + `PortfolioRiskMetricsService`；热路径不调用行情 Provider。
