@@ -100,7 +100,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "cd766374f44ac0a456e8b27f3b247179fb873102d11f18feeb3918f53ba8c3ad"
+    "4310d640ecc98572e1bba4f56abeee286bd394dc1db07a8d6bc4912238c7ef3a"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -333,7 +333,7 @@ EXPECTED_GROUPS = (
             "get_llm_usage_summary",
             "get_llm_usage_records",
         ),
-        "09f5b539c64af212918a0222fa0086fabc891a5161f56492190f1906b4dce072",
+        "dbaf76e36abb6b32ba5244f044d0f0d8200afbc14b0a302cfc0cf96f71ddd6c0",
     ),
 )
 

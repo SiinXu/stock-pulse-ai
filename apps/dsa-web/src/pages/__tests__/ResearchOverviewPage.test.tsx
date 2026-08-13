@@ -45,7 +45,7 @@ describe('ResearchOverviewPage', () => {
 
     expect(screen.getByTestId('research-overview-page')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: '研究' })).toBeInTheDocument();
-    for (const title of ['大盘复盘', '发现', '分析工作台', '回测', '技能后验']) {
+    for (const title of ['大盘复盘', '发现', '分析工作台', '回测', '事件日历', '技能后验']) {
       expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
     }
 
@@ -60,6 +60,8 @@ describe('ResearchOverviewPage', () => {
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchAnalysis);
     expect(screen.getByRole('link', { name: '进入回测' }))
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchBacktest);
+    expect(screen.getByRole('link', { name: '进入事件日历' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.eventCalendar);
     expect(screen.getByRole('link', { name: '进入技能后验' }))
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchSkillOutcomes);
     expect(document.title).toBe('研究 - StockPulse');

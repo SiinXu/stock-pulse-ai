@@ -478,7 +478,8 @@ export interface SchedulerStatusResponse {
   enabled: boolean;
   running: boolean;
   attached?: boolean;
-  processMode?: 'serve' | 'desktop' | 'not_attached';
+  /** Authoritative process mode. Legacy `serve` may appear from older servers. */
+  processMode?: 'serve+schedule' | 'desktop' | 'cli-schedule' | 'not_attached' | 'serve';
   scheduleTimezone?: string;
   runNowAvailable?: boolean;
   runNowBlockReason?: string | null;

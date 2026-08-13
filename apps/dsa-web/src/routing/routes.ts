@@ -8,6 +8,8 @@ export const APP_ROUTE_PATHS = {
   playgroundRender: '/playground/render/:componentId/:scenarioId',
   agent: '/chat',
   portfolio: '/portfolio',
+  /** Process-quality personal performance for paper trades (#1134); outcome metrics owned by #987. */
+  portfolioPerformance: '/portfolio/performance',
   signals: '/signals',
   approvals: '/approvals',
   stockDetails: '/stocks/:stockCode',

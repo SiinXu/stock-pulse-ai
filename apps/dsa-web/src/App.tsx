@@ -48,6 +48,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
+const PersonalPerformancePage = lazy(() => import('./pages/PersonalPerformancePage'));
 const EventCalendarPage = lazy(() => import('./pages/EventCalendarPage'));
 const SignalCenterPage = lazy(() => import('./pages/DecisionSignalsPage'));
 const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage'));
@@ -177,6 +178,7 @@ const routes = [
           },
           { path: APP_ROUTE_PATHS.agent, element: <ChatPage /> },
           { path: APP_ROUTE_PATHS.portfolio, element: <PortfolioPage /> },
+          { path: APP_ROUTE_PATHS.portfolioPerformance, element: <PersonalPerformancePage /> },
           { path: APP_ROUTE_PATHS.eventCalendar, element: <EventCalendarPage /> },
           { path: APP_ROUTE_PATHS.signals, element: <SignalCenterPage /> },
           { path: APP_ROUTE_PATHS.approvals, element: <ApprovalsPage /> },

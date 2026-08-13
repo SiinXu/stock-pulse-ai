@@ -67,19 +67,35 @@ function toErrorEnvelope(value: unknown): ErrorEnvelope | null {
     return null;
   }
   const params = isRecord(source.params) ? { ...source.params } : {};
-  const reserved = new Set(['error', 'code', 'message', 'params', 'details', 'detail', 'trace_id', 'traceId', 'type']);
+  const reserved = new Set([
+    'error',
+    'code',
+    'message',
+    'params',
+    'details',
+    'detail',
+    'trace_id',
+    'traceId',
+    'type',
+    'category',
+    'severity',
+  ]);
   Object.entries(source).forEach(([key, entry]) => {
     if (!reserved.has(key) && params[key] === undefined) {
       params[key] = entry;
     }
   });
   const traceId = pickString(source.trace_id, source.traceId, value.trace_id, value.traceId) ?? undefined;
+  const category = pickString(source.category) ?? undefined;
+  const severity = pickString(source.severity) ?? undefined;
   return {
     error: source.error.trim(),
     message: pickString(source.message) ?? undefined,
     params,
     details: source.details !== undefined ? source.details : source.detail,
     traceId,
+    category,
+    severity,
   };
 }
 
@@ -275,6 +291,8 @@ export function parseApiError(error: unknown): ParsedApiError {
       params: envelope.params,
       details: envelope.details,
       traceId: envelope.traceId,
+      taxonomyCategory: envelope.category,
+      taxonomySeverity: envelope.severity,
     });
   }
   const payloadText = extractErrorPayloadText(response?.data);

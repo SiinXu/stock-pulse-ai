@@ -49,7 +49,21 @@ Issue [#545](https://github.com/SiinXu/stock-pulse-ai/issues/545)。在**不新�
 dashboard.committee_deliberation  # schema_version: committee-deliberation-v1
 ```
 
-结构遵循证据分层呈现习惯（缺失/冲突、模型推断、风险与反证、非投资建议声明），Markdown / WeChat 模板在 `strategy_synthesis` 之后渲染。历史报告无该字段时保持安静。
+该 payload **确定性**由 specialist 观点与 `strategy_synthesis` 投影生成（挂载前会剥离模型自由文本）。结构遵循证据分层习惯，并包含：
+
+| 字段 | 含义 |
+| --- | --- |
+| `members` | 各人格立场（信号、置信度、理由摘录） |
+| `conclusion` | 来自 `strategy_synthesis` 的最终信号 + 共识度 + 置信度 |
+| `dissenting_opinions` | 保留/反方意见（来自 opposing skills 或成员对立信号） |
+| `divergence_points` | 结构化分歧标准字段：`source`、`kind`、`severity`、`participants`、`summary_key`；仅在版本化记录不存在时映射旧冲突 |
+| `status` / `outcome` | 导出与 UI 用紧凑状态 |
+
+Markdown / WeChat / History / Notification 在 `strategy_synthesis` 之后渲染。历史报告无该字段时保持安静。
+
+报告 API 还将有界副本投影到
+`details.structured_insights.committee_deliberation`，供 Web / Signal / History
+消费。委员会产出时，DecisionSignal `evidence.committee_deliberation` 携带同一紧凑投影。
 
 ## 成本与免责
 
@@ -58,7 +72,9 @@ dashboard.committee_deliberation  # schema_version: committee-deliberation-v1
 
 ## Web UI
 
-本 issue v1 **不包含** Web 设置页 / 分析页 UI（延后）。配置与 API context 字段优先；Web 启用入口见后续 issue。
+- **设置 / 模式开关**：仍以配置与 API context 为主（本批不新增设置 IA）。
+- **报告 / History**：`ReportStructuredInsights` 在 payload 存在时渲染结论、委员立场、保留意见与分歧。
+- **Signal Center**：详情页从 `evidence.committee_deliberation` 复用同一卡片。
 
 ## 回滚
 

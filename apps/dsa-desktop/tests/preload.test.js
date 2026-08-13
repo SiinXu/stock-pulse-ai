@@ -49,6 +49,9 @@ test('preload exposes desktop version from BrowserWindow additionalArguments', (
   assert.equal(typeof exposed.dsaDesktop.checkForUpdates, 'function');
   assert.equal(typeof exposed.dsaDesktop.installDownloadedUpdate, 'function');
   assert.equal(typeof exposed.dsaDesktop.openReleasePage, 'function');
+  assert.equal(typeof exposed.dsaDesktop.getEnvDiagnostics, 'function');
+  assert.equal(typeof exposed.dsaDesktop.openOperatorTerminal, 'function');
+  assert.equal(typeof exposed.dsaDesktop.openCliInstallGuide, 'function');
   assert.equal(typeof exposed.dsaDesktop.onUpdateStateChange, 'function');
   assert.deepEqual(Object.keys(exposed.stockPulseLocalModels).sort(), [
     'detect',
