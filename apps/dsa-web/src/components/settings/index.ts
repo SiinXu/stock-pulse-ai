@@ -6,6 +6,7 @@ export * from './IntelligentImport';
 export * from './NotificationTestPanel';
 export * from './NotificationChannelsPanel';
 export * from './DataProvidersPanel';
+export * from './DataProviderRuntimeStatusPanel';
 export * from './dataProviders';
 export * from './AgentBehaviorPanel';
 export * from './agentSetupPresets';

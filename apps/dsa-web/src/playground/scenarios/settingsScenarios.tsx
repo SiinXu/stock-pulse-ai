@@ -4,6 +4,7 @@ import { Button } from '../../components/common';
 import { AuthSettingsCard } from '../../components/settings/AuthSettingsCard';
 import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard';
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
+import { DataProviderRuntimeStatusPanel } from '../../components/settings/DataProviderRuntimeStatusPanel';
 import { FirstRunWizard } from '../../components/settings/FirstRunWizard';
 import { GenerationBackendStatusPanel } from '../../components/settings/GenerationBackendStatusPanel';
 import { KronosSettingsFields } from '../../components/settings/KronosSettingsFields';
@@ -154,6 +155,8 @@ const DataProvidersPanelStory = () => {
     />
   );
 };
+
+const DataProviderRuntimeStatusPanelStory = () => <DataProviderRuntimeStatusPanel />;
 
 const FirstRunWizardStory = () => {
   const { language, text } = useStoryText();
@@ -570,6 +573,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'auth-settings-card': AuthSettingsCard,
   'change-password-card': ChangePasswordCard,
   'data-providers-panel': DataProvidersPanelStory,
+  'data-provider-runtime-status-panel': DataProviderRuntimeStatusPanelStory,
   'first-run-wizard': FirstRunWizardStory,
   'generation-backend-status-panel': GenerationBackendStatusPanelStory,
   'kronos-status-panel': KronosStatusPanelStory,

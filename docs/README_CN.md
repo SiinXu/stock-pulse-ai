@@ -54,7 +54,7 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 | 投资框架完整决策树/维度矩阵编辑与 Multi/Research 全路径注入 | 规划 / 进行中 | [#465](https://github.com/SiinXu/stock-pulse-ai/issues/465) |
 | 多用户 / 工作区隔离 | 规划 | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
 
-更完整的场景入口见 [文档中心](INDEX.md)。架构边界见 [技术架构总览](architecture-overview.md)。
+与上游及本地优先同类项目的诚实对照见 [竞品格局](competitive-landscape_CN.md)（[English](competitive-landscape.md)）。更完整的场景入口见 [文档中心](INDEX.md)。架构边界见 [技术架构总览](architecture-overview.md)。
 
 ## 🗂️ 目录导览
 

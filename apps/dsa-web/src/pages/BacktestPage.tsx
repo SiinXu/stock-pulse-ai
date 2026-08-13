@@ -2,6 +2,7 @@ import type React from 'react';
 import { useState, useEffect, useCallback, useId, useRef } from 'react';
 import { Check, ChevronDown, Inbox, Minus, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
@@ -11,6 +12,7 @@ import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
+  APP_ROUTE_PATHS,
   RESEARCH_BACKTEST_LIMITS,
   RESEARCH_BACKTEST_PHASE_VALUES,
 } from '../routing/routes';
@@ -332,6 +334,12 @@ const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> 
 const BacktestPage: React.FC = () => {
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.researchBacktest,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const text = BACKTEST_TEXT[language];
   const validationText = BACKTEST_VALIDATION_TEXT[language];
   const phaseFilterOptions = BACKTEST_PHASE_FILTER_OPTIONS[language];
@@ -840,7 +848,7 @@ const BacktestPage: React.FC = () => {
 
   return (
     <AppPage className="flex min-h-full flex-col">
-      <PageHeader className="shrink-0" title={text.pageTitle} />
+      <PageHeader ref={pageHeadingRef} className="shrink-0" title={text.pageTitle} />
       <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
           {/* #879 B2: mobile disclosure; page-scoped name avoids legacy "筛选" action. */}

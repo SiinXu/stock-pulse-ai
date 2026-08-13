@@ -414,6 +414,8 @@ const ChatComposerStory = () => {
         contextCompressionSaving={false}
         contextCompressionError={null}
         onContextCompressionChange={() => undefined}
+        whatIfDraft={DEFAULT_WHAT_IF_DRAFT}
+        onWhatIfChange={() => undefined}
         skills={FIXTURE_SKILLS}
         selectedSkillIds={selectedSkillIds}
         selectedSkillIdSet={new Set(selectedSkillIds)}
@@ -569,7 +571,12 @@ const WhatIfScenarioPanelStory = () => {
   };
   return (
     <div className="max-w-3xl rounded-lg border border-subtle bg-card p-2">
-      <WhatIfScenarioPanel t={t as never} draft={draft} onChange={() => undefined} />
+      <WhatIfScenarioPanel
+        t={t as never}
+        draft={draft}
+        onChange={() => undefined}
+        promoteHref={scenario === 'states' ? '/research/analysis?stock=600519' : null}
+      />
     </div>
   );
 };

@@ -593,6 +593,35 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertEqual(second_task["interval_seconds"], 11 * 60)
         self.assertEqual(third_task["interval_seconds"], 11 * 60)
 
+    def test_event_research_brief_task_is_bound_cached_and_disableable(self) -> None:
+        config = SimpleNamespace(event_research_brief_enabled=True)
+        callback = MagicMock()
+        service = RuntimeSchedulerService(config_provider=lambda: config)
+        service._reload_config = lambda: config
+
+        with patch(
+            "src.services.runtime_scheduler.build_event_research_brief_scheduler_background_tasks",
+            return_value=[{
+                "task": callback,
+                "interval_seconds": 120,
+                "run_immediately": True,
+                "name": "event_research_brief",
+            }],
+        ) as builder:
+            first = service._current_event_research_brief_background_tasks(config)
+            second = service._current_event_research_brief_background_tasks(config)
+            config.event_research_brief_enabled = False
+            disabled = service._current_event_research_brief_background_tasks(config)
+
+        self.assertEqual(builder.call_count, 1)
+        self.assertEqual(first[0]["name"], "event_research_brief")
+        self.assertEqual(first[0]["interval_seconds"], 120)
+        self.assertTrue(first[0]["run_immediately"])
+        self.assertFalse(second[0]["run_immediately"])
+        self.assertIs(first[0]["task"], second[0]["task"])
+        self.assertEqual(disabled, [])
+        self.assertNotIn("event_research_brief", service._background_task_cache)
+
     def test_force_enabled_survives_time_reconcile_until_explicit_enabled_update(self) -> None:
         fake_schedule = _FakeScheduleModule()
         config = SimpleNamespace(

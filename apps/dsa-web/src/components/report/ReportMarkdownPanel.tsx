@@ -1,9 +1,9 @@
 import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { Check, Code2, Download, ExternalLink, FileText, FileDown } from 'lucide-react';
+import { Check, Code2, Download, ExternalLink, FileCode, FileText, FileDown } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
-import { reportExportApi } from '../../api/reportExport';
+import { reportExportApi, type ReportExportFormat } from '../../api/reportExport';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { AnalysisReport, ReportLanguage } from '../../types/analysis';
@@ -48,8 +48,9 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [copiedType, setCopiedType] = useState<'markdown' | 'text' | null>(null);
-  const [exporting, setExporting] = useState<'md' | 'pdf' | null>(null);
+  const [exporting, setExporting] = useState<ReportExportFormat | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [htmlAvailable, setHtmlAvailable] = useState(false);
   const [pdfAvailable, setPdfAvailable] = useState(false);
   const { copyText, copyError } = useClipboard();
 
@@ -75,7 +76,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     }
   }, [content, copyText]);
 
-  const handleExport = useCallback(async (format: 'md' | 'pdf') => {
+  const handleExport = useCallback(async (format: ReportExportFormat) => {
     setExportError(null);
     setExporting(format);
     try {
@@ -92,10 +93,16 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     let active = true;
     reportExportApi.getCapabilities(uiLanguage === 'zh' ? 'zh' : 'en')
       .then((caps) => {
-        if (active) setPdfAvailable(Boolean(caps.formats.pdf.available));
+        if (active) {
+          setHtmlAvailable(Boolean(caps.formats.html?.available));
+          setPdfAvailable(Boolean(caps.formats.pdf.available));
+        }
       })
       .catch(() => {
-        if (active) setPdfAvailable(false);
+        if (active) {
+          setHtmlAvailable(false);
+          setPdfAvailable(false);
+        }
       });
     return () => {
       active = false;
@@ -207,6 +214,19 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
             data-testid="report-export-md"
           >
             <Download aria-hidden="true" />
+          </IconButton>
+
+          <IconButton
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={() => { void handleExport('html'); }}
+            disabled={isLoading || exporting !== null || !htmlAvailable}
+            aria-label={htmlAvailable ? text.downloadHtml : text.downloadHtmlUnavailable}
+            title={htmlAvailable ? text.downloadHtml : text.downloadHtmlUnavailable}
+            data-testid="report-export-html"
+          >
+            <FileCode aria-hidden="true" />
           </IconButton>
 
           <IconButton

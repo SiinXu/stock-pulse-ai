@@ -33,6 +33,10 @@ For **new** modules and **files already under edit**, prefer:
    caller already owns a config instance.
 2. **Composition-root access** via `get_application_services().config` when the
    process root is the correct owner (see ADR-003).
+3. **Raw key + source** via `src.core.config.resolve` / `Config.resolve_with_source`
+   when the caller needs a string value and its origin (`default` / `env` /
+   `persisted`) without opening a parallel dotenv/env channel. See
+   [config resolve path](config-resolve-path.md) (issue #1070).
 
 Do **not** add new bare `get_config()` call sites without PR justification.
 

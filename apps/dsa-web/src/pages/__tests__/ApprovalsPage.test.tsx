@@ -2,6 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { MemoryRouter } from 'react-router-dom';
 import { approvalsApi } from '../../api/approvals';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
@@ -49,6 +53,11 @@ function proposal(
   };
 }
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 function wrapWithQueryClient(ui: ReactElement): ReactElement {
   const client = new QueryClient({
     defaultOptions: {
@@ -63,9 +72,11 @@ function renderPage() {
   return render(
     wrapWithQueryClient(
       <MemoryRouter>
+        <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <UiLanguageProvider initialLanguage="en">
           <ApprovalsPage />
         </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>
       </MemoryRouter>,
     ),
   );
@@ -84,6 +95,7 @@ function mockHappyLoad(nextRule: ApprovalRule = rule) {
     total: 3,
   });
 }
+
 
 describe('ApprovalsPage', () => {
   beforeEach(() => {

@@ -3,7 +3,8 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BellRing, CalendarDays } from 'lucide-react';
 import { eventCalendarApi } from '../../api/eventCalendar';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import {
@@ -23,7 +24,9 @@ import {
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
+import { EVENT_ALERT_PAGE_TEXT } from '../../locales/eventAlerts';
 import { EVENT_CALENDAR_TEXT } from '../../locales/eventCalendar';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import type { CalendarEventItem, CorporateEventCategory, EventCalendarResponse } from '../../types/eventCalendar';
 
 function isoDate(value: Date): string {
@@ -53,8 +56,10 @@ function isCancelled(error: unknown): boolean {
 }
 
 const EventCalendarWorkspace: React.FC = () => {
+  const navigate = useNavigate();
   const { language } = useUiLanguage();
   const text = EVENT_CALENDAR_TEXT[language];
+  const alertsText = EVENT_ALERT_PAGE_TEXT[language];
   const defaults = useMemo(() => defaultRange(), []);
   const [dateFrom, setDateFrom] = useState(defaults.from);
   const [dateTo, setDateTo] = useState(defaults.to);
@@ -158,9 +163,20 @@ const EventCalendarWorkspace: React.FC = () => {
         title={text.title}
         description={text.description}
         actions={(
-          <Button type="button" variant="secondary" onClick={() => void load()}>
-            {text.refresh}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              data-testid="event-calendar-open-alerts"
+              onClick={() => navigate(APP_ROUTE_PATHS.eventAlerts)}
+            >
+              <BellRing className="h-4 w-4" aria-hidden="true" />
+              {alertsText.title}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => void load()}>
+              {text.refresh}
+            </Button>
+          </div>
         )}
       />
 

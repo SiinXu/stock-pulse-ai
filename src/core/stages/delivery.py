@@ -245,13 +245,22 @@ class _DeliveryStageMixin:
             dispatch_stage: Optional[PipelineStageObservation] = None
             try:
                 if report_type == ReportType.FULL:
-                    report_content = self.notifier.generate_dashboard_report([result])
+                    report_content = self.notifier.generate_dashboard_report(
+                        [result],
+                        report_type=report_type,
+                    )
                     logger.info("[%s] Using full report format", stock_code)
                 elif report_type == ReportType.BRIEF:
-                    report_content = self.notifier.generate_brief_report([result])
+                    report_content = self.notifier.generate_brief_report(
+                        [result],
+                        report_type=report_type,
+                    )
                     logger.info("[%s] Using brief report format", stock_code)
                 else:
-                    report_content = self.notifier.generate_single_stock_report(result)
+                    report_content = self.notifier.generate_single_stock_report(
+                        result,
+                        report_type=report_type,
+                    )
                     logger.info("[%s] Using simple report format", stock_code)
                 report_content = self._format_delta_first_notification(
                     report_content,
