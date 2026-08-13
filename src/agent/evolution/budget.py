@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Hard LLM call budget for reflection / post-mortem paths.
+"""Hard LLM call budget for multi-level reflection paths.
 
 Semantics intentionally mirror ``src/agent/critic.py`` budget-skip recording:
 when the remaining budget cannot fund another LLM call, the path records an
@@ -12,11 +12,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
+
 BUDGET_SKIPPED = "budget_skipped"
 DEFAULT_STEP_CRITIQUE_LLM_BUDGET = 0
 DEFAULT_REFLECTION_LLM_BUDGET = 1
 DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET = 8
 DEFAULT_META_REVIEW_LLM_BUDGET = 0
+MAX_REFLECTION_LLM_CALL_BUDGET = 64
+MAX_BUDGET_SKIP_REASONS = 32
 
 
 @dataclass
@@ -29,11 +32,29 @@ class LlmCallBudget:
     skip_reasons: list = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        if self.total < 0:
-            raise ValueError("llm budget total must be >= 0")
+        if type(self.total) is not int:
+            raise TypeError("llm budget total must be an integer")
+        if not 0 <= self.total <= MAX_REFLECTION_LLM_CALL_BUDGET:
+            raise ValueError(
+                f"llm budget total must be between 0 and {MAX_REFLECTION_LLM_CALL_BUDGET}"
+            )
+        if type(self.consumed) is not int:
+            raise TypeError("llm budget consumed must be an integer")
         if self.consumed < 0:
             raise ValueError("llm budget consumed must be >= 0")
-        self.consumed = min(self.consumed, self.total)
+        if self.consumed > self.total:
+            raise ValueError("llm budget consumed must not exceed total")
+        if type(self.skips) is not int or self.skips < 0:
+            raise ValueError("llm budget skips must be a non-negative integer")
+        if not isinstance(self.skip_reasons, list):
+            raise TypeError("llm budget skip_reasons must be a list")
+        if any(not isinstance(reason, str) for reason in self.skip_reasons):
+            raise TypeError("every llm budget skip reason must be a string")
+        self.skip_reasons = [
+            reason.strip()[:160]
+            for reason in self.skip_reasons[-MAX_BUDGET_SKIP_REASONS:]
+            if reason.strip()
+        ]
 
     @property
     def remaining(self) -> int:
@@ -49,9 +70,13 @@ class LlmCallBudget:
 
     def record_skip(self, *, reason: str) -> Dict[str, Any]:
         """Record that optional LLM work was skipped; never silent."""
+        if not isinstance(reason, str):
+            raise TypeError("budget skip reason must be a string")
         self.skips += 1
-        safe_reason = (reason or "budget_exhausted").strip() or "budget_exhausted"
+        safe_reason = reason.strip()[:160] or "budget_exhausted"
         self.skip_reasons.append(safe_reason)
+        if len(self.skip_reasons) > MAX_BUDGET_SKIP_REASONS:
+            self.skip_reasons = self.skip_reasons[-MAX_BUDGET_SKIP_REASONS:]
         return self.snapshot(validation_status=BUDGET_SKIPPED, skip_reason=safe_reason)
 
     def snapshot(
@@ -75,29 +100,24 @@ class LlmCallBudget:
 def budget_from_config(
     config: Any,
     *,
-    default: int = DEFAULT_REFLECTION_LLM_BUDGET,
     attr: str = "agent_reflection_llm_budget",
+    default: int = DEFAULT_REFLECTION_LLM_BUDGET,
 ) -> LlmCallBudget:
-    """Build a budget from one named config attribute with a safe default.
-
-    Callers must pass ``attr`` for post-mortem vs reflection: both fields are
-    always ints on Config, so a reflection-first fallback would never apply
-    ``agent_postmortem_llm_budget``.
-    """
+    """Build a budget from a named config attribute with a safe default."""
     raw = getattr(config, attr, None) if config is not None else None
-    try:
-        total = int(raw) if raw is not None else int(default)
-    except (TypeError, ValueError):
-        total = int(default)
-    return LlmCallBudget(total=max(0, total))
+    total = raw if type(raw) is int else default
+    if type(total) is not int:
+        raise TypeError("default llm budget must be an integer")
+    return LlmCallBudget(total=total)
 
 
 __all__ = [
     "BUDGET_SKIPPED",
     "DEFAULT_META_REVIEW_LLM_BUDGET",
     "DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET",
-    "DEFAULT_STEP_CRITIQUE_LLM_BUDGET",
     "DEFAULT_REFLECTION_LLM_BUDGET",
+    "DEFAULT_STEP_CRITIQUE_LLM_BUDGET",
     "LlmCallBudget",
+    "MAX_REFLECTION_LLM_CALL_BUDGET",
     "budget_from_config",
 ]
