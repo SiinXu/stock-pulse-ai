@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "description": "Annotated high-risk Web i18n key inventory for issue #882. nativeReviewStatus is a provenance marker, not a CI gate. PRODUCT_SOURCE locales (zh/en) are product provenance; translated locales stay PENDING_NATIVE_REVIEW until a named native financial reviewer + date are recorded in languageReview.",
-  "generatedAt": "2026-08-12",
+  "generatedAt": "2026-08-13",
   "source": "apps/dsa-web/scripts/high-risk-i18n-audit.json category selectors against live UI_TRANSLATION_KEYS",
   "count": 361,
   "sha256": "7d53bce96e1c1ab67efcf7c8e5ff054df48376a8989ad236a8e95a5831e55631",

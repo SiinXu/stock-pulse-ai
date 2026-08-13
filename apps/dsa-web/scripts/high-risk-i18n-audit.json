@@ -135,7 +135,7 @@
     ],
     "blocksCiOnPendingNativeReview": false,
     "identicalBaselinePolicy": "shrink-only; high-risk review work must not grow identicalToEnglish.baseline.json",
-    "inventoryGeneratedAt": "2026-08-12",
+    "inventoryGeneratedAt": "2026-08-13",
     "changeWorkflow": [
       "Edit product source (zh/en) or a locale bundle for an audited high-risk key.",
       "If the key set or selectors change, refresh category snapshots and regenerate high-risk-i18n-keys.json via npm run i18n:high-risk -- --write-key-inventory.",
@@ -148,9 +148,9 @@
   },
   "keyInventory": {
     "path": "apps/dsa-web/scripts/high-risk-i18n-keys.json",
-    "count": 353,
-    "sha256": "a8f3472ea9ab2f3ea388ae537eb7c11dace7d6cd6a937c31a3394720d5d75763",
-    "keySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe",
+    "count": 361,
+    "sha256": "7d53bce96e1c1ab67efcf7c8e5ff054df48376a8989ad236a8e95a5831e55631",
+    "keySetSha256": "3a0db998104bc840b2a0b419dfd07a825e4b7f90ec83179a2cba270353147be0",
     "decisionLinkedCount": 95
   },
   "reviewPasses": [
@@ -160,9 +160,9 @@
       "reviewer": "issue-882-worker@stock-pulse-ai",
       "reviewedAt": "2026-08-12",
       "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
-      "summary": "353 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "summary": "361 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Eight new evidence-chain and audit-export error title/message pairs were added as product-source retain entries. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
       "claimsNativeApproval": false,
-      "keyCount": 353,
+      "keyCount": 361,
       "categoryConclusions": [
         {
           "category": "trading_action",
@@ -187,7 +187,7 @@
         {
           "category": "error",
           "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
-          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained; locale naturalness remains PENDING_NATIVE_REVIEW."
+          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained for the four new evidence-chain/audit-export codes (evidence_chain_disabled, evidence_chain_auth_required, audit_export_disabled, audit_export_auth_required); locale naturalness remains PENDING_NATIVE_REVIEW."
         },
         {
           "category": "disclaimer",
@@ -195,7 +195,7 @@
           "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
         }
       ],
-      "inventoryKeySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe"
+      "inventoryKeySetSha256": "3a0db998104bc840b2a0b419dfd07a825e4b7f90ec83179a2cba270353147be0"
     }
   ],
   "languageReview": {
@@ -574,19 +574,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 144,
-        "keySetSha256": "c74f46787bcd2c9a81c3ffd6bdfae37d394d1f64354ada0a08521e3b71bd58e6",
+        "keyCount": 152,
+        "keySetSha256": "03c38f69eae7157314ebc70a15c7f6a916b2d96aefb4f683dd44e0817e353243",
         "bundleSha256": {
-          "zh": "5c8724b9086c3c96d8fc7f0cf8101c06a795c49b3c9072580daa0ff93e751b1a",
-          "zh-TW": "45554a100c380a9317b1b891d7e39c54b4fb455e5571bbf57c42e38f64ac0d5a",
-          "en": "7a6c37b92c2f31a758cae274d04d8f3a28216abe42c7b8fd47669d339b298b25",
-          "ja": "0b1dee76f7be5462edeb90c2938cf6de73355c8f9c2f443d842b8a9993948887",
-          "ko": "c9a43f1f64f541e291e56288fec3eeaa1c242d6bdc48b879c21bdee39c2a4b2a",
-          "de": "61656d9d7715fb2677f5fef5107b86de0b54ad49f1e779e146ff44afc952cfe6",
-          "es": "cf61cba12a7e7ec6e3f90520b187b7202c49274dd7206bb942555e4ad6441ecb",
-          "ms": "151c0303a6191efdf76f038bbfdc245c1dab959f1bebeb5156cffe6c2104f506",
-          "fr": "e580b2021d2651bbb119d0720ffea029b81483d1459e35e2317e09c8f628a9d3",
-          "id": "ae147ede7a1d250bdf7f04194cd6f29ec695d05265a650c25013ecc32b155155"
+          "zh": "92fe8587d93c39ba261d632bb6057cd7ce0c41b3cdbd3833a3e23bffa3ce2108",
+          "zh-TW": "7152e6fdfede999d346f3dbfbecebf460e8e22bd393a6523c7413f512e943c75",
+          "en": "18ca88eb3b3ce7f7491dc2104795db7ccc39bfccbd244c6399ea358bf92c0cbc",
+          "ja": "61d505cf6b8f3a9e9f20381456cda0ba3346a84ebc0d48dd02f5f581448d2059",
+          "ko": "a9faebdf31780c0e5971932e2f1fccebd50308c6ff7c633ebe30f83383e61443",
+          "de": "1923ebe3d935af63079503cb3ca84d896d1960ba31eeed60f8b5ee8872c3bee4",
+          "es": "38288825ebf8ebff0b729906589fb00019c0c9b3f598a0f52aea7b24a2498e31",
+          "ms": "3356f40174e95c64ae1c313bd9ccdec18a22a85865816c2c6957bc1b4610d018",
+          "fr": "83f559af5be5a65116d7b75033ebd183bd554439347231cdad2a3f90b19729eb",
+          "id": "e5588ab94245d8808838fd6045add801bd4aee27e571925f0ec666e796b78038"
         }
       }
     },
@@ -710,6 +710,8 @@
         "analysis_failed",
         "api_response_validation_failed",
         "approval_auth_required",
+        "audit_export_auth_required",
+        "audit_export_disabled",
         "auth_disabled",
         "config_conflict",
         "config_version_conflict",
@@ -719,6 +721,8 @@
         "duplicate_task",
         "empty_stock_code",
         "env_backup_access_denied",
+        "evidence_chain_auth_required",
+        "evidence_chain_disabled",
         "file_too_large",
         "idempotency_conflict",
         "internal_error",
@@ -810,6 +814,14 @@
           "api.error.STABLE_ERROR_TEXT.approval_auth_required.title",
           "api.error.STABLE_ERROR_TEXT.approval_auth_required.message"
         ],
+        "audit_export_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.audit_export_auth_required.message"
+        ],
+        "audit_export_disabled": [
+          "api.error.STABLE_ERROR_TEXT.audit_export_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.audit_export_disabled.message"
+        ],
         "auth_disabled": [
           "api.error.STABLE_ERROR_TEXT.auth_disabled.title",
           "api.error.STABLE_ERROR_TEXT.auth_disabled.message"
@@ -845,6 +857,14 @@
         "env_backup_access_denied": [
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title",
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"
+        ],
+        "evidence_chain_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_auth_required.message"
+        ],
+        "evidence_chain_disabled": [
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.evidence_chain_disabled.message"
         ],
         "file_too_large": [
           "api.error.STABLE_ERROR_TEXT.file_too_large.title",
