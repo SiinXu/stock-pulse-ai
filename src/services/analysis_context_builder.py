@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
+from src.analysis_context_pack.snapshot import stamp_pack_snapshot_identity
 from src.schemas.analysis_context_pack import (
     AnalysisContextBlock,
     AnalysisContextItem,
@@ -141,7 +142,9 @@ class AnalysisContextBuilder:
             )
 
             pack = attach_alternative_data_block(pack, artifacts.alternative_data)
-        return pack
+        # Issue #182: stamp per-run snapshot identity so multi-agent stages
+        # share one versioned, digest-addressable input pack.
+        return stamp_pack_snapshot_identity(pack)
 
     @staticmethod
     def build_batch(items: Sequence[PipelineAnalysisArtifacts]) -> List[AnalysisContextPack]:
