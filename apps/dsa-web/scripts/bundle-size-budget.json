@@ -177,6 +177,13 @@
       "measuredGzipBytes": 16615
     },
     {
+      "id": "ChatSendFeedback",
+      "match": "assets/ChatSendFeedback-*.js",
+      "maxGzipBytes": 13957,
+      "measuredGzipBytes": 13757,
+      "note": "Local production-build measurement after merging origin/main (PR #1268); measured 13757 B + 200 B headroom."
+    },
+    {
       "id": "screening",
       "match": "assets/screening-*.js",
       "maxGzipBytes": 17866,
