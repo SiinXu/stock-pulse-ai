@@ -87,6 +87,8 @@ jobs:
             backend_non_web:
               - '**'
               - '!apps/dsa-web/**'
+              - '!docs/CHANGELOG.md'
+              - '!docs/changelog.d/**'
 
   ai-governance:
     name: ai-governance
@@ -103,6 +105,13 @@ jobs:
           python-version: '3.11'
       - name: 🤖 Check AI governance assets
         run: python scripts/check_ai_assets.py
+      - name: 🧾 Validate changelog fragments
+        run: python scripts/collect_changelog.py --check
+      - name: 🧾 Require changelog entry for product-code PRs
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          python scripts/collect_changelog.py --require-entry --base "origin/${{ github.base_ref }}"
 
   # ---------------------------------------------------------------------------
   # PR tier: fast backend-gate (selective pytest; full suite on uncertain path

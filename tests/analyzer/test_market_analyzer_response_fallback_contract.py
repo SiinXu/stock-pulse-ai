@@ -184,7 +184,12 @@ class TestAnalyzerGenerateText(_AnalyzerFactoryMixin):
 
         # _parse_response called twice (initial + retry)
         assert mock_parse.call_count == 2
-        mock_parse.assert_called_with("这不是 JSON，而是纯文本分析结果", "600519", "贵州茅台")
+        mock_parse.assert_called_with(
+            "这不是 JSON，而是纯文本分析结果",
+            "600519",
+            "贵州茅台",
+            analysis_context={"code": "600519", "stock_name": "贵州茅台"},
+        )
 
         # Placeholder fill was applied after retry exhaustion
         mock_fill.assert_called_once()

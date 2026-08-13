@@ -7,7 +7,7 @@
 | 我想要 | 先看 | 继续看 |
 | --- | --- | --- |
 | 快速了解项目能做什么 | [README](../README.md) | [完整配置与部署指南](full-guide.md) |
-| **了解 StockPulse 的定位与能力** | [English README · Why StockPulse](../README.md#why-stockpulse) | [简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
+| **了解 StockPulse 的定位与能力** | [English README · Why StockPulse](../README.md#why-stockpulse) | [竞品格局（本地优先金融 AI）](competitive-landscape_CN.md)（[English](competitive-landscape.md)）、[简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
 | 第一次把项目跑起来 | [小白客户端安装与配置](beginner-client-setup.md)（[English](beginner-client-setup_EN.md)） | [README · 定位与亮点](../README.md#why-stockpulse)、[安全基线 · 运维边界](security-baseline.md#operator-security-boundaries)、[完整配置与部署指南](full-guide.md) |
 | **学习 Web / 桌面界面怎么用** | [界面操作手册](ui-manual/README.md) | 各模块分册（分析、信号、持仓等） |
 | 配置大模型渠道 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | [LLM 服务商配置指南](llm-providers.md) |
@@ -29,6 +29,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [README（英文默认）](../README.md) | 项目定位、差异化、核心能力、快速开始（GitHub 首页） |
+| [竞品格局（本地优先金融 AI）](competitive-landscape_CN.md) | 诚实竞品对照、StockPulse 差异点、已交付/规划/缺口（[English](competitive-landscape.md)；Refs #799、#1063） |
 | [README（简体中文）](README_CN.md) | 同上中文版 |
 | [小白客户端安装与配置](beginner-client-setup.md) | 面向不会代码用户的客户端下载、Anspire Open / AIHubMix 模型配置、新闻源配置和常见问题；[English](beginner-client-setup_EN.md) |
 | [助手引导配置](agent-guided-onboarding.md) | 画像采集、规则配置计划、非密钥应用、L0–L3 路径；[English](agent-guided-onboarding_EN.md) |
@@ -73,14 +74,19 @@
 | [每日简报（个人晨报 + 准确率）](daily-brief.md) | 持仓、隔夜要点、近期财报事件上下文、昨日分析、自选与诚实准确率（[英文](daily-brief_EN.md)） |
 | [事件研究简报](event-research-brief.md) | 财报 EventBrief（指标、超预期定义、事后清单）（[英文](event-research-brief_EN.md)） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
+| [预测 resolve_after 交易日历策略](prediction-resolve-after.md) | horizon → UTC `resolve_after`（A/HK/US 交易 session、节假日/半日市/跨市场）；禁止自然日近似（[EN](prediction-resolve-after_EN.md)） |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
+| [多标的组合级分析](portfolio-level-analysis.md) | 对一组标的做组合层面相关性/集中度/共同风险分析，复用健康评分与压力测试数据面，含规模上界与缺数降级；`POST /api/v1/analysis/portfolio` ([English](portfolio-level-analysis_EN.md)) |
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
+| [投资者 Persona](investor-personas.md) | 默认关闭的研究立场与投资视角 Skills（#119, #467） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
+| [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
 | [资讯 / 情报源](intelligence-sources.md) | RSS/Atom 合规资讯源配置、测试、拉取、去重、存储、查询与安全边界 |
 | [分析上下文包契约、运行态消费与可见性](analysis-context-pack.md) | AnalysisContextPack 首版范围、字段质量状态、P1/P2 内部契约、P3 Prompt 摘要消费、P4 历史/API/Web 低敏可见性、P5 数据质量评分、P6 迁移回滚与源码锚点；完整指南补充 #1386 阶段感知分析、迁移与回滚入口 |
+| [情绪分析管线](sentiment-analysis-pipeline.md) | 基于已接入新闻/事件源的情绪评分证据（来源可追溯、时效、置信度），进入 AnalysisContextPack 作为证据而非结论（#179） |
 | [图片识别 Prompt](image-extract-prompt.md) | 图片识别股票信息的 Prompt 与使用边界 |
 | [OpenClaw Skill 集成](openclaw-skill-integration.md) | OpenClaw / Skill 外部集成说明 |
 
@@ -92,6 +98,8 @@
 | [云端 WebUI 部署](deploy-webui-cloud.md) | 云服务器访问 WebUI 的部署说明 |
 | [Zeabur 部署](docker/zeabur-deployment.md) | Zeabur 平台部署说明 |
 | [桌面端打包说明](desktop-package.md)（[EN](desktop-package_EN.md)） | Electron 桌面端首次启动、本地模型与打包说明 |
+| [桌面端 vs Web 能力矩阵](desktop-capability-matrix.md)（[EN](desktop-capability-matrix_EN.md)） | Desktop / Web 能力对照、CLI 诊断与更新留存 |
+| [桌面深链策略](desktop-deep-link-policy.md)（[EN](desktop-deep-link-policy_EN.md)） | `stockpulse://` 白名单、拒绝语义与 UX |
 
 ## 参考与开发
 
@@ -104,6 +112,7 @@
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [OpenAPI Web 类型与运行时校验（英文）](openapi-web-types.md) | 从 OpenAPI 生成 Web 类型、CI 漂移门禁与 stocks 运行时校验试点 |
+| [API 错误分类学](api-error-taxonomy.md) | 稳定 error 码的类别/严重度/默认动作与 Web 可行动指引（[English](api-error-taxonomy_EN.md)） |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
 | [工程效率操作手册](engineering-efficiency-playbook.md) | 并行修复/合并火车的操作指南：批次合并、冲突图、配置注册守卫、squash 误关防线、自迭代验收、单机资源与工作区保护（[EN](engineering-efficiency-playbook_EN.md)；合同仍以 `AGENTS.md` 为准） |
 | [离线测试门禁（超时、覆盖率下限、marker）](testing-ci-gate.md) | 单测超时、faulthandler、实测覆盖率下限、严格 marker，以及手动 benchmark 说明（英文专题；中英流程一致） |

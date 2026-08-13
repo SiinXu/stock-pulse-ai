@@ -12,6 +12,7 @@ import { readParams, writeParams } from '../../utils/urlState';
 import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
+import { extractExistingTaskId } from '../../utils/asyncTaskUx';
 import { AnalysisPhaseSelect } from '../analysis';
 import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
@@ -502,11 +503,7 @@ const PortfolioWorkspace: React.FC = () => {
       });
     } catch (err) {
       const parsed = getParsedApiError(err);
-      const existingTaskId = String(
-        parsed.params?.existing_task_id
-          ?? parsed.params?.existingTaskId
-          ?? '',
-      ).trim();
+      const existingTaskId = extractExistingTaskId(parsed);
       // Reattach an in-flight duplicate instead of leaving the user with only an error toast.
       if (parsed.code === 'duplicate_task' && existingTaskId) {
         dispatchPortfolioAnalysisTaskAction((controller) => {
@@ -927,6 +924,14 @@ const PortfolioWorkspace: React.FC = () => {
               <span>{t('layout.nav.portfolio')}</span>
               {isPaperAccountSelected ? (
                 <Badge variant="info">{text.paperAccount}</Badge>
+              ) : null}
+              {isPaperAccountSelected ? (
+                <Link
+                  to={APP_ROUTE_PATHS.portfolioPerformance}
+                  className="inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline"
+                >
+                  {text.processQualityLink}
+                </Link>
               ) : null}
             </div>
           )}

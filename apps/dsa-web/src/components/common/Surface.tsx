@@ -17,14 +17,15 @@ const SURFACE_LEVEL_STYLES: Record<SurfaceLevel, string> = {
   canvas: 'bg-transparent',
   section: 'rounded-xl bg-card',
   interactive: 'rounded-xl border border-border bg-card',
-  overlay: 'rounded-xl border border-border bg-elevated shadow-soft-card-strong',
+  overlay: 'rounded-xl border border-border bg-elevated shadow-elevation-overlay',
 };
 
+/** Padding maps to shared density tokens (`src/design/density.ts` / `index.css`). */
 const SURFACE_PADDING_STYLES: Record<SurfacePadding, string> = {
   none: '',
-  sm: 'p-4',
-  md: 'p-5',
-  lg: 'p-6',
+  sm: 'density-surface-pad-sm',
+  md: 'density-surface-pad-md',
+  lg: 'density-surface-pad-lg',
 };
 
 export const Surface = forwardRef<HTMLElement, SurfaceProps>(({

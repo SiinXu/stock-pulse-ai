@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { DcfSensitivityPanel } from '../../components/valuation';
-import type { ValuationEstimate } from '../../api/valuation';
+import { DcfSensitivityPanel, PeerValuationCanvas } from '../../components/valuation';
+import type { PeerValuationCanvas as PeerCanvasPayload, ValuationEstimate } from '../../api/valuation';
 import { usePlaygroundScenario } from '../scenarioContext';
 import type { PlaygroundScenarioRenderer } from '../types';
 
@@ -55,6 +55,52 @@ const EMPTY_ESTIMATE: ValuationEstimate = {
   disclaimer: 'Model estimate for research support only. Not investment advice.',
 };
 
+const SAMPLE_PEER_CANVAS: PeerCanvasPayload = {
+  schemaVersion: 'peer-valuation-canvas-v1',
+  status: 'partial',
+  stockCode: '600519',
+  baseCurrency: 'CNY',
+  fxStale: false,
+  peerSet: {
+    source: 'custom',
+    sourceLabel: 'Manual peer set',
+    explanation: 'Caller-supplied peer codes; membership is not inferred.',
+  },
+  metrics: ['peRatio', 'pbRatio', 'marketCap'],
+  rows: [
+    {
+      stockCode: '600519',
+      role: 'target',
+      dataStatus: 'ok',
+      missingMetrics: [],
+      metrics: {
+        peRatio: { value: 30, status: 'ok' },
+        pbRatio: { value: 8, status: 'ok' },
+        marketCap: { value: 2_000_000, status: 'ok', currency: 'CNY' },
+        currentPrice: { value: 1_600, status: 'ok', currency: 'CNY' },
+      },
+    },
+    {
+      stockCode: '000858',
+      role: 'peer',
+      dataStatus: 'partial',
+      missingMetrics: ['pbRatio'],
+      metrics: {
+        peRatio: { value: 20, status: 'ok' },
+        pbRatio: { value: null, status: 'missing', missingReason: 'unavailable' },
+        marketCap: { value: 800_000, status: 'ok', currency: 'CNY' },
+        currentPrice: { value: 120, status: 'ok', currency: 'CNY' },
+      },
+    },
+  ],
+  medians: { peMedian: 20, pbMedian: 8 },
+  heatmapCells: [
+    { rowId: '600519', rowLabel: '600519', columnId: 'pe_ratio', columnLabel: 'P/E', score: 60 },
+    { rowId: '000858', rowLabel: '000858', columnId: 'pe_ratio', columnLabel: 'P/E', score: 40 },
+  ],
+  disclaimer: 'Model estimate for research support only. Not investment advice.',
+};
+
 const DcfSensitivityPanelStory = () => {
   const { scenario } = usePlaygroundScenario();
   if (scenario === 'empty') {
@@ -87,6 +133,29 @@ const DcfSensitivityPanelStory = () => {
   return <div className="max-w-3xl"><DcfSensitivityPanel estimate={SAMPLE_ESTIMATE} stockCode="AAPL" readOnly /></div>;
 };
 
+const PeerValuationCanvasStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return <div className="max-w-5xl"><PeerValuationCanvas stockCode="600519" readOnly /></div>;
+  }
+  if (scenario === 'interactive') {
+    return (
+      <div className="max-w-5xl">
+        <PeerValuationCanvas
+          stockCode="600519"
+          fetchCanvas={async () => SAMPLE_PEER_CANVAS}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-5xl">
+      <PeerValuationCanvas canvas={SAMPLE_PEER_CANVAS} stockCode="600519" readOnly />
+    </div>
+  );
+};
+
 export const VALUATION_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'dcf-sensitivity-panel': DcfSensitivityPanelStory,
+  'peer-valuation-canvas': PeerValuationCanvasStory,
 };

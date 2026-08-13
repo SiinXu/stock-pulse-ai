@@ -437,7 +437,20 @@ python main.py --market-only
 
 ---
 
-### Q18: 为什么周末在 GitHub Actions 手动触发仍显示“非交易日跳过”？
+### Q18: 为什么选择 StockPulse，而不是上游  或其他本地优先金融 AI？
+
+**简短回答**：StockPulse 是**本地优先的投资研究工作台**——与上游共享多市场分析血缘，并更强调报告分层、默认拒绝的 Agent 工具面、可选 HITL、可信插件，以及双许可证（原始部分 MIT + StockPulse 新增 AGPL-3.0）。它**不是**黑盒荐股服务，也**不是**多租户 SaaS。
+
+**延伸阅读**：
+1. 首页差异化：[README · 为什么选 StockPulse](../README.md#why-stockpulse) / [简体 README](README_CN.md#why-stockpulse)
+2. 诚实竞品对照（go-stock、FinRobot Desktop、TradingAgents 一类、上游、StockAI/OpenCandle 一类）、已交付/规划与缺口：[竞品格局](competitive-landscape_CN.md)（[English](competitive-landscape.md)）
+3. 上游移植策略：[上游一致性检查](upstream-parity_CN.md)
+
+竞品文中的星标与对方主张带有信息时点；对外引用前请复核。
+
+---
+
+### Q19: 为什么周末在 GitHub Actions 手动触发仍显示“非交易日跳过”？
 
 **现象**：已经配置了 `TRADING_DAY_CHECK_ENABLED` 或希望手动运行，但日志仍提示“今日所有相关市场均为非交易日，跳过执行”。
 
