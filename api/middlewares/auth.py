@@ -36,6 +36,24 @@ def _path_exempt(path: str) -> bool:
     return normalized in EXEMPT_PATHS
 
 
+def _is_capability_write_mutation(method: str, path: str) -> bool:
+    """Write mutations record their own unauthorized denial audit.
+
+    AuthMiddleware still protects other /api/v1/* routes. Register / update /
+    retire must reach the endpoint so ``_require_write_access`` can persist a
+    ``capability.write`` denied completion before returning 401.
+    """
+    normalized = path.rstrip("/") or "/"
+    prefix = "/api/v1/capabilities/registry"
+    if method == "POST" and normalized == prefix:
+        return True
+    if not normalized.startswith(prefix + "/"):
+        return False
+    if method == "PUT":
+        return True
+    return method == "POST" and normalized.endswith("/retire")
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """Require valid session for /api/v1/* when auth is enabled."""
 
@@ -56,6 +74,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         cookie_val = request.cookies.get(COOKIE_NAME)
         if not cookie_val or not verify_session(cookie_val):
+            if _is_capability_write_mutation(request.method, path):
+                return await call_next(request)
             return JSONResponse(
                 status_code=401,
                 content=error_body("unauthorized", "Login required"),

@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from api.middlewares.auth import add_auth_middleware
 from api.v1.endpoints import capabilities as capabilities_endpoint
 from src.capability_registry.write_audit import CapabilityWriteAuditor
 from src.capability_registry.write_service import (
@@ -35,6 +36,7 @@ def _app(tmp_path: Path) -> tuple[TestClient, SecurityAuditRecorderStub]:
 
     app = FastAPI()
     app.include_router(capabilities_endpoint.router, prefix="/api/v1/capabilities")
+    add_auth_middleware(app)
     return TestClient(app), audit
 
 

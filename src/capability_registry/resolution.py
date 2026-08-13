@@ -262,6 +262,7 @@ def resolve_many(
                         checked_against_generation=write_snapshot.generation,
                     )
                 )
+                seen.add(entry.capability_id)
             continue
         results.append(
             resolve_capability_dependencies(

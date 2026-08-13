@@ -145,6 +145,27 @@ def test_registration_failure_does_not_pollute_read_inventory(
     )
 
 
+def test_resolve_many_retired_requested_id_is_not_also_not_found(
+    tmp_path: Path,
+) -> None:
+    """Explicit retired ids emit capability_retired once, never not_found."""
+
+    service, _ = _svc(tmp_path)
+    service.register(_llm_payload("llm:old"))
+    service.retire("llm:old")
+    snap = service.list_entries(include_retired=True)
+    results = resolve_many(
+        ["llm:old", "llm:missing"],
+        write_snapshot=snap,
+        active_only=True,
+    )
+    by_id = {item.capability_id: item for item in results}
+    assert len(results) == 2
+    assert by_id["llm:old"].reason_code == "capability_retired"
+    assert by_id["llm:old"].ready is False
+    assert by_id["llm:missing"].reason_code == "capability_not_found"
+
+
 def test_unauthorized_write_denied_is_audited(tmp_path: Path) -> None:
     """Hard acceptance: unauthorized writes are rejected and leave audit trail."""
 
