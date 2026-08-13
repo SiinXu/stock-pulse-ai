@@ -6268,4 +6268,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Batas global tarikan paralel",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Batas per-penyedia tarikan paralel",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualitas proses",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.notes.0": "Tanpa data portofolio, perhitungan tetap tersedia dalam mode fallback saham tunggal yang eksplisit.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "Mengatur rentang posisi deterministik dengan bobot portofolio saat ini.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "Ukuran posisi berbasis portofolio",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "Tetap aktifkan untuk rentang berbasis portofolio. Bobot maksimum satu saham adalah pecahan 0 sampai 1 dan default 0,15.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "Ukuran berbasis portofolio diaktifkan",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "Bobot maksimum satu saham",
 } as const;

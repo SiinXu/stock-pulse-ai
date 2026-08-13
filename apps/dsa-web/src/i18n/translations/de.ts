@@ -6268,4 +6268,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Parallele Abfrage – globales Limit",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Parallele Abfrage – Limit pro Provider",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Prozesswert",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.notes.0": "Ohne Portfoliodaten bleibt die Berechnung im ausdrücklichen Einzeltitel-Fallback verfügbar.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "Steuert deterministische Positionsbänder anhand der aktuellen Portfoliogewichte.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "Portfoliobewusste Positionsgröße",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "Für portfoliobewusste Bänder aktiv lassen. Das maximale Einzeltitelgewicht liegt zwischen 0 und 1 und ist standardmäßig 0,15.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "Portfoliobewusste Größenberechnung aktiviert",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "Maximales Einzeltitelgewicht",
 } as const;
