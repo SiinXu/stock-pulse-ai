@@ -159,9 +159,9 @@
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 26363,
-      "measuredGzipBytes": 26163,
-      "note": "GitHub Actions Linux measurement after the integrated portfolio flow; measured 26163 B + 200 B headroom."
+      "maxGzipBytes": 26601,
+      "measuredGzipBytes": 26401,
+      "note": "GitHub Actions Linux measurement on the current PR/main synthetic merge; route code is unchanged and the residual variation is Vite dependency-map hashes. Measured 26401 B + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",
