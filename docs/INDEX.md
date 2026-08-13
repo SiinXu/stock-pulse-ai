@@ -79,6 +79,7 @@
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
 | [多标的组合级分析](portfolio-level-analysis.md) | 对一组标的做组合层面相关性/集中度/共同风险分析，复用健康评分与压力测试数据面，含规模上界与缺数降级；`POST /api/v1/analysis/portfolio` ([English](portfolio-level-analysis_EN.md)) |
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
+| [组合再平衡与风险调整仓位](portfolio-rebalancing.md) | 风险带再平衡建议、仓位区间、拒绝条件；`GET /api/v1/portfolio/rebalancing-recommendations`（[英文](portfolio-rebalancing_EN.md)） |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
 | [投资者 Persona](investor-personas.md) | 默认关闭的研究立场与投资视角 Skills（#119, #467） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
@@ -128,6 +129,8 @@
 | [Analysis Strategy 插件作者指南（英文）](analysis-strategy-plugin-authoring.md) | 声明式优先边界、`Skill` 注册字段、catalog 优先级、生命周期、诊断、测试与信任模型 |
 | [供应链维护策略](supply-chain-maintenance.md) | 依赖与 GitHub Actions 的固定、权限、更新、例外、验证和回滚契约（英文） |
 | [Web UI 基础控件契约](web-ui-foundation.md) | Button、IconButton、Input、Field、Textarea 的语义、尺寸、命中区、守卫和迁移边界 |
+| [Web PWA（仅外壳缓存）](web-pwa.md) | 可安装 PWA、保守外壳缓存边界、不缓存分析/行情数据（#234；英文正文） |
+| [Web 响应式断点矩阵](web-responsive-breakpoints.md) | 320/768/1024 支持矩阵、页面差距清单与分批计划（#146 / #234；英文正文） |
 | [Web 运行时性能预算](web-runtime-performance_CN.md) | 长列表虚拟化、Settings 隔离、SSE 批处理软门（#883）；[English](web-runtime-performance.md) |
 | [导航信息架构提案](navigation-ia-proposal_zh.md) | 路由/导航现状审计、遗留重定向、孤儿项与 #368 目标选项（**需要决策**；[English](navigation-ia-proposal.md)） |
 | [多语言金融术语指导](financial-terminology-guide.md) | 十语言 UI 金融术语单一治理源：语义边界、术语表、已知译文漂移、风险表达、格式化与审查流程 |
