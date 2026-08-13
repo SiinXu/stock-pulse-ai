@@ -1432,6 +1432,26 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.AGENT_STEP_CRITIQUE_ENABLED': {
+    title: 'Critique',
+    summary: 'Typed failure/contradiction.',
+  },
+  'settings.agent.AGENT_REFLECTION_ENABLED': {
+    title: 'Reflection',
+    summary: 'Bounded, redacted evidence.',
+  },
+  'settings.agent.AGENT_REFLECTION_LLM_BUDGET': {
+    title: 'Calls',
+    summary: '0–1 provider call.',
+  },
+  'settings.agent.AGENT_META_REVIEW_ENABLED': {
+    title: 'Review',
+    summary: 'Validated lessons; deterministic reports.',
+  },
+  'settings.agent.AGENT_META_REVIEW_MIN_EPISODES': {
+    title: 'Minimum',
+    summary: 'Validated episodes gate advice.',
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',

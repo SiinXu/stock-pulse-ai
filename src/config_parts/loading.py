@@ -954,6 +954,32 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            agent_step_critique_enabled=parse_env_bool(
+                os.getenv('AGENT_STEP_CRITIQUE_ENABLED'),
+                False,
+            ),
+            agent_reflection_enabled=parse_env_bool(
+                os.getenv('AGENT_REFLECTION_ENABLED'),
+                False,
+            ),
+            agent_reflection_llm_budget=parse_env_int(
+                os.getenv('AGENT_REFLECTION_LLM_BUDGET'),
+                1,
+                field_name='AGENT_REFLECTION_LLM_BUDGET',
+                minimum=0,
+                maximum=1,
+            ),
+            agent_meta_review_enabled=parse_env_bool(
+                os.getenv('AGENT_META_REVIEW_ENABLED'),
+                False,
+            ),
+            agent_meta_review_min_episodes=parse_env_int(
+                os.getenv('AGENT_META_REVIEW_MIN_EPISODES'),
+                30,
+                field_name='AGENT_META_REVIEW_MIN_EPISODES',
+                minimum=1,
+                maximum=50000,
+            ),
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
