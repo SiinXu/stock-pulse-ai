@@ -1439,6 +1439,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Can reduce multi-model fan-out or disable it; budget metadata is attached to the comparison payload.'],
   },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: 'Research Persona Preset',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: 'Custom Research Stance',
+  },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
     summary: 'Append decision-profile calibration breakdowns to decision-signal outcome stats.',
@@ -2463,6 +2469,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: [
       'Bounds per-call analysis cost.',
     ],
+  },
+  'settings.system.resume': {
+    title: 'Resume & reproduce',
   },
 };
 

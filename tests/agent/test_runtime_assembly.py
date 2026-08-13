@@ -198,24 +198,36 @@ def test_configured_optional_tool_absence_keeps_construction_provenance(
     """A configured factory that produced nothing is never ``not_registered``."""
     from src.agent import runtime_assembly
     from src.agent.tools import valuation_tools
+    from src.application_services import reset_application_services
 
     def _build(config, **kwargs):
         if outcome == "raises":
             raise RuntimeError("valuation dependency unavailable")
         return None
 
-    original_registry = runtime_assembly._TOOL_REGISTRY
     services = MagicMock()
     services.config = MagicMock(valuation_agent_tool_enabled=True)
     try:
+        # This test owns a temporary process registry. Drain any installed
+        # composition root first so its deferred agent-tool backend cannot be
+        # flushed into that temporary registry and retain stale ownership.
+        reset_application_services()
         runtime_assembly._TOOL_REGISTRY = None
+        runtime_assembly._TOOL_REGISTRY_BUILDING = None
         with patch.object(valuation_tools, "build_valuation_tool", _build), patch(
             "src.application_services.get_application_services",
             return_value=services,
         ):
             registry = runtime_assembly.get_tool_registry()
     finally:
-        runtime_assembly._TOOL_REGISTRY = original_registry
+        reset_application_services()
+        # reset_application_services() unregisters plugin-owned tools from the
+        # active registry. Never restore that drained object; force the next
+        # consumer to build a complete production registry instead.
+        runtime_assembly._TOOL_REGISTRY = None
+        runtime_assembly._TOOL_REGISTRY_BUILDING = None
+
+    assert runtime_assembly._TOOL_REGISTRY is None
 
     declaration = _optional_tool_declarations(registry)[
         valuation_tools.VALUATION_TOOL_NAME

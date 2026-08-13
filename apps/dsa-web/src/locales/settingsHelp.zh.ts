@@ -2294,6 +2294,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['可减少多模型扇出或关闭该能力；预算元数据写入对比产物。'],
   },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: '研究立场预设',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: '自定义研究立场',
+  },
 
 
   'settings.mcp.MCP_SERVER_ENABLED': {
@@ -2505,6 +2511,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: [
       '限制单次分析成本。',
     ],
+  },
+  'settings.system.resume': {
+    title: '续跑与复现',
   },
 };
 

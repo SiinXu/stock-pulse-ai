@@ -74,6 +74,7 @@ Registering an unsupported extension point fails closed with
 | Package | Point | Role |
 | --- | --- | --- |
 | [`examples/plugins/example-provider`](../examples/plugins/example-provider/) | `data_provider` | Network-free daily-data fixture; requires a manager-bound registry |
+| [`examples/plugins/example-alternative-data`](../examples/plugins/example-alternative-data/) | `agent_tool` | Default-off corporate-events alt-data tool (`alt_data:read`, non-authoritative); see [alternative-data plugin contract](alternative-data-plugin-contract.md) |
 | [`examples/plugins/example-notification-channel`](../examples/plugins/example-notification-channel/) | `notification_channel` | Full lifecycle log-sink channel on the default process root |
 | [`docs/examples/report-template-plugin`](examples/report-template-plugin/) | `report_template` | Minimal Markdown template illustration |
 

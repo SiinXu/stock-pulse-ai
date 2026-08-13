@@ -427,8 +427,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `MAX_WORKERS` | Concurrent threads | `3` |
 | `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | Inject the daily market context into stock-analysis prompts and soften aggressive buy advice in high-risk/risk-off markets; enabled by default, and market review can still run when this is set to `false` | `true` |
-| `DECISION_MEMORY_ENABLED` | Inject a Historical Decision Reflection (the stock's past signal hit-rate plus pattern-level calibration) into analysis prompts and single-stock reports; calibrates confidence only and never flips direction; zero overhead when disabled or without history. Override per request with `use_memory` | `true` |
-| `DECISION_MEMORY_LOOKBACK` | Maximum number of the stock's most recent signals that already have outcomes to include in the reflection | `5` |
+| `DECISION_MEMORY_ENABLED` | Inject a Historical Decision Reflection (the stock's past signal hit-rate plus pattern-level calibration) into analysis prompts and single-stock reports; calibrates confidence only and never flips direction; admitted structured outcomes only with `signal_id` provenance, wrapped as untrusted memory data; zero overhead when disabled or without history. Override per request with `use_memory` | `true` |
+| `DECISION_MEMORY_LOOKBACK` | Maximum admitted evaluated signals per stock to inject into the reflection (hard cap 40) | `5` |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | Only reflect on signals created at least this many days ago (so their outcomes have settled) | `3` |
 | `DECISION_MEMORY_MIN_SAMPLES` | Minimum decided samples (hit+miss) before a hit-rate is shown; buckets below this threshold are treated as noise | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | Expose the aggregated public signal scorecard (`GET /api/v1/scorecard`, no auth); off by default so self-hosted stays private, and outputs aggregated non-sensitive data only when enabled. Editable in Web Settings → System & Security → System Settings; operator preview uses the same public route and returns 404 while disabled | `false` |
@@ -1302,6 +1302,16 @@ System defaults to AkShare (free), also supports other data sources:
 - If credentials are absent, the optional Longbridge fetcher is not instantiated
 - When runtime errors such as `client is closed`, `context closed`, or `connection closed` occur, Longbridge enters a short cooldown window and US/HK daily or realtime requests automatically fall back to YFinance / AkShare instead of reconnecting on every request
 
+### Alternative data plugins (default off)
+
+Corporate events, holdings, supply-chain tags, and quantified sentiment are **not** built-in primary market sources. They use the ToolSurface capability `alt_data:read` and stay **non-authoritative supporting evidence** only.
+
+- **Default off:** keep `PLUGINS_DIR` unset. The corporate-events factory is not in the default Agent tool catalog.
+- **Reference package:** `examples/plugins/example-alternative-data` (deterministic fixture; declare `alt_data:read` in the manifest).
+- **Enable:** point `PLUGINS_DIR` at a reviewed parent directory (for example `examples/plugins`), restart the process, and grant sessions `alt_data:read` only when intended.
+- **Governance:** invalid / missing payloads become gaps with `confidence=null`; attaching alt-data does not change core `AnalysisContextPack` quality scores or project into `verified_fact` / `decision` strata.
+- **Contract:** [alternative-data-plugin-contract.md](alternative-data-plugin-contract.md)
+
 ---
 
 ## Advanced Features
@@ -1317,6 +1327,26 @@ STOCK_LIST=600519,hk00700,hk01810
 CLI, Web, analysis/watchlist APIs, CSV/Excel/clipboard smart import, and Bot analysis/research share the same input rule. A bare four-digit code such as `0941` is checked against the stock index and becomes `HK00941` when unresolved; indexed Japanese `7203` remains `7203.T`. Explicit forms such as `1810.HK`, `7203.T`, `2330.TW`, and `005930.KS`, as well as an explicit API market hint, always take precedence and are never reinterpreted as Hong Kong.
 
 HK daily history skips efinance, pytdx, baostock, and other built-in providers that do not support HK daily data, avoiding mismatches between HK symbols and non-HK market data. AkShare/Tushare/YFinance/Longbridge continue to provide HK fallback paths. If Longbridge is inside its connection cooldown window, the route temporarily skips it and continues with the remaining HK-capable fallbacks.
+
+### ETF and index analysis
+
+For index-tracking ETFs and US indices (for example VOO, QQQ, SPY, 510050, SPX, DJI, IXIC), analysis focuses on **index path, tracking quality, and liquidity**, not fund-manager issuer risk (lawsuits, reputation, executive changes). Risk alerts and performance expectations are based on the constituent basket, not fund-company filings. See Issue #274.
+
+#### A-share ETF analysis semantics (Issue #173)
+
+A-share ETFs are identified as a distinct instrument type and take the **ETF analysis path**, while keeping the same decision-dashboard report structure as single stocks:
+
+| Dimension | Behavior |
+| --- | --- |
+| Identification | Code prefixes `51/52/56/58/15/16/18` (aligned with `data_provider` ETF routing); offshore names still use the existing `is_index_or_etf` heuristic |
+| Tracking target | Liquid bootstrap map first (e.g. `510300→CSI 300`, `159915→ChiNext`), else name heuristics; unresolved → `not_available` |
+| Premium/discount | Computed after realtime maps IOPV/NAV into analysis context when providers expose them; otherwise `not_available` (never invented). Pure indices use `not_applicable`. |
+| Holdings exposure | Coarse `broad_index` / `sector_theme` class; full constituent look-through is outside the public provider contract → `not_available` |
+| Inapplicable metrics | PE/PB/ROE/company financials/chip/Dragon Tiger lists are explicit **`not_applicable`** (including equity-style chip health framing) — do not hard-calculate; separate from validation-layer missing-field calibration (#185) |
+| Index vs ETF | Pure market indices (e.g. SPX) use `instrument_type=index`; A-share/offshore ETFs use `etf` |
+| Report structure | Shared decision-dashboard JSON with equities; no separate ETF template |
+
+Representative regression codes: `510300`, `510050`, `159915`, `159919`, `512880`. Validation-layer ETF false-positive calibration is documented in `docs/data-validation-layer.md` and Issue #185.
 
 ### Multi-Model Consensus Comparison (optional)
 
@@ -1763,7 +1793,7 @@ A: Check if Actions is enabled, and if cron expression is correct (note it's UTC
 - Expired idempotency records are lazily removed by a later keyed Portfolio write and an expired key starts a new operation. Cleanup, lookup, and ledger mutation share the same atomic transaction. Cleanup deletes only `portfolio_idempotency_records`; it does not delete trades, cash entries, corporate actions, snapshots, or any other ledger data.
 - Existing SQLite tables receive nullable scope columns, a unique index, and a legacy-write guard trigger through an additive migration. Raw-key legacy rows cannot prove their historical owner at write time, so they are retained unscoped and are not replayed by the current runtime; the same client key starts a new scoped operation.
 - Rollback uses a normal code revert while retaining the nullable columns, index, guard trigger, and all ledger data. The old runtime cannot read a v2 scoped response. If it tries to insert a raw row for an existing v2 client key, the trigger aborts the same transaction and rolls back the ledger mutation, preventing duplication but returning a failure instead of a replay. Other raw-key rows created during rollback remain unscoped on re-upgrade, so they cannot collide with the v2 unique index or block startup.
-- CSV records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
+- Spreadsheet import (CSV / `.xlsx`) is parsed before commit. Invalid rows are returned as structured `failed_rows` (`row_number`, `reason_code`, `reason`, `source`) so the Web wizard can download a correction file; empty rows are skipped. Valid records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
 - The Web client keeps the operation ID after a failed request, locks fields and close behavior while submission is pending, and changes compact forms to one column at 320px.
 
 ### Portfolio account archive on `/portfolio`

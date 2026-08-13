@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
     from src.notification import (
+        _append_committee_deliberation_block,
         _append_strategy_synthesis_block,
         _safe_float,
         display_action_fields_for_result,
@@ -802,6 +803,15 @@ class _RenderingMethods:
                     report_language,
                 )
 
+                # ========== Investment Committee (compact for notifications) ==========
+                _append_committee_deliberation_block(
+                    report_lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
+
                 # Financial summary / shareholder returns / related sectors (hidden when data is missing)
                 self._append_fundamental_blocks(report_lines, result)
 
@@ -1024,6 +1034,15 @@ class _RenderingMethods:
                     if summary:
                         lines.append(summary)
                     lines.append("")
+
+                # Investment Committee (compact for notifications).
+                _append_committee_deliberation_block(
+                    lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
 
                 # Simplified checklist
                 checklist = battle.get('action_checklist', []) if battle else []
@@ -1377,6 +1396,15 @@ class _RenderingMethods:
             dashboard.get("multi_model_comparison") if dashboard else None,
             labels,
             report_language,
+        )
+
+        # ========== Investment Committee (compact for notifications) ==========
+        _append_committee_deliberation_block(
+            lines,
+            dashboard.get("committee_deliberation") if dashboard else None,
+            labels,
+            report_language,
+            compact=True,
         )
 
         # Position recommendation

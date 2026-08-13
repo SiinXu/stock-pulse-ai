@@ -2,3 +2,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 export { DcfSensitivityPanel } from './DcfSensitivityPanel';
 export type { DcfSensitivityPanelProps } from './DcfSensitivityPanel';
+export { PeerValuationCanvas } from './PeerValuationCanvas';
+export type { PeerValuationCanvasProps } from './PeerValuationCanvas';

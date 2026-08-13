@@ -26,8 +26,7 @@ type OverviewSectionProps = {
   isSaving: boolean;
   isLoading: boolean;
   isRunningSetupSmoke: boolean;
-  setupSmokeError: FirstRunSetupProps['smokeError'];
-  setupSmokeSuccess: string;
+  setupSmokeOutcome: FirstRunSetupProps['smokeOutcome'];
   refreshSetupStatus: () => void;
   selectSectionView: (section: SettingsSectionId, view: string) => void;
   handleRunSetupSmoke: () => void;
@@ -71,8 +70,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
           firstStockCode={props.firstSetupStockCode}
           isSaving={props.isSaving}
           isRunningSmoke={props.isRunningSetupSmoke}
-          smokeError={props.setupSmokeError}
-          smokeSuccess={props.setupSmokeSuccess}
+          smokeOutcome={props.setupSmokeOutcome}
           onRefresh={props.refreshSetupStatus}
           onSelectCategory={(category) => {
             const target = legacyToSectionView(category, null);
