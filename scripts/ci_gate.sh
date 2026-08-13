@@ -38,6 +38,7 @@ deterministic_checks() {
   python scripts/check_install_guidance.py --self-test
   python scripts/check_install_guidance.py
   python scripts/check_local_model_catalog.py
+  python scripts/check_error_taxonomy.py
   python scripts/check_dependency_vulnerabilities.py --self-test
   python scripts/check_legacy_facade_imports.py --self-test
   python scripts/check_legacy_facade_imports.py

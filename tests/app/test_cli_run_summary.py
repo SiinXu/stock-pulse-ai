@@ -127,3 +127,29 @@ def test_capture_records_report_path_and_channel_outcomes() -> None:
     assert ("email", "sent") in capture.channel_outcomes
     assert ("feishu", "failed") in capture.channel_outcomes
     assert all(ch != "__context__" for ch, _ in capture.channel_outcomes)
+
+
+def test_capture_prefers_channel_summaries_contract() -> None:
+    """CLI capture should read the Issue #1081 channel/ok/error summary first."""
+
+    class _Result:
+        def channel_summaries(self):
+            return [
+                {"channel": "__context__", "ok": True, "error": None},
+                {"channel": "wechat", "ok": False, "error": "send_failed"},
+                {"channel": "custom", "ok": True, "error": None},
+            ]
+
+    class _Notifier:
+        def send_with_results(self, *args, **kwargs):
+            return _Result()
+
+    notifier = _Notifier()
+    capture = CliRunSummaryCapture()
+    capture.install(notifier)
+    notifier.send_with_results("body")
+    capture.restore()
+
+    assert ("wechat", "failed") in capture.channel_outcomes
+    assert ("custom", "sent") in capture.channel_outcomes
+    assert all(ch != "__context__" for ch, _ in capture.channel_outcomes)

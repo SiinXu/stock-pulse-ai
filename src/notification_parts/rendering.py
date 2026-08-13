@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
     from src.notification import (
+        _append_committee_deliberation_block,
         _append_strategy_synthesis_block,
         _safe_float,
         display_action_fields_for_result,
@@ -793,6 +794,15 @@ class _RenderingMethods:
                 )
                 _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
 
+                # ========== Investment Committee (compact for notifications) ==========
+                _append_committee_deliberation_block(
+                    report_lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
+
                 # Financial summary / shareholder returns / related sectors (hidden when data is missing)
                 self._append_fundamental_blocks(report_lines, result)
 
@@ -1016,6 +1026,15 @@ class _RenderingMethods:
                         lines.append(summary)
                     lines.append("")
 
+                # Investment Committee (compact for notifications).
+                _append_committee_deliberation_block(
+                    lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
+
                 # Simplified checklist
                 checklist = battle.get('action_checklist', []) if battle else []
                 if checklist:
@@ -1142,12 +1161,18 @@ class _RenderingMethods:
         if results:
             from src.services.report_renderer import render, render_plugin_template
 
+            # ReportType.BRIEF is the push/mobile density contract: always render
+            # with report_mode=brief so Decision Card length budgets hold even when
+            # global REPORT_MODE is standard/research (#861/#874).
             render_kwargs = {
                 "platform": "brief",
                 "results": results,
                 "report_date": report_date,
                 "summary_only": False,
-                "extra_context": {"report_language": report_language},
+                "extra_context": {
+                    "report_language": report_language,
+                    "report_mode": "brief",
+                },
             }
             out = render_plugin_template(**render_kwargs)
             if not out and getattr(config, 'report_renderer_enabled', False):
@@ -1354,6 +1379,15 @@ class _RenderingMethods:
             dashboard.get('strategy_synthesis') if dashboard else None
         )
         _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
+
+        # ========== Investment Committee (compact for notifications) ==========
+        _append_committee_deliberation_block(
+            lines,
+            dashboard.get("committee_deliberation") if dashboard else None,
+            labels,
+            report_language,
+            compact=True,
+        )
 
         # Position recommendation
         pos_advice = core.get('position_advice', {}) if core else {}

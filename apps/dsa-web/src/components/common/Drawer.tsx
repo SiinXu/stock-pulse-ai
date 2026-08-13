@@ -96,7 +96,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           data-drawer-side={side}
           data-drawer-size={isNavigation ? undefined : size}
           className={cn(
-            'relative flex min-h-0 w-full flex-col bg-elevated shadow-2xl focus:outline-none',
+            'relative flex min-h-0 w-full flex-col bg-elevated shadow-elevation-overlay focus:outline-none',
             isNavigation
               ? 'animate-slide-in-left border-r border-border'
               : 'animate-slide-in-right border-l border-border',
@@ -104,7 +104,7 @@ export const Drawer: React.FC<DrawerProps> = ({
         >
           <header
             data-overlay-slot="header"
-            className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4"
+            className="flex shrink-0 items-start justify-between density-gap-header border-b border-border density-overlay-pad-x density-overlay-pad-y"
           >
             <div className="min-w-0">
               <h2 id={titleId} className="text-base font-semibold text-foreground">{title}</h2>
@@ -127,7 +127,7 @@ export const Drawer: React.FC<DrawerProps> = ({
             data-overlay-slot="body"
             className={cn(
               'min-h-0 flex-1 overflow-y-auto',
-              isNavigation ? 'p-0' : 'p-5 sm:p-6',
+              isNavigation ? 'p-0' : 'density-surface-pad-md',
             )}
           >
             {children}
@@ -135,7 +135,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           {footer ? (
             <footer
               data-overlay-slot="footer"
-              className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-elevated px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+              className="flex shrink-0 flex-wrap items-center justify-end density-gap-tools border-t border-border bg-elevated density-overlay-pad-x py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
             >
               {footer}
             </footer>

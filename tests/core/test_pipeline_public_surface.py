@@ -20,8 +20,9 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     PIPELINE_STAGE_NAMES PipelineAnalysisArtifacts PipelinePersistValue
     PipelineStageName PipelineStageObservation PipelineStageResult
     PipelineStageRunner PipelineStageStatus ReportType SearchService
-    SimpleNamespace SocialSentimentService StockAnalysisPipeline
-    StockTrendAnalyzer ThreadPoolExecutor TrendAnalysisResult Tuple
+    SentimentPipelineService SimpleNamespace SocialSentimentService
+    StockAnalysisPipeline StockTrendAnalyzer ThreadPoolExecutor
+    TrendAnalysisResult Tuple
     activate_run_diagnostic_context apply_daily_market_context_guardrail
     apply_phase_decision_guardrails as_completed build_market_phase_context
     current_diagnostic_snapshot date datetime defaultdict
@@ -57,6 +58,7 @@ EXPECTED_DELIVERY_METHODS = (
 
 EXPECTED_ANALYSIS_METHODS = (
     "analyze_stock",
+    "_fetch_dependency_free_market_inputs",
     "_enhance_context",
     "_attach_belong_boards_to_fundamental_context",
     "_attach_concept_rankings_to_fundamental_context",

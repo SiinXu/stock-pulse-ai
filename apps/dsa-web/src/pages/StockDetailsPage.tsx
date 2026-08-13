@@ -10,6 +10,7 @@ import { KlineChart } from '../components/charts';
 import {
   ApiErrorAlert,
   AppPage,
+  Badge,
   Button,
   Card,
   DataTable,
@@ -22,7 +23,7 @@ import {
   PageHeader,
   Select,
 } from '../components/common';
-import { DcfSensitivityPanel } from '../components/valuation';
+import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
 import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -50,6 +51,7 @@ import { normalizeStockCode } from '../utils/stockCode';
 import {
   changeColorCssVar,
   changeSemantics,
+  formatMarketBadge,
   formatMarketTime,
   formatPrice,
   formatSignedChangeAmount,
@@ -341,6 +343,7 @@ const StockDetailsPage: React.FC = () => {
   }
 
   const quoteName = quote?.stockName?.trim();
+  const marketBadge = formatMarketBadge(marketId);
 
   const quoteChangeSemantics = marketId
     ? changeSemantics(quote?.change, marketId, changeColorPref)
@@ -439,6 +442,17 @@ const StockDetailsPage: React.FC = () => {
             <Loading />
           ) : quote ? (
             <div className="space-y-3">
+              {marketBadge ? (
+                <Badge
+                  variant="info"
+                  size="sm"
+                  className="font-mono shadow-none"
+                  aria-label={t('stocks.workspace.marketBadgeAria', { code: marketBadge })}
+                  data-testid="stock-details-market-badge"
+                >
+                  {marketBadge}
+                </Badge>
+              ) : null}
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="text-3xl font-semibold text-foreground">
                   {formatPriceCell(quote.currentPrice, marketId, language)}
@@ -576,6 +590,10 @@ const StockDetailsPage: React.FC = () => {
 
         <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
           <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
+        </section>
+
+        <section aria-label={valuationText.peerTitle} data-testid="stock-details-peer-canvas-section">
+          <PeerValuationCanvas key={`peer-${canonicalCode}`} stockCode={canonicalCode} />
         </section>
       </div>
     </AppPage>
