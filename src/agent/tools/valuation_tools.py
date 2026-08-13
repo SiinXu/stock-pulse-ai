@@ -126,7 +126,10 @@ def build_valuation_tool(
             "Estimate intrinsic value using a transparent DCF model and peer "
             "relative valuation (P/E, P/B). Returns explicit assumptions, a "
             "growth×discount sensitivity range, and never fabricates numbers "
-            "when fundamentals are insufficient. Research support only."
+            "when fundamentals are insufficient. Relative peer claims must cite "
+            "peer-valuation-canvas fields (or be downgraded); prefer "
+            "POST /api/v1/valuation/peer-canvas for structured peer grids. "
+            "Research support only."
         ),
         parameters=[
             ToolParameter(

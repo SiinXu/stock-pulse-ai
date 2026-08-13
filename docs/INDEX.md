@@ -77,8 +77,10 @@
 | [预测 resolve_after 交易日历策略](prediction-resolve-after.md) | horizon → UTC `resolve_after`（A/HK/US 交易 session、节假日/半日市/跨市场）；禁止自然日近似（[EN](prediction-resolve-after_EN.md)） |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
 | [多策略证据契约](multi-strategy-contract.md) | 多策略观点分拣、确定性合成、冲突检测、证据链隔离与报告渲染契约 |
+| [多标的组合级分析](portfolio-level-analysis.md) | 对一组标的做组合层面相关性/集中度/共同风险分析，复用健康评分与压力测试数据面，含规模上界与缺数降级；`POST /api/v1/analysis/portfolio` ([English](portfolio-level-analysis_EN.md)) |
 | [组合风险指标（VaR / 相关 / 分散化）](portfolio-risk-metrics.md) | 历史法 VaR、相关矩阵、HHI/分散化得分公式与假设；`GET /api/v1/portfolio/risk-metrics` V0 边界 |
 | [组合压力测试（确定性冲击）](portfolio-stress-test.md) | 声明式情景、确定性因子冲击、假设清单与 `partial` 诚实状态；`/api/v1/portfolio/stress-test`（[英文](portfolio-stress-test_EN.md)） |
+| [投资者 Persona](investor-personas.md) | 默认关闭的研究立场与投资视角 Skills（#119, #467） |
 | [投资委员会模式](investment-committee-mode.md) | 默认关闭的人格预设 + specialist 路径与委员会审议报告小节（#545） |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
 | [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
@@ -97,6 +99,8 @@
 | [云端 WebUI 部署](deploy-webui-cloud.md) | 云服务器访问 WebUI 的部署说明 |
 | [Zeabur 部署](docker/zeabur-deployment.md) | Zeabur 平台部署说明 |
 | [桌面端打包说明](desktop-package.md)（[EN](desktop-package_EN.md)） | Electron 桌面端首次启动、本地模型与打包说明 |
+| [桌面端 vs Web 能力矩阵](desktop-capability-matrix.md)（[EN](desktop-capability-matrix_EN.md)） | Desktop / Web 能力对照、CLI 诊断与更新留存 |
+| [桌面深链策略](desktop-deep-link-policy.md)（[EN](desktop-deep-link-policy_EN.md)） | `stockpulse://` 白名单、拒绝语义与 UX |
 
 ## 参考与开发
 
@@ -109,6 +113,7 @@
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [OpenAPI Web 类型与运行时校验（英文）](openapi-web-types.md) | 从 OpenAPI 生成 Web 类型、CI 漂移门禁与 stocks 运行时校验试点 |
+| [API 错误分类学](api-error-taxonomy.md) | 稳定 error 码的类别/严重度/默认动作与 Web 可行动指引（[English](api-error-taxonomy_EN.md)） |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
 | [工程效率操作手册](engineering-efficiency-playbook.md) | 并行修复/合并火车的操作指南：批次合并、冲突图、配置注册守卫、squash 误关防线、自迭代验收、单机资源与工作区保护（[EN](engineering-efficiency-playbook_EN.md)；合同仍以 `AGENTS.md` 为准） |
 | [离线测试门禁（超时、覆盖率下限、marker）](testing-ci-gate.md) | 单测超时、faulthandler、实测覆盖率下限、严格 marker，以及手动 benchmark 说明（英文专题；中英流程一致） |
