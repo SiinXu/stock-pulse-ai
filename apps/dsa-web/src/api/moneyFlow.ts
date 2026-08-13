@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 
 const moneyFlowSnapshotSchema = z
   .object({
@@ -161,7 +161,12 @@ export type MoneyFlowViewParams = {
 };
 
 export function parseMoneyFlowView(value: unknown): MoneyFlowView {
-  return moneyFlowViewSchema.parse(toCamelCase(value) as unknown);
+  return parseCamelCasePayload<MoneyFlowView>(
+    value,
+    moneyFlowViewSchema,
+    'MoneyFlowView',
+    'moneyFlow',
+  );
 }
 
 export async function getStockMoneyFlow(params: MoneyFlowViewParams): Promise<MoneyFlowView> {
