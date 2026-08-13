@@ -36,6 +36,8 @@ GET /api/v1/history/{record_id}/diagnostics
 
 PIPE-02 在观测契约之下增加内部 `PipelineStageResult[T]`。八个固定阶段统一返回 `stage / status / value / retryable / side_effect_committed / attempt / reused / error`，由 Pipeline 实例内、按 query/effect key 隔离的 stage runner 决定继续、重试或复用已提交副作用。该 Result 只用于后端编排，不新增 API 字段、数据库 schema 或配置项；`process_single_stock()`、`run()`、本地报告和通知入口的既有返回值保持不变。
 
+Issue #1072 在 Result 之上补充阶段 IO 契约（`src/core/contracts/`）：`RunContext` 承载跨阶段 run 身份（与 `AnalysisSubject` 对齐），`fetch` / `analyze` / `render` 使用显式 Input/Output 类型生成诊断摘要并作为阶段 value 载体；`StageError` 分类可经 `stage_result_from_error` 映射为既有 Result。契约兼容历史 value 形态（日线 fetch 的 tuple、市场输入 dict、analyze 的 `AnalysisResult`、render 的字符串或 `(content, path)`），不改变对外返回值。Issue #1083 要求 `src/core/pipeline.py` 保持编排 facade，业务规则落在 `src/core/stages/*` 与 services。
+
 - `resolve`、`fetch`、`intelligence`、`context`、`analyze` 的未提交失败可以按 Result 的 `retryable` 重试；keyed stage 只在实际执行时递增 attempt，缓存复用保留已提交结果的 attempt 并标记 `reused=true`。
 - legacy 与 Agent 路径共用一次性 `persist` stage。fence key 由 `query_id + code + report_type` 组成；未写入时仍可重试，一旦历史 ID 已确认，后续同 key 重入只返回 `reused=true`，不会再次写历史或再次提取 DecisionSignal。
 - `render` 与 `dispatch` 使用报告 route、report type、query/code identity 及 channel 组成 delivery key。同一 Pipeline 执行中，已确认成功的本地输出或通知渠道只执行一次；aggregate scope lock 串行化首次 noise-control gate 与整次静态发送。全部失败且没有确认副作用时仅由首次进入该 scope 的调用释放 scope，重试时重新执行 gate；已有部分送达的重入即使在遍历缓存渠道前失败也保留 scope。部分送达后 Result 同时标记 committed 与 retryable，同 scope 重入跳过已通过的首次 gate，由逐渠道 fence 复用已确认渠道并只重试未提交渠道。结构化单股 partial 仍按整次 notifier 调用复用且不可重试。缓存复用不会新增物理 notification attempt 或 `notification_run`。

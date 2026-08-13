@@ -339,6 +339,27 @@ class PipelineStageRunner:
                 level=logging.DEBUG,
                 context={"stage": stage.value, "attempt": attempt},
             )
+            # Prefer the typed StageError taxonomy when callers raise it
+            # (Issue #1072). Bare exceptions keep the historical failed/retryable
+            # fallback so behavior remains unchanged for existing stages.
+            try:
+                from src.core.contracts.errors import StageError, stage_result_from_error
+
+                if isinstance(exc, StageError):
+                    return stage_result_from_error(
+                        exc,
+                        stage=stage,
+                        attempt=attempt,
+                    )
+            except Exception as mapping_exc:  # broad-exception: fallback_recorded - Contract import/mapping failure is logged; historical failed result is used.
+                log_safe_exception(
+                    logger,
+                    "Pipeline stage contract mapping unavailable; using historical failed result",
+                    mapping_exc,
+                    error_code="pipeline_stage_contract_mapping_failed",
+                    level=logging.DEBUG,
+                    context={"stage": stage.value, "attempt": attempt},
+                )
             return PipelineStageResult.failed(
                 stage,
                 error=exc,
