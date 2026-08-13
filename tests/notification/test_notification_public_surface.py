@@ -362,7 +362,7 @@ def test_notification_method_order_matches_pre_split_contract():
         )
     )
 
-    assert len(expected_names) == 68
+    assert len(expected_names) == 69
     assert actual_names == expected_names
 
 
