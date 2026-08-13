@@ -35,6 +35,7 @@ from api.v1.schemas.system_config import (
     SystemConfigResponse,
     SystemConfigSchemaResponse,
     SetupStatusResponse,
+    ReadinessReportResponse,
     TestGenerationBackendRequest,
     TestGenerationBackendResponse,
     SystemConfigValidationErrorResponse,
@@ -374,6 +375,55 @@ def get_setup_status(
             detail={
                 "error": "internal_error",
                 "message": "Failed to load setup status",
+            },
+        )
+
+
+@router.get(
+    "/readiness",
+    response_model=ReadinessReportResponse,
+    responses={
+        200: {"description": "Structured readiness report loaded"},
+        401: {"description": "Unauthorized", "model": ErrorResponse},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get structured readiness / self-check report",
+    description=(
+        "On-demand structured readiness for data providers, LLM/generation backend, "
+        "task queue, and selected setup dependencies. Reuses existing observational "
+        "probes; does not write config, does not run model smoke tests, and is not "
+        "invoked automatically at process startup. Probe failures and per-check "
+        "timeouts are reported as failed or degraded and never as ready."
+    ),
+    operation_id="getSystemReadiness",
+)
+def get_system_readiness(
+    service: SystemConfigService = Depends(get_system_config_service),
+) -> ReadinessReportResponse:
+    """Return a fail-closed readiness snapshot for diagnostics and operators."""
+    try:
+        from src.core.readiness import build_readiness_report
+
+        # Reuse the same SystemConfigService instance as setup/status so first-run
+        # and readiness share one config owner (no parallel setup implementation).
+        report = build_readiness_report(
+            setup_status_factory=service.get_setup_status,
+            generation_status_factory=service.get_generation_backend_status,
+        )
+        return ReadinessReportResponse.model_validate(report.to_dict())
+    except Exception as exc:  # broad-exception: fallback_recorded - map readiness failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Readiness report load failed",
+            exc,
+            error_code="internal_error",
+            level=logging.ERROR,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to load readiness report",
             },
         )
 
