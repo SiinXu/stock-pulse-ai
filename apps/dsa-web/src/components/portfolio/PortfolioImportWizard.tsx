@@ -9,14 +9,17 @@ import type { ParsedApiError } from '../../api/error';
 import type {
   PortfolioImportBrokerItem,
   PortfolioImportCommitResponse,
+  PortfolioImportFailedRow,
   PortfolioImportParseResponse,
   PortfolioImportTradeItem,
 } from '../../types/portfolio';
 import {
+  buildFailedRowsCsv,
+  downloadTextFile,
   formatBrokerLabel,
   getCsvCommitVariant,
   getCsvParseVariant,
-} from '../../utils/portfolioFormat';
+} from './portfolioImportFailedRows';
 import { formatUiText } from '../../i18n/uiText';
 import type { UiLanguage } from '../../i18n/uiText';
 import {
@@ -153,15 +156,56 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
     },
   ], [text.code, text.quantity, text.side, text.tradeDate, text.tradePrice]);
 
+  const failedRows = useMemo<PortfolioImportFailedRow[]>(
+    () => (csvParseResult?.failedRows && csvParseResult.failedRows.length > 0
+      ? csvParseResult.failedRows
+      : []),
+    [csvParseResult],
+  );
+
+  const failedRowColumns = useMemo<DataTableColumn<PortfolioImportFailedRow>[]>(() => [
+    {
+      id: 'rowNumber',
+      header: text.importWizardFailedRowNumber,
+      cell: (row) => String(row.rowNumber),
+      width: 'compact',
+    },
+    {
+      id: 'reasonCode',
+      header: text.importWizardFailedRowCode,
+      cell: (row) => row.reasonCode,
+      width: 'compact',
+    },
+    {
+      id: 'reason',
+      header: text.importWizardFailedRowReason,
+      cell: (row) => row.reason,
+    },
+  ], [
+    text.importWizardFailedRowCode,
+    text.importWizardFailedRowNumber,
+    text.importWizardFailedRowReason,
+  ]);
+
   const canAdvanceFromFormat = Boolean(selectedBroker) && brokers.length > 0;
   const canAdvanceFromUpload = Boolean(csvFile) || pasteText.trim().length > 0;
-  const hasParseErrors = Boolean(csvParseResult && csvParseResult.errorCount > 0);
+  const hasParseErrors = Boolean(
+    csvParseResult
+    && (csvParseResult.errorCount > 0 || failedRows.length > 0),
+  );
   const hasPartialCommit = Boolean(
     csvCommitResult
     && !csvCommitResult.dryRun
     && csvCommitResult.failedCount > 0
     && csvCommitResult.insertedCount > 0,
   );
+
+  const downloadFailedRows = () => {
+    if (failedRows.length === 0) return;
+    const csv = buildFailedRowsCsv(failedRows);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadTextFile(`portfolio-import-failed-rows-${stamp}.csv`, csv);
+  };
 
   const goNext = () => {
     if (busy) return;
@@ -235,7 +279,8 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
 
   return (
     <div
-      data-testid="portfolio-import-wizard"
+      role="region"
+      aria-label={text.importWizardTitle}
       data-pattern="wizard"
       className="space-y-4"
     >
@@ -322,7 +367,7 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
               </Button>
               <FileInput
                 ref={csvInputRef}
-                accept=".csv"
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 aria-label={text.chooseCsv}
                 disabled={busy || brokers.length === 0}
                 onChange={(e) => {
@@ -439,24 +484,49 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
             {hasParseErrors && csvParseResult ? (
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-foreground">{text.importWizardRowErrors}</h3>
-                <ul className="max-h-64 list-disc space-y-1 overflow-auto pl-5 text-xs text-secondary-text">
-                  {csvParseResult.errors.map((error) => (
-                    <li key={error}>{error}</li>
-                  ))}
-                </ul>
+                {failedRows.length > 0 ? (
+                  <DataTable<PortfolioImportFailedRow>
+                    caption={text.importWizardFailedRowsTitle}
+                    columns={failedRowColumns}
+                    rows={failedRows.slice(0, 50)}
+                    getRowKey={(row) => `${row.rowNumber}-${row.reasonCode}`}
+                    emptyState={{ title: text.importWizardRowErrors }}
+                    density="compact"
+                    minWidth="wide"
+                  />
+                ) : null}
+                {csvParseResult.errors.length > 0 ? (
+                  <ul className="max-h-48 list-disc space-y-1 overflow-auto pl-5 text-xs text-secondary-text">
+                    {csvParseResult.errors.map((error) => (
+                      <li key={error}>{error}</li>
+                    ))}
+                  </ul>
+                ) : null}
                 <InlineAlert
                   variant="warning"
                   size="compact"
                   message={text.importWizardRetryHint}
                 />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="comfortable"
-                  onClick={() => setStep('upload')}
-                >
-                  {text.importWizardContinueEdit}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {failedRows.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="comfortable"
+                      onClick={downloadFailedRows}
+                    >
+                      {text.importWizardDownloadFailedRows}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="comfortable"
+                    onClick={() => setStep('upload')}
+                  >
+                    {text.importWizardContinueEdit}
+                  </Button>
+                </div>
               </div>
             ) : (
               <InlineAlert

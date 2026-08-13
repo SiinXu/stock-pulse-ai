@@ -89,11 +89,15 @@ GET /api/v1/history/{record_id}/export?format=pdf
 
 能力语言限定为 `en | zh | zh-TW | ja | ko`，返回固定、类型化的 `md` / `html` / `pdf` 状态与公开上限，不包含字体路径。`office_formats_status` 为 `html_only`。导出 `format` 是 OpenAPI 枚举 `md | html | pdf`。
 
+## Web 下载入口
+
+报告 Markdown 面板提供一键下载：Markdown（始终可用）、HTML（`markdown-it-py` 就绪时）、PDF（可选 PDF 栈与字形覆盖就绪时）。前端通过 `GET /api/v1/history/export/capabilities` 探测能力；不可用的可选格式仍可见但禁用，并带有明确的“不可用”文案。
+
 ## Issue #163 剩余范围
 
 - 原生 DOCX 二进制导出（若产品仍需要 OOXML）
 - XLSX 评分/指标工作表
 - 可选证据/审计附录开关（#127）
-- 报告页与 DecisionSignal 的 Web 一键导出入口
+- DecisionSignal 一键导出入口（报告 Markdown 面板已覆盖）
 
-本工作仅修改后端导出链路，不改报告模板、分析生成、Desktop、`pdf_parsing_service.py`、分享图或 `md2img`。
+本链路不改报告模板、分析生成、Desktop、`pdf_parsing_service.py`、分享图或 `md2img`。

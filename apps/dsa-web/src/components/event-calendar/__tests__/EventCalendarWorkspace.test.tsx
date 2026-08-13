@@ -2,22 +2,41 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { eventCalendarApi } from '../../../api/eventCalendar';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { APP_ROUTE_PATHS } from '../../../routing/routes';
 import type { EventCalendarResponse } from '../../../types/eventCalendar';
 import EventCalendarWorkspace from '../EventCalendarWorkspace';
-import { APP_ROUTE_PATHS } from '../../../routing/routes';
 
 vi.mock('../../../api/eventCalendar', () => ({
   eventCalendarApi: { getCalendar: vi.fn() },
 }));
 
-function renderWorkspace() {
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-path">{location.pathname}</div>;
+}
+
+function renderWorkspace(initialPath = APP_ROUTE_PATHS.eventCalendar) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
       <UiLanguageProvider initialLanguage="en">
-        <EventCalendarWorkspace />
+        <Routes>
+          <Route
+            path={APP_ROUTE_PATHS.eventCalendar}
+            element={(
+              <>
+                <EventCalendarWorkspace />
+                <LocationProbe />
+              </>
+            )}
+          />
+          <Route
+            path={APP_ROUTE_PATHS.eventAlerts}
+            element={<LocationProbe />}
+          />
+        </Routes>
       </UiLanguageProvider>
     </MemoryRouter>,
   );
@@ -78,6 +97,15 @@ describe('EventCalendarWorkspace', () => {
     renderWorkspace();
     expect(await screen.findByText('This date range cannot be confirmed empty')).toBeInTheDocument();
     expect(screen.queryByText('No corporate events in this date range')).not.toBeInTheDocument();
+  });
+
+  it('exposes a production entry to event alerts without typed URLs', async () => {
+    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue(emptyPayload);
+    renderWorkspace();
+    const openAlerts = await screen.findByTestId('event-calendar-open-alerts');
+    expect(openAlerts).toHaveTextContent('Event-driven alerts');
+    fireEvent.click(openAlerts);
+    expect(await screen.findByTestId('location-path')).toHaveTextContent(APP_ROUTE_PATHS.eventAlerts);
   });
 
   it('aborts the previous generation and ignores its late response', async () => {

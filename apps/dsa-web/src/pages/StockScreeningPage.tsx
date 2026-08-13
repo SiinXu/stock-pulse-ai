@@ -19,7 +19,8 @@ import { AppPage } from '../components/common';
 import { ScreeningConfigurationModal } from '../components/screening/ScreeningConfigurationModal';
 import { ScreeningHotspotsSection } from '../components/screening/ScreeningHotspotsSection';
 import ScreeningPageAlerts from '../components/screening/ScreeningPageAlerts';
-import ScreeningPageHeader from '../components/screening/ScreeningPageHeader';
+import ScreeningModeShell, { type ScreeningMode } from '../components/screening/ScreeningModeShell';
+import { useRouteFocusTarget } from '../components/routing';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
@@ -51,6 +52,7 @@ import {
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import {
+  APP_ROUTE_PATHS,
   RESEARCH_DISCOVER_LIMITS,
   RESEARCH_DISCOVER_MARKET_VALUES,
   buildSettingsHref,
@@ -63,12 +65,21 @@ import { buildDeepLink } from '../utils/deepLink';
 import { formatTaskMessage } from '../utils/taskMessage';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { useScreeningUrlState } from '../components/screening/useScreeningUrlState';
+import { useCandidateDiscoveryText } from '../components/screening/useCandidateDiscoveryText';
 
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.researchDiscover,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const configurationFormId = useId();
-  const text = SCREENING_TEXT[language];
+  const baseText = SCREENING_TEXT[language];
+  const discoveryText = useCandidateDiscoveryText(language);
+  const text = useMemo(() => ({ ...baseText, ...discoveryText }), [baseText, discoveryText]);
   const markets = useMemo(
     () => [{ id: RESEARCH_DISCOVER_MARKET_VALUES.china, label: text.marketCn }],
     [text.marketCn],
@@ -115,6 +126,7 @@ const StockScreeningPage: React.FC = () => {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(restoredTask?.taskId ?? null);
   const [taskProgress, setTaskProgress] = useState(restoredTask?.taskId ? 10 : 0);
   const [taskMessage, setTaskMessage] = useState(restoredTask?.taskId ? text.restoringTask : '');
+  const [screenMode, setScreenMode] = useState<ScreeningMode>('strategy');
 
   const {
     expandedCode,
@@ -326,6 +338,8 @@ const StockScreeningPage: React.FC = () => {
     enableFailedText: text.enableFailed,
     loadStrategies,
     loadHotspots,
+    // AI discovery does not need AlphaSift; probe only when strategy mode is open.
+    active: screenMode === 'strategy',
   });
   const loading = isScreeningAttemptLoading(attemptState);
   const showingLastGood = Boolean(
@@ -548,8 +562,17 @@ const StockScreeningPage: React.FC = () => {
 
   return (
     <AppPage className="space-y-6 pb-12 pt-6">
-      <ScreeningPageHeader text={text} enabled={isScreeningEnabled} status={statusText} />
+      <ScreeningModeShell
+        text={text}
+        mode={screenMode}
+        strategyEnabled={isScreeningEnabled}
+        strategyStatus={statusText}
+        onModeChange={setScreenMode}
+        headingRef={pageHeadingRef}
+      />
 
+      {screenMode === 'strategy' ? (
+      <>
       <ScreeningPageAlerts
         text={text}
         capability={capability.state}
@@ -655,6 +678,8 @@ const StockScreeningPage: React.FC = () => {
         })}
         onExpandedCodeChange={handleExpandedCodeChange}
       />
+      </>
+      ) : null}
     </AppPage>
   );
 };

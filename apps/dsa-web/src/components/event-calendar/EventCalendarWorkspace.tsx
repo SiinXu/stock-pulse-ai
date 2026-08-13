@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type React from 'react';
-import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { BellRing, CalendarDays } from 'lucide-react';
 import { eventCalendarApi } from '../../api/eventCalendar';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import {
@@ -24,9 +24,10 @@ import {
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
+import { EVENT_ALERT_PAGE_TEXT } from '../../locales/eventAlerts';
 import { EVENT_CALENDAR_TEXT } from '../../locales/eventCalendar';
-import type { CalendarEventItem, CorporateEventCategory, EventCalendarResponse } from '../../types/eventCalendar';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
+import type { CalendarEventItem, CorporateEventCategory, EventCalendarResponse } from '../../types/eventCalendar';
 
 function isoDate(value: Date): string {
   const year = value.getFullYear();
@@ -55,8 +56,10 @@ function isCancelled(error: unknown): boolean {
 }
 
 const EventCalendarWorkspace: React.FC = () => {
+  const navigate = useNavigate();
   const { language } = useUiLanguage();
   const text = EVENT_CALENDAR_TEXT[language];
+  const alertsText = EVENT_ALERT_PAGE_TEXT[language];
   const defaults = useMemo(() => defaultRange(), []);
   const [dateFrom, setDateFrom] = useState(defaults.from);
   const [dateTo, setDateTo] = useState(defaults.to);
@@ -160,19 +163,22 @@ const EventCalendarWorkspace: React.FC = () => {
         title={text.title}
         description={text.description}
         actions={(
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               to={APP_ROUTE_PATHS.eventAlerts}
               data-testid="event-calendar-open-event-alerts"
               data-control="navigation-link"
-              className="control-hit-target inline-flex min-h-7 items-center rounded-md px-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+              aria-label={text.openEventAlerts}
+              className="control-hit-target inline-flex min-h-7 items-center gap-2 rounded-md border border-border bg-hover px-2.5 text-sm font-medium text-foreground shadow-soft-card hover:bg-subtle-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-border dark:hover:bg-subtle-active"
+              onClick={() => navigate(APP_ROUTE_PATHS.eventAlerts)}
             >
-              {text.openEventAlerts}
+              <BellRing className="h-4 w-4" aria-hidden="true" />
+              <span data-testid="event-calendar-open-alerts">{alertsText.title}</span>
             </Link>
             <Button type="button" variant="secondary" onClick={() => void load()}>
               {text.refresh}
             </Button>
-          </>
+          </div>
         )}
       />
 

@@ -281,11 +281,58 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         status = service.status()
         self.assertEqual(status["track"], "legacy_day_batch")
         self.assertTrue(status["attached"])
-        self.assertEqual(status["process_mode"], "serve")
+        self.assertEqual(status["process_mode"], "serve+schedule")
         self.assertEqual(status["schedule_timezone"], "America/New_York")
         self.assertTrue(status["run_now_available"])
         self.assertIsNone(status["run_now_block_reason"])
         self.assertTrue(status["next_run_at"].endswith("-05:00"))
+
+    def test_process_mode_four_state_vocabulary_from_runtime_signals(self) -> None:
+        from src.services.runtime_scheduler import (
+            DESKTOP_MODE_ENV,
+            CLI_SCHEDULER_OWNER_ENV,
+            resolve_scheduler_process_mode,
+        )
+
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=True, attached=True, desktop_mode=False),
+            "serve+schedule",
+        )
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=True, attached=True, desktop_mode=True),
+            "desktop",
+        )
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=False, attached=False, desktop_mode=False),
+            "cli-schedule",
+        )
+        self.assertEqual(
+            resolve_scheduler_process_mode(owns_schedule=True, attached=False, desktop_mode=False),
+            "not_attached",
+        )
+
+        config = SimpleNamespace(
+            schedule_enabled=True,
+            schedule_time="18:00",
+            schedule_times=["18:00"],
+        )
+
+        with patch.dict(os.environ, {DESKTOP_MODE_ENV: "true", CLI_SCHEDULER_OWNER_ENV: ""}, clear=False):
+            desktop = RuntimeSchedulerService(config_provider=lambda: config)
+            self.assertEqual(desktop.status()["process_mode"], "desktop")
+            self.assertTrue(desktop.status()["attached"])
+
+        with patch.dict(os.environ, {CLI_SCHEDULER_OWNER_ENV: "true", DESKTOP_MODE_ENV: ""}, clear=False):
+            cli_owned = RuntimeSchedulerService(config_provider=lambda: config)
+            self.assertEqual(cli_owned.status()["process_mode"], "cli-schedule")
+            self.assertFalse(cli_owned.status()["attached"])
+
+        serve_only = RuntimeSchedulerService(
+            config_provider=lambda: config,
+            legacy_schedule_enabled=False,
+        )
+        self.assertEqual(serve_only.status()["process_mode"], "not_attached")
+        self.assertFalse(serve_only.status()["attached"])
 
     def test_run_now_uses_shared_lock_across_service_instances(self) -> None:
         config = SimpleNamespace(
@@ -592,6 +639,35 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertIs(first_task["task"], third_task["task"])
         self.assertEqual(second_task["interval_seconds"], 11 * 60)
         self.assertEqual(third_task["interval_seconds"], 11 * 60)
+
+    def test_event_research_brief_task_is_bound_cached_and_disableable(self) -> None:
+        config = SimpleNamespace(event_research_brief_enabled=True)
+        callback = MagicMock()
+        service = RuntimeSchedulerService(config_provider=lambda: config)
+        service._reload_config = lambda: config
+
+        with patch(
+            "src.services.runtime_scheduler.build_event_research_brief_scheduler_background_tasks",
+            return_value=[{
+                "task": callback,
+                "interval_seconds": 120,
+                "run_immediately": True,
+                "name": "event_research_brief",
+            }],
+        ) as builder:
+            first = service._current_event_research_brief_background_tasks(config)
+            second = service._current_event_research_brief_background_tasks(config)
+            config.event_research_brief_enabled = False
+            disabled = service._current_event_research_brief_background_tasks(config)
+
+        self.assertEqual(builder.call_count, 1)
+        self.assertEqual(first[0]["name"], "event_research_brief")
+        self.assertEqual(first[0]["interval_seconds"], 120)
+        self.assertTrue(first[0]["run_immediately"])
+        self.assertFalse(second[0]["run_immediately"])
+        self.assertIs(first[0]["task"], second[0]["task"])
+        self.assertEqual(disabled, [])
+        self.assertNotIn("event_research_brief", service._background_task_cache)
 
     def test_force_enabled_survives_time_reconcile_until_explicit_enabled_update(self) -> None:
         fake_schedule = _FakeScheduleModule()

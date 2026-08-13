@@ -13,7 +13,14 @@ from api.v1.schemas.common import ErrorDetailsCompatibilityModel
 LLMCapabilityCheck = Literal["json", "tools", "vision", "stream"]
 GenerationBackendSmokeMode = Literal["text", "json"]
 GenerationBackendHealthStatus = Literal["not_tested", "passed", "failed", "skipped"]
-SchedulerProcessMode = Literal["serve", "desktop", "not_attached"]
+# Design vocabulary (#869): serve+schedule / desktop / cli-schedule / not_attached.
+# Values come from runtime ownership + attachment, never static labels.
+SchedulerProcessMode = Literal[
+    "serve+schedule",
+    "desktop",
+    "cli-schedule",
+    "not_attached",
+]
 SchedulerRunOutcome = Literal["succeeded", "failed"]
 NotificationTestChannel = Literal[
     "wechat",
@@ -356,6 +363,38 @@ class SetupStatusResponse(BaseModel):
     checks: List[SetupStatusCheck] = Field(default_factory=list)
 
 
+class ReadinessCheckItem(BaseModel):
+    """One structured readiness dimension (ok | degraded | failed)."""
+
+    key: str
+    status: Literal["ok", "degraded", "failed"]
+    reason_code: str
+    reason: str
+    suggestion: Optional[str] = None
+    required: bool = True
+    details: Dict[str, Any] = Field(default_factory=dict)
+    duration_ms: Optional[float] = None
+    timed_out: bool = False
+
+
+class ReadinessReportResponse(BaseModel):
+    """On-demand structured readiness/self-check report.
+
+    Composes existing observational probes (setup status, data-provider runtime
+    status, generation-backend cheap status, task-queue stats). Never mutates
+    configuration and is not invoked automatically at process startup.
+    Failures and timeouts are explicit and never reported as ready.
+    """
+
+    schema_version: str
+    status: Literal["ok", "degraded", "failed"]
+    generated_at: str
+    summary: str
+    partial: bool = False
+    timeout_seconds: float
+    checks: List[ReadinessCheckItem] = Field(default_factory=list)
+
+
 class GenerationBackendStatus(BaseModel):
     """Cheap status for one generation backend.
 
@@ -422,6 +461,96 @@ class KronosStatusResponse(BaseModel):
     packaged_desktop: bool = False
     install_supported: bool = True
     download_size_hint: Optional[str] = None
+
+
+DataProviderRuntimeSourceState = Literal["ok", "not_initialized", "error"]
+DataProviderRole = Literal["baseline", "enhancer", "specialist"]
+DataProviderHealthStatus = Literal[
+    "healthy",
+    "degraded",
+    "unknown",
+    "unavailable",
+    "not_configured",
+    "circuit_open",
+    "failed",
+]
+DataProviderMarketQuality = Literal["ok", "degraded", "unknown", "unavailable"]
+DataProviderCacheQuality = Literal[
+    "active",
+    "idle",
+    "cold",
+    "stale",
+    "local_only",
+    "unknown",
+]
+
+
+class DataProviderRuntimeMarketChain(BaseModel):
+    """Active daily-data routing chain for one overview market."""
+
+    market: str
+    data_type: str
+    ordered_provider_ids: List[str] = Field(default_factory=list)
+    primary_provider_id: Optional[str] = None
+    fallback_provider_ids: List[str] = Field(default_factory=list)
+    primary_selection: Optional[str] = None
+    quality: DataProviderMarketQuality = "unknown"
+    as_of: Optional[str] = None
+
+
+class DataProviderRuntimeProviderStatus(BaseModel):
+    """Process-local health and role for one registered market-data provider."""
+
+    provider_id: str
+    display_name: str
+    role: DataProviderRole
+    markets: List[str] = Field(default_factory=list)
+    capabilities: List[str] = Field(default_factory=list)
+    configured: Optional[bool] = None
+    available: bool
+    health_status: DataProviderHealthStatus
+    health_score: Optional[float] = None
+    circuit_state: Optional[str] = None
+    sample_count: int = 0
+    static_priority: Optional[int] = None
+    last_success_at: Optional[str] = None
+    last_failure_at: Optional[str] = None
+    failure_reason: Optional[str] = None
+    is_primary_for: List[str] = Field(default_factory=list)
+    is_fallback_for: List[str] = Field(default_factory=list)
+    config_directory: bool = False
+
+
+class DataProviderRuntimeCacheStatus(BaseModel):
+    """Daily-data cache counters projected for Hub quality labels."""
+
+    enabled: Optional[bool] = None
+    fetch_mode: Optional[str] = None
+    hits: Optional[int] = None
+    misses: Optional[int] = None
+    stale_hits: Optional[int] = None
+    writes: Optional[int] = None
+    quality: DataProviderCacheQuality = "unknown"
+    note: Optional[str] = None
+
+
+class DataProviderRuntimeStatusResponse(BaseModel):
+    """Read-only Data Sources Hub runtime projection.
+
+    Observes the live ``DataFetcherManager`` only. Probe failures and missing
+    owners are explicit; availability is never defaulted to true on failure.
+    Does not open third-party connections or mutate circuits/config.
+    """
+
+    schema_version: str
+    as_of: str
+    partial: bool
+    source_state: DataProviderRuntimeSourceState
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    markets: List[DataProviderRuntimeMarketChain] = Field(default_factory=list)
+    providers: List[DataProviderRuntimeProviderStatus] = Field(default_factory=list)
+    cache: Optional[DataProviderRuntimeCacheStatus] = None
 
 
 class ExportSystemConfigResponse(BaseModel):
