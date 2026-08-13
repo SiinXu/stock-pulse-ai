@@ -1979,6 +1979,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "종목 시세",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "거래량",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "관심목록 추가",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "시장 {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "관심목록에 있음",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "모든 역사",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "평균입니다 {score}",

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, List, Optional, Sequence, Tuple
@@ -95,8 +96,30 @@ class _FakeDb:
     def __init__(self, rows: List[Any], error: Optional[Exception] = None) -> None:
         self.rows = rows
         self.error = error
+        self.calls: list[dict[str, Any]] = []
 
     def get_analysis_history(self, **kwargs: Any) -> List[Any]:
+        self.calls.append(dict(kwargs))
+        if self.error:
+            raise self.error
+        report_type = kwargs.get("report_type")
+        rows = list(self.rows)
+        if report_type is not None:
+            wanted = str(report_type).strip().lower()
+            rows = [
+                row
+                for row in rows
+                if str(getattr(row, "report_type", "") or "").strip().lower() == wanted
+            ]
+        return list(rows[: int(kwargs["limit"])])
+
+
+class _FakePortfolioHealthRepo:
+    def __init__(self, rows: List[Any], error: Optional[Exception] = None) -> None:
+        self.rows = rows
+        self.error = error
+
+    def list_recent_snapshots(self, **kwargs: Any) -> List[Any]:
         if self.error:
             raise self.error
         return list(self.rows[: int(kwargs["limit"])])
@@ -106,17 +129,70 @@ def _analysis(
     *,
     record_id: int = 1,
     created_at: Optional[datetime] = None,
+    report_type: str = "stock",
+    code: str = "600519",
+    name: str = "Kweichow Moutai",
+    raw_result: Any = None,
+    analysis_summary: str = "Stable outlook",
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=record_id,
-        code="600519",
-        name="Kweichow Moutai",
+        code=code,
+        name=name,
         operation_advice="hold",
-        analysis_summary="Stable outlook",
-        report_type="stock",
+        analysis_summary=analysis_summary,
+        report_type=report_type,
         query_id=f"q-{record_id}",
         created_at=created_at or datetime(2026, 8, 10, 19, 0),
+        raw_result=raw_result,
     )
+
+
+def _high_disagreement_raw(
+    *,
+    conflict_severity: str = "high",
+    consensus_level: str = "low",
+    conflict_count: int = 2,
+) -> str:
+    return json.dumps(
+        {
+            "dashboard": {
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "consensus_level": consensus_level,
+                    "conflict_severity": conflict_severity,
+                    "conflict_count": conflict_count,
+                    "supporting_skills": [],
+                    "opposing_skills": [],
+                    "conflicts": [],
+                }
+            }
+        }
+    )
+
+
+def _portfolio_snapshot(
+    *,
+    snapshot_id: int = 7,
+    account_key: str = "all",
+    snapshot_date: str = "2026-08-10",
+    cost_method: str = "fifo",
+    score: float = 42.0,
+    status: str = "ok",
+    band: str = "caution",
+) -> dict[str, Any]:
+    return {
+        "id": snapshot_id,
+        "account_key": account_key,
+        "snapshot_date": snapshot_date,
+        "cost_method": cost_method,
+        "score": score,
+        "status": status,
+        "band": band,
+        "calculated_at": "2026-08-10 08:00:00",
+        "created_at": "2026-08-10 08:00:00",
+        "updated_at": "2026-08-10 08:00:00",
+    }
 
 
 def _alert(*, trigger_id: int = 11, triggered_at: Optional[datetime] = None) -> SimpleNamespace:
@@ -172,10 +248,12 @@ def _service(
     alerts: Optional[List[Any]] = None,
     runs: Optional[List[Any]] = None,
     signals: Optional[List[Any]] = None,
+    portfolio_health: Optional[List[Any]] = None,
     analysis_error: Optional[Exception] = None,
     alert_error: Optional[Exception] = None,
     scheduled_error: Optional[Exception] = None,
     signal_error: Optional[Exception] = None,
+    portfolio_health_error: Optional[Exception] = None,
     retention_days: Optional[int] = 90,
     max_items: Optional[int] = 100,
     read_repo: Optional[_FakeReadRepo] = None,
@@ -187,6 +265,10 @@ def _service(
         alert_repository=_FakeAlertRepo(alerts or [], alert_error),  # type: ignore[arg-type]
         scheduled_task_repository=_FakeScheduledRepo(runs or [], scheduled_error),  # type: ignore[arg-type]
         decision_signal_repository=_FakeSignalRepo(signals or [], signal_error),  # type: ignore[arg-type]
+        portfolio_health_repository=_FakePortfolioHealthRepo(  # type: ignore[arg-type]
+            portfolio_health or [],
+            portfolio_health_error,
+        ),
         retention_days=retention_days,
         max_items=max_items,
         clock=lambda: NOW,
@@ -277,6 +359,7 @@ def test_all_source_failures_fail_the_request() -> None:
         alert_error=_failure("alerts"),
         scheduled_error=_failure("scheduled"),
         signal_error=_failure("signals"),
+        portfolio_health_error=_failure("portfolio_health"),
     )
 
     with pytest.raises(RepositoryError) as exc_info:
@@ -420,3 +503,114 @@ def test_old_events_outside_retention_are_excluded() -> None:
     )
     page = service.list_items()
     assert [item.kind for item in page.items] == ["alert_triggered"]
+
+
+def test_daily_brief_projects_only_persisted_history_rows() -> None:
+    service = _service(
+        analysis=[
+            _analysis(record_id=1, report_type="stock"),
+            _analysis(
+                record_id=2,
+                report_type="daily_brief",
+                code="DAILY_BRIEF",
+                name="Daily Brief",
+                analysis_summary="Honesty note",
+                created_at=datetime(2026, 8, 10, 18, 0),
+            ),
+        ]
+    )
+    page = service.list_items()
+    kinds = [item.kind for item in page.items]
+    assert "daily_brief" in kinds
+    assert "analysis_complete" in kinds
+    brief = next(item for item in page.items if item.kind == "daily_brief")
+    assert brief.title_key == "dailyBriefTitle"
+    assert brief.summary == "Honesty note"
+    assert brief.metadata["report_type"] == "daily_brief"
+    assert all(
+        item.metadata.get("report_type") != "daily_brief"
+        for item in page.items
+        if item.kind == "analysis_complete"
+    )
+
+
+def test_daily_brief_source_is_available_empty_without_fabricated_occurrences() -> None:
+    service = _service(analysis=[_analysis(report_type="stock")])
+    page = service.list_items(kind="daily_brief")
+    status = next(row for row in page.source_statuses if row.source == "daily_briefs")
+    assert page.total == 0
+    assert page.items == []
+    assert status.available is True
+    assert status.item_count == 0
+    assert status.error_code is None
+
+
+def test_daily_brief_source_marked_unavailable_when_history_fails() -> None:
+    service = _service(
+        analysis=[_analysis()],
+        alerts=[_alert()],
+        analysis_error=_failure("analysis"),
+    )
+    page = service.list_items()
+    daily_status = next(row for row in page.source_statuses if row.source == "daily_briefs")
+    assert daily_status.available is False
+    assert daily_status.error_code == "analysis_unavailable"
+    assert all(item.kind != "daily_brief" for item in page.items)
+
+
+def test_high_disagreement_requires_durable_high_conflict_synthesis() -> None:
+    service = _service(
+        analysis=[
+            _analysis(
+                record_id=3,
+                raw_result=_high_disagreement_raw(conflict_severity="high"),
+                created_at=datetime(2026, 8, 10, 18, 30),
+            ),
+            _analysis(
+                record_id=4,
+                raw_result=_high_disagreement_raw(conflict_severity="medium"),
+            ),
+            _analysis(record_id=5, raw_result=None),
+        ]
+    )
+    page = service.list_items(kind="high_disagreement")
+    assert page.total == 1
+    item = page.items[0]
+    assert item.kind == "high_disagreement"
+    assert item.title_key == "highDisagreementTitle"
+    assert item.severity == "warning"
+    assert item.metadata["conflict_severity"] == "high"
+    assert "conflict_severity=high" in item.summary
+
+
+def test_portfolio_health_projects_durable_snapshots() -> None:
+    service = _service(portfolio_health=[_portfolio_snapshot(band="poor", score=18.5)])
+    page = service.list_items(kind="portfolio_health")
+    assert page.total == 1
+    item = page.items[0]
+    assert item.kind == "portfolio_health"
+    assert item.title_key == "portfolioHealthTitle"
+    assert item.severity == "error"
+    assert item.href == "/portfolio"
+    assert item.source_id == "all.2026-08-10.fifo"
+    assert item.created_at.isoformat() == "2026-08-10T00:00:00+00:00"
+    assert "band=poor" in item.summary
+
+
+def test_portfolio_health_source_unavailable_does_not_fabricate_or_break_others() -> None:
+    service = _service(
+        analysis=[_analysis()],
+        portfolio_health_error=RepositoryError(
+            "migration required",
+            error_code="portfolio_health_migration_required",
+        ),
+    )
+    page = service.list_items()
+    health_status = next(
+        row for row in page.source_statuses if row.source == "portfolio_health"
+    )
+    assert health_status.available is False
+    assert health_status.error_code == "portfolio_health_migration_required"
+    assert page.total >= 1
+    assert all(item.kind != "portfolio_health" for item in page.items)
+

@@ -498,7 +498,7 @@ touch panning when page-owned content is wider than its viewport.
 | `canvas` | Page canvas or content already grouped by layout | Transparent, without border, radius, or shadow |
 | `section` | A content grouping that needs slight tonal separation | Semantic surface color, without border or shadow |
 | `interactive` | A selectable or independently interactive object | One necessary border; hover is opt-in; no default shadow |
-| `overlay` | Content above the document flow | Semantic overlay surface, one border, and the shared elevated shadow |
+| `overlay` | Content above the document flow | Semantic overlay surface, one border, and the shared elevated shadow (`shadow-elevation-overlay`) |
 
 Pages must not add background, border, radius, ring, or shadow utilities to
 `Surface`, `Section`, `StatePanel`, `Alert`, `EmptyState`, or
@@ -588,7 +588,7 @@ focus traps are out of contract.
 | D2 | **Secondary blocks default collapsed.** Advanced / governance / rarely edited groups and full report strata below the Decision Card start collapsed on first visit of that section/view. User expand state may be remembered later; first paint must not show every block open. | **Progressive** on Settings advanced groups, Discover strategy copy blocks, report strata; **Immediate** when a PR adds a new advanced block |
 | D3 | **Card-in-card limit.** Nested bordered surfaces are allowed only when the inner piece is independently interactive (selectable row, activatable card). Prefer section spacing, dividers, and heading hierarchy over nested `interactive` boxes. | **Immediate** for new composition. Aligns with Surface Hierarchy “at most two visible surface boundaries” |
 | D4 | **Help text is secondary.** Helper copy must not share equal visual weight with the control row (no competing primary emphasis in the same band). | **Immediate** for new fields; **Progressive** for dense Settings rows |
-| D5 | **No per-page spacing invention.** Use shared size tiers and existing spacing scale until a product-wide density token ships. | **Immediate** |
+| D5 | **No per-page spacing invention.** Use the shared density token scale in `apps/dsa-web/src/index.css` (`--density-*`) and structural utilities (`density-gap-*`, `density-surface-pad-*`, `density-overlay-pad*`). Named inventory: `apps/dsa-web/src/design/density.ts`. Compact regions may set `data-density="compact"`. Do not redefine `--density-*` outside `index.css`. | **Immediate** |
 
 ### Working-region breakpoints
 
@@ -656,10 +656,12 @@ Refresh).
 
 **Elevation usage (R3 / R5):** use Surface Hierarchy levels only. Nested content
 inside a section must not add another card border unless independently
-interactive. Overlays (`Modal` / `Drawer` / menus) must read above page section
-via the shared overlay surface, backdrop, and elevated shadow tokens. Only
-semantic shadow tokens from `index.css`—no glow, glass, or decorative colored
-shadows (DESIGN_GUIDE).
+interactive. Overlays (`Modal` / `Drawer` / `Sheet` / `ConfirmDialog`) must read
+above page section via the shared overlay surface, backdrop, and
+`shadow-elevation-overlay` (not raw Tailwind `shadow-2xl` / `shadow-lg` ladders).
+Menus and tooltips use `shadow-elevation-popper` when elevated. Only semantic
+shadow tokens from `index.css`—no glow, glass, or decorative colored shadows
+(DESIGN_GUIDE).
 
 | Action-matrix rule | Compliance |
 | --- | --- |

@@ -1979,6 +1979,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.stocks.workspace.title": "Kuotasi saham",
   "i18n.uiText.UI_TEXT.stocks.workspace.volume": "Volume",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdd": "Tambah ke watchlist",
+  "i18n.uiText.UI_TEXT.stocks.workspace.marketBadgeAria": "Pasar {code}",
   "i18n.uiText.UI_TEXT.stocks.workspace.watchlistAdded": "Di watchlist",
   "i18n.uiText.UI_TEXT.stockTrend.allHistory": "Semua sejarah",
   "i18n.uiText.UI_TEXT.stockTrend.averageScore": "Rata-rata {score}",
