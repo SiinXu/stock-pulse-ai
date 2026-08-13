@@ -626,7 +626,7 @@ class Config:
             object.__setattr__(self, "agent_skill_routing", "auto")
         override = str(self.market_regime_override or "").strip().lower()
         if override not in self._VALID_MARKET_REGIME_OVERRIDES:
-            logger.warning(
+            _log.warning(
                 "Invalid MARKET_REGIME_OVERRIDE=%r, ignoring. Valid: %s",
                 self.market_regime_override,
                 sorted(self._VALID_MARKET_REGIME_OVERRIDES - {""}),

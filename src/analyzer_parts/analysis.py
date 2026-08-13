@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         check_content_integrity,
         format_daily_market_context_prompt_section,
         format_market_phase_prompt_section,
+        format_market_regime_prompt_section,
         format_market_structure_prompt_section,
         get_chip_unavailable_text,
         get_no_data_text,
