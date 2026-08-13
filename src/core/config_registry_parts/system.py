@@ -34,7 +34,8 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_TIME": {
         "title": "Schedule Time",
         "description": (
-            "Deprecated legacy day-batch daily time (HH:MM). Prefer versioned scheduled tasks. Still supported for compatibility."
+            "Deprecated legacy day-batch daily time (HH:MM). Prefer versioned scheduled tasks. Still supported for compatibility. "
+            "When this process has an attached runtime scheduler, saving rebinds daily jobs without a process restart."
         ),
         "category": "system",
         "data_type": "time",
@@ -71,7 +72,8 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_TIMES": {
         "title": "Schedule Times",
         "description": (
-            "Deprecated legacy day-batch multi-time list (comma-separated HH:MM). Falls back to SCHEDULE_TIME when empty. Prefer versioned scheduled tasks."
+            "Deprecated legacy day-batch multi-time list (comma-separated HH:MM). Falls back to SCHEDULE_TIME when empty. Prefer versioned scheduled tasks. "
+            "When this process has an attached runtime scheduler, saving rebinds daily jobs without a process restart."
         ),
         "category": "system",
         "data_type": "string",
@@ -448,7 +450,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_ENABLED": {
         "title": "Schedule Enabled",
         "description": (
-            "Deprecated legacy day-batch switch for whole-watchlist daily analysis. Prefer versioned scheduled tasks. Still supported for compatibility."
+            "Deprecated legacy day-batch switch for whole-watchlist daily analysis. Prefer versioned scheduled tasks. Still supported for compatibility. "
+            "On attached Web/API/Desktop runtime schedulers, saving this value hot-reconciles start/stop without a process restart. "
+            "Pure CLI `--schedule` still follows process startup ownership and is not re-bound by this process alone."
         ),
         "category": "system",
         "data_type": "boolean",
@@ -476,7 +480,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
-        "warning_codes": ["restart_required"],
+        # Not restart_required: attached runtime scheduler hot-reconciles on save.
+        # Do not claim unconditional hot_reload either — pure CLI schedule still follows startup.
+        "warning_codes": [],
         "deprecated": True,
         "replacement": (
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
@@ -642,7 +648,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_RUN_IMMEDIATELY": {
         "title": "Schedule Run Immediately",
         "description": (
-            "Deprecated legacy schedule-mode startup flag: run one analysis immediately when schedule mode starts. Prefer versioned scheduled tasks. Still supported."
+            "Deprecated legacy schedule-mode startup flag: run one analysis immediately when schedule mode starts. "
+            "Prefer versioned scheduled tasks. Still supported. Saving this value does not re-trigger an already running "
+            "Web/API process; use the runtime scheduler run-now action for an immediate analysis in an attached process."
         ),
         "category": "system",
         "data_type": "boolean",
@@ -977,6 +985,135 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
             },
         ],
+        "warning_codes": [],
+    },
+    "ANALYSIS_CHECKPOINT_ENABLED": {
+        "title": "Checkpoint",
+        "description": (
+            "Persist multi-agent stage state so interrupted analyses can exact-replay from the last "
+            "completed stage. Resume is refused when code, configuration, or assembled inputs differ."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 88,
+        "help_key": "settings.system.resume",
+        "examples": ["ANALYSIS_CHECKPOINT_ENABLED=true", "ANALYSIS_CHECKPOINT_ENABLED=false"],
+        "docs": [{"label": "Analysis checkpoint and reproducibility", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-checkpoint-resume.md"}],
+        "warning_codes": [],
+    },
+    "ANALYSIS_CHECKPOINT_DIR": {
+        "title": "Checkpoint Dir",
+        "description": "Filesystem directory for process-local analysis stage checkpoints.",
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "./data/checkpoints",
+        "options": [],
+        "validation": {"maxLength": 1024},
+        "display_order": 89,
+        "help_key": "settings.system.resume",
+        "examples": ["ANALYSIS_CHECKPOINT_DIR=./data/checkpoints"],
+        "docs": [{"label": "Analysis checkpoint and reproducibility", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-checkpoint-resume.md"}],
+        "warning_codes": ["path_must_exist"],
+    },
+    "ANALYSIS_CHECKPOINT_TTL_HOURS": {
+        "title": "Checkpoint TTL",
+        "description": "Auto-delete analysis stage checkpoints older than this many hours. 0 disables TTL cleanup.",
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "24",
+        "options": [],
+        "validation": {"min": 0, "max": 8760},
+        "display_order": 90,
+        "help_key": "settings.system.resume",
+        "examples": ["ANALYSIS_CHECKPOINT_TTL_HOURS=24", "ANALYSIS_CHECKPOINT_TTL_HOURS=72"],
+        "docs": [{"label": "Analysis checkpoint and reproducibility", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-checkpoint-resume.md"}],
+        "warning_codes": [],
+    },
+    "ANALYSIS_CHECKPOINT_FORCE_FULL": {
+        "title": "Full Rerun",
+        "description": "Ignore existing stage checkpoints and run the full pipeline.",
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 91,
+        "help_key": "settings.system.resume",
+        "examples": ["ANALYSIS_CHECKPOINT_FORCE_FULL=false", "ANALYSIS_CHECKPOINT_FORCE_FULL=true"],
+        "docs": [{"label": "Analysis checkpoint and reproducibility", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-checkpoint-resume.md"}],
+        "warning_codes": [],
+    },
+    "REPRO_MODE_ENABLED": {
+        "title": "Repro",
+        "description": "Use request-scoped temperature=0 and forward a seed where the provider supports it. Provider-side non-determinism may still remain.",
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 92,
+        "help_key": "settings.system.resume",
+        "examples": ["REPRO_MODE_ENABLED=false", "REPRO_MODE_ENABLED=true", "REPRO_SEED=0"],
+        "docs": [{"label": "Analysis checkpoint and reproducibility", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-checkpoint-resume.md"}],
+        "warning_codes": [],
+    },
+    "REPRO_RECORD_CONFIG": {
+        "title": "Record Config",
+        "description": "Record models, temperature, pipeline flags, skills, and version markers into report metadata.",
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 93,
+        "help_key": "settings.system.resume",
+        "examples": ["REPRO_RECORD_CONFIG=true", "REPRO_RECORD_CONFIG=false"],
+        "docs": [{"label": "Analysis checkpoint and reproducibility", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-checkpoint-resume.md"}],
+        "warning_codes": [],
+    },
+    "REPRO_SEED": {
+        "title": "Seed",
+        "description": "Integer seed forwarded per request when reproducibility mode is enabled. Default 0 when mode is on and seed is unset.",
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 94,
+        "help_key": "settings.system.resume",
+        "examples": ["REPRO_SEED=0", "REPRO_SEED=42"],
+        "docs": [{"label": "Analysis checkpoint and reproducibility", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-checkpoint-resume.md"}],
         "warning_codes": [],
     },
     "SAVE_CONTEXT_SNAPSHOT": {

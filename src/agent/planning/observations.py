@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from src.agent.planning.config import (
     MAX_OBSERVATION_ERROR_CODE_CHARS,
+    MAX_PLANNING_TRACE_EVENTS,
     MAX_RESULT_SUMMARY_CHARS,
     MAX_TOOL_NAME_CHARS,
     MAX_TRACE_STEPS,
@@ -210,6 +211,9 @@ class PlanExecutionResult:
     timed_out: bool = False
     duration_ms: Optional[int] = None
     plans: List[Dict[str, Any]] = field(default_factory=list)
+    #: Ordered plan/action/observation/replan/terminate events for one run (#1078).
+    trace_events: List[Dict[str, Any]] = field(default_factory=list)
+    planning_run_id: Optional[str] = None
 
     def to_metadata(self) -> Dict[str, Any]:
         """Trace-safe metadata for diagnostics / audit consumers."""
@@ -232,6 +236,8 @@ class PlanExecutionResult:
             payload["initial_plan_id"] = self.initial_plan_id
         if self.final_plan_id:
             payload["final_plan_id"] = self.final_plan_id
+        if self.planning_run_id:
+            payload["planning_run_id"] = self.planning_run_id
         if self.reason:
             payload["reason"] = _safe_code(self.reason, default="failed")
         if self.error_code:
@@ -247,6 +253,12 @@ class PlanExecutionResult:
             payload["observations_truncated"] = True
         if self.plans:
             payload["plans"] = list(self.plans)[:MAX_TRACE_STEPS]
+        if self.trace_events:
+            # Same bound as PlanningTraceRecorder — do not reuse MAX_TRACE_STEPS
+            # (step-observation cap) or reconstruction via metadata silently loses events.
+            payload["trace_events"] = list(self.trace_events)[:MAX_PLANNING_TRACE_EVENTS]
+            if len(self.trace_events) > MAX_PLANNING_TRACE_EVENTS:
+                payload["trace_events_truncated"] = True
         return payload
 
 

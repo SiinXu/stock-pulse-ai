@@ -2237,6 +2237,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
     notes: ['需要 Agent multi 能力。'],
   },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: '研究立场预设',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: '自定义研究立场',
+  },
 
 
   'settings.mcp.MCP_SERVER_ENABLED': {
@@ -2452,6 +2458,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.ai_model.TASK_ROUTING': {
     title: '任务路由',
     summary: '配置模型路由与覆盖。',
+  },
+  'settings.system.resume': {
+    title: '续跑与复现',
   },
 };
 

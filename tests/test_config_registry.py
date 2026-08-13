@@ -601,9 +601,11 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         self.assertIn("analysis-context-pack.md#p6-", field["docs"][0]["href"])
 
     def test_restart_warning_codes_match_runtime_behavior(self):
+        # Only keys whose real runtime still requires a process restart/start cycle.
+        # SCHEDULE_ENABLED is intentionally omitted: attached Web/API/Desktop runtime
+        # hot-reconciles start/stop on save (see system_config updates_validation).
         restart_required_keys = (
             "RUN_IMMEDIATELY",
-            "SCHEDULE_ENABLED",
             "SCHEDULE_RUN_IMMEDIATELY",
             "WEBUI_HOST",
             "WEBUI_PORT",
@@ -618,8 +620,12 @@ class TestSettingsHelpMetadata(unittest.TestCase):
             field = get_field_definition(key)
             self.assertIn("restart_required", field.get("warning_codes", []))
 
+        schedule_enabled = get_field_definition("SCHEDULE_ENABLED")
+        self.assertNotIn("restart_required", schedule_enabled.get("warning_codes", []))
         schedule_time = get_field_definition("SCHEDULE_TIME")
         self.assertNotIn("restart_required", schedule_time.get("warning_codes", []))
+        schedule_times = get_field_definition("SCHEDULE_TIMES")
+        self.assertNotIn("restart_required", schedule_times.get("warning_codes", []))
 
     def test_schema_response_includes_help_metadata(self):
         schema = build_schema_response()

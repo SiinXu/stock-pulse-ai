@@ -7,7 +7,7 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { KronosStatusResponse } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button, Surface } from '../common';
+import { ApiErrorAlert, Badge, IconButton, Surface } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
@@ -70,19 +70,20 @@ export const KronosStatusPanel: React.FC<KronosStatusPanelProps> = ({
       title={t('settings.kronosStatusTitle')}
       description={t('settings.kronosStatusDescription')}
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Button
+      <div className="mb-3 flex flex-wrap items-center density-gap-tools">
+        <IconButton
           type="button"
-          variant="secondary"
+          variant="ghost"
           size="default"
           disabled={disabled || isLoading}
+          isLoading={isLoading}
+          aria-label={isLoading ? t('settings.kronosStatusRefreshing') : t('settings.kronosStatusRefresh')}
           onClick={() => {
             void refresh();
           }}
         >
-          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
-          {isLoading ? t('settings.kronosStatusRefreshing') : t('settings.kronosStatusRefresh')}
-        </Button>
+          <RefreshCw aria-hidden="true" />
+        </IconButton>
       </div>
 
       {error ? <ApiErrorAlert error={error} className="mb-3" /> : null}
