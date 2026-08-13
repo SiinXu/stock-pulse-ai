@@ -666,7 +666,7 @@ class ResearchPackExportService:
         context_snapshot = _parse_record_json(self.history_service, record, "context_snapshot")
         raw_result = _parse_record_json(self.history_service, record, "raw_result")
         diagnostics = context_snapshot.get("diagnostics") if isinstance(context_snapshot, Mapping) else None
-        raw_meta = _as_mapping(raw_result.get("meta"))
+        raw_meta = _as_mapping(_as_mapping(raw_result).get("meta"))
         report_mode = normalize_report_mode(
             _clip_str(
                 raw_meta.get("report_mode")

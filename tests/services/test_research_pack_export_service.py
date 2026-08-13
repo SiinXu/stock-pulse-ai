@@ -85,6 +85,19 @@ def test_export_not_found():
     with pytest.raises(ResearchPackNotFound):
         service.export_for_record("missing")
 
+
+@pytest.mark.parametrize("raw_result", [None, "", "   ", []])
+def test_export_tolerates_null_or_non_mapping_raw_result(raw_result):
+    record = _record(raw_result=raw_result, report_type="standard")
+    result = ResearchPackExportService(
+        history_service=_FakeHistory(record),
+        config=_enabled_config(),
+    ).export_for_record("42")
+    assert result.resolved_record_id == "42"
+    files = _unzip(result.zip_bytes)
+    assert any(name.endswith("/brief-card.md") for name in files)
+    assert any(name.endswith("/meta.json") for name in files)
+
 def test_export_zip_structure_and_progress():
     stages = []
     service = ResearchPackExportService(
