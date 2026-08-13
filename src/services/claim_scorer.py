@@ -91,12 +91,14 @@ class ClaimScorer:
         act = ClaimActuals.from_mapping(actuals)
         results: List[ClaimScoreResult] = []
         for raw in claims:
-            claim, coerce_details = self._coerce_claim(raw)
+            claim, coerce_details, raw_claim_id, raw_claim_type = self._coerce_claim(
+                raw
+            )
             if claim is None:
                 results.append(
                     ClaimScoreResult(
-                        claim_id=self._raw_claim_id(raw),
-                        claim_type=self._raw_claim_type(raw),
+                        claim_id=raw_claim_id,
+                        claim_type=raw_claim_type,
                         outcome=OUTCOME_DATA_UNAVAILABLE,
                         score=None,
                         reason="invalid_claim",
@@ -124,34 +126,56 @@ class ClaimScorer:
     @staticmethod
     def _coerce_claim(
         raw: ClaimLike,
-    ) -> Tuple[Optional[PredictionClaim], Optional[Dict[str, Any]]]:
+    ) -> Tuple[
+        Optional[PredictionClaim],
+        Optional[Dict[str, Any]],
+        str,
+        str,
+    ]:
         """Validate a claim mapping into A1 ``PredictionClaim``.
 
-        Returns ``(claim, None)`` on success. On failure returns
-        ``(None, details)`` with a truncated validation diagnostic so resolvers
-        can log why the claim could not be scored without poisoning model metrics.
+        Returns the validated claim, optional diagnostics, and bounded raw
+        identity fields. Failures preserve only deterministic diagnostics so
+        resolvers cannot leak adapter exception text or poison model metrics.
         """
         if isinstance(raw, PredictionClaim):
-            return raw, None
+            return raw, None, str(raw.claim_id), str(raw.type)
         if not isinstance(raw, Mapping):
-            return None, {
-                "error": "claim_validation_failed",
-                "validation_error": "claim must be a mapping or PredictionClaim",
-            }
+            return (
+                None,
+                {
+                    "error": "claim_validation_failed",
+                    "validation_error": "claim must be a mapping or PredictionClaim",
+                },
+                "unknown",
+                "unknown",
+            )
+        raw_claim_id = "unknown"
+        raw_claim_type = "unknown"
         try:
-            return PredictionClaim.model_validate(dict(raw)), None
+            payload = dict(raw)
+            raw_claim_id = ClaimScorer._bounded_raw_label(payload.get("claim_id"))
+            raw_claim_type = ClaimScorer._bounded_raw_label(
+                payload.get("type") or payload.get("claim_type")
+            )
+            claim = PredictionClaim.model_validate(payload)
+            return claim, None, str(claim.claim_id), str(claim.type)
         except ValidationError as exc:
-            return None, {
-                "error": "claim_validation_failed",
-                "validation_error": ClaimScorer._truncate_detail(str(exc)),
-            }
-        except Exception as exc:  # noqa: BLE001 — unavailable, never hit
-            return None, {
-                "error": "claim_validation_failed",
-                "validation_error": ClaimScorer._truncate_detail(
-                    f"{type(exc).__name__}: {exc}"
-                ),
-            }
+            return (
+                None,
+                {
+                    "error": "claim_validation_failed",
+                    "validation_error": ClaimScorer._truncate_detail(str(exc)),
+                },
+                raw_claim_id,
+                raw_claim_type,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - malformed mapping is returned as a deterministic unavailable diagnostic
+            diagnostic: Dict[str, Any] = {}
+            diagnostic["error"] = "claim_validation_failed"
+            diagnostic["validation_error"] = "unexpected_claim_validation_error"
+            diagnostic["exception_type"] = type(exc).__name__
+            return None, diagnostic, raw_claim_id, raw_claim_type
 
     @staticmethod
     def _truncate_detail(text: str) -> str:
@@ -161,20 +185,13 @@ class ClaimScorer:
         return cleaned[: MAX_VALIDATION_DETAIL_CHARS - 3] + "..."
 
     @staticmethod
-    def _raw_claim_id(raw: ClaimLike) -> str:
-        if isinstance(raw, PredictionClaim):
-            return raw.claim_id
-        if isinstance(raw, Mapping):
-            return str(raw.get("claim_id") or "unknown")
-        return "unknown"
-
-    @staticmethod
-    def _raw_claim_type(raw: ClaimLike) -> str:
-        if isinstance(raw, PredictionClaim):
-            return raw.type
-        if isinstance(raw, Mapping):
-            return str(raw.get("type") or raw.get("claim_type") or "unknown")
-        return "unknown"
+    def _bounded_raw_label(value: Any) -> str:
+        if not isinstance(value, str):
+            return "unknown"
+        cleaned = value.strip()
+        if not cleaned or len(cleaned) > 128:
+            return "unknown"
+        return cleaned
 
     # ------------------------------------------------------------------
     # Per-claim dispatch
@@ -208,9 +225,8 @@ class ClaimScorer:
             return self._score_vol_regime(claim, payload, actuals, confidence)
         if claim.type == "custom" and isinstance(payload, CustomClaimPayload):
             return self._score_custom(claim, payload, actuals, confidence)
-        return self._result(
+        return self._unavailable(
             claim,
-            OUTCOME_MISS,
             reason="invalid_claim",
             confidence=confidence,
             details={"error": "payload_type_mismatch", "claim_type": claim.type},

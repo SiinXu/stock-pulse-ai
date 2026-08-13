@@ -219,6 +219,58 @@ def test_invalid_claim_mapping_is_unavailable_and_excluded_from_metrics() -> Non
     assert "direction" in validation_error.lower() or "payload" in validation_error.lower()
 
 
+def test_constructed_payload_type_mismatch_is_unavailable_not_miss() -> None:
+    claim = PredictionClaim.model_construct(
+        claim_id="constructed",
+        type="direction",
+        confidence=0.9,
+        payload={"direction": "up"},
+    )
+
+    report = ClaimScorer().score(
+        [claim],
+        {"start_price": 100.0, "end_price": 110.0},
+    )
+
+    result = report.claim_results[0]
+    assert result.outcome == OUTCOME_DATA_UNAVAILABLE
+    assert result.reason == "invalid_claim"
+    assert result.score is None
+    assert result.details["error"] == "payload_type_mismatch"
+    assert report.aggregate.scored_claims == 0
+    assert report.aggregate.miss_count == 0
+
+
+def test_mapping_adapter_failure_is_deterministic_and_fail_closed() -> None:
+    class _ExplodingMapping(Mapping[str, Any]):
+        def __getitem__(self, key: str) -> Any:
+            raise RuntimeError("sensitive mapping detail")
+
+        def __iter__(self):
+            raise RuntimeError("sensitive mapping detail")
+
+        def __len__(self) -> int:
+            return 1
+
+    scorer = ClaimScorer()
+    actuals = {"start_price": 100.0, "end_price": 110.0}
+
+    first = scorer.score([_ExplodingMapping()], actuals).to_dict()
+    second = scorer.score([_ExplodingMapping()], actuals).to_dict()
+
+    assert first == second
+    result = first["claim_results"][0]
+    assert result["outcome"] == OUTCOME_DATA_UNAVAILABLE
+    assert result["score"] is None
+    assert result["claim_id"] == "unknown"
+    assert result["details"] == {
+        "error": "claim_validation_failed",
+        "validation_error": "unexpected_claim_validation_error",
+        "exception_type": "RuntimeError",
+    }
+    assert "sensitive mapping detail" not in str(first)
+
+
 @pytest.mark.parametrize(
     "availability",
     [
