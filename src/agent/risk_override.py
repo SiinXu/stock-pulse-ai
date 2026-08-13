@@ -595,14 +595,20 @@ def build_risk_context_for_exit(
         except ValueError:
             ctx.set_data("risk_evidence_invalid", True)
 
-    # Issue #123: grade C is deterministic risk evidence (consumes dashboard info_quality).
+    # Issue #123: grade C is deterministic risk evidence (trusted info-quality-v1 only).
     info_quality = (
         dashboard.get("info_quality") if isinstance(dashboard, Mapping) else None
     )
     grade = ""
+    schema_version = ""
     if isinstance(info_quality, Mapping):
         grade = str(info_quality.get("grade") or "").strip().upper()
-    if info_quality_risk_enabled and grade == "C":
+        schema_version = str(info_quality.get("schema_version") or "").strip()
+    if (
+        info_quality_risk_enabled
+        and grade == "C"
+        and schema_version == "info-quality-v1"
+    ):
         ctx.set_data("info_quality_grade", "C")
         ctx.add_risk_flag(
             "info_quality",

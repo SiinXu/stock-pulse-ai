@@ -117,12 +117,19 @@ class _AnalysisResultStageMixin:
                     attach_risk_gate_result,
                     build_agent_runtime_facts,
                 )
+                from src.services.info_quality_grading import (
+                    read_info_quality_feature_flag,
+                )
 
                 gate_ctx = build_risk_context_for_exit(
                     stock_code=code,
                     current_signal=dash.get("decision_type", "hold"),
                     dashboard=dash,
                     runtime_facts=runtime_facts,
+                    info_quality_risk_enabled=read_info_quality_feature_flag(
+                        getattr(self, "config", None),
+                        "forced_conclusion_enabled",
+                    ),
                 )
                 gate_result = apply_risk_manager_gate_from_config(
                     gate_ctx,
