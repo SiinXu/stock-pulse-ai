@@ -6280,4 +6280,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Had global tarikan selari",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Had per-pembekal tarikan selari",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualiti proses",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.notes.0": "Tanpa data portfolio, pengiraan kekal tersedia dalam mod sandaran saham tunggal yang jelas.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "Mengawal julat kedudukan deterministik menggunakan wajaran portfolio semasa.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "Saiz kedudukan berasaskan portfolio",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "Kekalkan aktif untuk julat berasaskan portfolio. Wajaran maksimum satu saham ialah pecahan 0 hingga 1 dan lalai 0.15.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "Saiz berasaskan portfolio diaktifkan",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "Wajaran maksimum satu saham",
 } as const;
