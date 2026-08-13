@@ -164,6 +164,34 @@ class TestReportRenderer(unittest.TestCase):
         self.assertIn("data_unavailable", wechat)
         self.assertNotIn("Synthesis: Hold", markdown)
 
+    def test_render_surfaces_active_research_persona(self) -> None:
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {"one_sentence": "Wait for evidence"},
+                "intelligence": {"risk_alerts": []},
+                "battle_plan": {"sniper_points": {"stop_loss": "110"}},
+                "active_research_persona": {
+                    "enabled": True,
+                    "preset_id": "risk_guardian",
+                    "display_name": "Risk Guardian",
+                    "source": "framework",
+                    "style_references": ["risk-first"],
+                    "disclaimer": "Not investment advice.",
+                },
+            },
+            report_language="en",
+        )
+
+        markdown = render("markdown", [r], summary_only=False)
+        wechat = render("wechat", [r], summary_only=False)
+
+        self.assertIn("Research Persona", markdown)
+        self.assertIn("Risk Guardian", markdown)
+        self.assertIn("risk-first", markdown)
+        self.assertIn("Not investment advice.", markdown)
+        self.assertIn("Research Persona", wechat)
+        self.assertIn("Risk Guardian", wechat)
+
     def test_render_surfaces_structured_risk_decision_near_decision_card(self) -> None:
         r = _make_result(
             decision_type="hold",

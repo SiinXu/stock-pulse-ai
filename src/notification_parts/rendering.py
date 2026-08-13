@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
     from src.notification import (
+        _append_committee_deliberation_block,
         _append_strategy_synthesis_block,
         _append_bull_bear_debate_block,
         _safe_float,
@@ -796,6 +797,15 @@ class _RenderingMethods:
                 debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
                 _append_bull_bear_debate_block(report_lines, debate_payload, labels, report_language)
 
+                # ========== Investment Committee (compact for notifications) ==========
+                _append_committee_deliberation_block(
+                    report_lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
+
                 # Financial summary / shareholder returns / related sectors (hidden when data is missing)
                 self._append_fundamental_blocks(report_lines, result)
 
@@ -1018,6 +1028,15 @@ class _RenderingMethods:
                     if summary:
                         lines.append(summary)
                     lines.append("")
+
+                # Investment Committee (compact for notifications).
+                _append_committee_deliberation_block(
+                    lines,
+                    dashboard.get("committee_deliberation") if dashboard else None,
+                    labels,
+                    report_language,
+                    compact=True,
+                )
 
                 # Simplified checklist
                 checklist = battle.get('action_checklist', []) if battle else []
@@ -1365,6 +1384,15 @@ class _RenderingMethods:
         _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
         debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
         _append_bull_bear_debate_block(lines, debate_payload, labels, report_language)
+
+        # ========== Investment Committee (compact for notifications) ==========
+        _append_committee_deliberation_block(
+            lines,
+            dashboard.get("committee_deliberation") if dashboard else None,
+            labels,
+            report_language,
+            compact=True,
+        )
 
         # Position recommendation
         pos_advice = core.get('position_advice', {}) if core else {}

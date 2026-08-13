@@ -13,14 +13,16 @@ This document records the evidence boundary for StockPulse Web copy that can alt
 | Merged-copy baseline | `origin/main@f080336626bf625759251350a2cfeb18af0e672e` |
 | Audit date | 2026-07-20 |
 | Machine-readable evidence | `apps/dsa-web/scripts/high-risk-i18n-audit.json` |
+| Annotated key inventory | `apps/dsa-web/scripts/high-risk-i18n-keys.json` |
 | Enforced command | `cd apps/dsa-web && npm run i18n:high-risk` |
 | Baseline verification | `cd apps/dsa-web && npm run i18n:high-risk -- --verify-baseline` |
+| Key inventory refresh | `cd apps/dsa-web && npm run i18n:high-risk -- --write-key-inventory` |
 
 Only copy merged at the recorded baseline was audited. Open PRs #98, #101, and #102 were excluded; none edits an i18n resource or rewrites a high-risk Web string. PR #101 reuses the existing alert-label maps, and #102 reuses existing search keys; their only E2-owned file overlap is the append-only `[Unreleased]` changelog. PRs #94, #95, #96, #99, and #100 merged while the audit was in review; none changed an i18n resource or an audited high-risk Web string, so the baseline advanced without changing the audited source inventory. PR #90 merged before the first audit baseline: its three localized `interrupted` task-state labels were reviewed and remain outside the six high-risk categories. Dependencies #51, #56, and #64 were merged before this audit.
 
 ## Result
 
-The executable audit covers six required categories, ten UI locales, and 318 distinct stable translation keys. Category counts overlap where one string has more than one risk dimension. Its 95 recorded stable-key decisions and 517 locale-value revisions are protected by separate counts and SHA-256 digests, so removing or changing decision evidence fails the normal guard even when candidate bundle snapshots remain unchanged.
+The executable audit covers six required categories, ten UI locales, and the live distinct stable translation keys listed in the annotated inventory. Category counts overlap where one string has more than one risk dimension. Its 95 recorded stable-key decisions and 517 locale-value revisions are protected by separate counts and SHA-256 digests, so removing or changing decision evidence fails the normal guard even when candidate bundle snapshots remain unchanged.
 
 | Category | Stable keys | Boundary |
 | --- | ---: | --- |
@@ -50,7 +52,48 @@ All currently shipped keys in these selectors are snapshotted per locale. Adding
 | `fr` | `PENDING_NATIVE_REVIEW` | None recorded |
 | `id` | `PENDING_NATIVE_REVIEW` | None recorded |
 
-Resource completeness, placeholder parity, NFC checks, semantic snapshots, and automated language review are not native financial sign-off. The audit manifest rejects an unsubstantiated approval status and requires reviewer identity plus date before a locale can be marked `NATIVE_REVIEWED`.
+Resource completeness, placeholder parity, NFC checks, semantic snapshots, and automated language review are not native financial sign-off. The audit manifest rejects an unsubstantiated approval status and requires reviewer identity, date, and a high-risk bundle fingerprint (`reviewedSnapshotSha256`) before a locale can be marked `NATIVE_REVIEWED`.
+
+## Native review pipeline (Issue #882)
+
+Native review is a **status annotation**, not a human CI gate. `PENDING_NATIVE_REVIEW` never fails `npm run i18n:high-risk` by itself. CI continues to enforce only structural integrity: resource parity, high-risk snapshots, decision digests, annotated key-inventory parity, and the shrink-only identical-to-English ratchet.
+
+| Layer | What it records | CI role |
+| --- | --- | --- |
+| `languageReview` | Locale-level `PRODUCT_SOURCE` / `PENDING_NATIVE_REVIEW` / `NATIVE_REVIEWED` | Integrity only: pending cannot name a reviewer; reviewed requires `reviewer` + `reviewedAt` + `reviewedSnapshotSha256` |
+| `high-risk-i18n-keys.json` | Full high-risk key list with categories, product-source verdict, decision link, and per-key `PENDING_NATIVE_REVIEW` marker | Must match live selectors; never claims key-level native approval |
+| `reviewPasses` | Recorded product-source or native financial review rounds with category conclusions, `keyCount`, and `inventoryKeySetSha256` | Provenance; product-source passes must set `claimsNativeApproval=false`; pin must match the live key set |
+| `nativeReviewPipeline` | Required evidence fields, CI vs non-CI gates, identical-baseline policy, contributor workflow | Documented contract checked by the guard |
+
+### Required evidence to upgrade a locale
+
+1. Named native financial reviewer identity (`languageReview.<locale>.reviewer`)
+2. Review date (`reviewedAt`, `YYYY-MM-DD`)
+3. Bundle fingerprint pin (`reviewedSnapshotSha256` = digest of current per-category bundle hashes for that locale)
+4. A `reviewPasses` entry of kind `NATIVE_FINANCIAL_REVIEW` covering that locale
+
+If high-risk copy for a `NATIVE_REVIEWED` locale later changes, the fingerprint no longer matches and the guard fails until the locale is demoted to `PENDING_NATIVE_REVIEW` or a fresh native review pass is recorded. Do not keep a stale approval.
+
+### Annotated key inventory
+
+`apps/dsa-web/scripts/high-risk-i18n-keys.json` lists every audited high-risk key with:
+
+- `categories` — one or more of the six high-risk categories
+- `productSourceVerdict` — `RETAIN_PRODUCT_SOURCE` or `REVISED_IN_DECISIONS` (linked via `decisionId`)
+- `nativeReviewStatus` — always `PENDING_NATIVE_REVIEW` at key level; native approval is recorded only on `languageReview`
+
+Regenerate after key-set or selector changes:
+
+```bash
+cd apps/dsa-web
+npm run i18n:high-risk -- --write-key-inventory
+```
+
+`--write-key-inventory` rewrites `high-risk-i18n-keys.json` and refreshes the `keyInventory` pointer digests in `high-risk-i18n-audit.json`. It does **not** auto-bump `reviewPasses[].keyCount` or `inventoryKeySetSha256`: when the key set changes, record a fresh review pass (or deliberately update conclusions, `keyCount`, and `inventoryKeySetSha256`) so coverage is not silently overclaimed. Category snapshots, decisions, and native-review status still need a deliberate human review when copy changes.
+
+### Product-source review pass (2026-08-12)
+
+Pass id `product-source-high-risk-pass-2026-08-12` reviewed the full high-risk inventory (353 keys) against zh/en product source and the existing 95 decision records. Category conclusions are retained in the audit manifest. This pass **does not** claim native financial approval for any translated locale. All eight non-source locales remain `PENDING_NATIVE_REVIEW`. The identical-to-English baseline was not expanded.
 
 ## Product source and recommendations
 
@@ -128,9 +171,10 @@ npm run test:i18n
 
 The high-risk guard fails on:
 
-- a missing required category, source, locale status, or evidence decision;
+- a missing required category, source, locale status, evidence decision, native-review pipeline, review pass, or key inventory;
 - a translated locale mislabeled as product source;
 - a pending locale that names a native reviewer or review date;
+- a reviewed locale missing reviewer, date, or `reviewedSnapshotSha256`, or a fingerprint that no longer matches current bundles;
 - unsupported approval language without the native-review evidence contract;
 - decision or locale-revision evidence whose count or SHA-256 digest no longer matches the recorded layers;
 - a recorded `before` value that differs from the merge-base bundle when baseline verification is requested;
@@ -147,10 +191,11 @@ To review an intentional change, update the product source or candidate bundle f
 cd apps/dsa-web
 npm run i18n:resources -- --write
 npm run i18n:high-risk -- --print-snapshot
+npm run i18n:high-risk -- --write-key-inventory
 npm run i18n:high-risk -- --verify-baseline
 ```
 
-Copy the reviewed snapshot into `high-risk-i18n-audit.json`, run the normal guard, and keep translated locales pending unless a real native financial reviewer is identified with a review date.
+Copy the reviewed category snapshot into `high-risk-i18n-audit.json`, run `--write-key-inventory` to refresh the annotated inventory and pointer digests, run the normal guard, and keep translated locales pending unless a real native financial reviewer is identified with a review date and `reviewedSnapshotSha256`. Do not grow `identicalToEnglish.baseline.json` as part of high-risk review work.
 
 ## Deferred to UIUX
 

@@ -34,7 +34,8 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_TIME": {
         "title": "Schedule Time",
         "description": (
-            "Deprecated legacy day-batch daily time (HH:MM). Prefer versioned scheduled tasks. Still supported for compatibility."
+            "Deprecated legacy day-batch daily time (HH:MM). Prefer versioned scheduled tasks. Still supported for compatibility. "
+            "When this process has an attached runtime scheduler, saving rebinds daily jobs without a process restart."
         ),
         "category": "system",
         "data_type": "time",
@@ -71,7 +72,8 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_TIMES": {
         "title": "Schedule Times",
         "description": (
-            "Deprecated legacy day-batch multi-time list (comma-separated HH:MM). Falls back to SCHEDULE_TIME when empty. Prefer versioned scheduled tasks."
+            "Deprecated legacy day-batch multi-time list (comma-separated HH:MM). Falls back to SCHEDULE_TIME when empty. Prefer versioned scheduled tasks. "
+            "When this process has an attached runtime scheduler, saving rebinds daily jobs without a process restart."
         ),
         "category": "system",
         "data_type": "string",
@@ -448,7 +450,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_ENABLED": {
         "title": "Schedule Enabled",
         "description": (
-            "Deprecated legacy day-batch switch for whole-watchlist daily analysis. Prefer versioned scheduled tasks. Still supported for compatibility."
+            "Deprecated legacy day-batch switch for whole-watchlist daily analysis. Prefer versioned scheduled tasks. Still supported for compatibility. "
+            "On attached Web/API/Desktop runtime schedulers, saving this value hot-reconciles start/stop without a process restart. "
+            "Pure CLI `--schedule` still follows process startup ownership and is not re-bound by this process alone."
         ),
         "category": "system",
         "data_type": "boolean",
@@ -476,7 +480,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
             },
         ],
-        "warning_codes": ["restart_required"],
+        # Not restart_required: attached runtime scheduler hot-reconciles on save.
+        # Do not claim unconditional hot_reload either — pure CLI schedule still follows startup.
+        "warning_codes": [],
         "deprecated": True,
         "replacement": (
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
@@ -642,7 +648,9 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SCHEDULE_RUN_IMMEDIATELY": {
         "title": "Schedule Run Immediately",
         "description": (
-            "Deprecated legacy schedule-mode startup flag: run one analysis immediately when schedule mode starts. Prefer versioned scheduled tasks. Still supported."
+            "Deprecated legacy schedule-mode startup flag: run one analysis immediately when schedule mode starts. "
+            "Prefer versioned scheduled tasks. Still supported. Saving this value does not re-trigger an already running "
+            "Web/API process; use the runtime scheduler run-now action for an immediate analysis in an attached process."
         ),
         "category": "system",
         "data_type": "boolean",

@@ -24,12 +24,12 @@ export const Toolbar = forwardRef<
       role="toolbar"
       data-pattern="toolbar"
       className={cn(
-        'flex w-full min-w-0 flex-col gap-3 border-y border-border/60 py-3 sm:flex-row sm:items-center sm:justify-between',
+        'flex w-full min-w-0 flex-col density-gap-stack border-y border-border/60 py-3 sm:flex-row sm:items-center sm:justify-between',
         className,
       )}
     >
-      {left ? <div data-slot="start" className="flex min-w-0 flex-wrap items-center gap-2">{left}</div> : null}
-      {right ? <div data-slot="end" className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">{right}</div> : null}
+      {left ? <div data-slot="start" className="flex min-w-0 flex-wrap items-center density-gap-tools">{left}</div> : null}
+      {right ? <div data-slot="end" className="flex min-w-0 flex-wrap items-center density-gap-tools sm:justify-end">{right}</div> : null}
     </div>
   );
 });

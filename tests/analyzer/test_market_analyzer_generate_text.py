@@ -244,6 +244,7 @@ class TestAnalyzerGenerateText(_AnalyzerFactoryMixin):
             "这不是 JSON，而是 fallback 模型返回的纯文本分析",
             "600519",
             "贵州茅台",
+            analysis_context={"code": "600519", "stock_name": "贵州茅台"},
         )
         mock_persist.assert_called_once_with(
             {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},

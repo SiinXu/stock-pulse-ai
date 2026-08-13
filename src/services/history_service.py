@@ -19,6 +19,7 @@ from src.config import resolve_news_window_days
 from src.data.stock_index_loader import resolve_index_stock_code
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
+    append_committee_deliberation_lines,
     format_strategy_skill_items,
     get_bias_status_emoji,
     get_localized_stock_name,
@@ -1448,6 +1449,18 @@ class HistoryService:
             for point in (debate_payload.get('contention_points') or [])[:3]:
                 if isinstance(point, dict):
                     report_lines.append(f"- [{point.get('source', 'debate')}] {point.get('topic') or point.get('kind')}")
+            report_lines.append("")
+
+        # ========== Investment Committee (real deliberation trace) ==========
+        committee = (
+            dashboard.get("committee_deliberation") if dashboard else None
+        )
+        append_committee_deliberation_lines(
+            report_lines,
+            committee,
+            labels,
+            report_language,
+        )
 
         # ========== If no dashboard, display traditional format ==========
         if not dashboard:
