@@ -6,9 +6,12 @@ import {
   BriefcaseBusiness,
   ClipboardCheck,
   FileText,
+  GitBranch,
   LineChart,
+  Settings2,
   ShieldCheck,
   Sparkles,
+  Wand2,
 } from 'lucide-react';
 import {
   useEffect,
@@ -37,6 +40,11 @@ import { listCommandPalettePages } from '../layout/navigation';
 import { Modal } from '../common/Modal';
 import { SearchInput } from '../common/SearchInput';
 import { Spinner } from '../common/Spinner';
+import {
+  buildPipelineEntities,
+  buildSettingsEntities,
+  buildSkillEntities,
+} from './commandPaletteEntities';
 import { useCommandPaletteSearch } from './useCommandPaletteSearch';
 import type { LucideIcon } from 'lucide-react';
 
@@ -155,9 +163,45 @@ export function CommandPalette({
     description: report.summary ?? formatReportType(report.reportType, language),
     meta: `${formatReportType(report.reportType, language)} · ${formatDateTime(report.createdAt, language)}`,
   }));
+  const skillResults = useMemo(
+    () => buildSkillEntities(search.skills, language, query).map<PaletteResult>((item) => ({
+      id: item.id,
+      href: item.href,
+      icon: Wand2,
+      label: item.label,
+      description: item.description,
+      meta: item.meta,
+    })),
+    [language, query, search.skills],
+  );
+  const pipelineResults = useMemo(
+    () => buildPipelineEntities(language, query).map<PaletteResult>((item) => ({
+      id: item.id,
+      href: item.href,
+      icon: GitBranch,
+      label: item.label,
+      description: item.description,
+      meta: item.meta,
+    })),
+    [language, query],
+  );
+  const settingsResults = useMemo(
+    () => buildSettingsEntities(language, query).map<PaletteResult>((item) => ({
+      id: item.id,
+      href: item.href,
+      icon: Settings2,
+      label: item.label,
+      description: item.description,
+      meta: item.meta,
+    })),
+    [language, query],
+  );
   const groups: PaletteGroup[] = [
     { id: 'stocks', label: text.stocksGroup, items: stockResults },
     { id: 'reports', label: text.reportsGroup, items: reportResults },
+    { id: 'skills', label: text.skillsGroup, items: skillResults },
+    { id: 'pipelines', label: text.pipelinesGroup, items: pipelineResults },
+    { id: 'settings', label: text.settingsGroup, items: settingsResults },
     {
       id: 'pages',
       label: text.pagesGroup,
@@ -306,6 +350,11 @@ export function CommandPalette({
           {search.hasError ? (
             <p role="alert" className="px-2 py-3 text-center text-sm text-danger">
               {text.searchUnavailable}
+            </p>
+          ) : null}
+          {search.skillSearchError ? (
+            <p role="alert" className="px-2 py-3 text-center text-sm text-danger">
+              {text.skillSearchUnavailable}
             </p>
           ) : null}
           {normalizedQuery.length > 0

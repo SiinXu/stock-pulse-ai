@@ -1082,6 +1082,7 @@ class _StockAnalysisStageMixin:
                     failure_reason="Analysis history was not saved.",
                     failure_message="Analysis history persistence failed",
                     failure_error_code="pipeline_analysis_history_save_failed",
+                    prediction_mode="analysis",
                 )
                 persistence_value = persistence_result.value
                 self._finish_pipeline_stage(
