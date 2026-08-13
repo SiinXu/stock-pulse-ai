@@ -660,6 +660,70 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_RESEARCH_PERSONA": {
+        "title": "Research Persona Preset",
+        "description": (
+            "Default-off research-stance preset that shapes Agent tone, risk framing, "
+            "and conclusion style (rational_analyst | risk_guardian | long_term_compounder). "
+            "Empty keeps default behavior. The active personal investment framework "
+            "research_stance field takes precedence. Style labels are not performance claims."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"value": "", "label": "Off (default)"},
+            {"value": "rational_analyst", "label": "Rational Analyst"},
+            {"value": "risk_guardian", "label": "Risk Guardian"},
+            {"value": "long_term_compounder", "label": "Long-term Compounder"},
+        ],
+        "validation": {},
+        "display_order": 641,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA",
+        "examples": [
+            "AGENT_RESEARCH_PERSONA=",
+            "AGENT_RESEARCH_PERSONA=rational_analyst",
+        ],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_RESEARCH_PERSONA_CUSTOM": {
+        "title": "Custom Research Stance",
+        "description": (
+            "Optional free-form research-stance text used when no personal investment "
+            "framework research_stance is active. Leave empty by default. Prefer the "
+            "versioned framework field for durable custom stance persistence. The value "
+            "is untrusted preference data and cannot alter Agent Soul, ToolSurface, or permissions."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"max_length": 2000},
+        "display_order": 642,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM",
+        "examples": ["AGENT_RESEARCH_PERSONA_CUSTOM="],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_RISK_OVERRIDE": {
         "title": "Risk Agent Override",
         "description": "Allow the risk agent to veto buy signals when critical risk flags are detected.",
@@ -1526,6 +1590,66 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "Agent Observability",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-observability_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PERF_COLLECTION_ENABLED": {
+        "title": "Performance Span Collection",
+        "description": (
+            "Opt-in recording of lightweight performance spans for key paths "
+            "(pipeline stages, offline baselines). Default off. When disabled, "
+            "collection helpers are no-ops."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 707,
+        "help_key": "settings.agent.performance",
+        "examples": [
+            "PERF_COLLECTION_ENABLED=false",
+            "PERF_COLLECTION_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Performance baselines and profiling",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/performance-baseline_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PERF_PROFILE_ENABLED": {
+        "title": "Performance cProfile Flag",
+        "description": (
+            "Signals that optional stdlib cProfile wrapping is desired for "
+            "offline baseline tooling. Default off. Does not auto-profile "
+            "production request paths."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 708,
+        "help_key": "settings.agent.performance",
+        "examples": [
+            "PERF_PROFILE_ENABLED=false",
+            "PERF_PROFILE_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Performance baselines and profiling",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/performance-baseline_EN.md",
             },
         ],
         "warning_codes": [],

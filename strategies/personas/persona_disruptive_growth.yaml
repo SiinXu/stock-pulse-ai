@@ -9,7 +9,8 @@ required_tools:
   - get_daily_history
   - search_comprehensive_intel
   - search_stock_news
-aliases: [颠覆式成长, 创新成长, 采用曲线]
+# Style-reference aliases only (not affiliation or return endorsement).
+aliases: [颠覆式成长, 创新成长, 采用曲线, disruptive-growth-style, 颠覆式成长风格]
 default_active: false
 default_router: false
 default_priority: 240

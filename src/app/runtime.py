@@ -524,6 +524,17 @@ def _run_schedule_mode(
                 config_provider=_reload_runtime_config,
             )
         )
+    if getattr(config, "event_research_brief_enabled", False):
+        from src.services.event_research_brief_service import (
+            build_event_research_brief_background_tasks,
+        )
+
+        background_tasks.extend(
+            build_event_research_brief_background_tasks(
+                config,
+                config_provider=_reload_runtime_config,
+            )
+        )
 
     if getattr(config, "prediction_resolve_enabled", False):
         from src.services.prediction_resolver import (

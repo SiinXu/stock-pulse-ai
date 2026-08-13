@@ -22,6 +22,9 @@ NotificationInboxKind = Literal[
     "alert_triggered",
     "scheduled_task_result",
     "decision_signal",
+    "daily_brief",
+    "high_disagreement",
+    "portfolio_health",
 ]
 
 NotificationInboxSeverity = Literal["info", "warning", "error"]
@@ -31,6 +34,9 @@ NotificationInboxSource = Literal[
     "alerts",
     "scheduled_tasks",
     "decision_signals",
+    "daily_briefs",
+    "high_disagreement",
+    "portfolio_health",
 ]
 
 NotificationInboxTitleKey = Literal[
@@ -38,6 +44,9 @@ NotificationInboxTitleKey = Literal[
     "alertTriggeredTitle",
     "scheduledTaskResultTitle",
     "decisionSignalTitle",
+    "dailyBriefTitle",
+    "highDisagreementTitle",
+    "portfolioHealthTitle",
 ]
 
 INBOX_KIND_VALUES: tuple[str, ...] = (
@@ -45,6 +54,9 @@ INBOX_KIND_VALUES: tuple[str, ...] = (
     "alert_triggered",
     "scheduled_task_result",
     "decision_signal",
+    "daily_brief",
+    "high_disagreement",
+    "portfolio_health",
 )
 
 INBOX_SOURCE_VALUES: tuple[str, ...] = (
@@ -52,7 +64,16 @@ INBOX_SOURCE_VALUES: tuple[str, ...] = (
     "alerts",
     "scheduled_tasks",
     "decision_signals",
+    "daily_briefs",
+    "high_disagreement",
+    "portfolio_health",
 )
+
+# Durable analysis-history report shapes that must not be re-projected as
+# generic analysis_complete rows once they have a dedicated inbox kind.
+INBOX_SPECIALIZED_ANALYSIS_REPORT_TYPES: frozenset[str] = frozenset({
+    "daily_brief",
+})
 
 _SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
