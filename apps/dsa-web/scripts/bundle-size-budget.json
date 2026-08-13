@@ -26,30 +26,30 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 158718,
-      "measuredGzipBytes": 158018,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 159576,
+      "measuredGzipBytes": 158876,
+      "note": "Local production-build remasure after merging origin/main; measured 158876 B + 700 B retained headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 151940,
-      "measuredGzipBytes": 151240,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 152787,
+      "measuredGzipBytes": 152087,
+      "note": "Local production-build remasure after merging origin/main; measured 152087 B + 700 B retained headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 151860,
-      "measuredGzipBytes": 151160,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 152699,
+      "measuredGzipBytes": 151999,
+      "note": "Local production-build remasure after merging origin/main; measured 151999 B + 700 B retained headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 151617,
-      "measuredGzipBytes": 151017,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 600 B headroom."
+      "maxGzipBytes": 152488,
+      "measuredGzipBytes": 151888,
+      "note": "Local production-build remasure after merging origin/main; measured 151888 B + 600 B retained headroom."
     },
     {
       "id": "locale-es",
@@ -61,23 +61,23 @@
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 144356,
-      "measuredGzipBytes": 143656,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 145222,
+      "measuredGzipBytes": 144522,
+      "note": "Local production-build remasure after merging origin/main; measured 144522 B + 700 B retained headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 137634,
-      "measuredGzipBytes": 136934,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 138340,
+      "measuredGzipBytes": 137640,
+      "note": "Local production-build remasure after merging origin/main; measured 137640 B + 700 B retained headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 137721,
-      "measuredGzipBytes": 137021,
-      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
+      "maxGzipBytes": 138461,
+      "measuredGzipBytes": 137761,
+      "note": "Local production-build remasure after merging origin/main; measured 137761 B + 700 B retained headroom."
     },
     {
       "id": "vendor-charts",
