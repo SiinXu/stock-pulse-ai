@@ -27,6 +27,7 @@ describe('pluginsApi', () => {
           reloadable: true,
           package_root: '/opt/plugins/acme',
           extension_points: ['agent_tool'],
+          notification_channels: [],
           last_error_code: 'manifest_permissions_undeclared',
           settings_count: 3,
         }],
@@ -44,9 +45,35 @@ describe('pluginsApi', () => {
       desiredEnabled: true,
       packageRoot: '/opt/plugins/acme',
       extensionPoints: ['agent_tool'],
+      notificationChannels: [],
       lastErrorCode: 'manifest_permissions_undeclared',
       settingsCount: 3,
     });
+  });
+
+  it('maps active notification channel registrations from the list response', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        total: 1,
+        items: [{
+          id: 'example-notification-channel',
+          name: 'Example Notification Channel',
+          version: '1.0.0',
+          source: 'external',
+          state: 'enabled',
+          desired_enabled: true,
+          reloadable: true,
+          package_root: '/opt/plugins/example-notification-channel',
+          extension_points: ['notification_channel'],
+          notification_channels: ['example_log'],
+          settings_count: 0,
+        }],
+      },
+    });
+
+    const result = await pluginsApi.list();
+    expect(result.items[0].notificationChannels).toEqual(['example_log']);
+    expect(result.items[0].extensionPoints).toEqual(['notification_channel']);
   });
 
   it('parses generated settings and sends a full typed replacement', async () => {
