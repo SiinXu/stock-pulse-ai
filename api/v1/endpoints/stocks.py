@@ -9,6 +9,7 @@
 2. POST /api/v1/stocks/parse-import 解析 CSV/Excel/剪贴板
 3. GET /api/v1/stocks/{code}/quote 实时行情接口
 4. GET /api/v1/stocks/{code}/history 历史行情接口
+5. GET /api/v1/stocks/{code}/research-timeline 按标的聚合的研究时间线
 """
 
 import logging
@@ -27,7 +28,15 @@ from api.v1.schemas.stocks import (
 )
 from api.v1.schemas.history import WatchlistRequest, WatchlistResponse
 from api.v1.schemas.common import ErrorResponse
+from api.v1.schemas.research_timeline import ResearchTimelineResponse
 from api.v1.errors import api_error
+from src.services.research_timeline_service import (
+    DEFAULT_LIMIT as RESEARCH_TIMELINE_DEFAULT_LIMIT,
+    MAX_CURSOR_LENGTH as RESEARCH_TIMELINE_MAX_CURSOR_LENGTH,
+    MAX_LIMIT as RESEARCH_TIMELINE_MAX_LIMIT,
+    ResearchTimelineService,
+    ResearchTimelineValidationError,
+)
 from src.services.image_stock_extractor import (
     ALLOWED_MIME,
     MAX_SIZE_BYTES,
@@ -437,6 +446,80 @@ def remove_from_watchlist(
             status_code=500,
             detail={"error": "internal_error", "message": f"从自选删除失败: {str(e)}"},
         )
+
+
+
+@router.get(
+    "/{stock_code}/research-timeline",
+    response_model=ResearchTimelineResponse,
+    responses={
+        200: {"description": "Per-symbol research timeline page"},
+        400: {"description": "Invalid stock code or cursor", "model": ErrorResponse},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Per-symbol research timeline",
+    description=(
+        "Cursor-paginated research activity for one symbol: analysis runs, related chat "
+        "turns, decision signals, and hypothesis transitions when the hypothesis workspace "
+        "is available. Does not full-scan sources; each page overscans at most `limit` rows "
+        "per source. Hypothesis is reported as unavailable until that workspace ships."
+    ),
+)
+def get_stock_research_timeline(
+    stock_code: str,
+    cursor: Optional[str] = Query(
+        None,
+        min_length=1,
+        max_length=RESEARCH_TIMELINE_MAX_CURSOR_LENGTH,
+        description="Opaque continuation cursor from a previous page",
+    ),
+    limit: int = Query(
+        RESEARCH_TIMELINE_DEFAULT_LIMIT,
+        ge=1,
+        le=RESEARCH_TIMELINE_MAX_LIMIT,
+        description="Page size (max 50)",
+    ),
+    kinds: Optional[str] = Query(
+        None,
+        description=(
+            "Optional comma-separated kinds filter: analysis_run,chat,signal,hypothesis"
+        ),
+    ),
+) -> ResearchTimelineResponse:
+    """Return a cursor page of research timeline nodes for one stock."""
+    kind_list = None
+    if kinds is not None and str(kinds).strip():
+        kind_list = [part.strip() for part in str(kinds).split(",") if part.strip()]
+    try:
+        page = ResearchTimelineService().list_timeline(
+            stock_code,
+            cursor=cursor,
+            limit=limit,
+            kinds=kind_list,
+        )
+        return ResearchTimelineResponse.model_validate(page.to_dict())
+    except ResearchTimelineValidationError as exc:
+        raise api_error(
+            400,
+            getattr(exc, "error_code", None) or "validation_error",
+            str(exc),
+            params={"stock_code": stock_code},
+        ) from exc
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Research timeline query failed",
+            exc,
+            error_code="internal_error",
+            context={"stock_code": stock_code},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to load research timeline",
+            },
+        ) from exc
 
 
 @router.get(

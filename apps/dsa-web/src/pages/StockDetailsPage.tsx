@@ -24,6 +24,7 @@ import {
   Select,
 } from '../components/common';
 import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
+import ResearchTimelinePanel from '../components/stocks/ResearchTimelinePanel';
 import { VALUATION_TEXT } from '../locales/valuation';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
@@ -587,6 +588,8 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <ResearchTimelinePanel key={`timeline-${canonicalCode}`} stockCode={canonicalCode} />
 
         <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
           <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
