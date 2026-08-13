@@ -17,6 +17,9 @@ from src.core.pipeline_stage_results import (
     PipelineStageResult,
     PipelineStageStatus,
 )
+from src.core.outbound_delivery import (
+    outbound_notifications_enabled as _outbound_notifications_enabled,
+)
 from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY
 from src.services.analysis_context_builder import (
     AnalysisContextBuilder,
@@ -265,6 +268,32 @@ class _PersistenceStageMixin:
                             "Skill opinion sample recording after history save failed",
                             skill_exc,
                             error_code="skill_opinion_sample_after_history_failed",
+                            level=logging.WARNING,
+                            context={"analysis_history_id": saved_history_id},
+                        )
+                    # High-disagreement alerts (#134): consume structured
+                    # disagreement_handling from #1205; never recompute score.
+                    # Failures must not interrupt history persistence.
+                    try:
+                        from src.services.high_disagreement_alert import (
+                            maybe_send_high_disagreement_alert,
+                        )
+
+                        maybe_send_high_disagreement_alert(
+                            result,
+                            history_id=int(saved_history_id),
+                            config=getattr(self, "config", None),
+                            notifier=getattr(self, "notifier", None),
+                            outbound_notifications_enabled=(
+                                _outbound_notifications_enabled()
+                            ),
+                        )
+                    except Exception as alert_exc:  # broad-exception: fallback_recorded - High-disagreement alerts must never fail history persistence.
+                        log_safe_exception(
+                            logger,
+                            "High-disagreement alert after history save failed",
+                            alert_exc,
+                            error_code="high_disagreement_alert_after_history_failed",
                             level=logging.WARNING,
                             context={"analysis_history_id": saved_history_id},
                         )

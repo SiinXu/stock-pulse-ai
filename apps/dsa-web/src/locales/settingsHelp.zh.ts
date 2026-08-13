@@ -2239,6 +2239,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '留空（自动）表示仅在配置了 NOTIFICATION_SYSTEM_ERROR_CHANNELS 时发送；true 强制开启；false 强制关闭。',
     impact: ['影响失败的每日/Actions 运行是否尝试推送失败通知。'],
   },
+  'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
+    title: '高分歧告警',
+    summary: '默认开启；发送高分歧告警并遵守免打扰。',
+  },
+  'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
+    title: '高分歧告警阈值',
+    summary: '告警阈值（0–1，默认 0.6）。',
+  },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: '纸面组合初始资金',
     summary: '新建纸面组合时的起始现金。',

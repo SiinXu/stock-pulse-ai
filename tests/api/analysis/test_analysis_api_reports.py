@@ -52,6 +52,12 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             ReportType.FULL,
 
         )
+        self.assertIs(
+            pipeline_instance.process_single_stock.call_args.kwargs[
+                "send_notification"
+            ],
+            True,
+        )
 
     def test_analysis_service_passes_request_skills_to_pipeline(self) -> None:
         service = object.__new__(AnalysisService)
