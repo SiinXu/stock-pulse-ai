@@ -1,6 +1,50 @@
 {
   "components": {
     "schemas": {
+      "AgentModeBreakdown": {
+        "properties": {
+          "agent_mode": {
+            "title": "Agent Mode",
+            "type": "string"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_mode",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "AgentModeBreakdown",
+        "type": "object"
+      },
       "AgentModelDeployment": {
         "properties": {
           "api_base": {
@@ -5265,6 +5309,17 @@
             "default": 0,
             "title": "Completion Tokens",
             "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
           },
           "prompt_tokens": {
             "default": 0,
@@ -14248,6 +14303,17 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "max_total_tokens": {
             "default": 0,
             "title": "Max Total Tokens",
@@ -17197,10 +17263,13 @@
         "type": "object"
       },
       "PortfolioConcentrationBlock": {
+        "additionalProperties": false,
         "properties": {
           "diversification_score": {
             "anyOf": [
               {
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17213,6 +17282,7 @@
           "effective_n": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17225,6 +17295,8 @@
           "hhi": {
             "anyOf": [
               {
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17247,6 +17319,8 @@
           "top_weight_pct": {
             "anyOf": [
               {
+                "maximum": 100.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -17503,6 +17577,7 @@
         "type": "object"
       },
       "PortfolioCorrelationBlock": {
+        "additionalProperties": false,
         "properties": {
           "matrix": {
             "description": "Pairwise Pearson correlation matrix aligned with symbols",
@@ -17510,6 +17585,8 @@
               "items": {
                 "anyOf": [
                   {
+                    "maximum": 1.0,
+                    "minimum": -1.0,
                     "type": "number"
                   },
                   {
@@ -18562,6 +18639,7 @@
         "type": "object"
       },
       "PortfolioHistoricalVaRBlock": {
+        "additionalProperties": false,
         "properties": {
           "confidence": {
             "anyOf": [
@@ -18593,6 +18671,7 @@
           "one_day_var_pct": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -18604,6 +18683,8 @@
           "percentile_used": {
             "anyOf": [
               {
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -18631,6 +18712,7 @@
           "var_pct": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -18643,13 +18725,14 @@
           "var_value": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Historical VaR in portfolio currency units",
+            "description": "Historical VaR in portfolio response-base currency units",
             "title": "Var Value"
           }
         },
@@ -18748,6 +18831,41 @@
         "title": "PortfolioImportCommitResponse",
         "type": "object"
       },
+      "PortfolioImportFailedRow": {
+        "description": "One source row rejected during spreadsheet parse (correctable).",
+        "properties": {
+          "reason": {
+            "description": "Human-readable rejection reason",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "description": "Stable machine code for the rejection reason",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "row_number": {
+            "description": "1-based line number in the source file (header is 1)",
+            "title": "Row Number",
+            "type": "integer"
+          },
+          "source": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Non-empty original cells from the rejected row for download/correction",
+            "title": "Source",
+            "type": "object"
+          }
+        },
+        "required": [
+          "row_number",
+          "reason_code",
+          "reason"
+        ],
+        "title": "PortfolioImportFailedRow",
+        "type": "object"
+      },
       "PortfolioImportParseResponse": {
         "properties": {
           "broker": {
@@ -18763,6 +18881,14 @@
               "type": "string"
             },
             "title": "Errors",
+            "type": "array"
+          },
+          "failed_rows": {
+            "description": "Structured rejected rows with original cells for client download",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioImportFailedRow"
+            },
+            "title": "Failed Rows",
             "type": "array"
           },
           "record_count": {
@@ -19018,6 +19144,7 @@
         "type": "object"
       },
       "PortfolioRiskAssumptions": {
+        "additionalProperties": false,
         "properties": {
           "cash_excluded": {
             "title": "Cash Excluded",
@@ -19041,6 +19168,10 @@
           },
           "distribution_assumption": {
             "title": "Distribution Assumption",
+            "type": "string"
+          },
+          "fx_policy": {
+            "title": "Fx Policy",
             "type": "string"
           },
           "horizon_days": {
@@ -19095,6 +19226,7 @@
           "portfolio_aggregation",
           "cash_excluded",
           "weight_basis",
+          "fx_policy",
           "horizon_scaling",
           "distribution_assumption",
           "correlation_method",
@@ -19106,6 +19238,7 @@
         "type": "object"
       },
       "PortfolioRiskHistoryMeta": {
+        "additionalProperties": false,
         "properties": {
           "aligned_end": {
             "anyOf": [
@@ -19151,6 +19284,7 @@
         "type": "object"
       },
       "PortfolioRiskMetricsResponse": {
+        "additionalProperties": false,
         "properties": {
           "account_id": {
             "anyOf": [
@@ -19184,6 +19318,11 @@
             "title": "Currency",
             "type": "string"
           },
+          "fx_stale": {
+            "default": false,
+            "title": "Fx Stale",
+            "type": "boolean"
+          },
           "history": {
             "anyOf": [
               {
@@ -19196,6 +19335,7 @@
           },
           "portfolio_value": {
             "default": 0.0,
+            "minimum": 0.0,
             "title": "Portfolio Value",
             "type": "number"
           },
@@ -19205,7 +19345,7 @@
             "type": "integer"
           },
           "status": {
-            "description": "'ok', 'empty_portfolio', 'insufficient_history', or 'partial'",
+            "description": "'ok', 'empty_portfolio', 'insufficient_history', 'partial'",
             "title": "Status",
             "type": "string"
           },
@@ -19300,12 +19440,15 @@
         "type": "object"
       },
       "PortfolioRiskWeightItem": {
+        "additionalProperties": false,
         "properties": {
           "symbol": {
             "title": "Symbol",
             "type": "string"
           },
           "weight_pct": {
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Weight Pct",
             "type": "number"
           }
@@ -20070,6 +20213,128 @@
           "value_bp"
         ],
         "title": "RateStressShock",
+        "type": "object"
+      },
+      "ReadinessCheckItem": {
+        "description": "One structured readiness dimension (ok | degraded | failed).",
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion"
+          },
+          "timed_out": {
+            "default": false,
+            "title": "Timed Out",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "reason_code",
+          "reason"
+        ],
+        "title": "ReadinessCheckItem",
+        "type": "object"
+      },
+      "ReadinessReportResponse": {
+        "description": "On-demand structured readiness/self-check report.\n\nComposes existing observational probes (setup status, data-provider runtime\nstatus, generation-backend cheap status, task-queue stats). Never mutates\nconfiguration and is not invoked automatically at process startup.\nFailures and timeouts are explicit and never reported as ready.",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessCheckItem"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "title": "Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status",
+          "generated_at",
+          "summary",
+          "timeout_seconds"
+        ],
+        "title": "ReadinessReportResponse",
         "type": "object"
       },
       "ReasoningTraceAgent": {
@@ -22604,6 +22869,407 @@
           "limit"
         ],
         "title": "ReportVersionRunListResponse",
+        "type": "object"
+      },
+      "ResearchConclusionBody": {
+        "additionalProperties": false,
+        "description": "Mode-density stratified conclusion body (no secrets, no raw_result dump).",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "action_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Label"
+          },
+          "analysis_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Summary"
+          },
+          "confidence_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Reason"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchGapItem"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "omitted_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Omitted Count",
+            "type": "integer"
+          },
+          "one_sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Sentence"
+          },
+          "operation_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Advice"
+          },
+          "position_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Advice"
+          },
+          "positive_catalysts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Catalysts"
+          },
+          "report_strata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mode-filtered report strata; null in brief mode",
+            "title": "Report Strata"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "signal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Type"
+          },
+          "time_sensitivity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Sensitivity"
+          },
+          "trend_prediction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend Prediction"
+          },
+          "truncation_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncation Notice"
+          }
+        },
+        "title": "ResearchConclusionBody",
+        "type": "object"
+      },
+      "ResearchConclusionMetadata": {
+        "additionalProperties": false,
+        "description": "Record-level metadata for embed/portal clients.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Best-effort data as-of timestamp from strata facts or record time",
+            "title": "As Of"
+          },
+          "confidence_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Level"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "evidence_counts": {
+            "$ref": "#/components/schemas/ResearchEvidenceCounts"
+          },
+          "evidence_refs": {
+            "description": "Bounded unique evidence reference ids (source_id values)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "minimum": 1.0,
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "report_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Language"
+          },
+          "report_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Type"
+          },
+          "stock_code": {
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Name"
+          }
+        },
+        "required": [
+          "record_id",
+          "stock_code"
+        ],
+        "title": "ResearchConclusionMetadata",
+        "type": "object"
+      },
+      "ResearchConclusionResponse": {
+        "additionalProperties": false,
+        "description": "Compact stratified conclusion response for embed/portal use.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/ResearchConclusionBody"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ResearchConclusionMetadata"
+          },
+          "mode": {
+            "enum": [
+              "brief",
+              "standard",
+              "research"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "research-conclusion-v1",
+            "default": "research-conclusion-v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "metadata",
+          "conclusion"
+        ],
+        "title": "ResearchConclusionResponse",
+        "type": "object"
+      },
+      "ResearchEvidenceCounts": {
+        "additionalProperties": false,
+        "description": "Counts derived from the mode-filtered strata projection.",
+        "properties": {
+          "evidence_refs": {
+            "default": 0,
+            "description": "Unique source_id / source_ids count",
+            "minimum": 0.0,
+            "title": "Evidence Refs",
+            "type": "integer"
+          },
+          "missing_or_conflicts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Missing Or Conflicts",
+            "type": "integer"
+          },
+          "model_inference": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Model Inference",
+            "type": "integer"
+          },
+          "risks_counter_evidence": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Risks Counter Evidence",
+            "type": "integer"
+          },
+          "verified_facts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Verified Facts",
+            "type": "integer"
+          }
+        },
+        "title": "ResearchEvidenceCounts",
+        "type": "object"
+      },
+      "ResearchGapItem": {
+        "additionalProperties": false,
+        "description": "One missing-data or conflict gap the client can render without full history.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "default": "missing",
+            "enum": [
+              "missing",
+              "conflict"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "ResearchGapItem",
         "type": "object"
       },
       "ResearchRequest": {
@@ -25792,6 +26458,60 @@
           "skills"
         ],
         "title": "SkillsResponse",
+        "type": "object"
+      },
+      "StageBreakdown": {
+        "properties": {
+          "avg_latency_ms": {
+            "default": 0,
+            "title": "Avg Latency Ms",
+            "type": "integer"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "success_calls": {
+            "default": 0,
+            "title": "Success Calls",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "calls",
+          "total_tokens"
+        ],
+        "title": "StageBreakdown",
         "type": "object"
       },
       "StockAnalysisScheduledPayload": {
@@ -30253,6 +30973,28 @@
       },
       "UsageCallRecord": {
         "properties": {
+          "agent_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Mode"
+          },
+          "call_success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Success"
+          },
           "call_type": {
             "title": "Call Type",
             "type": "string"
@@ -30266,17 +31008,105 @@
             "title": "Completion Tokens",
             "type": "integer"
           },
+          "cost_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Status"
+          },
+          "estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Usd"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
           },
           "model": {
             "title": "Model",
             "type": "string"
           },
+          "primary_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Model"
+          },
           "prompt_tokens": {
             "title": "Prompt Tokens",
             "type": "integer"
+          },
+          "route_attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Attempt"
+          },
+          "route_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Outcome"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
           },
           "stock_code": {
             "anyOf": [
@@ -30308,6 +31138,13 @@
       },
       "UsageDashboardResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30322,8 +31159,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30332,6 +31175,11 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
           "recent_calls": {
             "items": {
               "$ref": "#/components/schemas/UsageCallRecord"
@@ -30339,8 +31187,44 @@
             "title": "Recent Calls",
             "type": "array"
           },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30353,6 +31237,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30360,6 +31255,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },
@@ -30378,6 +31278,13 @@
       },
       "UsageSummaryResponse": {
         "properties": {
+          "by_agent_mode": {
+            "items": {
+              "$ref": "#/components/schemas/AgentModeBreakdown"
+            },
+            "title": "By Agent Mode",
+            "type": "array"
+          },
           "by_call_type": {
             "items": {
               "$ref": "#/components/schemas/CallTypeBreakdown"
@@ -30392,8 +31299,14 @@
             "title": "By Model",
             "type": "array"
           },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageBreakdown"
+            },
+            "title": "By Stage",
+            "type": "array"
+          },
           "from_date": {
-            "description": "ISO date string",
             "title": "From Date",
             "type": "string"
           },
@@ -30402,8 +31315,49 @@
             "title": "Period",
             "type": "string"
           },
+          "priced_calls": {
+            "default": 0,
+            "title": "Priced Calls",
+            "type": "integer"
+          },
+          "routing_failed": {
+            "default": 0,
+            "title": "Routing Failed",
+            "type": "integer"
+          },
+          "routing_fallback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Fallback Rate"
+          },
+          "routing_fallback_success": {
+            "default": 0,
+            "title": "Routing Fallback Success",
+            "type": "integer"
+          },
+          "routing_primary_success": {
+            "default": 0,
+            "title": "Routing Primary Success",
+            "type": "integer"
+          },
+          "routing_success_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Success Rate"
+          },
           "to_date": {
-            "description": "ISO date string",
             "title": "To Date",
             "type": "string"
           },
@@ -30416,6 +31370,17 @@
             "title": "Total Completion Tokens",
             "type": "integer"
           },
+          "total_estimated_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Estimated Cost Usd"
+          },
           "total_prompt_tokens": {
             "default": 0,
             "title": "Total Prompt Tokens",
@@ -30423,6 +31388,11 @@
           },
           "total_tokens": {
             "title": "Total Tokens",
+            "type": "integer"
+          },
+          "unpriced_calls": {
+            "default": 0,
+            "title": "Unpriced Calls",
             "type": "integer"
           }
         },
@@ -42402,7 +43372,7 @@
             "description": "Internal Server Error"
           }
         },
-        "summary": "Parse broker CSV into normalized trade records",
+        "summary": "Parse broker CSV/XLSX into normalized trade records",
         "tags": [
           "Portfolio"
         ]
@@ -44037,6 +45007,298 @@
         "summary": "List analysis runs for version comparison",
         "tags": [
           "ReportVersionCompare"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions": {
+      "get": {
+        "description": "Returns the newest analysis history row for stock_code as a mode-filtered stratified conclusion. Same governance as GET by record id. Default-off.",
+        "operationId": "getLatestResearchConclusion",
+        "parameters": [
+          {
+            "description": "Stock code",
+            "in": "query",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "description": "Stock code",
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing stock_code or invalid mode"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or no history for stock_code"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get latest stratified research conclusion for a stock code",
+        "tags": [
+          "Research"
+        ]
+      }
+    },
+    "/api/v1/research/conclusions/{record_id}": {
+      "get": {
+        "description": "Authenticated read-only projection of stratified conclusions (brief / standard / research) plus metadata (as-of, confidence, evidence counts and refs). Default-off via RESEARCH_API_ENABLED; no write methods; reuses session auth, security audit, and sliding-window rate limits on the main API port.",
+        "operationId": "getResearchConclusionByRecordId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Presentation density: brief | standard | research",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "standard",
+              "description": "Presentation density: brief | standard | research",
+              "enum": [
+                "brief",
+                "standard",
+                "research"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional report language override (zh/en/ko)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional report language override (zh/en/ko)",
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchConclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid mode or record_id"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Feature disabled or analysis record not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Per-principal rate limit exceeded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit storage unavailable (fail-closed)"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Get stratified research conclusion by history record id",
+        "tags": [
+          "Research"
         ]
       }
     },
@@ -47699,6 +48961,48 @@
           }
         },
         "summary": "Validate system configuration",
+        "tags": [
+          "SystemConfig"
+        ]
+      }
+    },
+    "/api/v1/system/readiness": {
+      "get": {
+        "description": "On-demand structured readiness for data providers, LLM/generation backend, task queue, and selected setup dependencies. Reuses existing observational probes; does not write config, does not run model smoke tests, and is not invoked automatically at process startup. Probe failures and per-check timeouts are reported as failed or degraded and never as ready.",
+        "operationId": "getSystemReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReportResponse"
+                }
+              }
+            },
+            "description": "Structured readiness report loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal server error"
+          }
+        },
+        "summary": "Get structured readiness / self-check report",
         "tags": [
           "SystemConfig"
         ]

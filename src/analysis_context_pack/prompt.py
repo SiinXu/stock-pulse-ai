@@ -14,6 +14,7 @@ BLOCK_LABELS_ZH = {
     "chip": "筹码",
     "fundamentals": "基本面",
     "news": "新闻",
+    "sentiment": "情绪证据",
 }
 
 BLOCK_LABELS_EN = {
@@ -23,6 +24,7 @@ BLOCK_LABELS_EN = {
     "chip": "chip",
     "fundamentals": "fundamentals",
     "news": "news",
+    "sentiment": "sentiment evidence",
 }
 
 STATUS_LABELS_ZH = {

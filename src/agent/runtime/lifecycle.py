@@ -43,11 +43,42 @@ class UsageRecorder:
         model: str,
         *,
         call_type: str = "agent",
+        stock_code: Optional[str] = None,
+        run_id: Optional[str] = None,
+        stage: Optional[str] = None,
+        agent_mode: Optional[str] = None,
+        route_outcome: Optional[str] = None,
+        route_attempt: Optional[int] = None,
+        primary_model: Optional[str] = None,
+        latency_ms: Optional[int] = None,
+        call_success: Optional[bool] = None,
     ) -> bool:
         """Persist one usage sample; returns whether it was persisted."""
         if not should_persist_usage_telemetry(usage):
-            return False
-        persist_llm_usage(usage, model, call_type=call_type)
+            has_route_diag = route_outcome is not None or (
+                isinstance(usage, Mapping) and usage.get("route_outcome")
+            )
+            if not has_route_diag:
+                return False
+            if usage is None:
+                usage = {}
+        attribution = {
+            "stock_code": stock_code,
+            "run_id": run_id,
+            "stage": stage,
+            "agent_mode": agent_mode,
+            "route_outcome": route_outcome,
+            "route_attempt": route_attempt,
+            "primary_model": primary_model,
+            "latency_ms": latency_ms,
+            "call_success": call_success,
+        }
+        persist_llm_usage(
+            usage if usage is not None else {},
+            model,
+            call_type=call_type,
+            **{k: v for k, v in attribution.items() if v is not None},
+        )
         return True
 
 

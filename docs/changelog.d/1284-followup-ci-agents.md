@@ -1,0 +1,1 @@
+- [Chore] Wire changelog fragment CI guards, path-skip/always-report, tests, and AGENTS guidance after #1295 (Refs #1284).

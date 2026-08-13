@@ -1253,5 +1253,95 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
     },
+    "DATA_VALIDATION_FUND_PE_SUSPECT_ABS": {
+        "title": "Fundamental PE Suspect Bound",
+        "description": (
+            "Soft absolute PE bound for plausibility warnings. Finite PE values "
+            "with absolute magnitude at or above this bound are marked suspect "
+            "(warn) and kept for analysis. Hard feed extremes still reject. "
+            "Default 200."
+        ),
+        "category": "data_source",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "200",
+        "options": [],
+        "validation": {"minimum": 1.0},
+        "display_order": 95,
+        "help_key": "settings.data_source.DATA_VALIDATION_FUND_PE_SUSPECT_ABS",
+        "examples": [
+            "DATA_VALIDATION_FUND_PE_SUSPECT_ABS=200",
+            "DATA_VALIDATION_FUND_PE_SUSPECT_ABS=300",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
+    "DATA_VALIDATION_FUND_PB_SUSPECT_ABS": {
+        "title": "Fundamental PB Suspect Bound",
+        "description": (
+            "Soft absolute PB bound for plausibility warnings. Finite PB values "
+            "with absolute magnitude at or above this bound are marked suspect "
+            "(warn) and kept for analysis. Hard feed extremes still reject. "
+            "Default 50."
+        ),
+        "category": "data_source",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "50",
+        "options": [],
+        "validation": {"minimum": 0.1},
+        "display_order": 96,
+        "help_key": "settings.data_source.DATA_VALIDATION_FUND_PB_SUSPECT_ABS",
+        "examples": [
+            "DATA_VALIDATION_FUND_PB_SUSPECT_ABS=50",
+            "DATA_VALIDATION_FUND_PB_SUSPECT_ABS=80",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
+    "DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD": {
+        "title": "Cross-Source Relative Threshold",
+        "description": (
+            "Relative divergence threshold when multiple providers supply the "
+            "same realtime field. Differences above this threshold emit a warn "
+            "finding with provider attribution; values are kept. Default 0.05 "
+            "(5%)."
+        ),
+        "category": "data_source",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0.05",
+        "options": [],
+        "validation": {"minimum": 0.0001, "maximum": 1.0},
+        "display_order": 97,
+        "help_key": "settings.data_source.DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD",
+        "examples": [
+            "DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD=0.05",
+            "DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD=0.10",
+        ],
+        "docs": [
+            {
+                "label": "Data validation layer",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/data-validation-layer.md",
+            },
+        ],
+    },
 
 }
