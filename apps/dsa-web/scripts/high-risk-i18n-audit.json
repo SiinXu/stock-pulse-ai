@@ -114,6 +114,90 @@
     "localeValueCount": 517,
     "revisionSha256": "e7e31a9272a41219db270c7be78b9e4754b6c2182be6d6039bf06052a3c9f305"
   },
+  "nativeReviewPipeline": {
+    "version": "1",
+    "summary": "High-risk financial, risk, authentication, credential, error, and disclaimer copy stays explicitly marked until a named native financial reviewer records identity, date, and a bundle fingerprint. CI continues to gate resource integrity and semantic snapshots only; native-review status is provenance annotation and never a required human CI step.",
+    "requiredEvidenceFields": [
+      "reviewer",
+      "reviewedAt",
+      "reviewedSnapshotSha256"
+    ],
+    "ciGates": [
+      "i18n:resources key/source parity",
+      "i18n:high-risk category snapshots and decision digests",
+      "annotated high-risk key inventory parity",
+      "shrink-only identical-to-English ratchet"
+    ],
+    "notCiGates": [
+      "PENDING_NATIVE_REVIEW",
+      "NATIVE_REVIEWED",
+      "PRODUCT_SOURCE_SEMANTIC_PASS"
+    ],
+    "blocksCiOnPendingNativeReview": false,
+    "identicalBaselinePolicy": "shrink-only; high-risk review work must not grow identicalToEnglish.baseline.json",
+    "inventoryGeneratedAt": "2026-08-12",
+    "changeWorkflow": [
+      "Edit product source (zh/en) or a locale bundle for an audited high-risk key.",
+      "If the key set or selectors change, refresh category snapshots and regenerate high-risk-i18n-keys.json via npm run i18n:high-risk -- --write-key-inventory.",
+      "Record or update a decisions[] entry when candidate wording changes; keep before/recommended digests in lockstep.",
+      "Leave translated languageReview status at PENDING_NATIVE_REVIEW unless a real native financial reviewer is named with reviewedAt and reviewedSnapshotSha256.",
+      "If a locale is NATIVE_REVIEWED and any high-risk bundle hash changes, demote it to PENDING_NATIVE_REVIEW or record a fresh native review pass; do not keep a stale approval.",
+      "Never claim native approval or NATIVE_REVIEWED without reviewer identity plus date plus snapshot pin.",
+      "When the high-risk key set changes, record a fresh reviewPasses entry (or deliberately update keyCount, inventoryKeySetSha256, and conclusions); pointer refresh alone is not product-source or native sign-off."
+    ]
+  },
+  "keyInventory": {
+    "path": "apps/dsa-web/scripts/high-risk-i18n-keys.json",
+    "count": 353,
+    "sha256": "a8f3472ea9ab2f3ea388ae537eb7c11dace7d6cd6a937c31a3394720d5d75763",
+    "keySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe",
+    "decisionLinkedCount": 95
+  },
+  "reviewPasses": [
+    {
+      "id": "product-source-high-risk-pass-2026-08-12",
+      "kind": "PRODUCT_SOURCE_SEMANTIC_PASS",
+      "reviewer": "issue-882-worker@stock-pulse-ai",
+      "reviewedAt": "2026-08-12",
+      "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
+      "summary": "353 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "claimsNativeApproval": false,
+      "keyCount": 353,
+      "categoryConclusions": [
+        {
+          "category": "trading_action",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Action/side labels keep informational buy/sell/hold/watch/avoid semantics. Product source is stable; translated labels stay PENDING_NATIVE_REVIEW and must not be presented as personalized trading instructions."
+        },
+        {
+          "category": "risk",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Risk, volume, turnover, drawdown, alert-severity, and score labels match the product contract after prior decision corrections. No additional product-source collapse found in this pass."
+        },
+        {
+          "category": "authentication",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Authentication keys describe login, session, password, and admin-auth conditions without implying investment outcomes. Product source retained; native phrasing still pending for the eight translated locales."
+        },
+        {
+          "category": "credential",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Credential/API-key/provider-key keys keep credential classes distinct from passwords and usage HMAC secrets. Prior decision-linked wording remains the candidate baseline pending native review."
+        },
+        {
+          "category": "error",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained; locale naturalness remains PENDING_NATIVE_REVIEW."
+        },
+        {
+          "category": "disclaimer",
+          "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
+          "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
+        }
+      ],
+      "inventoryKeySetSha256": "6d20b74f3cce953f9945febefbc8fda6b0763e0b867b06c2509d85ac912527fe"
+    }
+  ],
   "languageReview": {
     "zh": {
       "status": "PRODUCT_SOURCE",
@@ -490,19 +574,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 118,
-        "keySetSha256": "302c4ff2373465d61926b228e42ed7e72b8336105570206b69aaa97e636a041f",
+        "keyCount": 144,
+        "keySetSha256": "c74f46787bcd2c9a81c3ffd6bdfae37d394d1f64354ada0a08521e3b71bd58e6",
         "bundleSha256": {
-          "zh": "4e3c9fe2a793cf22c71b9962872608b621d2cc9c299c97acd72be223347e46f1",
-          "zh-TW": "102ce5dc0c690515102646677a903ead4b0f30e4f39a7377fb5ff527623438ff",
-          "en": "f41a32aaaf042ed39135c3dee462a3d8c1b3b3b71d6fb06dba5938de7ce4cbf8",
-          "ja": "2264b5da3deb7670bea74230266a08d094e48439555bb1c53c375eec7ce10b3a",
-          "ko": "3965c847437268800a4d3e7b1cef9b1b258a9e3fe5b3825552469f668df3d234",
-          "de": "5b151ba5a81824c4939e48f92d6ed99d05aff1f3b9285c3a43b5ca3e7983bc8d",
-          "es": "8e2b878e3bf61172a26eaeb6eeb794737969ed511cb467967fa8f5882c693869",
-          "ms": "782c965279f2c20ece72fade66d139fcc9edc7ba124287ef4981edbf77d56875",
-          "fr": "4d5e45d89c6a5b168d37f72a9c4c1927e579164e8f5f1d6896e27181a6979d49",
-          "id": "c10e851a226bc1c41a0cab3b626f2500925c7ec382ce23ad1a251e3ff48981a2"
+          "zh": "5c8724b9086c3c96d8fc7f0cf8101c06a795c49b3c9072580daa0ff93e751b1a",
+          "zh-TW": "45554a100c380a9317b1b891d7e39c54b4fb455e5571bbf57c42e38f64ac0d5a",
+          "en": "7a6c37b92c2f31a758cae274d04d8f3a28216abe42c7b8fd47669d339b298b25",
+          "ja": "833779af9a006c1d707139f7648abf99bf8c7d5233d8220a2b750117f4c84e39",
+          "ko": "c9a43f1f64f541e291e56288fec3eeaa1c242d6bdc48b879c21bdee39c2a4b2a",
+          "de": "61656d9d7715fb2677f5fef5107b86de0b54ad49f1e779e146ff44afc952cfe6",
+          "es": "cf61cba12a7e7ec6e3f90520b187b7202c49274dd7206bb942555e4ad6441ecb",
+          "ms": "151c0303a6191efdf76f038bbfdc245c1dab959f1bebeb5156cffe6c2104f506",
+          "fr": "e580b2021d2651bbb119d0720ffea029b81483d1459e35e2317e09c8f628a9d3",
+          "id": "ae147ede7a1d250bdf7f04194cd6f29ec695d05265a650c25013ecc32b155155"
         }
       }
     },
@@ -610,7 +694,7 @@
     },
     {
       "id": "stable_api_error",
-      "contractSource": "apps/dsa-web/src/api/error.ts STABLE_ERROR_TEXT",
+      "contractSource": "apps/dsa-web/src/api/error/catalog.ts STABLE_ERROR_TEXT",
       "translationCodePattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.([^.]+)\\.(?:title|message)$",
       "internalCodes": [
         "agent_chat_failed",
@@ -622,6 +706,7 @@
         "alphasift_screen_failed",
         "alphasift_screen_task_not_found",
         "alphasift_unavailable",
+        "analysis_batch_limit_exceeded",
         "analysis_failed",
         "api_response_validation_failed",
         "approval_auth_required",
@@ -632,13 +717,20 @@
         "current_required",
         "duplicate_market_review",
         "duplicate_task",
+        "empty_stock_code",
         "env_backup_access_denied",
+        "file_too_large",
         "idempotency_conflict",
         "internal_error",
         "invalid_import_file",
         "invalid_params",
         "invalid_password",
+        "invalid_stock_code",
+        "invalid_stock_or_name",
         "llm_not_configured",
+        "missing_import_text",
+        "missing_stock_params",
+        "missing_upload_file",
         "no_channels",
         "not_changeable",
         "not_found",
@@ -649,14 +741,19 @@
         "portfolio_busy",
         "portfolio_oversell",
         "rate_limited",
+        "reasoning_trace_auth_required",
+        "reasoning_trace_export_disabled",
         "rollback_unavailable",
         "scheduler_busy",
         "security_audit_auth_required",
         "security_audit_unavailable",
         "share_image_content_too_large",
         "share_image_unavailable",
+        "sync_mode_batch_unsupported",
         "unauthorized",
         "unsupported_alert_type",
+        "unsupported_content_type",
+        "unsupported_type",
         "validation_error",
         "validation_failed"
       ],
@@ -696,6 +793,10 @@
         "alphasift_unavailable": [
           "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title",
           "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.message"
+        ],
+        "analysis_batch_limit_exceeded": [
+          "api.error.STABLE_ERROR_TEXT.analysis_batch_limit_exceeded.title",
+          "api.error.STABLE_ERROR_TEXT.analysis_batch_limit_exceeded.message"
         ],
         "analysis_failed": [
           "api.error.STABLE_ERROR_TEXT.analysis_failed.title",
@@ -737,9 +838,17 @@
           "api.error.STABLE_ERROR_TEXT.duplicate_task.title",
           "api.error.STABLE_ERROR_TEXT.duplicate_task.message"
         ],
+        "empty_stock_code": [
+          "api.error.STABLE_ERROR_TEXT.empty_stock_code.title",
+          "api.error.STABLE_ERROR_TEXT.empty_stock_code.message"
+        ],
         "env_backup_access_denied": [
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title",
           "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"
+        ],
+        "file_too_large": [
+          "api.error.STABLE_ERROR_TEXT.file_too_large.title",
+          "api.error.STABLE_ERROR_TEXT.file_too_large.message"
         ],
         "idempotency_conflict": [
           "api.error.STABLE_ERROR_TEXT.idempotency_conflict.title",
@@ -761,9 +870,29 @@
           "api.error.STABLE_ERROR_TEXT.invalid_password.title",
           "api.error.STABLE_ERROR_TEXT.invalid_password.message"
         ],
+        "invalid_stock_code": [
+          "api.error.STABLE_ERROR_TEXT.invalid_stock_code.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_stock_code.message"
+        ],
+        "invalid_stock_or_name": [
+          "api.error.STABLE_ERROR_TEXT.invalid_stock_or_name.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_stock_or_name.message"
+        ],
         "llm_not_configured": [
           "api.error.STABLE_ERROR_TEXT.llm_not_configured.title",
           "api.error.STABLE_ERROR_TEXT.llm_not_configured.message"
+        ],
+        "missing_import_text": [
+          "api.error.STABLE_ERROR_TEXT.missing_import_text.title",
+          "api.error.STABLE_ERROR_TEXT.missing_import_text.message"
+        ],
+        "missing_stock_params": [
+          "api.error.STABLE_ERROR_TEXT.missing_stock_params.title",
+          "api.error.STABLE_ERROR_TEXT.missing_stock_params.message"
+        ],
+        "missing_upload_file": [
+          "api.error.STABLE_ERROR_TEXT.missing_upload_file.title",
+          "api.error.STABLE_ERROR_TEXT.missing_upload_file.message"
         ],
         "no_channels": [
           "api.error.STABLE_ERROR_TEXT.no_channels.title",
@@ -805,6 +934,14 @@
           "api.error.STABLE_ERROR_TEXT.rate_limited.title",
           "api.error.STABLE_ERROR_TEXT.rate_limited.message"
         ],
+        "reasoning_trace_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message"
+        ],
+        "reasoning_trace_export_disabled": [
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.reasoning_trace_export_disabled.message"
+        ],
         "rollback_unavailable": [
           "api.error.STABLE_ERROR_TEXT.rollback_unavailable.title",
           "api.error.STABLE_ERROR_TEXT.rollback_unavailable.message"
@@ -829,6 +966,10 @@
           "api.error.STABLE_ERROR_TEXT.share_image_unavailable.title",
           "api.error.STABLE_ERROR_TEXT.share_image_unavailable.message"
         ],
+        "sync_mode_batch_unsupported": [
+          "api.error.STABLE_ERROR_TEXT.sync_mode_batch_unsupported.title",
+          "api.error.STABLE_ERROR_TEXT.sync_mode_batch_unsupported.message"
+        ],
         "unauthorized": [
           "api.error.STABLE_ERROR_TEXT.unauthorized.title",
           "api.error.STABLE_ERROR_TEXT.unauthorized.message"
@@ -836,6 +977,14 @@
         "unsupported_alert_type": [
           "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.title",
           "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message"
+        ],
+        "unsupported_content_type": [
+          "api.error.STABLE_ERROR_TEXT.unsupported_content_type.title",
+          "api.error.STABLE_ERROR_TEXT.unsupported_content_type.message"
+        ],
+        "unsupported_type": [
+          "api.error.STABLE_ERROR_TEXT.unsupported_type.title",
+          "api.error.STABLE_ERROR_TEXT.unsupported_type.message"
         ],
         "validation_error": [
           "api.error.STABLE_ERROR_TEXT.validation_error.title",

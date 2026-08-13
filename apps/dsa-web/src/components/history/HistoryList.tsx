@@ -1,19 +1,26 @@
 import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
-import { Trash2 } from 'lucide-react';
+import { GitCompareArrows, Trash2 } from 'lucide-react';
 import type { HistoryItem } from '../../types/analysis';
-import { Badge, Checkbox, IconButton, ScrollArea, Surface } from '../common';
+import { Badge, Button, Checkbox, IconButton, ScrollArea, Surface } from '../common';
 import { Spinner } from '../common/Spinner';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { REPORT_VERSION_COMPARE_TEXT } from '../../locales/reportVersionCompare';
+import { useVirtualWindow } from '../../hooks/useVirtualWindow';
+import {
+  HISTORY_LIST_ESTIMATED_ROW_HEIGHT_PX,
+  HISTORY_LIST_OVERSCAN,
+  HISTORY_LIST_VIRTUALIZE_THRESHOLD,
+} from '../../performance/runtimeBudgets';
 
 interface HistoryListProps {
   items: HistoryItem[];
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
-  selectedId?: number;  // Currently selected history record ID.
+  selectedId?: number;
   selectedIds: Set<number>;
   isDeleting?: boolean;
   onItemClick: (recordId: number) => void;
@@ -21,13 +28,14 @@ interface HistoryListProps {
   onToggleItemSelection: (recordId: number) => void;
   onToggleSelectAll: () => void;
   onDeleteSelected: () => void;
+  onCompareSelected?: (items: readonly [HistoryItem, HistoryItem]) => void;
   title?: string;
   emptyTitle?: string;
   emptyDescription?: string;
   className?: string;
 }
 
-/** History list with batch selection and incremental loading. */
+/** History list with batch selection, incremental loading, and windowed rows. */
 export const HistoryList: React.FC<HistoryListProps> = ({
   items,
   isLoading,
@@ -41,22 +49,44 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   onToggleItemSelection,
   onToggleSelectAll,
   onDeleteSelected,
+  onCompareSelected,
   title,
   emptyTitle,
   emptyDescription,
   className = '',
 }) => {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const selectAllId = useId();
+  const virtualize = items.length >= HISTORY_LIST_VIRTUALIZE_THRESHOLD;
+  const {
+    range,
+    onScroll: onVirtualScroll,
+    setViewportHeight,
+  } = useVirtualWindow({
+    itemCount: items.length,
+    estimatedItemHeight: HISTORY_LIST_ESTIMATED_ROW_HEIGHT_PX,
+    overscan: HISTORY_LIST_OVERSCAN,
+    enabled: virtualize,
+  });
 
   const selectedCount = items.filter((item) => selectedIds.has(item.id)).length;
+  const selectedItems = [...selectedIds]
+    .map((id) => items.find((item) => item.id === id))
+    .filter((item): item is HistoryItem => Boolean(item));
+  const comparisonStockCode = selectedItems[0]?.stockCode.trim().toUpperCase();
+  const comparisonItems = selectedItems.length === 2
+    && Boolean(comparisonStockCode)
+    && selectedItems.every(
+      (item) => item.stockCode.trim().toUpperCase() === comparisonStockCode,
+    )
+    ? selectedItems as [HistoryItem, HistoryItem]
+    : null;
   const allVisibleSelected = items.length > 0 && selectedCount === items.length;
   const someVisibleSelected = selectedCount > 0 && !allVisibleSelected;
 
-  // Load the next page when the bottom sentinel enters the scroll viewport.
   const handleObserver = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       const target = entries[0];
@@ -91,6 +121,38 @@ export const HistoryList: React.FC<HistoryListProps> = ({
     }
   }, [someVisibleSelected]);
 
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !virtualize) {
+      return;
+    }
+
+    const updateHeight = () => {
+      setViewportHeight(container.clientHeight);
+    };
+    updateHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [setViewportHeight, virtualize, items.length, isLoading]);
+
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      if (virtualize) {
+        onVirtualScroll(event);
+      }
+    },
+    [onVirtualScroll, virtualize],
+  );
+
+  const visibleItems = virtualize
+    ? items.slice(range.startIndex, range.endIndex + 1)
+    : items;
+
   return (
     <div className={className}>
       <Surface as="aside" level="interactive" className="flex h-full flex-col overflow-hidden">
@@ -98,6 +160,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
         viewportRef={scrollContainerRef}
         viewportClassName="p-4"
         testId="home-history-list-scroll"
+        onScroll={handleScroll}
       >
         <div className="mb-4 space-y-3">
           <DashboardPanelHeader
@@ -131,6 +194,18 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 containerClassName="min-h-11 flex-1 rounded-lg py-1"
                 label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
               />
+              {onCompareSelected && comparisonItems ? (
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  onClick={() => onCompareSelected(comparisonItems)}
+                  disabled={isDeleting}
+                  data-testid="history-compare-selected"
+                >
+                  <GitCompareArrows aria-hidden="true" />
+                  {REPORT_VERSION_COMPARE_TEXT[language].compare}
+                </Button>
+              ) : null}
               <IconButton
                 variant="danger"
                 size="compact"
@@ -162,8 +237,21 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             )}
           />
         ) : (
-          <div className="space-y-2">
-            {items.map((item) => (
+          <div
+            className="space-y-2"
+            data-testid="history-list-window"
+            data-virtualized={virtualize ? 'true' : 'false'}
+            data-mounted-count={visibleItems.length}
+            data-total-count={items.length}
+          >
+            {virtualize && range.offsetTop > 0 ? (
+              <div
+                aria-hidden="true"
+                data-testid="history-list-spacer-top"
+                style={{ height: range.offsetTop }}
+              />
+            ) : null}
+            {visibleItems.map((item) => (
               <HistoryListItem
                 key={item.id}
                 item={item}
@@ -174,9 +262,16 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 onClick={onItemClick}
               />
             ))}
+            {virtualize && range.offsetBottom > 0 ? (
+              <div
+                aria-hidden="true"
+                data-testid="history-list-spacer-bottom"
+                style={{ height: range.offsetBottom }}
+              />
+            ) : null}
 
             <div ref={loadMoreTriggerRef} className="h-4" />
-            
+
             {isLoadingMore && (
               <div className="flex justify-center py-4">
                 <Spinner size="md" label={t('history.loading')} />

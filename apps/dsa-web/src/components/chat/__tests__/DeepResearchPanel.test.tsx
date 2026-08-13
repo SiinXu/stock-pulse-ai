@@ -27,10 +27,14 @@ vi.mock('remark-gfm', () => ({ default: () => undefined }));
 
 const researchMock = vi.mocked(agentApi.research);
 
-function renderPanel(sessionId = 'sess-1') {
+function renderPanel(sessionId = 'sess-1', onHistoryChanged = vi.fn(), onRunInBackground = vi.fn()) {
   render(
     <UiLanguageProvider initialLanguage="en">
-      <DeepResearchPanel sessionId={sessionId} />
+      <DeepResearchPanel
+        sessionId={sessionId}
+        onHistoryChanged={onHistoryChanged}
+        onRunInBackground={onRunInBackground}
+      />
     </UiLanguageProvider>,
   );
 }
@@ -94,8 +98,12 @@ describe('DeepResearchPanel', () => {
 
     await waitFor(() => expect(screen.getByText('Moutai has a strong moat.')).toBeTruthy());
     expect(researchMock).toHaveBeenCalledWith(
-      { question: 'Moutai moat?', stockCode: '600519' },
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      {
+        question: 'Moutai moat?',
+        stockCode: '600519',
+        sessionId: 'sess-1',
+        turnId: expect.any(String),
+      },
     );
     expect(screen.getByText('Sub-questions and references')).toBeTruthy();
     expect(screen.getByText('What is the moat?')).toBeTruthy();
@@ -119,20 +127,77 @@ describe('DeepResearchPanel', () => {
 
     await waitFor(() => {
       expect(researchMock).toHaveBeenCalledWith(
-        { question: 'Keyboard submission?', stockCode: 'AAPL' },
-        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+        {
+          question: 'Keyboard submission?',
+          stockCode: 'AAPL',
+          sessionId: 'sess-1',
+          turnId: expect.any(String),
+        },
       );
     });
   });
 
+  it('refreshes conversation history after research completes', async () => {
+    const onHistoryChanged = vi.fn();
+    researchMock.mockResolvedValue({
+      success: true,
+      content: 'Saved findings.',
+      sources: [],
+      token_usage: 20,
+    });
+    renderPanel('sess-history', onHistoryChanged);
+
+    fireEvent.change(screen.getByLabelText('Research question'), {
+      target: { value: 'Persist this research' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Start research' }));
+
+    await waitFor(() => expect(onHistoryChanged).toHaveBeenCalledTimes(1));
+  });
+
+  it('moves an active run to the background without cancelling the request', async () => {
+    const onRunInBackground = vi.fn();
+    researchMock.mockReturnValue(new Promise(() => undefined));
+    renderPanel('sess-background', vi.fn(), onRunInBackground);
+
+    fireEvent.change(screen.getByLabelText('Research question'), {
+      target: { value: 'Keep running' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Start research' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Run in background' }));
+
+    expect(onRunInBackground).toHaveBeenCalledTimes(1);
+  });
+
   it('surfaces an error when the research response is unsuccessful', async () => {
-    researchMock.mockResolvedValue({ success: false, content: '', sources: [], token_usage: 0, error: 'timed out after 180s' });
+    researchMock.mockResolvedValue({ success: false, content: '', sources: [], token_usage: 0, error: 'agent_research_failed' });
     renderPanel();
 
     fireEvent.change(screen.getByLabelText('Research question'), { target: { value: 'Q' } });
     fireEvent.click(screen.getByRole('button', { name: 'Start research' }));
 
-    await waitFor(() => expect(screen.getByText('timed out after 180s')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Research failed')).toBeTruthy());
+    expect(screen.getByText('Deep research could not finish. Try again later.')).toBeTruthy();
+    expect(screen.queryByText('agent_research_failed')).not.toBeInTheDocument();
+    expect(screen.getByText('Research failed').closest('[data-overlay-root="toast"]')).toBeTruthy();
+  });
+
+  it('rejects a successful research response with an empty conclusion', async () => {
+    researchMock.mockResolvedValue({
+      success: true,
+      content: '   ',
+      sources: ['Sub-question 1: Q'],
+      token_usage: 42,
+    });
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText('Research question'), { target: { value: 'Q' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Start research' }));
+
+    await waitFor(() => expect(screen.getByText('Research failed')).toBeTruthy());
+    expect(screen.getByText('Research failed').closest('[data-overlay-root="toast"]')).toBeTruthy();
+    expect(screen.queryByText('Research result')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sub-question 1: Q')).not.toBeInTheDocument();
   });
 
   it('restores a persisted completed run for the session on mount', () => {
@@ -150,6 +215,23 @@ describe('DeepResearchPanel', () => {
     expect(screen.getByText('Restored findings.')).toBeTruthy();
     expect(screen.getByText('Prior sub-question')).toBeTruthy();
     expect((screen.getByLabelText('Research question') as HTMLTextAreaElement).value).toBe('Prior question');
+  });
+
+  it('converts a persisted blank completed run into a visible failure', () => {
+    window.sessionStorage.setItem('dsa_research_run:sess-blank', JSON.stringify({
+      question: 'Prior blank question',
+      stockCode: 'NVTS',
+      status: 'done',
+      content: '   ',
+      sources: ['Sub-question 1: Prior blank question'],
+    }));
+
+    renderPanel('sess-blank');
+
+    expect(screen.getByText('Research failed')).toBeTruthy();
+    expect(screen.getByText('Research failed').closest('[data-overlay-root="toast"]')).toBeTruthy();
+    expect(screen.queryByText('Research result')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sub-question 1: Prior blank question')).not.toBeInTheDocument();
   });
 
   it('does not restore a stale running state (coerces it to re-runnable)', () => {

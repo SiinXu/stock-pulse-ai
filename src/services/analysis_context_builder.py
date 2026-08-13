@@ -51,6 +51,7 @@ _AUX_LIMITATION_STATUSES = {
     ContextFieldStatus.FETCH_FAILED,
     ContextFieldStatus.FALLBACK,
     ContextFieldStatus.STALE,
+    ContextFieldStatus.PARTIAL,
 }
 
 
@@ -72,6 +73,11 @@ class PipelineAnalysisArtifacts:
     news_result_count: Optional[int]
     metadata: Dict[str, Any]
     portfolio_context: Optional[Dict[str, Any]] = None
+    money_flow_data: Optional[Any] = None
+    # Optional non-authoritative alt-data payload (Issues #139 / #1144).
+    # Default-off: omit or pass None so the pack shape stays unchanged.
+    alternative_data: Optional[Dict[str, Any]] = None
+    sentiment_snapshot: Optional[Dict[str, Any]] = None
 
 
 class AnalysisContextBuilder:
@@ -96,8 +102,14 @@ class AnalysisContextBuilder:
         blocks["technical"] = technical_block
         data_quality_warnings.extend(technical_warnings)
         blocks["chip"] = _build_chip_block(artifacts)
+        money_flow_block = _build_money_flow_block(artifacts)
+        if money_flow_block is not None:
+            blocks["money_flow"] = money_flow_block
         blocks["fundamentals"] = _build_fundamentals_block(artifacts)
         blocks["news"] = _build_news_block(artifacts)
+        sentiment_block = _build_sentiment_block(artifacts)
+        if sentiment_block is not None:
+            blocks["sentiment"] = sentiment_block
         portfolio_block = _build_portfolio_block(artifacts)
         if portfolio_block is not None:
             blocks["portfolio"] = portfolio_block
@@ -105,13 +117,14 @@ class AnalysisContextBuilder:
         data_quality_warnings.extend(
             code for code in evidence_codes if code not in data_quality_warnings
         )
+        # Core quality is computed before optional alt-data so supporting
+        # non-authoritative blocks never change overall_score / block_scores.
         data_quality = _build_data_quality(
             blocks,
             warnings=data_quality_warnings,
             validation_evidence=evidence,
         )
-
-        return AnalysisContextPack(
+        pack = AnalysisContextPack(
             subject=AnalysisSubject(
                 code=artifacts.code,
                 stock_name=artifacts.stock_name or None,
@@ -122,6 +135,13 @@ class AnalysisContextBuilder:
             data_quality=data_quality,
             metadata=metadata,
         )
+        if artifacts.alternative_data is not None:
+            from src.services.alternative_data_governance import (
+                attach_alternative_data_block,
+            )
+
+            pack = attach_alternative_data_block(pack, artifacts.alternative_data)
+        return pack
 
     @staticmethod
     def build_batch(items: Sequence[PipelineAnalysisArtifacts]) -> List[AnalysisContextPack]:
@@ -387,6 +407,118 @@ def _build_chip_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBl
     )
 
 
+def _build_money_flow_block(
+    artifacts: PipelineAnalysisArtifacts,
+) -> Optional[AnalysisContextBlock]:
+    """Build a capital-flow block without collapsing quality/failure outcomes."""
+    outcome = _to_dict(artifacts.money_flow_data)
+    if not outcome:
+        # Do not force a missing block when the feature is disabled — keeps pack
+        # shape stable for default (SMARTMONEY_ENABLED=false) runs.
+        if not bool((artifacts.metadata or {}).get("smartmoney_enabled")):
+            return None
+        status = ContextFieldStatus.MISSING
+        return AnalysisContextBlock(
+            status=status,
+            items={
+                "money_flow": AnalysisContextItem(
+                    status=status,
+                    missing_reason="money_flow_missing",
+                )
+            },
+        )
+
+    raw_status = str(outcome.get("status") or "").strip().lower()
+    status_map = {
+        "available": ContextFieldStatus.AVAILABLE,
+        "partial": ContextFieldStatus.PARTIAL,
+        "not_supported": ContextFieldStatus.NOT_SUPPORTED,
+        "fetch_failed": ContextFieldStatus.FETCH_FAILED,
+        "empty": ContextFieldStatus.MISSING,
+        "stale": ContextFieldStatus.STALE,
+        "fallback": ContextFieldStatus.FALLBACK,
+    }
+    status = status_map.get(raw_status, ContextFieldStatus.MISSING)
+    snapshot = outcome.get("snapshot")
+    snapshot = dict(snapshot) if isinstance(snapshot, Mapping) else {}
+    source_chain = outcome.get("source_chain")
+    source_chain = source_chain if isinstance(source_chain, list) else []
+    source = _source_text(snapshot.get("source")) or _source_from_chain(source_chain)
+    warnings = [str(item) for item in outcome.get("warnings", []) if item]
+    timestamp = _metadata_iso_datetime_value(
+        {"fetched_at": outcome.get("fetched_at"), "as_of": snapshot.get("as_of")},
+        "as_of",
+        "fetched_at",
+    )
+    metadata = {
+        "provider_date": outcome.get("provider_date") or snapshot.get("date"),
+        "age_days": outcome.get("age_days"),
+        "requested_days": outcome.get("requested_days") or snapshot.get("requested_days"),
+        "observed_days": snapshot.get("observed_days"),
+        "completeness": snapshot.get("completeness"),
+        "bucket_definition": snapshot.get("bucket_definition"),
+        "unit": snapshot.get("unit"),
+        "amount_scale": snapshot.get("amount_scale"),
+        "source_chain": source_chain,
+        "cache_state": outcome.get("cache_state"),
+        "fallback_from": outcome.get("fallback_from"),
+        "error_code": outcome.get("error_code"),
+    }
+    metadata = {key: value for key, value in metadata.items() if value not in (None, [], {})}
+
+    if not snapshot:
+        missing_reason = outcome.get("error_code") or f"money_flow_{raw_status or 'missing'}"
+        return AnalysisContextBlock(
+            status=status,
+            items={
+                "money_flow": AnalysisContextItem(
+                    status=status,
+                    source=source,
+                    timestamp=timestamp,
+                    missing_reason=str(missing_reason),
+                    warnings=warnings,
+                    metadata=metadata,
+                )
+            },
+            source=source,
+            timestamp=timestamp,
+            warnings=warnings,
+            metadata=metadata,
+        )
+
+    excluded = {
+        "raw_field_map", "source", "date", "as_of", "bucket_definition",
+        "unit", "amount_scale", "requested_days", "observed_days", "completeness",
+    }
+    items = {
+        key: AnalysisContextItem(
+            status=status,
+            value=value,
+            source=source,
+            timestamp=timestamp,
+            fallback_from=outcome.get("fallback_from"),
+            warnings=warnings,
+            metadata={
+                "bucket_definition": snapshot.get("bucket_definition"),
+                "unit": snapshot.get("unit"),
+                "amount_scale": snapshot.get("amount_scale"),
+            }
+            if key.endswith("net_inflow") or key.endswith("net_inflow_ratio")
+            else {},
+        )
+        for key, value in snapshot.items()
+        if value is not None and key not in excluded
+    }
+    return AnalysisContextBlock(
+        status=status,
+        items=items,
+        source=source,
+        timestamp=timestamp,
+        warnings=warnings,
+        metadata=metadata,
+    )
+
+
 def _build_fundamentals_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBlock:
     context = artifacts.fundamental_context if isinstance(artifacts.fundamental_context, dict) else None
     if not context:
@@ -480,6 +612,141 @@ def _build_news_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBl
         },
         metadata=metadata,
     )
+
+
+
+
+def _build_sentiment_block(
+    artifacts: PipelineAnalysisArtifacts,
+) -> Optional[AnalysisContextBlock]:
+    """Map a sentiment snapshot into an auxiliary evidence block.
+
+    Sentiment is supporting evidence only. It is never treated as a trading
+    conclusion and does not participate in the core data-quality weighted score.
+    """
+    snapshot = _to_dict(artifacts.sentiment_snapshot)
+    if not snapshot:
+        return None
+
+    raw_status = str(snapshot.get("status") or "").strip().lower()
+    reason_code = str(snapshot.get("reason_code") or "").strip() or None
+    degraded = bool(snapshot.get("degraded"))
+    freshness = str(snapshot.get("freshness") or "unknown").strip().lower()
+
+    if raw_status == "unavailable":
+        status = ContextFieldStatus.MISSING
+        if reason_code == "scoring_failed":
+            status = ContextFieldStatus.FETCH_FAILED
+    elif raw_status == "degraded" or degraded:
+        if freshness == "stale":
+            status = ContextFieldStatus.STALE
+        else:
+            status = ContextFieldStatus.PARTIAL
+    else:
+        status = ContextFieldStatus.AVAILABLE
+        if freshness == "stale":
+            status = ContextFieldStatus.STALE
+
+    warnings: List[str] = []
+    if degraded or raw_status == "degraded":
+        warnings.append("sentiment_degraded")
+    if freshness in {"stale", "unknown"}:
+        warnings.append(f"sentiment_freshness_{freshness}")
+    if reason_code and reason_code != "ok":
+        warnings.append(f"sentiment_reason_{reason_code}")
+    warnings.append("sentiment_is_evidence_not_conclusion")
+
+    timestamp = _safe_iso_timestamp(
+        snapshot.get("freshness_as_of") or snapshot.get("as_of")
+    )
+    source = "sentiment_pipeline:news_lexicon_v1"
+    evidence = snapshot.get("evidence")
+    evidence_count = len(evidence) if isinstance(evidence, list) else 0
+
+    items = {
+        "role": AnalysisContextItem(
+            status=ContextFieldStatus.AVAILABLE,
+            value="evidence",
+            source=source,
+            metadata={"meaning": "supporting_evidence_not_trading_conclusion"},
+        ),
+        "status": AnalysisContextItem(
+            status=status,
+            value=raw_status or status.value,
+            source=source,
+            missing_reason=reason_code if status != ContextFieldStatus.AVAILABLE else None,
+        ),
+        "score": AnalysisContextItem(
+            status=status if snapshot.get("score") is not None else ContextFieldStatus.MISSING,
+            value=snapshot.get("score"),
+            source=source,
+            timestamp=timestamp,
+            missing_reason=None if snapshot.get("score") is not None else "sentiment_score_unavailable",
+        ),
+        "label": AnalysisContextItem(
+            status=status,
+            value=snapshot.get("label"),
+            source=source,
+        ),
+        "confidence": AnalysisContextItem(
+            status=status if snapshot.get("confidence") is not None else ContextFieldStatus.MISSING,
+            value=snapshot.get("confidence"),
+            source=source,
+            missing_reason=(
+                None if snapshot.get("confidence") is not None else "sentiment_confidence_unavailable"
+            ),
+        ),
+        "freshness": AnalysisContextItem(
+            status=status,
+            value=freshness,
+            source=source,
+            timestamp=timestamp,
+        ),
+        "evidence": AnalysisContextItem(
+            status=status if evidence_count > 0 else ContextFieldStatus.MISSING,
+            value=evidence if evidence_count > 0 else None,
+            source=source,
+            missing_reason=None if evidence_count > 0 else "sentiment_evidence_missing",
+            metadata={"evidence_count": evidence_count},
+        ),
+        "snapshot": AnalysisContextItem(
+            status=status,
+            value=snapshot,
+            source=source,
+            timestamp=timestamp,
+            metadata={
+                "schema_version": snapshot.get("schema_version"),
+                "method": snapshot.get("method"),
+                "item_count": snapshot.get("item_count"),
+            },
+        ),
+    }
+
+    return AnalysisContextBlock(
+        status=status,
+        items=items,
+        source=source,
+        timestamp=timestamp,
+        warnings=warnings,
+        metadata={
+            "auxiliary": True,
+            "quality_weighted": False,
+            "role": "evidence",
+            "reason_code": reason_code,
+            "item_count": snapshot.get("item_count"),
+            "window_days": snapshot.get("window_days"),
+            "disclaimer": snapshot.get("disclaimer"),
+        },
+    )
+
+
+def _safe_iso_timestamp(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or "T" not in text:
+        return None
+    return text
 
 
 def _build_portfolio_block(artifacts: PipelineAnalysisArtifacts) -> Optional[AnalysisContextBlock]:
@@ -652,12 +919,12 @@ def _quality_limitations(blocks: Dict[str, AnalysisContextBlock]) -> List[str]:
         if status in _CORE_LIMITATION_STATUSES:
             limitations.append(f"{key}: {status.value}")
 
-    for key in ("news", "fundamentals", "chip"):
+    for key in ("news", "fundamentals", "chip", "money_flow"):
         status = _quality_block_status(blocks, key)
         if status in _AUX_LIMITATION_STATUSES:
             limitations.append(f"{key}: {status.value}")
 
-    return limitations[:5]
+    return limitations[:6]
 
 
 def _to_dict(value: Optional[Any]) -> Dict[str, Any]:

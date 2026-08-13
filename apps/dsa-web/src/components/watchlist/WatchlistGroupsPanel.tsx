@@ -1,12 +1,19 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, FolderPlus, GripVertical, MoreHorizontal, Trash2 } from 'lucide-react';
 import { IconButton, Input, InlineAlert } from '../common';
 import type { HomeWatchlistRow, WatchlistGroup } from '../../types/watchlist';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { truncateStockName } from '../../utils/stockName';
+import type { WatchlistScoreItem } from '../../types/watchlistScore';
+import {
+  createUnanalyzedWatchlistScore,
+  type WatchlistScoreLoadStatus,
+} from '../../hooks/useWatchlistScores';
+
+const WatchlistScoreColumn = lazy(() => import('./WatchlistScoreColumn'));
 
 export interface WatchlistGroupsPanelProps {
   groups: WatchlistGroup[];
@@ -14,6 +21,9 @@ export interface WatchlistGroupsPanelProps {
   loading?: boolean;
   actioning?: boolean;
   errorMessage?: string | null;
+  scoreStatus?: WatchlistScoreLoadStatus;
+  scoreItemsByCode?: ReadonlyMap<string, WatchlistScoreItem>;
+  memberReorderingDisabled?: boolean;
   onCreateGroup: (name: string) => Promise<boolean> | boolean;
   onDeleteGroup: (groupId: string) => Promise<boolean> | boolean;
   onReorderGroups: (orderedIds: string[]) => Promise<boolean> | boolean;
@@ -56,6 +66,9 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
   loading = false,
   actioning = false,
   errorMessage = null,
+  scoreStatus = 'idle',
+  scoreItemsByCode = new Map(),
+  memberReorderingDisabled = false,
   onCreateGroup,
   onDeleteGroup,
   onReorderGroups,
@@ -122,6 +135,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
   };
 
   const reorderMemberBy = async (group: WatchlistGroup, stockCode: string, delta: number) => {
+    if (memberReorderingDisabled) return;
     const codes = group.members.map((member) => member.stockCode);
     const from = codes.indexOf(stockCode);
     const to = Math.max(0, Math.min(from + delta, codes.length - 1));
@@ -152,6 +166,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
       if (from >= 0 && to >= 0 && from !== to) await onReorderGroups(moved(ids, from, to));
       return;
     }
+    if (memberReorderingDisabled) return;
     if (payload.groupId !== targetGroupId) {
       await onMoveMember({
         stockCode: payload.stockCode,
@@ -168,6 +183,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
   ) => {
     event.preventDefault();
     event.stopPropagation();
+    if (memberReorderingDisabled) return;
     const payload = parseDragPayload(event.dataTransfer.getData('application/json'));
     if (!payload || payload.kind !== 'member' || actioning) return;
     const codes = targetGroup.members.map((member) => member.stockCode);
@@ -286,7 +302,8 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
                           <button
                             type="button"
                             className="hidden cursor-grab text-muted-text sm:inline-flex"
-                            draggable={!actioning}
+                            draggable={!actioning && !memberReorderingDisabled}
+                            disabled={actioning || memberReorderingDisabled}
                             onDragStart={(event) => {
                               event.dataTransfer.setData('application/json', JSON.stringify({ kind: 'member', groupId: group.id, stockCode: member.stockCode }));
                               event.dataTransfer.effectAllowed = 'move';
@@ -305,11 +322,24 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
                             <p className="truncate text-sm font-medium text-foreground">{label}</p>
                             <p className="truncate font-mono text-xs text-secondary-text">{member.stockCode}</p>
                           </div>
+                          {scoreStatus === 'ready' ? (
+                            <Suspense fallback={<span className="px-1 py-1.5 text-xs text-muted-text">{t('common.loading')}</span>}>
+                              <WatchlistScoreColumn
+                                item={scoreItemsByCode.get(member.stockCode)
+                                  ?? createUnanalyzedWatchlistScore(member.stockCode)}
+                                className="max-w-40"
+                              />
+                            </Suspense>
+                          ) : scoreStatus === 'loading' || scoreStatus === 'error' ? (
+                            <span className="px-1 py-1.5 text-xs text-muted-text" data-testid="watchlist-score-status">
+                              {scoreStatus === 'error' ? t('common.failure') : t('common.loading')}
+                            </span>
+                          ) : null}
                           <div className="flex sm:hidden">
-                            <IconButton type="button" size="default" variant="ghost" disabled={actioning || memberIndex === 0} aria-label={t('watchlist.moveMemberUpAria', { code: member.stockCode })} onClick={() => void reorderMemberBy(group, member.stockCode, -1)}>
+                            <IconButton type="button" size="default" variant="ghost" disabled={actioning || memberReorderingDisabled || memberIndex === 0} aria-label={t('watchlist.moveMemberUpAria', { code: member.stockCode })} onClick={() => void reorderMemberBy(group, member.stockCode, -1)}>
                               <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
                             </IconButton>
-                            <IconButton type="button" size="default" variant="ghost" disabled={actioning || memberIndex === group.members.length - 1} aria-label={t('watchlist.moveMemberDownAria', { code: member.stockCode })} onClick={() => void reorderMemberBy(group, member.stockCode, 1)}>
+                            <IconButton type="button" size="default" variant="ghost" disabled={actioning || memberReorderingDisabled || memberIndex === group.members.length - 1} aria-label={t('watchlist.moveMemberDownAria', { code: member.stockCode })} onClick={() => void reorderMemberBy(group, member.stockCode, 1)}>
                               <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
                             </IconButton>
                           </div>

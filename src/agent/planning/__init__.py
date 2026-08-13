@@ -7,10 +7,20 @@ See ``docs/agent-planning-engine_EN.md`` for semantics, bounds, and rollback.
 from src.agent.planning.config import PlanExecutionSettings, PlanningSettings
 from src.agent.planning.engine import PlanningEngine, prepare_run_with_planning
 from src.agent.planning.loop import default_argument_builder, execute_plan_loop
+from src.agent.planning.product import (
+    is_agent_planning_enabled,
+    resolve_planning_settings,
+    try_run_with_planning,
+)
 from src.agent.planning.observations import (
     PlanExecutionResult,
     StepObservation,
     ToolCallObservation,
+)
+from src.agent.planning.trace import (
+    PlanningTraceRecorder,
+    reconstruct_planning_run,
+    validate_planning_trace_event,
 )
 from src.agent.planning.types import AgentPlan, PlanStep, PlanningOutcome, validate_plan_payload
 
@@ -22,10 +32,16 @@ __all__ = [
     "PlanningEngine",
     "PlanningOutcome",
     "PlanningSettings",
+    "PlanningTraceRecorder",
     "StepObservation",
     "ToolCallObservation",
     "default_argument_builder",
     "execute_plan_loop",
+    "is_agent_planning_enabled",
     "prepare_run_with_planning",
+    "reconstruct_planning_run",
+    "resolve_planning_settings",
+    "try_run_with_planning",
     "validate_plan_payload",
+    "validate_planning_trace_event",
 ]

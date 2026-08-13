@@ -41,6 +41,58 @@ _SENSITIVE_KEY_PARTS = {
     "token",
     "webhook",
 }
+# Final path segment "key"/"keys" is credential-bearing unless the preceding
+# segment is a structural identifier (cache key, sort key, public key, …).
+_STRUCTURAL_KEY_PREFIX_PARTS = frozenset(
+    {
+        "aria",
+        "cache",
+        "column",
+        "composite",
+        "css",
+        "data",
+        "dict",
+        "env",
+        "field",
+        "foreign",
+        "hash",
+        "help",
+        "id",
+        "index",
+        "issue",
+        "json",
+        "label",
+        "lookup",
+        "map",
+        "meta",
+        "name",
+        "object",
+        "option",
+        "param",
+        "partition",
+        "primary",
+        "public",
+        "record",
+        "row",
+        "scope",
+        "setting",
+        "shard",
+        "sort",
+        "symbol",
+        "ticker",
+        "type",
+        "xml",
+        "yaml",
+    }
+)
+_NON_SENSITIVE_MAPPING_KEYS = frozenset(
+    {
+        # Public response metadata about a sensitive install specification.
+        "install_spec_is_default",
+        # Boolean capability metadata, not an API key value.
+        "requires_api_key",
+    }
+)
 _SENSITIVE_KEY_PHRASES = {
     "access_token",
     "accesstoken",
@@ -48,10 +100,14 @@ _SENSITIVE_KEY_PHRASES = {
     "apikey",
     "api_token",
     "apitoken",
+    "app_key",
+    "appkey",
     "auth_token",
     "authtoken",
     "authorization_header",
     "authorizationheader",
+    "install_spec",
+    "installspec",
     "license_key",
     "licensekey",
     "private_key",
@@ -72,6 +128,8 @@ _SENSITIVE_KEY_PHRASES = {
     "sessiontoken",
     "send_key",
     "sendkey",
+    "user_key",
+    "userkey",
     "webhook_secret",
     "webhooksecret",
     "webhook_url",
@@ -1585,6 +1643,9 @@ def _is_sensitive_mapping_key_text(key_text: str) -> bool:
     if not key_text:
         return False
     parts = _mapping_key_parts(key_text)
+    normalized_key = "_".join(parts)
+    if normalized_key in _NON_SENSITIVE_MAPPING_KEYS:
+        return False
     if parts and parts[-1] == "proxy":
         return True
     if {"header", "headers"} & set(parts):
@@ -1597,7 +1658,17 @@ def _is_sensitive_mapping_key_text(key_text: str) -> bool:
         if index + 1 < len(parts) and parts[index + 1] == "tokens":
             continue
         return True
-    if _has_sensitive_phrase("_".join(parts)):
+    if _has_sensitive_phrase(normalized_key):
+        return True
+    if parts and parts[-1] in {"key", "keys"}:
+        # Generic {"key": ...} payloads are not credentials.
+        if len(parts) == 1:
+            return False
+        # Public / structural key names (cache_key, public_key, …).
+        if parts[-2] in _STRUCTURAL_KEY_PREFIX_PARTS:
+            return False
+        return True
+    if len(parts) >= 2 and parts[-2:] == ["install", "spec"]:
         return True
     return bool(set(parts) & _SENSITIVE_KEY_PARTS)
 

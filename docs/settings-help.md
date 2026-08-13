@@ -77,10 +77,18 @@ Issue #1512 收口后，Web 设置页只展示后端配置注册表中的正式�
 新增或修改帮助文案时，优先从以下位置核对：
 
 1. `.env.example`：配置键名、默认值、样例格式和敏感占位符。
-2. `docs/full-guide.md`：主要配置说明、运行入口和部署上下文。
-3. `docs/LLM_CONFIG_GUIDE.md`、`docs/llm-providers.md`：LLM 优先级、Channels、provider/model、兼容边界和排障说明。
-4. 专题文档：例如 `docs/bot/feishu-bot-config.md`、`docs/deploy-webui-cloud.md`、`docs/desktop-package.md`。
-5. 代码实现和测试：当文档与代码不一致时，先以可执行实现为准，并同步修正文档。
+2. 配置注册表 `src/core/config_registry_parts/`：Web 设置分组、控件类型、校验与帮助元数据。
+3. `docs/environment-variables.md` / `docs/environment-variables_EN.md`：完整键清单与配置项新增流程。
+4. `docs/full-guide.md`：主要配置说明、运行入口和部署上下文。
+5. `docs/LLM_CONFIG_GUIDE.md`、`docs/llm-providers.md`：LLM 优先级、Channels、provider/model、兼容边界和排障说明。
+6. 专题文档：例如 `docs/bot/feishu-bot-config.md`、`docs/deploy-webui-cloud.md`、`docs/desktop-package.md`。
+7. 代码实现和测试：当文档与代码不一致时，先以可执行实现为准，并同步修正文档。
+
+三方一致性检查：
+
+```bash
+python scripts/check_config_doc_consistency.py
+```
 
 ## 维护边界
 
@@ -98,9 +106,10 @@ Issue #1512 收口后，Web 设置页只展示后端配置注册表中的正式�
 - `WEBUI_HOST`、`WEBUI_PORT`：监听地址和端口只在进程启动时绑定，保存后必须重启当前进程、Docker 容器或服务管理器才会生效。
 - `RUN_IMMEDIATELY`：非 schedule 模式启动期单次运行配置，保存后不会让已运行的 WebUI/API 进程立即触发分析。
 - Web 设置页不直接暴露 `SCHEDULE_TIME` / `SCHEDULE_TIMES` / `SCHEDULE_RUN_IMMEDIATELY` 等内部键；用户通过“定时任务”卡片维护启用状态、多个执行时间和立即执行一次。
-- `SCHEDULE_ENABLED`：WebUI/API/Desktop 长运行进程（包括 `python main.py --serve --schedule`）会在保存后按新值启动或停止 runtime scheduler；纯 CLI schedule 模式（`python main.py --schedule`）仍按启动时参数和配置运行。
-- `SCHEDULE_TIME`、`SCHEDULE_TIMES`：不是重启必需项。`SCHEDULE_TIMES` 为空时使用 `SCHEDULE_TIME`；已运行的 scheduler 会按新时间重建 daily jobs。
-- `SCHEDULE_RUN_IMMEDIATELY`：schedule 模式启动行为，保存后不会让当前进程立即执行一次分析；手动执行请使用 runtime scheduler 的 run-now API。
+- `SCHEDULE_ENABLED`：已挂载的 WebUI/API/Desktop runtime scheduler 会在保存后热协调启动/停止（**不是** `restart_required`）；纯 CLI schedule 模式（`python main.py --schedule`）仍按启动时所有权运行。Web 调度卡片仅在本进程 `attached=true` 时显示「保存后热加载」标记。
+- `SCHEDULE_TIME`、`SCHEDULE_TIMES`：不是重启必需项。`SCHEDULE_TIMES` 为空时使用 `SCHEDULE_TIME`；已挂载的 runtime scheduler 会按新时间重建 daily jobs（同样仅在 `attached=true` 时标注热加载）。
+- `SCHEDULE_RUN_IMMEDIATELY`：schedule 模式**启动期**行为，保存后不会让当前进程立即执行一次分析（`restart_required`）；手动执行请使用 runtime scheduler 的 run-now API。
 - runtime scheduler 的 run-now API 仅在本 API 进程已挂载且启用遗留批处理、并且没有分析任务运行时接受请求；否则会返回稳定的未挂载、未启用、状态不可用或忙碌原因。
-- scheduler status 返回本进程的挂载状态、进程模式、调度时区和 run-now 可用性。时间戳带明确偏移；Web 不得借用浏览器时区补写服务端缺失的时区。
+- scheduler status 的 `process_mode` 为设计四态（来自真实运行时判定，不猜测）：`serve+schedule` / `desktop` / `cli-schedule` / `not_attached`。同时返回挂载状态、调度时区和 run-now 可用性。时间戳带明确偏移；Web 不得借用浏览器时区补写服务端缺失的时区。
+- 调度状态卡提供到 **设置 → 通知 → 渠道** 的一等深链（`/settings?section=notifications&view=channels`），用于查看调度输出会推送到哪些通知渠道。
 - 每次被接受的 run-now 都有 `run_id`，状态接口会用同一 ID 报告运行中及最终成功/失败；旧版服务端缺少关联字段时，Web 必须显示结果无法确认，不能把空闲误报为成功。

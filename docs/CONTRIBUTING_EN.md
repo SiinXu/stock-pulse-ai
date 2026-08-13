@@ -38,6 +38,8 @@ cp .env.example .env
 # Edit .env and fill in the required API keys
 ```
 
+When adding a configuration key, update `.env.example`, the configuration registry (`src/core/config_registry_parts/`), and the bilingual inventory in `docs/environment-variables.md` / `docs/environment-variables_EN.md`. Run `python scripts/check_config_doc_consistency.py` for the three-way consistency check.
+
 ### Contribution Workflow
 
 1. Fork this repository.
@@ -105,6 +107,12 @@ docs: update README deployment section
 - Add English comments for non-obvious logic.
 - Update relevant documentation when adding new features.
 
+### Parallel Merges And Engineering Efficiency Operations
+
+For large parallel fix/merge trains, read the [Engineering Efficiency Playbook](engineering-efficiency-playbook_EN.md) ([中文](engineering-efficiency-playbook.md)): train-batch merges, conflict-graph grouping, config registration guards, squash false-close defense, self-iteration acceptance loops, single-host resource limits, and worktree deletion safety.
+
+**Division of labor**: repository-root `AGENTS.md` is the collaboration **contract** (hard rules and verification matrix); the playbook is the **operational guide**. When they conflict, `AGENTS.md` wins.
+
 ### CI Checks
 
 After opening a PR, CI will automatically run the following PR checks:
@@ -117,7 +125,7 @@ After opening a PR, CI will automatically run the following PR checks:
 | `pydanticai-installed` | Installs optional PydanticAI dependencies and runs experimental runtime tests with skips rejected | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
 | `openapi-types-gate` | Regenerates the backend OpenAPI snapshot and Web TypeScript types and rejects checked-in artifact drift | ✅ |
-| `web-gate` | Always concludes; for Web changes runs `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build`, then blocks on the bundle size budget; otherwise records a no-frontend summary; fails closed when change detection is unavailable | ✅ |
+| `web-gate` | Always concludes; for Web changes runs `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build`, then runs the runtime performance soft gate and blocks on the bundle size budget; otherwise records a no-frontend summary; fails closed when change detection is unavailable | ✅ |
 | `web-e2e` | Uses the same related-path trigger, starts the real backend, Vite, and a local fake model endpoint in isolation, then runs `npm run test:smoke` | ✅ (when triggered) |
 | `pr-review` | Advisory `pull_request` review: static syntax/flake8 on changed files, PR-size advisory (~1000 lines excluding lockfiles/generated), same-repo AI review (requires `GEMINI_API_KEY` and/or `OPENAI_API_KEY` repository secrets), automatic labels, and a bot review comment. Fork PRs stay read-only (no secrets, no write jobs). AI review is non-blocking. | ❌ (advisory) |
 

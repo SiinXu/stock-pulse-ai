@@ -412,6 +412,20 @@ python main.py --market-only
 
 ---
 
+
+### Q18: Why use StockPulse instead of upstream  or other local-first finance AI tools?
+
+**Short answer**: StockPulse is a **local-first investment research workbench**—same multi-market analysis lineage as upstream, plus stronger emphasis on stratified reports, deny-by-default Agent tools, optional HITL, trusted plugins, and dual licensing (MIT original portions + AGPL-3.0 StockPulse additions). It is **not** a black-box tip service and **not** multi-tenant SaaS.
+
+**Where to read more**:
+1. Homepage differentiators: [README · Why StockPulse](../README.md#why-stockpulse)
+2. Honest peer table (go-stock, FinRobot Desktop, TradingAgents-class, upstream, StockAI/OpenCandle-class), shipped vs planned, and known gaps: [Competitive landscape](competitive-landscape.md) ([中文](competitive-landscape_CN.md))
+3. Upstream port policy: [Upstream parity](upstream-parity.md)
+
+Star counts and peer claims in the landscape note are timestamped; re-check before citing them externally.
+
+---
+
 ## Still Have Questions?
 
 If the above content doesn't solve your issue, welcome to:

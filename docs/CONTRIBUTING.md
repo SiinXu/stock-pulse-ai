@@ -37,6 +37,8 @@ python -m pip check
 cp .env.example .env
 ```
 
+新增配置键时，必须同步更新 `.env.example`、配置注册表（`src/core/config_registry_parts/`）以及中英清单 `docs/environment-variables.md` / `docs/environment-variables_EN.md`。运行 `python scripts/check_config_doc_consistency.py` 做三方一致性检查。
+
 ### 提交流程
 
 1. Fork 本仓库
@@ -102,6 +104,12 @@ docs: update the README deployment guide
 - 函数和类需要添加英文 docstring
 - 非直观逻辑使用英文注释
 - 新功能需要更新相关文档
+
+### 并行合并与工程效率操作
+
+大规模并行修复/合并时，优先阅读 [工程效率操作手册](engineering-efficiency-playbook.md)（[English](engineering-efficiency-playbook_EN.md)）：火车批次合并、冲突图分组、配置注册守卫、squash 误关 Issue 防线、自迭代验收闭环、单机资源上限与工作区防误删。
+
+**分工**：仓库根目录 `AGENTS.md` 是协作**合同**（硬规则与验证矩阵）；该手册是**操作指南**。二者冲突时以 `AGENTS.md` 为准。
 
 ### CI 自动检查
 

@@ -15,6 +15,13 @@ read from its existing owner:
 | `data` | provider runtime of the process manager that already serves callers | Active providers and the methods they declare |
 | `tool` | Agent `ToolRegistry` | Registered definitions, owner-declared optional members, and scopes |
 | `extension` | `PluginManager` and its unified extension registry | Plugin lifecycle observations and active contributions |
+| `skill` | Installed `ApplicationServices` analysis-strategy catalog plus declarative `SkillManager` | Plugin analysis strategies and custom skill definitions actually loaded in-process |
+| `pipeline` | Shared pipeline stage contract (`PIPELINE_STAGE_NAMES` / `PipelineStageName`) | Bound analysis pipeline stages; unbound names are reported, never invented |
+
+Availability is never copied from a static readiness catalog. When a registry or
+configuration owner cannot be read, that source is `error` or `not_initialized`
+with an explicit `error_code`, and the response is `partial=true`. The inventory
+never installs a substitute composition root to fabricate a successful snapshot.
 
 Each source supplies one stable snapshot and generation. All records from that
 source carry the same `source_generation` and `as_of`. Plugin lifecycle records
@@ -28,6 +35,21 @@ first, then the process-shared Agent tool manager — and never constructs one:
 a new `DataFetcherManager` would own a different provider runtime whose active
 registrations belong to no caller. When neither manager exists yet, the data
 source is reported as `not_initialized` instead of an empty inventory.
+
+The extension and skill sources likewise observe only an already-installed
+composition root. Calling the inventory never constructs a default
+`ApplicationServices` instance: absence is `not_initialized`
+(`application_services_not_initialized`). Skill configuration or catalog load
+failures surface as `skill_config_unavailable` or `skill_catalog_unavailable`.
+
+The tool source observes only an already-built process `ToolRegistry` and never
+constructs one. Skill source generations include plugin identities plus a bounded
+canonical hash of every record-visible declarative field (`name`, `source`,
+`enabled`, `display_name`, and `required_tools`), so same-name metadata changes
+and equal-count catalog swaps both advance generation. Pipeline stages are
+bound only when the live `StockAnalysisPipeline` type exposes a stage runner
+and bound stage methods reference the stage; registration alone never sets
+`healthy=true`.
 
 Owner generations cover every change a record can expose. Tool entries are
 frozen copies captured at registration, so a later in-place mutation of a live

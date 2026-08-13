@@ -29,6 +29,7 @@ from api.v1.schemas.portfolio import (
     PortfolioFxRefreshResponse,
     PortfolioImportBrokerListResponse,
     PortfolioImportCommitResponse,
+    PortfolioImportFailedRow,
     PortfolioImportParseResponse,
     PortfolioImportTradeItem,
     PortfolioPositionAnalysisRequest,
@@ -720,7 +721,7 @@ def _resolve_position_analysis_context(
     "/imports/csv/parse",
     response_model=PortfolioImportParseResponse,
     responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
-    summary="Parse broker CSV into normalized trade records",
+    summary="Parse broker CSV/XLSX into normalized trade records",
 )
 def parse_csv_import(
     broker: str = Form(..., description="Broker id: huatai/citic/cmb"),
@@ -729,7 +730,11 @@ def parse_csv_import(
     importer = PortfolioImportService()
     try:
         content = file.file.read()
-        parsed = importer.parse_trade_csv(broker=broker, content=content)
+        parsed = importer.parse_trade_csv(
+            broker=broker,
+            content=content,
+            filename=getattr(file, "filename", None),
+        )
         return PortfolioImportParseResponse(
             broker=parsed["broker"],
             record_count=parsed["record_count"],
@@ -737,6 +742,10 @@ def parse_csv_import(
             error_count=parsed["error_count"],
             records=[_serialize_import_record(item) for item in parsed.get("records", [])],
             errors=list(parsed.get("errors", [])),
+            failed_rows=[
+                PortfolioImportFailedRow.model_validate(item)
+                for item in parsed.get("failed_rows", [])
+            ],
         )
     except ValueError as exc:
         raise _bad_request(exc)
@@ -784,7 +793,11 @@ def commit_csv_import(
     importer = PortfolioImportService()
     try:
         content = file.file.read()
-        parsed = importer.parse_trade_csv(broker=broker, content=content)
+        parsed = importer.parse_trade_csv(
+            broker=broker,
+            content=content,
+            filename=getattr(file, "filename", None),
+        )
         result = importer.commit_trade_records(
             account_id=account_id,
             broker=parsed["broker"],
@@ -826,6 +839,10 @@ def preview_futu_import(
             error_count=parsed["error_count"],
             records=[_serialize_import_record(item) for item in parsed.get("records", [])],
             errors=list(parsed.get("errors", [])),
+            failed_rows=[
+                PortfolioImportFailedRow.model_validate(item)
+                for item in parsed.get("failed_rows", [])
+            ],
         )
     except FutuPositionFetchError as exc:
         raise api_error(503, "futu_opend_unavailable", str(exc))

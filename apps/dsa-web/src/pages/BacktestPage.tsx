@@ -2,6 +2,7 @@ import type React from 'react';
 import { useState, useEffect, useCallback, useId, useRef } from 'react';
 import { Check, ChevronDown, Inbox, Minus, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
@@ -11,14 +12,18 @@ import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
+  APP_ROUTE_PATHS,
   RESEARCH_BACKTEST_LIMITS,
   RESEARCH_BACKTEST_PHASE_VALUES,
 } from '../routing/routes';
 import {
-  parseResearchBacktestRouteState,
-  setResearchBacktestRouteState,
-  type ResearchBacktestRouteState,
-} from '../routing/researchRouteState';
+  DEFAULT_CANDIDATE_LIMIT,
+  getBacktestFiltersLocation,
+  getInitialBacktestFilters,
+  getInitialBacktestStrategy,
+  type BacktestFilterSnapshot,
+  type BacktestStrategySnapshot,
+} from '../routing/backtestUrlState';
 import {
   BACKTEST_DIRECTION_EXPECTED_LABELS,
   BACKTEST_MOVEMENT_LABELS,
@@ -43,19 +48,6 @@ import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../ut
 const BACKTEST_COMPACT_INPUT_CLASS =
   'h-8 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
-
-type BacktestFilterSnapshot = ResearchBacktestRouteState;
-
-function getInitialBacktestFilters(search = typeof window === 'undefined' ? '' : window.location.search): BacktestFilterSnapshot {
-  return parseResearchBacktestRouteState(search).state;
-}
-
-function getBacktestFiltersLocation(filters: BacktestFilterSnapshot): string | null {
-  if (typeof window === 'undefined') return null;
-  const url = new URL(window.location.href);
-  url.search = setResearchBacktestRouteState(url.searchParams, filters).toString();
-  return `${url.pathname}${url.search}${url.hash}`;
-}
 
 // ============ Helpers ============
 
@@ -342,13 +334,23 @@ const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> 
 const BacktestPage: React.FC = () => {
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.researchBacktest,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const text = BACKTEST_TEXT[language];
   const validationText = BACKTEST_VALIDATION_TEXT[language];
   const phaseFilterOptions = BACKTEST_PHASE_FILTER_OPTIONS[language];
   const actionLabels = buildDecisionActionLabelMap(t);
   const [initialFilters] = useState(() => getInitialBacktestFilters());
-  const syncBacktestFiltersToUrl = useCallback((filters: BacktestFilterSnapshot) => {
-    const location = getBacktestFiltersLocation(filters);
+  const [initialStrategy] = useState(() => getInitialBacktestStrategy());
+  const syncBacktestFiltersToUrl = useCallback((
+    filters: BacktestFilterSnapshot,
+    strategy?: BacktestStrategySnapshot,
+  ) => {
+    const location = getBacktestFiltersLocation(filters, strategy);
     if (location) navigate(location, { replace: true });
   }, [navigate]);
 
@@ -358,6 +360,7 @@ const BacktestPage: React.FC = () => {
   }, [text.documentTitle]);
 
   useEffect(() => {
+    // Normalize core filter keys on mount; strategy keys restored from the URL are preserved.
     syncBacktestFiltersToUrl(initialFilters);
   }, [initialFilters, syncBacktestFiltersToUrl]);
 
@@ -368,9 +371,9 @@ const BacktestPage: React.FC = () => {
   const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>(initialFilters.phase);
   const [evalDays, setEvalDays] = useState(initialFilters.windowDays ? String(initialFilters.windowDays) : '');
   const [evalDaysError, setEvalDaysError] = useState('');
-  const [minAgeDays, setMinAgeDays] = useState('');
+  const [minAgeDays, setMinAgeDays] = useState(initialStrategy.minAgeDays);
   const [minAgeError, setMinAgeError] = useState('');
-  const [candidateLimit, setCandidateLimit] = useState('200');
+  const [candidateLimit, setCandidateLimit] = useState(initialStrategy.candidateLimit);
   const [candidateLimitError, setCandidateLimitError] = useState('');
   const [dateFromError, setDateFromError] = useState('');
   const [dateToError, setDateToError] = useState('');
@@ -422,8 +425,30 @@ const BacktestPage: React.FC = () => {
     }
     return {
       minAgeDays: parsedMinAge,
-      limit: parsedLimit ?? 200,
+      limit: parsedLimit ?? DEFAULT_CANDIDATE_LIMIT,
     };
+  };
+
+  /** Build a URL strategy patch from validated run options. */
+  const strategySnapshotFromRunOptions = (
+    runOptions: { minAgeDays?: number; limit: number },
+  ): BacktestStrategySnapshot => ({
+    minAgeDays: runOptions.minAgeDays ?? null,
+    limit: runOptions.limit,
+  });
+
+  /**
+   * Soft-read strategy fields for URL writes without raising validation errors.
+   * Returns undefined when the draft is incomplete/invalid so existing URL strategy keys stay.
+   */
+  const tryStrategySnapshotFromDraft = (): BacktestStrategySnapshot | undefined => {
+    const parsedMinAge = minAgeDays.trim()
+      ? parseBoundedInteger(minAgeDays, 0, 365)
+      : null;
+    if (minAgeDays.trim() && parsedMinAge === undefined) return undefined;
+    const parsedLimit = parseBoundedInteger(candidateLimit, 1, 2000);
+    if (parsedLimit === undefined) return undefined;
+    return { minAgeDays: parsedMinAge ?? null, limit: parsedLimit };
   };
 
   const validateDraftFilters = (windowOverride?: number, codeOverride?: string): BacktestFilterSnapshot | null => {
@@ -607,14 +632,24 @@ const BacktestPage: React.FC = () => {
       if (response.appliedConfig?.limit != null) {
         setCandidateLimit(String(response.appliedConfig.limit));
       }
-      syncBacktestFiltersToUrl({
-        code: code ?? '',
-        windowDays: effectiveEvalWindowDays,
-        startDate: validatedFilters.startDate,
-        endDate: validatedFilters.endDate,
-        phase: validatedFilters.phase,
-        page: 1,
-      });
+      const appliedMinAge = force
+        ? 0
+        : (response.appliedConfig?.minAgeDays ?? runOptions.minAgeDays ?? null);
+      const appliedLimit = response.appliedConfig?.limit ?? runOptions.limit;
+      syncBacktestFiltersToUrl(
+        {
+          code: code ?? '',
+          windowDays: effectiveEvalWindowDays ?? undefined,
+          startDate: validatedFilters.startDate,
+          endDate: validatedFilters.endDate,
+          phase: validatedFilters.phase,
+          page: 1,
+        },
+        strategySnapshotFromRunOptions({
+          minAgeDays: appliedMinAge === null ? undefined : appliedMinAge,
+          limit: appliedLimit,
+        }),
+      );
       const nextAppliedFilters = { ...validatedFilters, windowDays: effectiveEvalWindowDays, page: 1 };
       setAppliedFilters(nextAppliedFilters);
       void fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, validatedFilters.phase);
@@ -645,7 +680,7 @@ const BacktestPage: React.FC = () => {
     const nextFilters = { ...appliedFilters, phase: value, page: 1 };
     setAppliedFilters(nextFilters);
     setCurrentPage(1);
-    syncBacktestFiltersToUrl(nextFilters);
+    syncBacktestFiltersToUrl(nextFilters, tryStrategySnapshotFromDraft());
     void fetchResults(1, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, value);
     void fetchPerformance(nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, value);
   };
@@ -656,7 +691,7 @@ const BacktestPage: React.FC = () => {
     if (!nextFilters) return;
     setAppliedFilters(nextFilters);
     setCurrentPage(1);
-    syncBacktestFiltersToUrl(nextFilters);
+    syncBacktestFiltersToUrl(nextFilters, tryStrategySnapshotFromDraft());
     void fetchResults(1, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
     void fetchPerformance(nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
@@ -668,7 +703,7 @@ const BacktestPage: React.FC = () => {
     setEvalDaysError('');
     setAppliedFilters(nextFilters);
     setCurrentPage(1);
-    syncBacktestFiltersToUrl(nextFilters);
+    syncBacktestFiltersToUrl(nextFilters, tryStrategySnapshotFromDraft());
     void fetchResults(1, nextFilters.code || undefined, 1, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
     void fetchPerformance(nextFilters.code || undefined, 1, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
@@ -685,7 +720,7 @@ const BacktestPage: React.FC = () => {
     setEvalDaysError('');
     setAppliedFilters(nextFilters);
     setCurrentPage(1);
-    syncBacktestFiltersToUrl(nextFilters);
+    syncBacktestFiltersToUrl(nextFilters, tryStrategySnapshotFromDraft());
     void fetchResults(1, nextFilters.code || undefined, windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
     void fetchPerformance(nextFilters.code || undefined, windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
@@ -696,7 +731,7 @@ const BacktestPage: React.FC = () => {
   const handlePageChange = (page: number) => {
     const nextFilters = { ...appliedFilters, page };
     setAppliedFilters(nextFilters);
-    syncBacktestFiltersToUrl(nextFilters);
+    syncBacktestFiltersToUrl(nextFilters, tryStrategySnapshotFromDraft());
     void fetchResults(page, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
 
@@ -813,7 +848,7 @@ const BacktestPage: React.FC = () => {
 
   return (
     <AppPage className="flex min-h-full flex-col">
-      <PageHeader className="shrink-0" title={text.pageTitle} />
+      <PageHeader ref={pageHeadingRef} className="shrink-0" title={text.pageTitle} />
       <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
           {/* #879 B2: mobile disclosure; page-scoped name avoids legacy "筛选" action. */}

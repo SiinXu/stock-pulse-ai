@@ -10,14 +10,13 @@
 
 1. **Proposal foundation** — produce and validate a bounded `AgentPlan` (`PlanningEngine`).
 2. **Execution loop** — optional `execute_plan_loop` that runs plan → act → observe → replan under hard budgets.
+3. **Production RUN path** — when `AGENT_PLANNING_ENABLED=true`, `AgentExecutor.run` (used by agent-mode analysis orchestration) calls `try_run_with_planning` so plan → act → observe really runs with `BoundToolSession` tool dispatch, then LLM synthesis for the decision dashboard.
 
-Neither path is wired into `AgentExecutor`, Chat, Research, daily analysis, the multi-agent orchestrator, reports, Web settings, or product configuration. Callers must invoke the APIs explicitly.
-
-A proposal alone must never be described as a complete production planning engine. The loop is the first real execution slice; product integration remains open.
+Default remains **off**: classic ReAct RUN is byte-stable when the switch is false. Chat, Research, multi-agent orchestrator, and durable product UI are still not fully mode-aware in this slice.
 
 ## Proposal contracts
 
-- Callers construct `PlanningSettings` explicitly. There are no `AGENT_PLANNING_*` environment variables or parallel configuration owner.
+- Shared Config owns product knobs via `AGENT_PLANNING_*` (registered in the Settings registry). Library callers may still construct `PlanningSettings` / `PlanExecutionSettings` explicitly.
 - **One limit authority.** Every absolute bound lives in `src/agent/planning/config.py` and is imported by settings validation, payload validation, the engine, prompt projection, and the execution loop. No module restates a limit as a literal.
 - Exact finite proposal limits: at most 16 steps, 3 proposal retries, 8,192 planner tokens, and 60 seconds per proposal call. Invalid explicit values raise `ValueError`; they are never clamped or silently defaulted.
 - The `max_steps` argument of the public `validate_plan_payload` is a *caller cap that may only tighten* the absolute 16-step authority.
@@ -33,7 +32,7 @@ A proposal alone must never be described as a complete production planning engin
 
 `execute_plan_loop` is the plan → act → observe → replan entry point.
 
-- Callers construct `PlanExecutionSettings` explicitly (no environment/Config owner in this slice).
+- Product path builds `PlanExecutionSettings` from Config; library callers may still construct settings explicitly.
 - Absolute execution maxima: 32 tool calls, 3 observation-driven replans, 120 seconds wall clock, 500-character observation summaries. Settings may only tighten these.
 - Each plan step invokes its `expected_tools` through a **caller-supplied invoker** (typically wrapping `ToolSurface.execute_tool`). The loop does not bypass tool authorization, capabilities, or the Tool Surface security contract.
 - Tool results must include an exact boolean `ok`. Missing or non-bool `ok` is a failure (`invalid_tool_result`). The loop **never fail-opens** a failed or ambiguous tool result as overall success.
@@ -42,7 +41,7 @@ A proposal alone must never be described as a complete production planning engin
 - On step failure with `on_step_failure="replan"` and remaining budget, the loop calls the planner with `prior_observations`, records the replan in the audit trail, and restarts from the new plan. Prior observations remain visible in metadata.
 - Template replan excludes hard-failed tools (non-transient error codes) when building the next proposal; authorization still comes only from the caller-supplied available-tool set.
 - Cost/step upper bounds that stop the loop: `max_tool_calls_exceeded`, `execution_timeout`, `max_observation_replans_exceeded`, `cancelled`, `replan_failed`.
-- Trace channel: the loop emits `plan_execution` / `plan_step` phase events, tool start/end events, and terminal decision events through the existing agent observability helpers (persisted when a diagnostic context is active). Full structured metadata is always available via `PlanExecutionResult.to_metadata()` for diagnostics and evaluation consumers.
+- Trace channel: the loop emits structured plan/action/observation/replan/terminate events (`agent.plan` … `agent.terminate`) through the shared agent observability channel (issue #1078; taxonomy aligned with the unified run-trace draft in #1125). Events carry `run_id`, optional `step`, `reason` / `error_type` when applicable, and a budget snapshot (tool calls, observation replans, tokens). Terminate always includes a non-empty reason. The same ordered list is on `PlanExecutionResult.trace_events` so one run can be reconstructed without log diving. Phase/tool/decision events continue as before. Recording is gated by `AGENT_OBSERVABILITY_ENABLED` (default on; set false to disable). Full structured metadata remains available via `PlanExecutionResult.to_metadata()`. Local and metadata event lists share `MAX_PLANNING_TRACE_EVENTS` (200); step observations remain capped by `MAX_TRACE_STEPS` (64).
 - `success=True` only when the active plan completes every step successfully after any replans. Historical failed steps before a successful replan stay in the observation list and do not flip the terminal flag to success by themselves — the terminal flag reflects loop completion, not “every observation row is green.”
 
 ### Explicit execution example
@@ -83,13 +82,36 @@ print(result.success, result.status, result.to_metadata())
 
 The library does not persist anything by itself. Observability emit is best-effort and fail-open at the emit boundary only; execution outcomes never claim success on failure. Callers must not persist private task text, free-form model reasoning, credentials, or raw provider responses. Returned metadata is restricted to stable reason codes, bounded summaries, plan ids, and observation status rows.
 
+## Production RUN integration
+
+| Env / Config field | Default | Role |
+| --- | --- | --- |
+| `AGENT_PLANNING_ENABLED` | `false` | Master switch for `AgentExecutor.run` |
+| `AGENT_PLANNING_STRATEGY` | `template` | `template` or `llm` |
+| `AGENT_PLANNING_MAX_PLAN_STEPS` | `8` | Proposal step cap (1–16) |
+| `AGENT_PLANNING_MAX_REPLANS` | `1` | Proposal retries (0–3) |
+| `AGENT_PLANNING_MAX_TOKENS` | `1500` | LLM planner token budget (1–8192) |
+| `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | Proposal wall clock (0.1–60) |
+| `AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS` | `16` | Execution tool-call cap (1–32) |
+| `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | Observation replans (0–3) |
+| `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | Execution wall clock (0.1–120) |
+| `AGENT_PLANNING_ON_STEP_FAILURE` | `replan` | `replan` or `terminate` |
+
+Flow when enabled:
+
+1. `PlanningEngine.plan` with tools from the executor registry.
+2. `execute_plan_loop` with a `BoundToolSession` invoker (same security authority as the native runner).
+3. On success, inject observation evidence into the user message and run dashboard synthesis via `_run_loop`.
+4. On proposal or execution failure, return `AgentResult(success=False)` with `planning_metadata` (never fail-open success).
+5. Traces: existing agent observability phase/tool/decision events; `AgentResult.planning_metadata` / `tool_calls_log` for diagnostics.
+
 ## Remaining #199 scope
 
-- mode-aware RUN/CHAT/RESEARCH/daily product policy and shared tool authorization budgets across those modes;
-- durable plan/action/observation audit persistence, tenant identity, redaction/retention ownership, and product UI;
-- one shared UsageRecorder / security-audit / run-diagnostics configuration owner for planning;
-- deterministic multi-step real-tool acceptance evidence inside production workflows.
+- mode-aware Chat / Research / multi-agent policy (RUN is wired; Chat/Research still classic paths);
+- durable plan/action/observation audit persistence, tenant identity, redaction/retention ownership, and richer product UI beyond Settings knobs;
+- deeper shared UsageRecorder ownership beyond BoundToolSession security audit + observability emit;
+- broader real-network multi-step acceptance evidence beyond focused offline production-path tests.
 
 ## Rollback
 
-Revert the additive planning module, tests, and documentation. There is no runtime switch, migration, or production integration to roll back.
+Set `AGENT_PLANNING_ENABLED=false` (default) or revert this integration PR. No data migration.

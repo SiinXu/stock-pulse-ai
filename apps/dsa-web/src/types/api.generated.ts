@@ -510,6 +510,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run portfolio-level analysis for a multi-symbol basket
+         * @description Analyze a list of symbols as one portfolio rather than stacking per-symbol conclusions. Returns correlation highlights, concentration/diversification, shared risk exposures, stance distribution from existing analyses, structural health, and an optional stress overlay. At most 20 symbols. Missing single-symbol price data degrades the result (status=partial) and never fails the whole request. Reuses the portfolio health and stress-test data planes via a synthetic equal/custom-weight snapshot — no separate holdings model.
+         */
+        post: operations["analyzePortfolioLevel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis/status/{task_id}": {
         parameters: {
             query?: never;
@@ -902,7 +922,7 @@ export interface paths {
         };
         /**
          * List the runtime capability inventory (read-only)
-         * @description Capture a versioned read-only inventory from the live data-provider, tool, and plugin owners. Unknown readiness remains null. Source read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or health-check capabilities.
+         * @description Capture a versioned read-only inventory from the live data-provider, tool, plugin, skill, and pipeline owners. Availability comes only from runtime registration and owner health state, never from a static catalog. Unknown readiness remains null. Source or config read failures are returned explicitly with partial=true; this endpoint does not register, resolve, grant, execute, or perform side-effecting health checks.
          */
         get: operations["listCapabilities"];
         put?: never;
@@ -1262,6 +1282,77 @@ export interface paths {
         patch: operations["updateDecisionSignalStatus"];
         trace?: never;
     };
+    "/api/v1/discover/screen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run bounded AI candidate discovery
+         * @description Natural-language or criteria-driven candidate discovery over an explicit paginated universe. Quotes go through data_provider with a hard provider-call budget. Research screening only — not trade instructions.
+         */
+        post: operations["runCandidateDiscovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit bounded AI candidate discovery task */
+        post: operations["startCandidateDiscoveryTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get candidate discovery task status */
+        get: operations["getCandidateDiscoveryTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discover/screen/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a running candidate discovery task */
+        post: operations["cancelCandidateDiscoveryTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/focus/today": {
         parameters: {
             query?: never;
@@ -1271,7 +1362,7 @@ export interface paths {
         };
         /**
          * Get today's focus recommendations
-         * @description Fresh local-calendar-day evidence from the watchlist and persisted holdings cache. Hard-capped, read-only, and explicit about source degradation; never fetches market data, runs analysis, or replays portfolio state.
+         * @description Fresh market-local-calendar-day evidence from the watchlist and full persisted holdings cache. A-shares, Hong Kong, and US symbols each use their own exchange timezone day boundary; hard-capped, read-only, and explicit about source degradation or non-finite financial values. Never fetches market data, runs analysis, or replays portfolio state.
          */
         get: operations["getTodaysFocus"];
         put?: never;
@@ -1360,7 +1451,7 @@ export interface paths {
         };
         /**
          * Report export capabilities
-         * @description Return which report export formats are available in this process. Markdown is always available. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. Office formats (docx/xlsx) are not implemented in this release.
+         * @description Return which report export formats are available in this process. Markdown is always available. HTML is the office-friendly format and requires markdown-it-py from the optional report-export set. PDF requires the optional fpdf2 package and a resolvable CJK/Unicode font. DOCX/XLSX are not implemented; office_formats_status is html_only.
          */
         get: operations["get_report_export_capabilities_api_v1_history_export_capabilities_get"];
         put?: never;
@@ -1460,7 +1551,7 @@ export interface paths {
         };
         /**
          * Export a history report
-         * @description Export an analysis history record as Markdown (always) or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. PDF preserves visible wording but drops link destinations and complete image destinations, replaces images with an omission note, and renders tables wider than six columns as stacked header/value rows. Explicit byte/page/table/time/concurrency limits apply.
+         * @description Export an analysis history record as Markdown (always), HTML (office-friendly; optional markdown-it-py), or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. HTML and PDF preserve visible wording but drop link destinations and complete image destinations, replace images with an omission note, and enforce explicit byte/table bounds. PDF also enforces page/time/concurrency limits and exact glyph coverage.
          */
         get: operations["export_history_report_api_v1_history__record_id__export_get"];
         put?: never;
@@ -1986,6 +2077,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notification-inbox/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List in-app notification inbox items */
+        get: operations["list_inbox_items_api_v1_notification_inbox_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/items/mark-all-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark the current notification inbox window as read */
+        post: operations["mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/items/mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark specific notification inbox items as read */
+        post: operations["mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-inbox/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get unread notification inbox count */
+        get: operations["get_inbox_unread_count_api_v1_notification_inbox_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onboarding/apply": {
         parameters: {
             query?: never;
@@ -2144,6 +2303,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/{plugin_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one plugin's generated settings contract
+         * @description Return the strict manifest-declared settings schema and effective values. Sensitive values are represented only by mask_token.
+         */
+        get: operations["getPluginSettings"];
+        /**
+         * Validate and persist one plugin's settings
+         * @description Replace explicit per-plugin settings after strict manifest validation. Omitted keys reset to defaults; masked sensitive values preserve the stored secret.
+         */
+        put: operations["updatePluginSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/portfolio/accounts": {
         parameters: {
             query?: never;
@@ -2175,6 +2358,26 @@ export interface paths {
         post?: never;
         /** Deactivate portfolio account */
         delete: operations["delete_account_api_v1_portfolio_accounts__account_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolio/accounts/{account_id}/paper-decision-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Score paper-trading decisions on process quality (not PnL)
+         * @description Returns explainable process scores for simulated trades on a paper account: analysis support, risk-gate compliance, and position discipline. This is not a return or win-rate evaluation. Outcome metrics remain owned by DecisionSignal post-hoc calibration (issue #987).
+         */
+        get: operations["getPaperDecisionQuality"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2367,7 +2570,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Parse broker CSV into normalized trade records */
+        /** Parse broker CSV/XLSX into normalized trade records */
         post: operations["parse_csv_import_api_v1_portfolio_imports_csv_parse_post"];
         delete?: never;
         options?: never;
@@ -2617,6 +2820,46 @@ export interface paths {
          * @description List historical analysis runs for a symbol with run id, time, model, and configuration fingerprint for the report version picker.
          */
         get: operations["listReportVersionRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/conclusions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get latest stratified research conclusion for a stock code
+         * @description Returns the newest analysis history row for stock_code as a mode-filtered stratified conclusion. Same governance as GET by record id. Default-off.
+         */
+        get: operations["getLatestResearchConclusion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/conclusions/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get stratified research conclusion by history record id
+         * @description Authenticated read-only projection of stratified conclusions (brief / standard / research) plus metadata (as-of, confidence, evidence counts and refs). Default-off via RESEARCH_API_ENABLED; no write methods; reuses session auth, security audit, and sliding-window rate limits on the main API port.
+         */
+        get: operations["getResearchConclusionByRecordId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3188,6 +3431,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/config/data-providers/runtime-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get data provider runtime status
+         * @description Read a side-effect-free projection of the live market-data provider runtime: CN/HK/US daily routing (primary/fallback), process-local health, cache quality, and enhancer configured state. Probe failures and missing owners are explicit; availability is never defaulted to true on failure. Does not call third-party APIs or mutate config.
+         */
+        get: operations["getDataProviderRuntimeStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/config/export": {
         parameters: {
             query?: never;
@@ -3568,6 +3831,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get structured readiness / self-check report
+         * @description On-demand structured readiness for data providers, LLM/generation backend, task queue, and selected setup dependencies. Reuses existing observational probes; does not write config, does not run model smoke tests, and is not invoked automatically at process startup. Probe failures and per-check timeouts are reported as failed or degraded and never as ready.
+         */
+        get: operations["getSystemReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/scheduler/run-now": {
         parameters: {
             query?: never;
@@ -3672,6 +3955,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/valuation/peer-canvas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build peer relative-value comparison canvas
+         * @description Constrained target + peer valuation metrics grid. Reuses the valuation estimate service for multiples/medians (no recompute). Peer set source is explainable (custom or industry). Peers with missing data stay in the grid and are annotated. Absolute estimates are normalized into a base currency when FX conversion is available. Research support only.
+         */
+        post: operations["buildPeerValuationCanvas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/watchlist/scores": {
         parameters: {
             query?: never;
@@ -3716,6 +4019,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentModeBreakdown */
+        AgentModeBreakdown: {
+            /** Agent Mode */
+            agent_mode: string;
+            /** Calls */
+            calls: number;
+            /**
+             * Completion Tokens
+             * @default 0
+             */
+            completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
+            /**
+             * Prompt Tokens
+             * @default 0
+             */
+            prompt_tokens: number;
+            /** Total Tokens */
+            total_tokens: number;
+        };
         /** AgentModelDeployment */
         AgentModelDeployment: {
             /** Api Base */
@@ -3757,6 +4081,84 @@ export interface components {
         AlertDeleteResponse: {
             /** Deleted */
             deleted: number;
+        };
+        /** AlertEventAffectedContext */
+        AlertEventAffectedContext: {
+            /**
+             * In Portfolio
+             * @default false
+             */
+            in_portfolio: boolean;
+            /**
+             * In Watchlist
+             * @default false
+             */
+            in_watchlist: boolean;
+            /** Symbol */
+            symbol?: string | null;
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /** AlertEventContext */
+        AlertEventContext: {
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactContext */
+        AlertImpactContext: {
+            affected?: components["schemas"]["AlertEventAffectedContext"] | null;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /** Event Categories */
+            event_categories?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst")[];
+            /** Event Category */
+            event_category?: ("earnings" | "shareholder" | "mna" | "regulatory" | "analyst") | null;
+            /** Matched Count */
+            matched_count?: number | null;
+            /** Related Analysis */
+            related_analysis?: string | null;
+            /** Source Item Id */
+            source_item_id?: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** What Happened */
+            what_happened?: string | null;
+            /** Why It Matters */
+            why_it_matters?: string | null;
+        };
+        /** AlertImpactResult */
+        AlertImpactResult: {
+            /**
+             * Grade
+             * @enum {string}
+             */
+            grade: "major" | "routine" | "unclassified";
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "rule_severity" | "unavailable";
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
         };
         /** AlertNotificationItem */
         AlertNotificationItem: {
@@ -3973,6 +4375,8 @@ export interface components {
         };
         /** AlertTriggerItem */
         AlertTriggerItem: {
+            /** Alert Type */
+            alert_type?: string | null;
             analysis_context_pack_overview?: components["schemas"]["AnalysisContextPackOverview"] | null;
             /**
              * Analysis Visibility Source
@@ -3989,8 +4393,11 @@ export interface components {
             } | null;
             /** Diagnostics */
             diagnostics?: string | null;
+            event_context?: components["schemas"]["AlertEventContext"] | null;
             /** Id */
             id: number;
+            impact_context?: components["schemas"]["AlertImpactContext"] | null;
+            impact_result?: components["schemas"]["AlertImpactResult"] | null;
             market_phase_summary?: components["schemas"]["MarketPhaseSummary"] | null;
             /** Observed Value */
             observed_value?: number | null;
@@ -3998,6 +4405,8 @@ export interface components {
             reason?: string | null;
             /** Rule Id */
             rule_id?: number | null;
+            /** Severity */
+            severity?: ("info" | "warning" | "critical") | null;
             /** Status */
             status: string;
             /** Target */
@@ -4011,6 +4420,8 @@ export interface components {
         AlertTriggerListResponse: {
             /** Items */
             items?: components["schemas"]["AlertTriggerItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
             /** Page */
             page: number;
             /** Page Size */
@@ -5538,6 +5949,8 @@ export interface components {
              * @default 0
              */
             completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
             /**
              * Prompt Tokens
              * @default 0
@@ -5545,6 +5958,244 @@ export interface components {
             prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+        };
+        /** CandidateDiscoveryCandidate */
+        CandidateDiscoveryCandidate: {
+            /** Amount */
+            amount?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Factor Scores */
+            factor_scores?: {
+                [key: string]: number;
+            };
+            /** Industry */
+            industry?: string | null;
+            /** Llm Thesis */
+            llm_thesis?: string | null;
+            /** Market */
+            market?: string | null;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Price */
+            price?: number | null;
+            /** Provider */
+            provider?: string | null;
+            /** Rank */
+            rank: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Reason Codes */
+            reason_codes?: string[];
+            /** Risk Level */
+            risk_level?: string | null;
+            /** Score */
+            score?: number | null;
+            /** Selection Source */
+            selection_source?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryCriteria */
+        CandidateDiscoveryCriteria: {
+            /**
+             * Exclude St
+             * @default true
+             */
+            exclude_st: boolean;
+            /** Keywords */
+            keywords?: string[];
+            /** Markets */
+            markets?: string[];
+            /** Max Change Pct */
+            max_change_pct?: number | null;
+            /** Min Amount */
+            min_amount?: number | null;
+            /** Min Change Pct */
+            min_change_pct?: number | null;
+        };
+        /** CandidateDiscoveryRequest */
+        CandidateDiscoveryRequest: {
+            /** Account Id */
+            account_id?: number | null;
+            /** Codes */
+            codes?: string[];
+            criteria?: components["schemas"]["CandidateDiscoveryCriteria"] | null;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Markets */
+            markets?: string[];
+            /**
+             * Max Provider Calls
+             * @default 20
+             */
+            max_provider_calls: number;
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 50
+             */
+            page_size: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /**
+             * Universe
+             * @description watchlist | portfolio | index | codes
+             * @default watchlist
+             */
+            universe: string;
+            /**
+             * Use Llm
+             * @default false
+             */
+            use_llm: boolean;
+        };
+        /** CandidateDiscoveryResponse */
+        CandidateDiscoveryResponse: {
+            /** Candidate Count */
+            candidate_count: number;
+            /** Candidates */
+            candidates?: components["schemas"]["CandidateDiscoveryCandidate"][];
+            /** Cost Contract */
+            cost_contract?: {
+                [key: string]: unknown;
+            };
+            /** Criteria */
+            criteria?: {
+                [key: string]: unknown;
+            };
+            /** Empty Message */
+            empty_message?: string | null;
+            /** Empty Reason */
+            empty_reason?: string | null;
+            /**
+             * Market
+             * @default cn
+             */
+            market: string;
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /** Pack Version */
+            pack_version: string;
+            /**
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @default 50
+             */
+            page_size: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /**
+             * Research Disclaimer
+             * @default Research screening only. Not investment advice or trade instructions.
+             */
+            research_disclaimer: string;
+            /** Run Id */
+            run_id: string;
+            /** Status */
+            status: string;
+            /** Universe */
+            universe: string;
+            /** Universe Contract */
+            universe_contract?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryTaskAccepted */
+        CandidateDiscoveryTaskAccepted: {
+            /** Max Provider Calls */
+            max_provider_calls: number;
+            /** Max Results */
+            max_results: number;
+            /** Message */
+            message: string;
+            /**
+             * Message Code
+             * @default task.discovery.queued
+             */
+            message_code: string;
+            /** Message Params */
+            message_params?: {
+                [key: string]: unknown;
+            };
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string;
+            /** Trace Id */
+            trace_id: string;
+            /** Universe */
+            universe: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** CandidateDiscoveryTaskStatus */
+        CandidateDiscoveryTaskStatus: {
+            /** Error */
+            error?: string | null;
+            /** Message */
+            message?: string | null;
+            /** Message Code */
+            message_code?: string | null;
+            /** Message Params */
+            message_params?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Progress
+             * @default 0
+             */
+            progress: number;
+            result?: components["schemas"]["CandidateDiscoveryResponse"] | null;
+            /** Status */
+            status: string;
+            /** Task Id */
+            task_id: string;
+            /** Trace Id */
+            trace_id?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * CapabilityListResponse
@@ -5554,7 +6205,7 @@ export interface components {
             /** Executable Count */
             executable_count: number;
             /** Items */
-            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"])[];
+            items?: (components["schemas"]["DataCapabilityItem"] | components["schemas"]["ToolCapabilityItem"] | components["schemas"]["ExtensionCapabilityItem"] | components["schemas"]["SkillCapabilityItem"] | components["schemas"]["PipelineCapabilityItem"])[];
             /** Non Executable Count */
             non_executable_count: number;
             /** Partial */
@@ -5586,7 +6237,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "data" | "tool" | "extension";
+            source: "data" | "tool" | "extension" | "skill" | "pipeline";
             /**
              * State
              * @enum {string}
@@ -6142,6 +6793,142 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * DataProviderRuntimeCacheStatus
+         * @description Daily-data cache counters projected for Hub quality labels.
+         */
+        DataProviderRuntimeCacheStatus: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Fetch Mode */
+            fetch_mode?: string | null;
+            /** Hits */
+            hits?: number | null;
+            /** Misses */
+            misses?: number | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Quality
+             * @default unknown
+             * @enum {string}
+             */
+            quality: "active" | "idle" | "cold" | "stale" | "local_only" | "unknown";
+            /** Stale Hits */
+            stale_hits?: number | null;
+            /** Writes */
+            writes?: number | null;
+        };
+        /**
+         * DataProviderRuntimeMarketChain
+         * @description Active daily-data routing chain for one overview market.
+         */
+        DataProviderRuntimeMarketChain: {
+            /** As Of */
+            as_of?: string | null;
+            /** Data Type */
+            data_type: string;
+            /** Fallback Provider Ids */
+            fallback_provider_ids?: string[];
+            /** Market */
+            market: string;
+            /** Ordered Provider Ids */
+            ordered_provider_ids?: string[];
+            /** Primary Provider Id */
+            primary_provider_id?: string | null;
+            /** Primary Selection */
+            primary_selection?: string | null;
+            /**
+             * Quality
+             * @default unknown
+             * @enum {string}
+             */
+            quality: "ok" | "degraded" | "unknown" | "unavailable";
+        };
+        /**
+         * DataProviderRuntimeProviderStatus
+         * @description Process-local health and role for one registered market-data provider.
+         */
+        DataProviderRuntimeProviderStatus: {
+            /** Available */
+            available: boolean;
+            /** Capabilities */
+            capabilities?: string[];
+            /** Circuit State */
+            circuit_state?: string | null;
+            /**
+             * Config Directory
+             * @default false
+             */
+            config_directory: boolean;
+            /** Configured */
+            configured?: boolean | null;
+            /** Display Name */
+            display_name: string;
+            /** Failure Reason */
+            failure_reason?: string | null;
+            /** Health Score */
+            health_score?: number | null;
+            /**
+             * Health Status
+             * @enum {string}
+             */
+            health_status: "healthy" | "degraded" | "unknown" | "unavailable" | "not_configured" | "circuit_open" | "failed";
+            /** Is Fallback For */
+            is_fallback_for?: string[];
+            /** Is Primary For */
+            is_primary_for?: string[];
+            /** Last Failure At */
+            last_failure_at?: string | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Markets */
+            markets?: string[];
+            /** Provider Id */
+            provider_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "baseline" | "enhancer" | "specialist";
+            /**
+             * Sample Count
+             * @default 0
+             */
+            sample_count: number;
+            /** Static Priority */
+            static_priority?: number | null;
+        };
+        /**
+         * DataProviderRuntimeStatusResponse
+         * @description Read-only Data Sources Hub runtime projection.
+         *
+         *     Observes the live ``DataFetcherManager`` only. Probe failures and missing
+         *     owners are explicit; availability is never defaulted to true on failure.
+         *     Does not open third-party connections or mutate circuits/config.
+         */
+        DataProviderRuntimeStatusResponse: {
+            /** As Of */
+            as_of: string;
+            cache?: components["schemas"]["DataProviderRuntimeCacheStatus"] | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+            /** Markets */
+            markets?: components["schemas"]["DataProviderRuntimeMarketChain"][];
+            /** Partial */
+            partial: boolean;
+            /** Providers */
+            providers?: components["schemas"]["DataProviderRuntimeProviderStatus"][];
+            /** Schema Version */
+            schema_version: string;
+            /**
+             * Source State
+             * @enum {string}
+             */
+            source_state: "ok" | "not_initialized" | "error";
+        };
         /** DecisionSignalCreateRequest */
         DecisionSignalCreateRequest: {
             /**
@@ -6500,6 +7287,11 @@ export interface components {
             miss: number;
             /** Neutral */
             neutral: number;
+            /**
+             * Sample Sufficient
+             * @default false
+             */
+            sample_sufficient: boolean;
             /** Total */
             total: number;
             /** Unable */
@@ -6529,11 +7321,21 @@ export interface components {
             hit_rate_pct?: number | null;
             /** Horizons */
             horizons?: string[] | null;
+            /**
+             * Minimum Completed Sample Size
+             * @default 30
+             */
+            minimum_completed_sample_size: number;
             /** Miss */
             miss: number;
             /** Neutral */
             neutral: number;
             profile_calibration?: components["schemas"]["DecisionSignalProfileCalibration"] | null;
+            /**
+             * Sample Sufficient
+             * @default false
+             */
+            sample_sufficient: boolean;
             /** Statuses */
             statuses?: string[];
             /** Total */
@@ -6974,13 +7776,21 @@ export interface components {
          * ErrorResponse
          * @description Stable API error envelope.
          * @example {
+         *       "category": "not_found",
          *       "error": "not_found",
          *       "message": "Resource not found",
          *       "params": {},
+         *       "severity": "warning",
          *       "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
          *     }
          */
         ErrorResponse: {
+            /**
+             * Category
+             * @description Taxonomy category for the stable error code (auth, credential, rate_quota, provider_network, timeout, validation, busy, config_conflict, capability, notification, not_found, outbound_policy, internal)
+             * @example not_found
+             */
+            category?: string | null;
             /**
              * Detail
              * @deprecated
@@ -7011,6 +7821,12 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             };
+            /**
+             * Severity
+             * @description Taxonomy severity: info | warning | error | critical
+             * @example warning
+             */
+            severity?: string | null;
             /**
              * Trace Id
              * @description Diagnostic trace ID
@@ -7795,6 +8611,7 @@ export interface components {
             evaluation_dimensions?: components["schemas"]["InvestmentFrameworkEvaluationDimension"][];
             /** Free Form Rules */
             free_form_rules?: string | null;
+            research_stance?: components["schemas"]["ResearchStanceContent"] | null;
             /** Risk Rules */
             risk_rules?: string[];
             /** Root Node Id */
@@ -8924,6 +9741,8 @@ export interface components {
              * @default 0
              */
             completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
             /**
              * Max Total Tokens
              * @default 0
@@ -9064,6 +9883,164 @@ export interface components {
              * @description 新闻条数
              */
             total: number;
+        };
+        /**
+         * NotificationInboxItem
+         * @description One aggregated inbox row projected from durable event sources.
+         */
+        NotificationInboxItem: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Href
+             * @description In-app deep link path with query string
+             */
+            href: string;
+            /**
+             * Id
+             * @description Versioned stable occurrence key
+             */
+            id: string;
+            /**
+             * Is Read
+             * @default false
+             */
+            is_read: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "analysis_complete" | "alert_triggered" | "scheduled_task_result" | "decision_signal" | "daily_brief" | "high_disagreement" | "portfolio_health";
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Severity
+             * @default info
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "error";
+            /** Source Id */
+            source_id: string;
+            /** Summary */
+            summary: string;
+            /**
+             * Title Key
+             * @enum {string}
+             */
+            title_key: "analysisCompleteTitle" | "alertTriggeredTitle" | "scheduledTaskResultTitle" | "decisionSignalTitle" | "dailyBriefTitle" | "highDisagreementTitle" | "portfolioHealthTitle";
+            /** Title Params */
+            title_params?: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * NotificationInboxListResponse
+         * @description GET /notification-inbox/items response body.
+         */
+        NotificationInboxListResponse: {
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["NotificationInboxItem"][];
+            /** Max Items */
+            max_items: number;
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Retention Days */
+            retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
+            /** Total */
+            total: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxMarkAllReadRequest
+         * @description POST /notification-inbox/items/mark-all-read request body.
+         */
+        NotificationInboxMarkAllReadRequest: {
+            /**
+             * Kind
+             * @description Optional kind filter when marking the current window
+             */
+            kind?: string | null;
+        };
+        /**
+         * NotificationInboxMarkAllReadResponse
+         * @description POST /notification-inbox/items/mark-all-read response body.
+         */
+        NotificationInboxMarkAllReadResponse: {
+            /** Marked Count */
+            marked_count: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxMarkReadRequest
+         * @description POST /notification-inbox/items/mark-read request body.
+         */
+        NotificationInboxMarkReadRequest: {
+            /**
+             * Item Ids
+             * @description Versioned stable inbox occurrence ids
+             */
+            item_ids: string[];
+        };
+        /**
+         * NotificationInboxMarkReadResponse
+         * @description POST /notification-inbox/items/mark-read response body.
+         */
+        NotificationInboxMarkReadResponse: {
+            /** Marked Count */
+            marked_count: number;
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
+         * NotificationInboxSourceStatus
+         * @description Availability and bounded provenance for one selected inbox source.
+         */
+        NotificationInboxSourceStatus: {
+            /** Available */
+            available: boolean;
+            /** Error Code */
+            error_code?: string | null;
+            /** Item Count */
+            item_count: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "analysis" | "alerts" | "scheduled_tasks" | "decision_signals" | "daily_briefs" | "high_disagreement" | "portfolio_health";
+        };
+        /**
+         * NotificationInboxUnreadCountResponse
+         * @description GET /notification-inbox/unread-count response body.
+         */
+        NotificationInboxUnreadCountResponse: {
+            /** Max Items */
+            max_items: number;
+            /** Retention Days */
+            retention_days: number;
+            /** Source Statuses */
+            source_statuses?: components["schemas"]["NotificationInboxSourceStatus"][];
+            /** Unread Total */
+            unread_total: number;
         };
         /**
          * NotificationTestAttempt
@@ -9344,6 +10321,163 @@ export interface components {
             /** Returned */
             returned: number;
         };
+        /** PaperDecisionQualityAggregate */
+        PaperDecisionQualityAggregate: {
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: components["schemas"]["PaperDecisionQualityAggregateDimension"];
+            };
+            /** Max Process Score */
+            max_process_score?: number | null;
+            /** Min Process Score */
+            min_process_score?: number | null;
+            /** Process Score */
+            process_score?: number | null;
+            /** Sample Size */
+            sample_size: number;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "empty";
+        };
+        /** PaperDecisionQualityAggregateDimension */
+        PaperDecisionQualityAggregateDimension: {
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+        };
+        /** PaperDecisionQualityDimension */
+        PaperDecisionQualityDimension: {
+            /** Inputs */
+            inputs?: {
+                [key: string]: number;
+            };
+            /** Reasons */
+            reasons?: components["schemas"]["PaperDecisionQualityReason"][];
+            /** Score */
+            score?: number | null;
+            /**
+             * Status
+             * @default ok
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+        };
+        /** PaperDecisionQualityDivisionOfLabor */
+        PaperDecisionQualityDivisionOfLabor: {
+            /** Does Not Own */
+            does_not_own: string;
+            /**
+             * Outcome Owner Issue
+             * @default 987
+             */
+            outcome_owner_issue: number;
+            /** Owns */
+            owns: string;
+            /**
+             * This Issue
+             * @default 1134
+             */
+            this_issue: number;
+        };
+        /** PaperDecisionQualityItem */
+        PaperDecisionQualityItem: {
+            /** Dimensions */
+            dimensions: {
+                [key: string]: components["schemas"]["PaperDecisionQualityDimension"];
+            };
+            /** Effective Weights */
+            effective_weights?: {
+                [key: string]: number;
+            };
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Formula Version */
+            formula_version: string;
+            /** Linked Signal Id */
+            linked_signal_id?: number | null;
+            /** Market */
+            market?: string | null;
+            /** Price */
+            price?: number | null;
+            /** Process Score */
+            process_score: number;
+            /** Quantity */
+            quantity?: number | null;
+            /** Reasons */
+            reasons?: components["schemas"]["PaperDecisionQualityReason"][];
+            /**
+             * Score Kind
+             * @default process
+             * @constant
+             */
+            score_kind: "process";
+            /** Side */
+            side?: string | null;
+            /** Symbol */
+            symbol?: string | null;
+            /** Trade Date */
+            trade_date?: string | null;
+            /** Trade Id */
+            trade_id?: number | null;
+        };
+        /** PaperDecisionQualityReason */
+        PaperDecisionQualityReason: {
+            /** Code */
+            code: string;
+            /** Dimension */
+            dimension?: string | null;
+            /** Message */
+            message: string;
+        };
+        /** PaperDecisionQualityResponse */
+        PaperDecisionQualityResponse: {
+            /** Account Id */
+            account_id: number;
+            /**
+             * Account Type
+             * @default paper
+             * @constant
+             */
+            account_type: "paper";
+            aggregate: components["schemas"]["PaperDecisionQualityAggregate"];
+            /** As Of */
+            as_of: string;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Disclaimer */
+            disclaimer: string;
+            division_of_labor: components["schemas"]["PaperDecisionQualityDivisionOfLabor"];
+            /** Formula Version */
+            formula_version: string;
+            /** Items */
+            items?: components["schemas"]["PaperDecisionQualityItem"][];
+            /** Sample Size */
+            sample_size: number;
+            /**
+             * Score Kind
+             * @default process
+             * @constant
+             */
+            score_kind: "process";
+            /** Total Trade Count */
+            total_trade_count: number;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** PaperTradeCreateRequest */
         PaperTradeCreateRequest: {
             /** Note */
@@ -9381,6 +10515,88 @@ export interface components {
             price: number;
             /** Price Source */
             price_source: string;
+        };
+        /**
+         * PeerValuationCanvasRequest
+         * @description Request body for the constrained peer relative-value canvas (issue #1139).
+         */
+        PeerValuationCanvasRequest: {
+            /**
+             * Base Currency
+             * @description Base currency for cross-market estimate normalization (default: target listing currency)
+             */
+            base_currency?: string | null;
+            /**
+             * Industry Label
+             * @description Optional industry label override when peer_source=industry
+             */
+            industry_label?: string | null;
+            /**
+             * Peer Codes
+             * @description Peer stock codes (required for comparison; never invented server-side)
+             */
+            peer_codes?: string[] | null;
+            /**
+             * Peer Source
+             * @description Explainable peer-set source: custom codes or industry-constrained set
+             * @default custom
+             * @enum {string}
+             */
+            peer_source: "custom" | "industry";
+            /**
+             * Stock Code
+             * @description Target stock code
+             */
+            stock_code: string;
+        };
+        /** PeerValuationCanvasResponse */
+        PeerValuationCanvasResponse: {
+            /** Base Currency */
+            base_currency?: string | null;
+            /** Currency Metrics */
+            currency_metrics?: string[] | null;
+            /** Disclaimer */
+            disclaimer?: string | null;
+            /** Fx Stale */
+            fx_stale?: boolean | null;
+            /** Heatmap Cells */
+            heatmap_cells?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Medians */
+            medians?: {
+                [key: string]: unknown;
+            } | null;
+            /** Message */
+            message?: string | null;
+            /** Metrics */
+            metrics?: string[];
+            /** Multiple Metrics */
+            multiple_metrics?: string[] | null;
+            /** Peer Set */
+            peer_set?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason */
+            reason?: string | null;
+            /** Relative Summary */
+            relative_summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Rows */
+            rows?: {
+                [key: string]: unknown;
+            }[];
+            /** Schema Version */
+            schema_version: string;
+            /** Status */
+            status: string;
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Valuation Status */
+            valuation_status?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** PerformanceMetrics */
         PerformanceMetrics: {
@@ -9436,6 +10652,74 @@ export interface components {
             win_count: number;
             /** Win Rate Pct */
             win_rate_pct?: number | null;
+        };
+        /**
+         * PipelineCapabilityItem
+         * @description Live pipeline-stage observation from the shared execution contract.
+         */
+        PipelineCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "pipeline";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "pipeline_stage";
+            /** Version */
+            version: string;
         };
         /**
          * PluginHealthEntryResponse
@@ -9532,6 +10816,12 @@ export interface components {
              */
             reloadable: boolean;
             /**
+             * Settings Count
+             * @description Number of declarative settings fields in the plugin manifest
+             * @default 0
+             */
+            settings_count: number;
+            /**
              * Source
              * @enum {string}
              */
@@ -9600,6 +10890,128 @@ export interface components {
             items?: components["schemas"]["PluginInfo"][];
             /** Total */
             total: number;
+        };
+        /**
+         * PluginSettingFieldResponse
+         * @description One strict manifest-declared plugin settings field.
+         */
+        PluginSettingFieldResponse: {
+            /**
+             * Data Type
+             * @enum {string}
+             */
+            data_type: "string" | "integer" | "number" | "boolean";
+            /** Default Value */
+            default_value?: string | number | boolean | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Display Order
+             * @default 100
+             */
+            display_order: number;
+            /**
+             * Is Required
+             * @default false
+             */
+            is_required: boolean;
+            /**
+             * Is Sensitive
+             * @default false
+             */
+            is_sensitive: boolean;
+            /** Key */
+            key: string;
+            /** Options */
+            options?: components["schemas"]["PluginSettingOptionResponse"][];
+            /** Title */
+            title: string;
+            /**
+             * Ui Control
+             * @enum {string}
+             */
+            ui_control: "text" | "password" | "number" | "select" | "textarea" | "switch";
+            /** Validation */
+            validation?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * PluginSettingOptionResponse
+         * @description One finite option for a generated plugin setting control.
+         */
+        PluginSettingOptionResponse: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string | number | boolean | null;
+        };
+        /**
+         * PluginSettingsResponse
+         * @description Generated schema and masked effective values for one plugin.
+         */
+        PluginSettingsResponse: {
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Masked Keys */
+            masked_keys?: string[];
+            /** Plugin Id */
+            plugin_id: string;
+            /** Schema */
+            schema?: components["schemas"]["PluginSettingFieldResponse"][];
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        /**
+         * PluginSettingsUpdateRequest
+         * @description Full replacement of explicit values; omitted keys reset to defaults.
+         */
+        PluginSettingsUpdateRequest: {
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        /**
+         * PluginSettingsUpdateResponse
+         * @description Persisted settings projection plus apply semantics.
+         */
+        PluginSettingsUpdateResponse: {
+            /** Changed Keys */
+            changed_keys?: string[];
+            /**
+             * Mask Token
+             * @default ******
+             */
+            mask_token: string;
+            /** Masked Keys */
+            masked_keys?: string[];
+            /** Plugin Id */
+            plugin_id: string;
+            /**
+             * Restart Required
+             * @default false
+             */
+            restart_required: boolean;
+            /** Schema */
+            schema?: components["schemas"]["PluginSettingFieldResponse"][];
+            /** Values */
+            values?: {
+                [key: string]: string | number | boolean | null;
+            };
         };
         /** PortfolioAccountCreateRequest */
         PortfolioAccountCreateRequest: {
@@ -10278,7 +11690,7 @@ export interface components {
             var_pct?: number | null;
             /**
              * Var Value
-             * @description Historical VaR in portfolio currency units
+             * @description Historical VaR in portfolio response-base currency units
              */
             var_value?: number | null;
         };
@@ -10313,6 +11725,34 @@ export interface components {
             /** Record Count */
             record_count: number;
         };
+        /**
+         * PortfolioImportFailedRow
+         * @description One source row rejected during spreadsheet parse (correctable).
+         */
+        PortfolioImportFailedRow: {
+            /**
+             * Reason
+             * @description Human-readable rejection reason
+             */
+            reason: string;
+            /**
+             * Reason Code
+             * @description Stable machine code for the rejection reason
+             */
+            reason_code: string;
+            /**
+             * Row Number
+             * @description 1-based line number in the source file (header is 1)
+             */
+            row_number: number;
+            /**
+             * Source
+             * @description Non-empty original cells from the rejected row for download/correction
+             */
+            source?: {
+                [key: string]: string;
+            };
+        };
         /** PortfolioImportParseResponse */
         PortfolioImportParseResponse: {
             /** Broker */
@@ -10321,6 +11761,11 @@ export interface components {
             error_count: number;
             /** Errors */
             errors?: string[];
+            /**
+             * Failed Rows
+             * @description Structured rejected rows with original cells for client download
+             */
+            failed_rows?: components["schemas"]["PortfolioImportFailedRow"][];
             /** Record Count */
             record_count: number;
             /** Records */
@@ -10353,6 +11798,288 @@ export interface components {
             trade_date: string;
             /** Trade Uid */
             trade_uid?: string | null;
+        };
+        /** PortfolioLevelAnalysisRequest */
+        PortfolioLevelAnalysisRequest: {
+            /**
+             * As Of
+             * @description As-of date for price history and synthetic snapshot; default today
+             */
+            as_of?: string | null;
+            /**
+             * Confidence
+             * @default 0.95
+             */
+            confidence: number;
+            /**
+             * Currency
+             * @default CNY
+             */
+            currency: string;
+            /**
+             * High Correlation Threshold
+             * @default 0.7
+             */
+            high_correlation_threshold: number;
+            /**
+             * Horizon Days
+             * @default 1
+             */
+            horizon_days: number;
+            /**
+             * Include Stress
+             * @description When true, overlay a deterministic stress scenario on the basket
+             * @default true
+             */
+            include_stress: boolean;
+            /**
+             * Lookback Trading Days
+             * @default 252
+             */
+            lookback_trading_days: number;
+            /**
+             * Scenario Id
+             * @default market_down_10
+             */
+            scenario_id: string;
+            /**
+             * Sector Map
+             * @description Optional caller-provided sector labels for shared-risk clustering
+             */
+            sector_map?: {
+                [key: string]: string;
+            } | null;
+            /**
+             * Stock Codes
+             * @description Symbols to analyze as one basket (1..20). Duplicates are rejected.
+             */
+            stock_codes: string[];
+            /**
+             * Weights
+             * @description Optional non-negative weights keyed by stock code. Usable symbols missing from the map receive an equal unit baseline, then all usable weights are renormalized to 1.0. Degraded (unpriced) symbols are excluded before weighting.
+             */
+            weights?: {
+                [key: string]: number;
+            } | null;
+        };
+        /** PortfolioLevelAnalysisResponse */
+        PortfolioLevelAnalysisResponse: {
+            /**
+             * Analysis Mode
+             * @constant
+             */
+            analysis_mode: "portfolio_level_basket";
+            /** Annotations */
+            annotations?: string[];
+            /** As Of */
+            as_of: string;
+            /** Assumptions */
+            assumptions?: {
+                [key: string]: unknown;
+            };
+            /** Calculated At */
+            calculated_at: string;
+            concentration: components["schemas"]["PortfolioConcentrationBlock"];
+            correlation: components["schemas"]["PortfolioCorrelationBlock"];
+            /** Correlation Highlights */
+            correlation_highlights?: components["schemas"]["PortfolioLevelCorrelationHighlight"][];
+            /** Currency */
+            currency: string;
+            /** Degraded Symbols */
+            degraded_symbols?: components["schemas"]["PortfolioLevelDegradedSymbol"][];
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Formula Version
+             * @constant
+             */
+            formula_version: "portfolio_level_analysis_v1";
+            health?: components["schemas"]["PortfolioLevelHealthBlock"];
+            /** Max Symbols */
+            max_symbols: number;
+            /** Requested Symbols */
+            requested_symbols: string[];
+            /** Risk History */
+            risk_history?: {
+                [key: string]: unknown;
+            };
+            /** Risk Metrics Status */
+            risk_metrics_status?: string | null;
+            /** Shared Risk Exposures */
+            shared_risk_exposures?: components["schemas"]["PortfolioLevelSharedRisk"][];
+            /**
+             * Snapshot Kind
+             * @constant
+             */
+            snapshot_kind: "synthetic_basket_v1";
+            stance_distribution: components["schemas"]["PortfolioLevelStanceDistribution"];
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            stress?: components["schemas"]["PortfolioLevelStressBlock"] | null;
+            /** Symbols Requested Count */
+            symbols_requested_count: number;
+            /** Symbols Used */
+            symbols_used?: string[];
+            /** Symbols Used Count */
+            symbols_used_count: number;
+            var: components["schemas"]["PortfolioHistoricalVaRBlock"];
+            /** Weighting Mode */
+            weighting_mode: string;
+            /** Weights */
+            weights?: components["schemas"]["PortfolioLevelWeightItem"][];
+        };
+        /** PortfolioLevelCorrelationHighlight */
+        PortfolioLevelCorrelationHighlight: {
+            /** Abs Correlation */
+            abs_correlation: number;
+            /** Correlation */
+            correlation: number;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "positive" | "negative";
+            /** Left */
+            left: string;
+            /** Right */
+            right: string;
+        };
+        /** PortfolioLevelDegradedSymbol */
+        PortfolioLevelDegradedSymbol: {
+            /** Detail */
+            detail?: string | null;
+            /** Reason */
+            reason: string;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /**
+         * PortfolioLevelHealthBlock
+         * @description Projected health payload; extra fields allowed for forward compatibility.
+         */
+        PortfolioLevelHealthBlock: {
+            /** Band */
+            band?: string | null;
+            /** Comparable */
+            comparable?: boolean | null;
+            /** Coverage Ratio */
+            coverage_ratio?: number | null;
+            /** Data Quality */
+            data_quality?: {
+                [key: string]: unknown;
+            } | null;
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: unknown;
+            } | null;
+            /** Disclaimer */
+            disclaimer?: string | null;
+            /** Effective Weights */
+            effective_weights?: {
+                [key: string]: unknown;
+            } | null;
+            /** Formula Version */
+            formula_version?: string | null;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            } | null;
+            /** Insights */
+            insights?: unknown[] | null;
+            /** Partial Score */
+            partial_score?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Status Message */
+            status_message?: string | null;
+            /** Unavailable Dimensions */
+            unavailable_dimensions?: string[] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** PortfolioLevelSharedRisk */
+        PortfolioLevelSharedRisk: {
+            /** Kind */
+            kind: string;
+            /** Rank */
+            rank?: number | null;
+            /** Sector */
+            sector?: string | null;
+            /** Size */
+            size?: number | null;
+            /** Summary */
+            summary: string;
+            /** Symbols */
+            symbols?: string[];
+            /** Top Weight Pct */
+            top_weight_pct?: number | null;
+        };
+        /** PortfolioLevelStanceDistribution */
+        PortfolioLevelStanceDistribution: {
+            /** Average Score */
+            average_score?: number | null;
+            /** By Operation Advice */
+            by_operation_advice?: {
+                [key: string]: number;
+            };
+            /** Formula Version */
+            formula_version?: string | null;
+            /** Items */
+            items?: components["schemas"]["PortfolioLevelStanceItem"][];
+            /**
+             * Scored Count
+             * @default 0
+             */
+            scored_count: number;
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+            /**
+             * Unanalyzed Count
+             * @default 0
+             */
+            unanalyzed_count: number;
+        };
+        /** PortfolioLevelStanceItem */
+        PortfolioLevelStanceItem: {
+            /** Freshness */
+            freshness?: string | null;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Score */
+            score?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Stock Code */
+            stock_code?: string | null;
+        };
+        /**
+         * PortfolioLevelStressBlock
+         * @description Stress overlay; reuses stress-test payload shape when available.
+         */
+        PortfolioLevelStressBlock: {
+            /** Scenario */
+            scenario?: {
+                [key: string]: unknown;
+            } | null;
+            /** Status */
+            status: string;
+            /** Status Message */
+            status_message?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** PortfolioLevelWeightItem */
+        PortfolioLevelWeightItem: {
+            /** Symbol */
+            symbol: string;
+            /** Weight Pct */
+            weight_pct: number;
         };
         /** PortfolioPositionAnalysisRequest */
         PortfolioPositionAnalysisRequest: {
@@ -10439,6 +12166,8 @@ export interface components {
             data_source: string;
             /** Distribution Assumption */
             distribution_assumption: string;
+            /** Fx Policy */
+            fx_policy: string;
             /** Horizon Days */
             horizon_days: number;
             /** Horizon Scaling */
@@ -10492,6 +12221,11 @@ export interface components {
             cost_method: string;
             /** Currency */
             currency: string;
+            /**
+             * Fx Stale
+             * @default false
+             */
+            fx_stale: boolean;
             history?: components["schemas"]["PortfolioRiskHistoryMeta"] | null;
             /**
              * Portfolio Value
@@ -10505,7 +12239,7 @@ export interface components {
             positions_used: number;
             /**
              * Status
-             * @description 'ok', 'empty_portfolio', 'insufficient_history', or 'partial'
+             * @description 'ok', 'empty_portfolio', 'insufficient_history', 'partial'
              */
             status: string;
             /** Status Message */
@@ -10828,6 +12562,72 @@ export interface components {
             factor: "rate";
             /** Value Bp */
             value_bp: number;
+        };
+        /**
+         * ReadinessCheckItem
+         * @description One structured readiness dimension (ok | degraded | failed).
+         */
+        ReadinessCheckItem: {
+            /** Details */
+            details?: {
+                [key: string]: unknown;
+            };
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "failed";
+            /** Suggestion */
+            suggestion?: string | null;
+            /**
+             * Timed Out
+             * @default false
+             */
+            timed_out: boolean;
+        };
+        /**
+         * ReadinessReportResponse
+         * @description On-demand structured readiness/self-check report.
+         *
+         *     Composes existing observational probes (setup status, data-provider runtime
+         *     status, generation-backend cheap status, task-queue stats). Never mutates
+         *     configuration and is not invoked automatically at process startup.
+         *     Failures and timeouts are explicit and never reported as ready.
+         */
+        ReadinessReportResponse: {
+            /** Checks */
+            checks?: components["schemas"]["ReadinessCheckItem"][];
+            /** Generated At */
+            generated_at: string;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /** Schema Version */
+            schema_version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "failed";
+            /** Summary */
+            summary: string;
+            /** Timeout Seconds */
+            timeout_seconds: number;
         };
         /** ReasoningTraceAgent */
         ReasoningTraceAgent: {
@@ -11165,7 +12965,7 @@ export interface components {
              * @description 板块涨跌榜（结构 {top, bottom}）
              */
             sector_rankings?: unknown | null;
-            /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis */
+            /** @description Optional report-structured-insights-v1 projection containing phase decision, signal attribution, multi-strategy synthesis, and committee deliberation */
             structured_insights?: components["schemas"]["ReportStructuredInsights"] | null;
         };
         /**
@@ -11183,7 +12983,7 @@ export interface components {
              * Office Formats Status
              * @constant
              */
-            office_formats_status: "not_implemented";
+            office_formats_status: "html_only";
             pdf_limits: components["schemas"]["ReportExportPdfLimits"];
             /**
              * Requested Language
@@ -11191,7 +12991,7 @@ export interface components {
              */
             requested_language: "en" | "zh" | "zh-TW" | "ja" | "ko";
             /** Supported Query Formats */
-            supported_query_formats: ("md" | "pdf")[];
+            supported_query_formats: ("md" | "html" | "pdf")[];
         };
         /**
          * ReportExportFormatCapability
@@ -11223,9 +13023,10 @@ export interface components {
         };
         /**
          * ReportExportFormats
-         * @description Closed format map so generated clients expose both known keys.
+         * @description Closed format map so generated clients expose every known key.
          */
         ReportExportFormats: {
+            html: components["schemas"]["ReportExportFormatCapability"];
             md: components["schemas"]["ReportExportFormatCapability"];
             pdf: components["schemas"]["ReportExportFormatCapability"];
         };
@@ -11354,10 +13155,116 @@ export interface components {
             take_profit?: string | null;
         };
         /**
+         * ReportStructuredCommitteeConclusion
+         * @description Authoritative committee conclusion projected from strategy_synthesis.
+         */
+        ReportStructuredCommitteeConclusion: {
+            /** Confidence */
+            confidence?: number;
+            /** Conflict Count */
+            conflict_count?: number;
+            /** Conflict Severity */
+            conflict_severity?: string;
+            /** Consensus Level */
+            consensus_level?: string;
+            /** Final Signal */
+            final_signal?: string;
+            /** Weighted Score */
+            weighted_score?: number;
+        };
+        /**
+         * ReportStructuredCommitteeDeliberation
+         * @description Bounded Investment Committee deliberation for report consumers.
+         */
+        ReportStructuredCommitteeDeliberation: {
+            conclusion?: components["schemas"]["ReportStructuredCommitteeConclusion"];
+            /** Dissenting Opinions */
+            dissenting_opinions?: components["schemas"]["ReportStructuredCommitteeOpinion"][];
+            /** Divergence Points */
+            divergence_points?: components["schemas"]["ReportStructuredCommitteeDivergence"][];
+            /** Members */
+            members?: components["schemas"]["ReportStructuredCommitteeMember"][];
+            /** Mode */
+            mode?: string;
+            /** Outcome */
+            outcome?: string;
+            /** Personas Invalid */
+            personas_invalid?: string[];
+            /** Personas Truncated */
+            personas_truncated?: string[];
+            /** Schema Version */
+            schema_version?: string;
+            /** Source */
+            source?: string;
+            /** Status */
+            status?: string;
+            /** Supporting Opinions */
+            supporting_opinions?: components["schemas"]["ReportStructuredCommitteeOpinion"][];
+        };
+        /**
+         * ReportStructuredCommitteeDivergence
+         * @description Divergence point aligned with multi-strategy conflict / #1205 records.
+         */
+        ReportStructuredCommitteeDivergence: {
+            /** Kind */
+            kind?: string;
+            /** Participants */
+            participants?: string[];
+            /** Severity */
+            severity?: string;
+            /** Source */
+            source?: string;
+            /** Summary Key */
+            summary_key?: string;
+        };
+        /**
+         * ReportStructuredCommitteeMember
+         * @description One committee persona stance projected for report / Signal / History UI.
+         */
+        ReportStructuredCommitteeMember: {
+            /** Agent Name */
+            agent_name?: string;
+            /** Confidence */
+            confidence?: number;
+            /** Display Name */
+            display_name?: string;
+            /** Invalid */
+            invalid?: boolean;
+            /** Invalid Reason */
+            invalid_reason?: string;
+            /** Lens Verdict */
+            lens_verdict?: string;
+            /** Persona Id */
+            persona_id?: string;
+            /** Reasoning Excerpt */
+            reasoning_excerpt?: string;
+            /** Signal */
+            signal?: string;
+        };
+        /**
+         * ReportStructuredCommitteeOpinion
+         * @description Supporting or dissenting persona opinion from real synthesis rows.
+         */
+        ReportStructuredCommitteeOpinion: {
+            /** Agent Name */
+            agent_name?: string;
+            /** Confidence */
+            confidence?: number;
+            /** Display Name */
+            display_name?: string;
+            /** Persona Id */
+            persona_id?: string;
+            /** Reasoning Excerpt */
+            reasoning_excerpt?: string;
+            /** Signal */
+            signal?: string;
+        };
+        /**
          * ReportStructuredInsights
          * @description Versioned structured-insight projection returned by report APIs.
          */
         ReportStructuredInsights: {
+            committee_deliberation?: components["schemas"]["ReportStructuredCommitteeDeliberation"];
             phase_decision?: components["schemas"]["ReportStructuredPhaseDecision"];
             /**
              * Schema Version
@@ -11701,12 +13608,164 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * ResearchConclusionBody
+         * @description Mode-density stratified conclusion body (no secrets, no raw_result dump).
+         */
+        ResearchConclusionBody: {
+            /** Action */
+            action?: string | null;
+            /** Action Label */
+            action_label?: string | null;
+            /** Analysis Summary */
+            analysis_summary?: string | null;
+            /** Confidence Reason */
+            confidence_reason?: string | null;
+            /** Gaps */
+            gaps?: components["schemas"]["ResearchGapItem"][];
+            /**
+             * Omitted Count
+             * @default 0
+             */
+            omitted_count: number;
+            /** One Sentence */
+            one_sentence?: string | null;
+            /** Operation Advice */
+            operation_advice?: string | null;
+            /** Position Advice */
+            position_advice?: string | null;
+            /** Positive Catalysts */
+            positive_catalysts?: string[] | null;
+            /**
+             * Report Strata
+             * @description Mode-filtered report strata; null in brief mode
+             */
+            report_strata?: {
+                [key: string]: unknown;
+            } | null;
+            /** Risks */
+            risks?: string[];
+            /** Signal Type */
+            signal_type?: string | null;
+            /** Time Sensitivity */
+            time_sensitivity?: string | null;
+            /** Trend Prediction */
+            trend_prediction?: string | null;
+            /** Truncation Notice */
+            truncation_notice?: string | null;
+        };
+        /**
+         * ResearchConclusionMetadata
+         * @description Record-level metadata for embed/portal clients.
+         */
+        ResearchConclusionMetadata: {
+            /**
+             * As Of
+             * @description Best-effort data as-of timestamp from strata facts or record time
+             */
+            as_of?: string | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            evidence_counts?: components["schemas"]["ResearchEvidenceCounts"];
+            /**
+             * Evidence Refs
+             * @description Bounded unique evidence reference ids (source_id values)
+             */
+            evidence_refs?: string[];
+            /** Query Id */
+            query_id?: string | null;
+            /** Record Id */
+            record_id: number;
+            /** Report Language */
+            report_language?: string | null;
+            /** Report Type */
+            report_type?: string | null;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name?: string | null;
+        };
+        /**
+         * ResearchConclusionResponse
+         * @description Compact stratified conclusion response for embed/portal use.
+         */
+        ResearchConclusionResponse: {
+            conclusion: components["schemas"]["ResearchConclusionBody"];
+            /** Disclaimer */
+            disclaimer?: string | null;
+            metadata: components["schemas"]["ResearchConclusionMetadata"];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "brief" | "standard" | "research";
+            /**
+             * Schema Version
+             * @default research-conclusion-v1
+             * @constant
+             */
+            schema_version: "research-conclusion-v1";
+        };
+        /**
+         * ResearchEvidenceCounts
+         * @description Counts derived from the mode-filtered strata projection.
+         */
+        ResearchEvidenceCounts: {
+            /**
+             * Evidence Refs
+             * @description Unique source_id / source_ids count
+             * @default 0
+             */
+            evidence_refs: number;
+            /**
+             * Missing Or Conflicts
+             * @default 0
+             */
+            missing_or_conflicts: number;
+            /**
+             * Model Inference
+             * @default 0
+             */
+            model_inference: number;
+            /**
+             * Risks Counter Evidence
+             * @default 0
+             */
+            risks_counter_evidence: number;
+            /**
+             * Verified Facts
+             * @default 0
+             */
+            verified_facts: number;
+        };
+        /**
+         * ResearchGapItem
+         * @description One missing-data or conflict gap the client can render without full history.
+         */
+        ResearchGapItem: {
+            /** Description */
+            description: string;
+            /**
+             * Kind
+             * @default missing
+             * @enum {string}
+             */
+            kind: "missing" | "conflict";
+            /** Source Ids */
+            source_ids?: string[];
+        };
         /** ResearchRequest */
         ResearchRequest: {
             /** Question */
             question: string;
+            /** Session Id */
+            session_id?: string | null;
             /** Stock Code */
             stock_code?: string | null;
+            /** Turn Id */
+            turn_id?: string | null;
         };
         /** ResearchResponse */
         ResearchResponse: {
@@ -11736,6 +13795,18 @@ export interface components {
             notify: boolean;
             /** Stock Code */
             stock_code: string;
+        };
+        /**
+         * ResearchStanceContent
+         * @description Optional research-tone stance on the personal investment framework.
+         */
+        ResearchStanceContent: {
+            /** Custom Text */
+            custom_text?: string | null;
+            /** Preferred Lens Skill Ids */
+            preferred_lens_skill_ids?: ("persona_value_moat" | "persona_mental_models" | "persona_contrarian_deep_value" | "persona_disruptive_growth" | "persona_tail_risk")[];
+            /** Preset Id */
+            preset_id?: ("rational_analyst" | "risk_guardian" | "long_term_compounder") | null;
         };
         /**
          * RollbackSystemConfigRequest
@@ -12378,7 +14449,7 @@ export interface components {
              * Process Mode
              * @enum {string}
              */
-            process_mode: "serve" | "desktop" | "not_attached";
+            process_mode: "serve+schedule" | "desktop" | "cli-schedule" | "not_attached";
             /** Run Now Available */
             run_now_available: boolean;
             /** Run Now Block Reason */
@@ -12656,6 +14727,74 @@ export interface components {
             /** Return Distribution */
             return_distribution: components["schemas"]["ScorecardReturnBand"][];
         };
+        /**
+         * SkillCapabilityItem
+         * @description Live analysis-skill observation from plugin or declarative owners.
+         */
+        SkillCapabilityItem: {
+            /** As Of */
+            as_of: string;
+            /** Configured */
+            configured?: boolean | null;
+            /** Degraded */
+            degraded?: boolean | null;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Dependency Ready */
+            dependency_ready?: boolean | null;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            domain: "skill";
+            /** Executable */
+            executable?: boolean | null;
+            /** Grantable */
+            grantable?: boolean | null;
+            /** Healthy */
+            healthy?: boolean | null;
+            /**
+             * Id
+             * @description Stable domain-prefixed id
+             */
+            id: string;
+            /** Markets */
+            markets?: string[];
+            /** Owner */
+            owner: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Provider Count
+             * @description True supplier count, which may exceed the listed providers.
+             */
+            provider_count?: number | null;
+            /**
+             * Providers
+             * @description Every owner identity supplying this capability. Populated for data-domain records; the scalar provider field never joins ids.
+             */
+            providers?: string[];
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Registered */
+            registered: boolean;
+            /** Scopes */
+            scopes?: string[];
+            /** Source Generation */
+            source_generation: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "analysis_skill";
+            /** Version */
+            version: string;
+        };
         /** SkillInfo */
         SkillInfo: {
             /** Description */
@@ -12869,6 +15008,37 @@ export interface components {
             default_skill_id: string;
             /** Skills */
             skills: components["schemas"]["SkillInfo"][];
+        };
+        /** StageBreakdown */
+        StageBreakdown: {
+            /**
+             * Avg Latency Ms
+             * @default 0
+             */
+            avg_latency_ms: number;
+            /** Calls */
+            calls: number;
+            /**
+             * Completion Tokens
+             * @default 0
+             */
+            completion_tokens: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
+            /**
+             * Prompt Tokens
+             * @default 0
+             */
+            prompt_tokens: number;
+            /** Stage */
+            stage: string;
+            /**
+             * Success Calls
+             * @default 0
+             */
+            success_calls: number;
+            /** Total Tokens */
+            total_tokens: number;
         };
         /**
          * StockAnalysisScheduledPayload
@@ -13509,7 +15679,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "uncategorized";
+            category: "base" | "data_source" | "ai_model" | "notification" | "system" | "agent" | "backtest" | "indicators" | "mcp" | "uncategorized";
             /** @description Authoritative requirement, condition, and connection-test metadata */
             contract?: components["schemas"]["SystemConfigFieldContract"] | null;
             /**
@@ -14307,6 +16477,12 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+            /**
+             * Model Id Mode
+             * @default route
+             * @enum {string}
+             */
+            model_id_mode: "route" | "literal";
             /** Models */
             models?: string[];
             /**
@@ -14551,6 +16727,33 @@ export interface components {
             /** Weight Pct */
             weight_pct?: number | null;
         };
+        /** TodaysFocusMarketDayWindow */
+        TodaysFocusMarketDayWindow: {
+            /** Is Trading Day */
+            is_trading_day?: boolean | null;
+            /**
+             * Local Date
+             * Format: date
+             */
+            local_date: string;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "cn" | "hk" | "us" | "unknown";
+            /** Timezone */
+            timezone: string;
+            /**
+             * Window End
+             * Format: date-time
+             */
+            window_end: string;
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+        };
         /** TodaysFocusPresentationBoundary */
         TodaysFocusPresentationBoundary: {
             /**
@@ -14577,7 +16780,7 @@ export interface components {
             /** Empty Message */
             empty_message?: string | null;
             /** Empty Reason */
-            empty_reason?: ("source_unavailable" | "no_fresh_deterministic_signals") | null;
+            empty_reason?: ("source_unavailable" | "no_fresh_deterministic_signals" | "insufficient_finite_data") | null;
             /**
              * Generated At
              * Format: date-time
@@ -14593,7 +16796,7 @@ export interface components {
              * Pack Version
              * @constant
              */
-            pack_version: "todays_focus/2.0";
+            pack_version: "todays_focus/2.1";
             presentation_boundary: components["schemas"]["TodaysFocusPresentationBoundary"];
             /** Sources Used */
             sources_used: ("alert" | "analysis" | "corporate_event" | "alerts" | "analysis_history" | "corporate_events")[];
@@ -14608,10 +16811,14 @@ export interface components {
         /** TodaysFocusTemporalPolicy */
         TodaysFocusTemporalPolicy: {
             /**
-             * Local Date
-             * Format: date
+             * Cross Market Rule
+             * @constant
              */
-            local_date: string;
+            cross_market_rule: "evidence_uses_target_symbol_market_timezone";
+            /** Fallback Timezone */
+            fallback_timezone: string;
+            /** Markets */
+            markets: components["schemas"]["TodaysFocusMarketDayWindow"][];
             /**
              * Missing Timestamp Policy
              * @constant
@@ -14631,22 +16838,19 @@ export interface components {
              * Semantics
              * @constant
              */
-            semantics: "local_calendar_day";
-            /** Timezone */
-            timezone: string;
+            semantics: "per_market_local_calendar_day";
             /**
              * Window End
              * Format: date-time
              */
             window_end: string;
-            /**
-             * Window Start
-             * Format: date-time
-             */
-            window_start: string;
         };
         /** TodaysFocusUniverseContract */
         TodaysFocusUniverseContract: {
+            /** Data Notes */
+            data_notes?: string[];
+            /** Excluded Non Finite Positions */
+            excluded_non_finite_positions: number;
             /**
              * Hard Cap
              * @constant
@@ -14810,6 +17014,10 @@ export interface components {
         };
         /** UsageCallRecord */
         UsageCallRecord: {
+            /** Agent Mode */
+            agent_mode?: string | null;
+            /** Call Success */
+            call_success?: boolean | null;
             /** Call Type */
             call_type: string;
             /**
@@ -14819,12 +17027,28 @@ export interface components {
             called_at: string;
             /** Completion Tokens */
             completion_tokens: number;
+            /** Cost Status */
+            cost_status?: string | null;
+            /** Estimated Cost Usd */
+            estimated_cost_usd?: number | null;
             /** Id */
             id: number;
+            /** Latency Ms */
+            latency_ms?: number | null;
             /** Model */
             model: string;
+            /** Primary Model */
+            primary_model?: string | null;
             /** Prompt Tokens */
             prompt_tokens: number;
+            /** Route Attempt */
+            route_attempt?: number | null;
+            /** Route Outcome */
+            route_outcome?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Stage */
+            stage?: string | null;
             /** Stock Code */
             stock_code?: string | null;
             /** Total Tokens */
@@ -14832,26 +17056,48 @@ export interface components {
         };
         /** UsageDashboardResponse */
         UsageDashboardResponse: {
+            /** By Agent Mode */
+            by_agent_mode?: components["schemas"]["AgentModeBreakdown"][];
             /** By Call Type */
             by_call_type: components["schemas"]["CallTypeBreakdown"][];
             /** By Model */
             by_model: components["schemas"]["ModelBreakdown"][];
-            /**
-             * From Date
-             * @description ISO date string
-             */
+            /** By Stage */
+            by_stage?: components["schemas"]["StageBreakdown"][];
+            /** From Date */
             from_date: string;
             /**
              * Period
              * @description 'today' | 'month' | 'all'
              */
             period: string;
+            /**
+             * Priced Calls
+             * @default 0
+             */
+            priced_calls: number;
             /** Recent Calls */
             recent_calls: components["schemas"]["UsageCallRecord"][];
             /**
-             * To Date
-             * @description ISO date string
+             * Routing Failed
+             * @default 0
              */
+            routing_failed: number;
+            /** Routing Fallback Rate */
+            routing_fallback_rate?: number | null;
+            /**
+             * Routing Fallback Success
+             * @default 0
+             */
+            routing_fallback_success: number;
+            /**
+             * Routing Primary Success
+             * @default 0
+             */
+            routing_primary_success: number;
+            /** Routing Success Rate */
+            routing_success_rate?: number | null;
+            /** To Date */
             to_date: string;
             /** Total Calls */
             total_calls: number;
@@ -14860,6 +17106,8 @@ export interface components {
              * @default 0
              */
             total_completion_tokens: number;
+            /** Total Estimated Cost Usd */
+            total_estimated_cost_usd?: number | null;
             /**
              * Total Prompt Tokens
              * @default 0
@@ -14867,17 +17115,23 @@ export interface components {
             total_prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+            /**
+             * Unpriced Calls
+             * @default 0
+             */
+            unpriced_calls: number;
         };
         /** UsageSummaryResponse */
         UsageSummaryResponse: {
+            /** By Agent Mode */
+            by_agent_mode?: components["schemas"]["AgentModeBreakdown"][];
             /** By Call Type */
             by_call_type: components["schemas"]["CallTypeBreakdown"][];
             /** By Model */
             by_model: components["schemas"]["ModelBreakdown"][];
-            /**
-             * From Date
-             * @description ISO date string
-             */
+            /** By Stage */
+            by_stage?: components["schemas"]["StageBreakdown"][];
+            /** From Date */
             from_date: string;
             /**
              * Period
@@ -14885,9 +17139,30 @@ export interface components {
              */
             period: string;
             /**
-             * To Date
-             * @description ISO date string
+             * Priced Calls
+             * @default 0
              */
+            priced_calls: number;
+            /**
+             * Routing Failed
+             * @default 0
+             */
+            routing_failed: number;
+            /** Routing Fallback Rate */
+            routing_fallback_rate?: number | null;
+            /**
+             * Routing Fallback Success
+             * @default 0
+             */
+            routing_fallback_success: number;
+            /**
+             * Routing Primary Success
+             * @default 0
+             */
+            routing_primary_success: number;
+            /** Routing Success Rate */
+            routing_success_rate?: number | null;
+            /** To Date */
             to_date: string;
             /** Total Calls */
             total_calls: number;
@@ -14896,6 +17171,8 @@ export interface components {
              * @default 0
              */
             total_completion_tokens: number;
+            /** Total Estimated Cost Usd */
+            total_estimated_cost_usd?: number | null;
             /**
              * Total Prompt Tokens
              * @default 0
@@ -14903,6 +17180,11 @@ export interface components {
             total_prompt_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+            /**
+             * Unpriced Calls
+             * @default 0
+             */
+            unpriced_calls: number;
         };
         /**
          * UserOnboardingProfile
@@ -16080,6 +18362,10 @@ export interface operations {
                 target?: string | null;
                 /** @description Optional status filter */
                 status?: string | null;
+                /** @description Optional typed corporate-event filter */
+                alert_type?: "corporate_event" | null;
+                /** @description Stable continuation cursor */
+                cursor?: string | null;
                 page?: number;
                 page_size?: number;
             };
@@ -16096,6 +18382,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertTriggerListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -16473,6 +18768,57 @@ export interface operations {
                 };
             };
             /** @description 提交失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analyzePortfolioLevel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioLevelAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioLevelAnalysisResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Portfolio-level analysis failed */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -17544,7 +19890,7 @@ export interface operations {
     listCapabilities: {
         parameters: {
             query?: {
-                /** @description Optional domain filter. Allowed values: data, tool, extension. */
+                /** @description Optional domain filter. Allowed values: data, tool, extension, skill, pipeline. */
                 domain?: string[] | null;
             };
             header?: never;
@@ -18840,6 +21186,170 @@ export interface operations {
             };
         };
     };
+    runCandidateDiscovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    startCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateDiscoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskAccepted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskStatus"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancelCandidateDiscoveryTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDiscoveryTaskStatus"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     getTodaysFocus: {
         parameters: {
             query?: {
@@ -19295,8 +21805,8 @@ export interface operations {
     export_history_report_api_v1_history__record_id__export_get: {
         parameters: {
             query?: {
-                /** @description Export format: md (default) or pdf */
-                format?: "md" | "pdf";
+                /** @description Export format: md (default), html, or pdf */
+                format?: "md" | "html" | "pdf";
             };
             header?: never;
             path: {
@@ -19313,6 +21823,7 @@ export interface operations {
                 };
                 content: {
                     "application/pdf": string;
+                    "text/html": string;
                     "text/markdown": string;
                 };
             };
@@ -19370,7 +21881,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description PDF dependency, font, deadline, or render worker unavailable */
+            /** @description PDF/HTML dependency, font, deadline, or render worker unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -20783,6 +23294,246 @@ export interface operations {
             };
         };
     };
+    list_inbox_items_api_v1_notification_inbox_items_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                cursor?: string | null;
+                kind?: string | null;
+                unread_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_all_inbox_items_read_api_v1_notification_inbox_items_mark_all_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NotificationInboxMarkAllReadRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxMarkAllReadResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_inbox_items_read_api_v1_notification_inbox_items_mark_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationInboxMarkReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxMarkReadResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_inbox_unread_count_api_v1_notification_inbox_unread_count_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationInboxUnreadCountResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     apply_onboarding_plan_api_v1_onboarding_apply_post: {
         parameters: {
             query?: never;
@@ -21168,6 +23919,135 @@ export interface operations {
             };
         };
     };
+    getPluginSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettingsResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    updatePluginSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSettingsUpdateResponse"];
+                };
+            };
+            /** @description Settings validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Plugin not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Settings persistence failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_accounts_api_v1_portfolio_accounts_get: {
         parameters: {
             query?: {
@@ -21340,6 +24220,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPaperDecisionQuality: {
+        parameters: {
+            query?: {
+                /** @description Optional trade date from */
+                date_from?: string | null;
+                /** @description Optional trade date to */
+                date_to?: string | null;
+                /** @description Max trades to score */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Paper account ID */
+                account_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperDecisionQualityResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Not Found */
@@ -23049,6 +25995,186 @@ export interface operations {
             };
             /** @description Server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getLatestResearchConclusion: {
+        parameters: {
+            query: {
+                /** @description Stock code */
+                stock_code: string;
+                /** @description Presentation density: brief | standard | research */
+                mode?: "brief" | "standard" | "research";
+                /** @description Optional report language override (zh/en/ko) */
+                language?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchConclusionResponse"];
+                };
+            };
+            /** @description Missing stock_code or invalid mode */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Feature disabled or no history for stock_code */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Per-principal rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit storage unavailable (fail-closed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getResearchConclusionByRecordId: {
+        parameters: {
+            query?: {
+                /** @description Presentation density: brief | standard | research */
+                mode?: "brief" | "standard" | "research";
+                /** @description Optional report language override (zh/en/ko) */
+                language?: string | null;
+            };
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchConclusionResponse"];
+                };
+            };
+            /** @description Invalid mode or record_id */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Feature disabled or analysis record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Per-principal rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit storage unavailable (fail-closed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -24886,6 +28012,35 @@ export interface operations {
             };
         };
     };
+    getDataProviderRuntimeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Data provider runtime status loaded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataProviderRuntimeStatusResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     export_system_config_api_v1_system_config_export_get: {
         parameters: {
             query?: never;
@@ -25679,6 +28834,44 @@ export interface operations {
             };
         };
     };
+    getSystemReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Structured readiness report loaded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessReportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     run_scheduler_now_api_v1_system_scheduler_run_now_post: {
         parameters: {
             query?: never;
@@ -25885,6 +29078,57 @@ export interface operations {
                 };
             };
             /** @description Valuation estimate failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    buildPeerValuationCanvas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeerValuationCanvasRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerValuationCanvasResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Peer canvas build failed */
             500: {
                 headers: {
                     [name: string]: unknown;

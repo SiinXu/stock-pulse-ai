@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRouteFocusTarget } from '../components/routing';
 import { CheckCircle2, Clock3, RefreshCw, ShieldAlert, XCircle } from 'lucide-react';
 import { approvalsApi } from '../api/approvals';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
@@ -15,6 +16,7 @@ import {
   PageHeader,
   Section,
   StatePanel,
+  Surface,
   Switch,
   WorkspacePage,
 } from '../components/common';
@@ -67,6 +69,12 @@ function resolveApprovalPrecondition(error: ParsedApiError | null): ApprovalPrec
 const ApprovalsPage: React.FC = () => {
   const { language } = useUiLanguage();
   const navigate = useNavigate();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.approvals,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const text = APPROVALS_TEXT[language];
   const [rule, setRule] = useState<ApprovalRule | null>(null);
   const [proposals, setProposals] = useState<ApprovalProposal[]>([]);
@@ -249,9 +257,11 @@ const ApprovalsPage: React.FC = () => {
       ? (seconds > 0 ? text.expiresIn.replace('{seconds}', String(seconds)) : text.expired)
       : (proposal.status === 'expired' ? text.expired : statusLabel(proposal.status));
     return (
-      <article
+      <Surface
+        as="article"
         key={proposal.id}
-        className="rounded-xl border border-border bg-surface-2/60 p-4"
+        level="interactive"
+        padding="sm"
         data-testid={`approval-${proposal.id}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -313,7 +323,7 @@ const ApprovalsPage: React.FC = () => {
             {proposal.consumedAt ? text.consumed : text.notConsumed}
           </p>
         )}
-      </article>
+      </Surface>
     );
   };
 

@@ -10,6 +10,7 @@ describe('placementForKey', () => {
       'REPORT_LANGUAGE',
       'REPORT_SUMMARY_ONLY',
       'REPORT_SHOW_LLM_MODEL',
+      'NOTIFICATION_DELTA_FIRST',
       'REPORT_INTEGRITY_ENABLED',
       'REPORT_HISTORY_COMPARE_N',
     ]) {

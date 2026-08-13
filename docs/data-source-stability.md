@@ -8,6 +8,24 @@
 
 架构决策见 [ADR-005：保留优先级 fallback 与按市场隔离的熔断控制](adr/ADR-005-provider-fallback-and-circuit-control.md)。
 
+## 数据源 Hub 运行时投影
+
+设置 → 集成 → 数据源 在「已保存的提供方配置目录」上方展示**只读运行时投影**：
+
+| 展示 | 权威来源 |
+| --- | --- |
+| 市场主源 / 回退（CN/HK/US 日线） | 进程内 `DataFetcherManager` 经市场、能力、可用性与熔断过滤后的有序链 |
+| 提供方健康 / 样本数 | 进程本地日线健康窗口（非静态目录） |
+| 增强源是否已配置（如 Tushare） | 已注册 fetcher 上的凭证是否存在；不泄露密钥 |
+| 缓存质量 | 日线缓存计数与 fetch 模式 |
+| as-of | 本次状态请求的快照时间 |
+
+API：`GET /api/v1/system/config/data-providers/runtime-status`。探测失败或管理器未初始化时返回 `partial=true` 与明确的 `source_state` / `error_code`，**不会**把失败默认显示为可用。该端点不打开第三方连接，也不改写配置或熔断状态。
+
+下方配置目录仍只编辑已保存的 token 与优先级；保存后请刷新投影以读取最新健康度。
+
+本投影未覆盖（issue #867 其余范围）：Tushare 认证连通测试向导、Today/分析/筛选空态由真实 `source_errors` 驱动的 CTA、将 web search 凭证完全迁至「集成 → 搜索」。
+
 
 ## 模块所有权
 

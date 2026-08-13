@@ -22,6 +22,7 @@ import {
   APP_ROUTE_PATHS,
   HOME_ROUTE_QUERY_KEYS,
   LEGACY_ROUTE_PATHS,
+  SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
@@ -239,6 +240,20 @@ const stockBarResponse: StockBarResponse = {
   ],
 };
 
+const alertRule = {
+  id: 1,
+  name: 'AAPL price breakout',
+  targetScope: 'single_symbol' as const,
+  target: 'AAPL',
+  alertType: 'price_cross' as const,
+  parameters: { direction: 'above' as const, price: 200 },
+  severity: 'warning' as const,
+  enabled: false,
+  source: 'api' as const,
+  createdAt: '2026-07-23T09:00:00Z',
+  updatedAt: '2026-07-23T09:00:00Z',
+};
+
 function makeSignal(overrides: Partial<DecisionSignalItem> = {}): DecisionSignalItem {
   return {
     ...signal,
@@ -266,12 +281,14 @@ const outcomeStats: DecisionSignalOutcomeStatsResponse = {
   engineVersion: 'decision-signal-v1',
   horizons: null,
   statuses: ['active', 'expired', 'invalidated', 'closed'],
-  total: 3,
-  completed: 2,
+  total: 31,
+  completed: 30,
   unable: 1,
-  hit: 1,
-  miss: 1,
+  hit: 15,
+  miss: 15,
   neutral: 0,
+  sampleSufficient: true,
+  minimumCompletedSampleSize: 30,
   hitRatePct: 50,
   avgStockReturnPct: 2.5,
   unableReasons: { missing_anchor_price: 1 },
@@ -534,9 +551,96 @@ beforeEach(() => {
   vi.mocked(alertsApi.listRules).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
   vi.mocked(alertsApi.listTriggers).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
   vi.mocked(alertsApi.listNotifications).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+  vi.mocked(alertsApi.getRule).mockResolvedValue(alertRule);
 });
 
 describe('DecisionSignalsPage', () => {
+  it('restores and updates embedded Alerts rule filters through the Signal Center URL', async () => {
+    vi.mocked(alertsApi.listRules).mockResolvedValue({
+      items: [alertRule],
+      total: 40,
+      page: 2,
+      pageSize: 20,
+    });
+    const params = new URLSearchParams(new URL(
+      buildSignalCenterHref({ tab: SIGNAL_CENTER_TAB_VALUES.rules }),
+      window.location.origin,
+    ).search);
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled, 'disabled');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesType, 'price_cross');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesPage, '2');
+    params.set('keep', 'yes');
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?${params.toString()}`);
+
+    renderPage();
+
+    await waitFor(() => expect(alertsApi.listRules).toHaveBeenCalledWith(expect.objectContaining({
+      enabled: false,
+      alertType: 'price_cross',
+      page: 2,
+      pageSize: 20,
+    })));
+    fireEvent.click(screen.getByRole('button', { name: '筛选，已启用 2 项' }));
+    const filterDialog = await screen.findByRole('dialog', { name: '筛选' });
+    chooseOption(within(filterDialog).getByLabelText('启停状态'), 'enabled');
+
+    await waitFor(() => {
+      const next = new URLSearchParams(window.location.search);
+      expect(next.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab)).toBe(SIGNAL_CENTER_TAB_VALUES.rules);
+      expect(next.get(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesEnabled)).toBe('enabled');
+      expect(next.has(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.rulesPage)).toBe(false);
+      expect(next.get('keep')).toBe('yes');
+    });
+  });
+
+  it('restores embedded notification filters and pagination from the Signal Center URL', async () => {
+    vi.mocked(alertsApi.listNotifications).mockResolvedValue({
+      items: [],
+      total: 40,
+      page: 2,
+      pageSize: 20,
+    });
+    const params = new URLSearchParams(new URL(buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.history,
+      history: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+    }), window.location.origin).search);
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationPage, '2');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationChannel, 'slack');
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.notificationSuccess, 'failure');
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?${params.toString()}`);
+
+    renderPage();
+
+    await waitFor(() => expect(alertsApi.listNotifications).toHaveBeenCalledWith({
+      channel: 'slack',
+      success: false,
+      page: 2,
+      pageSize: 20,
+    }));
+    expect(screen.getByRole('tabpanel', { name: '通知尝试记录' })).toBeVisible();
+  });
+
+  it('opens and clears an embedded rule deep link without leaving Signal Center', async () => {
+    const params = new URLSearchParams(new URL(
+      buildSignalCenterHref({ tab: SIGNAL_CENTER_TAB_VALUES.rules }),
+      window.location.origin,
+    ).search);
+    params.set(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert, String(alertRule.id));
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.signals}?${params.toString()}`);
+
+    renderPage();
+
+    await waitFor(() => expect(alertsApi.getRule).toHaveBeenCalledWith(alertRule.id));
+    const dialog = await screen.findByRole('dialog', { name: '编辑告警规则' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
+
+    await waitFor(() => {
+      const next = new URLSearchParams(window.location.search);
+      expect(next.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab)).toBe(SIGNAL_CENTER_TAB_VALUES.rules);
+      expect(next.has(SIGNAL_CENTER_ALERTS_ROUTE_QUERY_KEYS.alert)).toBe(false);
+    });
+  });
+
   it('registers the canonical Signal Center heading with route-focus coordination', async () => {
     renderPage();
 
@@ -1141,6 +1245,35 @@ describe('DecisionSignalsPage', () => {
       .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.history);
     expect(targetParams.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId)).toBe('3001');
     expect(targetParams.get(HOME_ROUTE_QUERY_KEYS.stock)).toBe('600519');
+  });
+
+  it('offers create-rule navigation from the selected signal detail drawer (#879 A3)', async () => {
+    // #879 A3 residual: open-source-report already lands as a Link; create-rule must also be a
+    // durable navigation command from the detail drawer (same contract as Stock Details).
+    renderPage();
+    await screen.findByText('贵州茅台');
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    const createRuleHref = buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+      createRule: true,
+      stock: signal.stockCode,
+    });
+    const createRuleLink = await screen.findByRole('link', { name: '从此信号创建规则' });
+    expect(createRuleLink).toHaveAttribute('href', createRuleHref);
+    expect(createRuleLink).toHaveAttribute('data-testid', 'decision-signal-create-rule');
+
+    fireEvent.click(createRuleLink);
+
+    const dialog = await screen.findByRole('dialog', { name: '创建告警规则' });
+    expect(within(dialog).getByLabelText('标的代码')).toHaveValue(signal.stockCode);
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab)).toBe(SIGNAL_CENTER_TAB_VALUES.rules);
+      expect(params.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock)).toBe(signal.stockCode);
+      // createRule is a one-shot request flag; owner clears it after opening the form.
+      expect(params.has(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule)).toBe(false);
+    });
   });
 
   it('reassesses from an existing source report id filter without a selected signal', async () => {

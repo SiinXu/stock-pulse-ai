@@ -11,7 +11,7 @@ from src.config import (
     get_effective_agent_primary_model,
     get_configured_llm_models,
 )
-from src.llm.backend_registry import AUTO_AGENT_BACKEND_ID, GENERATION_ONLY_BACKEND_IDS
+from src.llm.backend_registry import AUTO_AGENT_BACKEND_ID, LOCAL_CLI_GENERATION_BACKEND_IDS
 from src.llm.hermes import (
     build_route_provenance_map,
     filter_non_hermes_deployments,
@@ -74,8 +74,8 @@ def resolve_agent_litellm_route(config: Any) -> AgentLiteLLMRouteResolution:
         getattr(config, "agent_generation_backend", AUTO_AGENT_BACKEND_ID)
         or AUTO_AGENT_BACKEND_ID
     ).strip().lower()
-    if agent_backend in GENERATION_ONLY_BACKEND_IDS:
-        return AgentLiteLLMRouteResolution(False, reason="unsupported_agent_backend")
+    if agent_backend in LOCAL_CLI_GENERATION_BACKEND_IDS:
+        return AgentLiteLLMRouteResolution(False, reason="local_cli_agent_bridge")
 
     primary = get_effective_agent_primary_model(config)
     if not primary:

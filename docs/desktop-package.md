@@ -55,13 +55,34 @@ npm run dev
 
 ## 依赖与工具链（Desktop）
 
-当前桌面壳固定依赖（见 `apps/dsa-desktop/package.json`）：
+当前桌面壳固定依赖（见 `apps/dsa-desktop/package.json`；#615 经 PR #776 / #907 完成首轮 major 升级，#1060 将 Electron 钉到受支持的 `43.4.0` 并作为执行闭环；后续变更须同步本表、锁文件与 `tests/lint-and-deps.test.js`）：
 
-- Electron `43.3.0`（开发依赖，但作为打包运行时随应用分发）
-- electron-builder `26.15.7`（打包）
-- electron-updater `6.8.9`（自动更新；生产依赖）
-- `app-builder-lib` 的 `tar` override `7.5.22`（构建链审计修复，保留与 archive 路径的兼容性探测）
-- 顶层 `js-yaml` override `4.3.1`（覆盖 `electron-updater` 与 builder 链的 `^4.1.0` / `^4.3.0`，关闭 4.x 受影响范围 `<4.3.1` 的 [GHSA-5p4m-2wfm-xmqj](https://github.com/advisories/GHSA-5p4m-2wfm-xmqj)；该记录无独立 CVE ID，CVE-2026-59870 属于另一条 5.x 记录 [GHSA-724g-mxrg-4qvm](https://github.com/advisories/GHSA-724g-mxrg-4qvm)）
+| 包 | 固定版本 | 角色 |
+| --- | --- | --- |
+| `electron` | `43.4.0` | 开发依赖声明，但作为打包运行时随应用分发 |
+| `electron-builder` | `26.15.7` | 打包工具链（含 `app-builder-lib` 26.15.7） |
+| `electron-updater` | `6.8.9` | 自动更新（生产依赖） |
+| `app-builder-lib` → `tar` override | `7.5.22` | 构建链审计修复；与 archive 路径兼容性由单测探测 |
+| 顶层 `js-yaml` override | `4.3.1` | 覆盖 updater / builder 的 `^4.1.0` / `^4.3.0` 图 |
+
+期望审计结果：`npm audit` 与 `npm audit --omit=dev` 均为 **0 vulnerabilities**。Electron 虽标为 devDependency，但嵌入发行物，不能用 `--omit=dev` 替代产品暴露评估。
+
+> **历史纠偏（#615 / #1060）：** PR #919 仅补充 CLI/PATH 诊断文档，**没有**改动 Electron / builder / updater 版本行，不得记为“升级完成”。真正的 major 升级提交为 PR #776（+ js-yaml pin #907）；本 #1060 执行轨负责把运行时钉到当前受支持安全版本并完成验证闭环。
+
+### Advisory 依据（#615 / #1060 升级动机与当前 pins 如何清零）
+
+下列为升级前旧栈（Electron 31.7.7 / electron-builder 24.x / electron-updater ≤6.8.3 一带）相关的代表性 advisory；**不是**要求每次发版复述全量历史 CVE 列表。当前 pins 相对这些范围均已落在 patched 或 out-of-range 侧：
+
+| 组件 | Advisory | 严重度 | 受影响范围（摘要） | 当前处置 |
+| --- | --- | --- | --- | --- |
+| Electron（运行时） | 多条 GHSA / CVE（例如 iframe/popup、DevTools、contextBridge 等 2026 系列；如 [GHSA-9f4c-93c8-jc8g](https://github.com/advisories/GHSA-9f4c-93c8-jc8g) / CVE-2026-70608） | High / Moderate | 主要落在 39.x–42.x 补丁线；**不**覆盖 43.x 稳定线为 vulnerable | 固定 `43.4.0`（npm `latest` / `43-x-y`；含 Chromium 安全回移） |
+| electron-updater | [GHSA-9jxc-qjr9-vjxq](https://github.com/advisories/GHSA-9jxc-qjr9-vjxq) / CVE-2024-39698 | High | `<= 6.3.0-alpha.5` | `6.8.9` 远高于 patched 下限 |
+| electron-builder | （npm ecosystem 无单独 open GHSA 节点；历史高危经 builder 26 + 传递依赖清理） | — | 旧 24.x 链在本地 `npm audit` 中表现为 high | `26.15.7` |
+| `tar`（builder 传递） | 多条 7.5.x 线 advisory，例如 [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw) / CVE-2026-59873、[GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m) | Critical / High / Moderate | 分别 `<=7.5.18`、`<=7.5.20` 等 | override `7.5.22` |
+| `js-yaml` 4.x | [GHSA-5p4m-2wfm-xmqj](https://github.com/advisories/GHSA-5p4m-2wfm-xmqj)（**无**独立 CVE ID） | High | `>=4.0.0, <4.3.1` | 顶层 override `4.3.1` |
+| `js-yaml` 5.x（勿混） | [GHSA-724g-mxrg-4qvm](https://github.com/advisories/GHSA-724g-mxrg-4qvm) / CVE-2026-59870 | Moderate | `>=5.0.0, <=5.2.0` | 桌面图保持 4.x 线，不适用 5.x 记录 |
+
+禁止用 `npm audit fix --force` 或空白 `audit` 忽略清单代替上述显式 pins。新出现的 advisory 应先判断是**运行时 / 更新链**还是**仅构建机**暴露，再决定是否升 pin 或写明 applicability。
 
 本地校验：
 
@@ -70,7 +91,7 @@ cd apps/dsa-desktop
 npm ci
 npm audit
 npm audit --omit=dev
-npm ls js-yaml
+npm ls js-yaml tar
 npm explain js-yaml
 npm run lint
 npm test
@@ -78,9 +99,23 @@ npm test
 npm run typecheck
 ```
 
-`npm run lint` 使用 ESLint flat config（`eslint.config.js`），覆盖 main/preload/renderer/scripts/tests。`main.js` 启用 `// @ts-check` 供编辑器与 `npm run typecheck` 诊断使用；现有 JSDoc 缺口属于类型标注不完整，不在本升级中做语义改写。
+`npm run lint` 使用 ESLint flat config（`eslint.config.js`），覆盖 main/preload/renderer/scripts/tests。`main.js` 启用 `// @ts-check` 供编辑器与 `npm run typecheck` 诊断使用；现有 JSDoc 缺口属于类型标注不完整，不在依赖升级中做语义改写。
 
-从 Electron 31 / electron-builder 24 升级时需注意：自动更新与 NSIS/DMG 打包语义、沙箱与 contextIsolation 默认值，以及 builder 26 的 archive API（options object）。Windows 协议注册仍依赖 `installer.nsh`，不依赖 builder 的 protocols 字段。
+### Breaking change 与迁移注意（Electron 31 → 43 / builder 24 → 26）
+
+- **Chromium / Node / V8 跨多 major**：主进程、preload、沙箱与导航默认值可能随上游变化；本仓库仍固定 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`，并靠桌面单测锁定 isolation / IPC / 协议白名单。
+- **electron-builder 26 archive API**：`app-builder-lib` 归档路径改为 **options object**（不再使用旧的位置参数）；`tests/dependency-overrides.test.js` 探测 tar override 与该路径兼容。
+- **Windows 协议注册**：electron-builder 24–26 **不会**用 `build.protocols` 写 Windows 注册表；`stockpulse://` 仍依赖 `installer.nsh` + 运行时 `app.setAsDefaultProtocolClient`。macOS 继续用 `protocols` 生成 `CFBundleURLTypes`。
+- **自动更新**：生产依赖为 `electron-updater@6.8.9`；`package.json` 的 `build.win.publish` 仍指向 GitHub Releases（`SiinXu/stock-pulse-ai`）。`main.js` 中 `autoDownload = true`、打包后 Windows 安装目录备份/恢复语义未因本升级改写。`0.x` 版本线相对旧 `3.x` 客户端的 semver 不可自动跃迁见上文「版本号重启与自动更新说明」。
+- **本地模型 / CLI / 启动路径**：依赖升级不改 Ollama 解析顺序、内嵌 runtime 清单、生成后端 CLI 探测策略或后端端口自选（8000–8100）。CLI/PATH 可见性诊断属 #884，不在 #1060 依赖边界内改动。
+- **43.3.0 → 43.4.0（#1060）**：同 major 补丁线；上游含 Chromium / ANGLE / V8 回移与若干崩溃修复，不改变本仓库 isolation / 更新 / 协议配置面。
+- **发版产物**：完整 NSIS/DMG（含冻结后端与内嵌 Ollama）、签名/公证、已安装客户端更新闭环须在 Windows 发布执行器或具备 Apple 身份的 macOS 上验收；开发机上的 `electron-builder --mac dir` 仅证明配置与布局，不能替代发行等价烟测。签名/公证凭据缺失时标记为 **deferred（所有者）**。
+
+### 回滚
+
+1. 还原 `apps/dsa-desktop/package.json` 与 `package-lock.json` 到升级前 pins（或 `git revert` 对应依赖提交）。从 #1060 补丁回退时可先回到 `electron@43.3.0` 锁；若需回到 major 升级前栈，则恢复 Electron 31.7.7 / electron-builder 24.13.3 / electron-updater 6.8.3（会重新暴露审计 high）。
+2. 用还原后的锁文件重新安装并重建桌面发行物。
+3. 无数据库 / 配置 schema 迁移；`appId`（`com.daily-stock-analysis.desktop`）保持不变，已安装客户端不会仅因依赖回滚更换 NSIS 身份。
 
 
 ## Desktop vs Web 能力矩阵（#884）
@@ -106,13 +141,13 @@ npm run typecheck
 | 问题 | 实测结论 | 处置 |
 | --- | --- | --- |
 | Dock/Finder 启动时找不到 Homebrew CLI | 仍成立：GUI `process.env.PATH` 常缺 `/opt/homebrew/bin` 等 | **已有** `extendMacDesktopBackendPath` 注入后端与 Ollama 子进程 PATH；本任务补充有界异步启动摘要日志 |
-| PATH/CLI 对操作者不可见 | 部分成立：此前无统一诊断摘要 | **本任务** 在 `logs/desktop.log` 写入安全摘要，不向 renderer 暴露原始 PATH 或 CLI 绝对路径；#884 Phase 1 的可见设置 UI 仍待后续 Web 任务完成 |
-| 深链 / 二实例 URL 转发 | **已随既有实现解决** | 协议解析、冷启动排队、`open-url` / second-instance 与测试/文档已在仓库 |
-| 更新“像清空数据” | **已有备份/恢复路径** | Windows NSIS 更新备份 `.env`、DB、provider cache、AlphaSift、内嵌模型目录；macOS 使用 userData，不随 `.app` 替换丢失 |
+| PATH/CLI 对操作者不可见 | 已关闭 | Model Sources 渲染有界诊断；打开终端 / 安装说明；不向 renderer 暴露原始 PATH |
+| 深链 / 二实例 URL 转发 | **已收口** | 见 [桌面深链策略](desktop-deep-link-policy.md) |
+| 更新“像清空数据” | **已有备份/恢复路径 + 验证测试** | Windows NSIS 更新备份关键目录；见能力矩阵 |
 | 环境变量 denylist 与 shell 不一致 | 部分成立 | 本地 CLI 生成后端仅继承安全 env 白名单（防密钥泄漏）；**不**为“与 shell 完全一致”放宽 denylist（#884 non-goal） |
-| Desktop vs Web 矩阵文档 | 此前分散 | **本任务** 收敛为本节 |
+| Desktop vs Web 矩阵文档 | **已发布** | [desktop-capability-matrix.md](desktop-capability-matrix.md) / [EN](desktop-capability-matrix_EN.md) |
 
-Web 侧 Model Sources / Settings 面板直接渲染 CLI 表格属于 Web 域，不在 `apps/dsa-desktop/**` 边界内。本任务不新增 preload/IPC 契约；可见设置 UI、用户触发刷新及可操作引导仍属于 #884 后续阶段。
+Web 侧 Model Sources 通过 `window.dsaDesktop.getEnvDiagnostics` 消费路径安全摘要与可操作指引；诊断结果仍不包含原始 PATH、PATH 条目或 CLI 绝对路径。
 
 ### PATH / CLI 诊断
 
@@ -123,19 +158,23 @@ Web 侧 Model Sources / Settings 面板直接渲染 CLI 表格属于 Web 域，�
 - `claude`
 - `opencode`
 
-诊断有 250 ms 总时限、最多 64 个 PATH 条目和 4 个并发探测，并以单次请求合并和 5 分钟缓存限制重复 I/O。窗口创建和后端启动不等待诊断完成；慢文件系统、权限错误或缺失 PATH 会得到 `unknown`，不会误报为 `missing`。
+诊断有 250 ms 总时限、最多 64 个 PATH 条目和 4 个并发探测，并以单次请求合并和 5 分钟缓存限制重复 I/O。窗口创建和后端启动不等待诊断完成；慢文件系统、权限错误或缺失 PATH 会得到 `unknown`，不会误报为 `missing`，更不会 fail-open 成 `available`。
 
 **日志：** 一行摘要形如
 `[env-diagnostics] platform=darwin pathPolicy=macos-gui-homebrew-extend pathEntries=N pathAugmented=yes ollama=available codex=missing claude=unknown ...`
-日志只记录 `available` / `missing` / `unknown` 状态与条目数量，不记录原始 PATH、PATH 条目、CLI 绝对路径、应用目录或 `.env` 路径。诊断结果不通过 IPC/preload 暴露给 renderer。
+日志只记录 `available` / `missing` / `unknown` 状态与条目数量，不记录原始 PATH、PATH 条目、CLI 绝对路径、应用目录或 `.env` 路径。
+
+**UI：** Settings → Model Sources 的 Desktop CLI 可见性面板提供重新检测、打开系统终端、打开 HTTPS allowlist 安装说明；文案由主进程按语言返回，避免扩大 Web locale baseline。
 
 操作建议：
 
-1. 若 `codex`/`claude`/`opencode` 为 `missing`：在终端确认 `which <cli>`，并安装到 `/opt/homebrew/bin` 或 `/usr/local/bin`（macOS），或保证安装目录已在用户登录 PATH 且重启桌面端；`unknown` 表示探测超时、PATH 不可用或探测错误，不能据此断定 CLI 缺失。
+1. 若 `codex`/`claude`/`opencode` 为 `missing`：使用面板打开终端，确认 `which <cli>`，安装到登录 PATH 后重新检测或重启桌面端；`unknown` 表示探测超时、PATH 不可用或探测错误，不能据此断定 CLI 缺失。
 2. 若 `ollama=missing` 但 Local Models 仍可用：可能使用了**内嵌** runtime（不依赖 PATH 上的 `ollama`）；以 Local Models 面板状态为准。
 3. 生成失败时不要只看空白 “backend error”：对照上述 CLI 可见性与 Settings 中的 generation backend 配置。
 
 ## 桌面深链协议
+
+策略正文已发布为 [桌面深链策略](desktop-deep-link-policy.md)。下列摘要保持与实现对齐。
 
 桌面安装包注册 `stockpulse` 自定义协议。规范形式是
 `stockpulse://app/<应用内路径>?<查询参数>`，例如：

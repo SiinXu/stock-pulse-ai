@@ -52,15 +52,32 @@ flowchart TD
 
 ## Today's Focus data contract
 
-Today's Focus uses existing local records to produce at most five priority rows (API hard limit: ten), and never invents rows to fill the list. “Today” is the natural calendar day in `daily_brief_timezone`. Persisted timestamps without an offset are interpreted as UTC, while records without a timestamp are excluded. Pre-market, weekend, and non-trading-day requests do not roll previous-day evidence forward.
+Today's Focus uses existing local records to produce at most five priority rows (API hard limit: ten), and never invents rows to fill the list.
 
-The qualifying evidence is limited to:
+### Executable “today” time contract
 
-- alerts whose status is `triggered` today;
-- major corporate events observed today, when a trusted runtime event reader is configured;
-- analysis conclusions whose latest record is from today, whose preceding record is within 90 days, and whose direction changes among `buy`, `sell`, and `hold`.
+“Today” is **market-local**, not a single server timezone:
 
-The watchlist and persisted active-position cache only define the candidate universe; market aliases such as Hong Kong prefix/suffix forms are canonicalized first. Lifetime unrealized P&L is not a daily move and cannot qualify a symbol. Reading Today's Focus does not refresh quotes, run analysis, replay the portfolio ledger, or write snapshots. If a local source fails, the API returns `degraded` with the affected source instead of presenting a false normal empty state.
+| Market | Timezone | Day boundary |
+| --- | --- | --- |
+| A-shares (`cn`) | `Asia/Shanghai` | local calendar midnight → build time |
+| Hong Kong (`hk`) | `Asia/Hong_Kong` | local calendar midnight → build time |
+| United States (`us`) | `America/New_York` | local calendar midnight → build time |
+| Unrecognized symbols | `daily_brief_timezone` fallback (default `Asia/Shanghai`) | same |
+
+**Cross-market rule:** each evidence row is freshened against the **target symbol’s** market-local day window. The same absolute UTC timestamp can therefore be “today” for a US symbol and not for a China symbol (or the reverse). Response `temporal_policy.markets[]` exposes every window used for the build.
+
+Persisted timestamps without an offset are interpreted as UTC (`naive_timestamp_policy=assume_utc`); records without a timestamp are excluded. Pre-market, weekend, and non-trading-day requests keep the same local calendar-day window and **do not** roll previous-session evidence forward (`non_trading_day_policy=same_local_day_only`). Trading-day flags are informational when the exchange calendar is available.
+
+### Qualifying evidence
+
+- alerts whose status is `triggered` inside the symbol’s market-local today (targeted full-set query; never first-page-only `list_triggers`);
+- major corporate events observed inside that same market-local window, when a trusted runtime event reader is configured;
+- analysis conclusions whose latest record is inside the market-local today, whose preceding record is within 90 days, and whose direction changes among `buy`, `sell`, and `hold`.
+
+### Universe, amounts, and degradation
+
+The watchlist and the **full** persisted active-position cache only define the candidate universe; market aliases such as Hong Kong prefix/suffix forms are canonicalized first. Position amount / weight / change fields must be finite when present—non-finite rows are excluded with `universe_contract.excluded_non_finite_positions` and an explicit data note; zeros are never substituted. Lifetime unrealized P&L is not a daily move and cannot qualify a symbol. Reading Today's Focus does not refresh quotes, run analysis, replay the portfolio ledger, or write snapshots. If a local source fails, the API returns `degraded` with the affected source instead of presenting a false normal empty state. When only non-finite position rows remain, empty reason is `insufficient_finite_data`.
 
 Each row has a separate **View evidence** link. Alert evidence opens the exact Signal Center trigger, while analysis evidence opens the exact history record in the Analysis workbench. Stock selection remains a separate action.
 

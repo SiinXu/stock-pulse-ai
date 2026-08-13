@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
 import { isFixedPopupOwnedBy, useFixedPopup } from './useFixedPopup';
@@ -106,7 +106,7 @@ export const Popover = ({
     if (open && !portalHost) prepareForOpen();
   }, [open, portalHost, prepareForOpen]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (open) {
       restoreFocusRef.current = document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -114,17 +114,18 @@ export const Popover = ({
       return;
     }
     if (!shouldRestoreFocus) return;
-    const frame = requestAnimationFrame(() => {
-      const trigger = rootRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      ) ?? null;
-      const remembered = restoreFocusRef.current;
-      const target = remembered && rootRef.current?.contains(remembered)
-        ? remembered
-        : trigger ?? remembered;
-      target?.focus();
-      setShouldRestoreFocus(false);
-    });
+    // Restore during the closing commit. Deferring this to the next animation
+    // frame lets a dialog focus trap or a user's next Tab move focus first,
+    // after which the stale callback can steal focus back to the trigger.
+    const trigger = rootRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    ) ?? null;
+    const remembered = restoreFocusRef.current;
+    const target = remembered && rootRef.current?.contains(remembered)
+      ? remembered
+      : trigger ?? remembered;
+    target?.focus();
+    const frame = requestAnimationFrame(() => setShouldRestoreFocus(false));
     return () => cancelAnimationFrame(frame);
   }, [open, shouldRestoreFocus]);
 

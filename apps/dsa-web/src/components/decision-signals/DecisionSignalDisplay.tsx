@@ -1,4 +1,5 @@
 import type React from 'react';
+import { lazy, Suspense } from 'react';
 import { PanelRightOpen } from 'lucide-react';
 import { Badge, JsonViewer, Section, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -27,6 +28,11 @@ import {
   getDecisionSignalMarketPhaseLabel,
   getDecisionSignalPlanQualityLabel,
 } from '../../utils/decisionSignalLabels';
+import { getReportLanguageForUi } from '../../utils/reportLanguage';
+import { ReportRiskGateBanner } from '../report/ReportRiskGateBanner';
+import { buildRiskGatePresentation } from '../report/reportRiskGateUtils';
+
+const DecisionSignalCommitteeInsights = lazy(() => import('./DecisionSignalCommitteeInsights'));
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'history';
 
@@ -237,6 +243,18 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
         </div>
       </div>
 
+      <ReportRiskGateBanner
+        presentation={buildRiskGatePresentation({
+          metadata:
+            item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+              ? (item.metadata as Record<string, unknown>)
+              : null,
+        })}
+        language={getReportLanguageForUi(language)}
+        compact
+        className="mt-3"
+      />
+
       <div className="mt-4 grid grid-cols-3 gap-2">
         <SignalMetric label={t('decisionSignals.score')} value={formatNumber(item.score)} />
         <SignalMetric label={t('decisionSignals.confidence')} value={formatConfidence(presentation.confidence)} />
@@ -348,6 +366,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
   const evidenceData = asJsonViewerData(item.evidence);
   const qualityData = asJsonViewerData(item.dataQualitySummary);
   const metadataData = asJsonViewerData(item.metadata);
+  const reportLanguage = getReportLanguageForUi(language);
 
   return (
     <div className="space-y-5">
@@ -363,6 +382,26 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
+
+      <ReportRiskGateBanner
+        presentation={buildRiskGatePresentation({
+          metadata:
+            item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+              ? (item.metadata as Record<string, unknown>)
+              : null,
+        })}
+        language={reportLanguage}
+      />
+
+      {item.evidence && typeof item.evidence === 'object' && !Array.isArray(item.evidence)
+      && ('committeeDeliberation' in item.evidence || 'committee_deliberation' in item.evidence) ? (
+        <Suspense fallback={null}>
+          <DecisionSignalCommitteeInsights
+            evidence={item.evidence}
+            language={reportLanguage}
+          />
+        </Suspense>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <DetailRow label={t('decisionSignals.score')} value={formatNumber(item.score)} />

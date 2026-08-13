@@ -18,6 +18,7 @@ import {
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   buildInvestmentFrameworkSettingsHref,
+  buildAgentExecutionSettingsHref,
   buildSettingsHref,
 } from '../routes';
 
@@ -158,3 +159,13 @@ describe('LegacyRouteRedirect', () => {
     expect(await screen.findByText('Home route')).toBeInTheDocument();
   });
 });
+
+describe('buildAgentExecutionSettingsHref', () => {
+  it('targets Agent execution and can mark essentials-first deep links', () => {
+    expect(buildAgentExecutionSettingsHref()).toBe('/settings?section=agent_behavior&view=execution');
+    expect(buildAgentExecutionSettingsHref({ essentialsFocus: true })).toBe(
+      '/settings?section=agent_behavior&view=execution&from=agent_essentials',
+    );
+  });
+});
+

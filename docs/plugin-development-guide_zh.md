@@ -27,7 +27,9 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 - 自然语言策略与工具*元数据* → `AGENT_SKILL_DIR` 下的 YAML / `SKILL.md`（无需可信进程代码）
 - 仅改 Jinja 报告版式 → `REPORT_TEMPLATES_DIR`
-- UI 面板、设置页、远程应用商店、依赖安装器或第七扩展点 → 新 ADR；**不属于** surface v1
+- 插件自带 UI 组件、远程应用商店、依赖安装器或第七扩展点 → 新 ADR；**不属于**
+  surface v1。插件可以在 manifest 中声明有界的标量设置；StockPulse 负责生成
+  Settings 表单，不执行插件提供的前端代码。
 
 ## 安全模型（先读）
 
@@ -45,8 +47,11 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 
 ### Manifest `permissions`（声明 ≠ 沙箱）
 
-- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read`）。
+- 若插件注册 `agent_tool`，manifest 必须声明工具 `ToolPolicy.permissions` 所需的全部能力（使用 ToolSurface 字符串，例如 `market_data:read` 或 `alt_data:read`）。
 - 加载/启用时若工具要求未声明能力，将以稳定错误码 `manifest_permissions_undeclared` 拒绝该插件（失败隔离，不影响核心与其它插件）。
+- 另类 / 支持性数据工具使用能力 `alt_data:read`，契约见
+  [另类数据插件契约](alternative-data-plugin-contract_zh.md)
+  （默认关闭、非权威、失败为缺口而非编造）。
 - 允许声明多余权限；空列表表示工具不得要求任何能力。
 - **声明 ≠ 沙箱隔离**：插件代码仍以进程同等权限运行。
 
@@ -117,6 +122,51 @@ my-plugins/                 # PLUGINS_DIR 的值
 manifest 字段、版本规则与入口路径约束见契约
 [Package And Manifest](plugin-extension-contract.md#package-and-manifest)。
 可直接复制任一官方示例并修改稳定 ID。
+
+### 声明式插件设置
+
+可选的 manifest `settings` 列表允许插件请求宿主生成控件，而无需携带 Web 代码。
+支持 `string`、`integer`、`number`、`boolean` 数据类型，以及 `text`、
+`password`、`number`、`select`、`textarea`、`switch` 控件。manifest 解析器会拒绝
+不兼容的类型/控件组合、重复键或选项、无效正则、非有限数值或边界，以及敏感字段的
+明文默认值。
+
+```json
+{
+  "settings": [
+    {
+      "key": "endpoint",
+      "title": "Service endpoint",
+      "dataType": "string",
+      "uiControl": "text",
+      "isRequired": true,
+      "validation": {"maxLength": 500},
+      "displayOrder": 10
+    },
+    {
+      "key": "api_token",
+      "title": "API token",
+      "dataType": "string",
+      "uiControl": "password",
+      "isSensitive": true,
+      "isRequired": true,
+      "validation": {"minLength": 8},
+      "displayOrder": 20
+    }
+  ]
+}
+```
+
+加载时，经过验证的有效值以不可变 `context.settings` 映射提供给插件。
+Settings → System & Security → Extensions 提供生成式表单与持久化启停开关。
+各插件的值写入生命周期状态文件旁的 `plugin_settings.json`；写入采用原子替换，
+并在系统支持时将文件限制为当前 OS 用户可读写。该文件是本机明文文件，**不是加密
+密钥库**，因此必须保护数据目录。API 与 Web 表单会掩码敏感值；保持掩码不变即可
+保留已存值。
+
+为已启用插件保存设置会报告 `restart_required`。必须重新启用插件或重启应用后，
+才能认为运行实例已使用新值。省略的键会恢复声明默认值；未知键、错误类型、越界值、
+NaN 与正负 Infinity 都会 fail-closed，且不会改变持久化文件。
 
 ## 冻结的作者导入面
 
@@ -249,6 +299,6 @@ python -m pytest tests/plugins/test_example_*.py tests/plugins/test_extension_su
 - 应用商店分发、签名校验或多租户隔离
 - 对插件代码的强制沙箱（仅进程等价信任）
 - 在不保留 ToolSurface 的前提下迁移内置 Tools（#432 / #539）
-- UI、Settings 或 MCP 连接器扩展点
+- 插件自带 UI 组件或 MCP 连接器扩展点（生成式标量设置表单仍由宿主拥有）
 
 上述仍属独立设计轨道，请勿拉伸邻近注册 API 来模拟它们。

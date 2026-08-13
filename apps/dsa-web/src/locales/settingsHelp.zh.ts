@@ -225,6 +225,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['帮助区分不同密钥生成的 HMAC，避免错误比较不同部署或不同版本的指纹。'],
     notes: ['该字段只是版本标签，不是密钥。'],
   },
+  'settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED': {
+    title: '用量成本归因',
+    summary: '在 llm_usage 行上附加 run/stage/mode 成本估算与模型路由质量字段。',
+    usage: '默认开启。关闭后跳过成本估算与归因列写入，但 token 计数仍会落库。',
+    valueNotes: ['与每模式预算（#1213）共用 src/llm/cost.py 计量；未计价模型保持 cost_status=unpriced，不伪造 $0。'],
+    impact: ['影响 Usage 页成本与路由成功率展示，以及预算门可消费的计量字段。'],
+    notes: ['采集开销小；排查成本异常时可临时关闭。'],
+  },
+  'settings.ai_model.LLM_COST_PRICING_PATH': {
+    title: 'LLM 成本定价表路径',
+    summary: '可选 JSON 定价表路径，用于 estimated_cost_usd。',
+    usage: '留空则使用 LiteLLM model_cost；也可指向自维护的 per-model 输入/输出单价表。',
+    valueNotes: ['支持 input_cost_per_token / output_cost_per_token，或 per-1M tokens 字段。'],
+    impact: ['改变成本估算来源，不改变模型调用本身。'],
+    notes: ['详见 docs/llm-cost-attribution.md。'],
+  },
   'settings.ai_model.provider_keys': {
     title: '模型服务 API Key',
     summary: '配置模型服务商或聚合网关的访问密钥。',
@@ -478,6 +494,190 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['实际窗口会受 profile 与最大天数共同约束。'],
     impact: ['影响新闻上下文数量、时效性和报告长度。'],
     notes: ['窗口过长可能引入陈旧信息，过短可能遗漏慢发酵事件。'],
+  },
+
+  'settings.data_source.CRYPTO_PROVIDER_ENABLED': {
+    title: '启用加密货币数据源',
+    summary: '为 crypto:TICKER 身份注册默认关闭的 CoinGecko 行情路径。',
+    usage: '仅在确实需要分析 crypto:BTC 等加密标的时开启。关闭时股票路径保持不变。',
+    valueNotes: [
+      '裸 BTC / ETH 代码不会自动按加密货币处理。',
+      '更改 provider 注册开关后通常需要重启进程。',
+    ],
+    impact: ['控制新建生产数据 manager 是否挂载 CoinGecko 加密货币 provider。'],
+    notes: ['身份、UTC 日线与出站策略详见 docs/crypto-market-support.md。'],
+  },
+  'settings.data_source.COINGECKO_API_PLAN': {
+    title: 'CoinGecko API 方案',
+    summary: '选择 keyless、Demo 或 Pro 鉴权模式及对应官方域名。',
+    usage: 'keyless 无需密钥；demo / pro 仅在配置了匹配的 COINGECKO_API_KEY 时使用。',
+    valueNotes: [
+      'keyless 使用公共 API 且不发送凭据。',
+      'demo 与 pro 会选择对应官方 origin 与请求头。',
+      '非法值在加载时回退为 keyless。',
+    ],
+    impact: ['影响 CoinGecko 鉴权请求头与官方域名选择。'],
+    notes: ['自定义 COINGECKO_API_BASE 仅允许在 keyless 模式下使用。'],
+  },
+  'settings.data_source.COINGECKO_API_KEY': {
+    title: 'CoinGecko API Key',
+    summary: '可选的 CoinGecko Demo 或 Pro API 密钥。',
+    usage: 'keyless 模式请留空；仅当 COINGECKO_API_PLAN 为 demo 或 pro 时粘贴密钥。',
+    valueNotes: ['凭据不会发送到自定义 COINGECKO_API_BASE 地址。'],
+    impact: ['在方案匹配时启用已鉴权的 CoinGecko Demo / Pro 请求。'],
+    notes: ['不要把真实密钥提交到仓库或贴进公开 Issue / 截图。'],
+  },
+  'settings.data_source.COINGECKO_API_BASE': {
+    title: 'CoinGecko API 基础地址',
+    summary: '仅 keyless 模式下可选的自定义 HTTPS 基础地址。',
+    usage: '留空使用官方端点；仅在需要受信 keyless 镜像时填写完整 HTTPS URL。',
+    valueNotes: [
+      'Demo / Pro 始终使用官方域名，不受此字段影响。',
+      '私有主机还需加入 OUTBOUND_HTTP_ALLOWLIST。',
+    ],
+    impact: ['影响 keyless 加密货币行情请求的发送目标。'],
+    notes: ['保存自定义地址前请确认你信任该端点运营方。'],
+    examples: ['https://api.coingecko.com/api/v3'],
+  },
+  'settings.data_source.CRYPTO_COINGECKO_PRIORITY': {
+    title: 'CoinGecko 加密货币优先级',
+    summary: '控制 CoinGecko 在加密市场数据源中的尝试顺序。',
+    usage: '填写 0–99 的整数，数值越小越优先。默认 10。',
+    valueNotes: [
+      '归类在数据源优先级字段中，不会重排股票日 K 或实时行情链。',
+      '仅在 CRYPTO_PROVIDER_ENABLED=true 时生效。',
+    ],
+    impact: ['仅影响 crypto: 身份的加密货币 provider 选择顺序。'],
+    notes: ['除非新增了竞争优先级的加密 provider，否则保持默认即可。'],
+  },
+  'settings.data_source.PROVIDER_MARKET_DATA_MODE': {
+    title: '行情本地优先模式',
+    summary: '选择本地优先、仅本地或强制刷新的日线行情策略。',
+    usage: '日常保持 auto；离线完整缓存读取用 local_only；跳过本地并强制走一轮 provider 用 refresh。',
+    valueNotes: [
+      'auto：完整新鲜本地 → provider 链 → 全失败时可用 stale。',
+      'local_only：永不进入 provider/socket；本地不完整或过期则结构化失败。',
+      'refresh：跳过本地读，严格走一轮 provider，失败不回 stale。',
+      '非法非空值在配置加载时 fail-closed，不会静默变成 auto。',
+    ],
+    impact: ['影响分析、股票历史 API 与依赖行情的定时任务的日线读取路径。'],
+    notes: [
+      '与进程级出站 HTTP 门禁 LOCAL_ONLY_MODE 相互独立。',
+      '详见 docs/local-first-market-data.md。',
+    ],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_LOCAL_ONLY_MAX_AGE_SECONDS': {
+    title: '仅本地缓存最大年龄',
+    summary: 'local_only 模式下仍可使用的完整本地日线缓存最大年龄。',
+    usage: '填写秒数。默认 2592000（30 天）。必须大于 0。',
+    valueNotes: ['超过年龄的完整条目按结构化离线缺失处理，不会伪装成实时行情。'],
+    impact: ['限制 PROVIDER_MARKET_DATA_MODE=local_only 时可接受的本地缓存陈旧程度。'],
+    notes: ['不会替代 auto 模式使用的内存/持久化新鲜度 TTL。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_AGE_SECONDS': {
+    title: '持久日线缓存最大年龄',
+    summary: '读写时删除超过该年龄的持久化日线缓存文件。',
+    usage: '填写秒数。默认 7776000（90 天）。设为 0 可关闭按年龄删除。',
+    valueNotes: ['保留清理是确定性的，不会把密钥等敏感信息写入缓存。'],
+    impact: ['控制 provider 日线缓存目录的磁盘占用。'],
+    notes: ['schema 与列白名单独立于保留年龄继续生效。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_PERSISTENT_MAX_ENTRIES': {
+    title: '持久日线缓存最大条目数',
+    summary: '限制保留的持久化日线缓存条目数量。',
+    usage: '填写正整数。默认 512。优先删除最老条目。',
+    valueNotes: ['相同时间戳时按文件名做确定性决胜。'],
+    impact: ['限制多标的长时间运行时缓存目录增长。'],
+    notes: ['可与最大年龄设置组合，同时做时间与数量维度的保留控制。'],
+  },
+  'settings.data_source.PROVIDER_DAILY_CACHE_ROLLOVER_GRACE_DAYS': {
+    title: '日线缓存滚动宽限天数',
+    summary: '允许已覆盖本地区间跨若干自然日服务默认结束日期滚动窗口。',
+    usage: '填写正整数。默认 1 天滚动宽限。',
+    valueNotes: ['auto 模式仍会按新鲜度 TTL 对老化数据做在线复验。'],
+    impact: ['减少默认结束日期跨日后对重叠窗口的不必要 provider 调用。'],
+    notes: ['除非有意放宽或收紧滚动复用，否则保持默认。'],
+  },
+  'settings.data_source.DATA_VALIDATION_ENABLED': {
+    title: '启用数据校验',
+    summary: '运行统一数值校验层并写入版本化诊断证据。',
+    usage: '默认开启。仅在需要临时绕过校验诊断时关闭。',
+    valueNotes: ['开启时覆盖日线、实时、基本面及选定技术指标字段。'],
+    impact: ['控制是否产出校验证据，以及严格拒绝是否可生效。'],
+    notes: ['范围与回滚说明见 docs/data-validation-layer.md。'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT': {
+    title: '数据校验严格模式',
+    summary: '在接受或缓存前拒绝错误级数据，使既有有界回退链继续尝试下一数据源。',
+    usage: '默认关闭（偏告警）。仅在希望 reject 级发现直接丢弃候选时开启。',
+    valueNotes: ['严格模式复用既有有界 provider 回退，不会新建第二条抓取链。'],
+    impact: ['数据源返回结构不合法数值时可能触发更多回退。'],
+    notes: ['可与 DATA_VALIDATION_STRICT_SCOPES 配合，限制执行拒绝的市场/品种范围。'],
+  },
+  'settings.data_source.DATA_VALIDATION_STRICT_SCOPES': {
+    title: '数据校验严格作用域',
+    summary: '用市场/品种选择器限制严格拒绝生效的范围。',
+    usage: '逗号分隔选择器，例如 cn/equity,hk/etf,us/index。默认 */* 表示全部。',
+    valueNotes: ['支持的品种包括 equity、etf、index；两侧均可用 * 通配。'],
+    impact: ['收窄或扩大 DATA_VALIDATION_STRICT 下可被拒绝的标的集合。'],
+    notes: ['空值在配置加载时会规范为默认 */*。'],
+  },
+  'settings.data_source.DATA_VALIDATION_INSTRUMENT_OVERRIDES': {
+    title: '数据校验品种覆盖',
+    summary: '为无法从代码安全推断 ETF/指数身份的海外标的提供权威品种映射。',
+    usage: '逗号分隔 SYMBOL=instrument，例如 SPY=etf,HK02800=etf,1306.T=etf。内置分类足够时请留空。',
+    valueNotes: [
+      '这是逗号分隔映射，不是 JSON 文档。',
+      '仅在 ETF/指数身份可能被误判时使用。',
+    ],
+    impact: ['影响所列标的的校验品种身份及严格作用域匹配。'],
+    notes: ['优先维护稀疏权威覆盖，避免手维护大目录。'],
+    examples: ['SPY=etf,HK02800=etf,1306.T=etf'],
+  },
+  'settings.data_source.DATA_VALIDATION_UPPER_LAYER_MODE': {
+    title: '数据校验上层模式',
+    summary: '聚合基本面在合成边界的最终处理策略。',
+    usage: '保持 warn 以保留结果并记录证据；仅在需要上层显式失败时使用 reject。',
+    valueNotes: [
+      'warn 保留聚合结果并记录证据。',
+      'reject 在上层边界抛错，不描述为数据源回退。',
+      '其他值在加载时规范为 warn。',
+    ],
+    impact: ['影响聚合基本面校验失败如何向上游调用方暴露。'],
+    notes: ['与 DATA_VALIDATION_STRICT 的 provider 候选拒绝相互独立。'],
+  },
+  'settings.data_source.DATA_VALIDATION_FUND_PE_SUSPECT_ABS': {
+    title: '基本面 PE 可疑阈值',
+    summary: 'PE 绝对值软阈值。达到或超过该值时标记为可疑并保留数值。',
+    usage: '默认 200。仅当目标标的常见合法 PE 经常超过该软带时再调高。',
+    valueNotes: [
+      '可疑发现仅为告警；PE 数值仍保留给分析使用。',
+      '硬性极端仍拒绝，与该软阈值相互独立。',
+    ],
+    impact: ['改变诊断与上下文证据中 PE 被标记为可疑的时机。'],
+    notes: ['硬/软基本面区间说明见 docs/data-validation-layer.md。'],
+  },
+  'settings.data_source.DATA_VALIDATION_FUND_PB_SUSPECT_ABS': {
+    title: '基本面 PB 可疑阈值',
+    summary: 'PB 绝对值软阈值。达到或超过该值时标记为可疑并保留数值。',
+    usage: '默认 50。仅当目标标的常见合法 PB 经常超过该软带时再调高。',
+    valueNotes: [
+      '可疑发现仅为告警；PB 数值仍保留给分析使用。',
+      '硬性极端仍拒绝，与该软阈值相互独立。',
+    ],
+    impact: ['改变诊断与上下文证据中 PB 被标记为可疑的时机。'],
+    notes: ['ETF 与部分海外源缺失 PE/PB 仍视为合法。'],
+  },
+  'settings.data_source.DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD': {
+    title: '跨源相对差异阈值',
+    summary: '多数据源同字段相对差异告警阈值。',
+    usage: '默认 0.05（5%）。当数据源报价口径差异较大时可适当调高以减少告警。',
+    valueNotes: [
+      '仅当两个及以上数据源提供同一有限字段时生效。',
+      '差异值会保留并附带来源归因；单一数据源失败不会中断整体分析。',
+    ],
+    impact: ['控制跨源 WARN 证据写入运行诊断的时机。'],
+    notes: ['比对为观测性逻辑，比对异常 fail-open。'],
   },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: '飞书群机器人 Webhook',
@@ -733,7 +933,32 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 WebUI 登录、设置页访问和管理操作保护。'],
     notes: ['启用前请确认部署环境可以持久化认证数据；手动改 .env 后需要重启进程或使用认证设置流程刷新状态。'],
   },
+  'settings.system.SECURITY_AUDIT_RETENTION_DAYS': {
+    title: '安全审计保留天数',
+    summary: '特权操作安全审计事件的时间保留窗口。',
+    usage: '设置 security-audit-v1 行的保留天数。写入与查询时会执行清理；超过窗口的旧事件会被删除。',
+    valueNotes: [
+      '默认 90 天，允许范围 1–3650。',
+      '与 SECURITY_AUDIT_MAX_EVENTS 容量上限相互独立。',
+      '不会持久化密钥；落库前会脱敏。',
+    ],
+    impact: ['影响认证、配置、工具、插件、MCP、分析接受与本地进程等特权审计轨迹的可查询时长。'],
+    notes: ['详见 docs/security-audit_zh.md。若需更长留存，请先外部归档再降低保留天数。'],
+  },
+  'settings.system.SECURITY_AUDIT_MAX_EVENTS': {
+    title: '安全审计最大事件数',
+    summary: 'security-audit-v1 存储的硬性行容量上限。',
+    usage: '限制保留的审计行数。超出后按最旧优先删除，以保留最近的特权操作决策。',
+    valueNotes: [
+      '默认 10000，允许范围 100–1000000。',
+      '与 SECURITY_AUDIT_RETENTION_DAYS 时间保留相互独立。',
+      '每次成功追加后会检查并执行容量裁剪。',
+    ],
+    impact: ['限制审计存储增长；高特权操作量时可能删除较旧事件。'],
+    notes: ['详见 docs/security-audit_zh.md。若必须保留更旧事件，请提高容量或先导出。'],
+  },
   'settings.system.TRUST_X_FORWARDED_FOR': {
+
     title: '信任 X-Forwarded-For',
     summary: '在可信反向代理后使用 X-Forwarded-For 识别真实客户端 IP。',
     usage: '仅单层可信反向代理场景设为 true；直连公网保持 false。',
@@ -775,6 +1000,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响定时任务、CLI 和 GitHub Actions 手动运行是否在休市日执行；Web/API 大盘复盘按钮会直接提交任务。'],
     notes: ['关闭后休市日可能生成缺少实时行情的报告。'],
   },
+  'settings.system.PLUGIN_DATA_PROVIDER_AUTO_BIND': {
+    title: '插件数据源自动绑定',
+    summary: '可选：将 PluginManager 绑定到进程级数据管理器的 plugin_registry。',
+    usage: '默认保持 PLUGIN_DATA_PROVIDER_AUTO_BIND=false 以保留手动 manager 行为。仅当希望已注册的插件数据源经默认 ApplicationServices 组合根自动路由时开启。',
+    valueNotes: [
+      '默认关闭。',
+      '开启后，不兼容绑定会在启动时 fail-closed，而不是静默降级。',
+      '修改后需要进程重启。',
+    ],
+    impact: ['影响插件注册的行情/数据源是否自动接入个股服务与主分析流水线。'],
+    notes: ['详见 docs/plugin-extension-contract.md 与 docs/plugin-development-guide_zh.md。'],
+    examples: [
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=false',
+      'PLUGIN_DATA_PROVIDER_AUTO_BIND=true',
+    ],
+  },
   'settings.system.scorecard': {
     title: '公开信号计分卡',
     summary: '控制聚合信号计分卡（GET /api/v1/scorecard）的可选公开暴露。',
@@ -796,6 +1037,29 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=false',
       'SIGNAL_SCORECARD_PUBLIC_ENABLED=true',
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
+    ],
+  },
+  'settings.system.research_api': {
+    title: '只读研究 API',
+    summary: '控制面向嵌入/门户客户端的只读研究 API，用于暴露分层结论。',
+    usage: '除非明确需要 GET /api/v1/research/conclusions*，否则保持 RESEARCH_API_ENABLED 关闭。启用后客户端可按 brief/standard/research 密度读取结论，并获取 as-of、置信度与证据计数。RESEARCH_API_RATE_LIMIT_PER_MINUTE 设置每主体滑动窗口限流（与 MCP 同一治理模式）。',
+    valueNotes: [
+      '默认关闭；关闭时路由返回 404。',
+      '仅挂载在主 API 端口，不另开监听端口。',
+      '复用会话鉴权（ADMIN_AUTH_ENABLED 开启时）、fail-closed 安全审计与滑动窗口限流。',
+      '响应仅为紧凑投影：不返回 raw_result 全量，且无写方法。',
+    ],
+    impact: [
+      '影响认证后是否可访问 /api/v1/research/conclusions*。',
+      '不改变分析生成、历史存储或 MCP 工具清单。',
+    ],
+    notes: [
+      '能力注册表相关工作独立推进，不在本开关内完成。',
+    ],
+    examples: [
+      'RESEARCH_API_ENABLED=false',
+      'RESEARCH_API_ENABLED=true',
+      'RESEARCH_API_RATE_LIMIT_PER_MINUTE=60',
     ],
   },
   'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
@@ -1028,6 +1292,47 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 推理深度、耗时和 token 消耗。'],
     notes: ['设为 0 或极低值可能导致推理不完整。'],
   },
+  'settings.agent.AGENT_MODE_BUDGET_ENABLED': {
+    title: '启用按模式硬预算',
+    summary: '启用按模式的 Agent 硬预算（轮次/工具/成本）。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS': {
+    title: '模式预算最大 LLM 轮次（全局）',
+    summary: '全局收紧各模式 LLM 轮次上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS': {
+    title: '模式预算最大工具调用（全局）',
+    summary: '全局收紧各模式工具调用上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_COST_USD': {
+    title: '模式预算最大成本 USD（全局）',
+    summary: '全局收紧估算成本上限；0 表示保留模式默认。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+  'settings.agent.AGENT_MODE_BUDGET_MAX_TOKENS': {
+    title: '模式预算最大 Token（全局）',
+    summary: '可选全局 token 上限；0 关闭 token 维度。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
+    impact: ['控制各模式 Agent 运行的硬终止预算。'],
+    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    valueNotes: ['修改后需要重启进程生效。'],
+  },
+
   'settings.agent.AGENT_SKILLS': {
     title: 'Agent 策略列表',
     summary: '指定 Agent 使用的策略技能列表。',
@@ -1194,6 +1499,46 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 置信度校准和长期分析质量。'],
     notes: ['需要配合回测功能使用效果更佳。'],
   },
+  'settings.agent.AGENT_PLANNING_ENABLED': {
+    title: 'Agent 规划循环',
+    summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',
+  },
+  'settings.agent.AGENT_PLANNING_STRATEGY': {
+    title: 'Agent 规划策略',
+    summary: '选择确定性模板规划或有界的 LLM 提案规划。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_PLAN_STEPS': {
+    title: '规划最大步骤数',
+    summary: '限制每个有效规划提案包含的步骤数量。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_REPLANS': {
+    title: '规划提案重试次数',
+    summary: '限制规划生成或校验失败后的重试次数。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOKENS': {
+    title: '规划提案 Token 预算',
+    summary: '限制 LLM 规划提案及其重试的 Token 总量。',
+  },
+  'settings.agent.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS': {
+    title: '规划提案超时',
+    summary: '限制规划提案阶段的墙钟时间。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS': {
+    title: '规划最大工具调用数',
+    summary: '限制规划执行与观察重规划期间的工具调用总数。',
+  },
+  'settings.agent.AGENT_PLANNING_MAX_OBSERVATION_REPLANS': {
+    title: '观察驱动重规划次数',
+    summary: '限制工具步骤失败后由观察结果触发的重规划次数。',
+  },
+  'settings.agent.AGENT_PLANNING_EXEC_TIMEOUT_SECONDS': {
+    title: '规划执行超时',
+    summary: '限制完整规划执行循环的墙钟时间。',
+  },
+  'settings.agent.AGENT_PLANNING_ON_STEP_FAILURE': {
+    title: '规划步骤失败策略',
+    summary: '选择步骤失败后在预算内重规划，或立即终止。',
+  },
   'settings.agent.AGENT_SKILL_AUTOWEIGHT': {
     title: '策略自动权重',
     summary: '根据历史回测表现自动调整策略权重。',
@@ -1224,6 +1569,53 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '该配置只影响问股可见历史压缩，不改变 LLM provider、模型、Base URL、保存清理或运行时优先级语义。',
     ],
   },
+  'settings.agent.runtime_guards': {
+    title: 'Agent 运行时护栏',
+    summary: '低敏的工具循环与 Stage 失败护栏，用于约束 Agent 执行。',
+    usage: 'AGENT_TOOL_TIMEOUT_S 限制单次工具调用；AGENT_MAX_IDENTICAL_TOOL_CALLS 与 AGENT_MAX_STAGE_ENTRIES 阻止失控循环；AGENT_STAGE_FAILURE_POLICY 在 isolate 与 fail_fast 之间选择。',
+    valueNotes: [
+      '工具超时默认 120 秒；相同调用次数或 Stage 进入次数设为 0 可单独关闭对应护栏。',
+      'isolate 对非关键 Stage 降级继续；fail_fast 在普通 Stage 失败时停止 Pipeline。',
+      '有界 Critic 白名单重试使用独立一次性预算，失败时始终 fail-soft 进入 Decision。',
+    ],
+    impact: ['影响 Agent 工具循环、Stage 重入与 Pipeline 失败行为，不改变公开 SSE/API 契约。'],
+    notes: ['三层超时模型见完整指南中的 Agent 配置说明。'],
+  },
+  'settings.agent.stage_timeouts': {
+    title: 'Agent Stage 超时',
+    summary: '为 multi-agent Pipeline 各 Stage 设置可选独立超时预算。',
+    usage: '各 Stage 超时保持 0 时仅跟随 AGENT_ORCHESTRATOR_TIMEOUT_S；设为正值可单独封顶该 Stage。',
+    valueNotes: [
+      '多预算同时生效时取剩余时间最短的一项。',
+      '超时后的 late stage 状态会被 fence，不能提交到后续 Stage。',
+    ],
+    impact: ['影响 multi-agent Stage 耗时，以及 Stage 超时后的降级路径。'],
+    notes: ['无法强制终止已在运行的原生线程；仅接受时限内 COMPLETED 的 Stage。'],
+  },
+  'settings.agent.decision_memory': {
+    title: '决策记忆',
+    summary: '向个股分析注入近期已评估决策结果，供反思使用。',
+    usage: 'DECISION_MEMORY_ENABLED 为全局开关（默认开启）；LOOKBACK、MIN_AGE_DAYS、MIN_SAMPLES 控制参与反思的结果范围。',
+    valueNotes: [
+      '请求级 use_memory 可覆盖全局开关。',
+      '最小天数避免结果尚未形成时就被反思。',
+      '最小样本数抑制噪声命中率分桶。',
+    ],
+    impact: ['影响分析提示词是否包含历史决策反思上下文。'],
+    notes: ['决策信号生命周期见 docs/decision-signals.md。'],
+  },
+  'settings.agent.reasoning_trace_export': {
+    title: '推理轨迹导出',
+    summary: '可选导出已记录诊断数据的脱敏 reasoning-trace-v1 包。',
+    usage: '除非运营需要导出 API，否则保持 REASONING_TRACE_EXPORT_ENABLED=false。REASONING_TRACE_EXPORT_MAX_CHARS 控制完整响应字符预算（10000–2000000）。',
+    valueNotes: [
+      '默认关闭。',
+      '导出会脱敏凭据与本地路径，但仍属敏感运营数据。',
+      '服务不保存导出文件；已下载副本需运营自行删除。',
+    ],
+    impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
+    notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
+  },
   'settings.agent.observability': {
     title: 'Agent 可观测性',
     summary: '为运行流提供带 trace/span 的轻量 Agent 结构化事件。',
@@ -1234,6 +1626,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['为多步骤 Agent 排障提供低开销时间线细节。'],
     notes: ['隐私与开销说明见 docs/agent-observability.md。'],
+  },
+  'settings.agent.performance': {
+    title: '性能基线',
+    summary: '为关键分析路径提供可关闭的性能 span 采集与离线剖析入口。',
+    usage: 'PERF_COLLECTION_ENABLED 在 collector 激活时记录轻量 span（默认关闭）。PERF_PROFILE_ENABLED 仅表达离线 cProfile 意图，不会自动包装生产请求。',
+    valueNotes: [
+      '关闭时为 no-op，生产路径开销接近零。',
+      '离线基线与可选 cProfile 请使用 scripts/run_perf_baseline.py。',
+    ],
+    impact: ['在不改变默认运行时行为的前提下，支持本地基线对比与 pipeline 阶段耗时镜像。'],
+    notes: ['workload、CI 影响与刷新方式见 docs/performance-baseline.md。'],
   },
   'settings.agent.event_monitor': {
     title: '事件监控',
@@ -1388,6 +1791,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响通知报告中的模型信息可见性。'],
     notes: ['用于排查模型切换问题时可以临时开启。'],
   },
+  'settings.report.NOTIFICATION_DELTA_FIRST': {
+    title: '分析变化优先',
+    summary: '默认关闭；不调用模型，在完整报告前显示变化，失败仍保留报告。',
+  },
   'settings.report.REPORT_TEMPLATES_DIR': {
     title: '报告模板目录',
     summary: 'Jinja2 报告模板的存放目录。',
@@ -1395,6 +1802,22 @@ const settingsHelpZhCN: SettingsHelpMap = {
     valueNotes: ['需要同时开启 REPORT_RENDERER_ENABLED 才会使用模板渲染。'],
     impact: ['影响报告渲染使用的模板来源。'],
     notes: ['自定义模板需要符合 Jinja2 语法并包含必要的变量占位。'],
+  },
+  'settings.report.REPORT_MODE': {
+    title: '报告呈现模式',
+    summary: '在报告渲染引擎开启时，控制 Jinja 个股报告的呈现深度。',
+    usage: '可选 brief、standard（默认）或 research。选项来自运行时 report-mode 契约。单次可通过 extra_context.report_mode 覆盖。',
+    valueNotes: [
+      'brief 仅保留 Decision Card + 关键风险。',
+      'standard 为 Decision Card + 主要分析段落。',
+      'research 展开细节与更高 strata 上限。',
+      '硬性上限永不丢弃 Decision Card 区块。',
+    ],
+    impact: ['影响报告渲染哪些段落，以及内容截断的激进程度。'],
+    notes: [
+      '仅在 REPORT_RENDERER_ENABLED=true 时生效。',
+      '渲染关闭时的硬编码通知 fallback 路径不变。',
+    ],
   },
   'settings.report.REPORT_RENDERER_ENABLED': {
     title: '报告渲染引擎',
@@ -1537,6 +1960,26 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响分析总耗时和 API 调用频率。'],
     notes: ['并发过高可能导致 API 返回限流错误。'],
   },
+  'settings.system.ANALYSIS_PARALLEL_FETCH': {
+    title: '分析内并行取数',
+    summary:
+      '在单只股票分析内，对无依赖的行情输入（实时行情、筹码、资金流、基本面）并发拉取。',
+    usage:
+      'ANALYSIS_PARALLEL_FETCH_ENABLED 控制并行/串行；MAX_CONCURRENT 为全局并发上限；PER_PROVIDER_LIMIT 限制同一逻辑 provider key 的并发；BUDGET_SECONDS 为可选墙钟预算（0 关闭），未启动分支会以 budget_skipped 缺口返回。',
+    valueNotes: [
+      '仍走 DataFetcherManager（故障切换、缓存、熔断、校验），并行层不是旁路 HTTP。',
+      '默认并发 3、单源 1，在重叠无依赖能力的同时降低踩限流风险。',
+      '排查数据源问题时可关闭开关，强制按声明顺序串行。',
+    ],
+    impact: [
+      '影响单股分析延迟，以及单次运行内对数据源的峰值并发。',
+      '不改变跨股票队列的 MAX_WORKERS 并发语义。',
+    ],
+    notes: [
+      '写入 stage IO / AgentContext 的合并顺序按声明 key，不按完成先后。',
+      '与预测 ActualsFetcher 的 coalesce 兼容：重叠标的仍经 provider manager 路径。',
+    ],
+  },
   'settings.system.ANALYSIS_DELAY': {
     title: '分析间隔',
     summary: '控制每只股票分析之间的间隔秒数，用于限速。',
@@ -1547,15 +1990,123 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.system.daily_brief': {
     title: '每日简报',
-    summary: '按计划生成每日简报，并回顾历史简报准确率。',
-    usage: 'DAILY_BRIEF_ENABLED 控制开关；DAILY_BRIEF_SCHEDULE_TIME 与 DAILY_BRIEF_TIMEZONE 控制计划时间；DAILY_BRIEF_MIN_SAMPLES 控制展示准确率前的最小样本数。',
-    valueNotes: [
-      '默认关闭，不影响既有计划任务。',
-      '准确率回顾仅供参考，不会自动交易。',
-    ],
-    impact: ['影响计划简报生成与准确率回顾展示。'],
+    summary: '按计划生成个人晨报：持仓成员、隔夜要点、近期财报事件上下文、昨日分析、自选与历史准确率复盘。',
+    usage: 'DAILY_BRIEF_ENABLED 控制开关；SCHEDULE_TIME/TIMEZONE 控制时间；MIN_SAMPLES 控制准确率样本门槛；NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE 控制投递；QUIET_WHEN_EMPTY 在无实质内容时跳过推送。',
+    valueNotes: ['默认关闭。', '准确率仅供参考。', '安静模式仍可生成与落库。'],
+    impact: ['影响计划简报生成、统一报告路由推送、历史与准确率复盘面板。'],
     notes: ['定时投递需要 schedule 模式。'],
   },
+  'settings.system.event_research_brief': {
+    title: '事件研究简报',
+    summary: '可选的已观测财报事件触发复盘：关注指标、超预期定义与事后核对清单。',
+    usage: 'EVENT_RESEARCH_BRIEF_ENABLED 打开独立调度；NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE 控制投递；LOOKBACK_HOURS 与 CATEGORIES 限定近期托管触发（首日 earnings）。每日晨报会嵌入近期事件上下文；这不是未来事件目录。',
+    valueNotes: ['默认关闭。', '仅托管公司事件触发。', '不编造一致预期。'],
+    impact: ['影响近期事件上下文通知与可选历史。'],
+    notes: ['独立路径需要 schedule 模式。'],
+  },
+  'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
+    title: '管理员会话最长有效期（小时）',
+    summary: '已登录管理员 Web 会话的最长存活时间。',
+    usage: '填写 1–720 的整数小时，默认 24。已有会话可能保留旧 TTL，直至重新登录。',
+    impact: ['影响设置页与管理 API 在未重新登录前可保持认证的时长。'],
+    notes: ['变更会话策略后建议重启进程。'],
+  },
+  'settings.system.OUTBOUND_HTTP_ALLOWLIST': {
+    title: '出站 HTTP 允许列表',
+    summary: 'fail-closed 出站 HTTP 访问私网或回环目标时允许的精确 host:port 列表。',
+    usage: '逗号分隔的 host:port（例如 127.0.0.1:8642,searxng.internal:8080）。公网主机一般无需写入。',
+    valueNotes: [
+      '配置错误可能阻断本机 Ollama、Hermes、私有 SearXNG 或插件端点。',
+      '部分回环 Ollama 路径有单独豁免；不确定时建议显式写入 allowlist。',
+    ],
+    impact: ['影响所有面向私网/回环的 fail-closed 出站请求。'],
+    notes: ['建议重启，使长连接客户端重新加载策略。'],
+  },
+  'settings.system.OUTBOUND_HTTP_ALLOW_PROXY_FAKE_IP': {
+    title: '允许可信代理 Fake-IP',
+    summary: '在可信工作站上允许公网域名使用 Clash/Mihomo 标准 Fake-IP 解析结果。',
+    usage: '默认保持关闭。仅当可信 Clash/Mihomo TUN 接管文档所列 Fake-IP 网段，且系统代理严格绑定回环地址时开启。',
+    valueNotes: [
+      '字面 Fake-IP URL、私网域名、metadata、链路本地地址和非回环代理仍会被拒绝。',
+      'Local Only Mode 优先级更高，仍会阻断所有非回环目标。',
+    ],
+    impact: ['仅为标准 Fake-IP 网段和精确配置的回环代理扩展出站 DNS 接受范围。'],
+    notes: ['不再信任 TUN 或回环代理时应立即关闭。'],
+  },
+  'settings.system.SMARTMONEY_ENABLED': {
+    title: '启用 SmartMoney 资金流',
+    summary: 'SmartMoney 资金流跟踪与可选分析上下文注入的默认关闭总开关。',
+    usage: '仅在接受额外网络请求与校准元数据路径时开启。',
+    impact: ['影响 SmartMoney 服务与可选分析上下文字段。'],
+    notes: ['关闭时保持上下文字段形状稳定，不编造资金流数据。'],
+  },
+  'settings.system.fundamental_pipeline': {
+    title: '基本面流水线',
+    summary: '基本面增强阶段的总开关、超时、重试与缓存边界。',
+    usage:
+      'ENABLE_FUNDAMENTAL_PIPELINE 控制阶段开关；FUNDAMENTAL_STAGE_TIMEOUT_SECONDS 为整阶段预算；FUNDAMENTAL_FETCH_TIMEOUT_SECONDS 限制单次拉取；FUNDAMENTAL_RETRY_MAX、FUNDAMENTAL_CACHE_TTL_SECONDS、FUNDAMENTAL_CACHE_MAX_ENTRIES 控制重试与进程内缓存。',
+    valueNotes: [
+      '阶段/拉取默认超时 8 秒；重试默认 1；缓存默认 120 秒 / 256 条。',
+      '关闭流水线会跳过基本面增强，但不会拖垮其余分析阶段。',
+    ],
+    impact: ['影响分析中的基本面模块及相关 Agent 工具。'],
+  },
+  'settings.system.PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS': {
+    title: '组合幂等重放窗口（天）',
+    summary: '组合写操作幂等键可安全重放的保留天数。',
+    usage: '1–3650 的整数天，默认 7。',
+    impact: ['影响客户端重试或重连后组合写 API 的安全回放行为。'],
+  },
+  'settings.system.portfolio_risk': {
+    title: '组合风险阈值',
+    summary: '组合风险诊断的告警阈值与回看窗口。',
+    usage:
+      'PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT、PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT、PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT 为百分比；PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO 为止损阈值的近距比例（0–1）；PORTFOLIO_RISK_LOOKBACK_DAYS 为交易日回看窗口（默认 180）。',
+    impact: ['影响组合风险告警与 Agent 风险快照。'],
+  },
+  'settings.system.PORTFOLIO_FX_UPDATE_ENABLED': {
+    title: '启用组合汇率更新',
+    summary: '多币种持仓估值是否允许刷新汇率。',
+    usage: '默认 true。仅在希望估值复用已存汇率、不做网络刷新时关闭。',
+    impact: ['影响多币种组合估值的汇率新鲜度。'],
+  },
+  'settings.system.news_intel': {
+    title: '本地资讯情报池',
+    summary: '本地情报池（NEWS_INTEL_* / NewsNow）的保留天数、超时与自动拉取控制。',
+    usage:
+      'NEWS_INTEL_RETENTION_DAYS（1–365）、NEWS_INTEL_FETCH_TIMEOUT_SEC（1–30）、NEWS_INTEL_MAX_ITEMS_PER_SOURCE（1–200）、NEWS_INTEL_AUTO_FETCH_ENABLED（默认 false）与 NEWSNOW_BASE_URL 配置情报池。私有 NewsNow 主机还需写入 OUTBOUND_HTTP_ALLOWLIST。',
+    valueNotes: [
+      '自动拉取为 opt-in；GitHub Actions 工作流可能还需要 env allowlist 映射。',
+      '该池与 SearXNG / RSS 搜索链路新闻源相互独立。',
+    ],
+    impact: ['影响情报池新鲜度、存储占用与计划拉取。'],
+  },
+  'settings.ai_model.LLM_TIMEOUT_SEC': {
+    title: 'LLM 请求超时（秒）',
+    summary: '单次 LLM 请求超时；AlphaSift 选股重排会复用该 DSA 配置。',
+    usage: '默认 60。超时后 AlphaSift 降级为非 LLM 排序，而不是盲目重试。',
+    impact: ['影响 AlphaSift LLM 重排时延与降级路径。'],
+  },
+  'settings.ai_model.LLM_MAX_TOKENS': {
+    title: 'LLM 最大输出 Token 数',
+    summary: 'AlphaSift LLM 重排请求的输出 token 上限。',
+    usage: '默认 2048。不替代主分析链路各供应商自己的 max-token 配置。',
+    impact: ['仅影响 AlphaSift 重排输出长度。'],
+  },
+  'settings.notification.FAILURE_NOTIFY_ENABLED': {
+    title: '失败通知开关',
+    summary: '控制每日运行失败通知。',
+    usage:
+      '留空（自动）表示仅在配置了 NOTIFICATION_SYSTEM_ERROR_CHANNELS 时发送；true 强制开启；false 强制关闭。',
+    impact: ['影响失败的每日/Actions 运行是否尝试推送失败通知。'],
+  },
+  'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
+    title: '纸面组合初始资金',
+    summary: '新建纸面组合时的起始现金。',
+    usage: '非负数，默认 1000000。MVP 纸面引擎忽略手续费与滑点。',
+    impact: ['仅影响新创建的纸面组合；既有组合保留原有现金余额。'],
+  },
+
   'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
     title: '组合压力测试情景目录',
     summary: '用于确定性组合压力测试的可选、有边界 YAML 情景目录。',
@@ -1658,6 +2209,19 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
   },
 
+  'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
+    title: '就绪自检超时',
+    summary: '结构化就绪/自检报告的单检查超时。',
+    usage:
+      '默认 1.0 秒（限制在 0.1–5.0）。仅用于按需调用 GET /api/v1/system/readiness，' +
+      '不会在进程启动时自动运行。超时或失败的探测不得报就绪。',
+    examples: [
+      'READINESS_CHECK_TIMEOUT_SECONDS=1.0',
+      'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
+    ],
+  },
+
+
   'settings.system.portfolio_health': {
     title: '投资组合健康度公式',
     summary: '配置健康度的固定分母权重和预警阈值。',
@@ -1673,7 +2237,227 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 编排深度与报告中的投委会相关章节。'],
     notes: ['需要 Agent multi 能力。'],
   },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: '研究立场预设',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: '自定义研究立场',
+  },
 
+
+  'settings.mcp.MCP_SERVER_ENABLED': {
+    title: '启用 MCP 服务',
+    summary: '可选 MCP 进程总开关，默认关闭；主 API/Web 进程不会自动启动 MCP。',
+    usage: '仅在你明确要执行 `python -m src.mcp_server` 时设为 true。修改后需重启 MCP 进程。',
+    valueNotes: [
+      'false 时保持对外工具面关闭。',
+      '仅开启开关不够，还需要 scopes 与对应传输的安全配置。',
+    ],
+    impact: [
+      '决定独立 MCP 进程是否允许启动。',
+    ],
+    notes: [
+      'HTTP 传输属于安全敏感对外面。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_TRANSPORT': {
+    title: 'MCP 传输方式',
+    summary: '官方 SDK 传输：stdio（本机进程）或 streamable-http。',
+    usage: '本机操作优先 stdio。仅在具备管理员认证、scopes 与会话摘要时使用 streamable-http。',
+    valueNotes: [
+      'stdio 为默认本机边界。',
+      '运行时接受 http 作为 streamable-http 别名。',
+    ],
+    impact: [
+      '决定客户端如何连接以及适用哪些安全控制。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_HOST': {
+    title: 'MCP 绑定主机',
+    summary: 'streamable-http 绑定主机，优先 loopback。',
+    usage: '除非有可信网络控制，否则保持 127.0.0.1/localhost。',
+    valueNotes: [
+      '绑定到非本机地址会扩大攻击面。',
+    ],
+    impact: [
+      '影响 MCP HTTP 监听接受连接的位置。',
+    ],
+  },
+  'settings.mcp.MCP_SERVER_PORT': {
+    title: 'MCP 绑定端口',
+    summary: 'streamable-http TCP 端口（1–65535）。',
+    usage: '默认 8765；端口冲突时再修改。',
+    impact: [
+      '影响 MCP HTTP 监听地址。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_PRINCIPAL': {
+    title: 'MCP stdio 主体',
+    summary: 'stdio 审计与限速使用的稳定主体名。',
+    usage: '使用符合支持字符规则的短稳定标识。',
+    impact: [
+      '用于标注 stdio 工具调用日志与限速桶。',
+    ],
+  },
+  'settings.mcp.MCP_STDIO_SCOPES': {
+    title: 'MCP stdio 权限范围',
+    summary: 'stdio 的逗号分隔最小权限 scopes。',
+    usage: 'transport=stdio 且启用时必填。允许：market.read、history.read、portfolio.read、analysis.trigger。',
+    valueNotes: [
+      '只授予本机操作者真正需要的范围。',
+    ],
+    impact: [
+      '限制 stdio 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '放宽 scope 会扩大可调用能力。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SCOPES': {
+    title: 'MCP HTTP 权限范围',
+    summary: 'streamable-http 的逗号分隔最小权限 scopes。',
+    usage: '启用 HTTP 传输时必填；允许范围与 stdio 相同。',
+    impact: [
+      '限制 HTTP 客户端可调用的 MCP 工具。',
+    ],
+    notes: [
+      '远程可达传输应保持最小权限。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_SESSION_TOKEN_SHA256': {
+    title: 'MCP HTTP 会话令牌 SHA-256',
+    summary: '唯一接受的管理员会话令牌的 SHA-256 十六进制摘要。',
+    usage: 'streamable-http 必填。只存摘要，不存原始 Bearer。',
+    valueNotes: [
+      '须为 64 位十六进制，或在未使用时留空。',
+      '设置页会掩码此敏感字段。',
+    ],
+    impact: [
+      '为 HTTP MCP 锚定可接受的管理员会话。',
+    ],
+    notes: [
+      '若 Bearer 可能泄露，应轮换摘要。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_RESOURCE': {
+    title: 'MCP HTTP 资源 URL',
+    summary: 'streamable-http 的绝对 http(s) 资源/受众 URL。',
+    usage: '默认 http://127.0.0.1:8765/mcp，需与客户端使用的公开 MCP 端点一致。',
+    impact: [
+      '影响 HTTP MCP 的 resource/audience 绑定。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_HOSTS': {
+    title: 'MCP HTTP 允许 Host',
+    summary: 'streamable-http 的 Host 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback。通配端口使用官方 SDK 的 :* 形式。',
+    valueNotes: [
+      '放宽列表（如 * 或公网主机）会增加 Host 头与跨站风险。',
+    ],
+    impact: [
+      '控制 HTTP MCP 接受哪些 Host 值。',
+    ],
+    notes: [
+      '应把放宽视为安全决策，而非便利开关。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_ALLOWED_ORIGINS': {
+    title: 'MCP HTTP 允许 Origin',
+    summary: '浏览器客户端的 Origin 允许列表（逗号分隔）。',
+    usage: '默认仅 loopback HTTP origin。',
+    valueNotes: [
+      '放宽 origin（尤其 * 或不可信站点）会允许浏览器跨源访问 MCP 工具。',
+    ],
+    impact: [
+      '控制 HTTP MCP 的浏览器 CORS/Origin 接受策略。',
+    ],
+    notes: [
+      '保持列表尽量小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_BODY_BYTES': {
+    title: 'MCP HTTP 最大 Body 字节',
+    summary: 'streamable-http 接受的最大 JSON Body 大小。',
+    usage: '默认 1000000。仅在有真实大负载需求时上调。',
+    impact: [
+      '限制请求体内存占用。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_HEADER_BYTES': {
+    title: 'MCP HTTP 最大 Header 字节',
+    summary: 'streamable-http 未完整 Header 块上限。',
+    usage: '默认 32768。通常无需修改。',
+    impact: [
+      '限制 Header 缓冲大小。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_MAX_CONNECTIONS': {
+    title: 'MCP HTTP 最大连接数',
+    summary: 'streamable-http 最大并发连接数。',
+    usage: '默认 32。小主机可下调，加压测试后再上调。',
+    impact: [
+      '限制并发 HTTP MCP 客户端。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_BACKLOG': {
+    title: 'MCP HTTP 监听 backlog',
+    summary: 'streamable-http 接受器的 OS listen backlog。',
+    usage: '默认 16。容量调优之外很少改动。',
+    impact: [
+      '影响待处理连接队列深度。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_READ_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP 读取超时',
+    summary: 'streamable-http 每个 body chunk 读取超时（秒）。',
+    usage: '默认 10，范围 1–120。',
+    impact: [
+      '控制慢客户端可占用读取的时间。',
+    ],
+  },
+  'settings.mcp.MCP_HTTP_KEEPALIVE_TIMEOUT_SECONDS': {
+    title: 'MCP HTTP Keep-Alive 超时',
+    summary: 'streamable-http 连接 keep-alive 空闲超时（秒）。',
+    usage: '默认 5，范围 1–120。',
+    impact: [
+      '控制空闲连接保留时间。',
+    ],
+  },
+  'settings.mcp.MCP_MAX_CONCURRENT_TOOLS': {
+    title: 'MCP 最大并发工具数',
+    summary: '单个 MCP 进程最大并发工具 worker 数。',
+    usage: '默认 8，范围 1–128。',
+    impact: [
+      '限制并发工具执行成本。',
+    ],
+  },
+  'settings.mcp.MCP_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 工具速率限制',
+    summary: '按主体/工具的每分钟调用上限。',
+    usage: '默认 60，范围 1–10000。',
+    impact: [
+      '限制通用工具刷量。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_RATE_LIMIT_PER_MINUTE': {
+    title: 'MCP 分析速率限制',
+    summary: 'analysis.trigger 每分钟调用上限。',
+    usage: '默认 2。请保持较低以控制 LLM/数据成本。',
+    impact: [
+      '保护分析成本预算。',
+    ],
+  },
+  'settings.mcp.MCP_ANALYSIS_MAX_STOCKS': {
+    title: 'MCP 单次分析最大标的数',
+    summary: '单次 analysis.trigger 允许的最大标的数。',
+    usage: '默认 5，范围 1–50。',
+    impact: [
+      '限制单次分析成本。',
+    ],
+  },
+  'settings.system.resume': {
+    title: '续跑与复现',
+  },
 };
 
 export default settingsHelpZhCN;

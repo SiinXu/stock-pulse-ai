@@ -69,8 +69,9 @@ class _SystemConfigLLMOperationsMethods:
                 models=[],
                 latency_ms=None,
             )
-        resolved_secret, secret_error, redaction_values = self._resolve_hermes_saved_secret(
+        resolved_secret, secret_error, redaction_values = self._resolve_saved_connection_secret(
             channel_name=channel_name,
+            provider_id=str(provider_id or ""),
             protocol=protocol,
             base_url=base_url,
             submitted_api_key=api_key,
@@ -333,6 +334,7 @@ class _SystemConfigLLMOperationsMethods:
         base_url: str,
         api_key: str,
         models: Sequence[str],
+        model_id_mode: str = "route",
         enabled: bool = True,
         timeout_seconds: float = 20.0,
         capability_checks: Sequence[str] = (),
@@ -369,8 +371,9 @@ class _SystemConfigLLMOperationsMethods:
                     "Skipped because the base channel test did not pass",
                 ),
             )
-        resolved_secret, secret_error, redaction_values = self._resolve_hermes_saved_secret(
+        resolved_secret, secret_error, redaction_values = self._resolve_saved_connection_secret(
             channel_name=channel_name,
+            provider_id=str(provider_id or ""),
             protocol=protocol,
             base_url=base_url,
             submitted_api_key=api_key,
@@ -465,7 +468,20 @@ class _SystemConfigLLMOperationsMethods:
             )
 
         resolved_protocol = resolve_llm_channel_protocol(protocol, base_url=base_url, models=raw_models, channel_name=name)
-        resolved_models = [normalize_llm_channel_model(model, resolved_protocol, base_url) for model in raw_models]
+        preserve_wire_model = bool(
+            provider
+            and provider.get("is_custom")
+            and model_id_mode.strip().lower() == "literal"
+        )
+        resolved_models = [
+            normalize_llm_channel_model(
+                model,
+                resolved_protocol,
+                base_url,
+                preserve_wire_model=preserve_wire_model,
+            )
+            for model in raw_models
+        ]
         resolved_model = resolved_models[0]
         if is_reserved_hermes_name(channel_name):
             resolved_model = canonicalize_hermes_model_ref(raw_models[0]).wire_model

@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
   APP_ROUTE_PATHS,
@@ -148,28 +152,42 @@ beforeEach(() => {
   });
 });
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 describe('BacktestPage', () => {
   function renderPage() {
     return render(
-      <BrowserRouter>
-        <BacktestPage />
-      </BrowserRouter>,
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <BrowserRouter>
+          <BacktestPage />
+        </BrowserRouter>
+      </RouteFocusRegistrationContext.Provider>,
     );
   }
 
   function renderEnglishPage() {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     render(
-      <BrowserRouter>
-        <UiLanguageProvider>
-          <BacktestPage />
-        </UiLanguageProvider>
-      </BrowserRouter>,
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <BrowserRouter>
+          <UiLanguageProvider>
+            <BacktestPage />
+          </UiLanguageProvider>
+        </BrowserRouter>
+      </RouteFocusRegistrationContext.Provider>,
     );
   }
 
   it('renders shared surface inputs and prediction tracking outputs', async () => {
     renderPage();
+
+    expect(routeFocusRegister).toHaveBeenCalledWith(expect.objectContaining({
+      routeId: APP_ROUTE_PATHS.researchBacktest,
+      ready: true,
+    }));
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -1050,5 +1068,32 @@ describe('BacktestPage', () => {
     expect(applied).toHaveTextContent(/Candidate limit 50/i);
     expect(applied).toHaveTextContent(/Engine v1/i);
     expect(screen.getByText(/Insufficient:/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get('minAge')).toBe('7');
+      expect(search.get('limit')).toBe('50');
+    });
+  });
+
+  it('restores strategy run options (minAge, limit) from the URL via urlState', async () => {
+    const search = new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: 'AAPL',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '15',
+      minAge: '7',
+      limit: '50',
+    });
+    window.history.replaceState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchBacktest}?${search}`,
+    );
+
+    renderEnglishPage();
+
+    expect(await screen.findByLabelText('Min age (days)')).toHaveValue(7);
+    expect(screen.getByLabelText('Candidate limit')).toHaveValue(50);
+    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveValue('AAPL');
+    expect(screen.getByPlaceholderText('10')).toHaveValue(15);
   });
 });

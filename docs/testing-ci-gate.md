@@ -1,7 +1,7 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-06
+- Last verified: 2026-08-12
 - Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
@@ -10,11 +10,28 @@ The backend CI gate (`./scripts/ci_gate.sh`) must:
 
 1. Fail hangs with an attributed test name (per-test timeout).
 2. Dump thread stacks when a single test is silent for too long (`faulthandler_timeout`).
-3. Measure and enforce a **measured** line-coverage floor for production packages.
+3. Measure and enforce a **measured** line-coverage floor for production packages (**push-to-main / full tier only**).
 4. Fail collection on unknown pytest markers (`--strict-markers`).
 5. Keep wall-clock / throughput assertions out of the default offline gate so noisy runners do not redden CI.
 6. Refuse a working-tree coverage floor lower than `origin/main` (anti-lowering).
 7. Require the offline suite's `--cov=` scopes to match `baseline.packages` exactly, and require measured files under every package prefix.
+
+## Two-tier hosted CI (throughput)
+
+| Event | Backend tier | What runs |
+| --- | --- | --- |
+| `pull_request` | **Fast** | `syntax` + `flake8` + `deterministic` + **selective** offline pytest via `scripts/ci_select_tests.py` (falls back to the full suite when mapping is uncertain: config, conftest, CI scripts, etc.) |
+| `push` to `main` | **Full** | 4 sharded offline suites (`scripts/ci_test_shard.py`) + **one** combined coverage floor check |
+
+`python-minimum` (3.10) runs `python-min-smoke` (imports + a small offline subset) on pull requests and the full offline suite on pushes to `main`.
+
+Local full gate remains:
+
+```bash
+./scripts/ci_gate.sh
+# or
+./scripts/ci_gate.sh offline-tests
+```
 
 ## Default offline selection
 
@@ -148,6 +165,30 @@ Current benchmark-marked wall-clock cases:
 - `tests/security/test_sensitive_redaction.py::test_field_scanner_checks_one_public_boundary_per_whitespace_run` (`elapsed < 0.5`)
 - `tests/data_provider/test_hk_stock_name_fallback.py::test_parallel_cold_lookups_share_one_em_request` (4-thread barrier / sleep; relocated from the blocking gate)
 
+## Agent HITL / Critic path contracts (high-risk)
+
+Backend regressions in Human-in-the-Loop approvals and the bounded Critic must
+be caught by **deterministic offline tests** that exercise real risk layers:
+
+| Path | Real entry preferred | Deterministic seams | Anchor tests |
+| --- | --- | --- | --- |
+| HITL approve → consume | `ApprovalService.await_risk_control_bypass` and dashboard `_apply_risk_override` | Injectable `clock` / `sleeper`; in-memory SQLite | `tests/services/test_approval_regression_anchors.py`, `tests/agent/test_hitl_path_contracts.py` |
+| HITL reject | Same | Decision injected via `sleeper` (no wall-clock sleep) | Same |
+| HITL proposal lifetime timeout | Same | Advance injectable clock past `expires_at` | Same |
+| HITL pipeline deadline timeout | Same | `stop_waiting_check` or `_approval_deadline_epoch` | Same; semantics in [human-approvals_EN.md](human-approvals_EN.md) |
+| Critic pass / fail_soft / budget skip | Orchestrator `_execute_pipeline` | Fixture Critic + fake `time.time` budget | `tests/agent/test_bounded_critic.py` |
+
+**Hard rules for these suites** (see Issues #225, #1079):
+
+1. Do **not** mock away `ApprovalService.await_risk_control_bypass`, the risk
+   manager gate, or Critic fail-soft/budget logic merely to raise coverage.
+2. Prefer wiring a real service with a test database and injectable clock over
+   stubbing return values of the risk layer.
+3. Never lower `scripts/coverage_floor_baseline.json` to green these paths.
+
+Operational HITL defaults and the independence of proposal lifetime vs pipeline
+deadline are documented in [human-approvals_EN.md](human-approvals_EN.md).
+
 ## Time determinism (fake clock, phase 1)
 
 Wall-clock-sensitive offline tests should prefer the repo-local seam in
@@ -280,7 +321,7 @@ To avoid a doubled full offline suite on every PR:
 
 | Job | PR tier | Push-to-main |
 | --- | --- | --- |
-| `backend-gate` offline phase | `./scripts/ci_gate.sh offline-tests-selective` via `scripts/ci_select_tests.py` (prints `FULL` / `NONE` / path targets) | `./scripts/ci_gate.sh offline-tests` (coverage floor) |
+| `backend-gate` offline phase | `./scripts/ci_gate.sh offline-tests-selective` via `scripts/ci_select_tests.py` (prints `FULL` / `NONE` / path targets) | Four `offline-tests-shard` jobs followed by one `offline-tests-combine` coverage-floor check |
 | `python-minimum` | `./scripts/ci_gate.sh python-min-smoke` (3.10 import + small contract suite) | `./scripts/ci_gate.sh offline-tests` |
 
 Selective mapping falls back to the full offline suite when infrastructure paths change (for example `tests/conftest.py`, `ci.yml`, coverage floor scripts, or top-level config).

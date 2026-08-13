@@ -1,16 +1,21 @@
-import type React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
 import StockDetailsPage from '../StockDetailsPage';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { stocksApi } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
+import { estimateStockValuation } from '../../api/valuation';
 import {
   APP_ROUTE_PATHS,
   SIGNAL_CENTER_TAB_VALUES,
+  buildReportVersionCompareHref,
   buildSignalCenterHref,
 } from '../../routing/routes';
 import type { StockHistoryResponse, StockQuote } from '../../types/stocks';
@@ -26,23 +31,32 @@ vi.mock('../../api/systemConfig', () => ({
   },
 }));
 
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Line: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  Tooltip: () => null,
-  CartesianGrid: () => null,
+vi.mock('../../api/valuation', () => ({
+  estimateStockValuation: vi.fn(),
 }));
 
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
 const getHistoryMock = vi.mocked(stocksApi.getDailyHistory);
 const addWatchlistMock = vi.mocked(systemConfigApi.addToWatchlist);
+const estimateStockValuationMock = vi.mocked(estimateStockValuation);
 
 function SignalLocationProbe() {
   const location = useLocation();
   return <output data-testid="signal-location">{`${location.pathname}${location.search}`}</output>;
+}
+
+function StockRouteNavigationProbe() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate('/stocks/AAPL')}>
+      Navigate to AAPL
+    </button>
+  );
+}
+
+function ReportCompareLocationProbe() {
+  const location = useLocation();
+  return <output data-testid="report-compare-location">{`${location.pathname}${location.search}`}</output>;
 }
 
 function makeQuote(overrides: Partial<StockQuote> = {}): StockQuote {
@@ -75,6 +89,11 @@ function makeHistory(): StockHistoryResponse {
   };
 }
 
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+
 function wrapWithQueryClient(ui: ReactElement): ReactElement {
   const client = new QueryClient({
     defaultOptions: {
@@ -85,30 +104,39 @@ function wrapWithQueryClient(ui: ReactElement): ReactElement {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
-function renderPage(code = '600519') {
+function renderPage(code = '600519', includeNavigationProbe = false) {
   return render(
     wrapWithQueryClient(
-      <UiLanguageProvider initialLanguage="en">
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <UiLanguageProvider initialLanguage="en">
         <MemoryRouter initialEntries={[`/stocks/${code}`]}>
+          {includeNavigationProbe && <StockRouteNavigationProbe />}
           <Routes>
             <Route path="/stocks/:stockCode" element={<StockDetailsPage />} />
             <Route path="/" element={<div>home-route</div>} />
             <Route path={APP_ROUTE_PATHS.signals} element={<SignalLocationProbe />} />
+            <Route
+              path={APP_ROUTE_PATHS.researchReportCompare}
+              element={<ReportCompareLocationProbe />}
+            />
           </Routes>
         </MemoryRouter>
-      </UiLanguageProvider>,
+      </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>,
     ),
   );
 }
+
 
 describe('StockDetailsPage', () => {
   beforeEach(() => {
     getQuoteMock.mockReset();
     getHistoryMock.mockReset();
     addWatchlistMock.mockReset();
+    estimateStockValuationMock.mockReset();
   });
 
-  it('renders the quote and the accessible history table', async () => {
+  it('renders the quote, K-line chart, and accessible history table', async () => {
     getQuoteMock.mockResolvedValue(makeQuote());
     getHistoryMock.mockResolvedValue(makeHistory());
 
@@ -118,14 +146,30 @@ describe('StockDetailsPage', () => {
     expect(screen.getByText(/Latest available quote/)).toBeTruthy();
     // CN market: currency code + 2dp from marketFormat
     expect(screen.getByText('CNY 1,700.00')).toBeTruthy();
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('CN');
     // CN convention red_up: positive change uses red paint token
     const changeNode = screen.getByText(/\+20\.00/);
     expect(changeNode.getAttribute('data-change-color')).toBe('red');
     expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
-    // history table rows
-    expect(screen.getByText('2026-01-05')).toBeTruthy();
-    expect(screen.getByText('2026-01-06')).toBeTruthy();
+    // Product page consumes the shared KlineChart with history API candles.
+    expect(screen.getByTestId('stock-details-kline-chart')).toBeTruthy();
+    expect(screen.getByTestId('stock-details-kline-chart-canvas')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Peer relative-value canvas' })).toBeTruthy();
+    // history table rows (dates also appear in the K-line readout/axis)
+    expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('2026-01-06').length).toBeGreaterThanOrEqual(1);
     expect(getHistoryMock).toHaveBeenCalledWith('600519', 90);
+  });
+
+  it('keeps history loading and error states without painting a false chart', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockRejectedValue(new Error('history down'));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Kweichow Moutai')).toBeTruthy());
+    expect(screen.queryByTestId('stock-details-kline-chart')).toBeNull();
+    expect(screen.queryByTestId('stock-details-kline-chart-empty')).toBeNull();
   });
 
   it('formats US quotes with green_up convention and USD currency', async () => {
@@ -149,9 +193,39 @@ describe('StockDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('Apple')).toBeTruthy());
     expect(screen.getAllByText('USD 189.10').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('US');
     const changeNode = screen.getByText(/\+1\.25/);
     expect(changeNode.getAttribute('data-change-color')).toBe('green');
     expect(changeNode.getAttribute('data-change-pref')).toBe('green_up');
+  });
+
+  it('formats crypto:BTC with USD, CRYPTO badge, and green_up convention', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote({
+      stockCode: 'CRYPTO:BTC',
+      stockName: 'Bitcoin',
+      currentPrice: 67890.12,
+      change: 1200.5,
+      changePercent: 1.8,
+      updateTime: '2026-03-19T13:30:00.000Z',
+    }));
+    getHistoryMock.mockResolvedValue({
+      stockCode: 'CRYPTO:BTC',
+      stockName: 'Bitcoin',
+      period: 'daily',
+      data: [
+        { date: '2026-03-18', open: 66000, high: 68000, low: 65000, close: 67890.12, volume: 100, changePercent: 1.8 },
+      ],
+    });
+
+    renderPage('crypto%3ABTC');
+
+    await waitFor(() => expect(screen.getByText('Bitcoin')).toBeTruthy());
+    expect(screen.getAllByText('USD 67,890.12').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('CRYPTO');
+    const changeNode = screen.getByText(/\+1,200\.50/);
+    expect(changeNode.getAttribute('data-change-color')).toBe('green');
+    expect(changeNode.getAttribute('data-change-pref')).toBe('green_up');
+    expect(screen.getByText(/UTC|GMT/i)).toBeTruthy();
   });
 
   it('formats HK quotes with HKD 3dp and red_up convention', async () => {
@@ -175,6 +249,7 @@ describe('StockDetailsPage', () => {
 
     await waitFor(() => expect(screen.getByText('Tencent')).toBeTruthy());
     expect(screen.getAllByText('HKD 321.123').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('stock-details-market-badge')).toHaveTextContent('HK');
     const changeNode = screen.getByText(/-1\.500/);
     expect(changeNode.getAttribute('data-change-color')).toBe('green');
     expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
@@ -253,7 +328,7 @@ describe('StockDetailsPage', () => {
     renderPage();
 
     // history still renders despite quote failure
-    await waitFor(() => expect(screen.getByText('2026-01-05')).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1));
     // quote price not shown (currency-formatted form either)
     expect(screen.queryByText('CNY 1,700.00')).toBeNull();
     expect(screen.queryByText(/1,700/)).toBeNull();
@@ -289,6 +364,19 @@ describe('StockDetailsPage', () => {
       }));
   });
 
+  it('opens report comparison with the canonical stock code', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockResolvedValue(makeHistory());
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Kweichow Moutai')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Report version compare' }));
+
+    expect(await screen.findByTestId('report-compare-location'))
+      .toHaveTextContent(buildReportVersionCompareHref({ stock: '600519' }));
+  });
+
   it('canonicalizes an equivalent stock-code spelling in the route', async () => {
     getQuoteMock.mockResolvedValue(makeQuote({ stockCode: 'HK00700', stockName: 'Tencent' }));
     getHistoryMock.mockResolvedValue({ ...makeHistory(), stockCode: 'HK00700' });
@@ -297,5 +385,83 @@ describe('StockDetailsPage', () => {
 
     // The page redirects 00700 -> HK00700 and loads the canonical code.
     await waitFor(() => expect(getQuoteMock).toHaveBeenCalledWith('HK00700'));
+  });
+  it('mounts the DCF sensitivity panel with the stock code from the route', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockResolvedValue(makeHistory());
+    vi.mocked(estimateStockValuation).mockResolvedValue({
+      status: 'ok',
+      stockCode: '600519',
+      dcf: {
+        status: 'ok',
+        equityValue: 100,
+        intrinsicValuePerShare: 10,
+        assumptions: {
+          growthRate: 0.05,
+          discountRate: 0.1,
+          terminalGrowthRate: 0.03,
+          projectionYears: 5,
+        },
+        sensitivity: {
+          rows: [
+            { growthRate: 0.04, discountRate: 0.1, equityValue: 90 },
+            { growthRate: 0.05, discountRate: 0.1, equityValue: 100 },
+          ],
+        },
+      },
+    });
+
+    renderPage('600519');
+
+    const section = await screen.findByTestId('stock-details-dcf-section');
+    expect(section).toBeInTheDocument();
+    expect(section).toHaveAttribute('aria-label', 'DCF sensitivity');
+    expect(screen.getByTestId('dcf-sensitivity-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('dcf-stock-code')).toHaveValue('600519');
+  });
+  it('remounts DCF state and estimates only the new canonical route stock', async () => {
+    getQuoteMock.mockImplementation(async (stockCode) => makeQuote({ stockCode }));
+    getHistoryMock.mockImplementation(async (stockCode) => ({
+      ...makeHistory(),
+      stockCode,
+    }));
+    estimateStockValuationMock.mockResolvedValue({
+      status: 'ok',
+      stockCode: 'AAPL',
+      dcf: {
+        status: 'ok',
+        assumptions: {
+          growthRate: 0.05,
+          discountRate: 0.1,
+          terminalGrowthRate: 0.03,
+          projectionYears: 5,
+        },
+        sensitivity: { rows: [] },
+      },
+    });
+
+    renderPage('600519', true);
+    expect(await screen.findByTestId('dcf-stock-code')).toHaveValue('600519');
+    fireEvent.change(screen.getByTestId('dcf-growth-rate'), {
+      target: { value: '0.09' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Navigate to AAPL' }));
+
+    await waitFor(() => expect(screen.getByTestId('dcf-stock-code')).toHaveValue('AAPL'));
+    expect(screen.getByTestId('dcf-growth-rate')).toHaveValue('0.05');
+
+    fireEvent.click(screen.getByTestId('dcf-recompute'));
+
+    await waitFor(() => expect(estimateStockValuationMock).toHaveBeenCalledWith({
+      stockCode: 'AAPL',
+      growthRate: 0.05,
+      discountRate: 0.1,
+      terminalGrowthRate: 0.03,
+      projectionYears: 5,
+    }));
+    expect(estimateStockValuationMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ stockCode: '600519' }),
+    );
   });
 });

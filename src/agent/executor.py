@@ -33,9 +33,11 @@ from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_MESSAGE,
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    build_agent_tool_history_context,
     sanitize_agent_diagnostic,
 )
 from src.agent.runner import parse_dashboard_json_result, run_agent_loop
+from src.agent.runtime.mode_budget import create_mode_budget_account
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.runtime_facts import (
@@ -68,6 +70,7 @@ _EXECUTOR_COMPAT_EXPORTS = (
     build_agent_chat_context_bundle,
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
+    build_agent_tool_history_context,
     Callable,
     classify_result_terminal_state,
     _compose_agent_soul_prompt,
@@ -118,6 +121,11 @@ class AgentResult:
     runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
+    # Opt-in plan→act→observe product path metadata (default None when unused).
+    planning_metadata: Optional[Dict[str, Any]] = None
+    # Unified mode hard-budget snapshot (limits / used / breach).
+    budget_snapshot: Optional[Dict[str, Any]] = None
+    failure_reason: Optional[str] = None
 
 
 # ============================================================
@@ -512,6 +520,39 @@ CHAT_SYSTEM_PROMPT = """你是一位{market_role}投资分析 Agent，拥有数�
 {skills_section}
 {language_section}
 """
+
+
+class _VersionedPromptTemplate(str):
+    """Resolve a governed prompt revision only when the template is consumed."""
+
+    def __new__(cls, prompt_id: str, body: str) -> "_VersionedPromptTemplate":
+        instance = super().__new__(cls, body)
+        instance.prompt_id = prompt_id
+        return instance
+
+    def format(self, *args: object, **kwargs: object) -> str:
+        from src.agent.prompt_versioning import resolve_key_prompt_text
+
+        selected = resolve_key_prompt_text(self.prompt_id)
+        return str(selected).format(*args, **kwargs)
+
+    def format_map(self, mapping: object) -> str:
+        from src.agent.prompt_versioning import resolve_key_prompt_text
+
+        selected = resolve_key_prompt_text(self.prompt_id)
+        return str(selected).format_map(mapping)  # type: ignore[arg-type]
+
+
+LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT = _VersionedPromptTemplate(
+    "agent.system.legacy",
+    LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT,
+)
+AGENT_SYSTEM_PROMPT = _VersionedPromptTemplate("agent.system", AGENT_SYSTEM_PROMPT)
+LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT = _VersionedPromptTemplate(
+    "agent.chat.legacy",
+    LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT,
+)
+CHAT_SYSTEM_PROMPT = _VersionedPromptTemplate("agent.chat", CHAT_SYSTEM_PROMPT)
 
 
 def _build_language_section(report_language: str, *, chat_mode: bool = False) -> str:

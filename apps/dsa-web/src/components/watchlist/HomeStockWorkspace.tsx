@@ -18,15 +18,23 @@ import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
 import type { HomeWatchlistRow } from '../../types/watchlist';
 import { getSentimentColor } from '../../types/analysis';
+import type { WatchlistScoreItem, WatchlistScoreSortMode } from '../../types/watchlistScore';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
 import { truncateStockName } from '../../utils/stockName';
+import { orderWatchlistByScore } from '../../utils/watchlistScoreOrder';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
 import { HOME_WORKSPACE_VALUES, type HomeWorkspaceValue } from '../../routing/routes';
 import { Spinner } from '../common/Spinner';
 import { WatchlistGroupsPanel } from './WatchlistGroupsPanel';
+import { WatchlistScoreColumn } from './WatchlistScoreColumn';
 import type { WatchlistGroup } from '../../types/watchlist';
+import {
+  createUnanalyzedWatchlistScore,
+  useWatchlistScores,
+  type WatchlistScoreLoadStatus,
+} from '../../hooks/useWatchlistScores';
 
 export type HomeWorkspaceTab = HomeWorkspaceValue;
 export type WatchlistAnalyzeMode = 'all' | 'pending';
@@ -122,18 +130,21 @@ const ScoreBadge: React.FC<{ item?: StockBarItem }> = ({ item }) => {
   );
 };
 
+
 const WatchlistRowItem: React.FC<{
   row: HomeWatchlistRow;
+  scoreItem?: WatchlistScoreItem;
+  scoreStatus: WatchlistScoreLoadStatus;
   onRemove: (code: string) => Promise<boolean | void>;
   disabled: boolean;
-}> = ({ row, onRemove, disabled }) => {
+}> = ({ row, scoreItem, scoreStatus, onRemove, disabled }) => {
   const { language, t } = useUiLanguage();
   const taskLabel = getTaskStatusLabel(row.activeTask, t);
   const item = row.latestItem;
   const stockName = item?.stockName || row.code;
 
   return (
-    <div className="home-subpanel grid min-w-0 gap-2 px-3 py-2.5">
+    <div className="home-subpanel grid min-w-0 gap-2 px-3 py-2.5" data-testid="watchlist-row">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -166,8 +177,14 @@ const WatchlistRowItem: React.FC<{
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <ScoreBadge item={item} />
+        <div className="flex shrink-0 items-start gap-1.5">
+          {scoreStatus === 'ready' && scoreItem ? (
+            <WatchlistScoreColumn item={scoreItem} className="max-w-40" />
+          ) : (
+            <span className="px-1 py-1.5 text-xs text-muted-text" data-testid="watchlist-score-status">
+              {scoreStatus === 'error' ? t('common.failure') : t('common.loading')}
+            </span>
+          )}
           <IconButton
             type="button"
             variant="danger"
@@ -256,6 +273,33 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   const reactId = useId();
   const [draftCode, setDraftCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [scoreSort, setScoreSort] = useState<WatchlistScoreSortMode>('manual');
+  const [scoreRefreshGeneration, setScoreRefreshGeneration] = useState(0);
+  const watchlistCodes = useMemo(
+    () => watchlistRows.map((row) => row.code),
+    [watchlistRows],
+  );
+  const scoreLifecycleKey = useMemo(
+    () => JSON.stringify(watchlistRows.map((row) => ({
+      code: row.code,
+      analyzedToday: row.analyzedToday,
+      isTodayStatusLoading: row.isTodayStatusLoading,
+      isTodayStatusUnknown: row.isTodayStatusUnknown,
+      activeTaskId: row.activeTask?.taskId,
+      activeTaskStatus: row.activeTask?.status,
+      latestItemId: row.latestItem?.id,
+      latestAnalysisTime: row.latestItem?.lastAnalysisTime,
+      latestScore: row.latestItem?.sentimentScore,
+      latestAction: row.latestItem?.action,
+    }))),
+    [watchlistRows],
+  );
+  const scoreState = useWatchlistScores(
+    watchlistCodes,
+    `${scoreLifecycleKey}\n${scoreRefreshGeneration}`,
+  );
+  const effectiveScoreSort = scoreState.status === 'ready' ? scoreSort : 'manual';
+
   const pendingWatchlistCount = watchlistRows
     .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
     .length;
@@ -270,15 +314,17 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredWatchlistRows = useMemo(() => {
-    if (!normalizedSearchQuery) return watchlistRows;
-    return watchlistRows.filter((row) => {
-      const stockName = row.latestItem?.stockName ?? '';
-      return (
-        row.code.toLowerCase().includes(normalizedSearchQuery) ||
-        stockName.toLowerCase().includes(normalizedSearchQuery)
-      );
-    });
-  }, [normalizedSearchQuery, watchlistRows]);
+    const searched = !normalizedSearchQuery
+      ? watchlistRows
+      : watchlistRows.filter((row) => {
+        const stockName = row.latestItem?.stockName ?? '';
+        return (
+          row.code.toLowerCase().includes(normalizedSearchQuery) ||
+          stockName.toLowerCase().includes(normalizedSearchQuery)
+        );
+      });
+    return orderWatchlistByScore(searched, scoreState.itemsByCode, effectiveScoreSort);
+  }, [effectiveScoreSort, normalizedSearchQuery, scoreState.itemsByCode, watchlistRows]);
   const filteredTodayItems = useMemo(() => {
     if (!normalizedSearchQuery) return todayItems;
     return todayItems.filter((item) => (
@@ -301,6 +347,16 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     void onAddToWatchlist(code).then((success) => {
       if (success !== false) setDraftCode('');
     });
+  };
+
+  const handleRefreshWatchlist = async () => {
+    const refreshed = await onRefreshWatchlist();
+    if (refreshed !== false) setScoreRefreshGeneration((generation) => generation + 1);
+  };
+
+  const handleAnalyzeWatchlist = async (mode: WatchlistAnalyzeMode) => {
+    await onAnalyzeWatchlist(mode);
+    setScoreRefreshGeneration((generation) => generation + 1);
   };
 
   const panelId = `${reactId}-panel`;
@@ -390,7 +446,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 disabled={watchlistRows.length === 0 || isBatchAnalyzing}
                 isLoading={isBatchAnalyzing}
                 loadingText={t('watchlist.submitting')}
-                onClick={() => void onAnalyzeWatchlist('all')}
+                onClick={() => void handleAnalyzeWatchlist('all')}
               >
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {t('watchlist.analyzeAll')}
@@ -401,7 +457,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 variant="secondary"
                 className="whitespace-nowrap text-xs"
                 disabled={pendingWatchlistCount === 0 || isTodayStatusUnavailable || isBatchAnalyzing}
-                onClick={() => void onAnalyzeWatchlist('pending')}
+                onClick={() => void handleAnalyzeWatchlist('pending')}
               >
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 {t('watchlist.analyzePending')}
@@ -434,6 +490,14 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               <div className="rounded-xl border border-subtle bg-base/35 px-3 py-2 text-xs text-secondary-text">
                 {watchlistMessage}
               </div>
+            ) : null}
+            {scoreState.status === 'error' ? (
+              <InlineAlert
+                variant="danger"
+                size="compact"
+                title={t('common.failure')}
+                message={t('watchlistScore.loadFailed')}
+              />
             ) : null}
           </>
         ) : (
@@ -470,7 +534,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               compact
               title={t('chat.actionFailed')}
               action={(
-                <Button type="button" size="default" variant="secondary" onClick={() => void onRefreshWatchlist()}>
+                <Button type="button" size="default" variant="secondary" onClick={() => void handleRefreshWatchlist()}>
                   {t('common.retry')}
                 </Button>
               )}
@@ -502,14 +566,31 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                   onRemoveFromWatchlist={onRemoveFromWatchlist}
                 />
               ) : null}
-              <div className="flex items-center gap-2 text-xs text-muted-text">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-text">
                 <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('watchlist.listHint')}
+                <span className="min-w-0 flex-1">{t('watchlist.listHint')}</span>
+                <Select
+                  value={effectiveScoreSort}
+                  onChange={(value) => setScoreSort(value as WatchlistScoreSortMode)}
+                  options={[
+                    { value: 'manual', label: t('watchlistScore.sortManual') },
+                    { value: 'score_desc', label: t('watchlistScore.sortScoreDesc') },
+                    { value: 'score_asc', label: t('watchlistScore.sortScoreAsc') },
+                  ]}
+                  ariaLabel={t('watchlistScore.sortManual')}
+                  className="min-w-36"
+                  size="default"
+                  disabled={scoreState.status !== 'ready'}
+                />
               </div>
               {filteredWatchlistRows.map((row) => (
                 <WatchlistRowItem
                   key={row.code}
                   row={row}
+                  scoreItem={scoreState.status === 'ready'
+                    ? scoreState.itemsByCode.get(row.code) ?? createUnanalyzedWatchlistScore(row.code)
+                    : undefined}
+                  scoreStatus={scoreState.status}
                   onRemove={onRemoveFromWatchlist}
                   disabled={watchlistActioning}
                 />
@@ -552,7 +633,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             size="default"
             variant="ghost"
             disabled={watchlistLoading}
-            onClick={() => void onRefreshWatchlist()}
+            onClick={() => void handleRefreshWatchlist()}
           >
             {t('watchlist.refresh')}
           </Button>

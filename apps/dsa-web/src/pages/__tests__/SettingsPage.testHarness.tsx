@@ -2,6 +2,16 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, vi } from 'vitest';
+import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
+
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
+import type { ParsedApiError } from '../../api/error';
 import type { LlmConnectionFieldSchema } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
@@ -159,6 +169,13 @@ const routerSearchParamsMock = vi.hoisted(() => {
 });
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
+  Link: ({
+    to,
+    children,
+    ...props
+  }: Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
+    to: string;
+  }) => <a href={to} {...props}>{children}</a>,
   useBlocker: (shouldBlock: (args: unknown) => boolean) => {
     routerBlockerMock.shouldBlock = shouldBlock;
     return routerBlockerMock;
@@ -547,13 +564,18 @@ vi.mock('../../components/settings', async () => {
   SettingsErrorSummary: ({
     entries,
     onJump,
+    dismissLabel,
+    onDismiss,
   }: {
     entries: Array<{ key: string; label: string; message: string; section: string; view: string }>;
     onJump: (entry: { key: string; label: string; message: string; section: string; view: string }) => void;
+    dismissLabel?: string;
+    onDismiss?: () => void;
   }) => (
     entries.length ? (
       <div role="alert">
         <p>{`有 ${entries.length} 项配置需要修正`}</p>
+        {onDismiss ? <button type="button" onClick={onDismiss}>{dismissLabel}</button> : null}
         <ul>
           {entries.map((entry) => (
             <li key={entry.key}>
@@ -606,8 +628,8 @@ type ConfigState = {
   clearToast: typeof clearToast;
   isLoading: boolean;
   isSaving: boolean;
-  loadError: null;
-  saveError: null;
+  loadError: ParsedApiError | null;
+  saveError: ParsedApiError | null;
   retryAction: null;
   conflictState?: {
     fields: Array<{
@@ -809,7 +831,11 @@ async function expectConnectionDraftAutosaveBlockedBySchema(
 
   vi.useFakeTimers();
   try {
-    render(<SettingsPage />);
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <SettingsPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
@@ -1027,6 +1053,7 @@ const SettingsPageTestHarness = {
   refreshAfterExternalSave,
   refreshStatus,
   settingsPanelErrorBoundary,
+  usageNavigate,
   useAuthMock,
   useSystemConfigMock,
   webBuildInfoMock,

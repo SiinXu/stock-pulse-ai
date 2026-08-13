@@ -18,10 +18,10 @@ If this document conflicts with the repository's scripts, workflows, or current 
 - Prioritize reuse of existing modules, configuration entries, scripts, and tests; do not add parallel implementations.
 - Stability takes priority over incidental optimization by default. Avoid refactors, abstractions, and infrastructure migrations that are not directly required by the current task.
 - When adding configuration options, also update `.env.example` and the relevant documentation.
-- Changes to user-visible capabilities, CLI/API behavior, deployment, notifications, or report structure must also update the relevant documentation and `docs/CHANGELOG.md`.
+- Changes to user-visible capabilities, CLI/API behavior, deployment, notifications, or report structure must also update the relevant documentation and add a changelog fragment under `docs/changelog.d/` (see that directory's README). In-flight PRs may still edit `docs/CHANGELOG.md` directly until they land.
 - When modifying report formats, report rendering, or the Web UI, the PR description must include screenshots of the affected reports or pages. Prefer before-and-after comparisons when applicable. If screenshots are unavailable, explain why and provide alternative visual evidence.
 - Issue/PR process screenshots, review screenshots, one-time acceptance screenshots, and temporary visual evidence must not be committed to the repository. Put them in PR descriptions, PR comments, GitHub attachments, Actions artifacts, or externally accessible evidence links. Diagrams intentionally maintained as long-term product documentation are exempt, but their filenames and document context must be independent of a specific issue or PR number.
-- The `[Unreleased]` section of `docs/CHANGELOG.md` uses a **flat format**: each entry is a separate line formatted as `- [Type] Description`. Allowed `Type` values are `Added`/`Changed`/`Fixed`/`Docs`/`Tests`/`Chore`, and descriptions must be in English. **Do not add `### category headings` within `[Unreleased]`**, to reduce merge conflicts between concurrent PRs. Maintainers will consolidate entries into the categorized release format when publishing a release.
+- Prefer **changelog fragments** in `docs/changelog.d/<slug>.md` instead of editing the shared `docs/CHANGELOG.md` on feature PRs. Each fragment line uses the same flat format as `[Unreleased]`: `- [Type] Description`. Allowed `Type` values are `Added`/`Changed`/`Fixed`/`Docs`/`Tests`/`Chore`, and descriptions must be in English. **Do not add `### category headings`**. Maintainers run `python scripts/collect_changelog.py --consume` at release time to fold fragments into `docs/CHANGELOG.md`. Keep the `docs/CHANGELOG.md merge=union` attribute as a fallback for in-flight PRs.
 - Keep `README.md` focused on homepage-level information: project positioning, core capabilities, quick start, primary entry points, sponsorship, and collaboration. Avoid unnecessary README updates and continued expansion.
 - For detailed module behavior, page interactions, feature-specific configuration, troubleshooting guidance, field contracts, implementation semantics, and boundary conditions, update the corresponding `docs/*.md` or topic document instead of the README.
 - When changing either version of bilingual English/Chinese documentation, evaluate whether the other version also needs an update. If it is not updated, explain why in the delivery notes.
@@ -157,7 +157,7 @@ The current repository CI mainly contains:
 
 | Check | Source | Description | Blocking? |
 | --- | --- | --- | --- |
-| `changes` | `.github/workflows/ci.yml` | Path-filter job that sets the `frontend` output used to decide whether `web-gate` / `web-e2e` run | Yes (always runs; drives triggered jobs) |
+| `changes` | `.github/workflows/ci.yml` | Path-filter job that drives the backend, Docker, Web, and Web E2E jobs | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
 | `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest (FULL fallback); push-to-main: full suite + coverage floor | Yes |
 | `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: full offline suite on Python 3.10 | Yes |
@@ -169,6 +169,8 @@ The current repository CI mainly contains:
 | `api-real-client` | `.github/workflows/ci.yml` | `tests/api` with real Starlette TestClient | No on PR; observation on push-to-main |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
 | `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, opt-in via `workflow_dispatch` only |
+
+**Event model:** pull requests use path-selective pytest with a fail-closed full-suite fallback. Pushes to `main` run the complete offline suite in four module-level shards, then combine coverage and enforce the floor once.
 
 If there is a corresponding CI result on the existing PR, you can directly quote the CI conclusion; if the CI does not cover the changes or the local environment differs significantly from the CI environment, supplement local verification and gaps.
 
@@ -240,13 +242,19 @@ If there is a corresponding CI result on the existing PR, you can directly quote
 - The repository provides the following skills for preferred reuse:
   - `.claude/skills/analyze-issue/SKILL.md`
   - `.claude/skills/analyze-pr/SKILL.md`
+  - `.claude/skills/review-pr/SKILL.md`
   - `.claude/skills/fix-issue/SKILL.md`
   - `.claude/skills/develop-feature/SKILL.md`
   - `.claude/skills/run-verification/SKILL.md`
+  - `.claude/skills/test-change/SKILL.md`
   - `.claude/skills/draft-issue/SKILL.md`
   - `.claude/skills/handle-review-feedback/SKILL.md`
-- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`. For planned development tasks prefer `develop-feature` (which embeds `run-verification` and the `analyze-pr` review order); for responding to review feedback on your own PR follow `handle-review-feedback`. Skill selection guidance lives in `docs/claude-skills-guide.md`.
-- Commands, templates, validation order, and delivery structure in these skills must remain consistent with `AGENTS.md`.
+  - `.claude/skills/sync-ai-assets/SKILL.md`
+  - `.claude/skills/pr-template-fill/SKILL.md`
+  - `.claude/skills/regression-scout/SKILL.md`
+  - Shared hard rules and command recipes: `.claude/skills/references/hard-rules.md`, `.claude/skills/references/test-command-recipes.md`
+- If the task explicitly involves issue analysis, PR review, or issue resolution, follow the corresponding skill first and save its artifacts to `.claude/reviews/`. For planned development tasks prefer `develop-feature` (which embeds `test-change` / `run-verification` and the `review-pr` / `analyze-pr` review order); for responding to review feedback on your own PR follow `handle-review-feedback`. Skill selection guidance lives in `docs/claude-skills-guide.md`.
+- Commands, templates, validation order, and delivery structure in these skills must remain consistent with `AGENTS.md`. After editing AGENTS/skills/copilot mirrors, run `python scripts/check_ai_assets.py` (see `sync-ai-assets`).
 - Before creating or updating a PR, reviewing a PR, or analyzing an issue, synchronize the latest codebase: first check the workspace status and execute `git fetch --all --prune`; if the workspace is clean and the current branch can be fast-forwarded, execute `git pull --ff-only`. If there are local modifications, conflict states, untracked risk files, or inability to fast-forward, do not forcibly switch branches, stash, reset, or overwrite local status; PR review/issue analysis can use the fetched remote refs/PR head for analysis and clearly record the reason for not updating the local working tree and the current local HEAD with the remote baseline in the analysis document; PR creation/update should first explain the difference between the current branch and the target baseline, and request user confirmation to rebase, merge, or continue based on the current branch.
 - Skills should inspect CI and workflow evidence before deciding whether additional local validation is needed.
 - Except for the safe fast-forward synchronization described above for PR creation/update, PR review, and issue analysis, skills must not run `git pull`, `git push`, `git tag`, `gh pr create`, or other operations that change remote or current branch state by default. These operations require user confirmation.

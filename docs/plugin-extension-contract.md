@@ -74,6 +74,7 @@ Registering an unsupported extension point fails closed with
 | Package | Point | Role |
 | --- | --- | --- |
 | [`examples/plugins/example-provider`](../examples/plugins/example-provider/) | `data_provider` | Network-free daily-data fixture; requires a manager-bound registry |
+| [`examples/plugins/example-alternative-data`](../examples/plugins/example-alternative-data/) | `agent_tool` | Default-off corporate-events alt-data tool (`alt_data:read`, non-authoritative); see [alternative-data plugin contract](alternative-data-plugin-contract.md) |
 | [`examples/plugins/example-notification-channel`](../examples/plugins/example-notification-channel/) | `notification_channel` | Full lifecycle log-sink channel on the default process root |
 | [`docs/examples/report-template-plugin`](examples/report-template-plugin/) | `report_template` | Minimal Markdown template illustration |
 
@@ -333,7 +334,8 @@ Example `manifest.json`:
   "author": "Example Maintainer",
   "permissions": ["network", "environment"],
   "apiVersion": "1",
-  "entrypoint": "plugin.py:Plugin"
+  "entrypoint": "plugin.py:Plugin",
+  "settings": []
 }
 ```
 
@@ -348,6 +350,15 @@ Example `manifest.json`:
 | `permissions` | Required list of permission IDs using plugin-id syntax or ToolSurface `name:action` capability form. Visible in startup logs, health snapshots, and lifecycle audit metadata. For `agent_tool` plugins, every `ToolPolicy.permissions` entry must be a subset of this list at load time (stable error `manifest_permissions_undeclared`); extra declarations are allowed. **Not a sandbox** — declaration does not isolate process privileges. |
 | `apiVersion` | Optional plugin API major; defaults to `"1"`. |
 | `entrypoint` | Optional external entrypoint; defaults to `plugin.py:Plugin`. It must remain relative to the plugin directory. |
+| `settings` | Optional host-rendered scalar settings schema. Keys are unique lowercase plugin-setting IDs; types/controls, options, defaults, validation bounds, regexes, and finite numeric values are validated strictly. Sensitive fields must use `string`/`password` and cannot declare plaintext defaults. Plugin frontend code is not accepted. |
+
+Effective settings are projected into the immutable `PluginContext.settings`
+mapping on each load/enable. The host persists explicit overrides per plugin,
+masks sensitive response values, and validates a full replacement before an
+atomic write. An enabled plugin is not mutated in place: after a settings update,
+operators must re-enable it or restart the process before relying on the new
+values. The persistence file is local plaintext protected by OS file permissions,
+not an encrypted secret store.
 
 `version`, `minAppVersion`, and `apiVersion` have different meanings. A plugin
 release does not change the extension contract version, and an extension
@@ -540,11 +551,24 @@ on the factory result:
 | `daily_data` | `get_daily_data` |
 | `realtime_quote` | `get_realtime_quote` |
 | `chip_distribution` | `get_chip_distribution` |
+| `money_flow` | `get_money_flow` |
 | `stock_name` / `stock_list` | `get_stock_name` / `get_stock_list` |
 | `belong_boards` | `get_belong_board` |
 | `main_indices` / `market_stats` | `get_main_indices` / `get_market_stats` |
 | `sector_rankings` / `concept_rankings` | `get_sector_rankings` / `get_concept_rankings` |
 | `hot_stocks` / `limit_up_pool` | `get_hot_stocks` / `get_limit_up_pool` |
+
+`money_flow` is an additive contract v1 capability (Issue #862 / #619). Existing
+providers that do not declare or implement it remain valid: registration still
+requires only the capabilities listed on the registration object, and the
+manager returns a typed `not_supported` outcome for an undeclared or
+unimplemented capability rather than raising. Implementations must accept the
+single versioned signature `get_money_flow(stock_code, days=5)` and return a
+validated `MoneyFlowSnapshot`; the manager does not retry a different signature
+after a provider raises `TypeError`. Providers should expose a stable
+`money_flow_calibration_identity` string when their bucket/currency/scale
+contract can vary independently of the provider name; it participates in the
+same-session cache identity.
 
 Existing `prefetch_*` paths remain built-in manager optimizations and are not
 plugin capabilities in contract version 1.
