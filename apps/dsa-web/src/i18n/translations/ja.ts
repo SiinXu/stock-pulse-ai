@@ -7,9 +7,9 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ja,
   ...DR.ja,
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.summary": "完了したマルチエージェント段階を保存し、コード、設定、入力が異なる場合は完全再実行します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.summary": "完了段階を保存し、コード・設定・入力の不一致時は完全再実行します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.analysis_checkpoint.title": "分析段階チェックポイント",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.summary": "実行設定を記録し、対応時は温度 0 と設定済みシードを送信します。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.summary": "実行設定を記録し、対応時は温度0と指定シードを送信します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.repro_mode.title": "再現性コントロール",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_ENABLED": "分析段階チェックポイント",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_CHECKPOINT_DIR": "分析チェックポイントのディレクトリ",
