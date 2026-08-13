@@ -48,11 +48,14 @@ OS privileges as StockPulse. There is:
 ### Manifest `permissions` (declaration, not sandbox)
 
 - List every capability your `agent_tool` `ToolPolicy.permissions` will require
-  (use ToolSurface strings such as `market_data:read`).
+  (use ToolSurface strings such as `market_data:read` or `alt_data:read`).
 - At load/enable, StockPulse rejects the plugin with
   `manifest_permissions_undeclared` if a tool requires an undeclared capability.
 - Extra declared permissions are allowed; empty means tools must require none.
 - This is **not** sandbox isolation: plugin code still runs with process privileges.
+- Alternative / supporting data tools use capability `alt_data:read` and the
+  [alternative-data plugin contract](alternative-data-plugin-contract.md)
+  (default-off, non-authoritative, gap-not-fabrication).
 
 Review every line before enabling a package. Keep `PLUGINS_DIR` unset in
 production unless the packages are reviewed and pinned. The operator trust
