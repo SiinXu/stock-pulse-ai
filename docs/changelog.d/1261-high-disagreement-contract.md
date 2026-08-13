@@ -1,0 +1,1 @@
+- [Fixed] Consume only the versioned structured-disagreement contract for high-disagreement alerts and inject runtime configuration at the persistence boundary (Refs #134).

@@ -312,6 +312,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `GENERATION_FALLBACK_BACKEND` | `litellm` | 是 | Backend-level fallback; Local .env empty values disable backend-level fallback, litellm -> litellm will be parsed as ... |
 | `GOTIFY_TOKEN` | `空` | 是 | 模板中注释; Gotify application token |
 | `GOTIFY_URL` | `空` | 是 | 模板中注释; Gotify Configuration GOTIFY_URL is the Gotify server base URL, without /message; the system will append /message and ... |
+| `HIGH_DISAGREEMENT_ALERTS_ENABLED` | `true` | 是 | 模板中注释; High-disagreement alerts for multi-agent analyses (#134) |
+| `HIGH_DISAGREEMENT_THRESHOLD` | `0.6` | 是 | 模板中注释 |
 | `HTTP_PROXY` | `http://127.0.0.1:10809` | 是 | 模板中注释; Standard HTTP(S) proxy URL for outbound requests (data sources, LLM, search, notifications) |
 | `INDICATOR_MACD_FAST` | `12` | 是 | 模板中注释 |
 | `INDICATOR_MACD_SIGNAL` | `9` | 是 | 模板中注释 |
