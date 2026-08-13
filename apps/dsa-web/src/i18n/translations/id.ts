@@ -6140,5 +6140,11 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_INTERVAL_SECONDS": "Interval penyelesaian prediksi",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_LEASE_SECONDS": "Durasi sewa penyelesaian",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_ATTEMPTS": "Maksimum percobaan penyelesaian",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_FETCH_CONCURRENCY": "Konkurensi pengambilan resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK": "Anggaran postmortem resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD": "Ambang sirkuit resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS": "Waktu jeda sirkuit resolusi",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK": "Batas batch saat sirkuit terbuka",
+  "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_RETRY_JITTER_RATIO": "Jitter percobaan ulang resolusi",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_RESOLVE_MAX_PER_TICK": "Batas batch penyelesaian",
 } as const;

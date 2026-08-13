@@ -74,3 +74,19 @@ class ClaimScorerPort(Protocol):
 class EvolutionEventSink(Protocol):
     def emit(self, event_type: str, payload: Mapping[str, Any]) -> None:
         ...
+
+
+class PostmortemQueuePort(Protocol):
+    """Bounded hand-off for optional, expensive postmortem work."""
+
+    def enqueue(
+        self,
+        *,
+        prediction_id: str,
+        outcome: Mapping[str, Any],
+        priority: int = 0,
+    ) -> bool:
+        ...
+
+    def depth(self) -> int:
+        ...

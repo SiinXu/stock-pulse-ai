@@ -75,6 +75,14 @@ WEB_SETTINGS_HIDDEN_FROM_UI = {
     "SQLITE_BUSY_TIMEOUT_MS",
     "SQLITE_WRITE_RETRY_MAX",
     "SQLITE_WRITE_RETRY_BASE_DELAY",
+    # Advanced resolver backpressure tuning remains environment-managed. The
+    # primary enable/interval/batch/lease/attempt controls stay Web-editable.
+    "PREDICTION_RESOLVE_FETCH_CONCURRENCY",
+    "PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK",
+    "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_THRESHOLD",
+    "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS",
+    "PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK",
+    "PREDICTION_RESOLVE_RETRY_JITTER_RATIO",
     # USE_PROXY / PROXY_HOST / PROXY_PORT are Web-editable (system network
     # section). Previously hidden as low-frequency ops keys applied only at
     # process bootstrap; remain restart-gated via warning_codes + field help.
