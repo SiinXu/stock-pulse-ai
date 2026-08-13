@@ -113,3 +113,11 @@ python scripts/check_config_doc_consistency.py
 - scheduler status 的 `process_mode` 为设计四态（来自真实运行时判定，不猜测）：`serve+schedule` / `desktop` / `cli-schedule` / `not_attached`。同时返回挂载状态、调度时区和 run-now 可用性。时间戳带明确偏移；Web 不得借用浏览器时区补写服务端缺失的时区。
 - 调度状态卡提供到 **设置 → 通知 → 渠道** 的一等深链（`/settings?section=notifications&view=channels`），用于查看调度输出会推送到哪些通知渠道。
 - 每次被接受的 run-now 都有 `run_id`，状态接口会用同一 ID 报告运行中及最终成功/失败；旧版服务端缺少关联字段时，Web 必须显示结果无法确认，不能把空闲误报为成功。
+
+## 非设置页教育说明（Issue #201）
+
+风险等级、风险门裁决、组合结构健康与常用技术指标（MA / MACD / RSI）的平实解释使用独立的 education-help 库存与 `getEducationHelpContent` 解析路径，key 以 `education.*` 为前缀。Web 通过通用 `HelpKeyButton` 在真实展示点提供就地入口；不要把非配置 key 塞进 Settings 帮助契约，也不要在组件内散落硬编码正文。
+
+- 源语言维护：`apps/dsa-web/src/locales/educationHelp.zh.ts` 与 `educationHelp.en.ts`。
+- 英文维护说明见 `docs/settings-help_EN.md` 同名章节。
+- 非 zh/en UI 语言的教育正文位于 `locales/educationHelpTranslations/`，按当前 UI 语言懒加载；新增 key 后须更新全部语言专用分块，且不得与英文逐字节相同。母语润色前可标注 `PENDING_NATIVE_REVIEW`。
