@@ -207,6 +207,22 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Prevents accidental comparison across different HMAC keys or deployments.'],
     notes: ['This is only a version label, not a secret.'],
   },
+  'settings.ai_model.LLM_USAGE_ATTRIBUTION_ENABLED': {
+    title: 'Usage Cost Attribution',
+    summary: 'Attaches run/stage/mode cost estimates and model-routing quality fields to llm_usage rows.',
+    usage: 'Enabled by default. When disabled, cost estimation and attribution columns are skipped while token totals still persist.',
+    valueNotes: ['Shares metering with per-mode budgets (#1213) via src/llm/cost.py. Unpriced models stay cost_status=unpriced without inventing $0.'],
+    impact: ['Affects Usage page cost and routing rates, and fields consumable by the budget gate.'],
+    notes: ['Collection overhead is small; disable temporarily when debugging cost anomalies.'],
+  },
+  'settings.ai_model.LLM_COST_PRICING_PATH': {
+    title: 'LLM Cost Pricing Table Path',
+    summary: 'Optional JSON pricing table path used for estimated_cost_usd.',
+    usage: 'Leave empty to use LiteLLM model_cost, or point to a maintained per-model rate table.',
+    valueNotes: ['Accepts input_cost_per_token / output_cost_per_token or per-1M token fields.'],
+    impact: ['Changes cost-estimate sources only; does not change model calls.'],
+    notes: ['See docs/llm-cost-attribution_EN.md.'],
+  },
   'settings.ai_model.provider_keys': {
     title: 'Provider API Key',
     summary: 'Configures credentials for model providers or gateways.',
@@ -980,6 +996,29 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'SIGNAL_SCORECARD_MIN_SAMPLES=10',
     ],
   },
+  'settings.system.research_api': {
+    title: 'Read-only research API',
+    summary: 'Controls the authenticated read-only research API that exposes stratified conclusions for embed/portal clients.',
+    usage: 'Keep RESEARCH_API_ENABLED off unless you intentionally need GET /api/v1/research/conclusions*. When enabled, clients request brief/standard/research density plus as-of, confidence, and evidence counts. RESEARCH_API_RATE_LIMIT_PER_MINUTE sets the per-principal sliding-window budget (same pattern as MCP).',
+    valueNotes: [
+      'Default is off; routes return 404 while disabled.',
+      'Mounted on the main API port only — no separate listener.',
+      'Reuses session auth (when ADMIN_AUTH_ENABLED), fail-closed security audit, and sliding-window rate limits.',
+      'Responses are compact projections only: no raw_result dump and no write methods.',
+    ],
+    impact: [
+      'Affects whether /api/v1/research/conclusions* is reachable when authenticated.',
+      'Does not change analysis generation, history storage, or MCP tool inventory.',
+    ],
+    notes: [
+      'Capability registry work remains separate (see related tracking issues).',
+    ],
+    examples: [
+      'RESEARCH_API_ENABLED=false',
+      'RESEARCH_API_ENABLED=true',
+      'RESEARCH_API_RATE_LIMIT_PER_MINUTE=60',
+    ],
+  },
   'settings.system.REPORT_EXPORT_PDF_FONT_PATH': {
     title: 'Report Export PDF Font Path',
     summary: 'Selects the single-face TTF/OTF used by optional PDF report export.',
@@ -1342,6 +1381,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Off preserves the existing single-path analysis behavior.'],
     impact: ['Affects agent orchestration depth and report committee sections.'],
     notes: ['Requires agent multi mode capacity; see investment committee docs if present.'],
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA': {
+    title: 'Research Persona Preset',
+  },
+  'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
+    title: 'Custom Research Stance',
   },
   'settings.agent.DECISION_PROFILE_CALIBRATION_ENABLED': {
     title: 'Decision Profile Outcome Calibration',
@@ -1922,16 +1967,19 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.system.daily_brief': {
     title: 'Daily Brief',
-    summary: 'Scheduled daily brief with historical accuracy review of prior brief calls.',
-    usage:
-      'DAILY_BRIEF_ENABLED turns the feature on. DAILY_BRIEF_SCHEDULE_TIME and DAILY_BRIEF_TIMEZONE control schedule timing. DAILY_BRIEF_MIN_SAMPLES sets the minimum samples before accuracy stats are shown. DAILY_BRIEF_NOTIFY controls channel push after a successful brief. DAILY_BRIEF_PERSIST_HISTORY keeps review history. DAILY_BRIEF_SAVE_REPORT_FILE writes a report file under the report directory.',
-    valueNotes: [
-      'Default off keeps existing schedules unchanged.',
-      'Accuracy review is informational and does not auto-trade.',
-      'Notify/persist/save-file defaults are true once the brief itself is enabled.',
-    ],
-    impact: ['Affects scheduled brief generation, push, history, and accuracy review panels.'],
+    summary: 'Scheduled personal morning brief: portfolio membership, overnight highlights, recent earnings-event context, yesterday analyses, watchlist, and historical accuracy review.',
+    usage: 'DAILY_BRIEF_ENABLED turns the feature on. SCHEDULE_TIME/TIMEZONE control timing. MIN_SAMPLES gates accuracy stats. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. QUIET_WHEN_EMPTY skips notify without material content.',
+    valueNotes: ['Default off.', 'Accuracy is informational.', 'Quiet mode still generates and may persist.'],
+    impact: ['Affects scheduled brief generation, shared report-route notification, history, and accuracy review panels.'],
     notes: ['Requires schedule mode for timed delivery.'],
+  },
+  'settings.system.event_research_brief': {
+    title: 'Event Research Brief',
+    summary: 'Optional standalone review of observed earnings-event triggers with metrics, surprise criteria, and a post-event checklist.',
+    usage: 'EVENT_RESEARCH_BRIEF_ENABLED turns the standalone scheduler on. NOTIFY/PERSIST_HISTORY/SAVE_REPORT_FILE control delivery. LOOKBACK_HOURS and CATEGORIES bound recent managed triggers (day one: earnings). The daily brief embeds recent event context; this is not a future-event catalog.',
+    valueNotes: ['Default off.', 'Managed corporate-event triggers only.', 'Consensus figures are never fabricated.'],
+    impact: ['Affects recent event-context notifications and optional history rows.'],
+    notes: ['Requires schedule mode for the standalone path.'],
   },
   'settings.system.ADMIN_SESSION_MAX_AGE_HOURS': {
     title: 'Admin Session Max Age (Hours)',
@@ -2133,6 +2181,19 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
     ],
   },
+
+  'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
+    title: 'Readiness Check Timeout',
+    summary: 'Per-check timeout for the structured readiness/self-check report.',
+    usage:
+      'Default 1.0s (clamped to 0.1–5.0). Applies to on-demand GET /api/v1/system/readiness only; ' +
+      'never runs automatically at process startup. Timed-out or failed probes are never reported as ready.',
+    examples: [
+      'READINESS_CHECK_TIMEOUT_SECONDS=1.0',
+      'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
+    ],
+  },
+
 
   'settings.system.portfolio_health': {
     title: 'Portfolio Health Formula',

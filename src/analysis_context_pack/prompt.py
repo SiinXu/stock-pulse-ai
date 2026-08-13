@@ -15,6 +15,7 @@ BLOCK_LABELS_ZH = {
     "money_flow": "资金流",
     "fundamentals": "基本面",
     "news": "新闻",
+    "sentiment": "情绪证据",
 }
 
 BLOCK_LABELS_EN = {
@@ -25,6 +26,7 @@ BLOCK_LABELS_EN = {
     "money_flow": "money flow",
     "fundamentals": "fundamentals",
     "news": "news",
+    "sentiment": "sentiment evidence",
 }
 
 STATUS_LABELS_ZH = {

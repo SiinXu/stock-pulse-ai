@@ -408,7 +408,9 @@ class DecisionMemoryService:
         if not actions:
             return tuple()
         try:
-            stats = self.outcome_service.get_stats()
+            # Memory owns a separate decided-sample threshold, so it needs the
+            # authoritative raw rate rather than the public dashboard's floor.
+            stats = self.outcome_service.get_stats(publish=False)
         except Exception as exc:  # broad-exception: fallback_recorded - pattern calibration is optional; same-stock memory still stands.
             from src.utils.sanitize import log_safe_exception
 

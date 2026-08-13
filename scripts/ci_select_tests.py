@@ -100,6 +100,13 @@ def _forces_full(path: str) -> bool:
 def _targets_for_path(path: str) -> set[str]:
     normalized = path.replace("\\", "/")
     if normalized.startswith("tests/") and normalized.endswith(".py"):
+        # Pytest only collects ``test_*.py`` in this repository.  Helper,
+        # fixture, and nested conftest modules can affect many consumers, but
+        # passing one of them as the sole explicit target collects zero tests
+        # and makes pytest exit 5.  Their dependency surface is not encoded in
+        # this lightweight mapper, so fail closed to the full suite.
+        if not normalized.rsplit("/", 1)[-1].startswith("test_"):
+            return {"FULL"}
         return {normalized}
     for prefix, targets in PATH_TO_TARGETS:
         if normalized == prefix.rstrip("/") or normalized.startswith(prefix):
