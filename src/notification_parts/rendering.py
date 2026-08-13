@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from src.notification import (
         _append_committee_deliberation_block,
         _append_strategy_synthesis_block,
+        _append_bull_bear_debate_block,
         _safe_float,
         display_action_fields_for_result,
         display_decision_type_for_result,
@@ -793,6 +794,8 @@ class _RenderingMethods:
                     dashboard.get('strategy_synthesis') if dashboard else None
                 )
                 _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
+                debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
+                _append_bull_bear_debate_block(report_lines, debate_payload, labels, report_language)
 
                 # ========== Investment Committee (compact for notifications) ==========
                 _append_committee_deliberation_block(
@@ -1379,6 +1382,8 @@ class _RenderingMethods:
             dashboard.get('strategy_synthesis') if dashboard else None
         )
         _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
+        debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
+        _append_bull_bear_debate_block(lines, debate_payload, labels, report_language)
 
         # ========== Investment Committee (compact for notifications) ==========
         _append_committee_deliberation_block(

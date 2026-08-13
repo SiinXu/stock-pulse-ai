@@ -317,6 +317,11 @@ class Config:
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    # Optional structured Bull-Bear debate stage before Decision (Issue #117). Default off.
+    debate_enabled: bool = False
+    debate_max_rounds: int = 2
+    debate_temperature: float = 0.4
+    debate_model: str = ""  # Optional dedicated model; empty uses agent primary route
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
     agent_research_persona: str = ""  # Default-off research stance preset (#467)
     agent_research_persona_custom: str = ""  # Optional custom stance text (#467)

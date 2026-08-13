@@ -951,6 +951,25 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            debate_enabled=parse_env_bool(
+                os.getenv('DEBATE_ENABLED'),
+                False,
+            ),
+            debate_max_rounds=parse_env_int(
+                os.getenv('DEBATE_MAX_ROUNDS'),
+                2,
+                field_name='DEBATE_MAX_ROUNDS',
+                minimum=1,
+                maximum=3,
+            ),
+            debate_temperature=parse_env_float(
+                os.getenv('DEBATE_TEMPERATURE'),
+                0.4,
+                field_name='DEBATE_TEMPERATURE',
+                minimum=0.0,
+                maximum=1.5,
+            ),
+            debate_model=(os.getenv('DEBATE_MODEL') or '').strip(),
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,

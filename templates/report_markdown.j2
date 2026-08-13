@@ -295,6 +295,31 @@
 
 {% endif %}
 
+{% set bull_bear_debate = dashboard.get('bull_bear_debate') if dashboard else none %}
+{% if mode_limits.include_bull_bear_debate and bull_bear_debate and bull_bear_debate.get('enabled') %}
+### ⚔️ {{ labels.bull_bear_debate_heading }}
+
+- {{ labels.bull_bear_status_label }}: {{ bull_bear_debate.get('status') }} | {{ labels.bull_bear_rounds_label }}: {{ bull_bear_debate.get('rounds_completed') }}/{{ bull_bear_debate.get('max_rounds') }}
+{% set debate_synth = bull_bear_debate.get('synthesis') or {} %}
+{% if debate_synth %}
+- {{ labels.bull_bear_synthesis_label }}: {{ localize_strategy_signal(debate_synth.get('final_lean') or 'hold', report_language) }} | {{ labels.bull_bear_winner_label }}: {{ debate_synth.get('winner') }} | {{ labels.bull_bear_resolution_label }}: {{ debate_synth.get('resolution_status') }}
+{% if debate_synth.get('summary') %}- {{ debate_synth.get('summary') }}{% endif %}
+- {{ labels.bull_bear_no_majority_note }}
+{% endif %}
+{% for round in (bull_bear_debate.get('rounds') or [])[:3] %}
+{% set bull = round.get('bull') or {} %}
+{% set bear = round.get('bear') or {} %}
+- R{{ round.get('round') }} {{ labels.bull_bear_bull_label }}: {{ localize_strategy_signal(bull.get('stance') or 'N/A', report_language) }} ({{ '%.0f%%' | format((bull.get('confidence') or 0) * 100) if bull.get('confidence') is number else 'N/A' }}) | {{ labels.bull_bear_bear_label }}: {{ localize_strategy_signal(bear.get('stance') or 'N/A', report_language) }} ({{ '%.0f%%' | format((bear.get('confidence') or 0) * 100) if bear.get('confidence') is number else 'N/A' }})
+{% endfor %}
+{% if bull_bear_debate.get('contention_points') %}
+**{{ labels.bull_bear_contention_heading }}**
+{% for point in (bull_bear_debate.get('contention_points') or [])[:5] %}
+- [{{ point.get('source') }}] {{ localize_conflict_severity(point.get('severity', 'medium'), report_language) }} / {{ point.get('kind') }}{% if point.get('topic') %}: {{ point.get('topic') }}{% endif %}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
 {% if mode_limits.include_battle_plan and battle %}
 ### 🎯 {{ labels.battle_plan_heading }}
 

@@ -187,7 +187,7 @@ EXPECTED_GROUPS = (
             "_append_institutional_flow",
             "_append_related_boards",
         ),
-        "0129790cc3f7a29bf5699dfc3fe39508f5d07035df07ba7594a446d813f23343",  # committee rendering
+        "8bca69c4446a8cf767e05671b1f6ceb5d4d9c19a2b4c3386644d4cd93b663baf",  # debate + committee rendering
     ),
     (
         "_DispatchMethods",

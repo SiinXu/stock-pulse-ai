@@ -1436,6 +1436,21 @@ class HistoryService:
                 report_lines.append(f"- {invalid_text}")
             report_lines.append("")
 
+        debate_payload = dashboard.get('bull_bear_debate') if dashboard else None
+        if isinstance(debate_payload, dict) and debate_payload.get('enabled'):
+            synthesis = debate_payload.get('synthesis') if isinstance(debate_payload.get('synthesis'), dict) else {}
+            report_lines.append(f"### ⚔️ {labels.get('bull_bear_debate_heading', 'Bull-Bear Debate')}")
+            report_lines.append(
+                f"- {labels.get('bull_bear_status_label', 'Status')}: {debate_payload.get('status')} | "
+                f"{labels.get('bull_bear_rounds_label', 'Rounds')}: {debate_payload.get('rounds_completed')}"
+            )
+            if synthesis.get('summary'):
+                report_lines.append(f"- {synthesis.get('summary')}")
+            for point in (debate_payload.get('contention_points') or [])[:3]:
+                if isinstance(point, dict):
+                    report_lines.append(f"- [{point.get('source', 'debate')}] {point.get('topic') or point.get('kind')}")
+            report_lines.append("")
+
         # ========== Investment Committee (real deliberation trace) ==========
         committee = (
             dashboard.get("committee_deliberation") if dashboard else None

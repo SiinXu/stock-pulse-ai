@@ -265,6 +265,8 @@ class _TaskQueueWorkerMethods:
             portfolio_context=copy.deepcopy(metadata.get("portfolio_context")),
             report_language=metadata.get("report_language"),
             use_memory=metadata.get("use_memory"),
+            enable_debate=metadata.get("enable_debate"),
+            debate_max_rounds=metadata.get("debate_max_rounds"),
             request_context=request_context,
         )
         if result is None:

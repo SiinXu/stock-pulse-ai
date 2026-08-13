@@ -112,6 +112,16 @@
 {% endif %}
 {% endif %}
 
+{% set bull_bear_debate = dashboard.get('bull_bear_debate') if dashboard else none %}
+{% if bull_bear_debate and bull_bear_debate.get('enabled') %}
+⚔️ **{{ labels.bull_bear_debate_heading }}**: {{ bull_bear_debate.get('status') }} | {{ labels.bull_bear_rounds_label }} {{ bull_bear_debate.get('rounds_completed') }}
+{% set debate_synth = bull_bear_debate.get('synthesis') or {} %}
+{% if debate_synth.get('summary') %}- {{ debate_synth.get('summary') }}{% endif %}
+{% for point in (bull_bear_debate.get('contention_points') or [])[:3] %}
+- {{ point.get('kind') }}{% if point.get('topic') %}: {{ point.get('topic') }}{% endif %}
+{% endfor %}
+{% endif %}
+
 {% set checklist = battle.get('action_checklist', []) if battle else [] %}
 {% set fc = failed_checks(checklist) %}
 {% if fc %}
