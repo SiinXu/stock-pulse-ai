@@ -86,6 +86,7 @@
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
 | [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema / CAS store (Issue #1112) |
 | [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
+| [确定性预测声明打分器](prediction-claim-scorer.md) | 纯函数 `ClaimScorer`：A1 声明类型 → hit·partial·miss·data_unavailable，含置信度校准（#1111 / #1107；[EN](prediction-claim-scorer_EN.md)） |
 | [资讯 / 情报源](intelligence-sources.md) | RSS/Atom 合规资讯源配置、测试、拉取、去重、存储、查询与安全边界 |
 | [分析上下文包契约、运行态消费与可见性](analysis-context-pack.md) | AnalysisContextPack 首版范围、字段质量状态、P1/P2 内部契约、P3 Prompt 摘要消费、P4 历史/API/Web 低敏可见性、P5 数据质量评分、P6 迁移回滚与源码锚点；完整指南补充 #1386 阶段感知分析、迁移与回滚入口 |
 | [情绪分析管线](sentiment-analysis-pipeline.md) | 基于已接入新闻/事件源的情绪评分证据（来源可追溯、时效、置信度），进入 AnalysisContextPack 作为证据而非结论（#179） |

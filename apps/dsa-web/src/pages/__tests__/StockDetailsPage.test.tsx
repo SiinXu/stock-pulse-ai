@@ -408,6 +408,7 @@ describe('StockDetailsPage', () => {
     getQuoteMock.mockResolvedValue(makeQuote());
     getHistoryMock.mockResolvedValue(makeHistory());
     vi.mocked(estimateStockValuation).mockResolvedValue({
+      schemaVersion: 'valuation-estimate-v1',
       status: 'ok',
       stockCode: '600519',
       dcf: {
@@ -444,6 +445,7 @@ describe('StockDetailsPage', () => {
       stockCode,
     }));
     estimateStockValuationMock.mockResolvedValue({
+      schemaVersion: 'valuation-estimate-v1',
       status: 'ok',
       stockCode: 'AAPL',
       dcf: {
