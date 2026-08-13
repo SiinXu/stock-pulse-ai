@@ -1417,24 +1417,24 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
   'settings.agent.AGENT_STEP_CRITIQUE_ENABLED': {
-    title: '即时步骤批评',
-    summary: '在规划观察失败或相互矛盾后追加确定性的类型化批评。',
+    title: '步骤批评',
+    summary: '针对失败或矛盾步骤的类型化批评。',
   },
   'settings.agent.AGENT_REFLECTION_ENABLED': {
-    title: '轨迹反思',
-    summary: '在运行结束后，对有界且已脱敏的轨迹证据执行可选反思。',
+    title: '运行反思',
+    summary: '对有界、脱敏运行证据的可选反思。',
   },
   'settings.agent.AGENT_REFLECTION_LLM_BUDGET': {
-    title: '轨迹反思 LLM 预算',
-    summary: '限制单次轨迹反思可调用 provider 的次数。',
+    title: '反思调用上限',
+    summary: '允许 0–1 次 provider 调用。',
   },
   'settings.agent.AGENT_META_REVIEW_ENABLED': {
-    title: '跨运行元审查',
-    summary: '把已校验的 episode lesson 聚合为确定性的离线报告。',
+    title: '元审查',
+    summary: '基于已校验 lesson 生成确定性离线报告。',
   },
   'settings.agent.AGENT_META_REVIEW_MIN_EPISODES': {
-    title: '元审查样本阈值',
-    summary: '达到最少已校验 episode 数量后才输出建议。',
+    title: '最少 Episode',
+    summary: '输出建议前所需的已校验 episode 数。',
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',

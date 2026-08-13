@@ -1388,24 +1388,24 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
   'settings.agent.AGENT_STEP_CRITIQUE_ENABLED': {
-    title: 'Immediate Step Critique',
-    summary: 'Adds deterministic typed critique after failed or contradictory planning observations.',
+    title: 'Step Critique',
+    summary: 'Typed critique for failed or contradictory steps.',
   },
   'settings.agent.AGENT_REFLECTION_ENABLED': {
-    title: 'Trajectory Reflection',
-    summary: 'Runs an optional end-of-run reflection over bounded, redacted trajectory evidence.',
+    title: 'Run Reflection',
+    summary: 'Optional reflection on bounded, redacted run evidence.',
   },
   'settings.agent.AGENT_REFLECTION_LLM_BUDGET': {
-    title: 'Trajectory Reflection LLM Budget',
-    summary: 'Caps provider calls for one trajectory reflection.',
+    title: 'Reflection Calls',
+    summary: 'Allows 0–1 provider call.',
   },
   'settings.agent.AGENT_META_REVIEW_ENABLED': {
-    title: 'Cross-run Meta Review',
-    summary: 'Aggregates validated episode lessons into deterministic offline reports.',
+    title: 'Meta Review',
+    summary: 'Deterministic reports from validated episode lessons.',
   },
   'settings.agent.AGENT_META_REVIEW_MIN_EPISODES': {
-    title: 'Meta Review Sample Threshold',
-    summary: 'Requires a minimum number of validated episodes before recommendations are emitted.',
+    title: 'Episode Minimum',
+    summary: 'Validated episodes required before recommendations.',
   },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
