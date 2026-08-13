@@ -205,7 +205,7 @@ test.describe('application shell foundation', () => {
     await expect(opener).toBeFocused();
 
     await page.goForward();
-    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page).toHaveURL(/\/signals$/);
     await expect(opener).toBeFocused();
 
     await page.goForward();
@@ -213,7 +213,7 @@ test.describe('application shell foundation', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Route /portfolio' })).toBeFocused();
 
     await page.goBack();
-    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page).toHaveURL(/\/signals$/);
     await expect(opener).toBeFocused();
   });
 
