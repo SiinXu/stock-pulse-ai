@@ -118,17 +118,17 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MAX_STEPS` | `10` | 是 | 模板中注释; Agent maximum inference step limit (default 10, each sub-agent runs according to its preset value; higher than the de... |
 | `AGENT_MEMORY_ENABLED` | `false` | 是 | 模板中注释; Memory and calibration system (tracks historical accuracy and automatically adjusts confidence) |
 | `AGENT_MODE` | `true` | 是 | 模板中注释; =================================== Agent strategy dialogue configuration (Web dialogue page) =======================... |
+| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | 模板中注释; Hard per-mode budgets (LLM turns / tool calls / estimated USD cost / optional tokens) |
+| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
-| `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | Enable hard per-mode budgets (turns/tools/cost); breach terminates with explicit reason |
-| `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | Global tightener for mode LLM turn caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | Global tightener for mode tool-call caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | Global tightener for mode estimated cost caps; 0 keeps mode defaults |
-| `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | Optional global token ceiling; 0 disables token dimension |
 | `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |
 | `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 是 | 模板中注释 |
@@ -140,6 +140,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
+| `AGENT_RESEARCH_PERSONA` | `空` | 是 | 模板中注释; 可选研究立场预设（默认关闭）：`rational_analyst`、`risk_guardian` 或 `long_term_compounder` |
+| `AGENT_RESEARCH_PERSONA_CUSTOM` | `空` | 是 | 模板中注释; 可选自定义研究立场；持久化内容优先使用个人投资框架的 `research_stance` |
 | `AGENT_RISK_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_RISK_OVERRIDE` | `true` | 是 | 模板中注释; Whether the risk-control agent may reject buy signals (enabled by default) |
 | `AGENT_SKILLS` | `空` | 是 |  |
@@ -165,6 +167,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ALPHASIFT_SNAPSHOT_CALL_TIMEOUT_SEC` | `60` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHASIFT_SOURCE_CALL_TIMEOUT_SEC` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `ALPHAVANTAGE_API_KEY` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
+| `ANALYSIS_CHECKPOINT_DIR` | `./data/checkpoints` | 是 | 模板中注释 |
+| `ANALYSIS_CHECKPOINT_ENABLED` | `true` | 是 | 模板中注释; --- Analysis stage checkpoints + reproducibility (Issues #121 / #136) --- Persist multi-agent stage state for exact-r... |
+| `ANALYSIS_CHECKPOINT_FORCE_FULL` | `false` | 是 | 模板中注释 |
+| `ANALYSIS_CHECKPOINT_TTL_HOURS` | `24` | 是 | 模板中注释 |
 | `ANALYSIS_DELAY` | `0` | 是 | 模板中注释; =================================== Analyze interval configuration (optional) =================================== Del... |
 | `ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS` | `0` | 是 | 模板中注释; Coordinator wall-clock budget in seconds; 0 disables (individual stage timeouts still apply). |
 | `ANALYSIS_PARALLEL_FETCH_ENABLED` | `true` | 是 | 模板中注释; Parallel dependency-free market-input pulls inside one stock analysis (realtime / chip / money-flow / fundamental) |
@@ -556,6 +562,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPORT_SUMMARY_ONLY` | `false` | 是 | 模板中注释; Only analyze the result summary: when set to true, it only pushes summaries, without individual stock details |
 | `REPORT_TEMPLATES_DIR` | `templates` | 是 | 模板中注释; Report Engine P0 (Jinja2 / integrity check / Historical comparison) |
 | `REPORT_TYPE` | `simple` | 是 | 模板中注释; Report type: simple (concise), full (complete), brief (3-5 sentence summary) In a Docker environment, if content is n... |
+| `REPRO_MODE_ENABLED` | `false` | 是 | 模板中注释; Request-scoped temperature=0 plus provider seed forwarding where supported. |
+| `REPRO_RECORD_CONFIG` | `true` | 是 | 模板中注释 |
+| `REPRO_SEED` | `0` | 是 | 模板中注释 |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |

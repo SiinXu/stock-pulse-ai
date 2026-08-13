@@ -666,7 +666,12 @@ export function toUiTextKey(resourceKey: string): string | null {
   return match?.[1] ?? null;
 }
 
-/** Classes that should block duplicate analysis submission while the alert is visible. */
+/**
+ * Classes that should block duplicate analysis submission while the alert is
+ * visible. Includes config conflict (reload path) as well as busy. For pure
+ * task-busy checks prefer `isTaskBusyError` / `isLaunchBlockingError` from
+ * `asyncTaskUx.ts` (issue #885 async-task contract).
+ */
 export function isBusyActionableErrorClass(errorClass: ActionableErrorClass): boolean {
   return errorClass === 'busy' || errorClass === 'config_conflict';
 }
