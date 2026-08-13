@@ -21,6 +21,7 @@ from src.analyzer import (
     stabilize_decision_with_structure,
 )
 from src.config import FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
+from src.core.contracts import AnalyzeStageOutput
 from src.core.pipeline_stage_results import (
     PipelineStageName,
     PipelineStageResult,
@@ -46,6 +47,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.search_service import SearchService
+from src.services.sentiment_pipeline_service import SentimentPipelineService
 from src.services.daily_market_context import (
     DailyMarketContext,
     DailyMarketContextService,
@@ -162,6 +164,19 @@ class _AgentAnalysisStageMixin:
                 daily_market_context,
                 report_language=report_language,
             )
+            from src.services.analysis_stage_checkpoint import current_checkpoint_session
+
+            checkpoint_session = current_checkpoint_session()
+            if checkpoint_session is not None:
+                from src.services.analysis_stage_checkpoint import (
+                    META_ANNOTATION_KEY,
+                    META_REPRO_KEY,
+                    META_SESSION_KEY,
+                )
+
+                initial_context[META_SESSION_KEY] = checkpoint_session
+                initial_context[META_ANNOTATION_KEY] = checkpoint_session.annotation
+                initial_context[META_REPRO_KEY] = checkpoint_session.repro_snapshot
 
             if realtime_quote:
                 initial_context["realtime_quote"] = self._safe_to_dict(realtime_quote)
@@ -273,6 +288,50 @@ class _AgentAnalysisStageMixin:
             )
             active_stage = None
 
+
+            # Sentiment evidence for Agent path (news/event text only; no new sources).
+            market_for_sentiment = get_market_for_stock(normalize_stock_code(code)) or "cn"
+            sentiment_snapshot: Optional[Dict[str, Any]] = None
+            try:
+                window_days = 7
+                try:
+                    window_days = max(
+                        1,
+                        int(self.config.get_effective_news_window_days() or 7),
+                    )
+                except Exception:  # broad-exception: optional_metadata - window fallback keeps scoring usable
+                    window_days = int(
+                        getattr(self.config, "news_max_age_days", 7) or 7
+                    )
+                remote_search_available = bool(
+                    self.search_service is not None and self.search_service.is_available
+                )
+                sentiment_snapshot = SentimentPipelineService(
+                    window_days=window_days
+                ).build_from_news_context(
+                    stock_code=code,
+                    stock_name=stock_name,
+                    market=market_for_sentiment,
+                    news_context=initial_context.get("news_context"),
+                    remote_search_available=remote_search_available,
+                ).to_public_dict()
+            except Exception as exc:  # broad-exception: fallback_recorded - optional evidence
+                log_safe_exception(
+                    logger,
+                    "Agent sentiment pipeline failed; continuing without sentiment evidence",
+                    exc,
+                    error_code="pipeline_agent_sentiment_snapshot_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+                sentiment_snapshot = SentimentPipelineService().build_unavailable(
+                    stock_code=code,
+                    stock_name=stock_name,
+                    market=market_for_sentiment,
+                    reason_code="scoring_failed",
+                    gaps=["scoring_failed"],
+                ).to_public_dict()
+
             # Issue #1066: ensure deep history is in DB before agent tools run
             active_stage = observe_pipeline_stage(
                 "context",
@@ -304,6 +363,7 @@ class _AgentAnalysisStageMixin:
                     query_id=query_id,
                     base_context=analysis_context,
                     portfolio_context=portfolio_context,
+                    sentiment_snapshot=sentiment_snapshot,
                 ),
                 report_language=report_language,
                 code=code,
@@ -311,6 +371,30 @@ class _AgentAnalysisStageMixin:
             )
             if analysis_context_pack_summary:
                 initial_context["analysis_context_pack_summary"] = analysis_context_pack_summary
+            if isinstance(analysis_context_pack_overview, dict):
+                # Issue #182: pass snapshot identity + value-stripped pack audit
+                # so multi-agent seal reuses the same content_digest (no raw values).
+                snapshot_identity = {
+                    key: analysis_context_pack_overview.get(key)
+                    for key in (
+                        "snapshot_id",
+                        "snapshot_revision",
+                        "as_of",
+                        "pack_version",
+                        "created_at",
+                    )
+                    if analysis_context_pack_overview.get(key) is not None
+                }
+                overview_meta = analysis_context_pack_overview.get("metadata")
+                if isinstance(overview_meta, dict):
+                    digest = overview_meta.get("content_digest")
+                    if digest:
+                        snapshot_identity["content_digest"] = digest
+                pack_audit = analysis_context_pack_overview.pop("_pack_audit", None)
+                if isinstance(pack_audit, dict) and pack_audit:
+                    initial_context["analysis_context_pack_audit"] = pack_audit
+                if snapshot_identity:
+                    initial_context["analysis_context_snapshot"] = snapshot_identity
 
             agent_pack_counts = (
                 analysis_context_pack_overview.get("counts", {})
@@ -588,9 +672,8 @@ class _AgentAnalysisStageMixin:
                                 context={"stock_code": code},
                             )
 
-            agent_analysis_succeeded = bool(
-                result and getattr(result, "success", True)
-            )
+            analyze_output = AnalyzeStageOutput.from_result(result)
+            agent_analysis_succeeded = analyze_output.analysis_success
             agent_analysis_reason = (
                 getattr(result, "error_message", None)
                 if result is not None and not agent_analysis_succeeded
@@ -601,11 +684,14 @@ class _AgentAnalysisStageMixin:
                 )
             )
             analysis_stage_result = (
-                PipelineStageResult.success(PipelineStageName.ANALYZE, result)
+                PipelineStageResult.success(
+                    PipelineStageName.ANALYZE,
+                    analyze_output.as_legacy_value(),
+                )
                 if agent_analysis_succeeded
                 else PipelineStageResult.failed(
                     PipelineStageName.ANALYZE,
-                    value=result,
+                    value=analyze_output.as_legacy_value(),
                     retryable=True,
                     reason=agent_analysis_reason,
                 )
@@ -613,11 +699,7 @@ class _AgentAnalysisStageMixin:
             self._finish_pipeline_stage(
                 active_stage,
                 analysis_stage_result,
-                output_summary={
-                    "analysis_result_available": result is not None,
-                    "analysis_success": agent_analysis_succeeded,
-                    "model": getattr(result, "model_used", None) if result else None,
-                },
+                output_summary=analyze_output.to_output_summary(),
             )
             active_stage = None
 
@@ -682,6 +764,7 @@ class _AgentAnalysisStageMixin:
                         chip_data=chip_data,
                         analysis_context_pack_overview=analysis_context_pack_overview,
                         market_phase_summary=market_phase_summary,
+                        sentiment_snapshot=sentiment_snapshot,
                     )
                     context_snapshot["stock_name"] = resolved_stock_name
                     from src.agent.runtime_facts import (

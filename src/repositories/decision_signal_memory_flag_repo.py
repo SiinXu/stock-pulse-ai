@@ -44,6 +44,12 @@ class DecisionSignalMemoryFlagRepository:
             return list(rows)
 
     def upsert(self, fields: Dict[str, Any]) -> DecisionSignalMemoryFlagRecord:
+        # Sandbox fence: never mutate production decision-memory flags during simulation.
+        from src.agent.sandbox.context import require_sandbox_inactive_for_production_write
+        from src.agent.sandbox.effects import EFFECT_DECISION_MEMORY
+
+        require_sandbox_inactive_for_production_write(EFFECT_DECISION_MEMORY)
+
         now = utc_naive_now()
         with self.db.get_session() as session:
             existing = session.execute(

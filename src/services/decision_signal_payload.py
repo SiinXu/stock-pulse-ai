@@ -198,7 +198,7 @@ def build_decision_signal_payload_from_report(
         "risk_summary": _risk_summary(result, dashboard),
         "catalyst_summary": _catalyst_summary(dashboard),
         "watch_conditions": _watch_conditions(dashboard),
-        "evidence": _evidence(result, sniper_points),
+        "evidence": _evidence(result, sniper_points, dashboard=dashboard),
         "data_quality_summary": _extract_data_quality(context_snapshot, result),
         "metadata": metadata,
         "report_language": getattr(result, "report_language", None),
@@ -453,8 +453,13 @@ def _watch_conditions(dashboard: Mapping[str, Any]) -> Optional[Any]:
     return None
 
 
-def _evidence(result: AnalysisResult, sniper_points: Mapping[str, Any]) -> Dict[str, Any]:
-    evidence = {
+def _evidence(
+    result: AnalysisResult,
+    sniper_points: Mapping[str, Any],
+    *,
+    dashboard: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    evidence: Dict[str, Any] = {
         "operation_advice": getattr(result, "operation_advice", None),
         "decision_type": getattr(result, "decision_type", None),
         "trend_prediction": getattr(result, "trend_prediction", None),
@@ -463,4 +468,15 @@ def _evidence(result: AnalysisResult, sniper_points: Mapping[str, Any]) -> Dict[
         "change_pct": getattr(result, "change_pct", None),
         "sniper_points": dict(sniper_points),
     }
+    # Compact real committee deliberation for Signal Center review (#546 / #985).
+    from src.schemas.report_structured_insights import (
+        project_report_structured_insights_for_api,
+    )
+
+    insights = project_report_structured_insights_for_api(
+        {"dashboard": dict(dashboard or {})}
+    )
+    committee = (insights or {}).get("committee_deliberation")
+    if committee:
+        evidence["committee_deliberation"] = committee
     return {key: value for key, value in evidence.items() if value not in (None, "", [], {})}

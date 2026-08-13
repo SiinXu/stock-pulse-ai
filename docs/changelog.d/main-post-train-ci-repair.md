@@ -1,0 +1,1 @@
+- [Fixed] Restore deterministic test isolation, Web acceptance contracts, and bundle baselines after recent feature merges.

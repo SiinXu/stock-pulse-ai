@@ -1,8 +1,13 @@
+---
+name: handle-review-feedback
+description: Process external review feedback on your own open PR by converging the full business contract instead of stacking point patches.
+---
+
 # Handle Review Feedback
 
 Process external review feedback on your own open PR following `AGENTS.md` §8.1: converge the full business contract behind each finding instead of stacking point patches at the named lines. This repository explicitly treats patch stacking as a low-quality-PR trait and grounds for close-and-redo.
 
-**Source of truth**: repository root `AGENTS.md` §8.1. If this skill drifts from it, `AGENTS.md` wins.
+**Source of truth**: repository root `AGENTS.md` §8.1. If this skill drifts from it, `AGENTS.md` wins. After fixes, re-run squash body check (hard-rules §1) so the PR body matches the new head.
 
 ## Usage
 

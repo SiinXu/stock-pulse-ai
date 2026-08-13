@@ -1,10 +1,13 @@
 # Bounded Image OCR Agent Tool
 
 StockPulse can optionally extract **raw text** from local images and
-PDF pages that embed rasters with Tesseract. This phase is useful for
-low-cost text recovery, but it does not claim verified table cells, OCR
-confidence, brokerage-statement accuracy, or semantic chart understanding.
-OCR text is never decision-authoritative.
+PDF pages that embed rasters with Tesseract. Product targets cover
+screenshots, filing/PDF page images, table-like statements, and chart
+annotations via ``document_kind``. This phase is useful for low-cost text
+recovery, but it does not claim verified table cells, OCR confidence,
+brokerage-statement accuracy, or semantic chart understanding (use
+``read_price_chart`` for K-line semantics). OCR text is never
+decision-authoritative.
 
 Optional secondary verification before high-impact conclusions and shared
 agent-tool budget/rate-limit accounting remain open on issue #196.
@@ -25,13 +28,19 @@ OCR complements these owners; it does not reimplement them.
 Callers should set `document_kind` so the envelope and structural hints match
 the intended target:
 
-| `document_kind` | Input | Structural hints |
-| --- | --- | --- |
-| `screenshot` | PNG/JPEG/WebP/GIF | Raw text only |
-| `filing_page` | Image or raster PDF page | Raw text only; text-layer PDFs → `parse_financial_pdf` |
-| `table_statement` | Table-like image | Unverified whitespace-split candidate rows (not brokerage-grade cells) |
-| `chart_annotation` | Chart screenshot | Sparse label tokens only; semantic charts stay on `read_price_chart` |
-| `pdf_page` | PDF with embedded images | First embedded raster on `page_index`; fails closed when no embedded image |
+| `document_kind` | Input | Structural hints | Not claimed |
+| --- | --- | --- | --- |
+| `screenshot` (default) | PNG/JPEG/WebP/GIF | Raw text only | layout |
+| `filing_page` | Image or raster PDF page | Raw text only; text-layer PDFs → `parse_financial_pdf` | full filing parse |
+| `table_statement` | Table-like image | Unverified whitespace-split candidate rows (not brokerage-grade cells) | verified cells |
+| `chart_annotation` | Chart screenshot | Sparse label tokens only; semantic charts stay on `read_price_chart` | chart semantics |
+| `pdf_page` | PDF with embedded images | First embedded raster on `page_index`; fails closed when no embedded image | text-layer PDF parse / vector rasterization |
+
+Every kind returns the same untrusted document envelope:
+`trust.classification=untrusted_user_document`,
+`trust.authoritative_for_decisions=false`, and
+`instructions_authoritative=false`. After a successful OCR call, BoundToolSession
+blocks follow-on tools until a new user turn.
 
 ## Privacy and trust boundary
 
@@ -61,7 +70,7 @@ document text cannot grant a capability or bypass the session allowlist.
 
 ## Resource and file contract
 
-- Path must resolve under `OCR_FILE_ROOT` (or `MULTIMODAL_FILE_ROOT`).
+- Path must resolve under `OCR_FILE_ROOT` (or `MULTIMODAL_FILE_ROOT`). Raster images and PDF pages with embedded images are accepted; text-layer PDFs should use `parse_financial_pdf`.
 - The service opens the resolved path once, rejects non-regular files, reads at
   most 5 MiB + 1 byte, and verifies suffix plus image signature (or PDF header).
 - PDF pages: extract one embedded raster via pypdf; no silent vector rasterization.

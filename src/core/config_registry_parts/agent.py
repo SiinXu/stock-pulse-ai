@@ -354,7 +354,152 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
-    "SKILL_OPINION_RECORDING_ENABLED": {
+    "AGENT_MODE_BUDGET_ENABLED": {
+        "title": "Mode Hard Budget Enabled",
+        "description": "Enable hard per-mode budgets for LLM turns, tool calls, and estimated cost. On breach the run terminates with an explicit budget reason (never silent success). Residual wall-clock skips remain budget_skip under the same diagnostic snapshot.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 351,
+        "help_key": "settings.agent.AGENT_MODE_BUDGET_ENABLED",
+        "examples": [
+            "AGENT_MODE_BUDGET_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Full guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_MODE_BUDGET_MAX_LLM_TURNS": {
+        "title": "Mode Budget Max LLM Turns (global)",
+        "description": "Optional global tightener for per-mode LLM turn caps. 0 keeps mode defaults (quick=6, standard=10, full/specialist=12, chat=10). Exceeding terminates with budget_turns.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0, "max": 100},
+        "display_order": 352,
+        "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS",
+        "examples": [
+            "AGENT_MODE_BUDGET_MAX_LLM_TURNS=0",
+        ],
+        "docs": [
+            {
+                "label": "Full guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_MODE_BUDGET_MAX_TOOL_CALLS": {
+        "title": "Mode Budget Max Tool Calls (global)",
+        "description": "Optional global tightener for per-mode tool-call caps. 0 keeps mode defaults. Exceeding terminates with budget_tools.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0, "max": 500},
+        "display_order": 353,
+        "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS",
+        "examples": [
+            "AGENT_MODE_BUDGET_MAX_TOOL_CALLS=0",
+        ],
+        "docs": [
+            {
+                "label": "Full guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_MODE_BUDGET_MAX_COST_USD": {
+        "title": "Mode Budget Max Cost USD (global)",
+        "description": "Optional global tightener for per-mode estimated USD cost caps. 0 keeps mode defaults. Exceeding terminates with budget_cost.",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 354,
+        "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_COST_USD",
+        "examples": [
+            "AGENT_MODE_BUDGET_MAX_COST_USD=0",
+        ],
+        "docs": [
+            {
+                "label": "Full guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+    "AGENT_MODE_BUDGET_MAX_TOKENS": {
+        "title": "Mode Budget Max Tokens (global)",
+        "description": "Optional global hard token ceiling across the analysis run. 0 disables the token dimension (mode defaults also leave tokens unlimited unless set).",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 355,
+        "help_key": "settings.agent.AGENT_MODE_BUDGET_MAX_TOKENS",
+        "examples": [
+            "AGENT_MODE_BUDGET_MAX_TOKENS=0",
+        ],
+        "docs": [
+            {
+                "label": "Full guide (EN)",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": ["restart_required"],
+        "contract": {
+            "requirement": "optional",
+            "restart_required": True,
+        },
+    },
+"SKILL_OPINION_RECORDING_ENABLED": {
         "title": "Skill Opinion Recording",
         "description": (
             "When enabled, record each valid individual skill opinion into the "
@@ -511,6 +656,70 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "投资委员会模式",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investment-committee-mode.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_RESEARCH_PERSONA": {
+        "title": "Research Persona Preset",
+        "description": (
+            "Default-off research-stance preset that shapes Agent tone, risk framing, "
+            "and conclusion style (rational_analyst | risk_guardian | long_term_compounder). "
+            "Empty keeps default behavior. The active personal investment framework "
+            "research_stance field takes precedence. Style labels are not performance claims."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"value": "", "label": "Off (default)"},
+            {"value": "rational_analyst", "label": "Rational Analyst"},
+            {"value": "risk_guardian", "label": "Risk Guardian"},
+            {"value": "long_term_compounder", "label": "Long-term Compounder"},
+        ],
+        "validation": {},
+        "display_order": 641,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA",
+        "examples": [
+            "AGENT_RESEARCH_PERSONA=",
+            "AGENT_RESEARCH_PERSONA=rational_analyst",
+        ],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_RESEARCH_PERSONA_CUSTOM": {
+        "title": "Custom Research Stance",
+        "description": (
+            "Optional free-form research-stance text used when no personal investment "
+            "framework research_stance is active. Leave empty by default. Prefer the "
+            "versioned framework field for durable custom stance persistence. The value "
+            "is untrusted preference data and cannot alter Agent Soul, ToolSurface, or permissions."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"max_length": 2000},
+        "display_order": 642,
+        "help_key": "settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM",
+        "examples": ["AGENT_RESEARCH_PERSONA_CUSTOM="],
+        "docs": [
+            {
+                "label": "Investor Personas",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/investor-personas_EN.md",
             },
         ],
         "warning_codes": [],
@@ -1385,6 +1594,66 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "PERF_COLLECTION_ENABLED": {
+        "title": "Performance Span Collection",
+        "description": (
+            "Opt-in recording of lightweight performance spans for key paths "
+            "(pipeline stages, offline baselines). Default off. When disabled, "
+            "collection helpers are no-ops."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 707,
+        "help_key": "settings.agent.performance",
+        "examples": [
+            "PERF_COLLECTION_ENABLED=false",
+            "PERF_COLLECTION_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Performance baselines and profiling",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/performance-baseline_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "PERF_PROFILE_ENABLED": {
+        "title": "Performance cProfile Flag",
+        "description": (
+            "Signals that optional stdlib cProfile wrapping is desired for "
+            "offline baseline tooling. Default off. Does not auto-profile "
+            "production request paths."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 708,
+        "help_key": "settings.agent.performance",
+        "examples": [
+            "PERF_PROFILE_ENABLED=false",
+            "PERF_PROFILE_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Performance baselines and profiling",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/performance-baseline_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_EVENT_MONITOR_ENABLED": {
         "title": "Event Monitor",
         "description": "Enable background Event Monitor polling in schedule mode.",
@@ -2046,7 +2315,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "DECISION_MEMORY_LOOKBACK": {
         "title": "Decision Memory Lookback",
-        "description": "Maximum recent evaluated signals per stock to inject into decision memory reflection. Default 5.",
+        "description": "Maximum recent evaluated signals per stock to inject into decision memory reflection. Default 5; hard cap 40.",
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",
@@ -2055,7 +2324,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "5",
         "options": [],
-        "validation": {"min": 0, "max": 100},
+        "validation": {"min": 0, "max": 40},
         "display_order": 721,
         "help_key": "settings.agent.decision_memory",
         "examples": ["DECISION_MEMORY_LOOKBACK=5", "DECISION_MEMORY_LOOKBACK=10"],
