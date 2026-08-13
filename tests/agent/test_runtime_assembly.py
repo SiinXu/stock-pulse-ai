@@ -205,8 +205,6 @@ def test_configured_optional_tool_absence_keeps_construction_provenance(
             raise RuntimeError("valuation dependency unavailable")
         return None
 
-    original_registry = runtime_assembly._TOOL_REGISTRY
-    original_registry_building = runtime_assembly._TOOL_REGISTRY_BUILDING
     services = MagicMock()
     services.config = MagicMock(valuation_agent_tool_enabled=True)
     try:
@@ -223,8 +221,13 @@ def test_configured_optional_tool_absence_keeps_construction_provenance(
             registry = runtime_assembly.get_tool_registry()
     finally:
         reset_application_services()
-        runtime_assembly._TOOL_REGISTRY = original_registry
-        runtime_assembly._TOOL_REGISTRY_BUILDING = original_registry_building
+        # reset_application_services() unregisters plugin-owned tools from the
+        # active registry. Never restore that drained object; force the next
+        # consumer to build a complete production registry instead.
+        runtime_assembly._TOOL_REGISTRY = None
+        runtime_assembly._TOOL_REGISTRY_BUILDING = None
+
+    assert runtime_assembly._TOOL_REGISTRY is None
 
     declaration = _optional_tool_declarations(registry)[
         valuation_tools.VALUATION_TOOL_NAME
