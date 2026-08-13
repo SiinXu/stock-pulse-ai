@@ -22,6 +22,7 @@ def build_application_extension_registry(
     agent_tool_registry: ToolRegistry | Callable[[], ToolRegistry],
     *,
     additional_contracts: Mapping[ExtensionPoint, ExtensionContract] | None = None,
+    defer_agent_tool_registration: bool = False,
 ) -> ExtensionRegistry:
     """Build one process registry from the implemented extension point seams."""
 
@@ -29,7 +30,8 @@ def build_application_extension_registry(
     if additional_contracts is not None:
         contracts.update(additional_contracts)
     contracts["agent_tool"] = build_agent_tool_extension_contract(
-        agent_tool_registry
+        agent_tool_registry,
+        defer_until_process_registry=defer_agent_tool_registration,
     )
     contracts["event_hook"] = event_hook_extension_contract()
     return ExtensionRegistry(contracts)
