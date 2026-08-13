@@ -913,6 +913,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/capabilities/registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List write-side capability declarations
+         * @description Return operator-declared capability entries from the durable write registry. This is independent of the live-owner inventory.
+         */
+        get: operations["listCapabilityWriteRegistry"];
+        put?: never;
+        /**
+         * Register a write-side capability
+         * @description Create a new operator-declared capability. Failures are explicit and never pollute the read-only inventory snapshot. Privileged writes require the security-audit chain.
+         */
+        post: operations["registerCapability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/registry/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve capability dependencies and version compatibility */
+        post: operations["resolveCapabilityDependencies"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/registry/{capability_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a write-side capability */
+        put: operations["updateCapability"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/registry/{capability_id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire a write-side capability
+         * @description Mark a capability retired so task-aware routing and resolution no longer treat it as active. Idempotent for already-retired ids.
+         */
+        post: operations["retireCapability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/capabilities/route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compute an explainable task-aware model route decision
+         * @description Select a model for a task class using write-registry LLM capabilities and the configured routing policy. Explicit pins win; decisions are structured for diagnostics reconstruction.
+         */
+        post: operations["routeTaskModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/config-profiles/export": {
         parameters: {
             query?: never;
@@ -5873,6 +5971,30 @@ export interface components {
             /** Unknown Executable Count */
             unknown_executable_count: number;
         };
+        /** CapabilityResolveRequest */
+        CapabilityResolveRequest: {
+            /**
+             * Active Only
+             * @default true
+             */
+            active_only: boolean;
+            /** Capability Ids */
+            capability_ids?: string[] | null;
+            /**
+             * Include Inventory
+             * @default true
+             */
+            include_inventory: boolean;
+        };
+        /** CapabilityResolveResponse */
+        CapabilityResolveResponse: {
+            /** Results */
+            results?: components["schemas"]["ResolutionResultResponse"][];
+            /** Total */
+            total: number;
+            /** Write Generation */
+            write_generation: number;
+        };
         /**
          * CapabilitySourceStatus
          * @description Freshness and consistency state for one authoritative owner.
@@ -7306,6 +7428,20 @@ export interface components {
             sentiment_score: number;
             /** Trend Prediction */
             trend_prediction: string;
+        };
+        /** DependencyIssueResponse */
+        DependencyIssueResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /** Dependency */
+            dependency: string;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /** Reason Code */
+            reason_code: string;
         };
         /**
          * DiscoverLLMChannelModelsRequest
@@ -12886,6 +13022,21 @@ export interface components {
             /** Stock Code */
             stock_code: string;
         };
+        /** ResolutionResultResponse */
+        ResolutionResultResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /** Checked Against Generation */
+            checked_against_generation: number;
+            /** Issues */
+            issues?: components["schemas"]["DependencyIssueResponse"][];
+            /** Ready */
+            ready: boolean;
+            /** Reason Code */
+            reason_code: string;
+            /** Satisfied */
+            satisfied?: string[];
+        };
         /**
          * RollbackSystemConfigRequest
          * @description Request one-step restoration of the last-known-good runtime config.
@@ -12893,6 +13044,19 @@ export interface components {
         RollbackSystemConfigRequest: {
             /** Config Version */
             config_version: string;
+        };
+        /** RouteCandidateResponse */
+        RouteCandidateResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /** Model Route */
+            model_route: string;
+            /** Reasons */
+            reasons?: string[];
+            /** Score */
+            score: number;
+            /** Tags */
+            tags?: string[];
         };
         /**
          * RunDiagnosticComponent
@@ -15388,6 +15552,70 @@ export interface components {
              */
             total: number;
         };
+        /** TaskRouteRequest */
+        TaskRouteRequest: {
+            /** Policy */
+            policy?: ("quality" | "cost" | "local_first") | null;
+            /**
+             * Task Class
+             * @enum {string}
+             */
+            task_class: "report" | "agent" | "vision" | "market_review" | "cheap_scan" | "deep_reasoning" | "coding";
+        };
+        /** TaskRouteResponse */
+        TaskRouteResponse: {
+            /**
+             * As Of
+             * @default
+             */
+            as_of: string;
+            /** Candidates */
+            candidates?: components["schemas"]["RouteCandidateResponse"][];
+            /** Explain */
+            explain?: string[];
+            /**
+             * Fallback Used
+             * @default false
+             */
+            fallback_used: boolean;
+            /**
+             * Pin Source
+             * @default
+             */
+            pin_source: string;
+            /**
+             * Policy
+             * @enum {string}
+             */
+            policy: "quality" | "cost" | "local_first";
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Routing Enabled
+             * @default false
+             */
+            routing_enabled: boolean;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "task-route-decision/v1";
+            /**
+             * Selected Capability Id
+             * @default
+             */
+            selected_capability_id: string;
+            /**
+             * Selected Model
+             * @default
+             */
+            selected_model: string;
+            /**
+             * Task Class
+             * @enum {string}
+             */
+            task_class: "report" | "agent" | "vision" | "market_review" | "cheap_scan" | "deep_reasoning" | "coding";
+        };
         /**
          * TaskStatus
          * @description Task status model
@@ -16677,6 +16905,176 @@ export interface components {
             analysis: number;
             /** Signals */
             signals: number;
+        };
+        /**
+         * WriteCapabilityEntryResponse
+         * @description One operator-declared capability entry.
+         */
+        WriteCapabilityEntryResponse: {
+            /** Capability Id */
+            capability_id: string;
+            /**
+             * Capability Type
+             * @enum {string}
+             */
+            capability_type: "data_provider" | "data_method" | "agent_tool" | "analysis_skill" | "pipeline_stage" | "llm_model" | "persona_role";
+            /**
+             * Cost Tier
+             * @default
+             */
+            cost_tier: string;
+            /** Dependencies */
+            dependencies?: string[];
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "data" | "tool" | "skill" | "pipeline" | "llm" | "persona";
+            /** Generation */
+            generation: number;
+            /**
+             * Latency Class
+             * @default
+             */
+            latency_class: string;
+            /** Markets */
+            markets?: string[];
+            /**
+             * Model Route
+             * @default
+             */
+            model_route: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Registered At
+             * @default
+             */
+            registered_at: string;
+            /** Retired At */
+            retired_at?: string | null;
+            /** Scopes */
+            scopes?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            /** Tags */
+            tags?: string[];
+            /**
+             * Updated At
+             * @default
+             */
+            updated_at: string;
+            /** Version */
+            version: string;
+        };
+        /**
+         * WriteCapabilityListResponse
+         * @description Versioned write-side registry list.
+         */
+        WriteCapabilityListResponse: {
+            /** As Of */
+            as_of: string;
+            /** Entries */
+            entries?: components["schemas"]["WriteCapabilityEntryResponse"][];
+            /** Generation */
+            generation: number;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "capability-write-registry/v1";
+            /** Total */
+            total: number;
+        };
+        /**
+         * WriteCapabilityRegisterRequest
+         * @description Create a new write-side capability declaration.
+         */
+        WriteCapabilityRegisterRequest: {
+            /** Capability Id */
+            capability_id: string;
+            /**
+             * Capability Type
+             * @enum {string}
+             */
+            capability_type: "data_provider" | "data_method" | "agent_tool" | "analysis_skill" | "pipeline_stage" | "llm_model" | "persona_role";
+            /**
+             * Cost Tier
+             * @default
+             */
+            cost_tier: string;
+            /** Dependencies */
+            dependencies?: string[];
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "data" | "tool" | "skill" | "pipeline" | "llm" | "persona";
+            /**
+             * Latency Class
+             * @default
+             */
+            latency_class: string;
+            /** Markets */
+            markets?: string[];
+            /**
+             * Model Route
+             * @default
+             */
+            model_route: string;
+            /**
+             * Provider
+             * @default
+             */
+            provider: string;
+            /** Scopes */
+            scopes?: string[];
+            /** Tags */
+            tags?: string[];
+            /**
+             * Version
+             * @default 1
+             */
+            version: string;
+        };
+        /**
+         * WriteCapabilityUpdateRequest
+         * @description Partial update for a non-retired capability declaration.
+         */
+        WriteCapabilityUpdateRequest: {
+            /** Cost Tier */
+            cost_tier?: string | null;
+            /** Dependencies */
+            dependencies?: string[] | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Latency Class */
+            latency_class?: string | null;
+            /** Markets */
+            markets?: string[] | null;
+            /** Model Route */
+            model_route?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Scopes */
+            scopes?: string[] | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Version */
+            version?: string | null;
         };
     };
     responses: never;
@@ -18936,6 +19334,419 @@ export interface operations {
                 };
             };
             /** @description Invalid domain filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listCapabilityWriteRegistry: {
+        parameters: {
+            query?: {
+                domain?: string | null;
+                include_retired?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityListResponse"];
+                };
+            };
+            /** @description Invalid domain filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    registerCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteCapabilityRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityEntryResponse"];
+                };
+            };
+            /** @description Invalid domain filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Write denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resolveCapabilityDependencies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CapabilityResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityResolveResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    updateCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WriteCapabilityUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityEntryResponse"];
+                };
+            };
+            /** @description Invalid domain filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Write denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retireCapability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriteCapabilityEntryResponse"];
+                };
+            };
+            /** @description Invalid domain filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Login required when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Write denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Capability already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    routeTaskModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRouteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRouteResponse"];
+                };
+            };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;

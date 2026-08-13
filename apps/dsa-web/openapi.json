@@ -5426,6 +5426,67 @@
         "title": "CapabilityListResponse",
         "type": "object"
       },
+      "CapabilityResolveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "active_only": {
+            "default": true,
+            "title": "Active Only",
+            "type": "boolean"
+          },
+          "capability_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability Ids"
+          },
+          "include_inventory": {
+            "default": true,
+            "title": "Include Inventory",
+            "type": "boolean"
+          }
+        },
+        "title": "CapabilityResolveRequest",
+        "type": "object"
+      },
+      "CapabilityResolveResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ResolutionResultResponse"
+            },
+            "maxItems": 1024,
+            "title": "Results",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "write_generation": {
+            "minimum": 0.0,
+            "title": "Write Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "write_generation"
+        ],
+        "title": "CapabilityResolveResponse",
+        "type": "object"
+      },
       "CapabilitySourceStatus": {
         "additionalProperties": false,
         "description": "Freshness and consistency state for one authoritative owner.",
@@ -9578,6 +9639,42 @@
           "sentiment_label"
         ],
         "title": "DemoAnalysisSummary",
+        "type": "object"
+      },
+      "DependencyIssueResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "dependency": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Dependency",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Detail",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependency",
+          "capability_id",
+          "reason_code"
+        ],
+        "title": "DependencyIssueResponse",
         "type": "object"
       },
       "DiscoverLLMChannelModelsRequest": {
@@ -23678,6 +23775,56 @@
         "title": "ResearchScheduledPayload",
         "type": "object"
       },
+      "ResolutionResultResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "checked_against_generation": {
+            "minimum": 0.0,
+            "title": "Checked Against Generation",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyIssueResponse"
+            },
+            "maxItems": 64,
+            "title": "Issues",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "satisfied": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Satisfied",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability_id",
+          "ready",
+          "reason_code",
+          "checked_against_generation"
+        ],
+        "title": "ResolutionResultResponse",
+        "type": "object"
+      },
       "RollbackSystemConfigRequest": {
         "description": "Request one-step restoration of the last-known-good runtime config.",
         "properties": {
@@ -23690,6 +23837,50 @@
           "config_version"
         ],
         "title": "RollbackSystemConfigRequest",
+        "type": "object"
+      },
+      "RouteCandidateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "model_route": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Model Route",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability_id",
+          "model_route",
+          "score"
+        ],
+        "title": "RouteCandidateResponse",
         "type": "object"
       },
       "RunDiagnosticComponent": {
@@ -29622,6 +29813,141 @@
         "title": "TaskListResponse",
         "type": "object"
       },
+      "TaskRouteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "quality",
+                  "cost",
+                  "local_first"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy"
+          },
+          "task_class": {
+            "enum": [
+              "report",
+              "agent",
+              "vision",
+              "market_review",
+              "cheap_scan",
+              "deep_reasoning",
+              "coding"
+            ],
+            "title": "Task Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_class"
+        ],
+        "title": "TaskRouteRequest",
+        "type": "object"
+      },
+      "TaskRouteResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "default": "",
+            "maxLength": 64,
+            "title": "As Of",
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/RouteCandidateResponse"
+            },
+            "maxItems": 8,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "explain": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Explain",
+            "type": "array"
+          },
+          "fallback_used": {
+            "default": false,
+            "title": "Fallback Used",
+            "type": "boolean"
+          },
+          "pin_source": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Pin Source",
+            "type": "string"
+          },
+          "policy": {
+            "enum": [
+              "quality",
+              "cost",
+              "local_first"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "routing_enabled": {
+            "default": false,
+            "title": "Routing Enabled",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "task-route-decision/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "selected_capability_id": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Selected Capability Id",
+            "type": "string"
+          },
+          "selected_model": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Selected Model",
+            "type": "string"
+          },
+          "task_class": {
+            "enum": [
+              "report",
+              "agent",
+              "vision",
+              "market_review",
+              "cheap_scan",
+              "deep_reasoning",
+              "coding"
+            ],
+            "title": "Task Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "task_class",
+          "policy",
+          "reason_code"
+        ],
+        "title": "TaskRouteResponse",
+        "type": "object"
+      },
       "TaskStatus": {
         "description": "Task status model",
         "example": {
@@ -32819,6 +33145,463 @@
           "signals"
         ],
         "title": "WatchlistScoreSourceRows",
+        "type": "object"
+      },
+      "WriteCapabilityEntryResponse": {
+        "additionalProperties": false,
+        "description": "One operator-declared capability entry.",
+        "properties": {
+          "capability_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "capability_type": {
+            "enum": [
+              "data_provider",
+              "data_method",
+              "agent_tool",
+              "analysis_skill",
+              "pipeline_stage",
+              "llm_model",
+              "persona_role"
+            ],
+            "title": "Capability Type",
+            "type": "string"
+          },
+          "cost_tier": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Cost Tier",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "data",
+              "tool",
+              "skill",
+              "pipeline",
+              "llm",
+              "persona"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "generation": {
+            "minimum": 1.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "latency_class": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Latency Class",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Markets",
+            "type": "array"
+          },
+          "model_route": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Model Route",
+            "type": "string"
+          },
+          "provider": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "registered_at": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Registered At",
+            "type": "string"
+          },
+          "retired_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retired At"
+          },
+          "scopes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "retired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "domain",
+          "capability_type",
+          "version",
+          "status",
+          "provider",
+          "generation"
+        ],
+        "title": "WriteCapabilityEntryResponse",
+        "type": "object"
+      },
+      "WriteCapabilityListResponse": {
+        "additionalProperties": false,
+        "description": "Versioned write-side registry list.",
+        "properties": {
+          "as_of": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+            },
+            "maxItems": 1024,
+            "title": "Entries",
+            "type": "array"
+          },
+          "generation": {
+            "minimum": 0.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "capability-write-registry/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "generation",
+          "as_of",
+          "total"
+        ],
+        "title": "WriteCapabilityListResponse",
+        "type": "object"
+      },
+      "WriteCapabilityRegisterRequest": {
+        "additionalProperties": false,
+        "description": "Create a new write-side capability declaration.",
+        "properties": {
+          "capability_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "capability_type": {
+            "enum": [
+              "data_provider",
+              "data_method",
+              "agent_tool",
+              "analysis_skill",
+              "pipeline_stage",
+              "llm_model",
+              "persona_role"
+            ],
+            "title": "Capability Type",
+            "type": "string"
+          },
+          "cost_tier": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Cost Tier",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "display_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "data",
+              "tool",
+              "skill",
+              "pipeline",
+              "llm",
+              "persona"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "latency_class": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Latency Class",
+            "type": "string"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Markets",
+            "type": "array"
+          },
+          "model_route": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Model Route",
+            "type": "string"
+          },
+          "provider": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Provider",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Tags",
+            "type": "array"
+          },
+          "version": {
+            "default": "1",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "domain",
+          "capability_type"
+        ],
+        "title": "WriteCapabilityRegisterRequest",
+        "type": "object"
+      },
+      "WriteCapabilityUpdateRequest": {
+        "additionalProperties": false,
+        "description": "Partial update for a non-retired capability declaration.",
+        "properties": {
+          "cost_tier": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Tier"
+          },
+          "dependencies": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependencies"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "latency_class": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Class"
+          },
+          "markets": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markets"
+          },
+          "model_route": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Route"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "title": "WriteCapabilityUpdateRequest",
         "type": "object"
       }
     },
@@ -36322,6 +37105,554 @@
           }
         ],
         "summary": "List the runtime capability inventory (read-only)",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry": {
+      "get": {
+        "description": "Return operator-declared capability entries from the durable write registry. This is independent of the live-owner inventory.",
+        "operationId": "listCapabilityWriteRegistry",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_retired",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Retired",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid domain filter"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List write-side capability declarations",
+        "tags": [
+          "Capabilities"
+        ]
+      },
+      "post": {
+        "description": "Create a new operator-declared capability. Failures are explicit and never pollute the read-only inventory snapshot. Privileged writes require the security-audit chain.",
+        "operationId": "registerCapability",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteCapabilityRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid domain filter"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Write denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Register a write-side capability",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry/resolve": {
+      "post": {
+        "operationId": "resolveCapabilityDependencies",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityResolveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Resolve capability dependencies and version compatibility",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry/{capability_id}": {
+      "put": {
+        "operationId": "updateCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability_id",
+            "required": true,
+            "schema": {
+              "title": "Capability Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteCapabilityUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid domain filter"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Write denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Update a write-side capability",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/registry/{capability_id}/retire": {
+      "post": {
+        "description": "Mark a capability retired so task-aware routing and resolution no longer treat it as active. Idempotent for already-retired ids.",
+        "operationId": "retireCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability_id",
+            "required": true,
+            "schema": {
+              "title": "Capability Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteCapabilityEntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid domain filter"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Write denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Capability already exists"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Retire a write-side capability",
+        "tags": [
+          "Capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/route": {
+      "post": {
+        "description": "Select a model for a task class using write-registry LLM capabilities and the configured routing policy. Explicit pins win; decisions are structured for diagnostics reconstruction.",
+        "operationId": "routeTaskModel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRouteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRouteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Login required when ADMIN_AUTH_ENABLED=true"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "Compute an explainable task-aware model route decision",
         "tags": [
           "Capabilities"
         ]

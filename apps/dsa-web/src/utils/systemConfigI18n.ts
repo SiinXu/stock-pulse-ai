@@ -254,6 +254,16 @@ const fieldTitleMapZh = {
   DECISION_MEMORY_MIN_SAMPLES: '决策记忆最小样本数',
   REASONING_TRACE_EXPORT_ENABLED: '推理轨迹导出',
   REASONING_TRACE_EXPORT_MAX_CHARS: '推理轨迹导出最大字符数',
+  TASK_ROUTING_ENABLED: '任务感知模型路由',
+  TASK_ROUTING_POLICY: '任务路由策略',
+  CAPABILITY_WRITE_REGISTRY_PATH: '能力写入注册表路径',
+  TASK_ROUTING_PIN_REPORT: '报告任务模型固定',
+  TASK_ROUTING_PIN_AGENT: 'Agent 任务模型固定',
+  TASK_ROUTING_PIN_VISION: '视觉任务模型固定',
+  TASK_ROUTING_PIN_MARKET_REVIEW: '市场复盘任务模型固定',
+  TASK_ROUTING_PIN_CHEAP_SCAN: '廉价扫描任务模型固定',
+  TASK_ROUTING_PIN_DEEP_REASONING: '深度推理任务模型固定',
+  TASK_ROUTING_PIN_CODING: '编码任务模型固定',
   SKILL_OPINION_RECORDING_ENABLED: '技能观点样本记录',
   SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED: '技能观点后验加权',
   DECISION_PROFILE_CALIBRATION_ENABLED: '决策风格后验校准',
@@ -633,6 +643,16 @@ const fieldTitleMapEn = {
   DECISION_MEMORY_MIN_SAMPLES: 'Decision Memory Min Samples',
   REASONING_TRACE_EXPORT_ENABLED: 'Reasoning Trace Export',
   REASONING_TRACE_EXPORT_MAX_CHARS: 'Reasoning Trace Max Chars',
+  TASK_ROUTING_ENABLED: 'Model Routing',
+  TASK_ROUTING_POLICY: 'Routing Policy',
+  CAPABILITY_WRITE_REGISTRY_PATH: 'Registry Path',
+  TASK_ROUTING_PIN_REPORT: 'Report Pin',
+  TASK_ROUTING_PIN_AGENT: 'Agent Pin',
+  TASK_ROUTING_PIN_VISION: 'Vision Pin',
+  TASK_ROUTING_PIN_MARKET_REVIEW: 'Market Review Pin',
+  TASK_ROUTING_PIN_CHEAP_SCAN: 'Cheap Scan Pin',
+  TASK_ROUTING_PIN_DEEP_REASONING: 'Deep Reasoning Pin',
+  TASK_ROUTING_PIN_CODING: 'Coding Pin',
   SKILL_OPINION_RECORDING_ENABLED: 'Skill Opinion Recording',
   SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED: 'Skill Opinion Outcome Weights',
   DECISION_PROFILE_CALIBRATION_ENABLED: 'Decision Profile Outcome Calibration',
@@ -1029,6 +1049,9 @@ const fieldDescriptionMap: Record<string, string> = {
   DECISION_MEMORY_MIN_SAMPLES: '展示命中率前要求的最小已判定样本数，默认 5。',
   REASONING_TRACE_EXPORT_ENABLED: '推理轨迹导出 API/服务总开关，默认关闭。',
   REASONING_TRACE_EXPORT_MAX_CHARS: '完整推理轨迹导出响应的字符预算，默认 500000，有效范围 10000–2000000。',
+  TASK_ROUTING_ENABLED: '从写入侧能力注册表按任务类型选择模型，默认关闭。',
+  TASK_ROUTING_POLICY: 'quality / cost / local_first 评分策略。',
+  CAPABILITY_WRITE_REGISTRY_PATH: '写入侧能力注册表 JSON 路径，留空使用数据库目录。',
   SKILL_OPINION_RECORDING_ENABLED: '默认关闭。开启后把个体技能观点写入离线后验评估存储；不改变聚合权重，评估仍需显式 API。',
   SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED: '默认关闭。开启后在技能聚合时对样本充足的后验桶应用保守贝叶斯权重；关闭时聚合路径与此前一致。',
   DECISION_PROFILE_CALIBRATION_ENABLED: '默认关闭。开启后在决策信号后验统计中追加决策风格校准分组；关闭时响应保持兼容，不改变评估与持久化。',
@@ -1370,6 +1393,9 @@ export function getFieldTitle(
 }
 
 export function getFieldDescriptionZh(key: string, fallback?: string): string {
+  if (key.startsWith('TASK_ROUTING_PIN_')) {
+    return '设置后覆盖自动任务路由。';
+  }
   return fieldDescriptionMap[key] || fallback || '';
 }
 
