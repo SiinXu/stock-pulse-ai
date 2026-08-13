@@ -98,5 +98,55 @@ GET /api/v1/capabilities?domain=data&domain=tool
 插件管理器会在注册生效前执行既有兼容性检查；本清单不会再做一套重复判断。
 
 消费者必须根据 `schema_version` 分支，容忍新增记录和可空状态，并把来源错误
-视为未知。中央写入注册、依赖解析、Stage/Skill/LLM/Persona 元数据、ToolSurface
-授权与预算评估、启动校验和迁移仍不属于该 API，继续由 issue #221 跟踪。
+视为未知。
+
+
+## 写入侧注册表（控制面）
+
+在只读清单之外，进程还提供持久化的**写入侧**能力控制面（schema
+`capability-write-registry/v1`），用于操作员声明式元数据、依赖解析与任务感知
+路由。它**不会**替换 live owner：此处登记本身不会把工具、插件或模型安装进执行路径。
+
+| 操作 | 端点 | 说明 |
+| --- | --- | --- |
+| 列出声明 | `GET /api/v1/capabilities/registry` | 可选 `domain`、`include_retired` |
+| 登记 | `POST /api/v1/capabilities/registry` | 特权操作；必须走安全审计 attempt/completion |
+| 更新 | `PUT /api/v1/capabilities/registry/{capability_id}` | 身份字段不可变 |
+| 下线 | `POST /api/v1/capabilities/registry/{capability_id}/retire` | 已下线 id 幂等成功 |
+| 依赖解析 | `POST /api/v1/capabilities/resolve` | fail-closed 的 ready 与 reason_code |
+| 任务路由 | `POST /api/v1/capabilities/route` | 可解释决策，便于诊断追溯 |
+
+写入域：`data`、`tool`、`skill`、`pipeline`、`llm`、`persona`。
+
+硬性规则：
+
+- 变更必须经过特权操作审计链（`event_type=capability.write`）。审计不可用时返回
+  `503` / `security_audit_unavailable`，**不会**落盘写入。
+- 校验失败、身份冲突、存储损坏返回明确错误码；注册失败绝不能伪造成功快照。
+- 默认存储路径为
+  `<DATABASE_PATH 目录>/capability_write_registry.json`
+  （可用 `CAPABILITY_WRITE_REGISTRY_PATH` 覆盖）。损坏文件 fail-closed。
+
+### 依赖与兼容性解析
+
+`POST /api/v1/capabilities/resolve` 对照写入注册表与可选 live 清单评估依赖。
+支持的依赖 token：`capability_id`、`@`/`==` 精确、`>=`、`~=`。
+
+缺失、已下线、不可执行或版本不兼容时返回 `ready=false` 与明确 `reason_code`
+（绝不 fail-open 成 ready）。
+
+### 任务感知模型路由
+
+`POST /api/v1/capabilities/route` 返回版本化 `task-route-decision/v1` 决策。
+手动钉选始终优先；`TASK_ROUTING_ENABLED=true` 时按标签与
+`TASK_ROUTING_POLICY`（`quality` | `cost` | `local_first`）打分。
+
+可选 multi-model ensemble 不在本切片内，仍由 issue #204 跟踪。
+
+## 仍开放（issues #221 / #204）
+
+- 每个执行路径上的 ToolSurface 授权/预算策略强制
+- 启动/启用/热重载路径上把全部扩展类迁移到写入侧契约
+- 能力安装/启用/治理的产品 UI
+- 可选、有预算上限的 ensemble/vote 模式
+

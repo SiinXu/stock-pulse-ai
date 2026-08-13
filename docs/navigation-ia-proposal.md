@@ -1,8 +1,9 @@
 # Navigation Information Architecture — Target Proposal
 
-**Status**: DECISION NEEDED (maintainer approval required before structural route redesign)  
+**Status**: Phase 2 B0/B1 implementing against [#873](https://github.com/SiinXu/stock-pulse-ai/issues/873) spine (Today · Research · Signals · Portfolio · Settings; Agent demoted). Historical A–D options retained below for context.  
 **Issue**: [#368](https://github.com/SiinXu/stock-pulse-ai/issues/368)  
-**Companion PR**: mechanical label / redirect / palette hygiene only (this document is not an implementation mandate)
+**Design input**: [#873](https://github.com/SiinXu/stock-pulse-ai/issues/873)  
+**Companion PR**: mechanical label / redirect / palette hygiene only for the audit baseline; chrome batches land separately
 
 This document records the **current-state audit** and **target IA options** so the maintainer can pick a direction. Speculative route restructuring is intentionally out of scope for the mechanical PR.
 
@@ -53,11 +54,13 @@ This document records the **current-state audit** and **target IA options** so t
 | Dead page modules without routes | `AlertsPage` re-export shell | Routed via `/signals` + legacy redirect only |
 | Deep-link allowlist gap (fixed in mechanical PR) | `/research/skill-outcomes` | Was rejected as `unsupported_route`; now allowed |
 
-### 1.4 Primary nav (shipped IA shape)
+### 1.4 Primary nav (target after #873 B0/B1)
 
-Order: **Home → Research (group) → Portfolio → Agent → Settings**.
+Order: **Today (`layout.nav.home`) → Research (group) → Signals → Portfolio → Settings**.
 
-Research children order: **Market review → Discover → Analysis Workbench → Backtest → Skill outcomes**.
+Research children order: **Market review → Discover → Analysis Workbench → Backtest → Calculators → Skill outcomes**.
+
+Agent and Approvals: command-palette secondary only (not primary sidebar). Sidebar + Cmd+K pages share `listCommandPalettePages` / `APPLICATION_NAVIGATION_ITEMS` in `navigation.ts`; path constants remain `routes.ts` only.
 
 Labels for Research children use the `layout.nav.*` key namespace (mechanical alignment).
 
