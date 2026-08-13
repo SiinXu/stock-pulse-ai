@@ -1670,6 +1670,23 @@ class _ConfigLoadingMethods:
                 minimum=100,
                 maximum=1_000_000,
             ),
+            capability_write_registry_path=(
+                os.getenv('CAPABILITY_WRITE_REGISTRY_PATH', '').strip()
+            ),
+            task_routing_enabled=parse_env_bool(
+                os.getenv('TASK_ROUTING_ENABLED'), default=False
+            ),
+            task_routing_policy=(
+                os.getenv('TASK_ROUTING_POLICY', 'quality').strip().lower()
+                or 'quality'
+            ),
+            task_routing_pin_report=os.getenv('TASK_ROUTING_PIN_REPORT', '').strip(),
+            task_routing_pin_agent=os.getenv('TASK_ROUTING_PIN_AGENT', '').strip(),
+            task_routing_pin_vision=os.getenv('TASK_ROUTING_PIN_VISION', '').strip(),
+            task_routing_pin_market_review=os.getenv('TASK_ROUTING_PIN_MARKET_REVIEW', '').strip(),
+            task_routing_pin_cheap_scan=os.getenv('TASK_ROUTING_PIN_CHEAP_SCAN', '').strip(),
+            task_routing_pin_deep_reasoning=os.getenv('TASK_ROUTING_PIN_DEEP_REASONING', '').strip(),
+            task_routing_pin_coding=os.getenv('TASK_ROUTING_PIN_CODING', '').strip(),
             daily_brief_enabled=parse_env_bool(
                 os.getenv('DAILY_BRIEF_ENABLED'), default=False
             ),
