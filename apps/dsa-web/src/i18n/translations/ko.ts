@@ -6209,4 +6209,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "시장 입력 병렬 수집",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.notes.0": "근거가 불명확하면 방향을 강제하지 않고 unknown을 반환합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.summary": "설명 가능한 규칙 기반 시장 레짐 컨텍스트를 분석에 추가합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.title": "시장 레짐 탐지",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.market_regime.usage": "자동 탐지를 활성화하고 제어된 진단에서만 지원되는 재정의를 사용하세요.",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "시장 레짐 탐지",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "시장 레짐 재정의",
 } as const;

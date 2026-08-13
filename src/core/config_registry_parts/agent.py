@@ -1359,7 +1359,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 681,
-        "help_key": "settings.agent.MARKET_REGIME_ENABLED",
+        "help_key": "settings.agent.market_regime",
         "examples": [
             "MARKET_REGIME_ENABLED=true",
             "MARKET_REGIME_ENABLED=false",
@@ -1392,7 +1392,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "validation": {},
         "display_order": 682,
-        "help_key": "settings.agent.MARKET_REGIME_OVERRIDE",
+        "help_key": "settings.agent.market_regime",
         "examples": [
             "MARKET_REGIME_OVERRIDE=",
             "MARKET_REGIME_OVERRIDE=trending_up",

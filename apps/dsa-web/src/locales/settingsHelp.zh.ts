@@ -1455,6 +1455,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.market_regime': {
+    title: '市场状态检测',
+    summary: '为分析增加可解释的规则型市场状态上下文。',
+    usage: '保持自动检测开启；仅在受控诊断时使用支持的强制值。',
+    notes: ['证据不明确时返回 unknown，不会强行判定方向。'],
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',

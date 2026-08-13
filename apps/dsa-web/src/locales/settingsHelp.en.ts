@@ -1426,6 +1426,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.market_regime': {
+    title: 'Market Regime Detection',
+    summary: 'Adds explainable rule-based market regime context to analysis.',
+    usage: 'Keep automatic detection enabled, or provide a supported override only for controlled diagnostics.',
+    notes: ['Unclear evidence produces unknown instead of forcing a directional regime.'],
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',
