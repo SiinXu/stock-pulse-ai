@@ -1480,6 +1480,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响所有最终 buy、hold、sell 建议的发布动作。'],
     notes: ['一次性人工授权可保留原始动作，但必须留下审批 ID 与结构化审计记录。'],
   },
+
+  'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
+    title: '分析质量门',
+    summary: '用与离线 agent-eval 相同的维度，把结论中的事实性声明绑定到输入证据。',
+  },
+  'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
+    title: '质量门失败策略',
+    summary: '发现未绑定事实时选择 annotate（默认）或 intercept。',
+  },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
     summary: '控制 Deep Research 的 token 预算和超时。',
