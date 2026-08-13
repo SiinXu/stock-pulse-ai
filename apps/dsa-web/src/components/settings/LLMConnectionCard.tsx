@@ -111,7 +111,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     <div
       data-testid={`connection-card-${channel.name}`}
       data-source-availability={availability}
-      className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-3 shadow-soft-card transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)]"
+      className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-3 transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)]"
     >
       <div className="flex items-start gap-3">
         <span

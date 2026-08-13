@@ -869,6 +869,19 @@ class EfinanceFetcher(BaseFetcher):
             low_col = '最低' if '最低' in df.columns else 'low'
             open_col = '开盘' if '开盘' in df.columns else 'open'
 
+            iopv = None
+            nav = None
+            for key in ("IOPV", "iopv", "估算净值", "净值估算", "实时估值"):
+                if key in df.columns:
+                    iopv = safe_float(row.get(key))
+                    if iopv is not None:
+                        break
+            for key in ("单位净值", "净值", "最新净值", "nav", "NAV"):
+                if key in df.columns:
+                    nav = safe_float(row.get(key))
+                    if nav is not None:
+                        break
+
             quote = UnifiedRealtimeQuote(
                 code=target_code,
                 name=str(row.get(name_col, '')),
@@ -883,6 +896,8 @@ class EfinanceFetcher(BaseFetcher):
                 high=safe_float(row.get(high_col)),
                 low=safe_float(row.get(low_col)),
                 open_price=safe_float(row.get(open_col)),
+                iopv=iopv,
+                nav=nav,
             )
 
             logger.info(
@@ -890,7 +905,7 @@ class EfinanceFetcher(BaseFetcher):
                 f"价格={quote.price}, 涨跌={quote.change_pct}%, 换手率={quote.turnover_rate}%"
             )
             return quote
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics and circuit state preserve ETF quote failover.
             log_safe_exception(
                 logger,
                 "Efinance ETF realtime quote failed",

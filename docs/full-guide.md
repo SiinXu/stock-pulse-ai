@@ -495,8 +495,8 @@ stock-pulse-ai/
 | `MAX_WORKERS` | 并发线程数 | `3` |
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | 将当日大盘环境摘要注入个股分析 Prompt，并在高风险/退潮环境下软化激进买入建议；默认开启，设为 `false` 后仍可运行大盘复盘 | `true` |
-| `DECISION_MEMORY_ENABLED` | 将“历史决策复盘”（该股过往信号的命中战绩与同类判断校准）注入分析 Prompt 与个股报告；仅用于校准置信度，永不翻转方向；关闭或无历史时零额外开销。可用请求参数 `use_memory` 单次覆盖 | `true` |
-| `DECISION_MEMORY_LOOKBACK` | 复盘时纳入的该股最近“已产生结果”的信号条数上限 | `5` |
+| `DECISION_MEMORY_ENABLED` | 将“历史决策复盘”（该股过往信号的命中战绩与同类判断校准）注入分析 Prompt 与个股报告；仅用于校准置信度，永不翻转方向；仅准入带 `signal_id` 来源的结构化已结算 outcome，并以不可信记忆数据隔离；关闭或无历史时零额外开销。可用请求参数 `use_memory` 单次覆盖 | `true` |
+| `DECISION_MEMORY_LOOKBACK` | 复盘注入时该股准入后的已评估信号条数上限（硬上限 40） | `5` |
 | `DECISION_MEMORY_MIN_AGE_DAYS` | 仅复盘创建时间早于该天数的信号（确保其结果已结算） | `3` |
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据。可在 Web 设置 → 系统与安全 → 系统设置中编辑；运营预览使用同一公开路由，关闭时返回 404 | `false` |
@@ -1420,6 +1420,16 @@ PUSHOVER_API_TOKEN=your_api_token
 - 仅在 YFinance（美股）或 AkShare（港股）返回数据不完整时自动触发，不影响 A 股链路
 - 未配置凭据时不会实例化该可选数据源；若运行时出现连接关闭类异常，会在冷却期内临时跳过 Longbridge，避免请求级频繁重连
 
+### 另类数据插件（默认关闭）
+
+公司事件、持仓变动、供应链标签、量化情绪等**不是**内置主行情源。它们使用 ToolSurface 能力 `alt_data:read`，且只能作为**非权威支持性证据**。
+
+- **默认关闭：** 保持 `PLUGINS_DIR` 未设置；公司事件工具不在默认 Agent 工具目录中。
+- **参考包：** `examples/plugins/example-alternative-data`（确定性夹具；manifest 声明 `alt_data:read`）。
+- **启用：** 将 `PLUGINS_DIR` 指向已审查的父目录（例如 `examples/plugins`），重启进程，并仅在需要时为会话授予 `alt_data:read`。
+- **治理：** 无效/缺失载荷转为缺口且 `confidence=null`；附加另类数据不改变核心 `AnalysisContextPack` 质量分，也不投影到 `verified_fact` / `decision` 层。
+- **契约：** [alternative-data-plugin-contract_zh.md](alternative-data-plugin-contract_zh.md)
+
 ### 东财接口频繁失败时的处理
 
 若日志出现 `RemoteDisconnected`、`push2his.eastmoney.com` 连接被关闭等，多为东财限流。建议：
@@ -1447,6 +1457,22 @@ CLI、Web、分析/自选 API、CSV/Excel/剪贴板智能导入以及 Bot 分析
 ### ETF 与指数分析
 
 针对指数跟踪型 ETF 和美股指数（如 VOO、QQQ、SPY、510050、SPX、DJI、IXIC），分析仅关注**指数走势、跟踪误差、市场流动性**，不纳入基金管理人/发行方的公司层面风险（诉讼、声誉、高管变动等）。风险警报与业绩预期均基于指数成分股整体表现，避免将基金公司新闻误判为标的本身利空。详见 Issue #274。
+
+#### A 股 ETF 分析语义（Issue #173）
+
+A 股 ETF 在分析链路中按**独立品种**识别并进入 ETF 专属路径，与个股共用同一决策仪表盘报告结构：
+
+| 维度 | 行为 |
+| --- | --- |
+| 识别 | 代码前缀 `51/52/56/58/15/16/18`（与 `data_provider` ETF 路由一致）；名称含 ETF 语义的海外标的仍走既有 `is_index_or_etf` 启发 |
+| 跟踪标的 | 优先使用高流动性 bootstrap 映射（如 `510300→沪深300`、`159915→创业板指`），否则从名称启发式提取主题标签；无法解析时 `not_available` |
+| 溢价率 | 实时链路映射 IOPV/净值到分析上下文后计算；provider 未返回时 `not_available`，不编造；纯指数标 `not_applicable` |
+| 持仓暴露 | 给出粗粒度 `broad_index` / `sector_theme` 暴露类型；完整成分穿透不在公共 provider 合同内，标记 `not_available` |
+| 不适用指标 | PE/PB/ROE/公司财报/筹码/龙虎榜等个股口径显式 **`not_applicable`**（含筹码健康标准），禁止硬算；与校验层“缺失不报错”（#185）职责分离 |
+| 指数 vs ETF | 纯市场指数（如 SPX）`instrument_type=index`，A 股/海外 ETF 为 `etf`，不再把指数硬标为 ETF |
+| 报告结构 | 与个股共用决策仪表盘 JSON；不另起 ETF 模板 |
+
+代表性回归代码：`510300`、`510050`、`159915`、`159919`、`512880`。数据校验层的 ETF 误报校准见 `docs/data-validation-layer.md` 与 Issue #185。
 
 ### 多模型切换
 
@@ -1967,7 +1993,7 @@ worker 会把 `triggered`、`skipped`、`degraded`、`failed` 写入 `alert_trig
 - 查看全量持仓或切换到单个账户视角。
 - 在 `fifo` / `avg` 两种成本法之间切换，查看快照 KPI、风险摘要和 Top Positions 集中度图表。
 - 直接在 Web 页面新增账户、删除误建账户，或录入交易、现金流水、公司行动等事件。
-- 通过 CSV 导入持仓记录，支持先 `dry_run` 预览，再决定是否正式写入。
+- 通过导入向导导入持仓记录（CSV / Excel `.xlsx` 或粘贴文本），支持解析预览、失败行下载修正、先 `dry_run` 再正式写入。
 - 在事件列表中按账户、日期、方向、代码等条件筛选，并对单账户事件做删除修正。
 
 ### 相关接口
@@ -1979,7 +2005,8 @@ worker 会把 `triggered`、`skipped`、`degraded`、`failed` 写入 `alert_trig
 | `/api/v1/portfolio/trades` | GET | 分页查询交易记录 |
 | `/api/v1/portfolio/cash-ledger` | GET | 分页查询现金流水 |
 | `/api/v1/portfolio/corporate-actions` | GET | 分页查询公司行动 |
-| `/api/v1/portfolio/imports/csv/brokers` | GET | 查询内建 CSV 券商解析器 |
+| `/api/v1/portfolio/imports/csv/brokers` | GET | 查询内建表格（CSV/XLSX）券商解析器 |
+| `/api/v1/portfolio/imports/csv/parse` | POST | 解析券商表格；返回标准化记录与结构化 `failed_rows` |
 | `/api/v1/portfolio/fx/refresh` | POST | 手动刷新汇率缓存 |
 | `/api/v1/portfolio/accounts/{account_id}` | DELETE | 删除/归档持仓账户 |
 | `/api/v1/portfolio/trades/{trade_id}` | DELETE | 删除交易记录 |
@@ -1990,13 +2017,14 @@ worker 会把 `triggered`、`skipped`、`degraded`、`failed` 写入 `alert_trig
 
 ### 使用行为说明
 
-- CSV 导入内建 `huatai`、`citic`、`cmb` 解析器；若券商列表接口失败，Web 端会自动回退到这些内建选项。
+- 表格导入内建 `huatai`、`citic`、`cmb` 解析器，支持 CSV 与 `.xlsx`（不支持旧版 `.xls`）；若券商列表接口失败，Web 端会自动回退到这些内建选项。
+- `POST /imports/csv/parse` 对坏数据行返回结构化 `failed_rows`（`row_number` / `reason_code` / `reason` / `source`），Web 向导可下载失败行 CSV 修正后重导；空行计为 `skipped`，不会静默写成有效记录。
 - 交易、现金流水、公司行动和 CSV 提交均支持客户端 `operation_id`（也可使用同值的 `Idempotency-Key` 请求头）。幂等身份由操作类型、账户、账户 owner 和客户端 key 共同确定；不同操作类型、账户或 owner 可以安全复用相同 key。
 - 默认 7 天回放窗口内，同一幂等身份和相同请求会回放首次响应；即使首次响应在提交后超时，重试也不会重复入账。同一身份对应不同请求时返回 `409 idempotency_conflict`。窗口可通过 `PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS` 调整。
 - 窗口外的幂等记录会在后续带 key 的 Portfolio 写事务中惰性清理，过期 key 按新操作处理。清理与查重、账本写入处于同一原子事务，只删除 `portfolio_idempotency_records`，不会删除交易、现金流水、公司行动、持仓快照或其它业务账本数据。
 - 旧 SQLite 表会以 additive migration 追加 nullable scope 列、唯一索引和 legacy 写入保护 trigger。raw-key 旧行无法证明写入时的历史 owner，因此会保留但保持 unscoped，当前版本不会回放这些旧行；相同客户端 key 将按新的 scoped 操作处理。
 - 回滚使用正常代码 revert，并保留新增 nullable 列、索引、保护 trigger 与全部账本数据。旧版本无法读取 v2 scoped 响应；若它尝试用已存在的 v2 client key 写入 raw-key 记录，trigger 会中止同一事务并回滚账本写入，避免重复入账，但该请求表现为失败而不是 replay。回滚期间产生的其它 raw-key 行在再次升级时仍保持 unscoped，不会与 v2 唯一索引冲突或阻断启动。
-- CSV 导入会先把文件解析成标准化记录，再在单个持仓账本事务内提交整批记录；每行使用独立 savepoint 保留 `inserted_count` / `duplicate_count` / `failed_count` 汇总，整批结果与 operation ID 记录一起提交。账本锁竞争会返回 `409 portfolio_busy`，客户端应使用原 operation ID 重试。
+- 表格导入会先把文件解析成标准化记录，再在单个持仓账本事务内提交整批记录；每行使用独立 savepoint 保留 `inserted_count` / `duplicate_count` / `failed_count` 汇总，整批结果与 operation ID 记录一起提交。账本锁竞争会返回 `409 portfolio_busy`，客户端应使用原 operation ID 重试。
 - 删除账户使用软删除语义：默认账户列表、快照、风险、录入入口和事件列表不再显示该账户，但交易、现金流水和公司行动不会被物理清理；如需纠正单条流水，需在账户归档前使用事件列表里的删除修正入口。
 - 交易去重优先使用账户内唯一的 `trade_uid`，缺失时回退到基于日期、代码、方向、数量、价格、费用、税费、币种的确定性哈希。
 - 卖出会先校验可用数量，超卖返回 `409 portfolio_oversell`；并发写入冲突时可能返回 `409 portfolio_busy`。

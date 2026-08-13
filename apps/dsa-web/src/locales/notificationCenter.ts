@@ -6,7 +6,7 @@ import type { NotificationInboxItem } from '../types/notificationInbox';
 
 const en = {
   title: 'Notification Center',
-  description: 'Aggregate completed analyses, alert triggers, scheduled task results, and decision signals for later review.',
+  description: 'Aggregate completed analyses, alerts, scheduled tasks, decision signals, daily briefs, high-disagreement analyses, and portfolio health for later review.',
   refresh: 'Refresh',
   markAllRead: 'Mark all read',
   markRead: 'Mark read',
@@ -17,8 +17,11 @@ const en = {
   kindAlert: 'Alert triggered',
   kindScheduled: 'Scheduled task',
   kindSignal: 'Decision signal',
+  kindDailyBrief: 'Daily brief',
+  kindHighDisagreement: 'High disagreement',
+  kindPortfolioHealth: 'Portfolio health',
   emptyTitle: 'No notifications yet',
-  emptyDescription: 'When analyses finish, alerts fire, or scheduled tasks complete, they will appear here.',
+  emptyDescription: 'When analyses finish, alerts fire, scheduled tasks complete, daily briefs persist, high disagreement is recorded, or portfolio health is saved, they will appear here.',
   emptyFilteredTitle: 'No matching notifications',
   emptyFilteredDescription: 'Try adjusting the type or read filter.',
   unreadBadge: '{count} unread',
@@ -35,7 +38,7 @@ type NotificationCenterText = Record<keyof typeof en, string>;
 export const NOTIFICATION_CENTER_TEXT = {
   zh: {
     title: '通知中心',
-    description: '聚合分析完成、告警触发、调度任务结果与决策信号，便于稍后回看。',
+    description: '聚合分析完成、告警、调度任务、决策信号、每日简报、高分歧分析与组合健康，便于稍后回看。',
     refresh: '刷新',
     markAllRead: '全部标为已读',
     markRead: '标为已读',
@@ -46,8 +49,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: '告警触发',
     kindScheduled: '调度任务',
     kindSignal: '决策信号',
+    kindDailyBrief: '每日简报',
+    kindHighDisagreement: '高分歧',
+    kindPortfolioHealth: '组合健康',
     emptyTitle: '暂无通知',
-    emptyDescription: '完成分析、触发告警或调度任务后，相关事件会出现在这里。',
+    emptyDescription: '完成分析、触发告警、调度任务结束、持久化每日简报、记录高分歧或保存组合健康后，相关事件会出现在这里。',
     emptyFilteredTitle: '没有匹配的通知',
     emptyFilteredDescription: '试试调整类型或已读筛选。',
     unreadBadge: '{count} 条未读',
@@ -61,7 +67,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   en,
   de: {
     title: 'Benachrichtigungszentrale',
-    description: 'Aggregiert abgeschlossene Analysen, Alarm-Auslöser, geplante Aufgaben und Entscheidungssignale zur späteren Prüfung.',
+    description: 'Aggregiert abgeschlossene Analysen, Alarme, geplante Aufgaben, Entscheidungssignale, Tagesberichte, hohe Meinungsverschiedenheiten und Portfolio-Gesundheit zur späteren Prüfung.',
     refresh: 'Aktualisieren',
     markAllRead: 'Alle als gelesen',
     markRead: 'Als gelesen',
@@ -72,8 +78,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: 'Alarm ausgelöst',
     kindScheduled: 'Geplante Aufgabe',
     kindSignal: 'Entscheidungssignal',
+    kindDailyBrief: 'Tagesbericht',
+    kindHighDisagreement: 'Hohe Meinungsverschiedenheit',
+    kindPortfolioHealth: 'Portfolio-Gesundheit',
     emptyTitle: 'Noch keine Benachrichtigungen',
-    emptyDescription: 'Abgeschlossene Analysen, Alarme und geplante Aufgaben erscheinen hier.',
+    emptyDescription: 'Abgeschlossene Analysen, Alarme, geplante Aufgaben, gespeicherte Tagesberichte, hohe Konflikte und Portfolio-Gesundheit erscheinen hier.',
     emptyFilteredTitle: 'Keine passenden Benachrichtigungen',
     emptyFilteredDescription: 'Typ- oder Lesefilter anpassen.',
     unreadBadge: '{count} ungelesen',
@@ -86,7 +95,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   },
   es: {
     title: 'Centro de notificaciones',
-    description: 'Agrega análisis completados, alertas, resultados de tareas programadas y señales de decisión para revisar después.',
+    description: 'Agrega análisis completados, alertas, tareas programadas, señales de decisión, resúmenes diarios, desacuerdos altos y salud de cartera para revisar después.',
     refresh: 'Actualizar',
     markAllRead: 'Marcar todo como leído',
     markRead: 'Marcar como leído',
@@ -97,8 +106,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: 'Alerta activada',
     kindScheduled: 'Tarea programada',
     kindSignal: 'Señal de decisión',
+    kindDailyBrief: 'Resumen diario',
+    kindHighDisagreement: 'Alto desacuerdo',
+    kindPortfolioHealth: 'Salud de cartera',
     emptyTitle: 'Aún no hay notificaciones',
-    emptyDescription: 'Cuando terminen análisis, se disparen alertas o tareas programadas, aparecerán aquí.',
+    emptyDescription: 'Cuando terminen análisis, se disparen alertas, se guarden resúmenes diarios, se registren desacuerdos altos o se calcule la salud de cartera, aparecerán aquí.',
     emptyFilteredTitle: 'No hay notificaciones coincidentes',
     emptyFilteredDescription: 'Prueba a cambiar el tipo o el filtro de lectura.',
     unreadBadge: '{count} sin leer',
@@ -111,7 +123,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   },
   fr: {
     title: 'Centre de notifications',
-    description: 'Agrège les analyses terminées, alertes, résultats de tâches planifiées et signaux de décision pour une relecture ultérieure.',
+    description: 'Agrège analyses terminées, alertes, tâches planifiées, signaux de décision, briefs quotidiens, désaccords élevés et santé de portefeuille pour une relecture ultérieure.',
     refresh: 'Actualiser',
     markAllRead: 'Tout marquer comme lu',
     markRead: 'Marquer comme lu',
@@ -122,8 +134,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: 'Alerte déclenchée',
     kindScheduled: 'Tâche planifiée',
     kindSignal: 'Signal de décision',
+    kindDailyBrief: 'Brief quotidien',
+    kindHighDisagreement: 'Désaccord élevé',
+    kindPortfolioHealth: 'Santé du portefeuille',
     emptyTitle: 'Aucune notification pour le moment',
-    emptyDescription: 'Lorsque des analyses se terminent, des alertes se déclenchent ou des tâches planifiées s’achèvent, elles apparaissent ici.',
+    emptyDescription: 'Lorsque des analyses se terminent, des alertes se déclenchent, des briefs quotidiens sont persistés, un fort désaccord est enregistré ou la santé du portefeuille est enregistrée, elles apparaissent ici.',
     emptyFilteredTitle: 'Aucune notification correspondante',
     emptyFilteredDescription: 'Essayez d’ajuster le type ou le filtre de lecture.',
     unreadBadge: '{count} non lues',
@@ -136,7 +151,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   },
   id: {
     title: 'Pusat notifikasi',
-    description: 'Mengagregasi analisis selesai, peringatan, hasil tugas terjadwal, dan sinyal keputusan untuk ditinjau nanti.',
+    description: 'Mengagregasi analisis selesai, peringatan, tugas terjadwal, sinyal keputusan, ringkasan harian, ketidaksepakatan tinggi, dan kesehatan portofolio untuk ditinjau nanti.',
     refresh: 'Muat ulang',
     markAllRead: 'Tandai semua dibaca',
     markRead: 'Tandai dibaca',
@@ -147,8 +162,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: 'Peringatan terpicu',
     kindScheduled: 'Tugas terjadwal',
     kindSignal: 'Sinyal keputusan',
+    kindDailyBrief: 'Ringkasan harian',
+    kindHighDisagreement: 'Ketidaksepakatan tinggi',
+    kindPortfolioHealth: 'Kesehatan portofolio',
     emptyTitle: 'Belum ada notifikasi',
-    emptyDescription: 'Saat analisis selesai, peringatan terpicu, atau tugas terjadwal selesai, item akan muncul di sini.',
+    emptyDescription: 'Saat analisis selesai, peringatan terpicu, ringkasan harian tersimpan, ketidaksepakatan tinggi tercatat, atau kesehatan portofolio disimpan, item akan muncul di sini.',
     emptyFilteredTitle: 'Tidak ada notifikasi yang cocok',
     emptyFilteredDescription: 'Coba sesuaikan filter jenis atau status baca.',
     unreadBadge: '{count} belum dibaca',
@@ -161,7 +179,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   },
   ja: {
     title: '通知センター',
-    description: '分析完了、アラート、スケジュール結果、意思決定シグナルを後から確認できる受信箱です。',
+    description: '分析完了、アラート、スケジュール結果、意思決定シグナル、デイリーブリーフ、高意見対立、ポートフォリオ健全性を後から確認できる受信箱です。',
     refresh: '更新',
     markAllRead: 'すべて既読にする',
     markRead: '既読にする',
@@ -172,8 +190,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: 'アラート',
     kindScheduled: 'スケジュールタスク',
     kindSignal: '意思決定シグナル',
+    kindDailyBrief: 'デイリーブリーフ',
+    kindHighDisagreement: '高意見対立',
+    kindPortfolioHealth: 'ポートフォリオ健全性',
     emptyTitle: '通知はまだありません',
-    emptyDescription: '分析完了やアラート、スケジュール結果がここに表示されます。',
+    emptyDescription: '分析完了やアラート、スケジュール結果、永続化されたデイリーブリーフ、高意見対立、ポートフォリオ健全性がここに表示されます。',
     emptyFilteredTitle: '一致する通知がありません',
     emptyFilteredDescription: '種類や既読フィルタを変更してみてください。',
     unreadBadge: '未読 {count} 件',
@@ -186,7 +207,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   },
   ko: {
     title: '알림 센터',
-    description: '분석 완료, 알림 트리거, 예약 작업 결과, 의사결정 신호를 나중에 확인할 수 있는 수신함입니다.',
+    description: '분석 완료, 알림, 예약 작업, 의사결정 신호, 일일 브리프, 높은 의견 불일치, 포트폴리오 건강을 나중에 확인할 수 있는 수신함입니다.',
     refresh: '새로고침',
     markAllRead: '모두 읽음 표시',
     markRead: '읽음 표시',
@@ -197,8 +218,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: '알림 트리거',
     kindScheduled: '예약 작업',
     kindSignal: '의사결정 신호',
+    kindDailyBrief: '일일 브리프',
+    kindHighDisagreement: '높은 의견 불일치',
+    kindPortfolioHealth: '포트폴리오 건강',
     emptyTitle: '알림이 없습니다',
-    emptyDescription: '분석이 끝나거나 알림/예약 작업이 발생하면 여기에 표시됩니다.',
+    emptyDescription: '분석이 끝나거나 알림/예약 작업이 발생하거나, 일일 브리프가 저장되거나, 높은 불일치가 기록되거나, 포트폴리오 건강이 저장되면 여기에 표시됩니다.',
     emptyFilteredTitle: '일치하는 알림 없음',
     emptyFilteredDescription: '유형 또는 읽음 필터를 바꿔 보세요.',
     unreadBadge: '읽지 않음 {count}개',
@@ -211,7 +235,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   },
   ms: {
     title: 'Pusat pemberitahuan',
-    description: 'Mengagregat analisis selesai, amaran, hasil tugas berjadual dan isyarat keputusan untuk semakan kemudian.',
+    description: 'Mengagregat analisis selesai, amaran, tugas berjadual, isyarat keputusan, ringkasan harian, perselisihan tinggi dan kesihatan portfolio untuk semakan kemudian.',
     refresh: 'Muat semula',
     markAllRead: 'Tanda semua dibaca',
     markRead: 'Tanda dibaca',
@@ -222,8 +246,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: 'Amaran dicetus',
     kindScheduled: 'Tugas berjadual',
     kindSignal: 'Isyarat keputusan',
+    kindDailyBrief: 'Ringkasan harian',
+    kindHighDisagreement: 'Perselisihan tinggi',
+    kindPortfolioHealth: 'Kesihatan portfolio',
     emptyTitle: 'Belum ada pemberitahuan',
-    emptyDescription: 'Apabila analisis selesai, amaran dicetus atau tugas berjadual tamat, ia akan muncul di sini.',
+    emptyDescription: 'Apabila analisis selesai, amaran dicetus, ringkasan harian disimpan, perselisihan tinggi direkod atau kesihatan portfolio disimpan, ia akan muncul di sini.',
     emptyFilteredTitle: 'Tiada pemberitahuan sepadan',
     emptyFilteredDescription: 'Cuba laraskan penapis jenis atau status baca.',
     unreadBadge: '{count} belum dibaca',
@@ -236,7 +263,7 @@ export const NOTIFICATION_CENTER_TEXT = {
   },
   'zh-TW': {
     title: '通知中心',
-    description: '彙整分析完成、告警觸發、排程任務結果與決策訊號，方便稍後回看。',
+    description: '彙整分析完成、告警、排程任務、決策訊號、每日簡報、高分歧分析與組合健康，方便稍後回看。',
     refresh: '重新整理',
     markAllRead: '全部標為已讀',
     markRead: '標為已讀',
@@ -247,8 +274,11 @@ export const NOTIFICATION_CENTER_TEXT = {
     kindAlert: '告警觸發',
     kindScheduled: '排程任務',
     kindSignal: '決策訊號',
+    kindDailyBrief: '每日簡報',
+    kindHighDisagreement: '高分歧',
+    kindPortfolioHealth: '組合健康',
     emptyTitle: '暫無通知',
-    emptyDescription: '完成分析、觸發告警或排程任務後，相關事件會出現在這裡。',
+    emptyDescription: '完成分析、觸發告警、排程任務結束、持久化每日簡報、記錄高分歧或儲存組合健康後，相關事件會出現在這裡。',
     emptyFilteredTitle: '沒有符合的通知',
     emptyFilteredDescription: '試試調整類型或已讀篩選。',
     unreadBadge: '{count} 則未讀',
@@ -273,6 +303,15 @@ export function formatNotificationInboxTitle(
   }
   if (item.titleKey === 'scheduledTaskResultTitle') {
     return formatUiText(`${text.kindScheduled}: {taskId}`, item.titleParams);
+  }
+  if (item.titleKey === 'dailyBriefTitle') {
+    return formatUiText(`${text.kindDailyBrief}: {label}`, item.titleParams);
+  }
+  if (item.titleKey === 'highDisagreementTitle') {
+    return formatUiText(`${text.kindHighDisagreement}: {label}`, item.titleParams);
+  }
+  if (item.titleKey === 'portfolioHealthTitle') {
+    return formatUiText(`${text.kindPortfolioHealth}: {label}`, item.titleParams);
   }
   return formatUiText(`${text.kindSignal}: {label}`, item.titleParams);
 }

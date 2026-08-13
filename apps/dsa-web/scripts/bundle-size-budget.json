@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-12",
-  "baselineNote": "Settings, locale, and IntelligenceSourcesPanel budgets use a combined production build after landing Daily Brief/Event Research, research API, and cost-attribution inventory changes (Refs #149 / #1131 / #1143 / #166 / #248); each rule retains its fixed headroom.",
+  "measuredAt": "2026-08-13",
+  "baselineNote": "IntelligenceSourcesPanel and locale budgets use the production build after the checkpoint-settings and DecisionSignal calibration localizations landed on main; each rule retains its fixed headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,205 +13,192 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 242427,
-      "measuredGzipBytes": 241714,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 242532,
+      "measuredGzipBytes": 242132,
+      "note": "Post-checkpoint-settings production-build measurement, with 400 B headroom."
     },
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
       "maxGzipBytes": 177591,
-      "measuredGzipBytes": 161446,
-      "note": "Merged budgets after main sync; maxGzipBytes=177591."
+      "measuredGzipBytes": 161446
     },
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 160036,
-      "measuredGzipBytes": 158251,
-      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 158718,
+      "measuredGzipBytes": 158018,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 153050,
-      "measuredGzipBytes": 151534,
-      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 151940,
+      "measuredGzipBytes": 151240,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 152857,
-      "measuredGzipBytes": 151343,
-      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 151860,
+      "measuredGzipBytes": 151160,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 152817,
-      "measuredGzipBytes": 151303,
-      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 151617,
+      "measuredGzipBytes": 151017,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 600 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 147055,
-      "measuredGzipBytes": 146087,
-      "note": "GitHub Actions Linux remeasure after evidence-chain settings help on synced main (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 147500,
+      "measuredGzipBytes": 146800,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 145236,
-      "measuredGzipBytes": 143798,
-      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 144356,
+      "measuredGzipBytes": 143656,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 138477,
-      "measuredGzipBytes": 137105,
-      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 137634,
+      "measuredGzipBytes": 136934,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 138532,
-      "measuredGzipBytes": 137160,
-      "note": "GitHub Actions Linux remeasure after evidence-chain title translations (PR #1214); measured gzip + ~1% headroom."
+      "maxGzipBytes": 137721,
+      "measuredGzipBytes": 137021,
+      "note": "GitHub Actions Linux measurement after DecisionSignal calibration localization, with 700 B headroom."
     },
     {
       "id": "vendor-charts",
       "match": "assets/vendor-charts-*.js",
       "maxGzipBytes": 122352,
-      "measuredGzipBytes": 111229,
-      "note": "Merged budgets after main sync; maxGzipBytes=122352."
+      "measuredGzipBytes": 111229
     },
     {
       "id": "vendor-react",
       "match": "assets/vendor-react-*.js",
       "maxGzipBytes": 66666,
-      "measuredGzipBytes": 60605,
-      "note": "Merged budgets after main sync; maxGzipBytes=66666."
+      "measuredGzipBytes": 60605
     },
     {
       "id": "vendor-markdown",
       "match": "assets/vendor-markdown-*.js",
       "maxGzipBytes": 48618,
-      "measuredGzipBytes": 44198,
-      "note": "Merged budgets after main sync; maxGzipBytes=48618."
+      "measuredGzipBytes": 44198
     },
     {
       "id": "vendor-motion",
       "match": "assets/vendor-motion-*.js",
       "maxGzipBytes": 43373,
-      "measuredGzipBytes": 39430,
-      "note": "Merged budgets after main sync; maxGzipBytes=43373."
+      "measuredGzipBytes": 39430
     },
     {
       "id": "vendor-router",
       "match": "assets/vendor-router-*.js",
       "maxGzipBytes": 33202,
-      "measuredGzipBytes": 30183,
-      "note": "Merged budgets after main sync; maxGzipBytes=33202."
+      "measuredGzipBytes": 30183
     },
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10376,
-      "measuredGzipBytes": 9432,
-      "note": "Merged budgets after main sync; maxGzipBytes=10376."
+      "maxGzipBytes": 10861,
+      "measuredGzipBytes": 10461,
+      "note": "Combined production-build measurement after merge train 20260813-03 (#1149 #1240 #1157 #1227 #1218 #1236 #1265). Each member is individually within the previous budget; the icon set grows cumulatively because each adds a small number of distinct Lucide icons. Measured 10461 B with 400 B headroom, matching the IntelligenceSourcesPanel convention."
     },
     {
       "id": "vendor-misc",
       "match": "assets/vendor-*.js",
       "maxGzipBytes": 86562,
       "measuredGzipBytes": 78692,
-      "note": "Merged budgets after main sync; maxGzipBytes=86562."
+      "note": "First-match residual for vendor-* after the more-specific vendor-* rules above (measured from vendor-CRoa6YUW)."
     },
     {
       "id": "RunFlowPanel",
       "match": "assets/RunFlowPanel-*.js",
       "maxGzipBytes": 73318,
       "measuredGzipBytes": 73118,
-      "note": "Merged budgets after main sync; maxGzipBytes=73318."
+      "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
       "id": "PlaygroundRenderPage",
       "match": "assets/PlaygroundRenderPage-*.js",
       "maxGzipBytes": 57276,
       "measuredGzipBytes": 57076,
-      "note": "Merged budgets after main sync; maxGzipBytes=57276."
+      "note": "Rebaselined after adding the reasoning-trace export controls Playground story (PR #1040); measured 57076 B + 200 B headroom."
     },
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
       "maxGzipBytes": 45803,
       "measuredGzipBytes": 45603,
-      "note": "Merged budgets after main sync; maxGzipBytes=45391."
+      "note": "GitHub Actions Linux remeasure after cost attribution and routing telemetry Settings controls (Refs #166 / #248); measured gzip + 200 B headroom."
     },
     {
       "id": "AlertsWorkspace",
       "match": "assets/AlertsWorkspace-*.js",
       "maxGzipBytes": 46602,
-      "measuredGzipBytes": 42365,
-      "note": "Merged budgets after main sync; maxGzipBytes=46602."
+      "measuredGzipBytes": 42365
     },
     {
       "id": "PortfolioRiskMetricsPanel",
       "match": "assets/PortfolioRiskMetricsPanel-*.js",
       "maxGzipBytes": 10654,
       "measuredGzipBytes": 9685,
-      "note": "Merged budgets after main sync; maxGzipBytes=10654."
+      "note": "Dedicated V1 risk-metrics chunk (PR #841); 10% headroom keeps the PortfolioPage route under its existing cap."
     },
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 26363,
-      "measuredGzipBytes": 26163,
-      "note": "Merged budgets after main sync; maxGzipBytes=26363."
+      "maxGzipBytes": 26601,
+      "measuredGzipBytes": 26401,
+      "note": "GitHub Actions Linux measurement after committee insights were split behind a dynamic import; the route retains only Vite dependency-map hashes. Measured 26401 B on the PR/main synthetic merge + 200 B headroom."
     },
     {
       "id": "DecisionSignalsPage",
       "match": "assets/DecisionSignalsPage-*.js",
       "maxGzipBytes": 23042,
-      "measuredGzipBytes": 20947,
-      "note": "Merged budgets after main sync; maxGzipBytes=23042."
+      "measuredGzipBytes": 20947
     },
     {
       "id": "ChatPage",
       "match": "assets/ChatPage-*.js",
       "maxGzipBytes": 18277,
-      "measuredGzipBytes": 16615,
-      "note": "Merged budgets after main sync; maxGzipBytes=18277."
+      "measuredGzipBytes": 16615
     },
     {
       "id": "screening",
       "match": "assets/screening-*.js",
       "maxGzipBytes": 17866,
-      "measuredGzipBytes": 16241,
-      "note": "Merged budgets after main sync; maxGzipBytes=17866."
+      "measuredGzipBytes": 16241
     },
     {
       "id": "BacktestPage",
       "match": "assets/BacktestPage-*.js",
       "maxGzipBytes": 15368,
-      "measuredGzipBytes": 13970,
-      "note": "Merged budgets after main sync; maxGzipBytes=15368."
+      "measuredGzipBytes": 13970
     },
     {
       "id": "css-entry",
       "match": "assets/index-*.css",
       "maxGzipBytes": 28791,
-      "measuredGzipBytes": 26173,
-      "note": "Merged budgets after main sync; maxGzipBytes=28791."
+      "measuredGzipBytes": 26173
     },
     {
       "id": "css-vendor",
       "match": "assets/vendor-*.css",
       "maxGzipBytes": 576,
-      "measuredGzipBytes": 523,
-      "note": "Merged budgets after main sync; maxGzipBytes=576."
+      "measuredGzipBytes": 523
     }
   ]
 }
