@@ -915,3 +915,7 @@ headers, credentials, and response bodies must never cross the iframe boundary.
 Tests should assert role, accessible name, native state, semantic variant/size,
 and behavior. Tailwind classes such as `h-11` or `rounded-full` are not product
 contracts and must not be asserted by component or page tests.
+
+## Responsive Breakpoints
+
+Supported audit widths and page-level gap tracking live in [web-responsive-breakpoints.md](web-responsive-breakpoints.md). PWA install and shell-only caching live in [web-pwa.md](web-pwa.md).

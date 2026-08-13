@@ -6241,4 +6241,10 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Plafond global d’extraction parallèle",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Plafond par fournisseur d’extraction parallèle",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Score du processus",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.notes.0": "Sans données de portefeuille, le calcul reste disponible en mode de repli explicite sur un seul titre.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "Contrôle des bandes de position déterministes avec les pondérations actuelles du portefeuille.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "Dimensionnement tenant compte du portefeuille",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "Laissez activé pour ces bandes. Le poids maximal par titre est une fraction de 0 à 1, avec 0,15 par défaut.",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "Dimensionnement portefeuille activé",
+  "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "Poids maximal par titre",
 } as const;
