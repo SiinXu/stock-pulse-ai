@@ -129,6 +129,7 @@ This is the entry point for project documentation. The README covers the project
 | [Config-access ratchet](config-access-ratchet.md) | Shrink-only bare `get_config()` gate, preferred injection / composition-root path, and legitimate baseline changes (ADR-011 / issue #625) |
 | [Import-cycle ratchet](import-cycle-ratchet.md) | Shrink-only bidirectional package-pair gate, failure reading, and legitimate baseline path (ADR-010) |
 | [Offline Analysis Quality Panel](analysis-quality-panel.md) | Fixed-panel offline trust fixtures, extension guide, and non-claims (#617 Phase A) |
+| [Prediction vs Actual Tracking Map](prediction-vs-actual-tracking_EN.md) | #449→#1107 ownership: framework superseded by Agent Evolution epic; residual display/adapters listed |
 | [Plugin Development Guide](plugin-development-guide.md) | Consolidated entry for the six extension points: what/why, trust model, 10-minute quickstart, official examples, and deep links ([中文](plugin-development-guide_zh.md)) |
 | [Offline Financial Agent Evaluation Benchmark](agent-eval-benchmark_EN.md) | Offline agent-run metrics (correctness, tool discipline, uncertainty honesty), baseline, and refresh flow (#252 V0) |
 | [Performance baselines & profiling](performance-baseline_EN.md) | Offline key-path baselines (data/analysis/report), opt-in spans, cProfile entry (#227) |
