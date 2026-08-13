@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -268,7 +269,7 @@ def test_litellm_completion_patch_target_for_chart_vision() -> None:
     assert result["status"] == "available"
     mock_completion.assert_called_once()
     kwargs = mock_completion.call_args.kwargs
-    assert kwargs["timeout"] == 25
+    assert 0 < kwargs["timeout"] <= 25
     content = kwargs["messages"][0]["content"]
     assert content[0]["type"] == "text"
     assert "chart" in content[0]["text"].lower() or "JSON" in content[0]["text"]
@@ -283,3 +284,106 @@ def test_service_wrapper() -> None:
     result = service.read_bytes(_png_bytes(), "image/png")
     assert result["status"] == "available"
     assert result["timeout_seconds"] == 40
+
+
+def _vision_ready_cfg(timeout_seconds: int = 30) -> SimpleNamespace:
+    return SimpleNamespace(
+        vision_model="openai/gpt-4o-mini",
+        openai_vision_model=None,
+        litellm_model="",
+        gemini_api_keys=[],
+        anthropic_api_keys=[],
+        openai_api_keys=["sk-test-key-12345678"],
+        gemini_model=None,
+        anthropic_model=None,
+        openai_model="gpt-4o-mini",
+        openai_base_url=None,
+        llm_model_list=[],
+        chart_read_timeout_seconds=timeout_seconds,
+    )
+
+
+def _chart_vision_runtime(cfg: SimpleNamespace, completion, clock: dict):
+    stack = ExitStack()
+    stack.enter_context(
+        patch(
+            "src.services.chart_reading_service._resolve_process_config",
+            return_value=cfg,
+        )
+    )
+    stack.enter_context(
+        patch("src.services.image_stock_extractor.get_config", return_value=cfg)
+    )
+    stack.enter_context(
+        patch(
+            "src.services.image_stock_extractor._resolve_vision_model",
+            return_value="openai/gpt-4o-mini",
+        )
+    )
+    stack.enter_context(
+        patch(
+            "src.services.chart_reading_service.litellm.completion",
+            side_effect=completion,
+        )
+    )
+    stack.enter_context(
+        patch("src.services.chart_reading_service.guard_litellm_outbound_call")
+    )
+    stack.enter_context(
+        patch(
+            "src.services.chart_reading_service.time.monotonic",
+            side_effect=lambda: clock["now"],
+        )
+    )
+    stack.enter_context(
+        patch(
+            "src.services.chart_reading_service.time.sleep",
+            side_effect=lambda seconds: clock.__setitem__(
+                "now", clock["now"] + float(seconds)
+            ),
+        )
+    )
+    return stack
+
+
+def test_wall_clock_timeout_is_shared_across_retries_not_multiplied() -> None:
+    """A hung provider must not get a fresh full timeout on each retry."""
+    cfg = _vision_ready_cfg(30)
+    clock = {"now": 1_000.0}
+    call_timeouts: list[float] = []
+
+    def fake_completion(**kwargs):
+        budget = float(kwargs["timeout"])
+        call_timeouts.append(budget)
+        clock["now"] += budget
+        raise ValueError("vision_empty_response")
+
+    with _chart_vision_runtime(cfg, fake_completion, clock):
+        result = read_chart_bytes(_png_bytes(), "image/png", timeout_seconds=30)
+
+    assert call_timeouts == [30]
+    assert result["status"] == "unavailable"
+    assert result["reason_code"] == "vision_timeout"
+    assert result["duration_ms"] >= 30_000
+    assert result["timeout_seconds"] == 30
+
+
+def test_retries_use_remaining_wall_clock_budget() -> None:
+    cfg = _vision_ready_cfg(30)
+    clock = {"now": 1_000.0}
+    call_timeouts: list[float] = []
+
+    def fake_completion(**kwargs):
+        call_timeouts.append(float(kwargs["timeout"]))
+        raise RuntimeError("transient provider error")
+
+    with _chart_vision_runtime(cfg, fake_completion, clock):
+        result = read_chart_bytes(_png_bytes(), "image/png", timeout_seconds=30)
+
+    assert len(call_timeouts) == 3
+    assert call_timeouts[0] == 30
+    assert call_timeouts[1] == pytest.approx(29)
+    assert call_timeouts[2] == pytest.approx(27)
+    assert result["status"] == "degraded"
+    assert result["reason_code"] == "vision_provider_failed"
+    assert result["duration_ms"] == pytest.approx(3_000, abs=5)

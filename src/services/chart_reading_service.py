@@ -183,6 +183,22 @@ def clamp_chart_read_timeout(raw: Any) -> int:
     )
 
 
+def _remaining_chart_read_timeout(started: float, timeout_seconds: int) -> float:
+    """Return leftover wall-clock seconds for one chart-read invocation."""
+    return max(0.0, float(timeout_seconds) - (time.monotonic() - started))
+
+
+def _backoff_within_chart_read_budget(
+    attempt: int, started: float, timeout_seconds: int
+) -> bool:
+    """Sleep for the next retry. Return False when the wall-clock budget is gone."""
+    remaining = _remaining_chart_read_timeout(started, timeout_seconds)
+    if remaining <= 0:
+        return False
+    time.sleep(min(float(2 ** attempt), remaining))
+    return True
+
+
 def _redact_text(raw_text: str) -> tuple[str, dict[str, int]]:
     redacted = str(raw_text or "")
     counts: dict[str, int] = {}
@@ -488,7 +504,7 @@ def _call_litellm_chart_vision(
     api_key: Optional[str] = None,
     prompt: str = CHART_READ_PROMPT,
     config: Optional[Config] = None,
-    timeout_seconds: int = DEFAULT_CHART_READ_TIMEOUT_SECONDS,
+    timeout_seconds: float = DEFAULT_CHART_READ_TIMEOUT_SECONDS,
 ) -> Tuple[str, str]:
     """Call LiteLLM vision with the chart prompt. Returns (raw_text, model)."""
     global litellm
@@ -517,7 +533,13 @@ def _call_litellm_chart_vision(
     )
     wire_model = str(deployment_params.get("model") or model).strip()
     data_url = f"data:{mime_type};base64,{image_b64}"
-    timeout = clamp_chart_read_timeout(timeout_seconds)
+    try:
+        timeout = float(timeout_seconds)
+    except (TypeError, ValueError):
+        timeout = float(DEFAULT_CHART_READ_TIMEOUT_SECONDS)
+    timeout = min(max(timeout, 0.0), float(MAX_CHART_READ_TIMEOUT_SECONDS))
+    if timeout <= 0:
+        raise TimeoutError("vision_timeout")
     call_kwargs: dict = {
         "model": wire_model,
         "messages": [
@@ -657,7 +679,12 @@ def read_chart_bytes(
 
     image_b64 = base64.b64encode(image_bytes).decode("ascii")
     attempts = max(1, int(max_retries) + 1)
+    timed_out = False
     for attempt in range(attempts):
+        remaining = _remaining_chart_read_timeout(started, effective_timeout)
+        if remaining <= 0:
+            timed_out = True
+            break
         try:
             if vision_caller is not None:
                 raw = vision_caller(image_b64, mime_type)
@@ -666,7 +693,7 @@ def read_chart_bytes(
                 raw, model = _call_litellm_chart_vision(
                     image_b64,
                     mime_type,
-                    timeout_seconds=effective_timeout,
+                    timeout_seconds=remaining,
                 )
             parsed = _parse_chart_json(raw)
             if not parsed["is_market_chart"]:
@@ -734,8 +761,11 @@ def read_chart_bytes(
                     duration_ms=int((time.monotonic() - started) * 1000),
                     image_meta=image_meta,
                 )
-            if attempt + 1 < attempts:
-                time.sleep(2 ** attempt)
+            if attempt + 1 < attempts and not _backoff_within_chart_read_budget(
+                attempt, started, effective_timeout
+            ):
+                timed_out = True
+                break
         except Exception as exc:  # broad-exception: fallback_recorded - isolate provider failures.
             log_safe_exception(
                 logger,
@@ -745,8 +775,24 @@ def read_chart_bytes(
                 level=logging.WARNING,
                 context={"attempt": f"{attempt + 1}/{attempts}"},
             )
-            if attempt + 1 < attempts:
-                time.sleep(2 ** attempt)
+            if attempt + 1 < attempts and not _backoff_within_chart_read_budget(
+                attempt, started, effective_timeout
+            ):
+                timed_out = True
+                break
+
+    if timed_out or _remaining_chart_read_timeout(started, effective_timeout) <= 0:
+        return _result(
+            status="unavailable",
+            reason_code="vision_timeout",
+            vision_model=str(readiness.get("model") or ""),
+            observations=[
+                "Chart vision exceeded the wall-clock timeout; no structured chart reading available."
+            ],
+            timeout_seconds=effective_timeout,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            image_meta=image_meta,
+        )
 
     return _result(
         status="degraded",
