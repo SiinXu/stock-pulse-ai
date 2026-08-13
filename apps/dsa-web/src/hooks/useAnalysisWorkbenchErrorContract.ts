@@ -7,7 +7,7 @@ import {
   type AnalysisWorkbenchSegment,
 } from '../routing/routes';
 import type { TaskInfo } from '../types/analysis';
-import { isBusyParsedApiError } from '../utils/apiReasonMapper';
+import { isLaunchBlockingError } from '../utils/asyncTaskUx';
 
 /** Busy/conflict launch blocking + recover-to-tasks CTA for Analysis Workbench. */
 export function useAnalysisWorkbenchErrorContract(options: {
@@ -28,7 +28,7 @@ export function useAnalysisWorkbenchErrorContract(options: {
   } = options;
 
   const launchBlockedByBusy = Boolean(duplicateError)
-    || isBusyParsedApiError(error);
+    || isLaunchBlockingError(error);
 
   const openBusyTasks = useCallback(() => {
     const existing = duplicateTask?.existingTaskId

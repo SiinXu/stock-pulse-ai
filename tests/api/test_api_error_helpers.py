@@ -13,6 +13,8 @@ def test_error_body_uses_stable_envelope() -> None:
         "params": {},
         "details": None,
         "detail": None,
+        "category": "validation",
+        "severity": "error",
         "trace_id": None,
     }
 
@@ -28,6 +30,8 @@ def test_api_error_uses_standard_detail_shape() -> None:
         "params": {},
         "details": {"id": 1},
         "detail": {"id": 1},
+        "category": "not_found",
+        "severity": "warning",
         "trace_id": None,
     }
 
@@ -38,7 +42,8 @@ def test_error_json_response_uses_standard_content() -> None:
     assert response.status_code == 409
     assert response.body == (
         b'{"error":"conflict","message":"already exists","params":{},'
-        b'"details":null,"detail":null,"trace_id":null}'
+        b'"details":null,"detail":null,"category":"config_conflict",'
+        b'"severity":"warning","trace_id":null}'
     )
 
 
