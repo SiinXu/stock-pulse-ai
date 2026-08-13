@@ -3,10 +3,12 @@
 import type React from 'react';
 import { ShieldAlert, ShieldCheck, ShieldQuestion, ShieldX } from 'lucide-react';
 import { Badge, InlineAlert, Spinner } from '../common';
+import { HelpKeyButton } from '../help';
 import {
   buildDecisionActionLabelMap,
   getDecisionActionLabel,
 } from '../../utils/decisionAction';
+import { riskGateStatusHelpKey } from '../../locales/educationHelpKeys';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { DecisionAction, ReportLanguage } from '../../types/analysis';
@@ -218,6 +220,10 @@ export const ReportRiskGateBanner: React.FC<ReportRiskGateBannerProps> = ({
               >
                 {verdictLabel(status, text)}
               </Badge>
+              <HelpKeyButton
+                helpKey={riskGateStatusHelpKey(status)}
+                data-testid="report-risk-gate-help"
+              />
             </div>
             <p data-testid="report-risk-gate-message">{bodyMessage}</p>
 
