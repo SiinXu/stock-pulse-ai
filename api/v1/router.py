@@ -36,6 +36,7 @@ from api.v1.endpoints import (
     paper_decision_quality,
     portfolio,
     portfolio_health,
+    portfolio_rebalancing,
     portfolio_level_analysis,
     portfolio_risk_metrics,
     portfolio_stress_test,
@@ -174,6 +175,12 @@ router.include_router(
 
 router.include_router(
     portfolio_risk_metrics.router,
+    prefix="/portfolio",
+    tags=["Portfolio"]
+)
+
+router.include_router(
+    portfolio_rebalancing.router,
     prefix="/portfolio",
     tags=["Portfolio"]
 )
