@@ -169,6 +169,13 @@ const routerSearchParamsMock = vi.hoisted(() => {
 });
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
+  Link: ({
+    to,
+    children,
+    ...props
+  }: Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
+    to: string;
+  }) => <a href={to} {...props}>{children}</a>,
   useBlocker: (shouldBlock: (args: unknown) => boolean) => {
     routerBlockerMock.shouldBlock = shouldBlock;
     return routerBlockerMock;
@@ -1065,6 +1072,7 @@ const SettingsPageTestHarness = {
   refreshAfterExternalSave,
   refreshStatus,
   settingsPanelErrorBoundary,
+  usageNavigate,
   useAuthMock,
   useSystemConfigMock,
   webBuildInfoMock,

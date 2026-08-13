@@ -97,7 +97,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
       placement={isHorizontalMenu || isNavVariant || isRailVariant ? 'top' : 'bottom'}
       align={isHorizontalMenu || isNavVariant || isRailVariant ? 'start' : 'end'}
       contentClassName={cn(
-        'min-w-[8rem] rounded-2xl border-border/70 p-1.5 shadow-2xl backdrop-blur-sm',
+        'min-w-[8rem] rounded-2xl border-border/70 p-1.5 shadow-elevation-popper',
         isHorizontalMenu
           ? 'grid w-[min(20rem,calc(100vw-1rem))] grid-cols-3'
           : isNavVariant || isRailVariant

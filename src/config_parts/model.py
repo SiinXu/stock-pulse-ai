@@ -21,6 +21,7 @@ from src.config_parts.defaults import (
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
     KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT,
 )
 from src.config_parts.domain_facade import (
     install_flat_domain_facade,
@@ -33,6 +34,9 @@ from src.config_parts.parsers import normalize_agent_context_compression_profile
 from src.config_parts.runtime import _ConfigRuntimeMethods
 from src.config_parts.share_image import ShareImageConfig
 from src.config_parts.validation import _ConfigValidationMethods
+from src.core.config.sources import (
+    WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS as _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS_CANONICAL,
+)
 from src.llm.backend_registry import AUTO_AGENT_BACKEND_ID, LITELLM_BACKEND_ID
 from src.llm.local_cli_backend import (
     DEFAULT_GENERATION_BACKEND_MAX_CONCURRENCY,
@@ -125,6 +129,10 @@ class Config:
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
 
+    # === Read-only research API for stratified conclusions (Issue #1143) ===
+    research_api_enabled: bool = False
+    research_api_rate_limit_per_minute: int = 60
+
     # === Reasoning-trace export (Issue #135) — default off ===
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
@@ -134,7 +142,7 @@ class Config:
     security_audit_retention_days: int = 90
     security_audit_max_events: int = 10_000
 
-    # === Daily brief with historical accuracy review (Issue #466) ===
+    # === Daily brief: personal morning + accuracy review (#149 / #466) ===
     daily_brief_enabled: bool = False
     daily_brief_schedule_time: str = "08:30"
     daily_brief_timezone: str = "Asia/Shanghai"
@@ -142,6 +150,15 @@ class Config:
     daily_brief_notify: bool = True
     daily_brief_persist_history: bool = True
     daily_brief_save_report_file: bool = True
+    daily_brief_quiet_when_empty: bool = False
+
+    # === Event-driven research briefs (Issue #1131; default off) ===
+    event_research_brief_enabled: bool = False
+    event_research_brief_notify: bool = True
+    event_research_brief_persist_history: bool = True
+    event_research_brief_save_report_file: bool = True
+    event_research_brief_lookback_hours: int = 48
+    event_research_brief_categories: str = "earnings"
 
     # === Paper trading portfolio (Issue #370) ===
     paper_portfolio_initial_cash: float = 1_000_000.0
@@ -165,6 +182,9 @@ class Config:
     llm_prompt_cache_telemetry_enabled: bool = True
     llm_prompt_cache_hints_enabled: bool = False
     llm_prompt_cache_diagnostics_level: str = "off"
+
+    # Fine-grained cost attribution + routing quality on llm_usage (Refs #166/#248).
+    llm_usage_attribution_enabled: bool = True
 
     # --- Multi-channel LLM config (new) ---
     # LITELLM_CONFIG: path to a standard litellm_config.yaml file (most powerful)
@@ -298,6 +318,8 @@ class Config:
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
+    agent_research_persona: str = ""  # Default-off research stance preset (#467)
+    agent_research_persona_custom: str = ""  # Optional custom stance text (#467)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
     decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats
@@ -375,6 +397,16 @@ class Config:
     # Analyze interval time (seconds) - to avoid API rate limiting
     analysis_delay: float = 0.0  # Delay between individual stock analysis and major index analysis
 
+    # Stage-level analysis checkpoints (Issues #121 / #136).
+    analysis_checkpoint_enabled: bool = True
+    analysis_checkpoint_dir: str = "./data/checkpoints"
+    analysis_checkpoint_ttl_hours: int = 24
+    analysis_checkpoint_force_full: bool = False
+    # Reproducibility controls.
+    repro_mode_enabled: bool = False
+    repro_record_config: bool = True
+    repro_seed: Optional[int] = None
+
     # Real-time quote prefetch (Issue #455): Set to false to disable, avoid full market pull from efinance/akshare_em
     prefetch_realtime_quotes: bool = True
 
@@ -401,6 +433,8 @@ class Config:
 
     # System Configuration
     max_workers: int = 3  # Low concurrency anti-ban
+    # Per-check timeout for structured readiness/self-check (on-demand only; never auto-run at startup).
+    readiness_check_timeout_seconds: float = READINESS_CHECK_TIMEOUT_SECONDS_DEFAULT
     # Parallel dependency-free market-input pulls inside one stock analysis
     # (realtime / chip / money-flow / fundamental). Does not bypass provider
     # governance or cache; set enabled=false to force serial declaration order.
@@ -542,16 +576,8 @@ class Config:
     _VALID_AGENT_ARCH = {"single", "multi"}
     _VALID_ORCHESTRATOR_MODES = {"quick", "standard", "full", "specialist"}
     _VALID_SKILL_ROUTING = {"auto", "manual"}
-    _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS = frozenset(
-        {
-            "STOCK_LIST",
-            "RUN_IMMEDIATELY",
-            "SCHEDULE_ENABLED",
-            "SCHEDULE_TIME",
-            "SCHEDULE_TIMES",
-            "SCHEDULE_RUN_IMMEDIATELY",
-        }
-    )
+    # Single source: src.core.config.sources.WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
+    _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS = _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS_CANONICAL
     _BOOTSTRAP_RUNTIME_ENV_OVERRIDES_CAPTURED = False
     _BOOTSTRAP_RUNTIME_ENV_OVERRIDES = frozenset()
     _BOOTSTRAP_RUNTIME_ENV_PRESENT_KEYS = frozenset()
@@ -666,6 +692,7 @@ _CONFIG_METHOD_GROUPS = (
             "_parse_research_presentation_profile",
             "_get_env_file_value",
             "_resolve_env_value",
+            "resolve_with_source",
             "_capture_bootstrap_runtime_env_overrides",
             "_has_bootstrap_runtime_env_override",
             "_had_bootstrap_runtime_env_key",

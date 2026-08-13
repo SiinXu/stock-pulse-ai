@@ -142,6 +142,28 @@ class LiteLLMFallbackPricingTestCase(unittest.TestCase):
         self.assertEqual(result.content, "agent ok")
         self.assertEqual(events[:2], [("register", ["openai/mimo-alpha"]), ("completion", "openai/mimo-alpha")])
 
+    def test_repro_mode_forwards_request_scoped_seed_and_zero_temperature(self) -> None:
+        adapter = llm_adapter.LLMToolAdapter.__new__(llm_adapter.LLMToolAdapter)
+        adapter._config = _fake_agent_config(repro_mode_enabled=True, repro_seed=17)
+        adapter._router = None
+        adapter._legacy_router_model_list = []
+        captured = {}
+
+        def _completion(**kwargs):
+            captured.update(kwargs)
+            return _fake_litellm_response()
+
+        with patch.object(llm_adapter.litellm, "completion", side_effect=_completion):
+            adapter._call_litellm_model(
+                [{"role": "user", "content": "hi"}],
+                [],
+                "openai/mimo-alpha",
+                temperature=0.9,
+            )
+
+        self.assertEqual(captured["seed"], 17)
+        self.assertEqual(captured["temperature"], 0.0)
+
     def test_llm_tool_adapter_registers_fallback_pricing_for_router_wire_model(self) -> None:
         adapter = llm_adapter.LLMToolAdapter.__new__(llm_adapter.LLMToolAdapter)
         adapter._config = _fake_agent_config(

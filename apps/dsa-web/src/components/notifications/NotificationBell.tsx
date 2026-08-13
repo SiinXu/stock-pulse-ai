@@ -119,13 +119,12 @@ export function NotificationBell({
       contentClassName="w-[min(22rem,calc(100vw-1.5rem))]"
       trigger={({ toggle }) => (
         <IconButton
-          variant="outline"
+          variant="ghost"
           size="navigation"
           onClick={toggle}
           aria-label={triggerLabel}
           aria-expanded={open}
           tooltip={triggerLabel}
-          className="bg-card shadow-soft-card"
         >
           {notifications.unreadCount > 0 ? <BellRing aria-hidden="true" /> : <Bell aria-hidden="true" />}
           {notifications.unreadCount > 0 ? (
