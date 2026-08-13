@@ -744,13 +744,18 @@ def _step_critique_replan_reasons(
     or ToolSurface.
     """
     from src.agent.evolution.step_critique import (
+        MAX_STEP_CRITIQUE_OBSERVATIONS,
         STEP_CRITIQUE_META_KEY,
         critique_step_observations,
         deterministic_step_lessons,
         map_replan_reason_kind,
     )
 
-    _, reason_codes = deterministic_step_lessons(observations)
+    # The loop retains observations across replans, so the audit trail can
+    # exceed the critique helper's hard cap. Keep the most recent window so the
+    # triggering failure stays in scope.
+    critique_window = list(observations)[-MAX_STEP_CRITIQUE_OBSERVATIONS:]
+    _, reason_codes = deterministic_step_lessons(critique_window)
     if not reason_codes:
         reason_codes = [
             map_replan_reason_kind(
@@ -783,7 +788,7 @@ def _step_critique_replan_reasons(
                 # force=True: we are already on a failed-step replan path, so the
                 # observation trigger is satisfied; still respect enable + budget.
                 critique_step_observations(
-                    observations,
+                    critique_window,
                     config=config,
                     ctx=critique_ctx,
                     force=True,

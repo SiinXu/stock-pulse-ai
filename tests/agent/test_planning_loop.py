@@ -271,6 +271,67 @@ def test_observation_replan_avoids_hard_failed_tool_and_can_succeed() -> None:
     assert any(entry.get("role") == "replan" for entry in meta.get("plans", []))
 
 
+def test_retained_observations_beyond_critique_cap_do_not_abort_loop() -> None:
+    """Replans keep prior observations; critique must not raise past 16 items."""
+    plan, tools = _plan(
+        tools_per_step=[["ok"]] * 15 + [["fail"]],
+        available=["ok", "fail"],
+    )
+    context: Dict[str, Any] = {
+        "config": SimpleNamespace(agent_step_critique_enabled=True),
+        "run_id": "run-critique-overflow",
+    }
+
+    def invoker(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        del arguments
+        if name == "fail":
+            return {"ok": False, "error": {"code": "provider_error", "message": "down"}}
+        return {"ok": True, "summary": "ok"}
+
+    class StickyPlanner:
+        def plan(
+            self,
+            task,
+            *,
+            available_tools,
+            context=None,
+            cancelled_check=None,
+            prior_observations=None,
+        ):
+            del task, available_tools, context, cancelled_check, prior_observations
+            sticky, _ = _plan(tools_per_step=[["fail"]], available=["ok", "fail"])
+            from src.agent.planning.types import PlanningOutcome
+
+            return PlanningOutcome(
+                enabled=True,
+                applied=True,
+                plan=sticky,
+                strategy="template",
+                requested_strategy="template",
+            )
+
+    result = execute_plan_loop(
+        plan=plan,
+        tool_invoker=invoker,
+        available_tools=tools,
+        context=context,
+        settings=PlanExecutionSettings(
+            max_observation_replans=1,
+            on_step_failure="replan",
+            max_total_tool_calls=32,
+        ),
+        planner=StickyPlanner(),
+    )
+
+    assert result.reason != "loop_error"
+    assert result.success is False
+    assert result.status == "max_observation_replans_exceeded"
+    assert len(result.step_observations) == 17
+    assert "tool_failure" in context["replan_reason_kinds"]
+    assert context["step_critique_result"]["status"] == "completed"
+    assert context["step_critique_result"]["lessons"]
+
+
 def test_max_observation_replans_exhausted_is_explicit() -> None:
     plan, tools = _plan(tools_per_step=[["always_fail"]], available=["always_fail"])
 
