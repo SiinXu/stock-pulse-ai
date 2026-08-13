@@ -964,8 +964,8 @@ const fieldDescriptionMap: Record<string, string> = {
   REPORT_SUMMARY_ONLY: '仅推送分析结果摘要，不包含个股详情。多股时适合快速浏览。',
   REPORT_SHOW_LLM_MODEL: '在通知报告底部显示本次分析使用的 LLM 模型名称；关闭后隐藏运行时模型信息。仅影响展示，不会影响 provider/model/Base URL、运行时模型保存、迁移或清理。',
   NOTIFICATION_DELTA_FIRST: '默认关闭；在完整通知前显示上次变化，不调用模型，失败仍发送原通知。',
-  HIGH_DISAGREEMENT_ALERTS_ENABLED: '默认开启。当多智能体分析已带有结构化 disagreement_handling 且分数超阈值时，经 NOTIFICATION_ALERT_CHANNELS 发送专用告警；不重新计算分歧；与报告推送一致遵守 no-notify；单渠道失败不中断分析。',
-  HIGH_DISAGREEMENT_THRESHOLD: '高分歧告警分数阈值（0-1，默认 0.6）。存在 disagreement_score 时仅分数 ≥ 阈值才告警；分数缺失时回退 high_disagreement。',
+  HIGH_DISAGREEMENT_ALERTS_ENABLED: '默认开启；不重新计算分歧，达阈值时经告警渠道发送；遵守 no-notify，单渠道失败不影响分析。',
+  HIGH_DISAGREEMENT_THRESHOLD: '阈值 0–1（默认 0.6）；有分数时按分数，无分数时回退 high_disagreement。',
   MAX_WORKERS: '异步任务队列最大并发数。配置保存后，队列空闲时会自动应用；繁忙时延后生效。',
   ANALYSIS_PARALLEL_FETCH_ENABLED:
     '单只股票分析内对无依赖行情输入（实时行情/筹码/资金流/基本面）并行拉取；仍走 DataFetcherManager 治理与缓存，关闭则严格串行。',

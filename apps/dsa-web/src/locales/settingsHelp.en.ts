@@ -2073,12 +2073,11 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
   'settings.notification.HIGH_DISAGREEMENT_ALERTS_ENABLED': {
     title: 'High Disagreement Alerts',
-    summary:
-      'Default on; routes existing structured high-disagreement records through alert channels while honoring no-notify.',
+    summary: 'On by default; routes structured high disagreement to alert channels and honors no-notify.',
   },
   'settings.notification.HIGH_DISAGREEMENT_THRESHOLD': {
     title: 'High Disagreement Alert Threshold',
-    summary: 'Score threshold from 0 to 1 for high-disagreement alerts; defaults to 0.6.',
+    summary: 'Alert score threshold (0–1); default 0.6.',
   },
   'settings.backtest.PAPER_PORTFOLIO_INITIAL_CASH': {
     title: 'Paper Portfolio Initial Cash',
