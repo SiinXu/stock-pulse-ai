@@ -358,7 +358,7 @@
 
 ## 7. I18N-01 候选修订与待审状态
 
-I18N-01 已修订下表中的明显语义漂移，并通过高风险语义守卫锁定当前 key 集合与十语言 bundle 快照。修订值是基于产品契约、一手机构术语和自动化语义审查得到的**候选产品译文**，不是母语金融签核。除 `zh` / `en` 产品源文案外，八个翻译 bundle 仍统一标记为 `PENDING_NATIVE_REVIEW`；完整来源、基线 SHA、逐语言状态和 `before` / `recommended` 记录见 [High-risk i18n semantic audit](high-risk-i18n-audit.md) 与机器清单 `apps/dsa-web/scripts/high-risk-i18n-audit.json`。
+I18N-01 已修订下表中的明显语义漂移，并通过高风险语义守卫锁定当前 key 集合与十语言 bundle 快照。修订值是基于产品契约、一手机构术语和自动化语义审查得到的**候选产品译文**，不是母语金融签核。除 `zh` / `en` 产品源文案外，八个翻译 bundle 仍统一标记为 `PENDING_NATIVE_REVIEW`；完整来源、基线 SHA、逐语言状态和 `before` / `recommended` 记录见 [High-risk i18n semantic audit](high-risk-i18n-audit.md) 与机器清单 `apps/dsa-web/scripts/high-risk-i18n-audit.json`、key 清单 `apps/dsa-web/scripts/high-risk-i18n-keys.json`。
 
 | 概念组 | 旧值样本 | 当前候选语义 | 审查状态 |
 | --- | --- | --- | --- |

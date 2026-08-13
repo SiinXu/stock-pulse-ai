@@ -318,6 +318,8 @@ class Config:
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
+    agent_research_persona: str = ""  # Default-off research stance preset (#467)
+    agent_research_persona_custom: str = ""  # Optional custom stance text (#467)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation
     skill_opinion_outcome_weights_enabled: bool = False  # Apply default-off Bayesian outcome weights at aggregation
     decision_profile_calibration_enabled: bool = False  # Include decision-profile calibration on outcome stats
@@ -393,6 +395,16 @@ class Config:
 
     # Analyze interval time (seconds) - to avoid API rate limiting
     analysis_delay: float = 0.0  # Delay between individual stock analysis and major index analysis
+
+    # Stage-level analysis checkpoints (Issues #121 / #136).
+    analysis_checkpoint_enabled: bool = True
+    analysis_checkpoint_dir: str = "./data/checkpoints"
+    analysis_checkpoint_ttl_hours: int = 24
+    analysis_checkpoint_force_full: bool = False
+    # Reproducibility controls.
+    repro_mode_enabled: bool = False
+    repro_record_config: bool = True
+    repro_seed: Optional[int] = None
 
     # Real-time quote prefetch (Issue #455): Set to false to disable, avoid full market pull from efinance/akshare_em
     prefetch_realtime_quotes: bool = True

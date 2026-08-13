@@ -27,6 +27,7 @@ from src.services.system_config_service import ConfigConflictError, ConfigImport
 
 class _SystemConfigServiceTestCaseBase(unittest.TestCase):
     def setUp(self) -> None:
+        self._original_process_env = os.environ.copy()
         self._original_outbound_allowlist = os.environ.get("OUTBOUND_HTTP_ALLOWLIST")
         os.environ["OUTBOUND_HTTP_ALLOWLIST"] = "localhost,127.0.0.1"
         self._saved_notification_env = {
@@ -86,6 +87,8 @@ class _SystemConfigServiceTestCaseBase(unittest.TestCase):
         os.environ.update(self._saved_runtime_priority_env)
         restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
+        os.environ.clear()
+        os.environ.update(self._original_process_env)
 
     def _rewrite_env(self, *lines: str) -> None:
         self.env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

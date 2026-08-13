@@ -93,6 +93,20 @@ class _DashboardMethods:
             analysis_context_pack_summary = context.get("analysis_context_pack_summary")
             if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
                 ctx.meta["analysis_context_pack_summary"] = analysis_context_pack_summary
+            # Carry process-local stage checkpoint session for exact-replay resume.
+            from src.services.analysis_stage_checkpoint import (
+                META_ANNOTATION_KEY,
+                META_REPRO_KEY,
+                META_SESSION_KEY,
+            )
+
+            session = context.get(META_SESSION_KEY)
+            if session is not None:
+                ctx.meta[META_SESSION_KEY] = session
+            if context.get(META_ANNOTATION_KEY) is not None:
+                ctx.meta[META_ANNOTATION_KEY] = context.get(META_ANNOTATION_KEY)
+            if context.get(META_REPRO_KEY) is not None:
+                ctx.meta[META_REPRO_KEY] = context.get(META_REPRO_KEY)
 
             # Pre-populate data fields that the caller already has
             for data_key in ("realtime_quote", "daily_history", "chip_distribution",
@@ -147,6 +161,24 @@ class _DashboardMethods:
                 "[Orchestrator] investment committee mode apply failed",
                 exc,
                 error_code="agent_committee_mode_apply_failed",
+                level=logging.WARNING,
+            )
+
+        try:
+            from src.services.research_persona_prompt import (
+                apply_research_persona_to_agent_context,
+            )
+
+            apply_research_persona_to_agent_context(
+                ctx,
+                config=getattr(self, "config", None),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Research persona is optional.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] research persona apply failed",
+                exc,
+                error_code="agent_research_persona_apply_failed",
                 level=logging.WARNING,
             )
 
@@ -599,6 +631,28 @@ class _DashboardMethods:
                 "[Orchestrator] investment committee report section failed",
                 exc,
                 error_code="agent_committee_report_section_failed",
+                level=logging.WARNING,
+            )
+
+        try:
+            from src.services.research_persona_prompt import (
+                enrich_dashboard_research_persona,
+            )
+
+            enriched = enrich_dashboard_research_persona(
+                dashboard_block,
+                config=getattr(self, "config", None),
+                agent_meta=ctx.meta if isinstance(ctx.meta, dict) else None,
+                report_language=str(ctx.meta.get("report_language") or "zh"),
+            )
+            if isinstance(enriched, dict):
+                dashboard_block = enriched
+        except Exception as exc:  # broad-exception: fallback_recorded - Research persona label is optional.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] research persona report label failed",
+                exc,
+                error_code="agent_research_persona_report_label_failed",
                 level=logging.WARNING,
             )
 

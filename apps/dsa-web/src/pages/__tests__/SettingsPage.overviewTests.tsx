@@ -3,6 +3,7 @@ import { expect, it, vi } from 'vitest';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { APP_ROUTE_PATHS, SETTINGS_ROUTE_QUERY_KEYS, SETTINGS_SECTION_IDS } from '../../routing/routes';
 import { resolveWebBuildInfo } from '../../utils/constants';
+import { buildAnalysisTasksHref } from '../../utils/setupSmokeTask';
 import SettingsPageTestHarness from './SettingsPage.testHarness';
 import type { BlockerArgs } from './SettingsPage.testHarness';
 
@@ -22,6 +23,7 @@ const {
   routerSearchParamsMock,
   save,
   settingsPanelErrorBoundary,
+  usageNavigate,
   useSystemConfigMock,
   webBuildInfoMock,
 } = SettingsPageTestHarness;
@@ -266,7 +268,10 @@ export function registerSettingsPageOverviewTests(): void {
       originalQuery: 'SH600000',
       selectionSource: 'manual',
     }));
-    expect(await screen.findByText(/task-setup-smoke/)).toBeInTheDocument();
+    expect(await screen.findByText('已提交 SH600000 的简短分析任务。')).toBeInTheDocument();
+    expect(screen.queryByText(/task-setup-smoke/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '运行中任务' }));
+    expect(usageNavigate).toHaveBeenCalledWith(buildAnalysisTasksHref('task-setup-smoke'));
   });
 
   it('allows brief setup smoke when only the Agent channel is incomplete', async () => {

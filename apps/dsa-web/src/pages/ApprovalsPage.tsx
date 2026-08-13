@@ -16,6 +16,7 @@ import {
   PageHeader,
   Section,
   StatePanel,
+  Surface,
   Switch,
   WorkspacePage,
 } from '../components/common';
@@ -256,9 +257,11 @@ const ApprovalsPage: React.FC = () => {
       ? (seconds > 0 ? text.expiresIn.replace('{seconds}', String(seconds)) : text.expired)
       : (proposal.status === 'expired' ? text.expired : statusLabel(proposal.status));
     return (
-      <article
+      <Surface
+        as="article"
         key={proposal.id}
-        className="rounded-xl border border-border bg-surface-2/60 p-4"
+        level="interactive"
+        padding="sm"
         data-testid={`approval-${proposal.id}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -320,7 +323,7 @@ const ApprovalsPage: React.FC = () => {
             {proposal.consumedAt ? text.consumed : text.notConsumed}
           </p>
         )}
-      </article>
+      </Surface>
     );
   };
 
