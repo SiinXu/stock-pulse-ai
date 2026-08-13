@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-13",
-  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1148) (js-entry). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
+  "baselineNote": "Remasured overflowing gzip rules after merging origin/main (#1231) (overflowing js-entry). Headroom retained: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other overflowing named rules +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -20,9 +20,9 @@
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
-      "maxGzipBytes": 187048,
-      "measuredGzipBytes": 186648,
-      "note": "Remeasured after merging origin/main (#1148); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 192592,
+      "measuredGzipBytes": 192192,
+      "note": "Remeasured after merging origin/main (#1231); overflowing rule only, fixed headroom retained."
     },
     {
       "id": "locale-ja",
