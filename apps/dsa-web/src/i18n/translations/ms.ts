@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ms,
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC.ms,
   ...EE.ms,
   ...MMC.ms,
+  ...S.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Had pencetus sehari",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Sahkan ciri Agent dimatikan",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Kaedah Penjanaan Tanya Saham",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Pratetap Pendirian Penyelidikan",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Teks Pendirian Penyelidikan Tersuai",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Model Utama Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Langkah Maksimum Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Memori Ejen",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "Masih menggunakan DataFetcherManager (sandaran, cache, litar, pengesahan); mod selari bukan laluan HTTP sampingan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "Lalai concurrent=3 dan per-provider=1 mengurangkan risiko stampede sambil menindih keupayaan bebas.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "Matikan suis untuk memaksa tertib bersiri semasa mendiagnosis pembekal.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "Bajet tarikan selari (saat)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Tarikan data pasaran selari",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Had global tarikan selari",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Had per-pembekal tarikan selari",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "Rekod konflik; tahan jika belum selesai.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "Ambang keputusan berpecah.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "Ambang semakan silang.",

@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ja,
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC.ja,
   ...EE.ja,
   ...MMC.ja,
+  ...S.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "1日あたりのイベント上限",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 機能を当面オフと確認",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "銘柄相談の生成方式",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "調査姿勢プリセット",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "独自の調査姿勢テキスト",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "エージェントのプライマリモデル",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "エージェントの最大ステップ数",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "エージェントメモリ",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "引き続き DataFetcherManager（フォールバック・キャッシュ・サーキット・検証）を使用します。並行モードは HTTP のサイドチャネルではありません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "既定の concurrent=3 と per-provider=1 は stampede を抑えつつ独立能力を重ねます。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "プロバイダ調査時はスイッチをオフにして直列取得順に戻してください。",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "並行取得の総予算（秒）",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "市場入力の並行取得",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取得の全体上限",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取得のプロバイダ別上限",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "衝突を記録し、未解決なら様子見にします。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "分裂判定のしきい値です。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "交差検証のしきい値です。",
