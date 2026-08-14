@@ -27439,6 +27439,299 @@
         "title": "ResearchStanceContent",
         "type": "object"
       },
+      "ResearchTimelineLink": {
+        "additionalProperties": true,
+        "description": "Deep-link payload for a timeline node (client builds the concrete URL).",
+        "properties": {
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Conversation message id",
+            "title": "Message Id"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "analysis_history.query_id when available",
+            "title": "Query Id"
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "analysis_history.id when type=analysis_history",
+            "title": "Record Id"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chat session id when type=chat_session",
+            "title": "Session Id"
+          },
+          "signal_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "decision_signals.id when type=decision_signal",
+            "title": "Signal Id"
+          },
+          "source_report_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Linked analysis history id for a signal",
+            "title": "Source Report Id"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Canonical stock code for the target",
+            "title": "Stock Code"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Durable chat turn id (#923 contract)",
+            "title": "Turn Id"
+          },
+          "type": {
+            "description": "Target type: analysis_history | chat_session | decision_signal | hypothesis",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "ResearchTimelineLink",
+        "type": "object"
+      },
+      "ResearchTimelineNode": {
+        "description": "One research activity node on the per-symbol timeline.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Normalized 0-1 confidence when available",
+            "title": "Confidence"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Direction/advice label for simple analysis-node diffs",
+            "title": "Direction"
+          },
+          "id": {
+            "description": "Stable node id, e.g. analysis_run:12",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "description": "analysis_run | chat | signal | hypothesis",
+            "title": "Kind",
+            "type": "string"
+          },
+          "link": {
+            "$ref": "#/components/schemas/ResearchTimelineLink",
+            "description": "Deep-link coordinates"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "description": "Kind-specific extras",
+            "title": "Meta",
+            "type": "object"
+          },
+          "occurred_at": {
+            "description": "ISO-8601 timestamp with offset",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Lifecycle status when applicable",
+            "title": "Status"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional one-line summary",
+            "title": "Summary"
+          },
+          "title": {
+            "description": "Short human-readable title",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "occurred_at",
+          "title",
+          "link"
+        ],
+        "title": "ResearchTimelineNode",
+        "type": "object"
+      },
+      "ResearchTimelineResponse": {
+        "description": "Cursor page of research timeline nodes for one symbol.",
+        "properties": {
+          "has_more": {
+            "description": "Whether additional older nodes exist",
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchTimelineNode"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "description": "Page size applied to this response",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque cursor for the next page; null when has_more is false",
+            "title": "Next Cursor"
+          },
+          "sources": {
+            "$ref": "#/components/schemas/ResearchTimelineSources",
+            "description": "Per-source status; hypothesis is unavailable until #1130 ships"
+          },
+          "stock_code": {
+            "description": "Canonical display stock code",
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "has_more",
+          "limit",
+          "sources"
+        ],
+        "title": "ResearchTimelineResponse",
+        "type": "object"
+      },
+      "ResearchTimelineSources": {
+        "description": "Per-source honesty flags so the UI never invents empty success for missing feeds.",
+        "properties": {
+          "analysis_run": {
+            "description": "ok | empty | unavailable | error",
+            "title": "Analysis Run",
+            "type": "string"
+          },
+          "chat": {
+            "description": "ok | empty | unavailable | error",
+            "title": "Chat",
+            "type": "string"
+          },
+          "hypothesis": {
+            "description": "ok | empty | unavailable | error",
+            "title": "Hypothesis",
+            "type": "string"
+          },
+          "signal": {
+            "description": "ok | empty | unavailable | error",
+            "title": "Signal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "analysis_run",
+          "chat",
+          "signal",
+          "hypothesis"
+        ],
+        "title": "ResearchTimelineSources",
+        "type": "object"
+      },
       "ResolutionResultResponse": {
         "additionalProperties": false,
         "properties": {
@@ -53982,6 +54275,121 @@
           }
         },
         "summary": "获取股票实时行情",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/{stock_code}/research-timeline": {
+      "get": {
+        "description": "Cursor-paginated research activity for one symbol: analysis runs, related chat turns, decision signals, and hypothesis transitions when the hypothesis workspace is available. Does not full-scan sources; each page overscans at most `limit` rows per source. Hypothesis is reported as unavailable until that workspace ships.",
+        "operationId": "get_stock_research_timeline_api_v1_stocks__stock_code__research_timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "title": "Stock Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque continuation cursor from a previous page",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque continuation cursor from a previous page",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Page size (max 50)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "description": "Page size (max 50)",
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional comma-separated kinds filter: analysis_run,chat,signal,hypothesis",
+            "in": "query",
+            "name": "kinds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional comma-separated kinds filter: analysis_run,chat,signal,hypothesis",
+              "title": "Kinds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchTimelineResponse"
+                }
+              }
+            },
+            "description": "Per-symbol research timeline page"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid stock code or cursor"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Per-symbol research timeline",
         "tags": [
           "Stocks"
         ]
