@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import unittest
 from types import SimpleNamespace
 
@@ -207,6 +208,38 @@ class TestMarketRegimeService(unittest.TestCase):
         )
         artifact = self.service.build_from_agent_context(ctx)
         self.assertEqual(artifact["regime"], "trending_up")
+
+    def test_latest_technical_opinion_wins_after_retry(self):
+        ctx = AgentContext()
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="technical",
+                signal="buy",
+                confidence=0.8,
+                raw_data={"ma_alignment": "bullish", "trend_score": 80},
+            )
+        )
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="technical",
+                signal="sell",
+                confidence=0.8,
+                raw_data={"ma_alignment": "bearish", "trend_score": 20},
+            )
+        )
+
+        artifact = self.service.build_from_agent_context(ctx)
+
+        self.assertEqual(artifact["regime"], "trending_down")
+
+    def test_non_finite_strength_is_omitted_from_persisted_artifact(self):
+        artifact = self.service.build_from_technical_raw(
+            {"trend_score": "NaN", "volume_status": "normal"}
+        )
+
+        self.assertEqual(artifact["regime"], "unknown")
+        self.assertIn("trend_strength", artifact["missing_inputs"])
+        json.dumps(artifact, allow_nan=False)
 
     def test_actionable_prebuilt_is_still_preferred(self):
         prebuilt = self.service.build_from_trend(

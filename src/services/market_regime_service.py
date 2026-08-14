@@ -9,6 +9,7 @@ label. Artifacts retain every evaluated rule for later audit.
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from src.schemas.market_regime import (
@@ -700,7 +701,7 @@ class MarketRegimeService:
     @staticmethod
     def _latest_technical_raw(ctx: Any) -> Optional[Dict[str, Any]]:
         opinions = getattr(ctx, "opinions", None) or []
-        for op in opinions:
+        for op in reversed(opinions):
             if getattr(op, "agent_name", None) != "technical":
                 continue
             raw = getattr(op, "raw_data", None)
@@ -742,9 +743,10 @@ class MarketRegimeService:
         if value is None or value == "":
             return None
         try:
-            return float(value)
+            parsed = float(value)
         except (TypeError, ValueError):
             return None
+        return parsed if math.isfinite(parsed) else None
 
 
 def extract_market_regime_context(payload: Any) -> Optional[Dict[str, Any]]:

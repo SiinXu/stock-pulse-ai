@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-14",
-  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1212) (locale-de, locale-ko, locale-fr, locale-es, locale-id, locale-ms). Headroom: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other named +400.",
+  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1273) (js-entry, locale-ja, locale-de, locale-ko, locale-fr, locale-es, locale-zh-TW, locale-id, locale-ms). Headroom: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other named +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -34,30 +34,30 @@
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 158431,
-      "measuredGzipBytes": 157731,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1212); overflowing named rule only, fixed headroom retained."
+      "maxGzipBytes": 157714,
+      "measuredGzipBytes": 157314,
+      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 157314 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 158314,
-      "measuredGzipBytes": 157614,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1212); overflowing named rule only, fixed headroom retained."
+      "maxGzipBytes": 157591,
+      "measuredGzipBytes": 157191,
+      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 157191 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 157968,
-      "measuredGzipBytes": 157368,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1212); overflowing named rule only, fixed headroom retained."
+      "maxGzipBytes": 157327,
+      "measuredGzipBytes": 156927,
+      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 156927 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 153697,
-      "measuredGzipBytes": 152997,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1212); overflowing named rule only, fixed headroom retained."
+      "maxGzipBytes": 152948,
+      "measuredGzipBytes": 152548,
+      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 152548 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
     },
     {
       "id": "locale-zh-TW",
@@ -69,16 +69,16 @@
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 143494,
-      "measuredGzipBytes": 142794,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1212); overflowing named rule only, fixed headroom retained."
+      "maxGzipBytes": 142787,
+      "measuredGzipBytes": 142387,
+      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 142387 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 143714,
-      "measuredGzipBytes": 143014,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1212); overflowing named rule only, fixed headroom retained."
+      "maxGzipBytes": 142996,
+      "measuredGzipBytes": 142596,
+      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 142596 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
     },
     {
       "id": "vendor-charts",

@@ -439,6 +439,21 @@ Examples / 示例:
         help='Do not save analysis context snapshots / 不保存分析上下文快照'
     )
 
+    parser.add_argument(
+        '--enable-debate',
+        action='store_true',
+        default=None,
+        help='Enable structured Bull-Bear debate for this run (overrides DEBATE_ENABLED) / 本次运行启用结构化多空辩论（覆盖 DEBATE_ENABLED）'
+    )
+
+    parser.add_argument(
+        '--debate-max-rounds',
+        type=int,
+        default=None,
+        choices=[1, 2, 3],
+        help='Debate max rounds for this run (1-3) / 本次运行辩论轮数（1-3）'
+    )
+
     # === Backtest ===
     parser.add_argument(
         '--backtest',
@@ -476,6 +491,14 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
     warnings = config.validate()
     for warning in warnings:
         logger.warning(warning)
+
+    # Optional per-run debate overrides (Issue #117)
+    if getattr(args, "enable_debate", None):
+        config.debate_enabled = True
+        logger.info("CLI override: debate_enabled=true")
+    if getattr(args, "debate_max_rounds", None) is not None:
+        config.debate_max_rounds = int(args.debate_max_rounds)
+        logger.info("CLI override: debate_max_rounds=%s", config.debate_max_rounds)
 
     if getattr(args, "check_notify", False):
         from src.application_services import get_application_services

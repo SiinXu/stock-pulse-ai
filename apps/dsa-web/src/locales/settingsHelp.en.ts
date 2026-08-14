@@ -1,6 +1,6 @@
-import type { SettingsHelpMap } from './settingsHelpTypes';
+import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 
-const settingsHelpEnUS: SettingsHelpMap = {
+const settingsHelpEnUS: SettingsHelpSourceMap = {
   'settings.base.STOCK_LIST': {
     title: 'Watchlist',
     summary: 'Defines the stock codes used by analysis jobs and notification reports.',
@@ -1428,7 +1428,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Recording failures are logged and never fail analysis.'],
   },
   'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
-    title: 'Multi-Strategy Deliberation',
     summary: 'Enable concurrent multi-strategy specialist scheduling with a final disagreement explanation.',
     usage: 'Default off. When true, Native Multi can schedule strategy specialists and surface disagreement explanations without changing the Phase-1 synthesis path when off.',
     valueNotes: [
@@ -1438,8 +1437,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects agent pipeline specialist scheduling and disagreement explanation fields.'],
     notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
   },
+  'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
+    summary: 'Record conflicts; hold if unresolved.',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
+    summary: 'Split-verdict threshold.',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
+    summary: 'Cross-check threshold.',
+  },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
-    title: 'Investment Committee Mode',
     summary: 'Run multi-role investment committee style analysis with structured dissent.',
     usage: 'Default off. When enabled, the agent schedules committee roles and surfaces agreement or dissent in the analysis result.',
     valueNotes: ['Off preserves the existing single-path analysis behavior.'],
@@ -1486,7 +1493,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
   },
   'settings.agent.AGENT_CRITIC_ENABLED': {
-    title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
     usage: 'Enable only when the extra Critic call and a possible single whitelist-stage retry fit the run budget.',
     valueNotes: [
@@ -1496,11 +1502,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
-  'settings.agent.market_regime': {
-    title: 'Market Regime Detection',
-    summary: 'Adds explainable rule-based market regime context to analysis.',
-    usage: 'Keep automatic detection enabled, or provide a supported override only for controlled diagnostics.',
-    notes: ['Unclear evidence produces unknown instead of forcing a directional regime.'],
+  'settings.agent.DEBATE': {
+    title: 'Bull-Bear debate',
+    summary: 'Configure the optional debate stage, limits, and dedicated model.',
   },
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: 'Reflection and Forecast Post-mortem',
@@ -1550,22 +1554,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Works best when combined with the backtest feature.'],
   },
   'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
-    title: 'Agent Episode Log',
     summary: 'Store compact Agent trajectories, lessons, and optional outcomes.',
   },
   'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
-    title: 'Agent Episode Retention Days',
     summary: 'Maximum episode age before retention cleanup.',
   },
   'settings.agent.AGENT_EPISODE_MAX_ROWS': {
-    title: 'Agent Episode Max Rows',
     summary: 'Episode row cap; oldest rows are removed first.',
   },
   'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
-    title: 'Error Pattern Encyclopedia',
   },
   'settings.agent.AGENT_PLANNING_ENABLED': {
-    title: 'Agent Planning Loop',
     summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',
   },
   'settings.agent.AGENT_PLANNING_STRATEGY': {

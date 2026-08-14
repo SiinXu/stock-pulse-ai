@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiLanguage } from '../i18n/uiText';
 import { getFieldTitle } from '../utils/systemConfigI18n';
+import { getSettingsHelpContent } from './settingsHelp';
 
 interface SettingsFieldTitleInput {
   itemKey: string;
@@ -25,9 +26,16 @@ export function resolveSettingsFieldTitle({
     return fallback;
   }
 
-  return getFieldTitle(
+  const localizedTitle = getFieldTitle(
     schemaKey ?? itemKey,
     getFieldTitle(itemKey, fallback, language),
     language,
   );
+  if (localizedTitle !== fallback) {
+    return localizedTitle;
+  }
+
+  return getSettingsHelpContent(schemaKey ?? itemKey, undefined, language)?.title
+    ?? getSettingsHelpContent(itemKey, undefined, language)?.title
+    ?? localizedTitle;
 }

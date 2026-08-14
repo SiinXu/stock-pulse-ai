@@ -537,6 +537,24 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "strategy_supporting_skills_label": "支持策略",
         "strategy_opposing_skills_label": "反方策略",
         "strategy_invalid_opinions_label": "另有 {count} 个策略解析失败",
+        "disagreement_handling_heading": "结构化分歧",
+        "disagreement_high_banner": "高分歧：专家结论冲突，未形成一致方向",
+        "disagreement_verdict_label": "裁决模式",
+        "disagreement_verdict_split": "分裂裁决（保守观望）",
+        "disagreement_verdict_consensus": "共识",
+        "disagreement_verdict_insufficient": "证据不足",
+        "disagreement_escalation_label": "升级动作",
+        "disagreement_score_label": "分歧分数",
+        "disagreement_resolution_label": "收敛状态",
+        "disagreement_resolution_unresolved": "未收敛",
+        "disagreement_resolution_partial": "部分收敛",
+        "disagreement_resolution_resolved": "已收敛",
+        "disagreement_points_label": "分歧点",
+        "disagreement_cross_validation_label": "交叉校验",
+        "disagreement_cross_validation_completed": "已完成双层交叉校验",
+        "disagreement_no_majority_note": "未采用简单多数强行合成方向",
+        "disagreement_pre_signal_label": "升级前信号",
+        "disagreement_applied_signal_label": "最终保守信号",
         "committee_deliberation_heading": "投资委员会审议",
         "committee_members_label": "委员视角",
         "committee_conclusion_label": "委员会结论",
@@ -550,6 +568,16 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "active_research_persona_source_label": "来源",
         "active_research_persona_style_label": "风格参考（非背书）",
         "committee_gaps_label": "缺失或隔离项",
+        "bull_bear_debate_heading": "多空辩论摘要",
+        "bull_bear_contention_heading": "关键交锋点",
+        "bull_bear_status_label": "辩论状态",
+        "bull_bear_rounds_label": "完成轮次",
+        "bull_bear_synthesis_label": "辩论合成结论",
+        "bull_bear_winner_label": "相对优势方",
+        "bull_bear_resolution_label": "解决状态",
+        "bull_bear_no_majority_note": "辩论合成不使用多数表决，不静默抹平分歧。",
+        "bull_bear_bull_label": "多方",
+        "bull_bear_bear_label": "空方",
         "report_strata_heading": "证据分层",
         "disclaimer_heading": "非投资建议声明",
         "verified_facts_heading": "已核实事实",
@@ -736,6 +764,24 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "strategy_supporting_skills_label": "Supporting Strategies",
         "strategy_opposing_skills_label": "Opposing Strategies",
         "strategy_invalid_opinions_label": "{count} additional strategies failed to produce valid signals",
+        "disagreement_handling_heading": "Structured Disagreement",
+        "disagreement_high_banner": "High disagreement: experts conflict; no forced directional consensus",
+        "disagreement_verdict_label": "Verdict mode",
+        "disagreement_verdict_split": "Split verdict (conservative hold)",
+        "disagreement_verdict_consensus": "Consensus",
+        "disagreement_verdict_insufficient": "Insufficient evidence",
+        "disagreement_escalation_label": "Escalation",
+        "disagreement_score_label": "Disagreement score",
+        "disagreement_resolution_label": "Resolution",
+        "disagreement_resolution_unresolved": "Unresolved",
+        "disagreement_resolution_partial": "Partially resolved",
+        "disagreement_resolution_resolved": "Resolved",
+        "disagreement_points_label": "Disagreement points",
+        "disagreement_cross_validation_label": "Cross-validation",
+        "disagreement_cross_validation_completed": "Dual-layer cross-validation completed",
+        "disagreement_no_majority_note": "Majority vote was not used to force a direction",
+        "disagreement_pre_signal_label": "Pre-escalation signal",
+        "disagreement_applied_signal_label": "Applied conservative signal",
         "committee_deliberation_heading": "Investment Committee Deliberation",
         "committee_members_label": "Committee Lenses",
         "committee_conclusion_label": "Committee Conclusion",
@@ -749,6 +795,16 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "active_research_persona_source_label": "Source",
         "active_research_persona_style_label": "Style references (not endorsement)",
         "committee_gaps_label": "Gaps / Isolated Items",
+        "bull_bear_debate_heading": "Bull-Bear Debate Summary",
+        "bull_bear_contention_heading": "Key Points of Contention",
+        "bull_bear_status_label": "Debate Status",
+        "bull_bear_rounds_label": "Rounds Completed",
+        "bull_bear_synthesis_label": "Debate Synthesis",
+        "bull_bear_winner_label": "Relative Edge",
+        "bull_bear_resolution_label": "Resolution Status",
+        "bull_bear_no_majority_note": "Debate synthesis does not use majority vote and does not silently smooth disagreement.",
+        "bull_bear_bull_label": "Bull",
+        "bull_bear_bear_label": "Bear",
         "report_strata_heading": "Evidence Strata",
         "disclaimer_heading": "Non-Investment-Advice Disclaimer",
         "verified_facts_heading": "Verified Facts",
@@ -937,6 +993,24 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "strategy_supporting_skills_label": "지지 전략",
         "strategy_opposing_skills_label": "반대 전략",
         "strategy_invalid_opinions_label": "추가로 {count}개 전략이 유효한 신호를 생성하지 못했습니다",
+        "disagreement_handling_heading": "구조화 이견",
+        "disagreement_high_banner": "높은 이견: 전문가 결론이 충돌하며 강제 합의하지 않음",
+        "disagreement_verdict_label": "판정 모드",
+        "disagreement_verdict_split": "분열 판정(보수적 관망)",
+        "disagreement_verdict_consensus": "합의",
+        "disagreement_verdict_insufficient": "증거 부족",
+        "disagreement_escalation_label": "에스컬레이션",
+        "disagreement_score_label": "이견 점수",
+        "disagreement_resolution_label": "수렴 상태",
+        "disagreement_resolution_unresolved": "미수렴",
+        "disagreement_resolution_partial": "부분 수렴",
+        "disagreement_resolution_resolved": "수렴 완료",
+        "disagreement_points_label": "이견 포인트",
+        "disagreement_cross_validation_label": "교차 검증",
+        "disagreement_cross_validation_completed": "이중 계층 교차 검증 완료",
+        "disagreement_no_majority_note": "다수결로 방향을 강제하지 않음",
+        "disagreement_pre_signal_label": "에스컬레이션 전 신호",
+        "disagreement_applied_signal_label": "적용된 보수 신호",
         "committee_deliberation_heading": "투자위원회 심의",
         "committee_members_label": "위원 관점",
         "committee_conclusion_label": "위원회 결론",
@@ -950,6 +1024,16 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "active_research_persona_source_label": "출처",
         "active_research_persona_style_label": "스타일 참조(추천 아님)",
         "committee_gaps_label": "누락/격리 항목",
+        "bull_bear_debate_heading": "불-베어 토론 요약",
+        "bull_bear_contention_heading": "핵심 쟁점",
+        "bull_bear_status_label": "토론 상태",
+        "bull_bear_rounds_label": "완료 라운드",
+        "bull_bear_synthesis_label": "토론 종합",
+        "bull_bear_winner_label": "상대 우위",
+        "bull_bear_resolution_label": "해소 상태",
+        "bull_bear_no_majority_note": "토론 종합은 다수결을 사용하지 않으며 이견을 조용히 덮지 않습니다.",
+        "bull_bear_bull_label": "강세",
+        "bull_bear_bear_label": "약세",
         "report_strata_heading": "증거 계층",
         "disclaimer_heading": "투자 권유 아님 고지",
         "verified_facts_heading": "검증된 사실",
@@ -1452,6 +1536,29 @@ def append_committee_deliberation_lines(
             lines.append("")
 
 
+def append_bull_bear_debate_lines(
+    lines: List[str],
+    dashboard: Any,
+    labels: Dict[str, str],
+) -> None:
+    """Append a Bull-Bear debate block from dashboard payload. No-op when disabled."""
+    payload = dashboard.get("bull_bear_debate") if dashboard else None
+    if not isinstance(payload, dict) or not payload.get("enabled"):
+        return
+    synthesis = payload.get("synthesis") if isinstance(payload.get("synthesis"), dict) else {}
+    lines.append(f"### ⚔️ {labels.get('bull_bear_debate_heading', 'Bull-Bear Debate')}")
+    lines.append(
+        f"- {labels.get('bull_bear_status_label', 'Status')}: {payload.get('status')} | "
+        f"{labels.get('bull_bear_rounds_label', 'Rounds')}: {payload.get('rounds_completed')}"
+    )
+    if synthesis.get("summary"):
+        lines.append(f"- {synthesis.get('summary')}")
+    for point in (payload.get("contention_points") or [])[:3]:
+        if isinstance(point, dict):
+            lines.append(f"- [{point.get('source', 'debate')}] {point.get('topic') or point.get('kind')}")
+    lines.append("")
+
+
 def localize_chip_health(value: Any, language: Optional[str]) -> str:
     """Translate chip health labels between Chinese and English when recognized."""
     return _translate_from_map(
@@ -1500,6 +1607,40 @@ def localize_strategy_conflict_description(conflict_type: Any, language: Optiona
         canonical_map=_STRATEGY_CONFLICT_TYPE_CANONICAL_MAP,
         translations=_STRATEGY_CONFLICT_DESCRIPTION_TRANSLATIONS,
     )
+
+
+
+
+def localize_disagreement_verdict_mode(value: Any, language: Optional[str]) -> str:
+    """Localize disagreement verdict_mode for report renderers."""
+    labels = get_report_labels(language)
+    key = str(value or "").strip().lower()
+    mapping = {
+        "split": labels.get("disagreement_verdict_split", "split"),
+        "consensus": labels.get("disagreement_verdict_consensus", "consensus"),
+        "insufficient": labels.get("disagreement_verdict_insufficient", "insufficient"),
+    }
+    return mapping.get(key, str(value or ""))
+
+
+def localize_disagreement_resolution(value: Any, language: Optional[str]) -> str:
+    """Localize disagreement resolution_status for report renderers."""
+    labels = get_report_labels(language)
+    key = str(value or "").strip().lower()
+    mapping = {
+        "unresolved": labels.get("disagreement_resolution_unresolved", "unresolved"),
+        "partially_resolved": labels.get("disagreement_resolution_partial", "partially_resolved"),
+        "resolved": labels.get("disagreement_resolution_resolved", "resolved"),
+    }
+    return mapping.get(key, str(value or ""))
+
+
+def normalize_disagreement_handling_payload(value: Any) -> Dict[str, Any]:
+    """Return a renderer-safe disagreement handling payload, or empty dict."""
+    from src.agent.disagreement_handling import public_disagreement_handling_payload
+
+    payload = public_disagreement_handling_payload(value)
+    return dict(payload) if isinstance(payload, dict) else {}
 
 
 def normalize_strategy_synthesis_payload(value: Any) -> Dict[str, Any]:

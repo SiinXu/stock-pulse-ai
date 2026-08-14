@@ -26,8 +26,8 @@ These labels align with built-in skill `market_regimes` tags (`trending_up`, `tr
 
 ## Artifact contract
 
-Key: `market_regime_context`  
-Schema version: `market-regime-v1`  
+Key: `market_regime_context`
+Schema version: `market-regime-v1`
 Method id: `deterministic_rules_v1`
 
 Important fields:

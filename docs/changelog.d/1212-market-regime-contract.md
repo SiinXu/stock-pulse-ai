@@ -1,1 +1,0 @@
-- [Fixed] Align market-regime configuration metadata and extracted facade snapshots with the implemented contract.
