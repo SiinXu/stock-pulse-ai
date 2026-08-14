@@ -1,0 +1,3 @@
+- [Added] scripts/merge_resolvers: fail-closed merge-conflict resolvers for whole-repository derived files (bundle-size budgets, public-surface snapshots, config-registry snapshot, docs index, Playground catalogue size, i18n tables, settings-help catalogue, generated API artifacts) with a single atomic entry point `resolve.py` (Refs #1284).
+- [Tests] Add tests/scripts/test_merge_resolvers.py covering additive merges, same-entry edit conflicts, marker-free files, unexpected hunk shapes, and the all-or-nothing batch behaviour.
+- [Docs] Document, per derived file, why neither merge side is correct and exactly what must cause a refusal (scripts/merge_resolvers/README.md).

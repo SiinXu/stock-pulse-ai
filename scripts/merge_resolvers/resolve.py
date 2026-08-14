@@ -162,14 +162,14 @@ def main(argv: list[str] | None = None) -> int:
         print("no paths given; nothing to do")
         return EXIT_OK
 
+    if args.rebaseline_collateral and not args.remeasure:
+        parser.error("--rebaseline-collateral requires --remeasure")
+
     try:
         repo = repo_root()
     except ResolverError as exc:
         print(f"merge-resolvers: {exc}", file=sys.stderr)
         return EXIT_INTERNAL_ERROR
-
-    if args.rebaseline_collateral and not args.remeasure:
-        parser.error("--rebaseline-collateral requires --remeasure")
 
     ctx = Context(
         repo_root=repo,
