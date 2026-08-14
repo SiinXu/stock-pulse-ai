@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-13",
-  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1158) (js-entry, locale-ja, locale-de, locale-ko, locale-fr, locale-es, locale-zh-TW, locale-id, locale-ms). Headroom: locale-fr +600, other locales +700, other named +400.",
+  "measuredAt": "2026-08-14",
+  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1260) (locale-ja, locale-de, locale-fr). Headroom: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other named +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -27,16 +27,16 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 163580,
-      "measuredGzipBytes": 162880,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1158); overflowing rule only."
+      "maxGzipBytes": 164380,
+      "measuredGzipBytes": 163680,
+      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1260); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 156632,
-      "measuredGzipBytes": 155932,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1158); overflowing rule only."
+      "maxGzipBytes": 157385,
+      "measuredGzipBytes": 156685,
+      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1260); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-ko",
@@ -48,9 +48,9 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 156297,
-      "measuredGzipBytes": 155697,
-      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1158); overflowing rule only."
+      "maxGzipBytes": 156942,
+      "measuredGzipBytes": 156342,
+      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1260); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-es",
