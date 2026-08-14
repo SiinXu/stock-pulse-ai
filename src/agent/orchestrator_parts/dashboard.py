@@ -93,6 +93,10 @@ class _DashboardMethods:
             ctx.meta["skills_requested"] = requested_skills or []
             ctx.meta["strategies_requested"] = requested_skills or []
             ctx.meta["report_language"] = normalize_report_language(context.get("report_language", "zh"))
+            if "enable_debate" in context:
+                ctx.meta["enable_debate"] = context.get("enable_debate")
+            if "debate_max_rounds" in context:
+                ctx.meta["debate_max_rounds"] = context.get("debate_max_rounds")
             instrument_type = context.get("instrument_type") or context.get("asset_type")
             if isinstance(instrument_type, str) and instrument_type.strip():
                 ctx.meta["instrument_type"] = instrument_type.strip()
@@ -744,6 +748,27 @@ class _DashboardMethods:
                 "[Orchestrator] investment committee report section failed",
                 exc,
                 error_code="agent_committee_report_section_failed",
+                level=logging.WARNING,
+            )
+
+        # Bull-Bear debate section (#117): additive product surface; never silent-drop.
+        try:
+            from src.agent.bull_bear_debate import (
+                DEBATE_META_KEY,
+                apply_debate_to_dashboard,
+                get_debate_record,
+            )
+
+            apply_debate_to_dashboard(
+                dashboard_block,
+                get_debate_record(ctx) or ctx.meta.get(DEBATE_META_KEY),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Report projection failure is logged while the primary decision remains authoritative.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] bull-bear debate report section failed",
+                exc,
+                error_code="agent_bull_bear_debate_report_section_failed",
                 level=logging.WARNING,
             )
 

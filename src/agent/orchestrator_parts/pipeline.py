@@ -7,6 +7,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from src.agent import bull_bear_debate as _debate
 from src.agent import critic as _critic
 from src.agent.chat_context import build_agent_chat_tool_registry
 from src.agent.disagreement import build_agent_disagreement_summary
@@ -46,6 +47,7 @@ NON_CRITICAL_BASE_STAGES = frozenset({
     "intel",
     "risk",
     _critic.CRITIC_STAGE_NAME,
+    _debate.DEBATE_STAGE_NAME,
 })
 
 
@@ -385,6 +387,10 @@ class _PipelineMethods:
                     agents.insert(index, critic_agent)
                     continue
 
+            if _debate.maybe_insert_before_decision(
+                self, agents, index, ctx, stats, timeout_s, remaining_budget, _OPTIONAL_STAGE_REQUIRED_S, progress_callback):
+                continue
+
             stage_name = str(agent.agent_name or "")
             observed_entries = stage_entry_counts.get(stage_name, 0) + 1
             stage_entry_limit = self.runtime_guard_policy.max_stage_entries
@@ -439,21 +445,7 @@ class _PipelineMethods:
                     message=f"Starting {agent.agent_name} analysis...",
                 ))
 
-            remaining_timeout_s = (
-                max(0.0, timeout_s - elapsed_s)
-                if timeout_s
-                else None
-            )
-            if (
-                _critic.is_critic_stage(stage_name)
-                and remaining_timeout_s is not None
-            ):
-                remaining_timeout_s = max(
-                    0.0,
-                    remaining_timeout_s
-                    - _DECISION_BUDGET_RESERVE_S
-                    - _OPTIONAL_STAGE_MARGIN_S,
-                )
+            remaining_timeout_s = _debate.reserve_optional_stage_timeout(stage_name, timeout_s, elapsed_s, _critic.is_critic_stage(stage_name), _DECISION_BUDGET_RESERVE_S, _OPTIONAL_STAGE_MARGIN_S)
             effective_stage_timeout_s = self._resolve_stage_timeout_seconds(
                 stage_name,
                 remaining_timeout_s,
@@ -558,6 +550,7 @@ class _PipelineMethods:
                     if critic_trace is None:
                         critic_trace = _critic.record_critic_stage_failure(ctx)
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
+            _debate.commit_pipeline_stage_result(ctx, result, stage_name)
             stats.record_stage(result)
             all_tool_calls.extend(
                 tc for tc in (result.meta.get("tool_calls_log") or [])
@@ -1495,6 +1488,13 @@ class _PipelineMethods:
                 stage=_critic.CRITIC_STAGE_NAME,
                 **_critic.trace_event_fields(trace),
             ))
+
+    def _record_debate_budget_skip(
+        self, ctx: AgentContext, stats: AgentRunStats, *,
+        settings: Optional[Dict[str, Any]] = None, progress_callback: Optional[Callable],
+    ) -> None:
+        """Fail soft on debate without spending Decision's reserved wall-clock budget."""
+        _debate.apply_pipeline_budget_skip(self, ctx, stats, settings=settings, progress_callback=progress_callback)
 
     def _record_degraded_stage(
         self,
