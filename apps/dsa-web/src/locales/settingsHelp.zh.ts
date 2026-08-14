@@ -1734,6 +1734,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
     notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
   },
+  'settings.agent.research_pack_export': {
+    title: '研报资产包导出',
+    summary: '一键导出脱敏研报资产包（报告、决策卡、证据引用、轨迹）。',
+    usage: '除非运营需要 ZIP 导出，否则保持 RESEARCH_PACK_EXPORT_ENABLED=false。RESEARCH_PACK_MAX_ZIP_BYTES 控制 ZIP 大小上限（1–64 MiB）。',
+    valueNotes: ['默认关闭；分享模式脱敏始终开启。', '完整证据链待 #986 / #127 合入后增量接入。'],
+    impact: ['控制 GET /api/v1/history/{record_id}/research-pack。'],
+    notes: ['详见 docs/research-pack-export.md。'],
+  },
+
   'settings.agent.observability': {
     title: 'Agent 可观测性',
     summary: '为运行流提供带 trace/span 的轻量 Agent 结构化事件。',
