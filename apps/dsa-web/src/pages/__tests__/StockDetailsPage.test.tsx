@@ -36,6 +36,24 @@ vi.mock('../../api/valuation', () => ({
   estimateStockValuation: vi.fn(),
 }));
 
+vi.mock('../../api/researchTimeline', () => ({
+  researchTimelineApi: {
+    list: vi.fn().mockResolvedValue({
+      stockCode: '600519',
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+      limit: 20,
+      sources: {
+        analysisRun: 'empty',
+        chat: 'empty',
+        signal: 'empty',
+        hypothesis: 'unavailable',
+      },
+    }),
+  },
+}));
+
 vi.mock('../../api/moneyFlow', () => ({
   getStockMoneyFlow: vi.fn(),
 }));
@@ -490,4 +508,12 @@ describe('StockDetailsPage', () => {
       expect.objectContaining({ stockCode: '600519' }),
     );
   });
+
+  it('mounts the research timeline on the product Stock Details page (reachability)', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockResolvedValue(makeHistory());
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'Research timeline' })).toBeInTheDocument();
+  });
+
 });

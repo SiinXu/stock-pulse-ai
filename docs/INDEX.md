@@ -74,6 +74,7 @@
 | [每日简报（个人晨报 + 准确率）](daily-brief.md) | 持仓、隔夜要点、近期财报事件上下文、昨日分析、自选与诚实准确率（[英文](daily-brief_EN.md)） |
 | [事件研究简报](event-research-brief.md) | 财报 EventBrief（指标、超预期定义、事后清单）（[英文](event-research-brief_EN.md)） |
 | [预测到期解析器](prediction-resolver.md) | 系统驱动到期解析：既有调度器 / CLI cron；Provider 失败 → data_unavailable（[英文](prediction-resolver_EN.md)） |
+| [研究时间线](research-timeline_CN.md) / [EN](research-timeline.md) | 按标的聚合分析运行、对话、信号（假设可选） |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |
 | [预测 resolve_after 交易日历策略](prediction-resolve-after.md) | horizon → UTC `resolve_after`（A/HK/US 交易 session、节假日/半日市/跨市场）；禁止自然日近似（[EN](prediction-resolve-after_EN.md)） |
 | [个人投资框架](personal-investment-framework.md) | Settings 最小编辑页、版本化 API、单股分析只读注入与报告 framework_alignment 槽位 |
