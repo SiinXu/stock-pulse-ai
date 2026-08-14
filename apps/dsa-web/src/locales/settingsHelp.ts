@@ -2,7 +2,7 @@ import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 import { getFieldTitle } from '../utils/systemConfigI18n';
 import { normalizeUiLanguage } from '../utils/uiLanguage';
-import settingsHelpEnUS, { settingsHelpSchemaDescriptionOnly } from './settingsHelp.en';
+import settingsHelpEnUS from './settingsHelp.en';
 import settingsHelpZhCN from './settingsHelp.zh';
 import type { SettingsHelpDefinition, SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 import type { SettingsHelpContent } from './settingsHelpTypes';
@@ -13,6 +13,10 @@ const SETTINGS_HELP_MAPS: Record<UiLanguage, SettingsHelpSourceMap> = createUiLa
   'locales.settingsHelp.SETTINGS_HELP_MAPS',
   { zh: settingsHelpZhCN, en: settingsHelpEnUS },
 );
+
+const SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY: SettingsHelpSourceMap = {
+  'settings.agent.multi_model_consensus': {},
+};
 
 const SETTINGS_HELP_FALLBACK_TITLES: Record<UiLanguage, string> = createUiLanguageRecord(
   'locales.settingsHelp.SETTINGS_HELP_FALLBACK_TITLES',
@@ -33,7 +37,7 @@ export function getSettingsHelpContent(
   }
 
   const language = getPreferredHelpLanguage(locale);
-  const localized = settingsHelpSchemaDescriptionOnly[helpKey]
+  const localized = SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY[helpKey]
     ?? SETTINGS_HELP_MAPS[language][helpKey]
     ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
   if (localized && Object.keys(localized).length > 0) {
