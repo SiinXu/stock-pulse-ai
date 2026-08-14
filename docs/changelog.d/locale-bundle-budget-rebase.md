@@ -1,0 +1,1 @@
+- [Chore] Re-measure locale bundle gzip budgets against a combined production build after the merge backlog drain (Refs #1284).
