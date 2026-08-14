@@ -810,6 +810,8 @@ class _PersistenceStageMixin:
         money_flow_data: Optional[Any] = None,
         sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> PipelineAnalysisArtifacts:
+        from src.services.info_quality_grading import read_info_quality_feature_flag
+
         return PipelineAnalysisArtifacts(
             code=code,
             stock_name=stock_name,
@@ -834,6 +836,14 @@ class _PersistenceStageMixin:
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
             money_flow_data=money_flow_data,
+            info_quality_grading_enabled=read_info_quality_feature_flag(
+                self.config,
+                "info_quality_grading_enabled",
+            ),
+            forced_conclusion_enabled=read_info_quality_feature_flag(
+                self.config,
+                "forced_conclusion_enabled",
+            ),
             sentiment_snapshot=dict(sentiment_snapshot) if isinstance(sentiment_snapshot, dict) else None,
         )
 
@@ -851,6 +861,8 @@ class _PersistenceStageMixin:
         portfolio_context: Optional[Dict[str, Any]] = None,
         sentiment_snapshot: Optional[Dict[str, Any]] = None,
     ) -> PipelineAnalysisArtifacts:
+        from src.services.info_quality_grading import read_info_quality_feature_flag
+
         context_candidate = base_context
         if not isinstance(context_candidate, dict):
             context_candidate = initial_context.get("analysis_context")
@@ -886,6 +898,14 @@ class _PersistenceStageMixin:
                 "trigger_source": self.query_source,
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
+            info_quality_grading_enabled=read_info_quality_feature_flag(
+                self.config,
+                "info_quality_grading_enabled",
+            ),
+            forced_conclusion_enabled=read_info_quality_feature_flag(
+                self.config,
+                "forced_conclusion_enabled",
+            ),
             sentiment_snapshot=dict(sentiment_snapshot) if isinstance(sentiment_snapshot, dict) else None,
         )
 
@@ -918,6 +938,7 @@ class _PersistenceStageMixin:
             summary = format_analysis_context_pack_prompt_section(
                 pack,
                 report_language=report_language,
+                enforce_forced_conclusion=artifacts.forced_conclusion_enabled,
             )
             overview = render_analysis_context_pack_overview(
                 pack,

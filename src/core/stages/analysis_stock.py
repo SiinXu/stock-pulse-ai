@@ -1050,6 +1050,22 @@ class _StockAnalysisStageMixin:
                     report_type=report_type.value,
                     previous_operation_advice=action_source_advice,
                 )
+                info_quality_adjustments = self._apply_info_quality_constraints(
+                    result,
+                    analysis_context_pack_overview=analysis_context_pack_overview,
+                )
+                if info_quality_adjustments:
+                    logger.info(
+                        "[info_quality] Applied constraints for %s: %s",
+                        code,
+                        info_quality_adjustments,
+                    )
+                    self._refresh_decision_action_for_final_result(
+                        result,
+                        report_type=report_type.value,
+                        previous_operation_advice=action_source_advice,
+                    )
+
                 # Pipeline quality gate: bind conclusion facts to input evidence (#887).
                 from src.services.analysis_quality_gate import (
                     apply_analysis_quality_gate,

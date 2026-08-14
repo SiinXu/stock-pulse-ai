@@ -128,6 +128,7 @@ def format_analysis_context_pack_prompt_section(
     pack: Any,
     *,
     report_language: str = "zh",
+    enforce_forced_conclusion: bool = True,
 ) -> str:
     """Return a low-sensitivity prompt summary for an AnalysisContextPack.
 
@@ -135,6 +136,8 @@ def format_analysis_context_pack_prompt_section(
     runtime prompt signal only; P4 exposes a separate low-sensitivity overview,
     not this prompt string or the full pack.
     """
+    if type(enforce_forced_conclusion) is not bool:
+        raise TypeError("enforce_forced_conclusion must be bool")
     payload = _pack_to_dict(pack)
     if not payload:
         return ""
@@ -145,7 +148,14 @@ def format_analysis_context_pack_prompt_section(
         return ""
 
     lang = normalize_analysis_context_pack_language(report_language)
-    return _format_en(payload) if lang == "en" else _format_zh(payload)
+    return (
+        _format_en(payload, enforce_forced_conclusion=enforce_forced_conclusion)
+        if lang == "en"
+        else _format_zh(
+            payload,
+            enforce_forced_conclusion=enforce_forced_conclusion,
+        )
+    )
 
 
 def analysis_context_pack_to_dict(pack: Any) -> Dict[str, Any]:
@@ -168,7 +178,11 @@ def analysis_context_pack_to_dict(pack: Any) -> Dict[str, Any]:
 _pack_to_dict = analysis_context_pack_to_dict
 
 
-def _format_zh(payload: Dict[str, Any]) -> str:
+def _format_zh(
+    payload: Dict[str, Any],
+    *,
+    enforce_forced_conclusion: bool,
+) -> str:
     lines = ["", "## 分析上下文包摘要"]
     lines.extend(_subject_lines(payload, lang="zh"))
     block_lines = _block_lines(payload, lang="zh")
@@ -181,11 +195,21 @@ def _format_zh(payload: Dict[str, Any]) -> str:
     warnings = _list_strings(_nested(payload, "data_quality", "warnings"))
     if warnings:
         lines.append(f"- 数据质量提醒：{_join_text(warnings, lang='zh')}")
-    lines.extend(_data_limitation_lines(payload, lang="zh"))
+    lines.extend(
+        _data_limitation_lines(
+            payload,
+            lang="zh",
+            enforce_forced_conclusion=enforce_forced_conclusion,
+        )
+    )
     return "\n".join(lines) + "\n"
 
 
-def _format_en(payload: Dict[str, Any]) -> str:
+def _format_en(
+    payload: Dict[str, Any],
+    *,
+    enforce_forced_conclusion: bool,
+) -> str:
     lines = ["", "## Analysis Context Pack Summary"]
     lines.extend(_subject_lines(payload, lang="en"))
     block_lines = _block_lines(payload, lang="en")
@@ -198,7 +222,13 @@ def _format_en(payload: Dict[str, Any]) -> str:
     warnings = _list_strings(_nested(payload, "data_quality", "warnings"))
     if warnings:
         lines.append(f"- Data quality notes: {_join_text(warnings, lang='en')}")
-    lines.extend(_data_limitation_lines(payload, lang="en"))
+    lines.extend(
+        _data_limitation_lines(
+            payload,
+            lang="en",
+            enforce_forced_conclusion=enforce_forced_conclusion,
+        )
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -304,7 +334,12 @@ def _metadata_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
     ]
 
 
-def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
+def _data_limitation_lines(
+    payload: Dict[str, Any],
+    *,
+    lang: str,
+    enforce_forced_conclusion: bool,
+) -> List[str]:
     lines = ["", "## Data Limitations" if lang == "en" else "## 数据限制"]
     data_quality = payload.get("data_quality")
     if not isinstance(data_quality, Mapping):
@@ -324,6 +359,10 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
                 line += f"（{level_text}）"
         lines.append(line)
 
+    grade_line = _info_quality_grade_line(data_quality, lang=lang)
+    if grade_line:
+        lines.append(grade_line)
+
     limitations = _localized_limitations(
         _list_strings(data_quality.get("limitations")),
         lang=lang,
@@ -334,6 +373,8 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
         lines.append(f"- {label}{separator}{_join_text(limitations, lang=lang)}")
 
     lines.extend(_phase_data_quality_constraint_lines(payload, lang=lang))
+    if enforce_forced_conclusion:
+        lines.extend(_info_quality_constraint_lines(data_quality, lang=lang))
 
     if _has_core_degraded_block(payload):
         if lang == "en":
@@ -358,6 +399,16 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
             "from this summary; do not reproduce raw payloads, news body text, "
             "raw trend values, secrets, tokens, or webhooks."
         )
+        if enforce_forced_conclusion:
+            lines.append(
+                "- Fact rule: never invent prices, fundamentals, or news facts absent "
+                "from available evidence; mark unsupported conclusions as uncertain Watch."
+            )
+        else:
+            lines.append(
+                "- Fact rule: never invent prices, fundamentals, or news facts absent "
+                "from available evidence; state unsupported limitations explicitly."
+            )
     else:
         lines.append(
             "- 分析规则：辅助数据块缺失只限制对应分析段落，不要把缺失本身解释为利好或利空。"
@@ -366,7 +417,78 @@ def _data_limitation_lines(payload: Dict[str, Any], *, lang: str) -> List[str]:
             "- 安全规则：只使用本摘要中的 status、source、warnings 和 missing_reason；"
             "不要复述 raw payload、新闻正文、趋势原始值、secret、token 或 webhook。"
         )
+        if enforce_forced_conclusion:
+            lines.append(
+                "- 事实规则：不得编造证据中不存在的价格、基本面或新闻事实；"
+                "无证据支撑的结论必须标为不确定的 Watch，不得冒充事实。"
+            )
+        else:
+            lines.append(
+                "- 事实规则：不得编造证据中不存在的价格、基本面或新闻事实；"
+                "必须明确说明缺乏证据的限制。"
+            )
     return lines
+
+
+def _info_quality_grade_line(data_quality: Mapping[str, Any], *, lang: str) -> str:
+    grade = _safe_text(
+        data_quality.get("info_quality_grade")
+        or _nested(data_quality, "info_quality", "grade")
+        or _nested(data_quality, "metadata", "info_quality_grade")
+    ).upper()
+    if grade not in {"A", "B", "C"}:
+        return ""
+    dimensions = _nested(data_quality, "info_quality", "dimensions")
+    if not isinstance(dimensions, Mapping):
+        dimensions = _nested(data_quality, "metadata", "info_quality", "dimensions")
+    dim_parts: List[str] = []
+    if isinstance(dimensions, Mapping):
+        for key in ("source_reliability", "timeliness", "consistency"):
+            value = _safe_text(dimensions.get(key)).upper()
+            if value in {"A", "B", "C"}:
+                dim_parts.append(f"{key}={value}")
+    if lang == "en":
+        line = f"- Information quality grade: {grade}"
+        if dim_parts:
+            line += f" ({', '.join(dim_parts)})"
+        return line
+    line = f"- 信息质量等级：{grade}"
+    if dim_parts:
+        line += f"（{', '.join(dim_parts)}）"
+    return line
+
+
+def _info_quality_constraint_lines(
+    data_quality: Mapping[str, Any],
+    *,
+    lang: str,
+) -> List[str]:
+    grade = _safe_text(
+        data_quality.get("info_quality_grade")
+        or _nested(data_quality, "info_quality", "grade")
+        or _nested(data_quality, "metadata", "info_quality_grade")
+    ).upper()
+    if grade not in {"B", "C"}:
+        return []
+    if lang == "en":
+        if grade == "C":
+            return [
+                "- Information quality rule: grade C forbids Pass conclusions and "
+                "requires Watch wording with explicit uncertainty; do not present "
+                "low-quality evidence as verified fact."
+            ]
+        return [
+            "- Information quality rule: grade B requires cautious wording and "
+            "must not claim high confidence without stronger evidence."
+        ]
+    if grade == "C":
+        return [
+            "- 信息质量规则：等级 C 禁止 Pass 结论，必须使用 Watch 表述并明确不确定；"
+            "不得把低质量证据写成已证实事实。"
+        ]
+    return [
+        "- 信息质量规则：等级 B 必须谨慎表述，证据不足时不得给出高置信结论。"
+    ]
 
 
 def _localized_limitations(limitations: List[str], *, lang: str) -> List[str]:

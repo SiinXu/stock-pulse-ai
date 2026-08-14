@@ -252,6 +252,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DATA_VALIDATION_STRICT` | `false` | 是 | 模板中注释; Reject invalid daily/realtime provider candidates before acceptance/cache so the existing bounded provider loop can c... |
 | `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | 是 | 模板中注释; Comma-separated market/instrument selectors; supported instruments are equity, etf, and index |
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | 是 | 模板中注释; Separate final aggregated-fundamental policy: warn or reject |
+| `FORCED_CONCLUSION_ENABLED` | `true` | 是 | 模板中注释; Forced Pass/Fail/Watch conclusion constrained by information quality (Issue #123) |
+| `INFO_QUALITY_GRADING_ENABLED` | `true` | 是 | 模板中注释; A/B/C information quality grade from validation evidence (Issue #123) |
 | `DEBUG` | `false` | 是 | Enable debugging logs |
 | `DECISION_MEMORY_ENABLED` | `true` | 是 | 模板中注释; Historical decision memory & reflection (Issue #118; default on, no config needed) Injects a "Historical Decision Ref... |
 | `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max admitted evaluated signals per stock to inject (rate and list use this set; hard cap 40) |
