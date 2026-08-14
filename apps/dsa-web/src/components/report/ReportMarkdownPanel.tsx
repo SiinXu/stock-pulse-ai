@@ -256,6 +256,13 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
 
       <Suspense fallback={false}>
         <EvidencePackExportControls
+          recordId={recordId}
+          disabled={isLoading}
+          className="mb-4"
+        />
+      </Suspense>
+
+      <Suspense fallback={false}>
         <ResearchPackExportControls
           recordId={recordId}
           disabled={isLoading}

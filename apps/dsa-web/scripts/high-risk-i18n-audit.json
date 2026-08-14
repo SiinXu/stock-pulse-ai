@@ -148,12 +148,9 @@
   },
   "keyInventory": {
     "path": "apps/dsa-web/scripts/high-risk-i18n-keys.json",
-    "count": 361,
-    "sha256": "7d53bce96e1c1ab67efcf7c8e5ff054df48376a8989ad236a8e95a5831e55631",
-    "keySetSha256": "3a0db998104bc840b2a0b419dfd07a825e4b7f90ec83179a2cba270353147be0",
-    "count": 359,
-    "sha256": "27b27520ae82fa614a844836bad550d30f03a14335cc34f7009009819c2e9160",
-    "keySetSha256": "a7e8cb353bb8949f95b8f813b26bcdde3c813bbc7c8810853a9120f9b8b709e8",
+    "count": 367,
+    "sha256": "2c8392ba743f55a40153b7a953b8bd6a53a9de46fad560a458b0dac6b44306ce",
+    "keySetSha256": "ce7f30b9f2d67829b72eb0bcca2c2d973c9679ddc44bf82fc9f909414479a801",
     "decisionLinkedCount": 95
   },
   "reviewPasses": [
@@ -163,11 +160,9 @@
       "reviewer": "issue-882-worker@stock-pulse-ai",
       "reviewedAt": "2026-08-12",
       "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
-      "summary": "361 high-risk keys annotated. 95 remain linked to recorded semantic decisions with candidate revisions. Eight new evidence-chain and audit-export error title/message pairs were added as product-source retain entries. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "summary": "High-risk keys annotated after merging evidence-chain/audit-export and research-pack error pairs. Eight evidence-chain/audit-export title/message pairs and six research-pack title/message pairs were added as product-source retain entries. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
       "claimsNativeApproval": false,
-      "keyCount": 361,
-      "summary": "359 high-risk keys annotated. The six added research-pack error title/message keys accurately preserve fail-closed administrator-authentication, feature-gate, and archive-size-limit behavior. 95 keys remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. The PR's existing identical-to-English baseline entries remain explicit; this merge-resolution pass did not expand them.",
-      "keyCount": 359,
+      "keyCount": 367,
       "categoryConclusions": [
         {
           "category": "trading_action",
@@ -192,8 +187,7 @@
         {
           "category": "error",
           "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
-          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained for the four new evidence-chain/audit-export codes (evidence_chain_disabled, evidence_chain_auth_required, audit_export_disabled, audit_export_auth_required); locale naturalness remains PENDING_NATIVE_REVIEW."
-          "notes": "Stable error title/message pairs keep internal codes separate from display copy. The six research-pack pairs explicitly explain disabled authentication, a disabled export gate, and the configured size limit without implying success or silently bypassing refusal. Product source retained; locale naturalness remains PENDING_NATIVE_REVIEW."
+          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained for the four evidence-chain/audit-export codes (evidence_chain_disabled, evidence_chain_auth_required, audit_export_disabled, audit_export_auth_required) and the three research-pack codes (research_pack_export_disabled, research_pack_auth_required, research_pack_limit_exceeded). The research-pack pairs explain disabled authentication, a disabled export gate, and the configured size limit without implying success or silently bypassing refusal. Locale naturalness remains PENDING_NATIVE_REVIEW."
         },
         {
           "category": "disclaimer",
@@ -201,8 +195,7 @@
           "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
         }
       ],
-      "inventoryKeySetSha256": "3a0db998104bc840b2a0b419dfd07a825e4b7f90ec83179a2cba270353147be0"
-      "inventoryKeySetSha256": "a7e8cb353bb8949f95b8f813b26bcdde3c813bbc7c8810853a9120f9b8b709e8"
+      "inventoryKeySetSha256": "ce7f30b9f2d67829b72eb0bcca2c2d973c9679ddc44bf82fc9f909414479a801"
     }
   ],
   "languageReview": {
@@ -581,31 +574,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 152,
-        "keySetSha256": "03c38f69eae7157314ebc70a15c7f6a916b2d96aefb4f683dd44e0817e353243",
+        "keyCount": 158,
+        "keySetSha256": "5bb65e37186143e62cc1edbc17c45fc3cf7d68eeb6929ed84d187cc3a1d4c70e",
         "bundleSha256": {
-          "zh": "92fe8587d93c39ba261d632bb6057cd7ce0c41b3cdbd3833a3e23bffa3ce2108",
-          "zh-TW": "7152e6fdfede999d346f3dbfbecebf460e8e22bd393a6523c7413f512e943c75",
-          "en": "18ca88eb3b3ce7f7491dc2104795db7ccc39bfccbd244c6399ea358bf92c0cbc",
-          "ja": "61d505cf6b8f3a9e9f20381456cda0ba3346a84ebc0d48dd02f5f581448d2059",
-          "ko": "a9faebdf31780c0e5971932e2f1fccebd50308c6ff7c633ebe30f83383e61443",
-          "de": "1923ebe3d935af63079503cb3ca84d896d1960ba31eeed60f8b5ee8872c3bee4",
-          "es": "38288825ebf8ebff0b729906589fb00019c0c9b3f598a0f52aea7b24a2498e31",
-          "ms": "3356f40174e95c64ae1c313bd9ccdec18a22a85865816c2c6957bc1b4610d018",
-          "fr": "83f559af5be5a65116d7b75033ebd183bd554439347231cdad2a3f90b19729eb",
-          "id": "e5588ab94245d8808838fd6045add801bd4aee27e571925f0ec666e796b78038"
-        "keyCount": 150,
-        "keySetSha256": "8a7dfcfa4c3333574764cd1c10a899df42dc5a2f97d684c19348f29c29ee4caa",
-          "zh": "c21c55793753b4ef8f5bd8f9f403f5efd034b5bc3a23ea9564538c1c6fa3cf1e",
-          "zh-TW": "2107abfcef8822a2d07760ad537fbd3d618767e76f963b5cb1f68f5196095f4b",
-          "en": "68bfe7daeabc1d799b96d028cc605a89615360606ba27a32d501981ed3756476",
-          "ja": "156ec026df640c23dab05320a93e33d1e0b081cf7f24a82f771963bcc82e70c9",
-          "ko": "34cd6440d76863751daa184962303cac8ed514c169e6b896df4a34cb0ae50d1b",
-          "de": "7aa8d8437fe34e563b78b753143ef90ec15b4017e263d0964a11de00fde4df05",
-          "es": "64268609cff8bc4724fa6b6149ea460a6b458febc794948957a613f90de713c9",
-          "ms": "a7abe3e2719acf3866c69c20e4bb684e655e6257eed75fac11a198aa015a85bd",
-          "fr": "73c4abb3451eef358db9874a94c1ad739dbcd11d803b52495675a6c53f67f2a7",
-          "id": "2b77ddbbdd9138fc68d75242d80499b86d28176047eb3f32955f6a9c41505267"
+          "zh": "250571092a227719a8b8f97b8909f9ecaeae8bbbb9e48b87e561d035686b6e98",
+          "zh-TW": "31b9c7e78635148cf93ec5bf9763d6c2cc67ee8b10771f0ff9a45669ff646a61",
+          "en": "eade447630a8cec800e8a1bcb5234b87a72a2472b0e0d72d680d7da3b25065b6",
+          "ja": "51a76ef78637e2b16c090f6e6c1a1fe723cc7c20a26bbb87bbe570a84433f00d",
+          "ko": "7d2d710e8a1347fe45dc283a30332a161c3911547e6b80f6558bef740b881e4e",
+          "de": "896f1f235ceb8ccd6c5477f3f22c4da87fb3d7681e17566b1182cc7324f61a63",
+          "es": "90320e6f0a6fb5bd583518e0bb985c74e1d0b6c16139b1bfe57cbac3fa0f8243",
+          "ms": "7911f0c39d972b3667164874892af6de1549ac949ba395c7454b5a5c5fc1f44d",
+          "fr": "41c74214e9356ebbafa0f5e842f5095677ecb695a460c616756eccada7798f80",
+          "id": "98077fad0a84d5b10155f92c41d3934552742120e3dc62f60ef506e0e9f9484b"
         }
       }
     },
