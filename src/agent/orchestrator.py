@@ -36,6 +36,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass, field, fields as dataclass_fields
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from src.agent import bull_bear_debate as _debate
 from src.agent import critic as _critic
 from src.agent.chat_context import (
     build_agent_chat_market_context,
@@ -145,6 +146,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     _ApprovalRiskSource,
     _ApprovalService,
     _critic,
+    _debate,
     AgentContext,
     _apply_risk_manager_gate,
     _authorize_risk_gate_bypass,
@@ -215,6 +217,7 @@ NON_CRITICAL_BASE_STAGES = frozenset({
     "intel",
     "risk",
     _critic.CRITIC_STAGE_NAME,
+    _debate.DEBATE_STAGE_NAME,
 })
 _PREPARED_DECISION_TYPE_INSERTED = "_prepared_dashboard_decision_type_inserted"
 

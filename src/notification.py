@@ -690,6 +690,33 @@ class NotificationBuilder:
 
 
 # Convenient function
+
+def _append_bull_bear_debate_block(lines: List[str], debate: Any, labels: Dict[str, str], report_language: str) -> None:
+    if not isinstance(debate, dict) or not debate.get("enabled"):
+        return
+    synthesis = debate.get("synthesis") if isinstance(debate.get("synthesis"), dict) else {}
+    lines.extend([
+        f"### ⚔️ {labels.get('bull_bear_debate_heading', 'Bull-Bear Debate')}",
+        (
+            f"- {labels.get('bull_bear_status_label', 'Status')}: {debate.get('status')} | "
+            f"{labels.get('bull_bear_rounds_label', 'Rounds')}: {debate.get('rounds_completed')}"
+        ),
+    ])
+    if synthesis.get("summary"):
+        lines.append(f"- {synthesis.get('summary')}")
+    if synthesis.get("final_lean"):
+        lines.append(
+            f"- {labels.get('bull_bear_synthesis_label', 'Synthesis')}: "
+            f"{localize_strategy_signal(synthesis.get('final_lean'), report_language)} | "
+            f"{labels.get('bull_bear_resolution_label', 'Resolution')}: {synthesis.get('resolution_status')}"
+        )
+    lines.append(f"- {labels.get('bull_bear_no_majority_note', 'No majority vote.')}")
+    for point in (debate.get("contention_points") or [])[:3]:
+        if not isinstance(point, dict):
+            continue
+        topic = point.get("topic") or point.get("kind") or ""
+        lines.append(f"- [{point.get('source', 'debate')}] {topic}")
+
 def get_notification_service() -> NotificationService:
     """获取通知服务实例"""
     return NotificationService()

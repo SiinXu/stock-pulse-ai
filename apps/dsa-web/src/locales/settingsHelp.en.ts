@@ -1508,6 +1508,10 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.DEBATE': {
+    title: 'Bull-Bear debate',
+    summary: 'Configure the optional debate stage, limits, and dedicated model.',
+  },
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: 'Reflection and Forecast Post-mortem',
   },

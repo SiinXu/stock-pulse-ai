@@ -334,6 +334,11 @@ class Config:
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    # Optional structured Bull-Bear debate stage before Decision (Issue #117). Default off.
+    debate_enabled: bool = False
+    debate_max_rounds: int = 2
+    debate_temperature: float = 0.4
+    debate_model: str = ""  # Optional dedicated model; empty uses agent primary route
     # Run-local reflection + resolved-forecast post-mortem (Issues #1089 / #1103). Default off.
     agent_reflection_enabled: bool = False
     agent_reflection_llm_budget: int = 1  # Max LLM calls per reflection loop (critique)

@@ -101,6 +101,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
+| `DEBATE_ENABLED` | `false` | 是 | 模板中注释; Optional structured Bull-Bear debate stage before Decision (default false, Issue #117) |
+| `DEBATE_MAX_ROUNDS` | `2` | 是 | 模板中注释; Debate rounds 1-3 |
+| `DEBATE_TEMPERATURE` | `0.4` | 是 | 模板中注释; Debate LLM temperature |
+| `DEBATE_MODEL` | empty | 是 | 模板中注释; Optional debate model name |
 | `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内反思循环（类型化教训；默认 false） |
 | `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限 |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释; 反思后运行内修订次数上限 |
