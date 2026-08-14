@@ -35,7 +35,7 @@ export function getSettingsHelpContent(
   const language = getPreferredHelpLanguage(locale);
   const localized = SETTINGS_HELP_MAPS[language][helpKey]
     ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
-  if (localized) {
+  if (localized && Object.keys(localized).length > 0) {
     const fieldKey = helpKey.split('.').pop() ?? helpKey;
     return {
       ...localized,

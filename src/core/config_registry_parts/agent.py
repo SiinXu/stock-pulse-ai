@@ -2078,7 +2078,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "MARKET_REGIME_ENABLED": {
-        "title": "Market Regime Detection",
+        "title": "Market Regime",
         "description": "Enable explainable rule-based market regime detection and adaptive analysis focus. When unclear, labels unknown instead of forcing a side.",
         "category": "agent",
         "data_type": "boolean",
@@ -2104,7 +2104,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
     "MARKET_REGIME_OVERRIDE": {
-        "title": "Market Regime Override",
+        "title": "Regime Override",
         "description": "Optional forced regime label (trending_up/trending_down/sideways/volatile/unknown). Empty uses automatic rule-based detection.",
         "category": "agent",
         "data_type": "string",
