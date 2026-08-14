@@ -42,6 +42,7 @@ from api.v1.endpoints import (
     portfolio_stress_test,
     reasoning_trace,
     report_export,
+    research_pack,
     research,
     report_version_compare,
     scheduled_tasks,
@@ -101,6 +102,12 @@ router.include_router(
 # /export/capabilities is registered before /{record_id}/export inside the module.
 router.include_router(
     report_export.router,
+    prefix="/history",
+    tags=["History"],
+)
+
+router.include_router(
+    research_pack.router,
     prefix="/history",
     tags=["History"],
 )
