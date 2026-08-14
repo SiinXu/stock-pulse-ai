@@ -141,6 +141,10 @@ class Config:
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
 
+    # === Research asset pack export (Issues #988 / #1140) — default off ===
+    research_pack_export_enabled: bool = False
+    research_pack_max_zip_bytes: int = 24 * 1024 * 1024
+
     # === Durable security-audit trail (Issue #535) ===
     # Time retention and hard row capacity for privileged-operation events.
     security_audit_retention_days: int = 90
