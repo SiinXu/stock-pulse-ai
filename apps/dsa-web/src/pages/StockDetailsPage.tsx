@@ -24,6 +24,7 @@ import {
   Select,
 } from '../components/common';
 import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
+import ResearchTimelinePanel from '../components/stocks/ResearchTimelinePanel';
 import { MoneyFlowPanel } from '../components/money-flow';
 import { VALUATION_TEXT } from '../locales/valuation';
 import { MONEY_FLOW_TEXT } from '../locales/moneyFlow';
@@ -594,6 +595,8 @@ const StockDetailsPage: React.FC = () => {
         <section aria-label={moneyFlowText.title} data-testid="stock-details-money-flow-section">
           <MoneyFlowPanel key={`money-flow-${canonicalCode}`} stockCode={canonicalCode} />
         </section>
+
+        <ResearchTimelinePanel key={`timeline-${canonicalCode}`} stockCode={canonicalCode} />
 
         <section aria-label={valuationText.title} data-testid="stock-details-dcf-section">
           <DcfSensitivityPanel key={canonicalCode} stockCode={canonicalCode} />
