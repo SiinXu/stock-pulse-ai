@@ -78,6 +78,7 @@ const ScheduledTaskRunHistory: React.FC<ScheduledTaskRunHistoryProps> = ({
   language,
 }) => {
   const requestSequence = useRef(0);
+  const activeTaskId = useRef(taskId);
   const [isOpen, setIsOpen] = useState(false);
   const [runs, setRuns] = useState<ScheduledTaskRunItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -86,6 +87,10 @@ const ScheduledTaskRunHistory: React.FC<ScheduledTaskRunHistoryProps> = ({
   const [error, setError] = useState<ParsedApiError | null>(null);
 
   useEffect(() => {
+    if (activeTaskId.current === taskId) {
+      return;
+    }
+    activeTaskId.current = taskId;
     requestSequence.current += 1;
     setIsOpen(false);
     setRuns([]);
