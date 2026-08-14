@@ -1,5 +1,9 @@
 import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 
+export const settingsHelpSchemaDescriptionOnly: SettingsHelpSourceMap = {
+  'settings.agent.multi_model_consensus': {},
+};
+
 const settingsHelpEnUS: SettingsHelpSourceMap = {
   'settings.base.STOCK_LIST': {
     title: 'Watchlist',
@@ -1502,8 +1506,6 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   },
   // Both controls use their field-specific schema description as help copy.
   'settings.agent.market_regime': {},
-  // All controls use their field-specific schema description as help copy.
-  'settings.agent.multi_model_consensus': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: 'Reflection and Forecast Post-mortem',
   },

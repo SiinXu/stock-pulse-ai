@@ -6,6 +6,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
@@ -13,6 +14,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...CP.id,
   ...DSC.id,
   ...EE.id,
+  ...MMC.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -6436,11 +6438,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "Beritahu brief riset peristiwa",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "Simpan riwayat brief riset peristiwa",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "Simpan file brief riset peristiwa",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_ENABLED": "Perbandingan multi-model",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_COST_USD": "Batas biaya (USD)",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_MODELS": "Jumlah model maksimum",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MODELS": "Daftar model",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_PRESET": "Preset multi-model",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "Memengaruhi latensi analisis satu simbol dan puncak panggilan penyedia bersamaan dalam satu jalankan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "Tidak mengubah konkurensi MAX_WORKERS lintas antrean multi-simbol.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "Urutan penggabungan ke stage IO / AgentContext mengikuti kunci tugas yang dideklarasikan, bukan urutan selesai.",

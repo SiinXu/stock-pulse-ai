@@ -6,6 +6,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ja,
@@ -13,6 +14,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...CP.ja,
   ...DSC.ja,
   ...EE.ja,
+  ...MMC.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -6436,11 +6438,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "イベントリサーチブリーフ通知",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "イベントリサーチブリーフ履歴保存",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "イベントリサーチブリーフ報告ファイル保存",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_ENABLED": "複数モデル比較",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_COST_USD": "コスト上限 (USD)",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_MODELS": "最大モデル数",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MODELS": "モデル一覧",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_PRESET": "モデルプリセット",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "1銘柄分析のレイテンシと、1実行内でのプロバイダ同時呼び出しのピークに影響します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "キュー全体の複数銘柄向け MAX_WORKERS 同時実行数は変更しません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "stage IO / AgentContext へのマージ順は宣言されたタスクキー順であり、完了順ではありません。",

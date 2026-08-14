@@ -6,6 +6,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
@@ -13,6 +14,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...CP.ko,
   ...DSC.ko,
   ...EE.ko,
+  ...MMC.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -6436,11 +6438,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "이벤트 리서치 브리프 알림",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "이벤트 리서치 브리프 이력 저장",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "이벤트 리서치 브리프 보고서 저장",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_ENABLED": "다중 모델 비교",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_COST_USD": "비용 상한 (USD)",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_MODELS": "최대 모델 수",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MODELS": "모델 목록",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_PRESET": "모델 프리셋",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "단일 종목 분석 지연과 한 실행 내 제공자 동시 호출 피크에 영향을 줍니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "다중 종목 큐의 MAX_WORKERS 동시성을 바꾸지 않습니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "stage IO / AgentContext 병합 순서는 선언된 작업 키 순이며 완료 순이 아닙니다.",

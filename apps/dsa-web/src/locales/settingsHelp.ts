@@ -2,7 +2,7 @@ import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 import { getFieldTitle } from '../utils/systemConfigI18n';
 import { normalizeUiLanguage } from '../utils/uiLanguage';
-import settingsHelpEnUS from './settingsHelp.en';
+import settingsHelpEnUS, { settingsHelpSchemaDescriptionOnly } from './settingsHelp.en';
 import settingsHelpZhCN from './settingsHelp.zh';
 import type { SettingsHelpDefinition, SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 import type { SettingsHelpContent } from './settingsHelpTypes';
@@ -33,7 +33,8 @@ export function getSettingsHelpContent(
   }
 
   const language = getPreferredHelpLanguage(locale);
-  const localized = SETTINGS_HELP_MAPS[language][helpKey]
+  const localized = settingsHelpSchemaDescriptionOnly[helpKey]
+    ?? SETTINGS_HELP_MAPS[language][helpKey]
     ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
   if (localized && Object.keys(localized).length > 0) {
     const fieldKey = helpKey.split('.').pop() ?? helpKey;

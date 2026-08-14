@@ -6,6 +6,7 @@ import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntime
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.fr,
@@ -13,6 +14,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...CP.fr,
   ...DSC.fr,
   ...EE.fr,
+  ...MMC.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -6436,11 +6438,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "Notifier le brief de recherche d’événements",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "Persister l’historique de recherche d’événements",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "Enregistrer le fichier de recherche d’événements",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_ENABLED": "Comparaison multimodèle",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_COST_USD": "Plafond de coût (USD)",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MAX_MODELS": "Nombre maximal de modèles",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_MODELS": "Liste des modèles",
-  "utils.systemConfigI18n.fieldTitleMaps.MULTI_MODEL_CONSENSUS_PRESET": "Préréglage multimodèle",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "Affecte la latence d’analyse d’un seul symbole et les pics d’appels concurrents aux fournisseurs dans une exécution.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "Ne modifie pas la concurrence MAX_WORKERS multi-symboles de la file.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "L’ordre de fusion dans stage IO / AgentContext suit les clés déclarées, jamais l’ordre d’achèvement.",
