@@ -241,19 +241,19 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
       </div>
       <div
         data-testid="backtest-summary-integrity"
-        className="mb-3 grid grid-cols-3 gap-2 rounded-md border border-subtle bg-background/40 p-2"
+        className="backtest-integrity"
       >
-        <div className="flex flex-col">
-          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.completedCount}</span>
-          <span className="font-mono text-sm text-success">{completed}</span>
+        <div>
+          <span>{text.completedCount}</span>
+          <span>{completed}</span>
         </div>
-        <div className="flex flex-col">
-          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.insufficientCount}</span>
-          <span className="font-mono text-sm text-warning">{insufficient}</span>
+        <div>
+          <span>{text.insufficientCount}</span>
+          <span>{insufficient}</span>
         </div>
-        <div className="flex flex-col">
-          <span className="text-xxs uppercase tracking-wide text-muted-text">{text.evaluationCount}</span>
-          <span className="font-mono text-sm text-secondary-text">{total}</span>
+        <div>
+          <span>{text.evaluationCount}</span>
+          <span>{total}</span>
         </div>
       </div>
       <MetricRow label={text.directionAccuracy} value={pct(metrics.directionAccuracyPct)} accent />
