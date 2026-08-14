@@ -873,47 +873,120 @@ class _StockAnalysisStageMixin:
                     f"{stock_name}：LLM 正在生成分析结果（已接收 {chars_received} 字符）",
                 )
 
+            from src.agent.multi_model_consensus import (
+                is_multi_model_consensus_enabled,
+                public_multi_model_comparison_payload,
+                resolve_consensus_models_for_run,
+                run_multi_model_consensus_analysis,
+            )
+
+            multi_model_enabled = is_multi_model_consensus_enabled(self.config)
+            multi_model_candidates: list = []
+            multi_model_budget_meta: dict = {}
+            if multi_model_enabled:
+                multi_model_candidates, multi_model_budget_meta = (
+                    resolve_consensus_models_for_run(self.config)
+                )
+            use_multi_model = multi_model_enabled and len(multi_model_candidates) >= 2
+
             active_stage = observe_pipeline_stage(
                 "analyze",
                 input_summary={
                     "stock_code": code,
-                    "mode": "legacy",
+                    "mode": "legacy_multi_model" if use_multi_model else "legacy",
                     "report_type": report_type.value,
                     "context_pack_available": bool(analysis_context_pack_summary),
+                    "multi_model_consensus": bool(use_multi_model),
+                    "multi_model_count": len(multi_model_candidates) if use_multi_model else 0,
+                    "multi_model_budget_enforced": bool(
+                        multi_model_budget_meta.get("budget_enforced")
+                    )
+                    if multi_model_enabled
+                    else False,
                 },
                 retryable=True,
             )
             self._emit_progress(64, f"{stock_name}：正在请求 LLM 生成报告")
             llm_started_at = time.monotonic()
+            multi_model_comparison = None
             try:
-                record_llm_run_started(
-                    model=getattr(self.config, "litellm_model", None),
-                    call_type="analysis",
-                )
-                result = self.analyzer.analyze(
-                    enhanced_context,
-                    news_context=news_context,
-                    progress_callback=self._emit_progress,
-                    stream_progress_callback=_on_llm_stream,
-                    analysis_context_pack_summary=analysis_context_pack_summary,
-                )
-                llm_duration_ms = int((time.monotonic() - llm_started_at) * 1000)
-                record_llm_run(
-                    success=bool(result and getattr(result, "success", True)),
-                    model=getattr(result, "model_used", None) if result else None,
-                    call_type="analysis",
-                    duration_ms=llm_duration_ms,
-                    error_type=(
-                        None
-                        if result and getattr(result, "success", True)
-                        else "AnalysisResultError"
-                    ),
-                    error_message=(
-                        getattr(result, "error_message", None)
-                        if result and not getattr(result, "success", True)
-                        else ("LLM returned empty result" if result is None else None)
-                    ),
-                )
+                if use_multi_model:
+                    self._emit_progress(
+                        64,
+                        f"{stock_name}：多模型共识对比（{len(multi_model_candidates)} 模型）",
+                    )
+                    result, multi_model_comparison = run_multi_model_consensus_analysis(
+                        analyzer=self.analyzer,
+                        config=self.config,
+                        context=enhanced_context,
+                        news_context=news_context,
+                        analysis_context_pack_summary=analysis_context_pack_summary,
+                        progress_callback=self._emit_progress,
+                        stream_progress_callback=_on_llm_stream,
+                        record_llm_run=record_llm_run,
+                        record_llm_run_started=record_llm_run_started,
+                    )
+                    if multi_model_comparison is None:
+                        # Models could not be resolved; fall back to single-model path.
+                        use_multi_model = False
+                    elif result is None:
+                        # Multi-model was attempted and every model failed: do not spend
+                        # another full single-model call on top of the failed fan-out.
+                        use_multi_model = True
+
+                if not use_multi_model:
+                    record_llm_run_started(
+                        model=getattr(self.config, "litellm_model", None),
+                        call_type="analysis",
+                    )
+                    result = self.analyzer.analyze(
+                        enhanced_context,
+                        news_context=news_context,
+                        progress_callback=self._emit_progress,
+                        stream_progress_callback=_on_llm_stream,
+                        analysis_context_pack_summary=analysis_context_pack_summary,
+                    )
+                    llm_duration_ms = int((time.monotonic() - llm_started_at) * 1000)
+                    record_llm_run(
+                        success=bool(result and getattr(result, "success", True)),
+                        model=getattr(result, "model_used", None) if result else None,
+                        call_type="analysis",
+                        duration_ms=llm_duration_ms,
+                        error_type=(
+                            None
+                            if result and getattr(result, "success", True)
+                            else "AnalysisResultError"
+                        ),
+                        error_message=(
+                            getattr(result, "error_message", None)
+                            if result and not getattr(result, "success", True)
+                            else ("LLM returned empty result" if result is None else None)
+                        ),
+                    )
+                elif result is not None and multi_model_comparison is not None:
+                    # Ensure product payload is present even if runner attached a private copy.
+                    public_payload = public_multi_model_comparison_payload(
+                        multi_model_comparison
+                    )
+                    if public_payload is not None:
+                        dashboard = getattr(result, "dashboard", None)
+                        if not isinstance(dashboard, dict):
+                            dashboard = {}
+                            result.dashboard = dashboard
+                        dashboard["multi_model_comparison"] = public_payload
+                        # Preserve honesty flags the runner already stamped.
+                        handling = public_payload.get("disagreement_handling") or {}
+                        if handling.get("high_disagreement"):
+                            dashboard["multi_model_high_disagreement"] = True
+                        degradation = public_payload.get("degradation")
+                        if isinstance(degradation, dict) and degradation.get("annotation"):
+                            dashboard["multi_model_degradation"] = {
+                                "annotation": degradation.get("annotation"),
+                                "reason": degradation.get("reason"),
+                                "failed_models": list(
+                                    degradation.get("failed_models") or []
+                                )[:5],
+                            }
             except Exception as exc:
                 record_llm_run(
                     success=False,

@@ -1,5 +1,10 @@
 import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 
+const settingsHelpSchemaDescriptionOnlyContract: SettingsHelpSourceMap = {
+  'settings.agent.multi_model_consensus': {},
+};
+void settingsHelpSchemaDescriptionOnlyContract;
+
 const settingsHelpEnUS: SettingsHelpSourceMap = {
   'settings.base.STOCK_LIST': {
     title: 'Watchlist',

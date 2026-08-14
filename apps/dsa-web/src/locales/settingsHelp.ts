@@ -14,6 +14,10 @@ const SETTINGS_HELP_MAPS: Record<UiLanguage, SettingsHelpSourceMap> = createUiLa
   { zh: settingsHelpZhCN, en: settingsHelpEnUS },
 );
 
+const SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY: SettingsHelpSourceMap = {
+  'settings.agent.multi_model_consensus': {},
+};
+
 const SETTINGS_HELP_FALLBACK_TITLES: Record<UiLanguage, string> = createUiLanguageRecord(
   'locales.settingsHelp.SETTINGS_HELP_FALLBACK_TITLES',
   { zh: '配置说明', en: 'Configuration help' },
@@ -33,7 +37,8 @@ export function getSettingsHelpContent(
   }
 
   const language = getPreferredHelpLanguage(locale);
-  const localized = SETTINGS_HELP_MAPS[language][helpKey]
+  const localized = SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY[helpKey]
+    ?? SETTINGS_HELP_MAPS[language][helpKey]
     ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
   if (localized && Object.keys(localized).length > 0) {
     const fieldKey = helpKey.split('.').pop() ?? helpKey;

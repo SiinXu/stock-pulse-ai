@@ -406,6 +406,7 @@ def render(
                     bool((merged_dashboard.get("strategy_synthesis") or {})),
                     bool((merged_dashboard.get("committee_deliberation") or {})),
                     bool((merged_dashboard.get("battle_plan") or {})),
+                    bool((merged_dashboard.get("multi_model_comparison") or {})),
                     bool(strata_public),
                 ]
             )

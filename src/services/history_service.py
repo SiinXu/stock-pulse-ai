@@ -21,6 +21,7 @@ from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
     append_bull_bear_debate_lines,
     append_committee_deliberation_lines,
+    append_multi_model_comparison_lines,
     get_bias_status_emoji,
     get_localized_stock_name,
     get_report_labels,
@@ -1394,6 +1395,7 @@ class HistoryService:
             report_language,
         )
 
+        append_multi_model_comparison_lines(report_lines, dashboard, labels, report_language)
         append_bull_bear_debate_lines(report_lines, dashboard, labels)
         committee = dashboard.get("committee_deliberation") if dashboard else None
         append_committee_deliberation_lines(report_lines, committee, labels, report_language)

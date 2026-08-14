@@ -1362,6 +1362,30 @@ A-share ETFs are identified as a distinct instrument type and take the **ETF ana
 
 Representative regression codes: `510300`, `510050`, `159915`, `159919`, `512880`. Validation-layer ETF false-positive calibration is documented in `docs/data-validation-layer.md` and Issue #185.
 
+### Multi-Model Consensus Comparison (optional)
+
+Default **off**. When `MULTI_MODEL_CONSENSUS_ENABLED=true`, the legacy stock analysis path can run the **same shared data snapshot** across 2–3 models sequentially (explicit list, `fast`/`quality` preset, or primary + fallbacks; sequential by default because the shared analyzer is not thread-safe), then attach a structured product payload:
+
+- Agreement table: action / score band / key risks per model
+- Consensus level + agreement score (not a blended trading signal)
+- Disagreement points using the same low-sensitivity point contract as multi-agent disagreement handling (`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`)
+- Hard honesty rules: **no majority vote**, **no averaging** of opposing directions; high disagreement stays visible; single-model failure degrades to the surviving result with `single_model_fallback` annotation
+- With fewer than two usable conclusions, the agreement score is explicitly **Not evaluated** instead of a misleading `0`; `NaN` and `±Inf` are rejected in budgets, confidence metrics, and shared snapshots
+- `brief` keeps only the Decision Card, key risk, and explicit omission notice; the full comparison is limited to `standard` / `research`, history export, and non-brief notifications so push budgets remain bounded
+- Model id / version / provider identities are recorded under `dashboard.multi_model_comparison.trace` and each LLM diagnostic run uses `call_type=multi_model_consensus`
+
+```bash
+MULTI_MODEL_CONSENSUS_ENABLED=true
+MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
+# or: MULTI_MODEL_CONSENSUS_PRESET=fast
+MULTI_MODEL_CONSENSUS_MAX_MODELS=3
+# MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+# Budget rules: empty = MAX_MODELS only; 0 = close multi-model fan-out;
+# positive (no live pricing yet) = hard-cap to 2 models and record skipped models.
+```
+
+Agent multi-agent mode is unchanged by this flag. Related multi-agent disagreement handling remains a separate surface (Issues #246 / #193 / PR #1205).
+
 ### Multi-Model Switching
 
 Configure multiple models, system auto-switches:

@@ -99,6 +99,9 @@ const getVendorChunkName = (id: string): string | undefined => {
   ) {
     return 'ex'
   }
+  if (normalizedId.endsWith('/src/locales/settingsIntelligence.ts')) {
+    return 'settings-intelligence'
+  }
   const packageName = getVendorPackageName(id)
   if (!packageName) {
     return undefined

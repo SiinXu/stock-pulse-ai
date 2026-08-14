@@ -351,6 +351,12 @@ class Config:
     agent_postmortem_llm_budget: int = 8  # Max LLM calls per resolution batch
     agent_postmortem_skip_clean_hits: bool = True  # Skip LLM post-mortem on clean hits
     agent_investment_committee_mode: bool = False  # Default-off Investment Committee persona preset (#545)
+    # Multi-model consensus comparison (#154). Default-off; cost-sensitive.
+    multi_model_consensus_enabled: bool = False
+    multi_model_consensus_models: List[str] = field(default_factory=list)
+    multi_model_consensus_preset: str = ""  # fast | quality | empty
+    multi_model_consensus_max_models: int = 3
+    multi_model_consensus_max_cost_usd: Optional[float] = None
     agent_research_persona: str = ""  # Default-off research stance preset (#467)
     agent_research_persona_custom: str = ""  # Optional custom stance text (#467)
     skill_opinion_recording_enabled: bool = False  # Record individual skill opinions for offline outcome evaluation

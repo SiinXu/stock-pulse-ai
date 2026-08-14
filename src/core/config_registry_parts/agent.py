@@ -3518,5 +3518,157 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "MULTI_MODEL_CONSENSUS_ENABLED": {
+        "title": "Multi-Model Consensus Comparison",
+        "description": (
+            "Default-off. When enabled, the legacy stock analysis path may run the "
+            "same shared data snapshot across 2–3 models sequentially, then attach "
+            "structured consensus degree and disagreement points to the product. "
+            "Disagreements are never averaged into a synthetic middle signal. "
+            "Requires at least two resolvable models (explicit list, preset, or "
+            "primary + fallbacks). Higher token/cost usage when enabled."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 726,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_ENABLED=false",
+            "MULTI_MODEL_CONSENSUS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: environment variables",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_MODELS": {
+        "title": "Multi-Model Consensus Model List",
+        "description": (
+            "Optional comma-separated LiteLLM model ids for multi-model comparison. "
+            "When empty, models are resolved from MULTI_MODEL_CONSENSUS_PRESET or "
+            "LITELLM_MODEL + LITELLM_FALLBACK_MODELS."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 727,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_PRESET": {
+        "title": "Multi-Model Consensus Preset",
+        "description": (
+            "Optional preset when MULTI_MODEL_CONSENSUS_MODELS is empty: "
+            "fast (up to 2 models) or quality (up to max models)."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"value": "", "label": "None (primary + fallbacks)"},
+            {"value": "fast", "label": "Fast consensus"},
+            {"value": "quality", "label": "Quality consensus"},
+        ],
+        "validation": {},
+        "display_order": 728,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_PRESET=fast",
+            "MULTI_MODEL_CONSENSUS_PRESET=quality",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_MAX_MODELS": {
+        "title": "Multi-Model Consensus Max Models",
+        "description": "Hard cap on models per comparison run (2–5, default 3).",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "3",
+        "options": [],
+        "validation": {"min": 2, "max": 5},
+        "display_order": 729,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_MAX_MODELS=3",
+            "MULTI_MODEL_CONSENSUS_MAX_MODELS=2",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_MAX_COST_USD": {
+        "title": "Multi-Model Consensus Max Cost USD",
+        "description": (
+            "Optional USD budget constraint for multi-model comparison. "
+            "Empty: no USD constraint (MAX_MODELS only). "
+            "0 or negative: multi-model fan-out is closed. "
+            "Positive (without live pricing): hard-cap fan-out to 2 models and "
+            "record skipped models. Never invents majority consensus under budget pressure."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 730,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
 
 }

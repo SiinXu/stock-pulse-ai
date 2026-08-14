@@ -803,6 +803,15 @@ class _RenderingMethods:
                 debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
                 _append_bull_bear_debate_block(report_lines, debate_payload, labels, report_language)
 
+                from src.notification import _append_multi_model_comparison_block
+
+                _append_multi_model_comparison_block(
+                    report_lines,
+                    dashboard.get("multi_model_comparison") if dashboard else None,
+                    labels,
+                    report_language,
+                )
+
                 # ========== Investment Committee (compact for notifications) ==========
                 _append_committee_deliberation_block(
                     report_lines,
@@ -1396,6 +1405,15 @@ class _RenderingMethods:
         )
         debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
         _append_bull_bear_debate_block(lines, debate_payload, labels, report_language)
+
+        from src.notification import _append_multi_model_comparison_block
+
+        _append_multi_model_comparison_block(
+            lines,
+            dashboard.get("multi_model_comparison") if dashboard else None,
+            labels,
+            report_language,
+        )
 
         # ========== Investment Committee (compact for notifications) ==========
         _append_committee_deliberation_block(

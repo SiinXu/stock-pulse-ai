@@ -1004,6 +1004,35 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
             ),
+            multi_model_consensus_enabled=parse_env_bool(
+                os.getenv('MULTI_MODEL_CONSENSUS_ENABLED'),
+                False,
+            ),
+            multi_model_consensus_models=[
+                part.strip()
+                for part in (os.getenv('MULTI_MODEL_CONSENSUS_MODELS') or '').split(',')
+                if part.strip()
+            ],
+            multi_model_consensus_preset=(
+                os.getenv('MULTI_MODEL_CONSENSUS_PRESET') or ''
+            ).strip().lower(),
+            multi_model_consensus_max_models=parse_env_int(
+                os.getenv('MULTI_MODEL_CONSENSUS_MAX_MODELS'),
+                3,
+                field_name='MULTI_MODEL_CONSENSUS_MAX_MODELS',
+                minimum=2,
+                maximum=5,
+            ),
+            multi_model_consensus_max_cost_usd=(
+                _parse_env_finite_float(
+                    os.getenv('MULTI_MODEL_CONSENSUS_MAX_COST_USD'),
+                    0.0,
+                    field_name='MULTI_MODEL_CONSENSUS_MAX_COST_USD',
+                    minimum=0,
+                )
+                if (os.getenv('MULTI_MODEL_CONSENSUS_MAX_COST_USD') or '').strip()
+                else None
+            ),
             agent_research_persona=(
                 (os.getenv('AGENT_RESEARCH_PERSONA') or '').strip().lower()
             ),

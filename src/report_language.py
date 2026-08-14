@@ -568,6 +568,17 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "active_research_persona_source_label": "来源",
         "active_research_persona_style_label": "风格参考（非背书）",
         "committee_gaps_label": "缺失或隔离项",
+        "multi_model_comparison_heading": "多模型共识对比",
+        "multi_model_consensus_level_label": "共识度",
+        "multi_model_consensus_score_label": "一致度",
+        "multi_model_not_evaluated_label": "未评估",
+        "multi_model_status_label": "状态",
+        "multi_model_degraded_label": "降级说明",
+        "multi_model_agreement_table_label": "模型对照表",
+        "multi_model_disagreement_points_label": "分歧点",
+        "multi_model_no_majority_note": "分歧未做多数表决或均值抹平",
+        "multi_model_high_disagreement_banner": "模型间高分歧：以下为结构化记录，最终方向未取平均",
+        "multi_model_trace_label": "模型标识",
         "bull_bear_debate_heading": "多空辩论摘要",
         "bull_bear_contention_heading": "关键交锋点",
         "bull_bear_status_label": "辩论状态",
@@ -795,6 +806,17 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "active_research_persona_source_label": "Source",
         "active_research_persona_style_label": "Style references (not endorsement)",
         "committee_gaps_label": "Gaps / Isolated Items",
+        "multi_model_comparison_heading": "Multi-Model Consensus Comparison",
+        "multi_model_consensus_level_label": "Consensus level",
+        "multi_model_consensus_score_label": "Agreement score",
+        "multi_model_not_evaluated_label": "Not evaluated",
+        "multi_model_status_label": "Status",
+        "multi_model_degraded_label": "Degradation",
+        "multi_model_agreement_table_label": "Model agreement table",
+        "multi_model_disagreement_points_label": "Disagreement points",
+        "multi_model_no_majority_note": "Disagreement was not majority-voted or averaged away",
+        "multi_model_high_disagreement_banner": "High multi-model disagreement: structured points only; direction was not averaged",
+        "multi_model_trace_label": "Model identities",
         "bull_bear_debate_heading": "Bull-Bear Debate Summary",
         "bull_bear_contention_heading": "Key Points of Contention",
         "bull_bear_status_label": "Debate Status",
@@ -1024,6 +1046,17 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "active_research_persona_source_label": "출처",
         "active_research_persona_style_label": "스타일 참조(추천 아님)",
         "committee_gaps_label": "누락/격리 항목",
+        "multi_model_comparison_heading": "다중 모델 합의 비교",
+        "multi_model_consensus_level_label": "합의 수준",
+        "multi_model_consensus_score_label": "일치 점수",
+        "multi_model_not_evaluated_label": "미평가",
+        "multi_model_status_label": "상태",
+        "multi_model_degraded_label": "저하 설명",
+        "multi_model_agreement_table_label": "모델 대조표",
+        "multi_model_disagreement_points_label": "이견 포인트",
+        "multi_model_no_majority_note": "이견은 다수결/평균으로 소거되지 않음",
+        "multi_model_high_disagreement_banner": "모델 간 고이견: 구조화 기록만 유지, 방향 평균 없음",
+        "multi_model_trace_label": "모델 식별자",
         "bull_bear_debate_heading": "불-베어 토론 요약",
         "bull_bear_contention_heading": "핵심 쟁점",
         "bull_bear_status_label": "토론 상태",
@@ -1534,6 +1567,82 @@ def append_committee_deliberation_lines(
             )
         if committee.get("personas_invalid") or committee.get("personas_truncated"):
             lines.append("")
+
+
+def append_multi_model_comparison_lines(
+    lines: List[str],
+    dashboard: Any,
+    labels: Dict[str, str],
+    report_language: Optional[str],
+) -> None:
+    """Append a multi-model consensus block from dashboard payload. No-op when disabled."""
+    multi_model = dashboard.get("multi_model_comparison") if dashboard else None
+    if not isinstance(multi_model, dict) or not multi_model.get("enabled"):
+        return
+    handling = multi_model.get("disagreement_handling") or {}
+    lines.extend(
+        [
+            f"### 🤝 {labels.get('multi_model_comparison_heading', 'Multi-Model Consensus')}",
+            "",
+        ]
+    )
+    if handling.get("high_disagreement"):
+        lines.append(
+            f"> ⚠️ {labels.get('multi_model_high_disagreement_banner', 'High multi-model disagreement')}"
+        )
+    not_evaluated = labels.get("multi_model_not_evaluated_label", "Not evaluated")
+    consensus_score = multi_model.get("consensus_score")
+    lines.append(
+        f"- {labels.get('multi_model_status_label', 'Status')}: "
+        f"{multi_model.get('status', 'N/A')} | "
+        f"{labels.get('multi_model_consensus_level_label', 'Consensus')}: "
+        f"{localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language)} | "
+        f"{labels.get('multi_model_consensus_score_label', 'Agreement')}: "
+        f"{consensus_score if consensus_score is not None else not_evaluated}"
+    )
+    degradation = multi_model.get("degradation")
+    if isinstance(degradation, dict) and (
+        degradation.get("annotation") or degradation.get("reason")
+    ):
+        lines.append(
+            f"- {labels.get('multi_model_degraded_label', 'Degradation')}: "
+            f"{degradation.get('annotation') or degradation.get('reason')}"
+        )
+    lines.append(
+        f"- {labels.get('multi_model_no_majority_note', 'Disagreement was not averaged')}"
+    )
+    for row in (multi_model.get("agreement_table") or [])[:5]:
+        if not isinstance(row, dict):
+            continue
+        raw_signal = row.get("signal") or row.get("action")
+        localized_signal = (
+            localize_strategy_signal(raw_signal, report_language)
+            if raw_signal
+            else not_evaluated
+        )
+        lines.append(
+            f"- `{row.get('model_id') or row.get('model_version') or 'model'}` "
+            f"({row.get('status') or 'n/a'}): "
+            f"{localized_signal}"
+            f" | {row.get('score_band') or not_evaluated}"
+        )
+    points = handling.get("points") if isinstance(handling, dict) else None
+    if isinstance(points, list) and points:
+        lines.append(
+            f"**{labels.get('multi_model_disagreement_points_label', 'Disagreement points')}**"
+        )
+        for point in points[:8]:
+            if not isinstance(point, dict):
+                continue
+            participants = ", ".join(
+                str(p) for p in (point.get("participants") or []) if str(p).strip()
+            )
+            lines.append(
+                f"- [{point.get('severity') or 'medium'}] "
+                f"{point.get('kind') or 'unknown'}"
+                f"{(' — ' + participants) if participants else ''}"
+            )
+    lines.append("")
 
 
 def append_bull_bear_debate_lines(
