@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
   ...DR.ko,
   ...CP.ko,
   ...DSC.ko,
+  ...EE.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -125,8 +127,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "매도 수량이 보유 가능한 보유량을 초과할 수 있습니다",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "잠시 기다렸다가 다시 시도해 보세요.",
   "api.error.STABLE_ERROR_TEXT.rate_limited.title": "너무 많은 시도",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message": "관리자 인증이 꺼져 있으면 추론 트레이스를 내보낼 수 없습니다(HTTP 403). 인증을 켠 뒤 로그인하세요.",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title": "추론 트레이스 내보내기에는 관리자 인증이 필요합니다",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.message": "Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.title": "Research pack export requires administrator authentication",
   "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message": "Enable Research Pack Export (RESEARCH_PACK_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.",

@@ -205,6 +205,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ANTHROPIC_TEMPERATURE` | `0.7` | 是 | 模板中注释; Legacy Claude sampling temperature (0.0-1.0); prefer LLM_TEMPERATURE for new setups. |
 | `ASTRBOT_TOKEN` | `空` | 是 | 模板中注释; Optional for AstrBot Webhook requiring Bearer Token |
 | `ASTRBOT_URL` | `空` | 是 | 模板中注释; AstrBot Configuration |
+| `AUDIT_EXPORT_ENABLED` | `false` | 是 | 模板中注释 |
+| `AUDIT_INCLUDE_RAW_ARTIFACTS` | `false` | 是 | 模板中注释 |
 | `BACKTEST_ENABLED` | `true` | 是 | =================================== Backtesting configuration (optional) =================================== Enable b... |
 | `BACKTEST_ENGINE_VERSION` | `v1` | 是 | Backtesting engine version (used to differentiate results when backtesting logic is upgraded). |
 | `BACKTEST_EVAL_WINDOW_DAYS` | `10` | 是 | Backtesting evaluation window (trading days) |
@@ -284,6 +286,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `EVENT_TRIGGER_MAX_PER_DAY` | `20` | 是 | 模板中注释 |
 | `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | 是 | 模板中注释 |
 | `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 是 | 模板中注释; Event-triggered deep analysis (issues #129/#152) |
+| `EVIDENCE_CHAIN_ENABLED` | `true` | 是 | 模板中注释; Evidence chain + auditable report package (#986 / #127) |
 | `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |

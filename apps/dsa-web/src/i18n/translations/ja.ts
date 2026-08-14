@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ja,
   ...DR.ja,
   ...CP.ja,
   ...DSC.ja,
+  ...EE.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -125,8 +127,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "売却量が利用可能な保有数を上回る",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "しばらく待ってから、もう一度お試しください。",
   "api.error.STABLE_ERROR_TEXT.rate_limited.title": "試行回数が多すぎます",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message": "管理者認証が無効のときは推論トレースをエクスポートできません（HTTP 403）。認証を有効にしてログインしてください。",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title": "推論トレースのエクスポートには管理者認証が必要です",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.message": "Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.title": "Research pack export requires administrator authentication",
   "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message": "Enable Research Pack Export (RESEARCH_PACK_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.",

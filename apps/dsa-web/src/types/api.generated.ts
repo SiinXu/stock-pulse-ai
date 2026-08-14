@@ -633,6 +633,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/{record_id}/evidence-chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export evidence chain for an analysis history record */
+        get: operations["exportAnalysisEvidenceChain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis/{record_id}/evidence-pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export auditable report package for an analysis history record */
+        get: operations["exportAnalysisAuditPackage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/approvals": {
         parameters: {
             query?: never;
@@ -1643,6 +1677,40 @@ export interface paths {
          * @description 根据分析历史记录 ID 或 query_id 获取用户可读诊断摘要和脱敏复制文本。
          */
         get: operations["get_history_diagnostics_api_v1_history__record_id__diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{record_id}/evidence-chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export evidence chain for an analysis history record */
+        get: operations["exportEvidenceChain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{record_id}/evidence-pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export auditable report package for an analysis history record */
+        get: operations["exportAuditPackage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5785,6 +5853,84 @@ export interface components {
          * @enum {string}
          */
         ApprovalStatus: "pending" | "approved" | "rejected" | "expired" | "cancelled";
+        /** AuditPackageArtifact */
+        AuditPackageArtifact: {
+            /** Byte Length */
+            byte_length?: number | null;
+            /** Content Type */
+            content_type: string;
+            /** Missing Reason */
+            missing_reason?: string | null;
+            /** Name */
+            name: string;
+            /** Sha256 */
+            sha256?: string | null;
+            /**
+             * Status
+             * @default present
+             * @enum {string}
+             */
+            status: "present" | "missing" | "skipped";
+        };
+        /** AuditPackageJsonEnvelope */
+        AuditPackageJsonEnvelope: {
+            /** Artifacts */
+            artifacts: {
+                [key: string]: unknown;
+            };
+            evidence_chain: components["schemas"]["EvidenceChainPackage"];
+            manifest: components["schemas"]["AuditPackageManifest"];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "audit-package-v1";
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** AuditPackageManifest */
+        AuditPackageManifest: {
+            /** Artifacts */
+            artifacts?: components["schemas"]["AuditPackageArtifact"][];
+            /**
+             * Evidence Chain Schema
+             * @default evidence-chain-v1
+             * @constant
+             */
+            evidence_chain_schema: "evidence-chain-v1";
+            /**
+             * Include Raw Artifacts
+             * @default false
+             */
+            include_raw_artifacts: boolean;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Reasoning Trace Schema */
+            reasoning_trace_schema?: string | null;
+            /**
+             * Redacted
+             * @default true
+             */
+            redacted: boolean;
+            run: components["schemas"]["EvidenceChainRun"];
+            /**
+             * Schema Version
+             * @default audit-package-v1
+             * @constant
+             */
+            schema_version: "audit-package-v1";
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
         /**
          * AuthSettingsRequest
          * @description Update auth enablement and initial password settings.
@@ -6652,6 +6798,38 @@ export interface components {
             total_gain: number;
             /** Years */
             years: number;
+        };
+        /** ConclusionLink */
+        ConclusionLink: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * As Of Status
+             * @default missing
+             * @enum {string}
+             */
+            as_of_status: "present" | "missing";
+            /** Conclusion Id */
+            conclusion_id: string;
+            /** Evidence Refs */
+            evidence_refs?: string[];
+            /**
+             * Evidence Status
+             * @default missing
+             * @enum {string}
+             */
+            evidence_status: "linked" | "missing" | "partial";
+            /** Missing Note */
+            missing_note?: string | null;
+            /** Source Id */
+            source_id?: string | null;
+            /** Statement */
+            statement: string;
+            /**
+             * Stratum
+             * @enum {string}
+             */
+            stratum: "verified_fact" | "model_inference" | "risk" | "synthesis" | "decision" | "gap";
         };
         /** ConfigComponentDiff */
         ConfigComponentDiff: {
@@ -8147,6 +8325,162 @@ export interface components {
              * @description Diagnostic trace ID
              */
             trace_id?: string | null;
+        };
+        /** EvidenceChainCoverage */
+        EvidenceChainCoverage: {
+            /** Not Recorded */
+            not_recorded?: string[];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Sources */
+            sources?: components["schemas"]["EvidenceChainCoverageSource"][];
+        };
+        /** EvidenceChainCoverageSource */
+        EvidenceChainCoverageSource: {
+            /** Absent */
+            absent: boolean;
+            /** Present */
+            present: boolean;
+            /** Reasons */
+            reasons?: string[];
+            /** Source */
+            source: string;
+            /**
+             * Supported
+             * @default true
+             */
+            supported: boolean;
+        };
+        /**
+         * EvidenceChainExportResponse
+         * @description Public API name for the strict evidence-chain domain package.
+         */
+        EvidenceChainExportResponse: {
+            /** Conclusions */
+            conclusions?: components["schemas"]["ConclusionLink"][];
+            coverage: components["schemas"]["EvidenceChainCoverage"];
+            /** Evidence Items */
+            evidence_items?: components["schemas"]["EvidenceItem"][];
+            /** Gaps */
+            gaps?: components["schemas"]["EvidenceGap"][];
+            /** Reasoning Steps */
+            reasoning_steps?: components["schemas"]["ReasoningStep"][];
+            run: components["schemas"]["EvidenceChainRun"];
+            /**
+             * Schema Version
+             * @default evidence-chain-v1
+             * @constant
+             */
+            schema_version: "evidence-chain-v1";
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** EvidenceChainPackage */
+        EvidenceChainPackage: {
+            /** Conclusions */
+            conclusions?: components["schemas"]["ConclusionLink"][];
+            coverage: components["schemas"]["EvidenceChainCoverage"];
+            /** Evidence Items */
+            evidence_items?: components["schemas"]["EvidenceItem"][];
+            /** Gaps */
+            gaps?: components["schemas"]["EvidenceGap"][];
+            /** Reasoning Steps */
+            reasoning_steps?: components["schemas"]["ReasoningStep"][];
+            run: components["schemas"]["EvidenceChainRun"];
+            /**
+             * Schema Version
+             * @default evidence-chain-v1
+             * @constant
+             */
+            schema_version: "evidence-chain-v1";
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** EvidenceChainRun */
+        EvidenceChainRun: {
+            /** Config Fingerprint */
+            config_fingerprint: string;
+            /** Exported At */
+            exported_at: string;
+            /** Lookup Key */
+            lookup_key?: string | null;
+            /** Lookup Mode */
+            lookup_mode?: ("primary_key" | "latest_by_query_id") | null;
+            /** Market */
+            market?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Query Id */
+            query_id?: string | null;
+            /** Record Id */
+            record_id?: string | null;
+            /** Run Id */
+            run_id: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Stock Code */
+            stock_code?: string | null;
+            /** Stock Name */
+            stock_name?: string | null;
+            /** Trace Id */
+            trace_id?: string | null;
+        };
+        /** EvidenceGap */
+        EvidenceGap: {
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string;
+            /** Related Conclusion Ids */
+            related_conclusion_ids?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "missing" | "partial" | "not_recorded";
+        };
+        /** EvidenceItem */
+        EvidenceItem: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * As Of Status
+             * @default missing
+             * @enum {string}
+             */
+            as_of_status: "present" | "missing";
+            /** Confidence */
+            confidence?: number | null;
+            /** Evidence Id */
+            evidence_id: string;
+            /** Link */
+            link?: string | null;
+            /** Missing Reason */
+            missing_reason?: string | null;
+            /** Snippet */
+            snippet?: string | null;
+            /** Source Id */
+            source_id?: string | null;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "data_source" | "tool_call" | "news" | "indicator" | "model" | "pipeline_stage" | "report_strata" | "decision" | "synthesis" | "missing";
+            /**
+             * Status
+             * @default present
+             * @enum {string}
+             */
+            status: "present" | "missing" | "partial";
         };
         /**
          * ExportSystemConfigResponse
@@ -13334,6 +13668,31 @@ export interface components {
             summary: string;
             /** Timeout Seconds */
             timeout_seconds: number;
+        };
+        /** ReasoningStep */
+        ReasoningStep: {
+            /** Input Refs */
+            input_refs?: string[];
+            /** Missing Reason */
+            missing_reason?: string | null;
+            /** Model Ref */
+            model_ref?: string | null;
+            /** Output Summary */
+            output_summary?: string | null;
+            /** Role */
+            role?: string | null;
+            /** Stage */
+            stage: string;
+            /**
+             * Status
+             * @default present
+             * @enum {string}
+             */
+            status: "present" | "missing" | "partial";
+            /** Step Id */
+            step_id: string;
+            /** Tool Call Ids */
+            tool_call_ids?: string[];
         };
         /** ReasoningTraceAgent */
         ReasoningTraceAgent: {
@@ -20223,6 +20582,161 @@ export interface operations {
             };
         };
     };
+    exportAnalysisEvidenceChain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted evidence-chain-v1 package */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceChainExportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    exportAnalysisAuditPackage: {
+        parameters: {
+            query?: {
+                format?: "zip" | "json";
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ZIP audit package or JSON envelope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPackageJsonEnvelope"];
+                    "application/zip": string;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_approvals_api_v1_approvals_get: {
         parameters: {
             query?: {
@@ -23537,6 +24051,161 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    exportEvidenceChain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted evidence-chain-v1 package */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceChainExportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    exportAuditPackage: {
+        parameters: {
+            query?: {
+                format?: "zip" | "json";
+            };
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ZIP audit package or JSON envelope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPackageJsonEnvelope"];
+                    "application/zip": string;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

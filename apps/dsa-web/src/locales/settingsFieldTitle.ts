@@ -26,16 +26,8 @@ export function resolveSettingsFieldTitle({
     return fallback;
   }
 
-  const localizedTitle = getFieldTitle(
-    schemaKey ?? itemKey,
-    getFieldTitle(itemKey, fallback, language),
-    language,
-  );
-  if (localizedTitle !== fallback) {
-    return localizedTitle;
-  }
-
-  return getSettingsHelpContent(schemaKey ?? itemKey, undefined, language)?.title
-    ?? getSettingsHelpContent(itemKey, undefined, language)?.title
-    ?? localizedTitle;
+  const key = schemaKey ?? itemKey;
+  const helpTitle = getSettingsHelpContent(key, undefined, language)?.title
+    ?? getSettingsHelpContent(itemKey, undefined, language)?.title;
+  return getFieldTitle(key, getFieldTitle(itemKey, helpTitle ?? fallback, language), language);
 }

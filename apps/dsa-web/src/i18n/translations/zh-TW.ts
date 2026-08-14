@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M['zh-TW'],
   ...DR["zh-TW"],
   ...CP["zh-TW"],
   ...DSC["zh-TW"],
+  ...EE['zh-TW'],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -125,8 +127,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "賣出數量超過可用持倉",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "請稍後再試。",
   "api.error.STABLE_ERROR_TEXT.rate_limited.title": "嘗試過於頻繁",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message": "管理員認證未啟用時無法匯出推理軌跡（HTTP 403）。請先啟用認證並登入。",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title": "推理軌跡匯出需要管理員認證",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.message": "Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.title": "Research pack export requires administrator authentication",
   "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message": "Enable Research Pack Export (RESEARCH_PACK_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.",

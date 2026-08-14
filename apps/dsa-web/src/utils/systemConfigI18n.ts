@@ -1,4 +1,5 @@
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
+import { EVIDENCE_EXPORT_FIELD_TITLES } from '../i18n/evidenceExportErrorTranslations';
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
 
@@ -273,6 +274,7 @@ const fieldTitleMapZh = {
   DECISION_MEMORY_MIN_AGE_DAYS: '决策记忆最小天数',
   DECISION_MEMORY_MIN_SAMPLES: '决策记忆最小样本数',
   REASONING_TRACE_EXPORT_ENABLED: '推理轨迹导出',
+  ...EVIDENCE_EXPORT_FIELD_TITLES.zh,
   REASONING_TRACE_EXPORT_MAX_CHARS: '推理轨迹导出最大字符数',
   RESEARCH_PACK_EXPORT_ENABLED: '研报资产包导出',
   RESEARCH_PACK_MAX_ZIP_BYTES: '研报资产包 ZIP 上限（字节）',
@@ -717,6 +719,7 @@ const fieldTitleMapEn = {
   DECISION_MEMORY_MIN_AGE_DAYS: 'Decision Memory Min Age (Days)',
   DECISION_MEMORY_MIN_SAMPLES: 'Decision Memory Min Samples',
   REASONING_TRACE_EXPORT_ENABLED: 'Reasoning Trace Export',
+  ...EVIDENCE_EXPORT_FIELD_TITLES.en,
   REASONING_TRACE_EXPORT_MAX_CHARS: 'Reasoning Trace Max Chars',
   RESEARCH_PACK_EXPORT_ENABLED: 'Research Pack Export',
   RESEARCH_PACK_MAX_ZIP_BYTES: 'Research Pack Max ZIP Bytes',

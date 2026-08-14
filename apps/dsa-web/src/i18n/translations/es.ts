@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.es,
   ...DR.es,
   ...CP.es,
   ...DSC.es,
+  ...EE.es,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activa el modo Agente e inténtalo de nuevo.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "El modo agente no está activado",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Solicitud no completada; por favor, revisa los detalles e inténtalo de nuevo.",
@@ -125,8 +127,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "La cantidad de venta supera las tenencias disponibles",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "Espera un momento y vuelve a intentarlo.",
   "api.error.STABLE_ERROR_TEXT.rate_limited.title": "Demasiados intentos",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message": "No se puede exportar la traza de razonamiento con la autenticación de administrador desactivada (HTTP 403). Active la autenticación e inicie sesión.",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title": "La exportación de traza de razonamiento requiere autenticación de administrador",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.message": "Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.title": "Research pack export requires administrator authentication",
   "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message": "Enable Research Pack Export (RESEARCH_PACK_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.",

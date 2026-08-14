@@ -138,6 +138,10 @@ class Config:
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
 
+    # === Evidence chain + audit package (Issues #986 / #127) ===
+    evidence_chain_enabled: bool = True
+    audit_export_enabled: bool = False
+    audit_include_raw_artifacts: bool = False
     # === Research asset pack export (Issues #988 / #1140) — default off ===
     research_pack_export_enabled: bool = False
     research_pack_max_zip_bytes: int = 24 * 1024 * 1024

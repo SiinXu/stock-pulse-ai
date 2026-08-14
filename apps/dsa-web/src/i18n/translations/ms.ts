@@ -5,12 +5,14 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycl
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ms,
   ...DR.ms,
   ...CP.ms,
   ...DSC.ms,
+  ...EE.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",
@@ -125,8 +127,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "Kuantiti jual melebihi pegangan yang tersedia",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "Tunggu sebentar dan cuba lagi.",
   "api.error.STABLE_ERROR_TEXT.rate_limited.title": "Terlalu banyak percubaan",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.message": "Eksport ditolak apabila pengesahan pentadbir dilumpuhkan (HTTP 403). Dayakan pengesahan dan log masuk.",
-  "api.error.STABLE_ERROR_TEXT.reasoning_trace_auth_required.title": "Eksport jejak penaakulan memerlukan pengesahan pentadbir",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.message": "Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.",
   "api.error.STABLE_ERROR_TEXT.research_pack_auth_required.title": "Research pack export requires administrator authentication",
   "api.error.STABLE_ERROR_TEXT.research_pack_export_disabled.message": "Enable Research Pack Export (RESEARCH_PACK_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.",
