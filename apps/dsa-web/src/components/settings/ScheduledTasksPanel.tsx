@@ -455,7 +455,7 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
         </div>
       ) : null}
 
-      {isLoading ? (
+      {isLoading && items.length === 0 ? (
         <StatePanel
           state="loading"
           title={t('common.loading')}
