@@ -62,6 +62,18 @@ export const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
       message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.',
     },
   }),
+  research_pack_export_disabled: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.research_pack_export_disabled", {
+    zh: { title: '研报资产包导出未启用', message: '请在设置 → Agent 行为 → 执行中开启「研报资产包导出」（RESEARCH_PACK_EXPORT_ENABLED），保存后重试。' },
+    en: { title: 'Research pack export is disabled', message: 'Enable Research Pack Export (RESEARCH_PACK_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.' },
+  }),
+  research_pack_auth_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.research_pack_auth_required", {
+    zh: { title: '研报资产包导出需要管理员认证', message: '管理员认证未启用时无法导出研报资产包（HTTP 403）。请先启用认证并登录。' },
+    en: { title: 'Research pack export requires administrator authentication', message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.' },
+  }),
+  research_pack_limit_exceeded: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.research_pack_limit_exceeded", {
+    zh: { title: '研报资产包超过大小上限', message: '导出包超过 RESEARCH_PACK_MAX_ZIP_BYTES 上限。可提高上限或改用单文件报告/轨迹导出。' },
+    en: { title: 'Research pack exceeds size limit', message: 'The package exceeds RESEARCH_PACK_MAX_ZIP_BYTES. Raise the limit or export report/trace files separately.' },
+  }),
   password_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.password_required", {
     zh: { title: '请输入密码', message: '填写所需密码后再试。' },
     en: { title: 'Password required', message: 'Enter the required password and try again.' },
