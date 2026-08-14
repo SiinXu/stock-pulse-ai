@@ -4,11 +4,8 @@ import { getFieldTitle } from '../utils/systemConfigI18n';
 import { normalizeUiLanguage } from '../utils/uiLanguage';
 import settingsHelpEnUS from './settingsHelp.en';
 import settingsHelpZhCN from './settingsHelp.zh';
-import type {
-  SettingsHelpContent,
-  SettingsHelpDefinition,
-  SettingsHelpSourceMap,
-} from './settingsHelpTypes';
+import type { SettingsHelpDefinition, SettingsHelpSourceMap } from './settingsHelpSourceTypes';
+import type { SettingsHelpContent } from './settingsHelpTypes';
 
 export type { SettingsHelpContent } from './settingsHelpTypes';
 

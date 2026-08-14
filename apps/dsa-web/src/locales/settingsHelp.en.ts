@@ -1,4 +1,4 @@
-import type { SettingsHelpSourceMap } from './settingsHelpTypes';
+import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 
 const settingsHelpEnUS: SettingsHelpSourceMap = {
   'settings.base.STOCK_LIST': {
