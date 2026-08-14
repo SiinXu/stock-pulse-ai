@@ -318,6 +318,75 @@ def test_invalid_dashboard_risk_evidence_fails_closed_without_truthy_coercion():
     assert "invalid_risk_evidence" in result.evidence_codes
 
 
+def test_grade_c_is_real_risk_evidence_only_when_forced_conclusion_is_enabled():
+    dashboard = {
+        "decision_type": "buy",
+        "info_quality": {
+            "schema_version": "info-quality-v1",
+            "grade": "C",
+        },
+    }
+
+    enabled = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        dashboard=dashboard,
+        info_quality_risk_enabled=True,
+    )
+    disabled = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        dashboard=dashboard,
+        info_quality_risk_enabled=False,
+    )
+
+    enabled_result = evaluate_risk_manager_gate(
+        enabled,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile="balanced",
+    )
+    assert enabled.get_data("info_quality_grade") == "C"
+    assert enabled_result.final_action == "hold"
+    assert "info_quality_grade_c" in enabled_result.evidence_codes
+    assert disabled.get_data("info_quality_grade") is None
+    assert all(flag.get("category") != "info_quality" for flag in disabled.risk_flags)
+
+
+def test_untrusted_grade_c_without_info_quality_schema_is_ignored():
+    untrusted = build_risk_context_for_exit(
+        stock_code="AAPL",
+        current_signal="buy",
+        dashboard={
+            "decision_type": "buy",
+            "info_quality": {"grade": "C"},
+        },
+        info_quality_risk_enabled=True,
+    )
+
+    result = evaluate_risk_manager_gate(
+        untrusted,
+        current_signal="buy",
+        exit_id=EXIT_SINGLE_AGENT,
+        profile="balanced",
+    )
+
+    assert untrusted.get_data("info_quality_grade") is None
+    assert all(flag.get("category") != "info_quality" for flag in untrusted.risk_flags)
+    assert "info_quality_grade_c" not in result.evidence_codes
+    assert result.final_action == "buy"
+
+
+def test_info_quality_risk_flag_rejects_truthy_string_coercion():
+    with pytest.raises(TypeError, match="info_quality_risk_enabled"):
+        build_risk_context_for_exit(
+            stock_code="AAPL",
+            current_signal="buy",
+            dashboard={},
+            info_quality_risk_enabled="false",
+        )
+
+
 def test_stale_runtime_evidence_is_preserved_and_blocks_bullish_publication():
     from src.agent.runtime_facts import AgentRuntimeFacts, RiskEvidenceFact
 
@@ -627,6 +696,90 @@ def test_real_single_agent_conversion_uses_dashboard_risk_evidence():
     assert agent_result.runtime_facts.risk_gate_result.final_action == "hold"
     assert agent_result.runtime_facts.risk_evidence.risk_level == "high"
     assert agent_result.runtime_facts.risk_evidence.flags[0][0] == "exposure"
+
+
+def test_real_single_agent_conversion_honors_forced_conclusion_flag():
+    from src.core.stages.analysis_results import _AnalysisResultStageMixin
+    from src.enums import ReportType
+
+    class Stage(_AnalysisResultStageMixin):
+        config = SimpleNamespace(
+            report_language="en",
+            risk_gate_profile="balanced",
+            agent_risk_override=False,
+            forced_conclusion_enabled=False,
+        )
+
+    agent_result = SimpleNamespace(
+        success=True,
+        error=None,
+        provider="test",
+        model="test/model",
+        runtime_facts=None,
+        dashboard={
+            "stock_name": "Apple",
+            "decision_type": "buy",
+            "operation_advice": "Buy",
+            "analysis_summary": "Buy now",
+            "risk_warning": "",
+            "info_quality": {
+                "schema_version": "info-quality-v1",
+                "grade": "C",
+            },
+        },
+    )
+
+    result = Stage()._agent_result_to_analysis_result(
+        agent_result,
+        "AAPL",
+        "Apple",
+        ReportType.FULL,
+        "query-grade-c",
+    )
+
+    assert result.decision_type == "buy"
+    assert agent_result.dashboard["decision_type"] == "buy"
+    assert "info_quality_grade_c" not in result.risk_gate_result["evidence_codes"]
+
+
+def test_agent_chat_honors_forced_conclusion_flag():
+    from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
+
+    dashboard = {
+        "decision_type": "buy",
+        "info_quality": {
+            "schema_version": "info-quality-v1",
+            "grade": "C",
+        },
+    }
+    orch = AgentOrchestrator(
+        tool_registry=MagicMock(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(
+            risk_gate_profile="balanced",
+            agent_risk_override=False,
+            forced_conclusion_enabled=False,
+        ),
+    )
+    fake_result = OrchestratorResult(
+        success=True,
+        content="buy AAPL",
+        dashboard=dashboard,
+    )
+    with patch.object(orch, "_execute_pipeline", return_value=fake_result):
+        with patch("src.agent.conversation.conversation_manager.add_user_message"):
+            with patch("src.agent.conversation.conversation_manager.add_message"):
+                result = orch.chat(
+                    "how is AAPL?",
+                    "session-grade-c",
+                    context={"stock_code": "AAPL"},
+                )
+
+    assert result.dashboard["decision_type"] == "buy"
+    assert result.runtime_facts.risk_gate_result.final_action == "buy"
+    assert "info_quality_grade_c" not in (
+        result.runtime_facts.risk_gate_result.evidence_codes
+    )
 
 
 def test_deliberation_projection_exit_records_gate():

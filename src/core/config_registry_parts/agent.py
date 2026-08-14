@@ -1178,6 +1178,84 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "ANALYSIS_QUALITY_GATE_ENABLED": {
+        "title": "Analysis Quality Gate",
+        "description": (
+            "Run the pipeline quality gate that binds factual claims in the "
+            "conclusion to input evidence using the same factuality / "
+            "boundary_honesty dimensions as the offline agent-eval suite. "
+            "Default on; disable only for diagnostics."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 630,
+        "help_key": "settings.agent.ANALYSIS_QUALITY_GATE_ENABLED",
+        "examples": [
+            "ANALYSIS_QUALITY_GATE_ENABLED=true",
+            "ANALYSIS_QUALITY_GATE_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Analysis quality gate",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate_EN.md",
+            },
+            {
+                "label": "分析质量门",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate.md",
+            },
+            {
+                "label": "Agent eval dimensions",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-eval-dimensions_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "ANALYSIS_QUALITY_GATE_ON_FAILURE": {
+        "title": "Quality Gate Failure Policy",
+        "description": (
+            "When ungrounded factual claims are found: annotate demotes them "
+            "to model opinion (default); intercept fails the analysis result. "
+            "Gate-internal errors always fail closed to annotate."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "annotate",
+        "options": [
+            {"label": "Annotate (default)", "value": "annotate"},
+            {"label": "Intercept", "value": "intercept"},
+        ],
+        "validation": {
+            "enum": ["annotate", "intercept"],
+        },
+        "display_order": 631,
+        "help_key": "settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE",
+        "examples": [
+            "ANALYSIS_QUALITY_GATE_ON_FAILURE=annotate",
+            "ANALYSIS_QUALITY_GATE_ON_FAILURE=intercept",
+        ],
+        "docs": [
+            {
+                "label": "Analysis quality gate",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate_EN.md",
+            },
+            {
+                "label": "分析质量门",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MULTI_STRATEGY_DELIBERATION": {
         "title": "Multi-Strategy Deliberation",
         "description": "Enable multi-strategy deliberation, concurrent specialist scheduling, and final disagreement explanation. Default off preserves Phase-1 synthesis byte-for-byte.",

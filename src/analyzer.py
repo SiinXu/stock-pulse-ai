@@ -374,6 +374,8 @@ class AnalysisResult:
     prediction_source: Optional[Dict[str, Any]] = None
     # Canonical low-sensitivity Risk Manager verdict, persisted by ``to_dict``.
     risk_gate_result: Optional[Dict[str, Any]] = None
+    # Pipeline analysis quality gate (no invented facts); persisted by ``to_dict``.
+    quality_gate_result: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -418,6 +420,7 @@ class AnalysisResult:
             'market_structure_context': self.market_structure_context,
             'market_regime_context': self.market_regime_context,
             'risk_gate_result': self.risk_gate_result,
+            'quality_gate_result': self.quality_gate_result,
         }
 
     def get_core_conclusion(self) -> str:

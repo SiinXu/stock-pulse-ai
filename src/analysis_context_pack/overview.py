@@ -228,48 +228,130 @@ def _sanitize_data_quality(value: Any) -> Optional[Dict[str, Any]]:
         if isinstance(metadata, Mapping)
         else None
     )
-    return {
+    info_quality = None
+    if isinstance(metadata, Mapping):
+        raw_info = metadata.get("info_quality")
+        if isinstance(raw_info, Mapping):
+            info_quality = _sanitize_info_quality(raw_info)
+    payload: Dict[str, Any] = {
         "overall_score": _safe_score(value.get("overall_score")),
         "level": _safe_quality_level(value.get("level")),
         "block_scores": _safe_block_scores(value.get("block_scores")),
         "limitations": _list_strings(value.get("limitations"), limit=5),
         "validation_evidence": _sanitize_validation_evidence(evidence),
     }
+    if info_quality is not None:
+        payload["info_quality"] = info_quality
+        payload["info_quality_grade"] = info_quality.get("grade")
+    return payload
+
+
+def _sanitize_info_quality(value: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(value, Mapping):
+        return None
+    if value.get("schema_version") != "info-quality-v1":
+        return None
+    grade = _safe_text(value.get("grade")).upper()
+    if grade not in {"A", "B", "C"}:
+        return None
+    dimensions_raw = value.get("dimensions")
+    dimensions: Dict[str, str] = {}
+    if isinstance(dimensions_raw, Mapping):
+        for key in ("source_reliability", "timeliness", "consistency"):
+            dim = _safe_text(dimensions_raw.get(key)).upper()
+            if dim in {"A", "B", "C"}:
+                dimensions[key] = dim
+    if set(dimensions) != {"source_reliability", "timeliness", "consistency"}:
+        return None
+    if type(value.get("evidence_backed")) is not bool:
+        return None
+    return {
+        "schema_version": "info-quality-v1",
+        "grade": grade,
+        "dimensions": dimensions,
+        "evidence_backed": value.get("evidence_backed") is True,
+        "reasons": [
+            reason[:96]
+            for reason in _list_strings(value.get("reasons"), limit=8)
+        ],
+        "source": _safe_text(value.get("source"))[:96] or None,
+    }
 
 
 def _sanitize_validation_evidence(value: Any) -> List[Dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    sanitized: List[Dict[str, Any]] = []
-    for item in value[-24:]:
+    overflow = len(value) > 24
+    sanitized: List[Dict[str, Any]] = (
+        [_invalid_validation_evidence()] if overflow else []
+    )
+    retained = 23 if overflow else 24
+    for item in value[-retained:]:
         if not isinstance(item, Mapping):
+            sanitized.append(_invalid_validation_evidence())
             continue
         if _safe_text(item.get("schema_version")) != "data_quality_evidence.v1":
+            sanitized.append(_invalid_validation_evidence())
             continue
+        data_type = _safe_text(item.get("data_type"))[:64]
+        severity = _safe_text(item.get("severity"))
+        rejected = item.get("rejected", False)
         issues = item.get("issues")
         reason_codes = []
+        invalid = (
+            not data_type
+            or severity not in {"pass", "warn", "reject"}
+            or type(rejected) is not bool
+            or not isinstance(issues, list)
+        )
         if isinstance(issues, list):
             for issue in issues[:24]:
                 if not isinstance(issue, Mapping):
+                    invalid = True
                     continue
-                code = _safe_text(issue.get("code"))
+                code = _safe_text(issue.get("code"))[:96]
+                issue_severity = _safe_text(issue.get("severity"))
+                if issue_severity not in {"pass", "warn", "reject"}:
+                    invalid = True
+                    continue
                 if code and code not in reason_codes:
                     reason_codes.append(code)
+                elif not code:
+                    invalid = True
+            if len(issues) > 24:
+                invalid = True
+        if invalid:
+            sanitized.append(_invalid_validation_evidence())
+            continue
         sanitized.append(
             {
                 "schema_version": "data_quality_evidence.v1",
-                "data_type": _safe_text(item.get("data_type")),
-                "severity": _safe_text(item.get("severity")),
-                "symbol": _safe_text(item.get("symbol")) or None,
-                "provider": _safe_text(item.get("provider")) or None,
-                "market": _safe_text(item.get("market")) or "unknown",
-                "instrument_type": _safe_text(item.get("instrument_type"))
+                "data_type": data_type,
+                "severity": severity,
+                "symbol": _safe_text(item.get("symbol"))[:64] or None,
+                "provider": _safe_text(item.get("provider"))[:64] or None,
+                "market": _safe_text(item.get("market"))[:32] or "unknown",
+                "instrument_type": _safe_text(item.get("instrument_type"))[:32]
                 or "equity",
-                "rejected": item.get("rejected") is True,
+                "rejected": rejected,
                 "reason_codes": reason_codes,
             }
         )
     return sanitized
+
+
+def _invalid_validation_evidence() -> Dict[str, Any]:
+    return {
+        "schema_version": "data_quality_evidence.v1",
+        "data_type": "invalid",
+        "severity": "reject",
+        "symbol": None,
+        "provider": None,
+        "market": "unknown",
+        "instrument_type": "equity",
+        "rejected": True,
+        "reason_codes": ["invalid_validation_evidence"],
+    }
 
 
 def _safe_status(value: Any) -> Optional[str]:

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
 from src.schemas.analysis_context_pack import (
     AnalysisContextBlock,
@@ -306,3 +308,47 @@ def test_builder_to_prompt_renders_aux_fetch_failed_without_confidence_cap() -> 
     assert "已知限制：基本面：抓取失败" in section
     assert "置信度规则" not in section
     assert "confidence_level" not in section
+
+
+def test_forced_conclusion_flag_controls_grade_driven_prompt_constraint() -> None:
+    pack = _pack()
+    pack.data_quality.metadata = {
+        "info_quality_grade": "C",
+        "info_quality": {
+            "schema_version": "info-quality-v1",
+            "grade": "C",
+            "dimensions": {
+                "source_reliability": "C",
+                "timeliness": "B",
+                "consistency": "A",
+            },
+            "evidence_backed": False,
+            "reasons": ["source_reliability:C"],
+        },
+    }
+
+    enabled = format_analysis_context_pack_prompt_section(
+        pack,
+        report_language="en",
+        enforce_forced_conclusion=True,
+    )
+    disabled = format_analysis_context_pack_prompt_section(
+        pack,
+        report_language="en",
+        enforce_forced_conclusion=False,
+    )
+
+    assert "Information quality grade: C" in enabled
+    assert "grade C forbids Pass conclusions" in enabled
+    assert "Information quality grade: C" in disabled
+    assert "grade C forbids Pass conclusions" not in disabled
+    assert "uncertain Watch" not in disabled
+    assert "state unsupported limitations explicitly" in disabled
+
+
+def test_prompt_rejects_coercive_forced_conclusion_flag() -> None:
+    with pytest.raises(TypeError, match="enforce_forced_conclusion"):
+        format_analysis_context_pack_prompt_section(
+            _pack(),
+            enforce_forced_conclusion="false",
+        )

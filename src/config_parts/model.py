@@ -97,6 +97,9 @@ class Config:
     data_validation_fund_pb_suspect_abs: float = 50.0
     # Multi-provider relative divergence threshold (WARN with attribution).
     data_validation_cross_source_rel_threshold: float = 0.05
+    # Issue #123: information quality grade + forced conclusion (Pass/Fail/Watch).
+    info_quality_grading_enabled: bool = True
+    forced_conclusion_enabled: bool = True
     plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
@@ -377,6 +380,9 @@ class Config:
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
     risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
+    # Pipeline quality gate: factual claims must bind to input evidence (#887).
+    analysis_quality_gate_enabled: bool = True
+    analysis_quality_gate_on_failure: str = "annotate"  # annotate | intercept
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     # Structured disagreement handling / cross-validation / split-verdict (default off).
     agent_disagreement_handling: bool = False

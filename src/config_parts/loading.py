@@ -158,7 +158,10 @@ class _ConfigLoadingMethods:
         2. WebUI 可写的运行期关键键优先复用持久化 `.env`，但保留启动时显式进程环境变量的 override
         3. 代码中的默认值
         """
-        from src.config_parts.parsers import parse_risk_gate_profile
+        from src.config_parts.parsers import (
+            parse_quality_gate_failure_policy,
+            parse_risk_gate_profile,
+        )
 
         cls._capture_bootstrap_runtime_env_overrides()
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
@@ -721,6 +724,14 @@ class _ConfigLoadingMethods:
                 minimum=0.0001,
                 maximum=1.0,
             ),
+            info_quality_grading_enabled=parse_env_bool(
+                os.getenv('INFO_QUALITY_GRADING_ENABLED'),
+                default=True,
+            ),
+            forced_conclusion_enabled=parse_env_bool(
+                os.getenv('FORCED_CONCLUSION_ENABLED'),
+                default=True,
+            ),
             plugin_data_provider_auto_bind_enabled=parse_env_bool(
                 os.getenv('PLUGIN_DATA_PROVIDER_AUTO_BIND'),
                 default=False,
@@ -1107,6 +1118,13 @@ class _ConfigLoadingMethods:
             ),
             risk_gate_profile=parse_risk_gate_profile(
                 os.getenv('RISK_GATE_PROFILE')
+            ),
+            analysis_quality_gate_enabled=parse_env_bool(
+                os.getenv('ANALYSIS_QUALITY_GATE_ENABLED'),
+                True,
+            ),
+            analysis_quality_gate_on_failure=parse_quality_gate_failure_policy(
+                os.getenv('ANALYSIS_QUALITY_GATE_ON_FAILURE')
             ),
             agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
             agent_disagreement_handling=parse_env_bool(
