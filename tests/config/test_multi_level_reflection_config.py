@@ -9,23 +9,28 @@ from unittest.mock import patch
 
 import pytest
 
+from src.agent.evolution.budget import MAX_REFLECTION_LLM_CALL_BUDGET
 from src.config import Config
 from src.core.config_registry import get_field_definition, get_registered_field_keys
 
 
-_REMOVED_KEYS = {
+# Immediate/meta LLM budgets remain code constants, not advertised env keys.
+# Encyclopedia still consumes AGENT_REFLECTION_MAX_REVISE at runtime.
+_UNADVERTISED_LLM_BUDGET_KEYS = {
     "AGENT_STEP_CRITIQUE_LLM_BUDGET",
-    "AGENT_REFLECTION_MAX_REVISE",
     "AGENT_META_REVIEW_LLM_BUDGET",
 }
 
 
 def test_reflection_registry_only_advertises_consumed_runtime_settings() -> None:
     keys = set(get_registered_field_keys())
-    assert _REMOVED_KEYS.isdisjoint(keys)
+    assert _UNADVERTISED_LLM_BUDGET_KEYS.isdisjoint(keys)
+    assert "AGENT_REFLECTION_MAX_REVISE" in keys
+    assert "AGENT_STEP_CRITIQUE_ENABLED" in keys
+    assert "AGENT_META_REVIEW_ENABLED" in keys
     assert get_field_definition("AGENT_REFLECTION_LLM_BUDGET")["validation"] == {
         "min": 0,
-        "max": 1,
+        "max": MAX_REFLECTION_LLM_CALL_BUDGET,
     }
     assert get_field_definition("AGENT_META_REVIEW_MIN_EPISODES")[
         "validation"
@@ -35,7 +40,12 @@ def test_reflection_registry_only_advertises_consumed_runtime_settings() -> None
 @pytest.mark.parametrize(
     ("key", "value", "attribute", "expected"),
     [
-        ("AGENT_REFLECTION_LLM_BUDGET", "2", "agent_reflection_llm_budget", 1),
+        (
+            "AGENT_REFLECTION_LLM_BUDGET",
+            str(MAX_REFLECTION_LLM_CALL_BUDGET + 1),
+            "agent_reflection_llm_budget",
+            MAX_REFLECTION_LLM_CALL_BUDGET,
+        ),
         ("AGENT_REFLECTION_LLM_BUDGET", "-1", "agent_reflection_llm_budget", 0),
         (
             "AGENT_META_REVIEW_MIN_EPISODES",
@@ -87,6 +97,7 @@ def test_reflection_config_parses_supported_values(
             "AGENT_STEP_CRITIQUE_ENABLED": "true",
             "AGENT_REFLECTION_ENABLED": "true",
             "AGENT_REFLECTION_LLM_BUDGET": "0",
+            "AGENT_REFLECTION_MAX_REVISE": "1",
             "AGENT_META_REVIEW_ENABLED": "true",
             "AGENT_META_REVIEW_MIN_EPISODES": "50000",
         },
@@ -97,11 +108,11 @@ def test_reflection_config_parses_supported_values(
     assert config.agent_step_critique_enabled is True
     assert config.agent_reflection_enabled is True
     assert config.agent_reflection_llm_budget == 0
+    assert config.agent_reflection_max_revise == 1
     assert config.agent_meta_review_enabled is True
     assert config.agent_meta_review_min_episodes == 50000
     for attr in (
         "agent_step_critique_llm_budget",
-        "agent_reflection_max_revise",
         "agent_meta_review_llm_budget",
     ):
         assert not hasattr(config, attr)

@@ -17,7 +17,7 @@ the prediction post-mortem / reflection track (**#1196**, kinds in
 | Layer | Trigger | Budget (default) | Output |
 | --- | --- | --- | --- |
 | **Immediate** (in-loop step critique) | Tool failure or contradictory observation during plan→act→observe | Deterministic in production | Typed lessons + standardized `replan_reason_kinds` |
-| **Trajectory** (end-of-run) | Config-enabled end-of-run reflection | `AGENT_REFLECTION_LLM_BUDGET` (**0–1**, default **1**) | Full `ReflectionResult` on run meta |
+| **Trajectory** (end-of-run) | Config-enabled end-of-run reflection | `AGENT_REFLECTION_LLM_BUDGET` (**0–64**, default **1**) | Full `ReflectionResult` on run meta |
 | **Meta** (cross-run offline job) | Offline CLI/job when sample count ≥ threshold | Deterministic | Markdown/JSON evolution report with recommended actions |
 
 Shared taxonomy (`LESSON_KINDS`):
@@ -84,9 +84,13 @@ Report includes:
 | --- | --- | --- |
 | `AGENT_STEP_CRITIQUE_ENABLED` | `false` | Enable immediate step critique |
 | `AGENT_REFLECTION_ENABLED` | `false` | Enable trajectory reflection |
-| `AGENT_REFLECTION_LLM_BUDGET` | `1` | Max provider calls per trajectory loop (`0` or `1`) |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | Max provider calls per trajectory loop (`0`–`64`; shared with run-local reflection) |
 | `AGENT_META_REVIEW_ENABLED` | `false` | Enable offline meta-review path |
 | `AGENT_META_REVIEW_MIN_EPISODES` | `30` | Sample threshold (`1`–`50000`) |
+
+Encyclopedia run-local keys remain in force: `AGENT_REFLECTION_MAX_REVISE` (default 1)
+and `AGENT_REFLECTION_LLM_BUDGET` is shared (hard max 64). Immediate and meta LLM
+budgets stay code constants defaulting to 0.
 
 Library callers can still inject an explicit `LlmCallBudget` and callback into
 the immediate/meta functions for bounded experiments. Those are not runtime

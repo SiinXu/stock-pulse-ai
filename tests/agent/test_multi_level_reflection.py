@@ -161,6 +161,32 @@ def test_trajectory_layer_rejects_corrupt_immediate_lesson_payload() -> None:
         )
 
 
+def test_trajectory_critique_prompt_includes_run_success_and_tool_evidence() -> None:
+    captured: list[str] = []
+
+    def _llm(_system: str, user: str) -> str:
+        captured.append(user)
+        return json.dumps({"lessons": [], "revised": False})
+
+    ctx = _Ctx(
+        run_id="run-evidence",
+        run_success=True,
+        trajectory_summary=[{"tool": "get_realtime_quote", "success": True}],
+        planning_outcome={"status": "completed", "reason": "ok"},
+        critic_trace=None,
+    )
+    run_reflection_loop(
+        ctx,
+        config=SimpleNamespace(agent_reflection_enabled=True),
+        llm_complete=_llm,
+        budget=LlmCallBudget(total=1),
+    )
+    assert captured
+    assert '"run_success": true' in captured[0]
+    assert '"trajectory_summary"' in captured[0]
+    assert '"critic_trace": null' in captured[0]
+
+
 def test_reflection_boundaries_are_explicit_for_zero_lessons_and_revision_cap() -> None:
     config = SimpleNamespace(agent_reflection_enabled=True)
     no_lesson_calls = 0

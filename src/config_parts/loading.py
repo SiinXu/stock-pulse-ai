@@ -964,7 +964,7 @@ class _ConfigLoadingMethods:
                 1,
                 field_name='AGENT_REFLECTION_LLM_BUDGET',
                 minimum=0,
-                maximum=1,
+                maximum=64,  # MAX_REFLECTION_LLM_CALL_BUDGET
             ),
             agent_meta_review_enabled=parse_env_bool(
                 os.getenv('AGENT_META_REVIEW_ENABLED'),

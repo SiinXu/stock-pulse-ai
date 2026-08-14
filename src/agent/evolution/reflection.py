@@ -341,6 +341,18 @@ def _meta_str(ctx: Any, key: str) -> Optional[str]:
     return text or None
 
 
+def _bounded_trajectory_summary(raw: Any) -> List[Dict[str, Any]]:
+    """Keep encyclopedia critic evidence alongside bounded trajectory rows."""
+    if not isinstance(raw, list):
+        return []
+    summary: List[Dict[str, Any]] = []
+    for row in raw[:64]:
+        if not isinstance(row, dict):
+            continue
+        summary.append(row)
+    return summary
+
+
 def _build_reflection_user_payload(ctx: Any) -> str:
     meta = getattr(ctx, "meta", {}) if ctx is not None else {}
     if not isinstance(meta, dict):
@@ -355,12 +367,20 @@ def _build_reflection_user_payload(ctx: Any) -> str:
                 "reasoning": getattr(opinion, "reasoning", None),
             }
         )
+    planning_outcome = meta.get("planning_outcome")
+    if not isinstance(planning_outcome, dict):
+        planning_outcome = None
     payload = {
         "stock_code": getattr(ctx, "stock_code", None),
         "opinions": opinions,
         "risk_flags": list(getattr(ctx, "risk_flags", None) or [])[:10],
         "degraded_stages": meta.get("degraded_stages", []),
         "critic_trace": meta.get("critic_trace"),
+        "run_success": meta.get("run_success"),
+        "planning_outcome": planning_outcome,
+        "trajectory_summary": _bounded_trajectory_summary(
+            meta.get("trajectory_summary")
+        ),
     }
     return "Critique this completed run snapshot and emit typed lessons only:\n" + json.dumps(
         payload, ensure_ascii=False, default=str

@@ -693,7 +693,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "AGENT_REFLECTION_LLM_BUDGET": {
         "title": "Reflection LLM Call Budget",
         "description": (
-            "Maximum LLM calls for one run-local reflection loop (default 1). "
+            "Maximum LLM calls for one run-local reflection loop (default 1, max 64). "
             "Budget exhaustion records an explicit budget skip; it does not silently "
             "continue as a successful reflection."
         ),
@@ -705,7 +705,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "1",
         "options": [],
-        "validation": {"min": 0},
+        "validation": {"min": 0, "max": 64},
         "display_order": 65,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [

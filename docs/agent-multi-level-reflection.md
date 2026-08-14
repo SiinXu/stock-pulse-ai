@@ -15,7 +15,7 @@
 | 层级 | 触发条件 | 预算（默认） | 产出 |
 | --- | --- | --- | --- |
 | **即时**（步骤批评） | 工具失败或矛盾观察 | 生产路径使用确定性映射 | 类型化教训 + `replan_reason_kinds` |
-| **运行级**（轨迹反思） | 配置开启的运行结束反思 | `AGENT_REFLECTION_LLM_BUDGET`（**0–1**，默认 **1**） | 完整 `ReflectionResult` |
+| **运行级**（轨迹反思） | 配置开启的运行结束反思 | `AGENT_REFLECTION_LLM_BUDGET`（**0–64**，默认 **1**） | 完整 `ReflectionResult` |
 | **跨运行**（离线 meta） | 离线任务且样本量 ≥ 阈值 | 确定性聚合 | Markdown/JSON 演进报告与建议动作 |
 
 教训使用既有 episode 投影形状（`kind` / `severity` / `claim_ref` / `remedy` / `source_step`），见 `episode_lessons.py`。生产路径在 `AGENT_REFLECTION_ENABLED` 时于 plan 结束挂轨迹反思。episode 持久化由 #1210 的单一运行结束 finalizer 负责；本变更不创建第二条 soft-append 写入路径。在该集成落地前，产出保留在 `planning_metadata`。
@@ -34,7 +34,7 @@ python scripts/run_meta_review.py --episodes path/to/episodes.json --output-dir 
 
 英文完整说明见 [agent-multi-level-reflection_EN.md](agent-multi-level-reflection_EN.md)。
 
-运行时配置仅包含 `AGENT_STEP_CRITIQUE_ENABLED`、`AGENT_REFLECTION_ENABLED`、`AGENT_REFLECTION_LLM_BUDGET`、`AGENT_META_REVIEW_ENABLED` 和 `AGENT_META_REVIEW_MIN_EPISODES`。即时层和 meta 层的实验性 LLM callback 只能由库调用方显式注入，不作为生产配置能力。
+运行时配置包含百科运行内反思键（`AGENT_REFLECTION_ENABLED`、`AGENT_REFLECTION_LLM_BUDGET` 0–64、`AGENT_REFLECTION_MAX_REVISE`）以及多层键 `AGENT_STEP_CRITIQUE_ENABLED`、`AGENT_META_REVIEW_ENABLED` 和 `AGENT_META_REVIEW_MIN_EPISODES`。即时层和 meta 层的实验性 LLM callback 只能由库调用方显式注入（默认预算为代码常量 0），不作为生产环境变量。
 
 ## 回滚
 
