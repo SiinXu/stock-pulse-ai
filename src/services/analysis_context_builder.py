@@ -78,6 +78,8 @@ class PipelineAnalysisArtifacts:
     # Optional non-authoritative alt-data payload (Issues #139 / #1144).
     # Default-off: omit or pass None so the pack shape stays unchanged.
     alternative_data: Optional[Dict[str, Any]] = None
+    info_quality_grading_enabled: bool = True
+    forced_conclusion_enabled: bool = True
     sentiment_snapshot: Optional[Dict[str, Any]] = None
 
 
@@ -86,6 +88,10 @@ class AnalysisContextBuilder:
 
     @staticmethod
     def build(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextPack:
+        if type(artifacts.info_quality_grading_enabled) is not bool:
+            raise TypeError("info_quality_grading_enabled must be bool")
+        if type(artifacts.forced_conclusion_enabled) is not bool:
+            raise TypeError("forced_conclusion_enabled must be bool")
         metadata = dict(artifacts.metadata or {})
         if artifacts.news_result_count is not None:
             metadata["news_result_count"] = artifacts.news_result_count
@@ -125,6 +131,9 @@ class AnalysisContextBuilder:
             warnings=data_quality_warnings,
             validation_evidence=evidence,
         )
+        if artifacts.info_quality_grading_enabled:
+            data_quality = _attach_info_quality(data_quality, blocks)
+
         pack = AnalysisContextPack(
             subject=AnalysisSubject(
                 code=artifacts.code,
@@ -819,17 +828,57 @@ def _build_data_quality(
         weighted_sum += score * weight
 
     overall_score = int(round(weighted_sum / 100))
-    return DataQuality(
+    limitations = _quality_limitations(blocks)
+    quality = DataQuality(
         overall_score=overall_score,
         level=_quality_level(overall_score),
         block_scores=block_scores,
-        limitations=_quality_limitations(blocks),
+        limitations=limitations,
         warnings=warnings,
         metadata={
             "validation_evidence_schema": "data_quality_evidence.v1",
             "validation_evidence": list(validation_evidence or [])[:24],
         },
     )
+    return quality
+
+
+def _attach_info_quality(
+    quality: DataQuality,
+    blocks: Mapping[str, AnalysisContextBlock],
+) -> DataQuality:
+    """Attach the deterministic grade to a completed context-pack quality object."""
+
+    from src.services.info_quality_grading import grade_info_quality
+
+    block_status_map = {
+        key: {
+            "status": (
+                block.status.value
+                if isinstance(block.status, ContextFieldStatus)
+                else str(block.status)
+            )
+        }
+        for key, block in blocks.items()
+    }
+    info_quality = grade_info_quality(
+        {
+            "overall_score": quality.overall_score,
+            "level": quality.level,
+            "block_scores": quality.block_scores,
+            "limitations": quality.limitations,
+            "warnings": quality.warnings,
+            "metadata": quality.metadata,
+        },
+        blocks=block_status_map,
+    )
+    quality.metadata = {
+        **quality.metadata,
+        "info_quality_schema": info_quality.get("schema_version"),
+        "info_quality_grade": info_quality.get("grade"),
+        "info_quality": info_quality,
+    }
+    return quality
 
 
 def _validation_evidence_from_metadata(

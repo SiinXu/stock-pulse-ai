@@ -16,7 +16,7 @@
 - 身份与来源：`stock_code`、`stock_name`、`market`、`source_type`、`source_agent`、`source_report_id`、`trace_id`、`decision_profile`、`trigger_source`。
 - 建议语义：`action`、`action_label`、`confidence`、`score`、`horizon`、`market_phase`、`plan_quality`、`status`。
 - 计划与解释：`entry_low`、`entry_high`、`stop_loss`、`target_price`、`invalidation`、`watch_conditions`、`reason`、`risk_summary`、`catalyst_summary`。
-- 证据与质量：`evidence`、`data_quality_summary`、`metadata`。
+- 证据与质量：`evidence`、`data_quality_summary`、`metadata`（#123 起可含 `info_quality` / `info_quality_grade` 与 `forced_conclusion` / `forced_conclusion_stance`；等级由校验层证据派生，不重复计算）。
 - 生命周期：`expires_at`、`created_at`、`updated_at`。
 - 展示模型：响应中的 `presentation` 固定包含 `action`、`label`、`confidence`、`summary`、`risk`、`timestamp`。
 

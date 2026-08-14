@@ -1,0 +1,1 @@
+- [Fixed] Align analysis-context compatibility seams and facade snapshots with information-quality constraints.

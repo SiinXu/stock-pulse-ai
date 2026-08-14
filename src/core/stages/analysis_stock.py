@@ -1050,6 +1050,21 @@ class _StockAnalysisStageMixin:
                     report_type=report_type.value,
                     previous_operation_advice=action_source_advice,
                 )
+                info_quality_adjustments = self._apply_info_quality_constraints(
+                    result,
+                    analysis_context_pack_overview=analysis_context_pack_overview,
+                )
+                if info_quality_adjustments:
+                    logger.info(
+                        "[info_quality] Applied constraints for %s: %s",
+                        code,
+                        info_quality_adjustments,
+                    )
+                    self._refresh_decision_action_for_final_result(
+                        result,
+                        report_type=report_type.value,
+                        previous_operation_advice=action_source_advice,
+                    )
 
             analyze_output = AnalyzeStageOutput.from_result(result)
             analysis_succeeded = analyze_output.analysis_success
