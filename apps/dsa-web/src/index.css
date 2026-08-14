@@ -2660,6 +2660,15 @@ a {
   border-top: 1px solid hsl(var(--border) / 0.40);
 }
 
+.backtest-methodology-disclaimer {
+  margin-top: 0.75rem;
+  border-top: 1px solid hsl(var(--border-subtle-raw) / 0.08);
+  padding-top: 0.5rem;
+  color: var(--text-muted-text);
+  font-size: 0.75rem;
+  line-height: 1.625;
+}
+
 .backtest-summary {
   display: flex;
   align-items: center;

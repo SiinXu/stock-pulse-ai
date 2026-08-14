@@ -283,7 +283,7 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
         </div>
       ) : null}
       <div
-        className="mt-3 border-t border-subtle pt-2 text-xs leading-relaxed text-muted-text"
+        className="backtest-methodology-disclaimer"
         role="note"
       >
         {metrics.methodology?.disclaimer || text.methodologyDisclaimer}
