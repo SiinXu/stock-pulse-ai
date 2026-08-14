@@ -101,6 +101,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
+| `AGENT_CRITIC_MAX_ITERS` | `1` | 是 | 模板中注释; Critic 发现问题后的受控修订轮次上限（硬上限 2） |
 | `DEBATE_ENABLED` | `false` | 是 | 模板中注释; Optional structured Bull-Bear debate stage before Decision (default false, Issue #117) |
 | `DEBATE_MAX_ROUNDS` | `2` | 是 | 模板中注释; Debate rounds 1-3 |
 | `DEBATE_TEMPERATURE` | `0.4` | 是 | 模板中注释; Debate LLM temperature |

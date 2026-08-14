@@ -341,6 +341,7 @@ class Config:
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    agent_critic_max_iters: int = 1  # Max controlled revision rounds after Critic findings (hard-capped at 2)
     # Multi-level reflection (#1094) plus encyclopedia run-local reflection / post-mortem.
     # Immediate and meta LLM budgets stay code constants (default 0); trajectory reuses
     # AGENT_REFLECTION_LLM_BUDGET (0-64). Default off.

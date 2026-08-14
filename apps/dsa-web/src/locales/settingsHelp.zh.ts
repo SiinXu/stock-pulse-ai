@@ -1554,6 +1554,17 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
+    title: 'Critic 最大修订轮次',
+    summary: 'Critic 发现重要证据缺口后，限制受控白名单修订的轮次。',
+    usage: '设为 1 执行一次保守修订；设为 2 可在复查后允许第二个不同目标。',
+    valueNotes: [
+      '允许范围为 1–2，默认 1。',
+      '证据发生变化不代表收敛；只有修订后的 Critic 显式 pass 才代表收敛。',
+    ],
+    impact: ['在保留 Decision 预算的同时限制可选 Critic 修订成本。'],
+    notes: ['达到轮次上限仍无显式 pass 时保持 not_converged，并保留 Critic 限制项。'],
+  },
   'settings.agent.DEBATE': {
     title: '多空辩论',
     summary: '配置可选辩论阶段、限制与专用模型。',

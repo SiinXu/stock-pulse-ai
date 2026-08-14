@@ -213,6 +213,10 @@ should sum to 100; all-zero means no effective signal and must not be faked.
                     "retry_budget_consumed",
                     "retry_budget_remaining",
                     "retry_status",
+                    "iteration_max",
+                    "iteration_consumed",
+                    "convergence_status",
+                    "revision_rounds",
                 )
             }
             parts.append("## Bounded Critic Trace (limitations only)")

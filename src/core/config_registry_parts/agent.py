@@ -636,7 +636,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "AGENT_CRITIC_ENABLED": {
         "title": "Bounded Multi-Agent Critic",
-        "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request at most one retry of an already-entered intelligence or catalog-backed skill stage.",
+        "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request controlled whitelist revision rounds of already-entered intelligence or catalog-backed skill stages.",
         "category": "agent",
         "data_type": "boolean",
         "ui_control": "switch",
@@ -658,6 +658,24 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
             },
         ],
+        "warning_codes": [],
+    },
+    "AGENT_CRITIC_MAX_ITERS": {
+        "title": "Critic Max Revision Rounds",
+        "description": "Maximum controlled revision rounds after the Critic finds material gaps (default 1, hard cap 2). Each round may re-run one whitelist stage and records a revision diff in the Critic trace. Only an explicit recheck pass marks convergence; optional work yields to Decision and per-mode budgets.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "options": [],
+        "validation": {"min": 1, "max": 2},
+        "display_order": 64,
+        "help_key": "settings.agent.AGENT_CRITIC_MAX_ITERS",
+        "examples": ["AGENT_CRITIC_MAX_ITERS=1", "AGENT_CRITIC_MAX_ITERS=2"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
         "warning_codes": [],
     },
     "DEBATE_ENABLED": {
@@ -772,7 +790,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 64,
+        "display_order": 66,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_ENABLED=false",
@@ -831,7 +849,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "1",
         "options": [],
         "validation": {"min": 0},
-        "display_order": 66,
+        "display_order": 67,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_MAX_REVISE=1",
@@ -861,7 +879,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 67,
+        "display_order": 68,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_ENABLED=false",
@@ -890,7 +908,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "8",
         "options": [],
         "validation": {"min": 0},
-        "display_order": 68,
+        "display_order": 69,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_LLM_BUDGET=8",
@@ -919,7 +937,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "true",
         "options": [],
         "validation": {},
-        "display_order": 69,
+        "display_order": 70,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true",
