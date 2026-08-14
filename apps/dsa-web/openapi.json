@@ -4099,6 +4099,8 @@
         "example": {
           "analysis_phase": "auto",
           "async_mode": false,
+          "debate_max_rounds": 2,
+          "enable_debate": false,
           "force_refresh": false,
           "notify": true,
           "original_query": "茅台",
@@ -4129,6 +4131,32 @@
             "description": "是否使用异步模式",
             "title": "Async Mode",
             "type": "boolean"
+          },
+          "debate_max_rounds": {
+            "anyOf": [
+              {
+                "maximum": 3.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "本次分析辩论轮数覆盖（1-3）；未传时使用全局 DEBATE_MAX_ROUNDS",
+            "title": "Debate Max Rounds"
+          },
+          "enable_debate": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "本次分析是否启用结构化 Bull-Bear 辩论；未传时使用全局 DEBATE_ENABLED",
+            "title": "Enable Debate"
           },
           "force_refresh": {
             "default": false,
@@ -4561,6 +4589,175 @@
         ],
         "title": "ApprovalStatus",
         "type": "string"
+      },
+      "AuditPackageArtifact": {
+        "additionalProperties": false,
+        "properties": {
+          "byte_length": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byte Length"
+          },
+          "content_type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Content Type",
+            "type": "string"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Reason"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "status": {
+            "default": "present",
+            "enum": [
+              "present",
+              "missing",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "content_type"
+        ],
+        "title": "AuditPackageArtifact",
+        "type": "object"
+      },
+      "AuditPackageJsonEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "additionalProperties": true,
+            "title": "Artifacts",
+            "type": "object"
+          },
+          "evidence_chain": {
+            "$ref": "#/components/schemas/EvidenceChainPackage"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/AuditPackageManifest"
+          },
+          "schema_version": {
+            "const": "audit-package-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema_version",
+          "manifest",
+          "evidence_chain",
+          "artifacts"
+        ],
+        "title": "AuditPackageJsonEnvelope",
+        "type": "object"
+      },
+      "AuditPackageManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/AuditPackageArtifact"
+            },
+            "maxItems": 32,
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "evidence_chain_schema": {
+            "const": "evidence-chain-v1",
+            "default": "evidence-chain-v1",
+            "title": "Evidence Chain Schema",
+            "type": "string"
+          },
+          "include_raw_artifacts": {
+            "default": false,
+            "title": "Include Raw Artifacts",
+            "type": "boolean"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Notes",
+            "type": "string"
+          },
+          "reasoning_trace_schema": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Trace Schema"
+          },
+          "redacted": {
+            "default": true,
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "run": {
+            "$ref": "#/components/schemas/EvidenceChainRun"
+          },
+          "schema_version": {
+            "const": "audit-package-v1",
+            "default": "audit-package-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "AuditPackageManifest",
+        "type": "object"
       },
       "AuthSettingsRequest": {
         "description": "Update auth enablement and initial password settings.",
@@ -6769,6 +6966,105 @@
           "series"
         ],
         "title": "CompoundGrowthResponse",
+        "type": "object"
+      },
+      "ConclusionLink": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "as_of_status": {
+            "default": "missing",
+            "enum": [
+              "present",
+              "missing"
+            ],
+            "title": "As Of Status",
+            "type": "string"
+          },
+          "conclusion_id": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Conclusion Id",
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "evidence_status": {
+            "default": "missing",
+            "enum": [
+              "linked",
+              "missing",
+              "partial"
+            ],
+            "title": "Evidence Status",
+            "type": "string"
+          },
+          "missing_note": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Note"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "statement": {
+            "maxLength": 1200,
+            "minLength": 1,
+            "title": "Statement",
+            "type": "string"
+          },
+          "stratum": {
+            "enum": [
+              "verified_fact",
+              "model_inference",
+              "risk",
+              "synthesis",
+              "decision",
+              "gap"
+            ],
+            "title": "Stratum",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conclusion_id",
+          "stratum",
+          "statement"
+        ],
+        "title": "ConclusionLink",
         "type": "object"
       },
       "ConfigComponentDiff": {
@@ -10914,6 +11210,514 @@
           "message"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "EvidenceChainCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "not_recorded": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Not Recorded",
+            "type": "array"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Notes",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceChainCoverageSource"
+            },
+            "maxItems": 32,
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "title": "EvidenceChainCoverage",
+        "type": "object"
+      },
+      "EvidenceChainCoverageSource": {
+        "additionalProperties": false,
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "boolean"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Reasons",
+            "type": "array"
+          },
+          "source": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "supported": {
+            "default": true,
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source",
+          "present",
+          "absent"
+        ],
+        "title": "EvidenceChainCoverageSource",
+        "type": "object"
+      },
+      "EvidenceChainExportResponse": {
+        "additionalProperties": false,
+        "description": "Public API name for the strict evidence-chain domain package.",
+        "properties": {
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/ConclusionLink"
+            },
+            "maxItems": 200,
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/EvidenceChainCoverage"
+          },
+          "evidence_items": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "maxItems": 400,
+            "title": "Evidence Items",
+            "type": "array"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceGap"
+            },
+            "maxItems": 200,
+            "title": "Gaps",
+            "type": "array"
+          },
+          "reasoning_steps": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningStep"
+            },
+            "maxItems": 200,
+            "title": "Reasoning Steps",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/EvidenceChainRun"
+          },
+          "schema_version": {
+            "const": "evidence-chain-v1",
+            "default": "evidence-chain-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "run",
+          "coverage"
+        ],
+        "title": "EvidenceChainExportResponse",
+        "type": "object"
+      },
+      "EvidenceChainPackage": {
+        "additionalProperties": false,
+        "properties": {
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/ConclusionLink"
+            },
+            "maxItems": 200,
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/EvidenceChainCoverage"
+          },
+          "evidence_items": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "maxItems": 400,
+            "title": "Evidence Items",
+            "type": "array"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceGap"
+            },
+            "maxItems": 200,
+            "title": "Gaps",
+            "type": "array"
+          },
+          "reasoning_steps": {
+            "items": {
+              "$ref": "#/components/schemas/ReasoningStep"
+            },
+            "maxItems": 200,
+            "title": "Reasoning Steps",
+            "type": "array"
+          },
+          "run": {
+            "$ref": "#/components/schemas/EvidenceChainRun"
+          },
+          "schema_version": {
+            "const": "evidence-chain-v1",
+            "default": "evidence-chain-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "run",
+          "coverage"
+        ],
+        "title": "EvidenceChainPackage",
+        "type": "object"
+      },
+      "EvidenceChainRun": {
+        "additionalProperties": false,
+        "properties": {
+          "config_fingerprint": {
+            "maxLength": 32,
+            "minLength": 8,
+            "title": "Config Fingerprint",
+            "type": "string"
+          },
+          "exported_at": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Exported At",
+            "type": "string"
+          },
+          "lookup_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookup Key"
+          },
+          "lookup_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "primary_key",
+                  "latest_by_query_id"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lookup Mode"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "record_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Id"
+          },
+          "run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "stock_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Code"
+          },
+          "stock_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Name"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          }
+        },
+        "required": [
+          "run_id",
+          "exported_at",
+          "config_fingerprint"
+        ],
+        "title": "EvidenceChainRun",
+        "type": "object"
+      },
+      "EvidenceGap": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "related_conclusion_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Related Conclusion Ids",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "missing",
+              "partial",
+              "not_recorded"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "status",
+          "reason"
+        ],
+        "title": "EvidenceGap",
+        "type": "object"
+      },
+      "EvidenceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "as_of_status": {
+            "default": "missing",
+            "enum": [
+              "present",
+              "missing"
+            ],
+            "title": "As Of Status",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "evidence_id": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Reason"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "maxLength": 800,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "source_type": {
+            "enum": [
+              "data_source",
+              "tool_call",
+              "news",
+              "indicator",
+              "model",
+              "pipeline_stage",
+              "report_strata",
+              "decision",
+              "synthesis",
+              "missing"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "status": {
+            "default": "present",
+            "enum": [
+              "present",
+              "missing",
+              "partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "source_type"
+        ],
+        "title": "EvidenceItem",
         "type": "object"
       },
       "ExportSystemConfigResponse": {
@@ -24240,6 +25044,103 @@
           "timeout_seconds"
         ],
         "title": "ReadinessReportResponse",
+        "type": "object"
+      },
+      "ReasoningStep": {
+        "additionalProperties": false,
+        "properties": {
+          "input_refs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Input Refs",
+            "type": "array"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Reason"
+          },
+          "model_ref": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Ref"
+          },
+          "output_summary": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Summary"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "stage": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Stage",
+            "type": "string"
+          },
+          "status": {
+            "default": "present",
+            "enum": [
+              "present",
+              "missing",
+              "partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step_id": {
+            "maxLength": 96,
+            "minLength": 1,
+            "title": "Step Id",
+            "type": "string"
+          },
+          "tool_call_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Tool Call Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "step_id",
+          "stage"
+        ],
+        "title": "ReasoningStep",
         "type": "object"
       },
       "ReasoningTraceAgent": {
@@ -39984,6 +40885,210 @@
         ]
       }
     },
+    "/api/v1/analysis/{record_id}/evidence-chain": {
+      "get": {
+        "operationId": "exportAnalysisEvidenceChain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceChainExportResponse"
+                }
+              }
+            },
+            "description": "Redacted evidence-chain-v1 package"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export evidence chain for an analysis history record",
+        "tags": [
+          "EvidencePack"
+        ]
+      }
+    },
+    "/api/v1/analysis/{record_id}/evidence-pack": {
+      "get": {
+        "operationId": "exportAnalysisAuditPackage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "zip",
+              "enum": [
+                "zip",
+                "json"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPackageJsonEnvelope"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "ZIP audit package or JSON envelope"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export auditable report package for an analysis history record",
+        "tags": [
+          "EvidencePack"
+        ]
+      }
+    },
     "/api/v1/approvals": {
       "get": {
         "operationId": "list_approvals_api_v1_approvals_get",
@@ -45260,6 +46365,210 @@
         "summary": "获取历史报告运行诊断摘要",
         "tags": [
           "History"
+        ]
+      }
+    },
+    "/api/v1/history/{record_id}/evidence-chain": {
+      "get": {
+        "operationId": "exportEvidenceChain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceChainExportResponse"
+                }
+              }
+            },
+            "description": "Redacted evidence-chain-v1 package"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export evidence chain for an analysis history record",
+        "tags": [
+          "EvidencePack"
+        ]
+      }
+    },
+    "/api/v1/history/{record_id}/evidence-pack": {
+      "get": {
+        "operationId": "exportAuditPackage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "zip",
+              "enum": [
+                "zip",
+                "json"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPackageJsonEnvelope"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "ZIP audit package or JSON envelope"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export auditable report package for an analysis history record",
+        "tags": [
+          "EvidencePack"
         ]
       }
     },

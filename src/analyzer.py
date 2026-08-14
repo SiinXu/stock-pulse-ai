@@ -108,6 +108,7 @@ from src.market_context import detect_market, get_market_role, get_market_guidel
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
+from src.market_regime_prompt import format_market_regime_prompt_section
 
 # A facade reload must recreate moved mutable constants, as the monolith did.
 if "__result_processing" in globals():
@@ -237,6 +238,7 @@ def _legacy_audit_marker_specs(
     add("market_phase", "## Market Phase Context" if report_language in ("en", "ko") else "## 市场阶段上下文")
     add("daily_market_context", "## Daily Market Context" if report_language in ("en", "ko") else "## 大盘环境摘要")
     add("market_structure_context", "## Market Structure Context" if report_language in ("en", "ko") else "## 市场结构上下文")
+    add("market_regime_context", "## Market Regime Context" if report_language in ("en", "ko") else "## 市场状态（Regime）上下文")
     add("analysis_context_pack", analysis_context_pack_summary)
     add("quote", "## 📈 技术面数据")
     add("news_context", "## 📰 舆情情报" if news_context else None)
@@ -362,6 +364,7 @@ class AnalysisResult:
     # ========== Fundamentals Context (Runtime only, used for notification assembly; not persisted to to_dict)==========
     fundamental_context: Optional[Dict[str, Any]] = None
     market_structure_context: Optional[Dict[str, Any]] = None
+    market_regime_context: Optional[Dict[str, Any]] = None
 
     # ========== Historical Decision Reflection (Issue #118; runtime only, not persisted to to_dict) ==========
     # Carries a DecisionReflection so the report renderer can emit its section.
@@ -371,6 +374,8 @@ class AnalysisResult:
     prediction_source: Optional[Dict[str, Any]] = None
     # Canonical low-sensitivity Risk Manager verdict, persisted by ``to_dict``.
     risk_gate_result: Optional[Dict[str, Any]] = None
+    # Pipeline analysis quality gate (no invented facts); persisted by ``to_dict``.
+    quality_gate_result: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -413,7 +418,9 @@ class AnalysisResult:
             'change_pct': self.change_pct,
             'model_used': self.model_used,
             'market_structure_context': self.market_structure_context,
+            'market_regime_context': self.market_regime_context,
             'risk_gate_result': self.risk_gate_result,
+            'quality_gate_result': self.quality_gate_result,
         }
 
     def get_core_conclusion(self) -> str:

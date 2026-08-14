@@ -96,6 +96,7 @@ This is the entry point for project documentation. The README covers the project
 | [Prediction Extraction](prediction-extraction_EN.md) | Structured decision → PredictionRecord drafts; prose anti-examples; default-off finalize hook ([中文](prediction-extraction.md)) |
 | [Skill Opinion Outcome Evaluation](skill-opinion-outcome-evaluation.md) | Individual skill samples, offline forward outcomes, sample-sufficiency statistics, migration, and V0 boundaries |
 | [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema and CAS store (Issue #1112) |
+| [Market Regime Detection](market-regime.md) | Explainable rule-based regime labels, evidence artifacts, adaptive analysis focus, and skill routing (Issue #220) |
 | [Prediction ActualsFetcher](prediction-actuals-fetcher.md) | Server-path actuals for prediction scoring: DataFetcherManager, short-TTL coalesce, provider_down/data_unavailable, non-finite rejection (#1110 / #1107) |
 | [Deterministic Prediction Claim Scorer](prediction-claim-scorer_EN.md) | Pure `ClaimScorer` for A1 claim types (direction / return_bucket / level_break / vol_regime / custom) with hit·partial·miss·data_unavailable and confidence calibration (#1111 / #1107; [Chinese](prediction-claim-scorer.md)) |
 | [Analysis Context Pack Contract, Runtime Consumption, And Visibility](analysis-context-pack.md) <sub><sub>![P6 Badge](https://img.shields.io/badge/P6-orange?style=flat)</sub></sub> (Chinese-only) | AnalysisContextPack first-scope boundaries, field quality states, P1/P2 internal contracts, P3 prompt-summary consumption, P4 history/API/Web low-sensitivity visibility, P5 data-quality scoring, and P6 migration/rollback notes, plus source anchors; the full guide adds #1386 market-phase analysis, migration, and rollback entry points |
@@ -132,6 +133,7 @@ This is the entry point for project documentation. The README covers the project
 | [Config-access ratchet](config-access-ratchet.md) | Shrink-only bare `get_config()` gate, preferred injection / composition-root path, and legitimate baseline changes (ADR-011 / issue #625) |
 | [Import-cycle ratchet](import-cycle-ratchet.md) | Shrink-only bidirectional package-pair gate, failure reading, and legitimate baseline path (ADR-010) |
 | [Offline Analysis Quality Panel](analysis-quality-panel.md) | Fixed-panel offline trust fixtures, extension guide, and non-claims (#617 Phase A) |
+| [Analysis quality gate](analysis-quality-gate_EN.md) | Pipeline no-invented-facts gate reusing agent-eval dimensions; annotate/intercept policies (#887) |
 | [Prediction vs Actual Tracking Map](prediction-vs-actual-tracking_EN.md) | #449→#1107 ownership: framework superseded by Agent Evolution epic; residual display/adapters listed |
 | [Plugin Development Guide](plugin-development-guide.md) | Consolidated entry for the six extension points: what/why, trust model, 10-minute quickstart, official examples, and deep links ([中文](plugin-development-guide_zh.md)) |
 | [Offline Financial Agent Evaluation Benchmark](agent-eval-benchmark_EN.md) | Offline agent-run metrics (correctness, tool discipline, uncertainty honesty), baseline, and refresh flow (#252 V0) |

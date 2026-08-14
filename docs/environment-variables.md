@@ -101,8 +101,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
-| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内反思循环（类型化教训；默认 false） |
-| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限 |
+| `DEBATE_ENABLED` | `false` | 是 | 模板中注释; Optional structured Bull-Bear debate stage before Decision (default false, Issue #117) |
+| `DEBATE_MAX_ROUNDS` | `2` | 是 | 模板中注释; Debate rounds 1-3 |
+| `DEBATE_TEMPERATURE` | `0.4` | 是 | 模板中注释; Debate LLM temperature |
+| `DEBATE_MODEL` | empty | 是 | 模板中注释; Optional debate model name |
+| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内/轨迹反思循环（类型化教训；默认 false） |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限（0–64） |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释; 反思后运行内修订次数上限 |
 | `AGENT_POSTMORTEM_ENABLED` | `false` | 是 | 模板中注释; 可选已解析预测后验复盘（默认 false） |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 是 | 模板中注释; 单批后验 LLM 调用上限 |
@@ -133,6 +137,14 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
 | `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
+| `MULTI_MODEL_CONSENSUS_ENABLED` | `false` | 是 | 模板中注释; 传统分析路径多模型共识对比（默认关闭；Issue #154） |
+| `MULTI_MODEL_CONSENSUS_MODELS` | 空 | 是 | 模板中注释; 可选的逗号分隔 LiteLLM 模型列表 |
+| `MULTI_MODEL_CONSENSUS_PRESET` | 空 | 是 | 模板中注释; 模型列表为空时可选 `fast` / `quality` |
+| `MULTI_MODEL_CONSENSUS_MAX_MODELS` | `3` | 是 | 模板中注释; 单次对比最大模型数（2–5） |
+| `MULTI_MODEL_CONSENSUS_MAX_COST_USD` | 空 | 是 | 模板中注释; 有限 USD 预算：空=仅 MAX_MODELS；0=关闭扇出；正值=硬限制最多 2 个模型（暂无实时计价）；拒绝 NaN/±Inf |
+| `AGENT_DISAGREEMENT_HANDLING` | `false` | 是 | 模板中注释; 结构化分歧记录/交叉校验/分裂裁决（默认关闭） |
+| `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释; 高分歧升级阈值 |
+| `AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD` | `0.55` | 是 | 模板中注释; 交叉校验触发阈值 |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
@@ -146,6 +158,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_MAX_TOKENS` | `1500` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS` | `16` | 是 | 模板中注释 |
 | `AGENT_PLANNING_ON_STEP_FAILURE` | `replan` | 是 | 模板中注释 |
+
+| `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; 即时步骤批评（默认关闭；#1094） |
+| `AGENT_META_REVIEW_ENABLED` | `false` | 是 | 模板中注释; 跨运行离线 meta-review（默认关闭） |
+| `AGENT_META_REVIEW_MIN_EPISODES` | `30` | 是 | 模板中注释; meta-review 样本阈值 |
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
@@ -158,6 +174,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
+| `MARKET_REGIME_ENABLED` | `true` | 是 | 模板中注释; 启用可解释规则市场状态检测 |
+| `MARKET_REGIME_OVERRIDE` | 空 | 是 | 模板中注释; 可选强制市场状态标签 |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
 | `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释; Independent per-sub-agent timeout cap in seconds (0 disables it; a positive value such as 180 enables a hard cap for ... |
 | `AGENT_TOOL_TIMEOUT_S` | `120` | 是 | 模板中注释; Agent runtime guards (enabled by default; set an individual numeric value to 0 to disable that guard) Timeout for one... |
@@ -196,6 +214,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ANTHROPIC_TEMPERATURE` | `0.7` | 是 | 模板中注释; Legacy Claude sampling temperature (0.0-1.0); prefer LLM_TEMPERATURE for new setups. |
 | `ASTRBOT_TOKEN` | `空` | 是 | 模板中注释; Optional for AstrBot Webhook requiring Bearer Token |
 | `ASTRBOT_URL` | `空` | 是 | 模板中注释; AstrBot Configuration |
+| `AUDIT_EXPORT_ENABLED` | `false` | 是 | 模板中注释 |
+| `AUDIT_INCLUDE_RAW_ARTIFACTS` | `false` | 是 | 模板中注释 |
 | `BACKTEST_ENABLED` | `true` | 是 | =================================== Backtesting configuration (optional) =================================== Enable b... |
 | `BACKTEST_ENGINE_VERSION` | `v1` | 是 | Backtesting engine version (used to differentiate results when backtesting logic is upgraded). |
 | `BACKTEST_EVAL_WINDOW_DAYS` | `10` | 是 | Backtesting evaluation window (trading days) |
@@ -234,6 +254,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DATA_VALIDATION_STRICT` | `false` | 是 | 模板中注释; Reject invalid daily/realtime provider candidates before acceptance/cache so the existing bounded provider loop can c... |
 | `DATA_VALIDATION_STRICT_SCOPES` | `*/*` | 是 | 模板中注释; Comma-separated market/instrument selectors; supported instruments are equity, etf, and index |
 | `DATA_VALIDATION_UPPER_LAYER_MODE` | `warn` | 是 | 模板中注释; Separate final aggregated-fundamental policy: warn or reject |
+| `FORCED_CONCLUSION_ENABLED` | `true` | 是 | 模板中注释; Forced Pass/Fail/Watch conclusion constrained by information quality (Issue #123) |
+| `INFO_QUALITY_GRADING_ENABLED` | `true` | 是 | 模板中注释; A/B/C information quality grade from validation evidence (Issue #123) |
 | `DEBUG` | `false` | 是 | Enable debugging logs |
 | `DECISION_MEMORY_ENABLED` | `true` | 是 | 模板中注释; Historical decision memory & reflection (Issue #118; default on, no config needed) Injects a "Historical Decision Ref... |
 | `DECISION_MEMORY_LOOKBACK` | `5` | 是 | 模板中注释; Max admitted evaluated signals per stock to inject (rate and list use this set; hard cap 40) |
@@ -277,6 +299,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `EVENT_TRIGGER_MAX_PER_DAY` | `20` | 是 | 模板中注释 |
 | `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | 是 | 模板中注释 |
 | `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 是 | 模板中注释; Event-triggered deep analysis (issues #129/#152) |
+| `EVIDENCE_CHAIN_ENABLED` | `true` | 是 | 模板中注释; Evidence chain + auditable report package (#986 / #127) |
 | `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |
@@ -607,6 +630,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `RESEARCH_PACK_MAX_ZIP_BYTES` | `25165824` | 是 | 模板中注释; clamped between 1 MiB and 64 MiB |
 | `RESEARCH_PRESENTATION_PROFILE` | `balanced` | 是 | 模板中注释; Research presentation profile (emphasis/order only; same evidence, full risk disclosure): conservative = risks first ... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
+| `ANALYSIS_QUALITY_GATE_ENABLED` | `true` | 是 | 模板中注释; 管线质量门：结论事实绑定输入证据（默认开启） |
+| `ANALYSIS_QUALITY_GATE_ON_FAILURE` | `annotate` | 是 | 模板中注释; 未绑定事实时 annotate（默认）或 intercept |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |
 | `RUN_IMMEDIATELY` | `true` | 是 | Whether to immediately execute an analysis when the non-time mode is started (true/false) |

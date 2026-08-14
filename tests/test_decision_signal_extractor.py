@@ -115,6 +115,82 @@ def test_build_payload_includes_tw_market() -> None:
     assert payload["action"] == "buy"
 
 
+def test_build_payload_persists_strict_info_quality_and_forced_conclusion() -> None:
+    result = _result()
+    result.dashboard.update(
+        {
+            "info_quality": {
+                "schema_version": "info-quality-v1",
+                "grade": "C",
+                "dimensions": {
+                    "source_reliability": "C",
+                    "timeliness": "B",
+                    "consistency": "A",
+                },
+                "evidence_backed": False,
+                "reasons": ["source_reliability:C"],
+            },
+            "forced_conclusion": {
+                "schema_version": "forced-conclusion-v1",
+                "stance": "Watch",
+                "uncertainty": True,
+                "evidence_backed": False,
+                "info_quality_grade": "C",
+                "constraint_reasons": ["grade_c_pass_downgraded"],
+                "summary": "Forced conclusion: Watch.",
+            },
+        }
+    )
+    result.analysis_context_pack_overview = {
+        "data_quality": {"level": "poor"}
+    }
+
+    payload = build_decision_signal_payload_from_report(
+        result,
+        trace_id="trace-quality",
+        query_source="api",
+        report_type="full",
+        profile_source=BUILD_PROFILE_SOURCE,
+    )
+
+    assert payload is not None
+    assert payload["metadata"]["info_quality_grade"] == "C"
+    assert payload["metadata"]["forced_conclusion_stance"] == "Watch"
+    assert payload["metadata"]["data_quality_level"] == "poor"
+    assert payload["data_quality_summary"]["info_quality_grade"] == "C"
+
+
+def test_build_payload_rejects_spoofed_quality_metadata() -> None:
+    result = _result()
+    result.dashboard.update(
+        {
+            "info_quality": {
+                "schema_version": "spoofed",
+                "grade": "A",
+                "dimensions": {},
+                "evidence_backed": "true",
+            },
+            "forced_conclusion": {
+                "schema_version": "spoofed",
+                "stance": "Pass",
+                "uncertainty": "false",
+            },
+        }
+    )
+
+    payload = build_decision_signal_payload_from_report(
+        result,
+        trace_id="trace-spoofed-quality",
+        query_source="api",
+        report_type="full",
+        profile_source=BUILD_PROFILE_SOURCE,
+    )
+
+    assert payload is not None
+    assert "info_quality" not in payload["metadata"]
+    assert "forced_conclusion" not in payload["metadata"]
+
+
 def test_build_payload_persists_structured_risk_manager_metadata() -> None:
     result = _result(decision_type="hold", operation_advice="观望")
     result.risk_gate_result = {

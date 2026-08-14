@@ -116,6 +116,7 @@ class _AgentAnalysisStageMixin:
         daily_market_context: Optional[DailyMarketContext] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
         market_structure_context: Optional[Dict[str, Any]] = None,
+        market_regime_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[AnalysisResult]:
         """
         使用 Agent 模式分析单只股票。
@@ -159,6 +160,8 @@ class _AgentAnalysisStageMixin:
                 initial_context["market_phase_context"] = market_phase_context
             if isinstance(market_structure_context, dict):
                 initial_context["market_structure_context"] = market_structure_context
+            if isinstance(market_regime_context, dict):
+                initial_context["market_regime_context"] = market_regime_context
             self._attach_daily_market_context(
                 initial_context,
                 daily_market_context,
@@ -559,10 +562,22 @@ class _AgentAnalysisStageMixin:
                         code,
                         market_context_adjustments,
                     )
+                info_quality_adjustments = self._apply_info_quality_constraints(
+                    result,
+                    analysis_context_pack_overview=analysis_context_pack_overview,
+                )
+                if info_quality_adjustments:
+                    logger.info(
+                        "[info_quality] Applied agent constraints for %s: %s",
+                        code,
+                        info_quality_adjustments,
+                    )
                 if isinstance(fundamental_context, dict):
                     result.fundamental_context = fundamental_context
                 if isinstance(market_structure_context, dict):
                     result.market_structure_context = market_structure_context
+                if isinstance(market_regime_context, dict):
+                    result.market_regime_context = market_regime_context
                 result.market_phase_summary = market_phase_summary
                 result.analysis_context_pack_overview = analysis_context_pack_overview
                 self._refresh_decision_action_for_final_result(
@@ -582,6 +597,9 @@ class _AgentAnalysisStageMixin:
                     attach_risk_gate_result,
                     build_agent_runtime_facts,
                 )
+                from src.services.info_quality_grading import (
+                    read_info_quality_feature_flag,
+                )
 
                 if not isinstance(result.dashboard, dict):
                     result.dashboard = {}
@@ -592,6 +610,10 @@ class _AgentAnalysisStageMixin:
                     current_signal=pipeline_start_signal,
                     dashboard=result.dashboard,
                     runtime_facts=runtime_facts,
+                    info_quality_risk_enabled=read_info_quality_feature_flag(
+                        self.config,
+                        "forced_conclusion_enabled",
+                    ),
                 )
                 final_gate = apply_risk_manager_gate_from_config(
                     final_gate_ctx,
@@ -629,6 +651,12 @@ class _AgentAnalysisStageMixin:
                     explicit_action=final_gate.final_action,
                     use_existing_action=False,
                     align_with_score=False,
+                )
+                # Refresh forced conclusion after Risk Manager final action.
+                self._apply_info_quality_constraints(
+                    result,
+                    analysis_context_pack_overview=analysis_context_pack_overview,
+                    enforce_action_downgrade=False,
                 )
 
                 if getattr(self.config, "agent_multi_strategy_deliberation", False):
@@ -671,6 +699,34 @@ class _AgentAnalysisStageMixin:
                                 level=logging.WARNING,
                                 context={"stock_code": code},
                             )
+
+                # Pipeline quality gate: bind conclusion facts to input evidence (#887).
+                from src.services.analysis_quality_gate import (
+                    apply_analysis_quality_gate,
+                )
+
+                snapshot = getattr(result, "market_snapshot", None)
+                if not isinstance(snapshot, dict):
+                    snapshot = realtime_data if isinstance(realtime_data, dict) else None
+                quality_gate = apply_analysis_quality_gate(
+                    result,
+                    config=self.config,
+                    analysis_context_pack_overview=analysis_context_pack_overview
+                    if isinstance(analysis_context_pack_overview, dict)
+                    else None,
+                    market_snapshot=snapshot,
+                    fundamental_context=fundamental_context
+                    if isinstance(fundamental_context, dict)
+                    else None,
+                    technical_context=trend_result,
+                )
+                if quality_gate.verdict.value not in {"pass", "skipped"}:
+                    logger.info(
+                        "[analysis_quality_gate] agent path %s verdict=%s action=%s",
+                        code,
+                        quality_gate.verdict.value,
+                        quality_gate.action_taken,
+                    )
 
             analyze_output = AnalyzeStageOutput.from_result(result)
             agent_analysis_succeeded = analyze_output.analysis_success

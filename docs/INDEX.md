@@ -93,6 +93,7 @@
 | [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
 | [确定性预测声明打分器](prediction-claim-scorer.md) | 纯函数 `ClaimScorer`：A1 声明类型 → hit·partial·miss·data_unavailable，含置信度校准（#1111 / #1107；[EN](prediction-claim-scorer_EN.md)） |
 | [资讯 / 情报源](intelligence-sources.md) | RSS/Atom 合规资讯源配置、测试、拉取、去重、存储、查询与安全边界 |
+| [市场状态（Regime）检测](market-regime.md) | 可解释规则状态判定、证据产物、分析侧重调整与技能路由（Issue #220） |
 | [分析上下文包契约、运行态消费与可见性](analysis-context-pack.md) | AnalysisContextPack 首版范围、字段质量状态、P1/P2 内部契约、P3 Prompt 摘要消费、P4 历史/API/Web 低敏可见性、P5 数据质量评分、P6 迁移回滚与源码锚点；完整指南补充 #1386 阶段感知分析、迁移与回滚入口 |
 | [情绪分析管线](sentiment-analysis-pipeline.md) | 基于已接入新闻/事件源的情绪评分证据（来源可追溯、时效、置信度），进入 AnalysisContextPack 作为证据而非结论（#179） |
 | [图片识别 Prompt](image-extract-prompt.md) | 图片识别股票信息的 Prompt 与使用边界 |
@@ -127,6 +128,7 @@
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
+| [分析质量门](analysis-quality-gate.md) | 管线内禁止无中生有事实的质量门，复用 agent-eval 维度；annotate/intercept（#887） |
 | [预测 vs 实际跟踪归属](prediction-vs-actual-tracking.md) | #449→#1107：框架由 Agent Evolution Epic 承接；展示/适配器残留见子 issue |
 | [性能基线与剖析](performance-baseline.md) | 关键路径离线基线（数据/分析/报告）、可关闭 span 采集与 cProfile 入口（#227） |
 | [插件开发指南](plugin-development-guide_zh.md) | 六个扩展点的统一入口：是什么/为什么、信任模型、10 分钟 quickstart、官方示例与专题链接（[English](plugin-development-guide.md)） |

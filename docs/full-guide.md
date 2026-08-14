@@ -440,6 +440,8 @@ stock-pulse-ai/
 | `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | PE 软合理性上界：达到该绝对值标记为可疑（warn）并保留；硬极限仍为 reject。 | `200` | 可选 |
 | `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | PB 软合理性上界：达到该绝对值标记为可疑（warn）并保留；硬极限仍为 reject。 | `50` | 可选 |
 | `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | 多数据源同一字段的相对差异阈值；超阈值记 warning 并保留归因，不丢弃数值。 | `0.05` | 可选 |
+| `INFO_QUALITY_GRADING_ENABLED` | 基于校验层与上下文包状态推导 A/B/C 信息质量等级；关闭时不生成等级元数据或等级提示规则。 | `true` | 可选 |
+| `FORCED_CONCLUSION_ENABLED` | 要求报告与 DecisionSignal 附带 Pass/Fail/Watch 结论，并启用等级驱动的动作/Risk Manager 约束；关闭时等级仍可见但不改变动作。 | `true` | 可选 |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | 基本面聚合总开关；关闭时仅返回 `not_supported` 块，不改变原分析链路 | `true` | 可选 |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | 基本面阶段总时延预算（秒） | `8.0` | 可选 |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | 单能力源调用超时（秒）；市场结构行业/概念排行也复用该预算 | `8.0` | 可选 |
@@ -1010,6 +1012,7 @@ P3 当时不新增 API/Web/Bot 参数，不写入 history/task status/report met
 
 Multi-agent 在进入 `DecisionAgent` 前会构造内部低敏 `agent_disagreement_summary`，用于提示前序 Agent opinion 的方向分歧、风险 override 证据、风险 override 是否受当前 `AGENT_RISK_OVERRIDE` 配置启用，以及非关键阶段降级信息。该摘要只包含 agent name、signal、confidence、conflict type、decision path hint、低敏 risk control 状态和 degraded stage marker，不包含 reasoning、raw_data、原始错误文本、token 或私密 payload。
 - `AGENT_MULTI_STRATEGY_DELIBERATION=false` — 默认关闭的多策略审议集群。
+- `AGENT_DISAGREEMENT_HANDLING=false` — 默认关闭的结构化分歧处理（记录分歧点、双层交叉校验、高分歧分裂裁决并写入最终产物）。
 
 该能力当前只是 `DecisionAgent` 的内部 Prompt 输入管线：摘要写入运行态 `ctx.meta`，不进入 Agent pre-fetched data，不新增 public API、Web/Desktop 展示、history/task status/report metadata、dashboard schema 或最终解释字段。`risk_level=high` 只作为风险证据，不会单独触发 override；summary 与最终 `_apply_risk_override()` 复用同一套 override 判断，并尊重 `AGENT_RISK_OVERRIDE=false`。非关键降级阶段沿用 orchestrator 的 `intel`、`risk` 和 specialist/skill agent 降级契约，避免把单一方向意见误描述成 multi-agent 共识。#1904 的用户可见最终解释输出仍属于后续阶段。
 
@@ -1474,6 +1477,30 @@ A 股 ETF 在分析链路中按**独立品种**识别并进入 ETF 专属路径�
 | 报告结构 | 与个股共用决策仪表盘 JSON；不另起 ETF 模板 |
 
 代表性回归代码：`510300`、`510050`、`159915`、`159919`、`512880`。数据校验层的 ETF 误报校准见 `docs/data-validation-layer.md` 与 Issue #185。
+
+### 多模型共识对比（可选）
+
+默认**关闭**。当 `MULTI_MODEL_CONSENSUS_ENABLED=true` 时，传统股票分析路径可在**同一共享数据快照**上按序运行 2–3 个模型（显式列表、`fast`/`quality` 预设，或主模型 + 回退模型；默认顺序执行，因共享 analyzer 非线程安全），并将结构化产物写入报告：
+
+- 模型对照表：各模型动作 / 分数带 / 关键风险
+- 共识度 + 一致度（**不是**混合后的交易信号）
+- 分歧点使用与多 Agent 分歧处理一致的低敏 point 契约（`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`）
+- 硬规则：**不做多数表决**、**不对反向信号取平均**；高分歧必须可见；单模型失败降级为存活结果并标注 `single_model_fallback`
+- 少于两个可用结论时，一致度明确显示“未评估”，不输出误导性的 `0`；预算、置信度与快照中的 `NaN` / `±Inf` 会被拒绝
+- `brief` 仅保留 Decision Card、关键风险和显式省略提示；完整多模型对照仅进入 `standard` / `research`、历史导出及非 brief 通知，避免突破推送长度预算
+- 模型 id / 版本 / provider 写入 `dashboard.multi_model_comparison.trace`，诊断 LLM run 的 `call_type=multi_model_consensus`
+
+```bash
+MULTI_MODEL_CONSENSUS_ENABLED=true
+MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
+# 或：MULTI_MODEL_CONSENSUS_PRESET=fast
+MULTI_MODEL_CONSENSUS_MAX_MODELS=3
+# MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+# 预算规则：空 = 仅 MAX_MODELS；0 = 关闭多模型扇出；
+# 正值（尚无实时计价）= 硬限制最多 2 个模型并记录被跳过的模型。
+```
+
+该开关不改变 Agent 多 Agent 路径。多 Agent 分歧处理仍是独立能力（Issues #246 / #193 / PR #1205）。
 
 ### 多模型切换
 
@@ -1944,6 +1971,11 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 `StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
 
 成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
+
+### 结构化多空辩论
+
+`DEBATE_ENABLED=false`（默认）保持现有行为。设为 `true` 时，仅 Native Multi 的非 Chat 分析在 Decision 前增加可选 Bull-Bear 结构化辩论（1–3 轮多方/空方立场 + 交锋点 + 非权威合成）。辩论结果写入 `dashboard.bull_bear_debate`、Markdown/WeChat 报告与 DecisionSignal metadata（`debate_summary`/`debate_rounds`），不得静默丢弃。受 `DEBATE_MAX_ROUNDS` 轮次上限、每轮 LLM turn 预算与 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余墙钟预算约束；与分歧记录契约对齐（`source=debate` 交锋点，不使用多数表决）。`DEBATE_MODEL` 非空时由每次辩论调用直接消费该 LiteLLM 模型路由；API/请求上下文可覆盖 `enable_debate`、`debate_max_rounds`。provider 失败或没有完成任何双边轮次时，产物明确记录 `data_unavailable`，不生成 `hold` 意见、伪造合成或把不可用当命中。回滚：关闭或删除 `DEBATE_ENABLED`。
+
 ### 按模式硬预算（#1121 / #125）
 
 每种运行模式（`quick` / `standard` / `full` / `specialist` / chat）对 LLM 轮次、工具调用与估算 USD 成本设有硬上限（可选 token 上限见 `AGENT_MODE_BUDGET_MAX_TOKENS`）。消耗记录在共享的 `mode_budget` 账户中，并可在诊断中查看（`ctx.meta["mode_budget"]` / `result.budget_snapshot`）。超限时以 `success=false` 明确终止并给出原因码（`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`）。既有的剩余墙钟预算跳过仍使用 `budget_skip` / `timeout`，并写入同一快照——预算概念统一，不另造并行体系。配置项为 `AGENT_MODE_BUDGET_*`（见 `.env.example`）。

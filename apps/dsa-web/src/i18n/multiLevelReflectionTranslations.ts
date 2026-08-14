@@ -1,0 +1,98 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { MULTI_LEVEL_REFLECTION_HELP_KEY } from './reflectionSettingsCopy';
+
+const HELP_PREFIX = `locales.settingsHelp.SETTINGS_HELP_MAPS.${MULTI_LEVEL_REFLECTION_HELP_KEY}`;
+
+/** Shared locale translations for the multi-level reflection settings group. */
+export const MULTI_LEVEL_REFLECTION_TRANSLATIONS = {
+  de: {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto des Risikoagenten",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Begrenzter Multi-Agent-Critic",
+    [`${HELP_PREFIX}.summary`]: "Steuert typisierte Schrittkritik, begrenzte Laufreflexion und Offline-Meta-Review-Schwellen.",
+    [`${HELP_PREFIX}.title`]: "Mehrstufige Reflexion",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "Meta-Review",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "Episodenminimum",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Laufreflexion",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "LLM-Reflexionsaufrufe",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "Schrittkritik",
+  },
+  es: {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto del agente de riesgo",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent acotado",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.summary": "Controla la crítica tipada, la reflexión limitada y los umbrales de metarrevisión sin conexión.",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.title": "Reflexión multinivel",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "Metarrevisión entre ejecuciones",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "Umbral de muestras de metarrevisión",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Reflexión de trayectoria",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "Presupuesto LLM de reflexión de trayectoria",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "Crítica inmediata de pasos",
+  },
+  fr: {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto de l’agent de risque",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent borné",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.summary": "Contrôle la critique typée, la réflexion bornée et les seuils de méta-revue hors ligne.",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.title": "Réflexion multiniveau",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "Méta-revue",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "Minimum épisodes",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Réflexion",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "Appels LLM",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "Critique",
+  },
+  id: {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto Agen Risiko",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent terbatas",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.summary": "Mengatur kritik bertipe, refleksi terbatas, dan ambang tinjauan meta luring.",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.title": "Refleksi multitingkat",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "Tinjauan meta lintas eksekusi",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "Ambang sampel tinjauan meta",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Refleksi lintasan",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "Anggaran LLM refleksi lintasan",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "Kritik langkah langsung",
+  },
+  ja: {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "リスクエージェントの拒否権",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "有界 Multi-Agent Critic",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.summary": "型付きステップ批評、制限付き実行リフレクション、オフラインメタレビューの閾値を制御。",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.title": "多層リフレクション",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "メタレビュー",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "最小エピソード数",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "実行リフレクション",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "LLMリフレクション呼出上限",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "ステップ批評",
+  },
+  ko: {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "위험 에이전트 거부권",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "제한된 Multi-Agent Critic",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.summary": "유형화 단계 비평, 제한된 실행 성찰, 오프라인 메타 리뷰 임계값을 제어합니다.",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.title": "다단계 성찰",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "메타 리뷰",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "최소 에피소드",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "실행 성찰",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "LLM 성찰 호출 한도",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "단계 비평",
+  },
+  ms: {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "Veto Ejen Risiko",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent terhad",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.summary": "Mengawal kritikan berjenis, refleksi terhad dan ambang semakan meta luar talian.",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.title": "Refleksi berbilang aras",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "Semakan meta merentas pelaksanaan",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "Ambang sampel semakan meta",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Refleksi trajektori",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "Bajet LLM refleksi trajektori",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "Kritikan langkah segera",
+  },
+  "zh-TW": {
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_RISK_OVERRIDE": "風險 Agent 決策否決權",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "有界 Multi-Agent Critic",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.summary": "控制類型化步驟批評、有界執行反思與離線元審查門檻。",
+    "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.multi_level_reflection.title": "多層反思",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_ENABLED": "元審查",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_META_REVIEW_MIN_EPISODES": "最少 Episode",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "執行反思",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "反思 LLM 呼叫上限",
+    "utils.systemConfigI18n.fieldTitleMaps.AGENT_STEP_CRITIQUE_ENABLED": "即時步驟批評",
+  },
+} as const;

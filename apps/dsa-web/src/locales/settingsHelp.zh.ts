@@ -1,6 +1,8 @@
-import type { SettingsHelpMap } from './settingsHelpTypes';
+import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
+import { REFLECTION_SETTINGS_HELP_ZH } from '../i18n/reflectionSettingsCopy';
 
-const settingsHelpZhCN: SettingsHelpMap = {
+const settingsHelpZhCN: SettingsHelpSourceMap = {
+  ...REFLECTION_SETTINGS_HELP_ZH,
   'settings.base.STOCK_LIST': {
     title: '自选股列表',
     summary: '配置需要分析的股票代码列表，是手动分析、定时任务和通知报告的基础输入。',
@@ -445,7 +447,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响使用 Pytdx 数据源时的行情连接目标和可用性。'],
     notes: ['服务器不可达时应依赖数据源 fallback，不建议只配置单个不稳定地址。'],
   },
-
   'settings.data_source.FUTU_OPEND_HOST': {
     title: 'Futu OpenD 主机',
     summary: '本地 Futu OpenD 网关 IPv4 地址，用于分析范围与组合持仓导入。',
@@ -495,7 +496,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响新闻上下文数量、时效性和报告长度。'],
     notes: ['窗口过长可能引入陈旧信息，过短可能遗漏慢发酵事件。'],
   },
-
   'settings.data_source.CRYPTO_PROVIDER_ENABLED': {
     title: '启用加密货币数据源',
     summary: '为 crypto:TICKER 身份注册默认关闭的 CoinGecko 行情路径。',
@@ -678,6 +678,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['控制跨源 WARN 证据写入运行诊断的时机。'],
     notes: ['比对为观测性逻辑，比对异常 fail-open。'],
+  },
+  'settings.data_source.INFO_QUALITY_GRADING_ENABLED': {
+    title: '信息质量分级',
+    summary: '基于校验证据与上下文包块状态推导 A/B/C 信息质量等级。',
+  },
+  'settings.data_source.FORCED_CONCLUSION_ENABLED': {
+    title: '强制结论结构',
+    summary: '要求报告给出受信息质量约束的 Pass / Fail / Watch 强制结论。',
   },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: '飞书群机器人 Webhook',
@@ -1280,9 +1288,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响图片/截图相关提取和视觉分析能力。'],
     notes: ['DeepSeek 等文本模型不一定支持 vision，请用能力检测确认。'],
   },
-  // ------------------------------------------------------------------
-  // Agent configuration
-  // ------------------------------------------------------------------
   'settings.agent.AGENT_MODE': {
     title: 'Agent 模式',
     summary: '启用 ReAct Agent 进行股票分析，替代普通分析流程。',
@@ -1384,7 +1389,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
     valueNotes: ['修改后需要重启进程生效。'],
   },
-
   'settings.agent.AGENT_SKILLS': {
     title: 'Agent 策略列表',
     summary: '指定 Agent 使用的策略技能列表。',
@@ -1469,7 +1473,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
   'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
-    title: '多策略合议',
     summary: '启用并发多策略专家调度，并在结果中给出最终分歧说明。',
     usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时保持 Phase-1 合成路径不变。',
     valueNotes: [
@@ -1478,6 +1481,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['影响 Agent 流水线的专家调度与分歧说明字段。'],
     notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
+    summary: '记录冲突；未解决时观望。',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
+    summary: '触发分裂裁决的阈值。',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
+    summary: '交叉复核阈值。',
   },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',
@@ -1533,7 +1545,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
   },
   'settings.agent.AGENT_CRITIC_ENABLED': {
-    title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
     usage: '仅在运行预算能够承担额外 Critic 调用及可能的一次白名单阶段重试时开启。',
     valueNotes: [
@@ -1543,6 +1554,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.DEBATE': {
+    title: '多空辩论',
+    summary: '配置可选辩论阶段、限制与专用模型。',
+  },
+  // Both controls use their field-specific schema description as help copy.
+  'settings.agent.market_regime': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: '反思与预测复盘',
   },
@@ -1571,6 +1588,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响所有最终 buy、hold、sell 建议的发布动作。'],
     notes: ['一次性人工授权可保留原始动作，但必须留下审批 ID 与结构化审计记录。'],
   },
+
+  'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
+    title: '分析质量门',
+    summary: '用与离线 agent-eval 相同的维度，把结论中的事实性声明绑定到输入证据。',
+  },
+  'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
+    title: '质量门失败策略',
+    summary: '发现未绑定事实时选择 annotate（默认）或 intercept。',
+  },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
     summary: '控制 Deep Research 的 token 预算和超时。',
@@ -1591,22 +1617,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['需要配合回测功能使用效果更佳。'],
   },
   'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
-    title: 'Agent 进化 episode 日志',
     summary: '保存精简 Agent 轨迹、教训和可选结果。',
   },
   'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
-    title: 'Agent episode 保留天数',
     summary: 'episode 清理前的最大保留天数。',
   },
   'settings.agent.AGENT_EPISODE_MAX_ROWS': {
-    title: 'Agent episode 最大行数',
     summary: 'episode 行数上限；优先删除最旧行。',
   },
   'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
-    title: '错误模式百科',
   },
   'settings.agent.AGENT_PLANNING_ENABLED': {
-    title: 'Agent 规划循环',
     summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',
   },
   'settings.agent.AGENT_PLANNING_STRATEGY': {
@@ -1722,6 +1743,8 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
     notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
   },
+  // Each control uses its field-specific schema description as help copy.
+  'settings.agent.evidence_chain_export': {},
   'settings.agent.research_pack_export': {
     title: '研报资产包导出',
     summary: '一键导出脱敏研报资产包（报告、决策卡、证据引用、轨迹）。',
@@ -1730,7 +1753,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 GET /api/v1/history/{record_id}/research-pack。'],
     notes: ['详见 docs/research-pack-export.md。'],
   },
-
   'settings.agent.observability': {
     title: 'Agent 可观测性',
     summary: '为运行流提供带 trace/span 的轻量 Agent 结构化事件。',
@@ -1824,9 +1846,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     title: 'OCR 超时秒数',
     summary: '1–120 秒的硬 wall-clock 上限；超时后终止并回收 OCR worker 及其子进程。',
   },
-  // ------------------------------------------------------------------
-  // Backtest configuration
-  // ------------------------------------------------------------------
   'settings.backtest.BACKTEST_ENABLED': {
     title: '回测开关',
     summary: '启用或关闭历史分析回测功能。',
@@ -1858,9 +1877,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响回测评估算法和结果。'],
     notes: ['除非明确要求切换版本，否则保持默认。'],
   },
-  // ------------------------------------------------------------------
-  // 技术指标周期（Issue #172）
-  // ------------------------------------------------------------------
   'settings.indicators.INDICATOR_MA_PERIODS': {
     title: '均线周期',
     summary: '趋势分析使用的均线周期列表（交易日，默认 5,10,20,60）。',
@@ -1895,9 +1911,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 RSI 数值及趋势分析中的超买超卖评分。'],
     notes: ['兼容字段 rsi_6/rsi_12/rsi_24 始终表示对应的真实历史周期，不按位置改名。'],
   },
-  // ------------------------------------------------------------------
-  // Report configuration
-  // ------------------------------------------------------------------
   'settings.report.REPORT_SUMMARY_ONLY': {
     title: '仅推送摘要',
     summary: '只推送分析摘要，不推送个股详情。适合跟踪大量股票时快速概览。',
@@ -2002,9 +2015,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响邮件通知的封数和内容组织。'],
     notes: ['关闭后个股分析和大盘复盘会分别发送邮件。'],
   },
-  // ------------------------------------------------------------------
-  // Notification routing
-  // ------------------------------------------------------------------
   'settings.notification.channel_routing': {
     title: '通知渠道路由',
     summary: '为不同类型的通知指定目标推送渠道。',
@@ -2067,9 +2077,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Web 一键生成历史报告分享图。'],
     notes: ['仅在确实需要允许更大 Markdown 输入时再提高该值。'],
   },
-  // ------------------------------------------------------------------
-  // System runtime
-  // ------------------------------------------------------------------
   'settings.system.LOG_LEVEL': {
     title: '日志级别',
     summary: '控制应用日志输出的详细程度。',
@@ -2260,7 +2267,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '非负数，默认 1000000。MVP 纸面引擎忽略手续费与滑点。',
     impact: ['仅影响新创建的纸面组合；既有组合保留原有现金余额。'],
   },
-
   'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
     title: '组合压力测试情景目录',
     summary: '用于确定性组合压力测试的可选、有边界 YAML 情景目录。',
@@ -2352,7 +2358,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'LOCAL_RUNTIME_AUTO_DETECT=false',
     ],
   },
-
   'settings.system.LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS': {
     title: '本地运行时探测超时',
     summary: '本地运行时探测单次请求超时（秒）。',
@@ -2362,7 +2367,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
     ],
   },
-
   'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
     title: '就绪自检超时',
     summary: '结构化就绪/自检报告的单检查超时。',
@@ -2374,17 +2378,13 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
     ],
   },
-
-
   'settings.system.portfolio_health': {
     title: '投资组合健康度公式',
     summary: '配置健康度的固定分母权重和预警阈值。',
     usage: '只能使用界面范围内的有限数值；非法值会被拒绝，不会被静默修正。',
     notes: ['修改后配置哈希会变化，需要显式刷新健康度快照。'],
   },
-
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
-    title: '投委会模式',
     summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
     usage: '默认关闭。开启后，Agent 会调度投委会角色并在结果中呈现共识或分歧。',
     valueNotes: ['关闭时保持既有单路径分析行为。'],
@@ -2397,8 +2397,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.AGENT_RESEARCH_PERSONA_CUSTOM': {
     title: '自定义研究立场',
   },
-
-
   'settings.mcp.MCP_SERVER_ENABLED': {
     title: '启用 MCP 服务',
     summary: '可选 MCP 进程总开关，默认关闭；主 API/Web 进程不会自动启动 MCP。',

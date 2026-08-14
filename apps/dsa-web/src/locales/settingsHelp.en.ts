@@ -1,6 +1,13 @@
-import type { SettingsHelpMap } from './settingsHelpTypes';
+import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
+import { REFLECTION_SETTINGS_HELP_EN } from '../i18n/reflectionSettingsCopy';
 
-const settingsHelpEnUS: SettingsHelpMap = {
+const settingsHelpSchemaDescriptionOnlyContract: SettingsHelpSourceMap = {
+  'settings.agent.multi_model_consensus': {},
+};
+void settingsHelpSchemaDescriptionOnlyContract;
+
+const settingsHelpEnUS: SettingsHelpSourceMap = {
+  ...REFLECTION_SETTINGS_HELP_EN,
   'settings.base.STOCK_LIST': {
     title: 'Watchlist',
     summary: 'Defines the stock codes used by analysis jobs and notification reports.',
@@ -418,7 +425,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects quote connectivity and availability when the Pytdx data source is used.'],
     notes: ['If a server is unreachable, rely on data-source fallback and avoid a single unstable endpoint.'],
   },
-
   'settings.data_source.FUTU_OPEND_HOST': {
     title: 'Futu OpenD Host',
     summary: 'IPv4 host for the local Futu OpenD gateway used by analysis scope and portfolio position import.',
@@ -468,7 +474,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects news context size, freshness, and report length.'],
     notes: ['Too wide can include stale news; too narrow can miss slow-moving events.'],
   },
-
   'settings.data_source.CRYPTO_PROVIDER_ENABLED': {
     title: 'Enable Crypto Provider',
     summary: 'Registers the default-off CoinGecko path for crypto:TICKER market data.',
@@ -651,6 +656,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
     impact: ['Controls when cross-source WARN evidence is written to run diagnostics.'],
     notes: ['Comparison is observational and fail-open on comparison errors.'],
+  },
+  'settings.data_source.INFO_QUALITY_GRADING_ENABLED': {
+    title: 'Information Quality Grading',
+    summary: 'Derive A/B/C grades from validation evidence and context-pack block statuses.',
+  },
+  'settings.data_source.FORCED_CONCLUSION_ENABLED': {
+    title: 'Forced Conclusion Structure',
+    summary: 'Require an explicit Pass / Fail / Watch conclusion constrained by information quality.',
   },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
@@ -1239,9 +1252,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects screenshot extraction and vision analysis.'],
     notes: ['Text-only models may not support vision; use capability checks to confirm.'],
   },
-  // ------------------------------------------------------------------
-  // Agent configuration
-  // ------------------------------------------------------------------
   'settings.agent.AGENT_MODE': {
     title: 'Agent Mode',
     summary: 'Enables the ReAct Agent for stock analysis, replacing the single-turn LLM flow.',
@@ -1343,7 +1353,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
     valueNotes: ['Requires process restart to take effect.'],
   },
-
   'settings.agent.AGENT_SKILLS': {
     title: 'Agent Strategies',
     summary: 'Specifies the list of strategy skills the Agent uses.',
@@ -1428,7 +1437,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Recording failures are logged and never fail analysis.'],
   },
   'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
-    title: 'Multi-Strategy Deliberation',
     summary: 'Enable concurrent multi-strategy specialist scheduling with a final disagreement explanation.',
     usage: 'Default off. When true, Native Multi can schedule strategy specialists and surface disagreement explanations without changing the Phase-1 synthesis path when off.',
     valueNotes: [
@@ -1438,8 +1446,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects agent pipeline specialist scheduling and disagreement explanation fields.'],
     notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
   },
+  'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
+    summary: 'Record conflicts; hold if unresolved.',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
+    summary: 'Split-verdict threshold.',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
+    summary: 'Cross-check threshold.',
+  },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
-    title: 'Investment Committee Mode',
     summary: 'Run multi-role investment committee style analysis with structured dissent.',
     usage: 'Default off. When enabled, the agent schedules committee roles and surfaces agreement or dissent in the analysis result.',
     valueNotes: ['Off preserves the existing single-path analysis behavior.'],
@@ -1486,7 +1502,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     ],
   },
   'settings.agent.AGENT_CRITIC_ENABLED': {
-    title: 'Bounded Multi-Agent Critic',
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
     usage: 'Enable only when the extra Critic call and a possible single whitelist-stage retry fit the run budget.',
     valueNotes: [
@@ -1496,6 +1511,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.DEBATE': {
+    title: 'Bull-Bear debate',
+    summary: 'Configure the optional debate stage, limits, and dedicated model.',
+  },
+  // Both controls use their field-specific schema description as help copy.
+  'settings.agent.market_regime': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: 'Reflection and Forecast Post-mortem',
   },
@@ -1524,6 +1545,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
     notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
   },
+
+  'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
+    title: 'Analysis Quality Gate',
+    summary: 'Binds factual claims in the analysis conclusion to input evidence using the offline agent-eval dimensions.',
+  },
+  'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
+    title: 'Quality Gate Failure Policy',
+    summary: 'Choose annotate (default) or intercept when ungrounded factual claims are found.',
+  },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
     summary: 'Controls the token budget and timeout for Deep Research.',
@@ -1544,22 +1574,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['Works best when combined with the backtest feature.'],
   },
   'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
-    title: 'Agent Episode Log',
     summary: 'Store compact Agent trajectories, lessons, and optional outcomes.',
   },
   'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
-    title: 'Agent Episode Retention Days',
     summary: 'Maximum episode age before retention cleanup.',
   },
   'settings.agent.AGENT_EPISODE_MAX_ROWS': {
-    title: 'Agent Episode Max Rows',
     summary: 'Episode row cap; oldest rows are removed first.',
   },
   'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
-    title: 'Error Pattern Encyclopedia',
   },
   'settings.agent.AGENT_PLANNING_ENABLED': {
-    title: 'Agent Planning Loop',
     summary: 'Opts the single-Agent RUN path into bounded plan, act, observe, and replan execution.',
   },
   'settings.agent.AGENT_PLANNING_STRATEGY': {
@@ -1675,6 +1700,8 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Gates GET /api/v1/reasoning-trace/{record_id} and related export service behavior.'],
     notes: ['See docs/reasoning-trace-export_EN.md for the contract and rollback steps.'],
   },
+  // Each control uses its field-specific schema description as help copy.
+  'settings.agent.evidence_chain_export': {},
   'settings.agent.research_pack_export': {
     title: 'Research Pack Export',
     summary: 'One-click redacted research asset package (report, decision card, evidence refs, trace).',
@@ -1683,7 +1710,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Gates GET /api/v1/history/{record_id}/research-pack.'],
     notes: ['See docs/research-pack-export_EN.md.'],
   },
-
   'settings.agent.observability': {
     title: 'Agent Observability',
     summary: 'Lightweight structured agent run events with trace/span ids for the run-flow view.',
@@ -1777,9 +1803,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'OCR Timeout Seconds',
     summary: 'Hard 1–120 second wall-clock limit; timed-out OCR workers and descendants are terminated and reaped.',
   },
-  // ------------------------------------------------------------------
-  // Backtest configuration
-  // ------------------------------------------------------------------
   'settings.backtest.BACKTEST_ENABLED': {
     title: 'Backtest Switch',
     summary: 'Enables or disables historical analysis backtesting.',
@@ -1811,9 +1834,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the evaluation algorithm and results.'],
     notes: ['Keep the default unless instructed to switch versions.'],
   },
-  // ------------------------------------------------------------------
-  // Technical indicator periods (Issue #172)
-  // ------------------------------------------------------------------
   'settings.indicators.INDICATOR_MA_PERIODS': {
     title: 'Moving Average Periods',
     summary: 'Comma-separated MA periods in trading days used by trend analysis (default 5,10,20,60).',
@@ -1848,9 +1868,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects RSI values and overbought/oversold scoring in trend analysis.'],
     notes: ['Legacy rsi_6/rsi_12/rsi_24 fields always retain their exact historical periods; they are never positional aliases.'],
   },
-  // ------------------------------------------------------------------
-  // Report configuration
-  // ------------------------------------------------------------------
   'settings.report.REPORT_SUMMARY_ONLY': {
     title: 'Summary Only',
     summary: 'Push only the analysis summary without per-stock details. Useful for quick overview when tracking many stocks.',
@@ -1955,9 +1972,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects email count and content organization.'],
     notes: ['When disabled, stock analysis and market review are sent as separate emails.'],
   },
-  // ------------------------------------------------------------------
-  // Notification routing
-  // ------------------------------------------------------------------
   'settings.notification.channel_routing': {
     title: 'Notification Channel Routing',
     summary: 'Specifies target push channels for different notification types.',
@@ -2020,9 +2034,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects Web one-click share image generation for history reports.'],
     notes: ['Raise this value only when you intentionally allow larger Markdown input for rendering.'],
   },
-  // ------------------------------------------------------------------
-  // System runtime
-  // ------------------------------------------------------------------
   'settings.system.LOG_LEVEL': {
     title: 'Log Level',
     summary: 'Controls application log verbosity.',
@@ -2213,7 +2224,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'Non-negative number. Default 1000000. Fees and slippage are ignored in the MVP paper engine.',
     impact: ['Affects only newly created paper portfolios; existing portfolios keep their cash balance.'],
   },
-
   'settings.system.PORTFOLIO_STRESS_SCENARIOS_PATH': {
     title: 'Portfolio Stress Scenario Catalog',
     summary: 'Optional bounded YAML catalog for deterministic portfolio stress scenarios.',
@@ -2336,7 +2346,6 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS=0.5',
     ],
   },
-
   'settings.system.READINESS_CHECK_TIMEOUT_SECONDS': {
     title: 'Readiness Check Timeout',
     summary: 'Per-check timeout for the structured readiness/self-check report.',
@@ -2348,16 +2357,12 @@ const settingsHelpEnUS: SettingsHelpMap = {
       'READINESS_CHECK_TIMEOUT_SECONDS=2.0',
     ],
   },
-
-
   'settings.system.portfolio_health': {
     title: 'Portfolio Health Formula',
     summary: 'Controls the fixed-denominator health-score weights and alert thresholds.',
     usage: 'Use finite values within the displayed ranges. Invalid values are rejected rather than clamped.',
     notes: ['Changing these values changes the configuration hash and requires an explicit health refresh.'],
   },
-
-
   'settings.mcp.MCP_SERVER_ENABLED': {
     title: 'Enable MCP Server',
     summary: 'Master switch for the optional MCP process. Default off; the main API/Web process never starts MCP automatically.',
