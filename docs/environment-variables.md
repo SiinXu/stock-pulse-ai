@@ -155,8 +155,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
-| `AGENT_RESEARCH_PERSONA` | `空` | 是 | 模板中注释; 可选研究立场预设（默认关闭）：`rational_analyst`、`risk_guardian` 或 `long_term_compounder` |
-| `AGENT_RESEARCH_PERSONA_CUSTOM` | `空` | 是 | 模板中注释; 可选自定义研究立场；持久化内容优先使用个人投资框架的 `research_stance` |
+| `AGENT_RESEARCH_PERSONA` | `空` | 是 | 模板中注释; Optional research-stance persona (default off): rational_analyst \| risk_guardian \| long_term_compounder |
+| `AGENT_RESEARCH_PERSONA_CUSTOM` | `空` | 是 | 模板中注释; Optional custom research-stance text; prefer framework research_stance for durable custom text. |
 | `AGENT_RISK_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_RISK_OVERRIDE` | `true` | 是 | 模板中注释; Whether the risk-control agent may reject buy signals (enabled by default) |
 | `AGENT_SKILLS` | `空` | 是 |  |
@@ -220,7 +220,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | `空` | 是 | 模板中注释; Optional: For Webhooks requiring authentication (Header Authorization: Bearer <token>) |
 | `CUSTOM_WEBHOOK_BODY_TEMPLATE` | `空` | 是 | 模板中注释; Optional global JSON body template, overrides Bark/Slack/Discord etc |
 | `CUSTOM_WEBHOOK_URLS` | `https://oapi.dingtalk.com/robot/send?access_token=xxx,https://hooks.slack.com/services/xxx` | 是 | 模板中注释; Custom Webhook (Supports multiple, comma-separated) Suitable for: DingTalk, Discord, Slack, Bark, and any service tha... |
-| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Personal daily morning brief (#149) + historical accuracy review (#466; default off) |
+| `DAILY_BRIEF_ENABLED` | `false` | 是 | 模板中注释; Personal daily morning brief (#149) + historical accuracy review (#466; default off) When enabled, the runtime schedu... |
 | `DAILY_BRIEF_MIN_SAMPLES` | `10` | 是 | 模板中注释 |
 | `DAILY_BRIEF_NOTIFY` | `true` | 是 | 模板中注释 |
 | `DAILY_BRIEF_PERSIST_HISTORY` | `true` | 是 | 模板中注释 |
@@ -356,6 +356,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_ANTHROPIC_PROVIDER` | `anthropic` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_CHANNELS` | `openrouter` | 是 | 模板中注释; OpenRouter（OpenAI Compatible） Source: Official Models API https://openrouter.ai/docs/api/api-reference/models/get-models |
 | `LLM_CONFIG_MODE` | `auto` | 是 | 模板中注释; --- Model Configuration Source Mode (Optional) --- auto(Default): Maintain historical priority YAML > Channels > Lega... |
+| `LLM_COST_PRICING_PATH` | `空` | 是 | 模板中注释 |
 | `LLM_DASHSCOPE_API_KEY` | `sk-xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_DASHSCOPE_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_DASHSCOPE_MODELS` | `qwen3.6-plus,qwen3.6-flash` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -420,8 +421,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LLM_SILICONFLOW_PROVIDER` | `siliconflow` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `LLM_TEMPERATURE` | `0.7` | 是 | 模板中注释; Sampling temperature (0.0-2.0, default 0.7; 0 is most deterministic and 2 is most random) |
 | `LLM_TIMEOUT_SEC` | `60` | 是 | 模板中注释; The timeout seconds for a single LLM request; AlphaSift stock selection reuses DSA configuration, downgrades to non-L... |
-| `LLM_COST_PRICING_PATH` | `空` | 是 | 模板中注释; Optional JSON path of per-model token rates for estimated_cost_usd |
-| `LLM_USAGE_ATTRIBUTION_ENABLED` | `true` | 是 | 模板中注释; Fine-grained cost attribution and routing quality on llm_usage |
+| `LLM_USAGE_ATTRIBUTION_ENABLED` | `true` | 是 | 模板中注释; LLM cost attribution + routing quality (default on). |
 | `LLM_USAGE_HMAC_KEY_VERSION` | `local-v1` | 是 | 模板中注释 |
 | `LLM_USAGE_HMAC_SECRET` | `空` | 是 | 模板中注释; LLM usage telemetry message HMAC configuration (optional) |
 | `LLM_VOLCENGINE_API_KEY` | `xxx` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
@@ -587,8 +587,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `PYTDX_PORT` | `7709` | 是 | 模板中注释 |
 | `PYTDX_PRIORITY` | `2` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `PYTDX_SERVERS` | `192.168.1.100:7709,10.0.0.1:7709` | 是 | 模板中注释; Comma-separated ip:port list; overrides PYTDX_HOST/PYTDX_PORT when set. |
+| `READINESS_CHECK_TIMEOUT_SECONDS` | `1.0` | 是 | 模板中注释; Structured readiness/self-check (on-demand GET /api/v1/system/readiness; never auto-run at startup) |
 | `REALTIME_SOURCE_PRIORITY` | `tencent,akshare_sina,efinance,akshare_em` | 是 | 模板中注释 |
-| `READINESS_CHECK_TIMEOUT_SECONDS` | `1.0` | 是 | 模板中注释; 结构化就绪/自检单检查超时（GET /api/v1/system/readiness；仅按需；钳制 0.1–5.0；超时不得报就绪） |
 | `REASONING_TRACE_EXPORT_ENABLED` | `false` | 是 | 模板中注释; Reasoning-trace export (Issue #135): default off |
 | `REASONING_TRACE_EXPORT_MAX_CHARS` | `500000` | 是 | 模板中注释; clamped to 10000..2000000 |
 | `REPORT_EXPORT_PDF_FONT_PATH` | `空` | 是 | 模板中注释; Report export (optional PDF) |
@@ -605,6 +605,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPRO_MODE_ENABLED` | `false` | 是 | 模板中注释; Request-scoped temperature=0 plus provider seed forwarding where supported. |
 | `REPRO_RECORD_CONFIG` | `true` | 是 | 模板中注释 |
 | `REPRO_SEED` | `0` | 是 | 模板中注释 |
+| `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; Read-only research API for stratified conclusions (Issue #1143; default off) Authenticated GET /api/v1/research/concl... |
+| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释 |
+| `RESEARCH_PACK_EXPORT_ENABLED` | `false` | 是 | 模板中注释; One-click research asset pack (report + decision card + evidence refs + redacted trace) |
+| `RESEARCH_PACK_MAX_ZIP_BYTES` | `25165824` | 是 | 模板中注释; clamped between 1 MiB and 64 MiB |
 | `RESEARCH_PRESENTATION_PROFILE` | `balanced` | 是 | 模板中注释; Research presentation profile (emphasis/order only; same evidence, full risk disclosure): conservative = risks first ... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
@@ -627,8 +631,6 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SHARE_IMAGE_XIAOHONGSHU_QR_PATH` | `src/assets/share_image/xiaohongshu_qr.jpg` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SHARE_IMAGE_XIAOHONGSHU_URL` | `空` | 否 | 模板中注释; 注册表缺口（见清单文档 / 跟踪 issue） |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | `10` | 是 | 模板中注释; Buckets below this decided sample render as insufficient_data |
-| `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; 分层结论只读研究 API（Issue #1143；默认关闭；仅主 API 端口） |
-| `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释; 研究 API 每主体滑动窗口限流 |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | `false` | 是 | 模板中注释; Public signal scorecard (Issue #379; default off so self-hosted stays private) Exposes an aggregated, non-sensitive n... |
 | `SINGLE_STOCK_NOTIFY` | `false` | 是 | 模板中注释; =================================== (Optional) Single stock push configuration =================================== Si... |
 | `SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED` | `false` | 是 | 模板中注释; Default-off Bayesian outcome weights for skill aggregation (issue #714) |
