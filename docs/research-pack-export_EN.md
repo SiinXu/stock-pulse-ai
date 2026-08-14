@@ -1,0 +1,53 @@
+# Research Pack Export
+
+One-click export of a portable research asset package (Issues #988 / #1140).
+Assembled from already-persisted analysis history. Chinese: [research-pack-export.md](research-pack-export.md).
+
+## Package layout (`research-pack-v1`)
+
+```
+research-pack-{code}-{date}/
+├── meta.json
+├── report.md
+├── brief-card.md
+├── signals.json
+├── evidence-refs.json
+├── evidence-summary.md
+├── claims-outcomes.json
+├── reasoning-trace.json
+└── README.md
+```
+
+Full `evidence-chain-v1` (#986/#127) is **deferred**; `meta.evidence_chain_status=deferred`.
+The persisted `brief`, `standard`, or `research` report is preserved in `report.md`
+and recorded as `meta.report_mode`; the compact decision card remains a separate
+bounded artifact. Non-finite metrics are never serialized: unavailable numeric
+values are shown as **Not calculable**, and a missing risk verdict is shown as
+**Not evaluated** rather than passed.
+
+## Configuration
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `RESEARCH_PACK_EXPORT_ENABLED` | `false` | Master switch |
+| `RESEARCH_PACK_MAX_ZIP_BYTES` | `25165824` | ZIP upper bound (1–64 MiB) |
+
+## API
+
+```http
+GET /api/v1/history/{record_id}/research-pack?format=zip|json&language=en|zh
+```
+
+Requires administrator authentication. Headers: `X-Research-Pack-Schema`, `Truncated`, `Bytes`, `Progress`. Security audit event: `research_pack.export`.
+
+## Security
+
+Share-mode redaction is always on via `redact_export_payload`. Counterexample tests cover API keys, bearer tokens, local paths, and credential URLs.
+
+## Rollback
+
+Set `RESEARCH_PACK_EXPORT_ENABLED=false` and restart.
+
+## Related surfaces
+
+The history **audit package** export tracked under Issues #986 / #127 (open PR #1214) is a separate evidence-chain audit ZIP. This research pack is the shareable research asset surface for #988 / #1140.
