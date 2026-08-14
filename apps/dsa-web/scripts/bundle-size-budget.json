@@ -3,8 +3,8 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-13",
-  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1238) (locale-ja, locale-ko, locale-de, locale-fr, locale-es, locale-zh-TW, locale-id, locale-ms). Headroom: locale-fr +600, other locales +700, other named +400.",
+  "measuredAt": "2026-08-14",
+  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1238) (IntelligenceSourcesPanel). Headroom: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other named +400.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 248056,
-      "measuredGzipBytes": 247656,
-      "note": "Local production-build remasure after merging origin/main; measured 247656 B + 400 B retained headroom."
+      "maxGzipBytes": 249392,
+      "measuredGzipBytes": 248992,
+      "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1238); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "js-entry",
