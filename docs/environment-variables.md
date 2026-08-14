@@ -137,6 +137,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
 | `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
+| `AGENT_DISAGREEMENT_HANDLING` | `false` | 是 | 模板中注释; 结构化分歧记录/交叉校验/分裂裁决（默认关闭） |
+| `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释; 高分歧升级阈值 |
+| `AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD` | `0.55` | 是 | 模板中注释; 交叉校验触发阈值 |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |

@@ -362,6 +362,10 @@ class Config:
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
     risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
+    # Structured disagreement handling / cross-validation / split-verdict (default off).
+    agent_disagreement_handling: bool = False
+    agent_disagreement_high_confidence_threshold: float = 0.7
+    agent_disagreement_medium_confidence_threshold: float = 0.55
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system

@@ -1057,6 +1057,23 @@ class _ConfigLoadingMethods:
                 os.getenv('RISK_GATE_PROFILE')
             ),
             agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
+            agent_disagreement_handling=parse_env_bool(
+                os.getenv('AGENT_DISAGREEMENT_HANDLING'), default=False
+            ),
+            agent_disagreement_high_confidence_threshold=parse_env_float(
+                os.getenv('AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD'),
+                0.7,
+                field_name='AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            agent_disagreement_medium_confidence_threshold=parse_env_float(
+                os.getenv('AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD'),
+                0.55,
+                field_name='AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD',
+                minimum=0.0,
+                maximum=1.0,
+            ),
             agent_deep_research_budget=parse_env_int(
                 os.getenv('AGENT_DEEP_RESEARCH_BUDGET'),
                 30000,

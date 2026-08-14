@@ -11,6 +11,7 @@ from src.agent import bull_bear_debate as _debate
 from src.agent import critic as _critic
 from src.agent.chat_context import build_agent_chat_tool_registry
 from src.agent.disagreement import build_agent_disagreement_summary
+from src.agent.orchestrator_parts import disagreement as _disagreement
 from src.agent.protocols import (
     AgentContext,
     AgentRunStats,
@@ -1455,9 +1456,8 @@ class _PipelineMethods:
 
     def _prepare_decision_context(self, ctx: AgentContext) -> None:
         """Populate low-sensitivity summaries consumed by DecisionAgent."""
-        ctx.meta["agent_disagreement_summary"] = build_agent_disagreement_summary(
-            ctx,
-            risk_override_enabled=getattr(self.config, "agent_risk_override", True),
+        _disagreement.prepare_decision_disagreement_context(
+            ctx, self.config, summary_builder=build_agent_disagreement_summary,
         )
 
     def _record_critic_budget_skip(

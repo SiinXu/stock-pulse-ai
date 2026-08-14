@@ -61,6 +61,8 @@ from src.report_language import (
     localize_trend_prediction,
     normalize_report_language,
     normalize_strategy_synthesis_payload,
+    normalize_disagreement_handling_payload as _normalize_disagreement_handling_payload,
+    localize_disagreement_verdict_mode as _localize_disagreement_verdict_mode,
     strategy_invalid_opinion_count,
 )
 from src.schemas.decision_action import (
@@ -187,10 +189,27 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
-def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, labels: Dict[str, str], report_language: str) -> None:
-    """Append the full localized strategy synthesis block when present."""
+def _append_strategy_synthesis_block(
+    lines: List[str],
+    strategy_synthesis: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    dashboard: Any = None,
+) -> None:
+    """Append the strategy synthesis block and any standalone disagreement banner."""
     strategy_synthesis = normalize_strategy_synthesis_payload(strategy_synthesis)
     if not strategy_synthesis:
+        before = len(lines)
+        _append_disagreement_handling_block(
+            lines,
+            None,
+            labels,
+            report_language,
+            dashboard=dashboard,
+        )
+        if len(lines) > before:
+            lines.append("")
         return
     confidence = strategy_synthesis.get("confidence")
     confidence_text = f"{confidence:.0%}" if isinstance(confidence, (int, float)) else "N/A"
@@ -233,6 +252,13 @@ def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, 
                 f"- {localize_conflict_severity(conflict.get('severity', 'medium'), report_language)}: "
                 f"{localize_strategy_conflict_description(conflict.get('conflict_type'), report_language)}{suffix}"
             )
+    _append_disagreement_handling_block(
+        lines,
+        strategy_synthesis,
+        labels,
+        report_language,
+        dashboard=dashboard,
+    )
     lines.append("")
 
 
@@ -695,6 +721,39 @@ def get_notification_service() -> NotificationService:
     """获取通知服务实例"""
     return NotificationService()
 
+def _append_disagreement_handling_block(
+    lines: List[str],
+    strategy_synthesis: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    dashboard: Any = None,
+) -> None:
+    """Append high-disagreement annotation so final products never silently smooth conflicts."""
+    handling = None
+    if isinstance(strategy_synthesis, dict):
+        handling = strategy_synthesis.get("disagreement_handling")
+    if not isinstance(handling, dict) and isinstance(dashboard, dict):
+        handling = dashboard.get("disagreement_handling")
+    handling = _normalize_disagreement_handling_payload(handling)
+    if not handling or not handling.get("high_disagreement"):
+        return
+    lines.append(f"- ⚠️ {labels.get('disagreement_high_banner', 'High disagreement')}")
+    lines.append(
+        f"- {labels.get('disagreement_verdict_label', 'Verdict mode')}: "
+        f"{_localize_disagreement_verdict_mode(handling.get('verdict_mode'), report_language)} | "
+        f"{labels.get('disagreement_escalation_label', 'Escalation')}: {handling.get('escalation')} | "
+        f"{labels.get('disagreement_score_label', 'Disagreement score')}: "
+        f"{(handling.get('disagreement_score') or 0) * 100:.0f}%"
+    )
+    lines.append(f"- {labels.get('disagreement_no_majority_note', 'Majority vote was not used')}")
+    for point in (handling.get("points") or [])[:3]:
+        if not isinstance(point, dict):
+            continue
+        lines.append(
+            f"- {labels.get('disagreement_points_label', 'Disagreement points')}: "
+            f"[{point.get('source')}] {point.get('severity')}/{point.get('kind')}"
+        )
 
 def send_daily_report(results: List[AnalysisResult]) -> bool:
     """

@@ -793,7 +793,13 @@ class _RenderingMethods:
                 strategy_synthesis = normalize_strategy_synthesis_payload(
                     dashboard.get('strategy_synthesis') if dashboard else None
                 )
-                _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
+                _append_strategy_synthesis_block(
+                    report_lines,
+                    strategy_synthesis,
+                    labels,
+                    report_language,
+                    dashboard=dashboard,
+                )
                 debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
                 _append_bull_bear_debate_block(report_lines, debate_payload, labels, report_language)
 
@@ -1381,7 +1387,13 @@ class _RenderingMethods:
         strategy_synthesis = normalize_strategy_synthesis_payload(
             dashboard.get('strategy_synthesis') if dashboard else None
         )
-        _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
+        _append_strategy_synthesis_block(
+            lines,
+            strategy_synthesis,
+            labels,
+            report_language,
+            dashboard=dashboard,
+        )
         debate_payload = dashboard.get("bull_bear_debate") if isinstance(dashboard, dict) else None
         _append_bull_bear_debate_block(lines, debate_payload, labels, report_language)
 
