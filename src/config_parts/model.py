@@ -138,6 +138,10 @@ class Config:
     reasoning_trace_export_enabled: bool = False
     reasoning_trace_export_max_chars: int = 500_000
 
+    # === Evidence chain + audit package (Issues #986 / #127) ===
+    evidence_chain_enabled: bool = True
+    audit_export_enabled: bool = False
+    audit_include_raw_artifacts: bool = False
     # === Research asset pack export (Issues #988 / #1140) — default off ===
     research_pack_export_enabled: bool = False
     research_pack_max_zip_bytes: int = 24 * 1024 * 1024
@@ -334,6 +338,11 @@ class Config:
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    # Optional structured Bull-Bear debate stage before Decision (Issue #117). Default off.
+    debate_enabled: bool = False
+    debate_max_rounds: int = 2
+    debate_temperature: float = 0.4
+    debate_model: str = ""  # Optional dedicated model; empty uses agent primary route
     # Run-local reflection + resolved-forecast post-mortem (Issues #1089 / #1103). Default off.
     agent_reflection_enabled: bool = False
     agent_reflection_llm_budget: int = 1  # Max LLM calls per reflection loop (critique)
@@ -363,6 +372,10 @@ class Config:
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
     risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
+    # Structured disagreement handling / cross-validation / split-verdict (default off).
+    agent_disagreement_handling: bool = False
+    agent_disagreement_high_confidence_threshold: float = 0.7
+    agent_disagreement_medium_confidence_threshold: float = 0.55
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
@@ -393,6 +406,8 @@ class Config:
     agent_planning_on_step_failure: str = "replan"  # replan | terminate
     agent_skill_autoweight: bool = True  # Auto-weight skills by backtest performance
     agent_skill_routing: str = "auto"  # Skill routing: 'auto' (regime-based) or 'manual'
+    market_regime_enabled: bool = True  # Explainable market-regime detection (Issue #220)
+    market_regime_override: str = ""  # Optional forced regime label; empty = auto
     agent_context_compression_enabled: bool = False  # Compress visible chat history before Agent calls
     agent_context_compression_profile: str = AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE
     agent_context_compression_trigger_tokens: int = 12000
@@ -635,6 +650,14 @@ class Config:
     _VALID_AGENT_ARCH = {"single", "multi"}
     _VALID_ORCHESTRATOR_MODES = {"quick", "standard", "full", "specialist"}
     _VALID_SKILL_ROUTING = {"auto", "manual"}
+    _VALID_MARKET_REGIME_OVERRIDES = {
+        "",
+        "trending_up",
+        "trending_down",
+        "sideways",
+        "volatile",
+        "unknown",
+    }
     # Single source: src.core.config.sources.WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
     _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS = _WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS_CANONICAL
     _BOOTSTRAP_RUNTIME_ENV_OVERRIDES_CAPTURED = False
@@ -682,6 +705,16 @@ class Config:
                 self.agent_skill_routing, self._VALID_SKILL_ROUTING,
             )
             object.__setattr__(self, "agent_skill_routing", "auto")
+        override = str(self.market_regime_override or "").strip().lower()
+        if override not in self._VALID_MARKET_REGIME_OVERRIDES:
+            _log.warning(
+                "Invalid MARKET_REGIME_OVERRIDE=%r, ignoring. Valid: %s",
+                self.market_regime_override,
+                sorted(self._VALID_MARKET_REGIME_OVERRIDES - {""}),
+            )
+            object.__setattr__(self, "market_regime_override", "")
+        else:
+            object.__setattr__(self, "market_regime_override", override)
         normalized_profile = normalize_agent_context_compression_profile(
             self.agent_context_compression_profile
         )

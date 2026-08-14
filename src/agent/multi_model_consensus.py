@@ -20,9 +20,7 @@ import hashlib
 import json
 import logging
 import math
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from src.agent.provider_trace import resolved_model_provider_identity
@@ -537,7 +535,6 @@ def run_multi_model_consensus_analysis(
     analysis_context_pack_summary: Optional[str] = None,
     progress_callback: Optional[Callable[[int, str], None]] = None,
     stream_progress_callback: Optional[Callable[[int], None]] = None,
-    parallel: bool = False,
     record_llm_run: Optional[Callable[..., None]] = None,
     record_llm_run_started: Optional[Callable[..., None]] = None,
 ) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
@@ -546,9 +543,8 @@ def run_multi_model_consensus_analysis(
     When fewer than two models are resolvable, returns (None, None) so the caller
     can fall back to the single-model path without product annotation.
 
-    Model runs are **sequential by default**. The shared analyzer instance is not
-    assumed thread-safe; ``parallel=True`` is accepted for callers that inject a
-    thread-safe facade, but the stock pipeline keeps sequential execution.
+    Model runs are sequential because the shared analyzer instance is not
+    thread-safe.
     """
     models, budget_meta = resolve_consensus_models_for_run(config)
     if len(models) < 2:
@@ -564,7 +560,7 @@ def run_multi_model_consensus_analysis(
         "budget_reason": budget_meta.get("budget_reason"),
         "skipped_for_budget": list(budget_meta.get("skipped_for_budget") or []),
         "models_before_budget": list(budget_meta.get("models_before_budget") or []),
-        "execution": "parallel" if parallel else "sequential",
+        "execution": "sequential",
     }
 
     fingerprint = fingerprint_shared_snapshot(context, news_context)
@@ -653,40 +649,8 @@ def run_multi_model_consensus_analysis(
             return model_id, None, exc, duration_ms
 
     outcomes: List[Tuple[str, Optional[Any], Optional[Exception], int]] = []
-    if parallel and len(models) > 1:
-        # Optional parallel path: serialize analyzer.analyze via a lock so a
-        # shared non-thread-safe analyzer cannot corrupt internal state.
-        analyze_lock = threading.Lock()
-        original_run_one = _run_one
-
-        def _run_one_locked(model_id: str) -> Tuple[str, Optional[Any], Optional[Exception], int]:
-            with analyze_lock:
-                return original_run_one(model_id)
-
-        max_workers = min(len(models), 3)
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {
-                pool.submit(_run_one_locked, model_id): model_id for model_id in models
-            }
-            for future in as_completed(futures):
-                try:
-                    outcomes.append(future.result())
-                except Exception as exc:  # broad-exception: fallback_recorded - Worker failure is logged and isolated from remaining comparison models.
-                    model_id = futures[future]
-                    log_safe_exception(
-                        logger,
-                        "multi-model worker failed",
-                        exc,
-                        error_code="multi_model_worker_failed",
-                        level=logging.WARNING,
-                    )
-                    outcomes.append((model_id, None, exc, 0))
-        # Preserve requested order for stable primary selection.
-        order = {model_id: index for index, model_id in enumerate(models)}
-        outcomes.sort(key=lambda item: order.get(item[0], 999))
-    else:
-        for model_id in models:
-            outcomes.append(_run_one(model_id))
+    for model_id in models:
+        outcomes.append(_run_one(model_id))
 
     stances: List[Dict[str, Any]] = []
     result_by_model: Dict[str, Any] = {}

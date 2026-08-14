@@ -228,6 +228,18 @@
 {% endfor %}
 
 {% endif %}
+{% set disagreement_handling = normalize_disagreement_handling_payload((strategy_synthesis.get('disagreement_handling') if strategy_synthesis else none) or (dashboard.get('disagreement_handling') if dashboard else none)) %}
+{% if disagreement_handling and disagreement_handling.get('high_disagreement') %}
+- **⚠️ {{ labels.disagreement_high_banner }}**
+- {{ labels.disagreement_verdict_label }}: {{ localize_disagreement_verdict_mode(disagreement_handling.get('verdict_mode'), report_language) }} | {{ labels.disagreement_escalation_label }}: {{ disagreement_handling.get('escalation') }} | {{ labels.disagreement_score_label }}: {{ '%.0f%%' | format((disagreement_handling.get('disagreement_score') or 0) * 100) }}
+- {{ labels.disagreement_resolution_label }}: {{ localize_disagreement_resolution(disagreement_handling.get('resolution_status'), report_language) }}
+- {{ labels.disagreement_no_majority_note }}
+{% if disagreement_handling.get('policy') and disagreement_handling.get('policy').get('pre_escalation_final_signal') %}- {{ labels.disagreement_pre_signal_label }}: {{ localize_strategy_signal(disagreement_handling.get('policy').get('pre_escalation_final_signal'), report_language) }} → {{ labels.disagreement_applied_signal_label }}: {{ localize_strategy_signal(disagreement_handling.get('policy').get('applied_final_signal') or 'hold', report_language) }}{% endif %}
+{% if disagreement_handling.get('cross_validation') and disagreement_handling.get('cross_validation').get('requested') %}- {{ labels.disagreement_cross_validation_label }}: {{ labels.disagreement_cross_validation_completed }} (role={{ disagreement_handling.get('cross_validation').get('role_layer_conflict') }}, strategy={{ disagreement_handling.get('cross_validation').get('strategy_layer_conflict') }}){% endif %}
+{% for point in (disagreement_handling.get('points') or [])[:5] %}
+- {{ labels.disagreement_points_label }}: [{{ point.get('source') }}] {{ localize_conflict_severity(point.get('severity', 'medium'), report_language) }} / {{ point.get('kind') }}{% if point.get('participants') %}（{% for participant in point.get('participants') %}{{ localize_strategy_skill(participant, report_language) }}{{ '、' if not loop.last else '' }}{% endfor %}）{% endif %}
+{% endfor %}
+{% endif %}
 
 {% set research_persona = dashboard.get('active_research_persona') if dashboard else none %}
 {% if research_persona and research_persona.get('enabled') %}
@@ -330,6 +342,31 @@
 **{{ labels.multi_model_trace_label }}**
 {% for ident in ((multi_model.get('trace') or {}).get('model_identities') or [])[:5] %}
 - {{ ident.get('provider') or '' }}/{{ ident.get('model_version') or ident.get('model_id') or 'unknown' }} ({{ ident.get('status') or 'n/a' }})
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+{% set bull_bear_debate = dashboard.get('bull_bear_debate') if dashboard else none %}
+{% if mode_limits.include_bull_bear_debate and bull_bear_debate and bull_bear_debate.get('enabled') %}
+### ⚔️ {{ labels.bull_bear_debate_heading }}
+
+- {{ labels.bull_bear_status_label }}: {{ bull_bear_debate.get('status') }} | {{ labels.bull_bear_rounds_label }}: {{ bull_bear_debate.get('rounds_completed') }}/{{ bull_bear_debate.get('max_rounds') }}
+{% set debate_synth = bull_bear_debate.get('synthesis') or {} %}
+{% if debate_synth %}
+- {{ labels.bull_bear_synthesis_label }}: {{ localize_strategy_signal(debate_synth.get('final_lean') or 'hold', report_language) }} | {{ labels.bull_bear_winner_label }}: {{ debate_synth.get('winner') }} | {{ labels.bull_bear_resolution_label }}: {{ debate_synth.get('resolution_status') }}
+{% if debate_synth.get('summary') %}- {{ debate_synth.get('summary') }}{% endif %}
+- {{ labels.bull_bear_no_majority_note }}
+{% endif %}
+{% for round in (bull_bear_debate.get('rounds') or [])[:3] %}
+{% set bull = round.get('bull') or {} %}
+{% set bear = round.get('bear') or {} %}
+- R{{ round.get('round') }} {{ labels.bull_bear_bull_label }}: {{ localize_strategy_signal(bull.get('stance') or 'N/A', report_language) }} ({{ '%.0f%%' | format((bull.get('confidence') or 0) * 100) if bull.get('confidence') is number else 'N/A' }}) | {{ labels.bull_bear_bear_label }}: {{ localize_strategy_signal(bear.get('stance') or 'N/A', report_language) }} ({{ '%.0f%%' | format((bear.get('confidence') or 0) * 100) if bear.get('confidence') is number else 'N/A' }})
+{% endfor %}
+{% if bull_bear_debate.get('contention_points') %}
+**{{ labels.bull_bear_contention_heading }}**
+{% for point in (bull_bear_debate.get('contention_points') or [])[:5] %}
+- [{{ point.get('source') }}] {{ localize_conflict_severity(point.get('severity', 'medium'), report_language) }} / {{ point.get('kind') }}{% if point.get('topic') %}: {{ point.get('topic') }}{% endif %}
 {% endfor %}
 {% endif %}
 

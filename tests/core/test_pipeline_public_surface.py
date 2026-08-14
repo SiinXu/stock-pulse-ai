@@ -63,6 +63,7 @@ EXPECTED_ANALYSIS_METHODS = (
     '_attach_concept_rankings_to_fundamental_context',
     '_get_concept_rankings_for_market',
     '_build_market_structure_context',
+    '_build_market_regime_context',
     '_ensure_agent_history',
     '_analyze_with_agent',
     '_load_agent_analysis_context',

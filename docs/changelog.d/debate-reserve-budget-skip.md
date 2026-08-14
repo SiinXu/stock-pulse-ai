@@ -1,0 +1,1 @@
+- [Fixed] Optional debate now yields leftover LLM-turn capacity to Decision with isolatable `budget_skip` instead of fail-fasting the run as `budget_turns`.

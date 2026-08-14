@@ -350,7 +350,6 @@ def test_run_multi_model_attaches_dashboard_and_trace_identities():
         config=config,
         context={"code": "600519", "realtime": {"price": 1}},
         news_context="shared-news",
-        parallel=False,
     )
     assert result is not None
     assert comparison is not None
@@ -389,7 +388,6 @@ def test_partial_failure_attaches_degradation_dashboard_flag():
             litellm_fallback_models=[],
         ),
         context={"code": "600519"},
-        parallel=False,
     )
     assert result is not None
     assert comparison["status"] == "degraded_single"
@@ -416,7 +414,6 @@ def test_run_multi_model_partial_failure_keeps_single_success():
             litellm_fallback_models=[],
         ),
         context={"code": "AAPL"},
-        parallel=False,
     )
     assert result is not None
     assert comparison["status"] == "degraded_single"
@@ -443,7 +440,6 @@ def test_all_models_failed_returns_no_primary_result():
             litellm_fallback_models=[],
         ),
         context={"code": "600519"},
-        parallel=False,
     )
     assert result is None
     assert comparison is not None

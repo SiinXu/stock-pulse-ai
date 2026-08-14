@@ -25,6 +25,7 @@ from src.schemas.decision_scale import (
     score_band_metadata,
 )
 from src.services.portfolio_service import VALID_MARKETS
+from src.utils.sanitize import log_safe_exception
 from src.utils.sniper_points import extract_sniper_points
 
 if TYPE_CHECKING:
@@ -135,6 +136,24 @@ def build_decision_signal_payload_from_report(
     }
     if has_canonical_risk_result:
         metadata["risk_manager"] = risk_gate_result
+    debate_payload = dashboard.get("bull_bear_debate")
+    if isinstance(debate_payload, Mapping) and debate_payload:
+        try:
+            from src.agent.bull_bear_debate import decision_signal_debate_metadata
+
+            debate_meta = decision_signal_debate_metadata(debate_payload)
+            if debate_meta:
+                metadata.update(debate_meta)
+                metadata["debate_summary"] = debate_meta.get("debate_summary")
+                metadata["debate_rounds"] = debate_meta.get("debate_rounds")
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional debate metadata cannot invalidate an otherwise valid primary DecisionSignal.
+            log_safe_exception(
+                logger,
+                "Skip debate metadata on decision signal payload",
+                exc,
+                error_code="decision_signal_debate_metadata_unavailable",
+                level=logging.DEBUG,
+            )
     score_metadata = score_band_metadata(score)
     if score_metadata:
         metadata["score_scale"] = score_metadata
