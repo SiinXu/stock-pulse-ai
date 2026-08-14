@@ -181,6 +181,10 @@ def resolve_many(
                         checked_against_generation=write_snapshot.generation,
                     )
                 )
+                # The id was requested and answered as retired; without this the
+                # `wanted - seen` sweep below would append a second, contradictory
+                # capability_not_found result for the same capability.
+                seen.add(entry.capability_id)
             continue
         results.append(
             resolve_capability_dependencies(

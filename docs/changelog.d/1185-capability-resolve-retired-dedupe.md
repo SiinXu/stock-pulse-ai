@@ -1,0 +1,1 @@
+- [Fixed] Report an explicitly requested retired capability once as `capability_retired` instead of also emitting a contradictory `capability_not_found` result from `POST /api/v1/capabilities/resolve` (Refs #1185).
