@@ -1439,15 +1439,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
     notes: ['See docs/multi-strategy-contract.md for the multi-strategy contract.'],
   },
   'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
-    title: 'Structured Disagreement Handling',
-    summary: 'Record conflicts; split holds.',
+    title: 'Disagreement Handling',
+    summary: 'Record conflicts; hold if unresolved.',
   },
   'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
-    title: 'Disagreement High-Confidence Threshold',
-    summary: 'Split threshold.',
+    title: 'High Disagreement Threshold',
+    summary: 'Split-verdict threshold.',
   },
   'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
-    title: 'Disagreement Medium-Confidence Threshold',
+    title: 'Review Threshold',
     summary: 'Cross-check threshold.',
   },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {

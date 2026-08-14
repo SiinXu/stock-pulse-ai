@@ -1480,16 +1480,16 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
   },
   'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
-    title: '结构化分歧处理',
-    summary: '记录冲突；未收敛时观望。',
+    title: '分歧处理',
+    summary: '记录冲突；未解决时观望。',
   },
   'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
-    title: '高分歧置信度阈值',
-    summary: '分裂裁决置信度阈值。',
+    title: '高分歧阈值',
+    summary: '触发分裂裁决的阈值。',
   },
   'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
-    title: '交叉校验置信度阈值',
-    summary: '角色与策略交叉校验阈值。',
+    title: '复核阈值',
+    summary: '交叉复核阈值。',
   },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',
