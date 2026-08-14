@@ -1550,6 +1550,8 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
   },
   // Both controls use their field-specific schema description as help copy.
   'settings.agent.market_regime': {},
+  // All controls use their field-specific schema description as help copy.
+  'settings.agent.multi_model_consensus': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: '反思与预测复盘',
   },

@@ -1502,6 +1502,8 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   },
   // Both controls use their field-specific schema description as help copy.
   'settings.agent.market_regime': {},
+  // All controls use their field-specific schema description as help copy.
+  'settings.agent.multi_model_consensus': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: 'Reflection and Forecast Post-mortem',
   },

@@ -3538,7 +3538,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 726,
-        "help_key": None,
+        "help_key": "settings.agent.multi_model_consensus",
         "examples": [
             "MULTI_MODEL_CONSENSUS_ENABLED=false",
             "MULTI_MODEL_CONSENSUS_ENABLED=true",
@@ -3568,7 +3568,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 727,
-        "help_key": None,
+        "help_key": "settings.agent.multi_model_consensus",
         "examples": [
             "MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash",
         ],
@@ -3600,7 +3600,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "validation": {},
         "display_order": 728,
-        "help_key": None,
+        "help_key": "settings.agent.multi_model_consensus",
         "examples": [
             "MULTI_MODEL_CONSENSUS_PRESET=fast",
             "MULTI_MODEL_CONSENSUS_PRESET=quality",
@@ -3626,7 +3626,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 2, "max": 5},
         "display_order": 729,
-        "help_key": None,
+        "help_key": "settings.agent.multi_model_consensus",
         "examples": [
             "MULTI_MODEL_CONSENSUS_MAX_MODELS=3",
             "MULTI_MODEL_CONSENSUS_MAX_MODELS=2",
@@ -3658,7 +3658,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 0},
         "display_order": 730,
-        "help_key": None,
+        "help_key": "settings.agent.multi_model_consensus",
         "examples": [
             "MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05",
         ],
