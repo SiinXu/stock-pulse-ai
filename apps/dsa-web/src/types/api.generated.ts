@@ -3576,6 +3576,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocks/{stock_code}/research-timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-symbol research timeline
+         * @description Cursor-paginated research activity for one symbol: analysis runs, related chat turns, decision signals, and hypothesis transitions when the hypothesis workspace is available. Does not full-scan sources; each page overscans at most `limit` rows per source. Hypothesis is reported as unavailable until that workspace ships.
+         */
+        get: operations["get_stock_research_timeline_api_v1_stocks__stock_code__research_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/config": {
         parameters: {
             query?: never;
@@ -14521,6 +14541,170 @@ export interface components {
             preferred_lens_skill_ids?: ("persona_value_moat" | "persona_mental_models" | "persona_contrarian_deep_value" | "persona_disruptive_growth" | "persona_tail_risk")[];
             /** Preset Id */
             preset_id?: ("rational_analyst" | "risk_guardian" | "long_term_compounder") | null;
+        };
+        /**
+         * ResearchTimelineLink
+         * @description Deep-link payload for a timeline node (client builds the concrete URL).
+         */
+        ResearchTimelineLink: {
+            /**
+             * Message Id
+             * @description Conversation message id
+             */
+            message_id?: number | null;
+            /**
+             * Query Id
+             * @description analysis_history.query_id when available
+             */
+            query_id?: string | null;
+            /**
+             * Record Id
+             * @description analysis_history.id when type=analysis_history
+             */
+            record_id?: number | null;
+            /**
+             * Session Id
+             * @description Chat session id when type=chat_session
+             */
+            session_id?: string | null;
+            /**
+             * Signal Id
+             * @description decision_signals.id when type=decision_signal
+             */
+            signal_id?: number | null;
+            /**
+             * Source Report Id
+             * @description Linked analysis history id for a signal
+             */
+            source_report_id?: number | null;
+            /**
+             * Stock Code
+             * @description Canonical stock code for the target
+             */
+            stock_code?: string | null;
+            /**
+             * Turn Id
+             * @description Durable chat turn id (#923 contract)
+             */
+            turn_id?: string | null;
+            /**
+             * Type
+             * @description Target type: analysis_history | chat_session | decision_signal | hypothesis
+             */
+            type: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ResearchTimelineNode
+         * @description One research activity node on the per-symbol timeline.
+         */
+        ResearchTimelineNode: {
+            /**
+             * Confidence
+             * @description Normalized 0-1 confidence when available
+             */
+            confidence?: number | null;
+            /**
+             * Direction
+             * @description Direction/advice label for simple analysis-node diffs
+             */
+            direction?: string | null;
+            /**
+             * Id
+             * @description Stable node id, e.g. analysis_run:12
+             */
+            id: string;
+            /**
+             * Kind
+             * @description analysis_run | chat | signal | hypothesis
+             */
+            kind: string;
+            /** @description Deep-link coordinates */
+            link: components["schemas"]["ResearchTimelineLink"];
+            /**
+             * Meta
+             * @description Kind-specific extras
+             */
+            meta?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Occurred At
+             * @description ISO-8601 timestamp with offset
+             */
+            occurred_at: string;
+            /**
+             * Status
+             * @description Lifecycle status when applicable
+             */
+            status?: string | null;
+            /**
+             * Summary
+             * @description Optional one-line summary
+             */
+            summary?: string | null;
+            /**
+             * Title
+             * @description Short human-readable title
+             */
+            title: string;
+        };
+        /**
+         * ResearchTimelineResponse
+         * @description Cursor page of research timeline nodes for one symbol.
+         */
+        ResearchTimelineResponse: {
+            /**
+             * Has More
+             * @description Whether additional older nodes exist
+             */
+            has_more: boolean;
+            /** Items */
+            items?: components["schemas"]["ResearchTimelineNode"][];
+            /**
+             * Limit
+             * @description Page size applied to this response
+             */
+            limit: number;
+            /**
+             * Next Cursor
+             * @description Opaque cursor for the next page; null when has_more is false
+             */
+            next_cursor?: string | null;
+            /** @description Per-source status; hypothesis is unavailable until #1130 ships */
+            sources: components["schemas"]["ResearchTimelineSources"];
+            /**
+             * Stock Code
+             * @description Canonical display stock code
+             */
+            stock_code: string;
+        };
+        /**
+         * ResearchTimelineSources
+         * @description Per-source honesty flags so the UI never invents empty success for missing feeds.
+         */
+        ResearchTimelineSources: {
+            /**
+             * Analysis Run
+             * @description ok | empty | unavailable | error
+             */
+            analysis_run: string;
+            /**
+             * Chat
+             * @description ok | empty | unavailable | error
+             */
+            chat: string;
+            /**
+             * Hypothesis
+             * @description ok | empty | unavailable | error
+             */
+            hypothesis: string;
+            /**
+             * Signal
+             * @description ok | empty | unavailable | error
+             */
+            signal: string;
         };
         /** ResolutionResultResponse */
         ResolutionResultResponse: {
@@ -29637,6 +29821,62 @@ export interface operations {
                 };
             };
             /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_stock_research_timeline_api_v1_stocks__stock_code__research_timeline_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque continuation cursor from a previous page */
+                cursor?: string | null;
+                /** @description Page size (max 50) */
+                limit?: number;
+                /** @description Optional comma-separated kinds filter: analysis_run,chat,signal,hypothesis */
+                kinds?: string | null;
+            };
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-symbol research timeline page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchTimelineResponse"];
+                };
+            };
+            /** @description Invalid stock code or cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
             500: {
                 headers: {
                     [name: string]: unknown;
