@@ -30,3 +30,7 @@ If a dual-write interruption is suspected, verify `STOCK_LIST` and read the grou
 ## Rollback
 
 Older code ignores the additive tables after a code rollback. Running the migration downgrade deletes all three tables and permanently removes group names, ordering, and computed attributes, so back up the database first. Downgrade never changes `STOCK_LIST`, and the global watchlist remains usable.
+
+## Related
+
+Home also hosts a separate [customizable dashboard layout](./home-dashboard-layout_EN.md) for watchlist / portfolio health / alerts / recent reports. Group membership and board layout preferences are independent.
