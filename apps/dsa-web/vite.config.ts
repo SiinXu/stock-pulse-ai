@@ -108,6 +108,12 @@ const getVendorChunkName = (id: string): string | undefined => {
   if (normalizedId.endsWith('/src/i18n/dataProviderRuntimeTranslations.ts')) {
     return 'settings-data-provider'
   }
+  if (
+    normalizedId.endsWith('/src/components/settings/settingsConnectionUpdateContract.ts')
+    || normalizedId.endsWith('/src/components/settings/settingsGenerationDraftModel.ts')
+  ) {
+    return 'settings-runtime-models'
+  }
   if (normalizedId.endsWith('/src/locales/settingsIntelligence.ts')) {
     return 'settings-intelligence'
   }
