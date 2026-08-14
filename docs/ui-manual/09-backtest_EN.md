@@ -5,8 +5,8 @@ Backtest answers:
 > Over a past window, did historical AI suggestions look optimistic, conservative, or simply too thin to judge?
 
 - This is **post-hoc checking of advice the system already produced**, not a full quant IDE.  
-- Cost and slippage are **explicit** config (`BACKTEST_COMMISSION_BPS` / `BACKTEST_SLIPPAGE_BPS`); defaults of zero mean zero friction, not hidden costs.  
-- Results carry a methodology block: look-ahead protection, survivorship (analyzed universe only), sample split labels, and percent-return currency policy.  
+- Cost and slippage are **explicit** config (`BACKTEST_COMMISSION_BPS` / `BACKTEST_SLIPPAGE_BPS`); defaults of zero mean zero friction, not hidden costs.
+- Results carry a methodology block: look-ahead protection, survivorship (analyzed universe only), sample split labels, and percent-return currency policy.
 - With few samples, pretty percentages are stories first.
 
 > Metrics are **not** promises of future return and are **not** your real fills.
