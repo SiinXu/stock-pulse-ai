@@ -1554,6 +1554,8 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     title: '多空辩论',
     summary: '配置可选辩论阶段、限制与专用模型。',
   },
+  // Both controls use their field-specific schema description as help copy.
+  'settings.agent.market_regime': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: '反思与预测复盘',
   },

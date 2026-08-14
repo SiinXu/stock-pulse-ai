@@ -1216,6 +1216,8 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_SKILL_ROUTING')
                 or os.getenv('AGENT_STRATEGY_ROUTING', 'auto')
             ).lower(),
+            market_regime_enabled=os.getenv('MARKET_REGIME_ENABLED', 'true').lower() == 'true',
+            market_regime_override=(os.getenv('MARKET_REGIME_OVERRIDE') or '').strip().lower(),
             agent_context_compression_enabled=parse_env_bool(
                 os.getenv('AGENT_CONTEXT_COMPRESSION_ENABLED'),
                 default=False,

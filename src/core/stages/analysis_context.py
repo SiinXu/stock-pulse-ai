@@ -594,6 +594,66 @@ class _AnalysisContextStageMixin:
             )
             return None
 
+    def _build_market_regime_context(
+        self,
+        *,
+        code: str,
+        market: str,
+        trend_result: Any = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Build explainable market-regime context without blocking analysis."""
+        try:
+            from src.services.market_regime_service import MarketRegimeService
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional regime import must not block analysis.
+            log_safe_exception(
+                logger,
+                "Market regime service import failed; continuing without regime data",
+                exc,
+                error_code="pipeline_market_regime_service_import_failed",
+                level=logging.DEBUG,
+                context={"stock_code": code},
+            )
+            return None
+
+        config = getattr(self, "config", None)
+        if config is not None and not bool(getattr(config, "market_regime_enabled", True)):
+            return MarketRegimeService(config=config).build_unavailable(
+                stock_code=code,
+                market=market,
+                reason="market_regime_enabled=false",
+            )
+
+        service = getattr(self, "market_regime_service", None)
+        if service is None:
+            try:
+                service = MarketRegimeService(config=config)
+                self.market_regime_service = service
+            except Exception as exc:  # broad-exception: fallback_recorded - Regime service init is optional.
+                log_safe_exception(
+                    logger,
+                    "Market regime service initialization failed; continuing without regime data",
+                    exc,
+                    error_code="pipeline_market_regime_service_init_failed",
+                    level=logging.DEBUG,
+                    context={"stock_code": code},
+                )
+                return None
+        try:
+            return service.build_from_trend(
+                trend_result,
+                stock_code=code,
+                market=market,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Regime build failure is fail-open.
+            log_safe_exception(
+                logger,
+                "Market regime context generation failed; continuing without regime data",
+                exc,
+                error_code="pipeline_market_regime_context_failed",
+                level=logging.DEBUG,
+                context={"stock_code": code},
+            )
+            return None
 
 
 # Keep AST-preserved static self-references valid when this private source

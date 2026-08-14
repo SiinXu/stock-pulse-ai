@@ -23,6 +23,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     fill_chip_structure_if_needed fill_price_position_if_needed
     filter_non_hermes_deployments filter_prompt_cache_telemetry
     format_daily_market_context_prompt_section format_market_phase_prompt_section
+    format_market_regime_prompt_section
     format_market_structure_prompt_section get_analyzer get_api_keys_for_model
     get_chip_unavailable_text get_config get_configured_llm_models get_market_guidelines
     get_market_role get_no_data_text get_placeholder_text get_signal_level

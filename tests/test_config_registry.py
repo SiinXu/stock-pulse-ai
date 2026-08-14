@@ -854,6 +854,25 @@ class TestSettingsHelpContract(unittest.TestCase):
         missing = sorted(registry_help_keys - locale_keys)
         self.assertEqual(missing, [], f"Registry help keys missing locale: {missing}")
 
+    def test_market_regime_fields_share_help_contract(self) -> None:
+        help_key = "settings.agent.market_regime"
+        expected_titles = {
+            "MARKET_REGIME_ENABLED": "Market Regime",
+            "MARKET_REGIME_OVERRIDE": "Regime Override",
+        }
+        for field_key, title in expected_titles.items():
+            definition = get_field_definition(field_key)
+            self.assertEqual(definition["title"], title)
+            self.assertEqual(definition["help_key"], help_key)
+
+        for path in self._SETTINGS_HELP_FILES:
+            content = path.read_text(encoding="utf-8")
+            self.assertEqual(
+                len(re.findall(rf"^\s*'{re.escape(help_key)}'\s*:\s*\{{", content, re.MULTILINE)),
+                1,
+                f"{path.name} must define the shared market-regime help exactly once",
+            )
+
     def test_locale_help_keys_are_registry_or_llm_channel_internal(self) -> None:
         registry_help_keys = self._collect_registry_help_keys()
         locale_keys = self._collect_locale_help_keys()

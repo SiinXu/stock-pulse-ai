@@ -43,6 +43,7 @@ EXPECTED_ANALYSIS_METHODS = (
     '_attach_concept_rankings_to_fundamental_context',
     '_get_concept_rankings_for_market',
     '_build_market_structure_context',
+    '_build_market_regime_context',
     '_ensure_agent_history',
     '_analyze_with_agent',
     '_load_agent_analysis_context',
@@ -84,17 +85,17 @@ IMPLEMENTATION_GROUPS = (
     (
         "src.core.stages.analysis_context",
         "_AnalysisContextStageMixin",
-        EXPECTED_ANALYSIS_METHODS[2:7],
+        EXPECTED_ANALYSIS_METHODS[2:8],
     ),
     (
         "src.core.stages.analysis_agent",
         "_AgentAnalysisStageMixin",
-        EXPECTED_ANALYSIS_METHODS[7:17],
+        EXPECTED_ANALYSIS_METHODS[8:18],
     ),
     (
         "src.core.stages.analysis_results",
         "_AnalysisResultStageMixin",
-        EXPECTED_ANALYSIS_METHODS[17:],
+        EXPECTED_ANALYSIS_METHODS[18:],
     ),
 )
 

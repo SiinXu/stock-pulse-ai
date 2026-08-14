@@ -1506,6 +1506,8 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     title: 'Bull-Bear debate',
     summary: 'Configure the optional debate stage, limits, and dedicated model.',
   },
+  // Both controls use their field-specific schema description as help copy.
+  'settings.agent.market_regime': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: 'Reflection and Forecast Post-mortem',
   },

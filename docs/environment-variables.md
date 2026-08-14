@@ -165,6 +165,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
+| `MARKET_REGIME_ENABLED` | `true` | 是 | 模板中注释; 启用可解释规则市场状态检测 |
+| `MARKET_REGIME_OVERRIDE` | 空 | 是 | 模板中注释; 可选强制市场状态标签 |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
 | `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释; Independent per-sub-agent timeout cap in seconds (0 disables it; a positive value such as 180 enables a hard cap for ... |
 | `AGENT_TOOL_TIMEOUT_S` | `120` | 是 | 模板中注释; Agent runtime guards (enabled by default; set an individual numeric value to 0 to disable that guard) Timeout for one... |
