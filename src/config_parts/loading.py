@@ -951,6 +951,10 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,
             ),
+            agent_step_critique_enabled=parse_env_bool(
+                os.getenv('AGENT_STEP_CRITIQUE_ENABLED'),
+                False,
+            ),
             debate_enabled=parse_env_bool(
                 os.getenv('DEBATE_ENABLED'),
                 False,
@@ -979,6 +983,18 @@ class _ConfigLoadingMethods:
                 1,
                 field_name='AGENT_REFLECTION_LLM_BUDGET',
                 minimum=0,
+                maximum=64,  # MAX_REFLECTION_LLM_CALL_BUDGET
+            ),
+            agent_meta_review_enabled=parse_env_bool(
+                os.getenv('AGENT_META_REVIEW_ENABLED'),
+                False,
+            ),
+            agent_meta_review_min_episodes=parse_env_int(
+                os.getenv('AGENT_META_REVIEW_MIN_EPISODES'),
+                30,
+                field_name='AGENT_META_REVIEW_MIN_EPISODES',
+                minimum=1,
+                maximum=50000,
             ),
             agent_reflection_max_revise=parse_env_int(
                 os.getenv('AGENT_REFLECTION_MAX_REVISE'),

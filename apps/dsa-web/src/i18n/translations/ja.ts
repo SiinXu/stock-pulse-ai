@@ -11,6 +11,7 @@ import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuI
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_JA_KO as SR } from '../settingsRegistryTranslations.east-ja-ko';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ja,
@@ -23,6 +24,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...SR.ja,
   ...EE.ja,
   ...MMC.ja,
+  ...S.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -5274,8 +5276,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "1日あたりのイベント上限",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 機能を当面オフと確認",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "銘柄相談の生成方式",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "調査姿勢プリセット",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "独自の調査姿勢テキスト",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "エージェントのプライマリモデル",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "エージェントの最大ステップ数",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "エージェントメモリ",

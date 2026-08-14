@@ -1,4 +1,5 @@
 import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
+import { REFLECTION_SETTINGS_HELP_EN } from '../i18n/reflectionSettingsCopy';
 
 const settingsHelpSchemaDescriptionOnlyContract: SettingsHelpSourceMap = {
   'settings.agent.multi_model_consensus': {},
@@ -6,6 +7,7 @@ const settingsHelpSchemaDescriptionOnlyContract: SettingsHelpSourceMap = {
 void settingsHelpSchemaDescriptionOnlyContract;
 
 const settingsHelpEnUS: SettingsHelpSourceMap = {
+  ...REFLECTION_SETTINGS_HELP_EN,
   'settings.base.STOCK_LIST': {
     title: 'Watchlist',
     summary: 'Defines the stock codes used by analysis jobs and notification reports.',

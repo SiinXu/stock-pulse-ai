@@ -11,6 +11,7 @@ import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuI
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_MS_ZHTW as SR } from '../settingsRegistryTranslations.east-ms-zhtw';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ms,
@@ -23,6 +24,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...SR.ms,
   ...EE.ms,
   ...MMC.ms,
+  ...S.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",
@@ -5274,8 +5276,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Had pencetus sehari",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Sahkan ciri Agent dimatikan",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Kaedah Penjanaan Tanya Saham",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Pratetap Pendirian Penyelidikan",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Teks Pendirian Penyelidikan Tersuai",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Model Utama Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Langkah Maksimum Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Memori Ejen",

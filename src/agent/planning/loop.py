@@ -258,6 +258,17 @@ def execute_plan_loop(
                 attrs={"failure_reason": step_obs.failure_reason or ""},
             )
 
+            # Standardize every failed/contradictory observation before any
+            # terminal fence returns. This keeps immediate reflection reachable
+            # even when retry budget is zero or the failure policy terminates.
+            replan_reason_kinds: List[str] = []
+            if _observation_requires_step_critique(step_obs):
+                replan_reason_kinds = _step_critique_replan_reasons(
+                    observations=observations,
+                    context=context,
+                    failed_step=step,
+                )
+
             if budget_hit == "cancelled":
                 return _finish(
                     success=False,
@@ -422,6 +433,7 @@ def execute_plan_loop(
                     "role": "replan",
                     "after_failed_step": step.id,
                     "replan_index": observation_replans,
+                    "replan_reason_kinds": list(replan_reason_kinds),
                 }
             )
             tracer.emit_replan(
@@ -446,6 +458,7 @@ def execute_plan_loop(
                     "new_plan_id": new_plan.plan_id,
                     "observation_replans": observation_replans,
                     "failed_step_id": step.id,
+                    "replan_reason_kinds": list(replan_reason_kinds),
                     "planning_run_id": tracer.run_id,
                 },
             )
@@ -711,6 +724,93 @@ def _execute_step(
         None,
     )
 
+def _observation_requires_step_critique(observation: StepObservation) -> bool:
+    from src.agent.evolution.step_critique import should_trigger_step_critique
+
+    return should_trigger_step_critique([observation])
+
+
+def _step_critique_replan_reasons(
+    *,
+    observations: Sequence[StepObservation],
+    context: Optional[Dict[str, Any]],
+    failed_step: PlanStep,
+) -> List[str]:
+    """Map the failed step into shared ReflectionLesson.kind replan codes.
+
+    Always deterministic and taxonomy-aligned. When step critique is enabled via
+    context config, also records a typed immediate-layer result onto
+    ``context["step_critique_result"]`` for episode storage. Never mutates Soul
+    or ToolSurface.
+    """
+    from src.agent.evolution.step_critique import (
+        MAX_STEP_CRITIQUE_OBSERVATIONS,
+        STEP_CRITIQUE_META_KEY,
+        critique_step_observations,
+        deterministic_step_lessons,
+        map_replan_reason_kind,
+    )
+
+    # The loop retains observations across replans, so the audit trail can
+    # exceed the critique helper's hard cap. Keep the most recent window so the
+    # triggering failure stays in scope.
+    critique_window = list(observations)[-MAX_STEP_CRITIQUE_OBSERVATIONS:]
+    _, reason_codes = deterministic_step_lessons(critique_window)
+    if not reason_codes:
+        reason_codes = [
+            map_replan_reason_kind(
+                failure_reason="step_failed",
+                error_code="tool_failed",
+                summary=failed_step.goal,
+            )
+        ]
+
+    if isinstance(context, dict):
+        context["replan_reason_kinds"] = list(reason_codes)
+        # Product path binds Config at context["config"] (see planning/product.py).
+        # Also accept a few aliases so library callers are not forced into one key.
+        config = (
+            context.get("config")
+            or context.get("agent_config")
+            or context.get("cfg")
+        )
+        if getattr(config, "agent_step_critique_enabled", False) is True:
+
+            class _Ctx:
+                meta: Dict[str, Any]
+
+            critique_ctx = _Ctx()
+            critique_ctx.meta = {
+                "run_id": context.get("run_id") or context.get("analysis_history_id"),
+                "episode_id": context.get("episode_id"),
+            }
+            try:
+                # force=True: we are already on a failed-step replan path, so the
+                # observation trigger is satisfied; still respect enable + budget.
+                critique_step_observations(
+                    critique_window,
+                    config=config,
+                    ctx=critique_ctx,
+                    force=True,
+                )
+                step_payload = critique_ctx.meta.get(STEP_CRITIQUE_META_KEY)
+                if isinstance(step_payload, dict):
+                    context[STEP_CRITIQUE_META_KEY] = step_payload
+                    if step_payload.get("replan_reasons"):
+                        context["replan_reason_kinds"] = list(
+                            step_payload["replan_reasons"]
+                        )
+                        reason_codes = list(step_payload["replan_reasons"])
+            except Exception as exc:  # broad-exception: fallback_recorded - step critique is advisory
+                log_safe_exception(
+                    logger,
+                    "Immediate step critique failed during replan",
+                    exc,
+                    error_code="agent_step_critique_replan_failed",
+                    level=logging.INFO,
+                )
+    return list(reason_codes)
+
 
 def _replan(
     *,
@@ -745,6 +845,8 @@ def _replan(
     replan_context["prior_observations_summary"] = compact_observation_summary(
         observations
     )
+    if isinstance(context, dict) and context.get("replan_reason_kinds"):
+        replan_context["replan_reason_kinds"] = list(context["replan_reason_kinds"])
     non_retriable = {
         call.tool_name
         for obs in observations

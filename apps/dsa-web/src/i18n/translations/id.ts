@@ -11,6 +11,7 @@ import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_WEST as PF } from '../portfolioFutuI
 import { SETTINGS_REGISTRY_TRANSLATIONS_WEST_FR_ID as SR } from '../settingsRegistryTranslations.west-fr-id';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
@@ -23,6 +24,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...SR.id,
   ...EE.id,
   ...MMC.id,
+  ...S.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -5274,8 +5276,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Batas pemicu per hari",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Konfirmasi fitur Agent nonaktif",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Metode pembuatan jawaban saham",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Preset Sikap Riset",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Teks Sikap Riset Khusus",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Model utama Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Langkah maksimum Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Memori Agen",

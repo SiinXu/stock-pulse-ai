@@ -11,6 +11,7 @@ import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuI
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_JA_KO as SR } from '../settingsRegistryTranslations.east-ja-ko';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
@@ -23,6 +24,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...SR.ko,
   ...EE.ko,
   ...MMC.ko,
+  ...S.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -5274,8 +5276,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "일일 이벤트 한도",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 기능 사용 안 함 확인",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "종목 질의 생성 방식",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "연구 관점 프리셋",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "사용자 지정 연구 관점 텍스트",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "에이전트 기본 모델",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "에이전트 최대 단계 수",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "에이전트 메모리",

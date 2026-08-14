@@ -11,6 +11,7 @@ import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuI
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_MS_ZHTW as SR } from '../settingsRegistryTranslations.east-ms-zhtw';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M['zh-TW'],
@@ -23,6 +24,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...SR['zh-TW'],
   ...EE['zh-TW'],
   ...MMC['zh-TW'],
+  ...S['zh-TW'],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -5274,8 +5276,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "事件觸發每日上限",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "確認暫不使用 Agent 功能",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "問股生成方式",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "研究立場預設",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "自訂研究立場",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Agent 主要模型",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Agent 最大步驟數",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Agent 記憶",

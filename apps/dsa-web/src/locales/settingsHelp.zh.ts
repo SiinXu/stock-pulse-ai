@@ -1,6 +1,8 @@
 import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
+import { REFLECTION_SETTINGS_HELP_ZH } from '../i18n/reflectionSettingsCopy';
 
 const settingsHelpZhCN: SettingsHelpSourceMap = {
+  ...REFLECTION_SETTINGS_HELP_ZH,
   'settings.base.STOCK_LIST': {
     title: '自选股列表',
     summary: '配置需要分析的股票代码列表，是手动分析、定时任务和通知报告的基础输入。',

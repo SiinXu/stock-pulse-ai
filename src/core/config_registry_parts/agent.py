@@ -789,7 +789,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "AGENT_REFLECTION_LLM_BUDGET": {
         "title": "Reflection LLM Call Budget",
         "description": (
-            "Maximum LLM calls for one run-local reflection loop (default 1). "
+            "Maximum LLM calls for one run-local reflection loop (default 1, max 64). "
             "Budget exhaustion records an explicit budget skip; it does not silently "
             "continue as a successful reflection."
         ),
@@ -801,7 +801,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "1",
         "options": [],
-        "validation": {"min": 0},
+        "validation": {"min": 0, "max": 64},
         "display_order": 65,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
@@ -931,6 +931,70 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
             },
         ],
+        "warning_codes": [],
+    },
+    "AGENT_STEP_CRITIQUE_ENABLED": {
+        "title": "Step Critique",
+        "description": (
+            "Default-off immediate (in-loop) step critique after tool failure or "
+            "contradictory observations. Emits typed ReflectionLesson values and "
+            "standardizes replan reason codes; never mutates Agent Soul or ToolSurface."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 726,
+        "help_key": "settings.agent.multi_level_reflection",
+        "examples": ["AGENT_STEP_CRITIQUE_ENABLED=false", "AGENT_STEP_CRITIQUE_ENABLED=true"],
+        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
+        "warning_codes": [],
+    },
+    "AGENT_META_REVIEW_ENABLED": {
+        "title": "Meta Review",
+        "description": (
+            "Default-off offline meta-review that aggregates episode lessons into a "
+            "human-readable report. Never auto-edits Soul, ToolSurface, or runtime config."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 731,
+        "help_key": "settings.agent.multi_level_reflection",
+        "examples": ["AGENT_META_REVIEW_ENABLED=false", "AGENT_META_REVIEW_ENABLED=true"],
+        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
+        "warning_codes": [],
+    },
+    "AGENT_META_REVIEW_MIN_EPISODES": {
+        "title": "Review Minimum",
+        "description": (
+            "Minimum episode samples before meta-review emits recommended actions "
+            "(default 30). Below threshold records threshold_not_met."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 1, "max": 50000},
+        "display_order": 732,
+        "help_key": "settings.agent.multi_level_reflection",
+        "examples": ["AGENT_META_REVIEW_MIN_EPISODES=30", "AGENT_META_REVIEW_MIN_EPISODES=10"],
+        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
         "warning_codes": [],
     },
     "AGENT_INVESTMENT_COMMITTEE_MODE": {

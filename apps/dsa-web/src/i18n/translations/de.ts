@@ -11,6 +11,7 @@ import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_WEST as PF } from '../portfolioFutuI
 import { SETTINGS_REGISTRY_TRANSLATIONS_WEST_DE_ES as SR } from '../settingsRegistryTranslations.west-de-es';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.de,
@@ -23,6 +24,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...SR.de,
   ...EE.de,
   ...MMC.de,
+  ...S.de,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktiviere den Agentenmodus und versuche es erneut.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agentenmodus ist nicht aktiviert",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Anfrage nicht erfüllt; bitte überprüfen Sie die Details und versuchen Sie es erneut.",
@@ -5274,8 +5276,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Ereignislimit pro Tag",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent-Funktionen als deaktiviert bestätigen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Generierungsmethode für Aktienfragen",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Voreinstellung der Forschungshaltung",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Eigene Forschungshaltung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Primäres Agentenmodell",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Maximale Agentenschritte",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Agentenspeicher",

@@ -11,6 +11,7 @@ import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_WEST as PF } from '../portfolioFutuI
 import { SETTINGS_REGISTRY_TRANSLATIONS_WEST_FR_ID as SR } from '../settingsRegistryTranslations.west-fr-id';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.fr,
@@ -23,6 +24,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...SR.fr,
   ...EE.fr,
   ...MMC.fr,
+  ...S.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -5274,8 +5276,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Limite d’événements par jour",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Confirmer les fonctions Agent désactivées",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Méthode de génération des requêtes boursières",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Préréglage de posture de recherche",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Texte personnalisé de posture de recherche",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Modèle principal de l’agent",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Nombre maximal d’étapes de l’agent",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Mémoire de l’agent",

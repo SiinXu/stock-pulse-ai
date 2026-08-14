@@ -104,6 +104,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep-research tool token budget and timeout (seconds) for Agent analysis paths that enable deep research. |
 | `AGENT_DEEP_RESEARCH_TIMEOUT` | `180` | 是 | 模板中注释 |
+| `AGENT_DISAGREEMENT_HANDLING` | `false` | 是 | 模板中注释; Structured disagreement handling: record points, dual-layer cross-validation, and split-verdict escalation (conservat... |
+| `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释 |
+| `AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD` | `0.55` | 是 | 模板中注释 |
 | `AGENT_EPISODE_LOG_ENABLED` | `false` | 是 | 模板中注释; Agent evolution episode log (Issue #1090) |
 | `AGENT_EPISODE_MAX_ROWS` | `50000` | 是 | 模板中注释 |
 | `AGENT_EPISODE_RETENTION_DAYS` | `90` | 是 | 模板中注释 |
@@ -123,6 +126,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MAX_STAGE_ENTRIES` | `1` | 是 | 模板中注释; An ordinary stage name may enter at most once per Pipeline run; the bounded Critic retry uses its separate one-shot b... |
 | `AGENT_MAX_STEPS` | `10` | 是 | 模板中注释; Agent maximum inference step limit (default 10, each sub-agent runs according to its preset value; higher than the de... |
 | `AGENT_MEMORY_ENABLED` | `false` | 是 | 模板中注释; Memory and calibration system (tracks historical accuracy and automatically adjusts confidence) |
+| `AGENT_META_REVIEW_ENABLED` | `false` | 是 | 模板中注释 |
+| `AGENT_META_REVIEW_MIN_EPISODES` | `30` | 是 | 模板中注释 |
 | `AGENT_MODE` | `true` | 是 | 模板中注释; =================================== Agent strategy dialogue configuration (Web dialogue page) =======================... |
 | `AGENT_MODE_BUDGET_ENABLED` | `true` | 是 | 模板中注释; Hard per-mode budgets (LLM turns / tool calls / estimated USD cost / optional tokens) |
 | `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | 模板中注释 |
@@ -130,14 +135,6 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
 | `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
-| `MULTI_MODEL_CONSENSUS_ENABLED` | `false` | 是 | 模板中注释; 传统分析路径多模型共识对比（默认关闭；Issue #154） |
-| `MULTI_MODEL_CONSENSUS_MODELS` | 空 | 是 | 模板中注释; 可选的逗号分隔 LiteLLM 模型列表 |
-| `MULTI_MODEL_CONSENSUS_PRESET` | 空 | 是 | 模板中注释; 模型列表为空时可选 `fast` / `quality` |
-| `MULTI_MODEL_CONSENSUS_MAX_MODELS` | `3` | 是 | 模板中注释; 单次对比最大模型数（2–5） |
-| `MULTI_MODEL_CONSENSUS_MAX_COST_USD` | 空 | 是 | 模板中注释; 有限 USD 预算：空=仅 MAX_MODELS；0=关闭扇出；正值=硬限制最多 2 个模型（暂无实时计价）；拒绝 NaN/±Inf |
-| `AGENT_DISAGREEMENT_HANDLING` | `false` | 是 | 模板中注释; 结构化分歧记录/交叉校验/分裂裁决（默认关闭） |
-| `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释; 高分歧升级阈值 |
-| `AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD` | `0.55` | 是 | 模板中注释; 交叉校验触发阈值 |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
@@ -169,9 +166,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
-| `MARKET_REGIME_ENABLED` | `true` | 是 | 模板中注释; 启用可解释规则市场状态检测 |
-| `MARKET_REGIME_OVERRIDE` | 空 | 是 | 模板中注释; 可选强制市场状态标签 |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
+| `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; Multi-level reflection (#1094): immediate step critique / trajectory / meta-review |
 | `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释; Independent per-sub-agent timeout cap in seconds (0 disables it; a positive value such as 180 enables a hard cap for ... |
 | `AGENT_TOOL_TIMEOUT_S` | `120` | 是 | 模板中注释; Agent runtime guards (enabled by default; set an individual numeric value to 0 to disable that guard) Timeout for one... |
 | `AIHUBMIX_KEY` | `空` | 是 | 模板中注释; AIHubmix Aggregation(https://aihubmix.com/) A Key using GPT/Claude/Gemini/GLM/Qwen models, without requiring VPN access |
@@ -469,6 +465,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `LONGBRIDGE_TRADE_WS_URL` | `wss://openapi-trade.longbridge.com/v2` | 是 | 模板中注释 |
 | `MARKDOWN_TO_IMAGE_CHANNELS` | `telegram,wechat,custom,email,slack` | 是 | 模板中注释; [Markdown Convert to image](Issue #455) For channels that don't support Markdown, convert the report to an image for ... |
 | `MARKDOWN_TO_IMAGE_MAX_CHARS` | `15000` | 是 | 模板中注释; Do not convert if exceeding this length to avoid oversized images |
+| `MARKET_REGIME_ENABLED` | `true` | 是 | 模板中注释; Explainable market-regime detection (Issue #220) |
+| `MARKET_REGIME_OVERRIDE` | `空` | 是 | 模板中注释; Optional override: trending_up \| trending_down \| sideways \| volatile \| unknown |
 | `MARKET_REVIEW_COLOR_SCHEME` | `green_up` | 是 | 模板中注释; Market-review index gain/loss colors: green_up=green for gains and red for losses (default); red_up=red for gains and... |
 | `MARKET_REVIEW_ENABLED` | `true` | 是 | Enable market review (true/false) |
 | `MARKET_REVIEW_REGION` | `cn` | 是 | 模板中注释; Main Market Review Market Region: cn(A-shares), hk(Hong Kong stocks), us(U.S |
@@ -499,6 +497,11 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `MINIMAX_API_KEYS` | `your_minimax_key_here` | 是 | 模板中注释; MiniMax API Key(Coding Plan Web Search, Supports multiple, Comma-separated) Get: https://platform.minimax.io/ |
 | `MULTIMODAL_AGENT_TOOLS_ENABLED` | `false` | 是 | Optional multimodal PDF/chart/transcript Agent Tools (issue #253) |
 | `MULTIMODAL_FILE_ROOT` | `/absolute/path/to/multimodal-uploads` | 是 | 模板中注释 |
+| `MULTI_MODEL_CONSENSUS_ENABLED` | `false` | 是 | 模板中注释; Multi-model consensus comparison (default off; higher cost when enabled) — Issue #154 |
+| `MULTI_MODEL_CONSENSUS_MAX_COST_USD` | `空` | 是 | 模板中注释; finite only; NaN/±Inf are rejected |
+| `MULTI_MODEL_CONSENSUS_MAX_MODELS` | `3` | 是 | 模板中注释 |
+| `MULTI_MODEL_CONSENSUS_MODELS` | `deepseek/deepseek-chat,gemini/gemini-2.0-flash` | 是 | 模板中注释 |
+| `MULTI_MODEL_CONSENSUS_PRESET` | `fast` | 是 | 模板中注释; fast \| quality \| empty (primary+fallbacks) |
 | `NEWSNOW_BASE_URL` | `https://newsnow.busiyi.world` | 是 | 模板中注释; NewsNow HTTP API base address – external dependency configuration - Official project and deployment guide: https://gi... |
 | `NEWS_INTEL_AUTO_FETCH_ENABLED` | `false` | 是 | 模板中注释; When enabled, automatically initialize built-in news sources and pull them into use before reading local news pools i... |
 | `NEWS_INTEL_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; RSS/Atom feed source pull timeout (seconds) |
@@ -619,7 +622,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPRO_SEED` | `0` | 是 | 模板中注释 |
 | `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; Read-only research API for stratified conclusions (Issue #1143; default off) Authenticated GET /api/v1/research/concl... |
 | `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释 |
-| `RESEARCH_PACK_EXPORT_ENABLED` | `false` | 是 | 模板中注释; One-click research asset pack (report + decision card + evidence refs + redacted trace) |
+| `RESEARCH_PACK_EXPORT_ENABLED` | `false` | 是 | 模板中注释; GET /api/v1/history/{record_id}/research-pack returns a redacted ZIP (default off) |
 | `RESEARCH_PACK_MAX_ZIP_BYTES` | `25165824` | 是 | 模板中注释; clamped between 1 MiB and 64 MiB |
 | `RESEARCH_PRESENTATION_PROFILE` | `balanced` | 是 | 模板中注释; Research presentation profile (emphasis/order only; same evidence, full risk disclosure): conservative = risks first ... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
