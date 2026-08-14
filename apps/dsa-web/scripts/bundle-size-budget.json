@@ -27,16 +27,16 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 164741,
-      "measuredGzipBytes": 164341,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 164341 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 165464,
+      "measuredGzipBytes": 164764,
+      "note": "Remeasured overflowing locale gzip from CI web-gate after evidence-chain i18n (#1214); overflowing rule only, +700 headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 157714,
-      "measuredGzipBytes": 157314,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 157314 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 158517,
+      "measuredGzipBytes": 157817,
+      "note": "Remeasured overflowing locale gzip from CI web-gate after evidence-chain i18n (#1214); overflowing rule only, +700 headroom retained."
     },
     {
       "id": "locale-ko",
@@ -48,16 +48,16 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 157327,
-      "measuredGzipBytes": 156927,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 156927 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 158067,
+      "measuredGzipBytes": 157367,
+      "note": "Remeasured overflowing locale gzip from CI web-gate after evidence-chain i18n (#1214); overflowing rule only, +700 headroom retained."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 152948,
-      "measuredGzipBytes": 152548,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 152548 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 153737,
+      "measuredGzipBytes": 153037,
+      "note": "Remeasured overflowing locale gzip from CI web-gate after evidence-chain i18n (#1214); overflowing rule only, +700 headroom retained."
     },
     {
       "id": "locale-zh-TW",
@@ -69,9 +69,9 @@
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 142787,
-      "measuredGzipBytes": 142387,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 142387 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 143490,
+      "measuredGzipBytes": 142790,
+      "note": "Remeasured overflowing locale gzip from CI web-gate after evidence-chain i18n (#1214); overflowing rule only, +700 headroom retained."
     },
     {
       "id": "locale-id",
@@ -113,9 +113,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10861,
-      "measuredGzipBytes": 10461,
-      "note": "Combined production-build measurement after merge train 20260813-03 (#1149 #1240 #1157 #1227 #1218 #1236 #1265). Each member is individually within the previous budget; the icon set grows cumulatively because each adds a small number of distinct Lucide icons. Measured 10461 B with 400 B headroom, matching the IntelligenceSourcesPanel convention."
+      "maxGzipBytes": 11358,
+      "measuredGzipBytes": 10958,
+      "note": "Remeasured overflowing vendor-icons gzip from CI web-gate after evidence-chain i18n (#1214); overflowing rule only, +400 headroom retained."
     },
     {
       "id": "vendor-misc",
