@@ -1839,6 +1839,16 @@ class _ConfigLoadingMethods:
                 minimum=10_000,
                 maximum=2_000_000,
             ),
+            research_pack_export_enabled=parse_env_bool(
+                os.getenv('RESEARCH_PACK_EXPORT_ENABLED'), default=False
+            ),
+            research_pack_max_zip_bytes=parse_env_int(
+                os.getenv('RESEARCH_PACK_MAX_ZIP_BYTES'),
+                24 * 1024 * 1024,
+                field_name='RESEARCH_PACK_MAX_ZIP_BYTES',
+                minimum=1 * 1024 * 1024,
+                maximum=64 * 1024 * 1024,
+            ),
             security_audit_retention_days=parse_env_int(
                 os.getenv('SECURITY_AUDIT_RETENTION_DAYS'),
                 90,

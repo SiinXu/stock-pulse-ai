@@ -2884,6 +2884,56 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "warning_codes": [],
     },
 
+
+    "RESEARCH_PACK_EXPORT_ENABLED": {
+        "title": "Research Pack Export",
+        "description": (
+            "Master switch for one-click research asset package export (ZIP). "
+            "Default off. Packages always redact credentials and local paths."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 726,
+        "help_key": "settings.agent.research_pack_export",
+        "examples": ["RESEARCH_PACK_EXPORT_ENABLED=false", "RESEARCH_PACK_EXPORT_ENABLED=true"],
+        "docs": [
+            {"label": "Research pack export (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/research-pack-export_EN.md"},
+            {"label": "研报资产包导出（中文）", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/research-pack-export.md"},
+        ],
+        "warning_codes": [],
+    },
+    "RESEARCH_PACK_MAX_ZIP_BYTES": {
+        "title": "Research Pack Max ZIP Bytes",
+        "description": (
+            "Upper bound for a single research-pack ZIP response. "
+            "Default 25165824 (24 MiB); clamped to 1–64 MiB when loading config."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "25165824",
+        "options": [],
+        "validation": {"min": 1048576, "max": 67108864},
+        "display_order": 727,
+        "help_key": "settings.agent.research_pack_export",
+        "examples": ["RESEARCH_PACK_MAX_ZIP_BYTES=25165824", "RESEARCH_PACK_MAX_ZIP_BYTES=10485760"],
+        "docs": [
+            {"label": "Research pack export (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/research-pack-export_EN.md"},
+            {"label": "研报资产包导出（中文）", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/research-pack-export.md"},
+        ],
+        "warning_codes": [],
+    },
+
     "AGENT_TOOL_TIMEOUT_S": {
         "title": "Agent Tool Timeout",
         "description": (
