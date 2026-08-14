@@ -26,12 +26,15 @@ from src.agent.agents.base_agent import BaseAgent
 from src.agent.protocols import (
     AgentContext,
     AgentOpinion,
+    AgentRunStats,
     StageFailureReason,
     StageResult,
     StageStatus,
     normalize_decision_signal,
 )
 from src.agent.public_contract import AGENT_EXECUTION_FAILURE_MESSAGE, sanitize_agent_diagnostic
+from src.agent.runtime_facts import DegradationBoundary
+from src.agent.stream_events import stream_event
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -314,6 +317,141 @@ def record_debate_budget_skip(
     record = empty_debate_record(status=STATUS_SKIPPED, settings=resolved, reason=reason)
     ctx.meta[DEBATE_META_KEY] = record
     return record
+
+
+def reserve_optional_stage_timeout(
+    stage_name: str,
+    timeout_s: Optional[float],
+    elapsed_s: float,
+    is_critic_stage: bool,
+    reserve_s: float,
+    margin_s: float,
+) -> Optional[float]:
+    """Reserve Decision wall-clock budget for critic or debate stages."""
+    remaining = max(0.0, timeout_s - elapsed_s) if timeout_s else None
+    if remaining is None:
+        return None
+    if is_critic_stage or is_debate_stage(stage_name):
+        return max(0.0, remaining - reserve_s - margin_s)
+    return remaining
+
+
+def maybe_insert_before_decision(
+    pipeline: Any,
+    agents: list,
+    index: int,
+    ctx: AgentContext,
+    stats: AgentRunStats,
+    timeout_s: Optional[float],
+    remaining_budget: Optional[float],
+    required_budget_s: float,
+    progress_callback: Optional[Callable],
+) -> bool:
+    """Insert or skip debate before Decision. True means the caller should ``continue``."""
+    agent = agents[index]
+    if (
+        agent.agent_name != "decision"
+        or ctx.meta.get("_debate_inserted")
+        or not is_debate_enabled(pipeline.config, ctx)
+    ):
+        return False
+    ctx.meta["_debate_inserted"] = True
+    debate_settings = resolve_debate_settings(pipeline.config, ctx)
+    ctx.meta["_debate_settings"] = debate_settings
+    has_budget = (
+        not timeout_s
+        or remaining_budget is None
+        or remaining_budget >= required_budget_s
+    )
+    if not has_budget:
+        apply_pipeline_budget_skip(
+            pipeline,
+            ctx,
+            stats,
+            settings=debate_settings,
+            progress_callback=progress_callback,
+        )
+        return False
+    debate_agent = pipeline._prepare_agent(
+        BoundedBullBearDebateAgent(
+            tool_registry=pipeline._tool_registry_for_context(ctx),
+            llm_adapter=pipeline.llm_adapter,
+            skill_instructions=pipeline.skill_instructions,
+            technical_skill_policy=pipeline.technical_skill_policy,
+            debate_config=pipeline.config,
+        )
+    )
+    agents.insert(index, debate_agent)
+    return True
+
+
+def apply_pipeline_budget_skip(
+    pipeline: Any,
+    ctx: AgentContext,
+    stats: AgentRunStats,
+    *,
+    settings: Optional[Mapping[str, Any]] = None,
+    progress_callback: Optional[Callable] = None,
+) -> None:
+    """Fail soft on debate without spending Decision's reserved wall-clock budget."""
+    record = record_debate_budget_skip(
+        ctx,
+        settings=settings,
+        reason="insufficient wall-clock budget for debate stage",
+    )
+    public = public_debate_payload(record) or {}
+    result = StageResult(
+        stage_name=DEBATE_STAGE_NAME,
+        status=StageStatus.FAILED,
+        failure_reason=StageFailureReason.BUDGET_SKIP,
+        meta={"bull_bear_debate": public},
+    )
+    stats.record_stage(result)
+    pipeline._record_degraded_stage(
+        ctx,
+        DEBATE_STAGE_NAME,
+        result,
+        boundary=DegradationBoundary.BEFORE_STAGE,
+    )
+    if progress_callback:
+        progress_callback(stream_event(
+            "debate_budget_skipped",
+            stage=DEBATE_STAGE_NAME,
+            status=public.get("status"),
+            rounds_completed=public.get("rounds_completed"),
+        ))
+
+
+def commit_pipeline_stage_result(
+    ctx: AgentContext,
+    result: StageResult,
+    stage_name: str,
+) -> None:
+    """Persist debate evidence onto the stage result and shared context."""
+    if not is_debate_stage(stage_name):
+        return
+    debate_record = get_debate_record(ctx)
+    staged_record = result.meta.get("bull_bear_debate")
+    if debate_record is None and isinstance(staged_record, dict):
+        debate_record = dict(staged_record)
+        ctx.meta[DEBATE_META_KEY] = debate_record
+    if debate_record is None:
+        debate_record = empty_debate_record(
+            status=(
+                STATUS_DATA_UNAVAILABLE
+                if result.status == StageStatus.FAILED
+                else STATUS_DEGRADED
+            ),
+            settings=ctx.meta.get("_debate_settings") or {
+                "max_rounds": 2,
+                "temperature": 0.4,
+                "model": "",
+                "source": "config",
+            },
+            reason=result.error or "debate_record_missing",
+        )
+        ctx.meta[DEBATE_META_KEY] = debate_record
+    result.meta["bull_bear_debate"] = public_debate_payload(debate_record)
 
 
 def build_contention_point(
@@ -1187,9 +1325,11 @@ __all__ = [
     "REQUEST_DEBATE_MAX_ROUNDS", "REQUEST_ENABLE_DEBATE",
     "RESOLUTION_PARTIAL", "RESOLUTION_RESOLVED", "RESOLUTION_UNRESOLVED",
     "STATUS_BUDGET_EXHAUSTED", "STATUS_COMPLETED", "STATUS_DATA_UNAVAILABLE", "STATUS_DEGRADED", "STATUS_FAILED", "STATUS_SKIPPED",
-    "apply_debate_to_dashboard", "build_contention_point", "decision_signal_debate_metadata",
+    "apply_debate_to_dashboard", "apply_pipeline_budget_skip", "build_contention_point",
+    "commit_pipeline_stage_result", "decision_signal_debate_metadata",
     "empty_debate_record", "extract_contention_points", "get_debate_record",
-    "is_debate_enabled", "is_debate_stage", "parse_stance_output", "parse_synthesis_output",
-    "public_debate_payload", "record_debate_budget_skip", "resolve_debate_settings",
-    "synthesize_debate_deterministic",
+    "is_debate_enabled", "is_debate_stage", "maybe_insert_before_decision",
+    "parse_stance_output", "parse_synthesis_output",
+    "public_debate_payload", "record_debate_budget_skip", "reserve_optional_stage_timeout",
+    "resolve_debate_settings", "synthesize_debate_deterministic",
 ]

@@ -808,3 +808,61 @@ def test_analysis_service_applies_debate_request_overrides(monkeypatch):
     assert cfg is not shared
     assert cfg.debate_enabled is True
     assert cfg.debate_max_rounds == 3
+
+
+def test_append_bull_bear_debate_lines_renders_enabled_payload() -> None:
+    from src.report_language import append_bull_bear_debate_lines
+
+    lines: List[str] = []
+    append_bull_bear_debate_lines(
+        lines,
+        {
+            "bull_bear_debate": {
+                "enabled": True,
+                "status": "completed",
+                "rounds_completed": 2,
+                "synthesis": {"summary": "Bull holds the edge"},
+                "contention_points": [{"source": "debate", "topic": "valuation"}],
+            }
+        },
+        {},
+    )
+    assert any("Bull-Bear Debate" in line for line in lines)
+    assert any("completed" in line and "2" in line for line in lines)
+    assert any("Bull holds the edge" in line for line in lines)
+    assert any("[debate] valuation" in line for line in lines)
+
+    skipped: List[str] = []
+    append_bull_bear_debate_lines(skipped, {"bull_bear_debate": {"enabled": False}}, {})
+    assert skipped == []
+
+
+def test_commit_pipeline_stage_result_persists_missing_record() -> None:
+    from src.agent.bull_bear_debate import commit_pipeline_stage_result
+
+    ctx = AgentContext(stock_code="600519")
+    result = StageResult(
+        stage_name=DEBATE_STAGE_NAME,
+        status=StageStatus.FAILED,
+        error="provider_down",
+    )
+    commit_pipeline_stage_result(ctx, result, DEBATE_STAGE_NAME)
+    payload = result.meta.get("bull_bear_debate")
+    assert isinstance(payload, dict)
+    assert payload.get("status") == STATUS_DATA_UNAVAILABLE
+    assert ctx.meta.get("bull_bear_debate") is not None
+
+
+def test_reserve_optional_stage_timeout_protects_decision_budget() -> None:
+    from src.agent.bull_bear_debate import reserve_optional_stage_timeout
+
+    remaining = reserve_optional_stage_timeout(
+        DEBATE_STAGE_NAME, timeout_s=20.0, elapsed_s=5.0, is_critic_stage=False,
+        reserve_s=8.0, margin_s=1.0,
+    )
+    assert remaining == 6.0
+    untouched = reserve_optional_stage_timeout(
+        "decision", timeout_s=20.0, elapsed_s=5.0, is_critic_stage=False,
+        reserve_s=8.0, margin_s=1.0,
+    )
+    assert untouched == 15.0

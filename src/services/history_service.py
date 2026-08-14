@@ -19,6 +19,7 @@ from src.config import resolve_news_window_days
 from src.data.stock_index_loader import resolve_index_stock_code
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
+    append_bull_bear_debate_lines,
     append_committee_deliberation_lines,
     format_strategy_skill_items,
     get_bias_status_emoji,
@@ -1436,31 +1437,9 @@ class HistoryService:
                 report_lines.append(f"- {invalid_text}")
             report_lines.append("")
 
-        debate_payload = dashboard.get('bull_bear_debate') if dashboard else None
-        if isinstance(debate_payload, dict) and debate_payload.get('enabled'):
-            synthesis = debate_payload.get('synthesis') if isinstance(debate_payload.get('synthesis'), dict) else {}
-            report_lines.append(f"### ⚔️ {labels.get('bull_bear_debate_heading', 'Bull-Bear Debate')}")
-            report_lines.append(
-                f"- {labels.get('bull_bear_status_label', 'Status')}: {debate_payload.get('status')} | "
-                f"{labels.get('bull_bear_rounds_label', 'Rounds')}: {debate_payload.get('rounds_completed')}"
-            )
-            if synthesis.get('summary'):
-                report_lines.append(f"- {synthesis.get('summary')}")
-            for point in (debate_payload.get('contention_points') or [])[:3]:
-                if isinstance(point, dict):
-                    report_lines.append(f"- [{point.get('source', 'debate')}] {point.get('topic') or point.get('kind')}")
-            report_lines.append("")
-
-        # ========== Investment Committee (real deliberation trace) ==========
-        committee = (
-            dashboard.get("committee_deliberation") if dashboard else None
-        )
-        append_committee_deliberation_lines(
-            report_lines,
-            committee,
-            labels,
-            report_language,
-        )
+        append_bull_bear_debate_lines(report_lines, dashboard, labels)
+        committee = dashboard.get("committee_deliberation") if dashboard else None
+        append_committee_deliberation_lines(report_lines, committee, labels, report_language)
 
         # ========== If no dashboard, display traditional format ==========
         if not dashboard:

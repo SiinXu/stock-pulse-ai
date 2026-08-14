@@ -1482,6 +1482,29 @@ def append_committee_deliberation_lines(
             lines.append("")
 
 
+def append_bull_bear_debate_lines(
+    lines: List[str],
+    dashboard: Any,
+    labels: Dict[str, str],
+) -> None:
+    """Append a Bull-Bear debate block from dashboard payload. No-op when disabled."""
+    payload = dashboard.get("bull_bear_debate") if dashboard else None
+    if not isinstance(payload, dict) or not payload.get("enabled"):
+        return
+    synthesis = payload.get("synthesis") if isinstance(payload.get("synthesis"), dict) else {}
+    lines.append(f"### ⚔️ {labels.get('bull_bear_debate_heading', 'Bull-Bear Debate')}")
+    lines.append(
+        f"- {labels.get('bull_bear_status_label', 'Status')}: {payload.get('status')} | "
+        f"{labels.get('bull_bear_rounds_label', 'Rounds')}: {payload.get('rounds_completed')}"
+    )
+    if synthesis.get("summary"):
+        lines.append(f"- {synthesis.get('summary')}")
+    for point in (payload.get("contention_points") or [])[:3]:
+        if isinstance(point, dict):
+            lines.append(f"- [{point.get('source', 'debate')}] {point.get('topic') or point.get('kind')}")
+    lines.append("")
+
+
 def localize_chip_health(value: Any, language: Optional[str]) -> str:
     """Translate chip health labels between Chinese and English when recognized."""
     return _translate_from_map(

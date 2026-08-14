@@ -97,7 +97,6 @@ class _PipelineMethods:
         agents = self._build_agent_chain(ctx)
         specialist_agents_inserted = False
         critic_inserted = False
-        debate_inserted = False
         stage_entry_counts: Dict[str, int] = {}
         index = 0
 
@@ -388,38 +387,9 @@ class _PipelineMethods:
                     agents.insert(index, critic_agent)
                     continue
 
-            if (
-                agent.agent_name == "decision"
-                and not debate_inserted
-                and _debate.is_debate_enabled(self.config, ctx)
-            ):
-                debate_inserted = True
-                debate_settings = _debate.resolve_debate_settings(self.config, ctx)
-                ctx.meta["_debate_settings"] = debate_settings
-                debate_has_budget = (
-                    not timeout_s
-                    or remaining_budget is None
-                    or remaining_budget >= _OPTIONAL_STAGE_REQUIRED_S
-                )
-                if not debate_has_budget:
-                    self._record_debate_budget_skip(
-                        ctx,
-                        stats,
-                        settings=debate_settings,
-                        progress_callback=progress_callback,
-                    )
-                else:
-                    debate_agent = self._prepare_agent(
-                        _debate.BoundedBullBearDebateAgent(
-                            tool_registry=self._tool_registry_for_context(ctx),
-                            llm_adapter=self.llm_adapter,
-                            skill_instructions=self.skill_instructions,
-                            technical_skill_policy=self.technical_skill_policy,
-                            debate_config=self.config,
-                        )
-                    )
-                    agents.insert(index, debate_agent)
-                    continue
+            if _debate.maybe_insert_before_decision(
+                self, agents, index, ctx, stats, timeout_s, remaining_budget, _OPTIONAL_STAGE_REQUIRED_S, progress_callback):
+                continue
 
             stage_name = str(agent.agent_name or "")
             observed_entries = stage_entry_counts.get(stage_name, 0) + 1
@@ -475,24 +445,7 @@ class _PipelineMethods:
                     message=f"Starting {agent.agent_name} analysis...",
                 ))
 
-            remaining_timeout_s = (
-                max(0.0, timeout_s - elapsed_s)
-                if timeout_s
-                else None
-            )
-            if (
-                (
-                    _critic.is_critic_stage(stage_name)
-                    or _debate.is_debate_stage(stage_name)
-                )
-                and remaining_timeout_s is not None
-            ):
-                remaining_timeout_s = max(
-                    0.0,
-                    remaining_timeout_s
-                    - _DECISION_BUDGET_RESERVE_S
-                    - _OPTIONAL_STAGE_MARGIN_S,
-                )
+            remaining_timeout_s = _debate.reserve_optional_stage_timeout(stage_name, timeout_s, elapsed_s, _critic.is_critic_stage(stage_name), _DECISION_BUDGET_RESERVE_S, _OPTIONAL_STAGE_MARGIN_S)
             effective_stage_timeout_s = self._resolve_stage_timeout_seconds(
                 stage_name,
                 remaining_timeout_s,
@@ -597,29 +550,7 @@ class _PipelineMethods:
                     if critic_trace is None:
                         critic_trace = _critic.record_critic_stage_failure(ctx)
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
-            if _debate.is_debate_stage(stage_name):
-                debate_record = _debate.get_debate_record(ctx)
-                staged_record = result.meta.get("bull_bear_debate")
-                if debate_record is None and isinstance(staged_record, dict):
-                    debate_record = dict(staged_record)
-                    ctx.meta[_debate.DEBATE_META_KEY] = debate_record
-                if debate_record is None:
-                    debate_record = _debate.empty_debate_record(
-                        status=(
-                            _debate.STATUS_DATA_UNAVAILABLE
-                            if result.status == StageStatus.FAILED
-                            else _debate.STATUS_DEGRADED
-                        ),
-                        settings=ctx.meta.get("_debate_settings") or {
-                            "max_rounds": 2,
-                            "temperature": 0.4,
-                            "model": "",
-                            "source": "config",
-                        },
-                        reason=result.error or "debate_record_missing",
-                    )
-                    ctx.meta[_debate.DEBATE_META_KEY] = debate_record
-                result.meta["bull_bear_debate"] = _debate.public_debate_payload(debate_record)
+            _debate.commit_pipeline_stage_result(ctx, result, stage_name)
             stats.record_stage(result)
             all_tool_calls.extend(
                 tc for tc in (result.meta.get("tool_calls_log") or [])
@@ -1559,40 +1490,11 @@ class _PipelineMethods:
             ))
 
     def _record_debate_budget_skip(
-        self,
-        ctx: AgentContext,
-        stats: AgentRunStats,
-        *,
-        settings: Optional[Dict[str, Any]] = None,
-        progress_callback: Optional[Callable],
+        self, ctx: AgentContext, stats: AgentRunStats, *,
+        settings: Optional[Dict[str, Any]] = None, progress_callback: Optional[Callable],
     ) -> None:
         """Fail soft on debate without spending Decision's reserved wall-clock budget."""
-        record = _debate.record_debate_budget_skip(
-            ctx,
-            settings=settings,
-            reason="insufficient wall-clock budget for debate stage",
-        )
-        public = _debate.public_debate_payload(record) or {}
-        result = StageResult(
-            stage_name=_debate.DEBATE_STAGE_NAME,
-            status=StageStatus.FAILED,
-            failure_reason=StageFailureReason.BUDGET_SKIP,
-            meta={"bull_bear_debate": public},
-        )
-        stats.record_stage(result)
-        self._record_degraded_stage(
-            ctx,
-            _debate.DEBATE_STAGE_NAME,
-            result,
-            boundary=DegradationBoundary.BEFORE_STAGE,
-        )
-        if progress_callback:
-            progress_callback(stream_event(
-                "debate_budget_skipped",
-                stage=_debate.DEBATE_STAGE_NAME,
-                status=public.get("status"),
-                rounds_completed=public.get("rounds_completed"),
-            ))
+        _debate.apply_pipeline_budget_skip(self, ctx, stats, settings=settings, progress_callback=progress_callback)
 
     def _record_degraded_stage(
         self,
