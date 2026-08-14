@@ -160,7 +160,7 @@
       "reviewer": "issue-882-worker@stock-pulse-ai",
       "reviewedAt": "2026-08-12",
       "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
-      "summary": "High-risk keys annotated after merging evidence-chain/audit-export and research-pack error pairs. Eight evidence-chain/audit-export title/message pairs and six research-pack title/message pairs were added as product-source retain entries. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "summary": "High-risk keys annotated after merging evidence-chain/audit-export and research-pack error pairs. Eight evidence-chain/audit-export title/message pairs and six research-pack title/message pairs were added as product-source retain entries. The evidence-chain/audit-export pairs use concise settings and authentication guidance while preserving distinct stable codes and refusal semantics. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
       "claimsNativeApproval": false,
       "keyCount": 367,
       "categoryConclusions": [
@@ -187,7 +187,7 @@
         {
           "category": "error",
           "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
-          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Product source retained for the four evidence-chain/audit-export codes (evidence_chain_disabled, evidence_chain_auth_required, audit_export_disabled, audit_export_auth_required) and the three research-pack codes (research_pack_export_disabled, research_pack_auth_required, research_pack_limit_exceeded). The research-pack pairs explain disabled authentication, a disabled export gate, and the configured size limit without implying success or silently bypassing refusal. Locale naturalness remains PENDING_NATIVE_REVIEW."
+          "notes": "Stable error title/message pairs keep internal codes separate from display copy. The four evidence-chain/audit-export codes (evidence_chain_disabled, evidence_chain_auth_required, audit_export_disabled, audit_export_auth_required) use concise settings or authentication guidance without collapsing disabled and authentication-required failures. The three research-pack codes (research_pack_export_disabled, research_pack_auth_required, research_pack_limit_exceeded) explain disabled authentication, a disabled export gate, and the configured size limit without implying success or silently bypassing refusal. Locale naturalness remains PENDING_NATIVE_REVIEW."
         },
         {
           "category": "disclaimer",
@@ -577,16 +577,16 @@
         "keyCount": 158,
         "keySetSha256": "5bb65e37186143e62cc1edbc17c45fc3cf7d68eeb6929ed84d187cc3a1d4c70e",
         "bundleSha256": {
-          "zh": "250571092a227719a8b8f97b8909f9ecaeae8bbbb9e48b87e561d035686b6e98",
-          "zh-TW": "31b9c7e78635148cf93ec5bf9763d6c2cc67ee8b10771f0ff9a45669ff646a61",
-          "en": "eade447630a8cec800e8a1bcb5234b87a72a2472b0e0d72d680d7da3b25065b6",
-          "ja": "51a76ef78637e2b16c090f6e6c1a1fe723cc7c20a26bbb87bbe570a84433f00d",
-          "ko": "7d2d710e8a1347fe45dc283a30332a161c3911547e6b80f6558bef740b881e4e",
-          "de": "896f1f235ceb8ccd6c5477f3f22c4da87fb3d7681e17566b1182cc7324f61a63",
-          "es": "90320e6f0a6fb5bd583518e0bb985c74e1d0b6c16139b1bfe57cbac3fa0f8243",
-          "ms": "7911f0c39d972b3667164874892af6de1549ac949ba395c7454b5a5c5fc1f44d",
-          "fr": "41c74214e9356ebbafa0f5e842f5095677ecb695a460c616756eccada7798f80",
-          "id": "98077fad0a84d5b10155f92c41d3934552742120e3dc62f60ef506e0e9f9484b"
+          "zh": "62e3ef53eb4c74d1d5368a554a1b60948408e61a50b29ea5c4a9b7492cf4c287",
+          "zh-TW": "dc0b4e56695183c0a48938c22d227bb1139891c116b2cd6a33343cf5690735f5",
+          "en": "24aa604cce5ac4a8ceb7d60f58a7385bc5d64efe9ab74e115f2aed8e640d07f7",
+          "ja": "7fe064c29632c91de2b271d43e64ad26556eab69ec20030872091e4aea421ca4",
+          "ko": "fd5a13697f2baa926d457c0afe763e92ef8ad35e5b00d5128e7f5695bf866690",
+          "de": "a7d3c25e5a302e10f8ac11f981892ff7c62f9f904ce03eb497d759d804553e15",
+          "es": "fa9b8891e2f550c7091ea9b0d1d23431db2a70970a6ac0a6f2c7c49413b7bcd7",
+          "ms": "66f6aee57abc452bbf5db2ccc49b1ea81abb6ad332a3f621747f439d4ac143e1",
+          "fr": "21fc3d78f8eb6019b1432716a665e4c592d58e677aba05ab9d70a243b5084675",
+          "id": "c40998f9e991998f7552296475d8c3a9e2b43c02714793f3f3f9982ca39648e7"
         }
       }
     },

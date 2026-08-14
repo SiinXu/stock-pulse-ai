@@ -32,7 +32,8 @@ def test_backend_gate_pr_is_selective() -> None:
     assert job["needs"] == ["changes", "ai-governance"]
     assert job["if"] == (
         "github.event_name == 'pull_request' && "
-        "needs.changes.outputs.backend == 'true'"
+        "needs.changes.outputs.backend == 'true' && "
+        "needs.changes.outputs.backend_full != 'true'"
     )
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert sum("offline-tests-selective" in command for command in runs) == 1
@@ -41,13 +42,34 @@ def test_backend_gate_pr_is_selective() -> None:
     )
 
 
-def test_backend_tests_are_sharded_on_push_to_main() -> None:
+def test_changes_job_plans_full_pr_suite_before_scheduling_backend_jobs() -> None:
+    workflow = _workflow()
+    job = workflow["jobs"]["changes"]
+
+    assert "backend_full" in job["outputs"]
+    checkout = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/checkout@")
+    )
+    assert checkout["with"]["fetch-depth"] == 0
+    planner = next(
+        step for step in job["steps"] if step.get("id") == "backend-selection"
+    )
+    assert "ci_select_tests.py" in planner["run"]
+    assert 'echo "full=true" >> "${GITHUB_OUTPUT}"' in planner["run"]
+
+
+def test_backend_tests_are_sharded_for_full_prs_and_push_to_main() -> None:
     workflow = _workflow()
     job = workflow["jobs"]["backend-tests"]
 
     assert job["needs"] == ["changes", "ai-governance"]
     assert job["if"] == (
-        "github.event_name == 'push' && needs.changes.outputs.backend == 'true'"
+        "needs.changes.outputs.backend == 'true' && "
+        "(github.event_name == 'push' || "
+        "(github.event_name == 'pull_request' && "
+        "needs.changes.outputs.backend_full == 'true'))"
     )
     assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
@@ -61,15 +83,17 @@ def test_backend_tests_are_sharded_on_push_to_main() -> None:
     assert upload["with"]["if-no-files-found"] == "error"
 
 
-def test_backend_gate_main_combines_coverage_after_all_shards() -> None:
+def test_backend_gate_summary_combines_coverage_after_all_shards() -> None:
     workflow = _workflow()
     job = workflow["jobs"]["backend-gate-main"]
 
     assert job["name"] == "backend-gate"
     assert job["needs"] == ["changes", "ai-governance", "backend-tests"]
     assert job["if"] == (
-        "always() && github.event_name == 'push' && "
-        "needs.changes.outputs.backend == 'true'"
+        "always() && needs.changes.outputs.backend == 'true' && "
+        "(github.event_name == 'push' || "
+        "(github.event_name == 'pull_request' && "
+        "needs.changes.outputs.backend_full == 'true'))"
     )
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert sum("offline-tests-combine" in command for command in runs) == 1

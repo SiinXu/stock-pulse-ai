@@ -92,6 +92,13 @@ const getVendorPackageName = (id: string): string | undefined => {
 }
 
 const getVendorChunkName = (id: string): string | undefined => {
+  const normalizedId = id.replace(/\\/g, '/')
+  if (
+    normalizedId.endsWith('/src/i18n/evidenceExportErrorTranslations.ts')
+    || normalizedId.endsWith('/src/api/error/evidenceExportErrors.ts')
+  ) {
+    return 'ex'
+  }
   const packageName = getVendorPackageName(id)
   if (!packageName) {
     return undefined

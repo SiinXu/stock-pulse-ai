@@ -53,9 +53,24 @@ class StrategyResult:
 class StrategyEngine:
     """Centralize the skill-opinion evidence chain into one facade."""
 
-    def __init__(self, aggregator: Optional[SkillAggregator] = None, *, deliberation_enabled: bool = False) -> None:
+    def __init__(
+        self,
+        aggregator: Optional[SkillAggregator] = None,
+        *,
+        deliberation_enabled: bool = False,
+        disagreement_handling_enabled: bool = False,
+        disagreement_high_confidence_threshold: float = 0.7,
+        disagreement_medium_confidence_threshold: float = 0.55,
+    ) -> None:
         self.aggregator = aggregator or SkillAggregator()
         self.deliberation_enabled = bool(deliberation_enabled)
+        self.disagreement_handling_enabled = bool(disagreement_handling_enabled)
+        self.disagreement_high_confidence_threshold = float(
+            disagreement_high_confidence_threshold
+        )
+        self.disagreement_medium_confidence_threshold = float(
+            disagreement_medium_confidence_threshold
+        )
 
     def partition_only(self, opinions: List[AgentOpinion]) -> EvidencePartition:
         valid_skill_opinions: List[AgentOpinion] = []
@@ -186,6 +201,23 @@ class StrategyEngine:
             insufficient_evidence=aggregation.insufficient_evidence,
             invalid_count=partition.invalid_count,
         )
+        if self.disagreement_handling_enabled:
+            from src.agent.disagreement_handling import (
+                apply_disagreement_handling_to_synthesis,
+            )
+
+            synthesis = apply_disagreement_handling_to_synthesis(
+                synthesis,
+                high_confidence_threshold=self.disagreement_high_confidence_threshold,
+                medium_confidence_threshold=self.disagreement_medium_confidence_threshold,
+            )
+            handling = synthesis.get("disagreement_handling") if isinstance(synthesis, dict) else None
+            if (
+                isinstance(handling, dict)
+                and handling.get("verdict_mode") == "split"
+                and synthesis.get("final_signal")
+            ):
+                aggregation.final_signal = str(synthesis["final_signal"])
         consensus_opinion = self.aggregator.build_consensus_opinion(aggregation, synthesis)
         return StrategyResult(
             status=StrategyResultStatus.CONSENSUS,

@@ -473,6 +473,8 @@ class _TaskQueueApiMethods:
         skills: Optional[List[str]],
         report_language: Optional[str],
         use_memory: Optional[bool] = None,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         strict_skill_selection: bool = False,
     ) -> TaskCommand:
@@ -491,6 +493,8 @@ class _TaskQueueApiMethods:
             "strict_skill_selection": bool(strict_skill_selection),
             "report_language": report_language,
             "use_memory": use_memory,
+            "enable_debate": enable_debate,
+            "debate_max_rounds": debate_max_rounds,
             "context_bound": request_context is not None,
             "message": "任务已加入队列",
             "message_code": "task.queued",
@@ -513,6 +517,8 @@ class _TaskQueueApiMethods:
                 strict_skill_selection=strict_skill_selection,
                 report_language=report_language,
                 use_memory=use_memory,
+                enable_debate=enable_debate,
+                debate_max_rounds=debate_max_rounds,
                 request_context=request_context,
             )
 
@@ -548,6 +554,8 @@ class _TaskQueueApiMethods:
         use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         strict_skill_selection: bool = False,
     ) -> TaskInfo:
         """
@@ -588,6 +596,8 @@ class _TaskQueueApiMethods:
             strict_skill_selection=strict_skill_selection,
             report_language=report_language,
             use_memory=use_memory,
+            enable_debate=enable_debate,
+            debate_max_rounds=debate_max_rounds,
             request_context=request_context,
         )
         if duplicates:
@@ -611,6 +621,8 @@ class _TaskQueueApiMethods:
         use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         strict_skill_selection: bool = False,
     ) -> Tuple[List[TaskInfo], List[DuplicateTaskError]]:
         """
@@ -648,6 +660,8 @@ class _TaskQueueApiMethods:
                 strict_skill_selection=strict_skill_selection,
                 report_language=report_language,
                 use_memory=use_memory,
+                enable_debate=enable_debate,
+                debate_max_rounds=debate_max_rounds,
                 request_context=request_context,
             )
             for stock_code in canonical_codes

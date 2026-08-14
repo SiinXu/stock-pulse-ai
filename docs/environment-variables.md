@@ -101,6 +101,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
+| `DEBATE_ENABLED` | `false` | 是 | 模板中注释; Optional structured Bull-Bear debate stage before Decision (default false, Issue #117) |
+| `DEBATE_MAX_ROUNDS` | `2` | 是 | 模板中注释; Debate rounds 1-3 |
+| `DEBATE_TEMPERATURE` | `0.4` | 是 | 模板中注释; Debate LLM temperature |
+| `DEBATE_MODEL` | empty | 是 | 模板中注释; Optional debate model name |
 | `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内反思循环（类型化教训；默认 false） |
 | `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限 |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释; 反思后运行内修订次数上限 |
@@ -133,6 +137,9 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
 | `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
+| `AGENT_DISAGREEMENT_HANDLING` | `false` | 是 | 模板中注释; 结构化分歧记录/交叉校验/分裂裁决（默认关闭） |
+| `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释; 高分歧升级阈值 |
+| `AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD` | `0.55` | 是 | 模板中注释; 交叉校验触发阈值 |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
@@ -158,6 +165,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
+| `MARKET_REGIME_ENABLED` | `true` | 是 | 模板中注释; 启用可解释规则市场状态检测 |
+| `MARKET_REGIME_OVERRIDE` | 空 | 是 | 模板中注释; 可选强制市场状态标签 |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
 | `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释; Independent per-sub-agent timeout cap in seconds (0 disables it; a positive value such as 180 enables a hard cap for ... |
 | `AGENT_TOOL_TIMEOUT_S` | `120` | 是 | 模板中注释; Agent runtime guards (enabled by default; set an individual numeric value to 0 to disable that guard) Timeout for one... |

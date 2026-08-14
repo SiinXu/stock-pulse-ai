@@ -196,9 +196,13 @@ def _portfolio_service() -> PortfolioService:
 def isolated_db(tmp_path):
     old_database_path = os.environ.get("DATABASE_PATH")
     old_initial_cash = os.environ.get("PAPER_PORTFOLIO_INITIAL_CASH")
+    old_concentration_alert = os.environ.get(
+        "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT"
+    )
     db_path = tmp_path / "paper_dq.db"
     os.environ["DATABASE_PATH"] = str(db_path)
     os.environ["PAPER_PORTFOLIO_INITIAL_CASH"] = str(_INITIAL_CASH)
+    os.environ["PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT"] = "35.0"
     Config.reset_instance()
     DatabaseManager.reset_instance()
     db = DatabaseManager.get_instance()
@@ -210,6 +214,10 @@ def isolated_db(tmp_path):
         for key, value in (
             ("DATABASE_PATH", old_database_path),
             ("PAPER_PORTFOLIO_INITIAL_CASH", old_initial_cash),
+            (
+                "PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT",
+                old_concentration_alert,
+            ),
         ):
             if value is None:
                 os.environ.pop(key, None)

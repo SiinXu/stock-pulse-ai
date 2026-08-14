@@ -19,8 +19,8 @@ from src.config import resolve_news_window_days
 from src.data.stock_index_loader import resolve_index_stock_code
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
+    append_bull_bear_debate_lines,
     append_committee_deliberation_lines,
-    format_strategy_skill_items,
     get_bias_status_emoji,
     get_localized_stock_name,
     get_report_labels,
@@ -29,17 +29,12 @@ from src.report_language import (
     is_chip_structure_unavailable,
     localize_bias_status,
     localize_chip_health,
-    localize_conflict_severity,
-    localize_consensus_level,
-    localize_strategy_signal,
-    localize_strategy_synthesis_summary,
     localize_trend_prediction,
     normalize_report_language,
-    normalize_strategy_synthesis_payload,
-    strategy_invalid_opinion_count,
 )
 from src.storage import DatabaseManager
 from src.services.run_diagnostics import build_run_diagnostic_summary
+from src.services.history_report_sections import append_strategy_synthesis_lines
 from src.market.phase_summary import (
     extract_market_phase_summary,
     rebuild_market_phase_summary_for_stock_code,
@@ -1392,60 +1387,16 @@ class HistoryService:
             report_lines.append("")
 
         # ========== Strategy synthesis ==========
-        strategy_synthesis = normalize_strategy_synthesis_payload(
-            dashboard.get('strategy_synthesis') if dashboard else None
-        )
-        if strategy_synthesis:
-            confidence = strategy_synthesis.get('confidence')
-            confidence_text = f"{confidence:.0%}" if isinstance(confidence, (int, float)) else "N/A"
-            report_lines.extend([
-                f"### 🧩 {labels.get('strategy_synthesis_heading', '多策略综合')}",
-                "",
-                (
-                    f"- {labels.get('strategy_final_signal_label', '综合信号')}: "
-                    f"{localize_strategy_signal(strategy_synthesis.get('final_signal', 'N/A'), report_language)} | "
-                    f"{labels.get('strategy_consensus_level_label', '共识度')}: "
-                    f"{localize_consensus_level(strategy_synthesis.get('consensus_level', 'N/A'), report_language)} | "
-                    f"{labels.get('strategy_conflict_label', '冲突')}: "
-                    f"{localize_conflict_severity(strategy_synthesis.get('conflict_severity', 'none'), report_language)} "
-                    f"({strategy_synthesis.get('conflict_count', 0)}) | "
-                    f"{labels.get('strategy_confidence_label', '置信度')}: {confidence_text}"
-                ),
-            ])
-            summary = localize_strategy_synthesis_summary(strategy_synthesis, report_language)
-            if summary:
-                report_lines.append(f"- {labels.get('strategy_summary_label', '综合说明')}: {summary}")
-            report_lines.append(
-                f"- {labels.get('strategy_supporting_skills_label', '支持策略')}: "
-                f"{format_strategy_skill_items(strategy_synthesis.get('supporting_skills'), report_language)}"
-            )
-            report_lines.append(
-                f"- {labels.get('strategy_opposing_skills_label', '反方策略')}: "
-                f"{format_strategy_skill_items(strategy_synthesis.get('opposing_skills'), report_language)}"
-            )
-            invalid_count = strategy_invalid_opinion_count(strategy_synthesis)
-            if invalid_count:
-                invalid_label_template = labels.get(
-                    "strategy_invalid_opinions_label",
-                    "另有 {count} 个策略解析失败",
-                )
-                try:
-                    invalid_text = invalid_label_template.format(count=invalid_count)
-                except (KeyError, IndexError):
-                    invalid_text = f"{invalid_label_template}: {invalid_count}"
-                report_lines.append(f"- {invalid_text}")
-            report_lines.append("")
-
-        # ========== Investment Committee (real deliberation trace) ==========
-        committee = (
-            dashboard.get("committee_deliberation") if dashboard else None
-        )
-        append_committee_deliberation_lines(
+        append_strategy_synthesis_lines(
             report_lines,
-            committee,
+            dashboard,
             labels,
             report_language,
         )
+
+        append_bull_bear_debate_lines(report_lines, dashboard, labels)
+        committee = dashboard.get("committee_deliberation") if dashboard else None
+        append_committee_deliberation_lines(report_lines, committee, labels, report_language)
 
         # ========== If no dashboard, display traditional format ==========
         if not dashboard:

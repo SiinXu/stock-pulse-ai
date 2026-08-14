@@ -1,6 +1,6 @@
-import type { SettingsHelpMap } from './settingsHelpTypes';
+import type { SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 
-const settingsHelpZhCN: SettingsHelpMap = {
+const settingsHelpZhCN: SettingsHelpSourceMap = {
   'settings.base.STOCK_LIST': {
     title: '自选股列表',
     summary: '配置需要分析的股票代码列表，是手动分析、定时任务和通知报告的基础输入。',
@@ -1463,7 +1463,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['记录失败仅记日志，不会让分析失败。'],
   },
   'settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION': {
-    title: '多策略合议',
     summary: '启用并发多策略专家调度，并在结果中给出最终分歧说明。',
     usage: '默认关闭。开启后，Native Multi 可调度策略专家并展示分歧说明；关闭时保持 Phase-1 合成路径不变。',
     valueNotes: [
@@ -1472,6 +1471,15 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['影响 Agent 流水线的专家调度与分歧说明字段。'],
     notes: ['多策略契约见 docs/multi-strategy-contract.md。'],
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HANDLING': {
+    summary: '记录冲突；未解决时观望。',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD': {
+    summary: '触发分裂裁决的阈值。',
+  },
+  'settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD': {
+    summary: '交叉复核阈值。',
   },
   'settings.agent.SKILL_OPINION_OUTCOME_WEIGHTS_ENABLED': {
     title: '技能观点后验加权',
@@ -1527,7 +1535,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
   },
   'settings.agent.AGENT_CRITIC_ENABLED': {
-    title: '有界 Multi-Agent Critic',
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
     usage: '仅在运行预算能够承担额外 Critic 调用及可能的一次白名单阶段重试时开启。',
     valueNotes: [
@@ -1537,6 +1544,12 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.DEBATE': {
+    title: '多空辩论',
+    summary: '配置可选辩论阶段、限制与专用模型。',
+  },
+  // Both controls use their field-specific schema description as help copy.
+  'settings.agent.market_regime': {},
   'settings.agent.REFLECTION_POSTMORTEM': {
     title: '反思与预测复盘',
   },
@@ -1585,22 +1598,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['需要配合回测功能使用效果更佳。'],
   },
   'settings.agent.AGENT_EPISODE_LOG_ENABLED': {
-    title: 'Agent 进化 episode 日志',
     summary: '保存精简 Agent 轨迹、教训和可选结果。',
   },
   'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
-    title: 'Agent episode 保留天数',
     summary: 'episode 清理前的最大保留天数。',
   },
   'settings.agent.AGENT_EPISODE_MAX_ROWS': {
-    title: 'Agent episode 最大行数',
     summary: 'episode 行数上限；优先删除最旧行。',
   },
   'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
-    title: '错误模式百科',
   },
   'settings.agent.AGENT_PLANNING_ENABLED': {
-    title: 'Agent 规划循环',
     summary: '让单 Agent RUN 路径按有界的规划、执行、观察与重规划流程运行。',
   },
   'settings.agent.AGENT_PLANNING_STRATEGY': {
@@ -1716,18 +1724,8 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['控制 GET /api/v1/reasoning-trace/{record_id} 及相关导出服务是否可用。'],
     notes: ['契约与回滚见 docs/reasoning-trace-export.md。'],
   },
-  'settings.agent.evidence_chain_export': {
-    title: '证据链与可审计报告包',
-    summary: '从已落盘历史投影「结论→证据」链，并支持脱敏可审计报告包导出。',
-    usage: 'EVIDENCE_CHAIN_ENABLED（默认 true）构建 evidence-chain-v1。AUDIT_EXPORT_ENABLED（默认 false）控制 ZIP/JSON 审计包导出，且需要管理员认证。AUDIT_INCLUDE_RAW_ARTIFACTS（默认 false）默认不包含原始中间产物。',
-    valueNotes: [
-      '缺失证据显式标注为 missing，不会捏造或静默省略。',
-      '导出复用 reasoning-trace 脱敏与安全审计 attempt/completion 链路。',
-      '服务不保存导出文件；已下载副本需运营自行删除。',
-    ],
-    impact: ['控制 GET /api/v1/history/{record_id}/evidence-chain 与 /evidence-pack（以及 /analysis 别名）。'],
-    notes: ['契约与回滚见 docs/evidence-chain-audit-package.md。'],
-  },
+  // Each control uses its field-specific schema description as help copy.
+  'settings.agent.evidence_chain_export': {},
   'settings.agent.research_pack_export': {
     title: '研报资产包导出',
     summary: '一键导出脱敏研报资产包（报告、决策卡、证据引用、轨迹）。',
@@ -2368,7 +2366,6 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['修改后配置哈希会变化，需要显式刷新健康度快照。'],
   },
   'settings.agent.AGENT_INVESTMENT_COMMITTEE_MODE': {
-    title: '投委会模式',
     summary: '以多角色投委会方式进行分析，并结构化呈现分歧。',
     usage: '默认关闭。开启后，Agent 会调度投委会角色并在结果中呈现共识或分歧。',
     valueNotes: ['关闭时保持既有单路径分析行为。'],

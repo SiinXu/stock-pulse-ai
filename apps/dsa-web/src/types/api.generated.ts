@@ -5628,6 +5628,8 @@ export interface components {
          * @example {
          *       "analysis_phase": "auto",
          *       "async_mode": false,
+         *       "debate_max_rounds": 2,
+         *       "enable_debate": false,
          *       "force_refresh": false,
          *       "notify": true,
          *       "original_query": "茅台",
@@ -5655,6 +5657,16 @@ export interface components {
              * @default false
              */
             async_mode: boolean;
+            /**
+             * Debate Max Rounds
+             * @description 本次分析辩论轮数覆盖（1-3）；未传时使用全局 DEBATE_MAX_ROUNDS
+             */
+            debate_max_rounds?: number | null;
+            /**
+             * Enable Debate
+             * @description 本次分析是否启用结构化 Bull-Bear 辩论；未传时使用全局 DEBATE_ENABLED
+             */
+            enable_debate?: boolean | null;
             /**
              * Force Refresh
              * @description 是否强制刷新（忽略缓存）
