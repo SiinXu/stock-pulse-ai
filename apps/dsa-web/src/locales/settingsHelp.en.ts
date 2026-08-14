@@ -1511,6 +1511,17 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
+    title: 'Critic Max Revision Rounds',
+    summary: 'Caps Critic revision rounds after material evidence gaps.',
+    usage: 'Use 1 for one revision, or 2 for a recheck and second target.',
+    valueNotes: [
+      'Allowed range is 1–2; the default is 1.',
+      'Changed evidence never proves convergence; only an explicit post-revision Critic pass does.',
+    ],
+    impact: ['Bounds optional Critic revision cost while preserving Decision budget.'],
+    notes: ['Reaching the round limit without an explicit pass remains not_converged and retains the Critic limitations.'],
+  },
   'settings.agent.DEBATE': {
     title: 'Bull-Bear debate',
     summary: 'Configure the optional debate stage, limits, and dedicated model.',

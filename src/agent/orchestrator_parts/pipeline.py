@@ -12,6 +12,7 @@ from src.agent import critic as _critic
 from src.agent.chat_context import build_agent_chat_tool_registry
 from src.agent.disagreement import build_agent_disagreement_summary
 from src.agent.orchestrator_parts import disagreement as _disagreement
+from src.agent.orchestrator_parts.critic_revision import _CriticRevisionRunner
 from src.agent.protocols import (
     AgentContext,
     AgentRunStats,
@@ -141,6 +142,20 @@ class _PipelineMethods:
             _MIN_STAGE_BUDGET_S
             + _DECISION_BUDGET_RESERVE_S
             + _OPTIONAL_STAGE_MARGIN_S
+        )
+
+        critic_revision_runner = _CriticRevisionRunner(
+            self,
+            ctx,
+            stats=stats,
+            all_tool_calls=all_tool_calls,
+            models_used=models_used,
+            started_at=t0,
+            timeout_seconds=timeout_s,
+            decision_budget_reserve_seconds=_DECISION_BUDGET_RESERVE_S,
+            optional_stage_margin_seconds=_OPTIONAL_STAGE_MARGIN_S,
+            progress_callback=progress_callback,
+            cancelled_check=cancelled_check,
         )
 
         while index < len(agents):
@@ -544,12 +559,30 @@ class _PipelineMethods:
                 )
             critic_trace = None
             if _critic.is_critic_stage(stage_name):
+                critic_max_iters = _critic.resolve_critic_max_iters(self.config)
                 if result.status == StageStatus.FAILED:
-                    critic_trace = _critic.record_critic_stage_failure(ctx)
+                    critic_trace = _critic.record_critic_stage_failure(
+                        ctx,
+                        max_iters=critic_max_iters,
+                    )
                 else:
                     critic_trace = _critic.get_critic_trace(ctx)
                     if critic_trace is None:
-                        critic_trace = _critic.record_critic_stage_failure(ctx)
+                        critic_trace = _critic.record_critic_stage_failure(
+                            ctx,
+                            max_iters=critic_max_iters,
+                        )
+                    else:
+                        critic_trace = _critic.apply_iteration_budget(
+                            critic_trace,
+                            max_iters=critic_max_iters,
+                        )
+                        ctx.meta["critic_trace"] = critic_trace
+                if (
+                    critic_trace is not None
+                    and critic_trace.get("verdict") != "retry"
+                ):
+                    critic_trace = _critic.finalize_convergence(ctx)
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
             _debate.commit_pipeline_stage_result(ctx, result, stage_name)
             stats.record_stage(result)
@@ -647,21 +680,31 @@ class _PipelineMethods:
 
             if _critic.is_critic_stage(stage_name):
                 if critic_trace is None:
-                    critic_trace = _critic.record_critic_stage_failure(ctx)
+                    critic_trace = _critic.record_critic_stage_failure(
+                        ctx,
+                        max_iters=_critic.resolve_critic_max_iters(self.config),
+                    )
 
                 retry_attempted = False
-                if critic_trace.get("verdict") == "retry":
+                while critic_trace.get("verdict") == "retry":
                     requested_targets = list(
                         critic_trace.get("retry_targets_requested") or []
                     )
-                    retry_target = requested_targets[0] if requested_targets else ""
-                    remaining_retry_budget_s = (
-                        max(0.0, timeout_s - elapsed_s) if timeout_s else None
+                    executed_targets = list(
+                        critic_trace.get("retry_targets_executed") or []
+                    )
+                    retry_target = next(
+                        (
+                            target
+                            for target in reversed(requested_targets)
+                            if target not in executed_targets
+                        ),
+                        "",
                     )
                     retry_source = _critic.resolve_retry_source_agent(
                         retry_target,
                         agents=agents[:index],
-                        prior_results=stats.stage_results[:-1],
+                        prior_results=stats.stage_results,
                         skill_manager=self.skill_manager,
                     )
                     if retry_source is None:
@@ -673,9 +716,30 @@ class _PipelineMethods:
                                 "whitelisted catalog stage."
                             ),
                         )
-                    elif (
-                        remaining_retry_budget_s is not None
-                        and remaining_retry_budget_s < _OPTIONAL_STAGE_REQUIRED_S
+                        break
+
+                    mode_budget_ok, mode_budget_reason = (
+                        _critic.mode_budget_allows_optional_work(
+                            ctx,
+                            required_llm_turns=max(
+                                1,
+                                int(getattr(retry_source, "max_steps", 1) or 1),
+                            ),
+                        )
+                    )
+                    remaining_s = (
+                        critic_revision_runner.remaining_optional_budget_s()
+                    )
+                    if not mode_budget_ok:
+                        critic_trace = _critic.mark_retry_unavailable(
+                            ctx,
+                            retry_target,
+                            reason=mode_budget_reason,
+                        )
+                        break
+                    if (
+                        remaining_s is not None
+                        and remaining_s < _OPTIONAL_STAGE_REQUIRED_S
                     ):
                         critic_trace = _critic.mark_retry_unavailable(
                             ctx,
@@ -685,236 +749,158 @@ class _PipelineMethods:
                                 "minimum Decision stage budget."
                             ),
                         )
-                    else:
-                        started_trace = _critic.start_retry(ctx, retry_target)
-                        if started_trace is None:
-                            critic_trace = _critic.mark_retry_unavailable(
-                                ctx,
-                                retry_target,
-                                reason="Critic retry budget was already consumed.",
-                            )
-                        else:
-                            retry_attempted = True
-                            critic_trace = started_trace
-                            result.meta["critic"] = _critic.trace_event_fields(
-                                critic_trace
-                            )
-                            if progress_callback:
-                                progress_callback(stream_event(
-                                    "critic_verdict",
-                                    stage=stage_name,
-                                    **_critic.trace_event_fields(critic_trace),
-                                ))
-                                progress_callback(stream_event(
-                                    "critic_retry_start",
-                                    stage=str(retry_source.agent_name),
-                                    retry_target=retry_target,
-                                    **_critic.trace_event_fields(critic_trace),
-                                ))
+                        break
 
-                            retry_started_elapsed_s = elapsed_s
-                            retry_seed = _critic.build_retry_seed(ctx, retry_target)
-                            retry_stage_name = str(retry_source.agent_name or "")
-                            retry_timeout_budget_s = (
-                                max(
-                                    0.0,
-                                    remaining_retry_budget_s
-                                    - _DECISION_BUDGET_RESERVE_S
-                                    - _OPTIONAL_STAGE_MARGIN_S,
-                                )
-                                if remaining_retry_budget_s is not None
-                                else None
-                            )
-                            retry_timeout_s = self._resolve_stage_timeout_seconds(
-                                retry_stage_name,
-                                retry_timeout_budget_s,
-                            )
-                            try:
-                                retry_result, retry_ctx = self._execute_isolated_stage(
-                                    retry_source,
-                                    retry_seed,
-                                    stage_name=retry_stage_name,
-                                    progress_callback=progress_callback,
-                                    timeout_seconds=retry_timeout_s,
-                                    cancelled_check=cancelled_check,
-                                )
-                                _propagate_agent_soul_composition(retry_ctx, ctx)
-                                if not isinstance(retry_result, StageResult):
-                                    raise TypeError(
-                                        "Critic retry stage returned an invalid result"
-                                    )
-                                if (
-                                    retry_result.status == StageStatus.COMPLETED
-                                    and not _critic.retry_produced_evidence(
-                                        retry_ctx,
-                                        retry_target,
-                                        strategy_engine=self.strategy_engine,
-                                    )
-                                ):
-                                    retry_result.status = StageStatus.FAILED
-                                    retry_result.error = AGENT_EXECUTION_FAILURE_MESSAGE
-                                    retry_result.failure_reason = (
-                                        StageFailureReason.STAGE_FAILURE
-                                    )
-                                if retry_result.status == StageStatus.COMPLETED:
-                                    self._commit_stage_context(ctx, retry_ctx)
-                            except TimeoutError as exc:
-                                log_safe_exception(
-                                    logger,
-                                    "[Orchestrator] Critic retry execution timed out",
-                                    exc,
-                                    error_code="agent_critic_retry_timeout",
-                                    level=logging.WARNING,
-                                    context={"stage": retry_stage_name},
-                                )
-                                retry_result = StageResult(
-                                    stage_name=retry_stage_name,
-                                    status=StageStatus.FAILED,
-                                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
-                                    failure_reason=StageFailureReason.TIMEOUT,
-                                    meta={
-                                        "runtime_guard_event": (
-                                            "critic_retry_exception_captured"
-                                        )
-                                    },
-                                )
-                            except Exception as exc:  # broad-exception: fallback_recorded - The optional one-shot retry becomes a fail-soft diagnostic.
-                                log_safe_exception(
-                                    logger,
-                                    "[Orchestrator] Critic retry execution failed",
-                                    exc,
-                                    error_code="agent_critic_retry_failed",
-                                    level=logging.WARNING,
-                                    context={"stage": retry_stage_name},
-                                )
-                                retry_result = StageResult(
-                                    stage_name=retry_stage_name,
-                                    status=StageStatus.FAILED,
-                                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
-                                    failure_reason=StageFailureReason.STAGE_FAILURE,
-                                    meta={
-                                        "runtime_guard_event": (
-                                            "critic_retry_exception_captured"
-                                        )
-                                    },
-                                )
+                    started_trace = _critic.start_retry(ctx, retry_target)
+                    if started_trace is None:
+                        critic_trace = _critic.mark_retry_unavailable(
+                            ctx,
+                            retry_target,
+                            reason=(
+                                "Critic revision budget was already consumed or "
+                                "the requested target was already executed."
+                            ),
+                        )
+                        break
 
-                            elapsed_s = time.time() - t0
-                            if retry_result.meta.get("runtime_guard_event") in {
-                                "critic_retry_exception_captured",
-                                "stage_timeout",
-                            }:
-                                retry_result.duration_s = round(
-                                    max(
-                                        0.0,
-                                        elapsed_s - retry_started_elapsed_s,
-                                    ),
-                                    2,
-                                )
-                            critic_trace = _critic.finish_retry(
-                                ctx,
-                                completed=(
-                                    retry_result.status == StageStatus.COMPLETED
-                                ),
-                            )
-                            result.meta["critic"] = _critic.trace_event_fields(
-                                critic_trace
-                            )
-                            retry_result.meta["critic_retry"] = (
-                                _critic.trace_event_fields(critic_trace)
-                            )
-                            stats.record_stage(retry_result)
-                            all_tool_calls.extend(
-                                tc for tc in (
-                                    retry_result.meta.get("tool_calls_log") or []
-                                )
-                            )
-                            models_used.extend(
-                                retry_result.meta.get("models_used", [])
-                            )
-                            if progress_callback:
-                                progress_callback(stream_event(
-                                    "critic_retry_done",
-                                    stage=retry_stage_name,
-                                    status=retry_result.status.value,
-                                    duration=retry_result.duration_s,
-                                    retry_target=retry_target,
-                                    **_critic.trace_event_fields(critic_trace),
-                                ))
+                    if not retry_attempted and progress_callback:
+                        progress_callback(stream_event(
+                            "critic_verdict",
+                            stage=stage_name,
+                            **_critic.trace_event_fields(started_trace),
+                        ))
+                    retry_attempted = True
+                    revision_result, critic_trace = critic_revision_runner.run_revision(
+                        retry_source,
+                        retry_target,
+                        started_trace,
+                    )
+                    elapsed_s = time.time() - t0
+                    if cancelled_check is not None and cancelled_check():
+                        break
+                    if revision_result.status != StageStatus.COMPLETED:
+                        critic_trace = _critic.finalize_convergence(ctx)
+                        break
 
-                            if cancelled_check is not None and cancelled_check():
-                                logger.info(
-                                    "[Orchestrator] pipeline cancelled after Critic retry '%s'",
-                                    retry_stage_name,
-                                )
-                                return self._build_cancelled_result(
-                                    stats,
-                                    all_tool_calls,
-                                    models_used,
-                                    elapsed_s,
-                                    ctx=ctx,
-                                )
+                    remaining_iterations = int(
+                        critic_trace.get("retry_budget_remaining") or 0
+                    )
+                    configured_iterations = int(
+                        critic_trace.get("iteration_max") or 1
+                    )
+                    if (
+                        remaining_iterations <= 0
+                        or configured_iterations <= 1
+                    ):
+                        critic_trace = _critic.finalize_convergence(ctx)
+                        break
 
-                            if retry_result.status == StageStatus.FAILED:
-                                self._record_degraded_stage(
-                                    ctx,
-                                    retry_stage_name,
-                                    retry_result,
-                                )
+                    recheck_mode_ok, recheck_mode_reason = (
+                        _critic.mode_budget_allows_optional_work(ctx)
+                    )
+                    recheck_remaining_s = (
+                        critic_revision_runner.remaining_optional_budget_s()
+                    )
+                    if not recheck_mode_ok:
+                        critic_trace = _critic.mark_convergence_unavailable(
+                            ctx,
+                            recheck_mode_reason,
+                        )
+                        break
+                    if (
+                        recheck_remaining_s is not None
+                        and recheck_remaining_s < _OPTIONAL_STAGE_REQUIRED_S
+                    ):
+                        critic_trace = _critic.mark_convergence_unavailable(
+                            ctx,
+                            "Critic convergence recheck was skipped to preserve "
+                            "the minimum Decision stage budget.",
+                        )
+                        break
 
-                            if timeout_s and elapsed_s >= timeout_s:
-                                log_runtime_guard_event(
-                                    logger,
-                                    "run_timeout",
-                                    level=logging.ERROR,
-                                    scope="orchestrator",
-                                    phase="after_critic_retry",
-                                    stage=retry_stage_name,
-                                    elapsed_seconds=round(elapsed_s, 3),
-                                    limit_seconds=timeout_s,
-                                )
-                                last_completed_stage = next(
-                                    (
-                                        stage.stage_name
-                                        for stage in reversed(stats.stage_results)
-                                        if stage.status == StageStatus.COMPLETED
-                                    ),
-                                    None,
-                                )
-                                self._record_pipeline_termination(
-                                    ctx,
-                                    last_completed_stage=last_completed_stage,
-                                )
-                                if progress_callback:
-                                    progress_callback(stream_event(
-                                        "pipeline_timeout",
-                                        stage=retry_stage_name,
-                                        elapsed=round(elapsed_s, 2),
-                                        timeout=timeout_s,
-                                    ))
-                                self._apply_partition_fallback(ctx)
-                                return self._build_timeout_result(
-                                    stats,
-                                    all_tool_calls,
-                                    models_used,
-                                    elapsed_s,
-                                    timeout_s,
-                                    ctx=ctx,
-                                    parse_dashboard=parse_dashboard,
-                                )
+                    recheck_result, recheck_verdict, critic_trace = (
+                        critic_revision_runner.run_recheck()
+                    )
+                    elapsed_s = time.time() - t0
+                    if cancelled_check is not None and cancelled_check():
+                        break
+                    if recheck_result.status != StageStatus.COMPLETED:
+                        break
+                    if recheck_verdict != "retry":
+                        critic_trace = _critic.finalize_convergence(
+                            ctx,
+                            recheck_verdict=recheck_verdict,
+                        )
+                        break
 
+                elapsed_s = time.time() - t0
+                if critic_trace is not None and not retry_attempted:
+                    critic_trace = _critic.finalize_convergence(ctx)
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
-                if progress_callback and not retry_attempted:
+                if progress_callback:
                     progress_callback(stream_event(
                         "critic_verdict",
                         stage=stage_name,
                         **_critic.trace_event_fields(critic_trace),
                     ))
+
+                if cancelled_check is not None and cancelled_check():
+                    logger.info(
+                        "[Orchestrator] pipeline cancelled after Critic work"
+                    )
+                    return self._build_cancelled_result(
+                        stats,
+                        all_tool_calls,
+                        models_used,
+                        elapsed_s,
+                        ctx=ctx,
+                    )
+
+                if timeout_s and elapsed_s >= timeout_s:
+                    log_runtime_guard_event(
+                        logger,
+                        "run_timeout",
+                        level=logging.ERROR,
+                        scope="orchestrator",
+                        phase="after_critic_retry",
+                        stage=stage_name,
+                        elapsed_seconds=round(elapsed_s, 3),
+                        limit_seconds=timeout_s,
+                    )
+                    last_completed_stage = next(
+                        (
+                            stage.stage_name
+                            for stage in reversed(stats.stage_results)
+                            if stage.status == StageStatus.COMPLETED
+                        ),
+                        None,
+                    )
+                    self._record_pipeline_termination(
+                        ctx,
+                        last_completed_stage=last_completed_stage,
+                    )
+                    if progress_callback:
+                        progress_callback(stream_event(
+                            "pipeline_timeout",
+                            stage=stage_name,
+                            elapsed=round(elapsed_s, 2),
+                            timeout=timeout_s,
+                        ))
+                    self._apply_partition_fallback(ctx)
+                    return self._build_timeout_result(
+                        stats,
+                        all_tool_calls,
+                        models_used,
+                        elapsed_s,
+                        timeout_s,
+                        ctx=ctx,
+                        parse_dashboard=parse_dashboard,
+                    )
+
                 if result.status == StageStatus.FAILED:
                     self._record_degraded_stage(ctx, stage_name, result)
                     index += 1
                     continue
-
             # Isolate eligible support-stage failures unless fail-fast is explicit.
             # Mode hard-budget breaches never isolate: terminate with explicit reason.
             if result.status == StageStatus.FAILED:
@@ -1468,7 +1454,10 @@ class _PipelineMethods:
         progress_callback: Optional[Callable],
     ) -> None:
         """Fail soft without spending the budget reserved for Decision."""
-        trace = _critic.record_critic_budget_skip(ctx)
+        trace = _critic.record_critic_budget_skip(
+            ctx,
+            max_iters=_critic.resolve_critic_max_iters(self.config),
+        )
         result = StageResult(
             stage_name=_critic.CRITIC_STAGE_NAME,
             status=StageStatus.FAILED,

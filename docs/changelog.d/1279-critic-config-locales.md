@@ -1,0 +1,1 @@
+- [Fixed] Keep the Critic revision-round setting aligned across the backend registry and Web locale catalogs (Refs #131).
