@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.fr,
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC.fr,
   ...EE.fr,
   ...MMC.fr,
+  ...S.fr,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activez le mode Agent et réessayez.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Le mode agent n’est pas activé",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Demande non remplie ; veuillez vérifier les détails et réessayer.",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Limite d’événements par jour",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Confirmer les fonctions Agent désactivées",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Méthode de génération des requêtes boursières",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Préréglage de posture de recherche",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Texte personnalisé de posture de recherche",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Modèle principal de l’agent",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Nombre maximal d’étapes de l’agent",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Mémoire de l’agent",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "Utilise toujours DataFetcherManager (repli, cache, circuit, validation) ; le mode parallèle n’est pas un chemin HTTP parallèle.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "Par défaut concurrent=3 et per-provider=1 réduisent le risque de ruée et superposent des capacités indépendantes.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "Désactivez le commutateur pour forcer l’ordre sériel lors du diagnostic des fournisseurs.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "Budget d’extraction parallèle (secondes)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Extraction parallèle des données de marché",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Plafond global d’extraction parallèle",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Plafond par fournisseur d’extraction parallèle",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "Consigne les conflits ; attente s'ils persistent.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "Seuil du verdict partagé.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "Seuil du contrôle croisé.",

@@ -2,6 +2,7 @@ import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import { EVIDENCE_EXPORT_FIELD_TITLES } from '../i18n/evidenceExportErrorTranslations';
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
+import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
 
 const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
@@ -58,6 +59,7 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
 });
 
 const fieldTitleMapZh = {
+  ...REFLECTION_FIELD_TITLE_MAP_ZH,
   STOCK_LIST: '自选股列表',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API 地址',
@@ -510,6 +512,7 @@ type SystemConfigFieldTitleKey = keyof typeof fieldTitleMapZh;
 // the translation source inventory, while the Settings UI still prefers the
 // live backend schema title when the selected UI language is English.
 const fieldTitleMapEn = {
+  ...REFLECTION_FIELD_TITLE_MAP_EN,
   STOCK_LIST: 'Stock List',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API URL',

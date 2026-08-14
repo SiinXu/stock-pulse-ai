@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.de,
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC.de,
   ...EE.de,
   ...MMC.de,
+  ...S.de,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktiviere den Agentenmodus und versuche es erneut.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agentenmodus ist nicht aktiviert",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Anfrage nicht erfüllt; bitte überprüfen Sie die Details und versuchen Sie es erneut.",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Ereignislimit pro Tag",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent-Funktionen als deaktiviert bestätigen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Generierungsmethode für Aktienfragen",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Voreinstellung der Forschungshaltung",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Eigene Forschungshaltung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Primäres Agentenmodell",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Maximale Agentenschritte",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Agentenspeicher",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "Nutzt weiterhin DataFetcherManager (Fallback, Cache, Circuit, Validierung); der Parallelmodus ist kein HTTP-Nebenpfad.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "Standard concurrent=3 und per-provider=1 senken Stampede-Risiko und überlappen unabhängige Fähigkeiten.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "Schalter deaktivieren, um bei Provider-Diagnose strikt seriell zu fetchen.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "Parallele Abfrage – Gesamtbudget (Sekunden)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Parallele Marktdaten-Abfrage",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Parallele Abfrage – globales Limit",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Parallele Abfrage – Limit pro Provider",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "Offen: halten.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "Schwelle für geteiltes Urteil.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "Kreuzprüfschwelle.",

@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M['zh-TW'],
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC["zh-TW"],
   ...EE['zh-TW'],
   ...MMC['zh-TW'],
+  ...S['zh-TW'],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "事件觸發每日上限",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "確認暫不使用 Agent 功能",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "問股生成方式",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "研究立場預設",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "自訂研究立場",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Agent 主要模型",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Agent 最大步驟數",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Agent 記憶",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "仍走 DataFetcherManager（故障切換、快取、熔斷、校驗），並行層不是旁路 HTTP。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "預設並行 3、單源 1，在重疊無依賴能力的同時降低踩限流風險。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "排查資料源問題時可關閉開關，強制依宣告順序串列。",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "並行取數總預算（秒）",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "分析內並行取數",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取數全域並行上限",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取數單源並行上限",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "記錄衝突；未解決時觀望。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "觸發分裂裁決的門檻。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "交叉複核門檻。",

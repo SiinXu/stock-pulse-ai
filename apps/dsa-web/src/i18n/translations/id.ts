@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC.id,
   ...EE.id,
   ...MMC.id,
+  ...S.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Batas pemicu per hari",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Konfirmasi fitur Agent nonaktif",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Metode pembuatan jawaban saham",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Preset Sikap Riset",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Teks Sikap Riset Khusus",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Model utama Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Langkah maksimum Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Memori Agen",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "Tetap memakai DataFetcherManager (fallback, cache, circuit, validasi); mode paralel bukan jalur HTTP samping.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "Default concurrent=3 dan per-provider=1 mengurangi risiko stampede sambil menumpuk kemampuan independen.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "Matikan sakelar untuk memaksa urutan serial saat mendiagnosis penyedia.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "Anggaran tarikan paralel (detik)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Tarikan data pasar paralel",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Batas global tarikan paralel",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Batas per-penyedia tarikan paralel",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "Catat konflik; tahan bila belum selesai.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "Ambang putusan terbelah.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "Ambang validasi silang.",

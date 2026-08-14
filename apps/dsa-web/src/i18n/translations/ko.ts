@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC.ko,
   ...EE.ko,
   ...MMC.ko,
+  ...S.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "일일 이벤트 한도",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 기능 사용 안 함 확인",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "종목 질의 생성 방식",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "연구 관점 프리셋",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "사용자 지정 연구 관점 텍스트",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "에이전트 기본 모델",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "에이전트 최대 단계 수",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "에이전트 메모리",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "여전히 DataFetcherManager(폴백, 캐시, 회로, 검증)를 사용합니다. 병렬 모드는 HTTP 우회 경로가 아닙니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "기본 concurrent=3, per-provider=1은 stampede 위험을 줄이면서 독립 기능을 겹칩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "제공자 진단 시 스위치를 끄면 직렬 수집 순서로 강제됩니다.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "병렬 수집 총 예산(초)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "시장 입력 병렬 수집",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "미해결 시 관망.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "분열 판정값.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "재검토값.",

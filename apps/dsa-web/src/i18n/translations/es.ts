@@ -7,6 +7,7 @@ import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTra
 import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSignalCalibrationTranslations';
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
+import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.es,
@@ -15,6 +16,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...DSC.es,
   ...EE.es,
   ...MMC.es,
+  ...S.es,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activa el modo Agente e inténtalo de nuevo.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "El modo agente no está activado",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Solicitud no completada; por favor, revisa los detalles e inténtalo de nuevo.",
@@ -5269,8 +5271,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Límite de eventos por día",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Confirmar funciones de Agent desactivadas",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Método de generación para consultas de acciones",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Preajuste de postura de investigación",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Postura de investigación personalizada",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Modelo principal del agente",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MAX_STEPS": "Pasos máximos del agente",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MEMORY_ENABLED": "Memoria del agente",
@@ -6448,10 +6448,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.0": "Sigue usando DataFetcherManager (fallback, caché, circuito, validación); el modo paralelo no es un canal HTTP paralelo.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.1": "Por defecto concurrent=3 y per-provider=1 reducen el riesgo de avalancha y superponen capacidades independientes.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.valueNotes.2": "Desactive el interruptor para forzar orden serial al diagnosticar proveedores.",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_BUDGET_SECONDS": "Presupuesto de extracción paralela (segundos)",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_ENABLED": "Extracción paralela de datos de mercado",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Tope global de extracción paralela",
-  "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Tope por proveedor de extracción paralela",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HANDLING.summary": "Espera.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD.summary": "División",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD.summary": "Revisa.",

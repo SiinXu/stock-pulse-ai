@@ -22,7 +22,7 @@
 | 变量 | 默认 | 含义 |
 | --- | --- | --- |
 | `AGENT_REFLECTION_ENABLED` | `false` | 启用运行内反思 |
-| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 单次反思 LLM 调用上限 |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 单次反思 LLM 调用上限（0–64） |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | 运行内修订次数上限 |
 | `AGENT_POSTMORTEM_ENABLED` | `false` | 启用预测后验复盘 |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 单批后验 LLM 调用上限 |

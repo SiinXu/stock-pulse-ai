@@ -738,9 +738,10 @@ class TestEnvExampleWebSettingsCoverage(unittest.TestCase):
 class TestSettingsFieldTitleContract(unittest.TestCase):
     """The Web field-title catalog must cover the backend registry exactly."""
 
-    _FIELD_TITLE_FILE = (
-        Path(__file__).resolve().parents[1]
-        / "apps/dsa-web/src/utils/systemConfigI18n.ts"
+    _WEB_ROOT = Path(__file__).resolve().parents[1] / "apps/dsa-web/src"
+    _FIELD_TITLE_FILES = (
+        _WEB_ROOT / "utils/systemConfigI18n.ts",
+        _WEB_ROOT / "i18n/reflectionSettingsCopy.ts",
     )
     _FEATURE_FIELD_TITLE_FILE = (
         Path(__file__).resolve().parents[1]
@@ -772,15 +773,17 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
 
     @classmethod
     def _collect_web_field_title_keys(cls) -> set[str]:
-        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
-        match = cls._FIELD_TITLE_MAP_RE.search(content)
-        if match is None:
-            raise AssertionError("Unable to locate fieldTitleMapZh in systemConfigI18n.ts")
+        keys = []
+        for path in cls._FIELD_TITLE_FILES:
+            content = path.read_text(encoding="utf-8")
+            match = cls._FIELD_TITLE_MAP_RE.search(content)
+            if match is None:
+                raise AssertionError(f"Unable to locate fieldTitleMapZh in {path}")
+            keys.extend(cls._FIELD_TITLE_KEY_RE.findall(match.group("body")))
         feature_content = cls._FEATURE_FIELD_TITLE_FILE.read_text(encoding="utf-8")
         feature_match = cls._FEATURE_FIELD_TITLE_MAP_RE.search(feature_content)
         if feature_match is None:
             raise AssertionError("Unable to locate EVIDENCE_EXPORT_FIELD_TITLES")
-        keys = cls._FIELD_TITLE_KEY_RE.findall(match.group("body"))
         keys.extend(cls._FIELD_TITLE_KEY_RE.findall(feature_match.group("zh")))
         if len(keys) != len(set(keys)):
             raise AssertionError("Composed field-title catalog contains duplicate field keys")
@@ -788,11 +791,13 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
 
     @classmethod
     def _collect_web_english_field_titles(cls) -> dict[str, str]:
-        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
-        match = cls._FIELD_TITLE_EN_MAP_RE.search(content)
-        if match is None:
-            raise AssertionError("Unable to locate fieldTitleMapEn in systemConfigI18n.ts")
-        entries = cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body"))
+        entries = []
+        for path in cls._FIELD_TITLE_FILES:
+            content = path.read_text(encoding="utf-8")
+            match = cls._FIELD_TITLE_EN_MAP_RE.search(content)
+            if match is None:
+                raise AssertionError(f"Unable to locate fieldTitleMapEn in {path}")
+            entries.extend(cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body")))
         feature_content = cls._FEATURE_FIELD_TITLE_FILE.read_text(encoding="utf-8")
         feature_match = cls._FEATURE_FIELD_TITLE_MAP_RE.search(feature_content)
         if feature_match is None:
@@ -844,9 +849,13 @@ class TestSettingsHelpContract(unittest.TestCase):
     # Help entries were split per language (#477); the aggregator
     # settingsHelp.ts now only re-exports, so the literal key map lives in the
     # per-language sources.
-    _SETTINGS_HELP_FILES = (
+    _LANGUAGE_HELP_FILES = (
         _LOCALE_DIR / "settingsHelp.en.ts",
         _LOCALE_DIR / "settingsHelp.zh.ts",
+    )
+    _SETTINGS_HELP_FILES = (
+        *_LANGUAGE_HELP_FILES,
+        _LOCALE_DIR.parent / "i18n/reflectionSettingsCopy.ts",
     )
 
     @classmethod
@@ -886,7 +895,7 @@ class TestSettingsHelpContract(unittest.TestCase):
             self.assertEqual(definition["title"], title)
             self.assertEqual(definition["help_key"], help_key)
 
-        for path in self._SETTINGS_HELP_FILES:
+        for path in self._LANGUAGE_HELP_FILES:
             content = path.read_text(encoding="utf-8")
             self.assertEqual(
                 len(re.findall(rf"^\s*'{re.escape(help_key)}'\s*:\s*\{{", content, re.MULTILINE)),

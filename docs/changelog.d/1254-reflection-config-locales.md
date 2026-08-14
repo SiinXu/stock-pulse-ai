@@ -1,0 +1,1 @@
+- [Fixed] Keep multi-level reflection settings aligned across the backend registry and Web locale catalogs (Refs #1094).

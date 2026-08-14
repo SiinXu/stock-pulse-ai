@@ -105,8 +105,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DEBATE_MAX_ROUNDS` | `2` | 是 | 模板中注释; Debate rounds 1-3 |
 | `DEBATE_TEMPERATURE` | `0.4` | 是 | 模板中注释; Debate LLM temperature |
 | `DEBATE_MODEL` | empty | 是 | 模板中注释; Optional debate model name |
-| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内反思循环（类型化教训；默认 false） |
-| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限 |
+| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内/轨迹反思循环（类型化教训；默认 false） |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限（0–64） |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释; 反思后运行内修订次数上限 |
 | `AGENT_POSTMORTEM_ENABLED` | `false` | 是 | 模板中注释; 可选已解析预测后验复盘（默认 false） |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 是 | 模板中注释; 单批后验 LLM 调用上限 |
@@ -158,6 +158,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_MAX_TOKENS` | `1500` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS` | `16` | 是 | 模板中注释 |
 | `AGENT_PLANNING_ON_STEP_FAILURE` | `replan` | 是 | 模板中注释 |
+
+| `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; 即时步骤批评（默认关闭；#1094） |
+| `AGENT_META_REVIEW_ENABLED` | `false` | 是 | 模板中注释; 跨运行离线 meta-review（默认关闭） |
+| `AGENT_META_REVIEW_MIN_EPISODES` | `30` | 是 | 模板中注释; meta-review 样本阈值 |
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
