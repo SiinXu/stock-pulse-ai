@@ -9,6 +9,8 @@ import { PORTFOLIO_HEALTH_TRANSLATIONS_WEST as PH } from '../portfolioHealthTran
 import { PORTFOLIO_INSIGHTS_TRANSLATIONS_WEST as PI } from '../portfolioInsightsTranslations.west';
 import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_WEST as PF } from '../portfolioFutuImportTranslations.west';
 import { SETTINGS_REGISTRY_TRANSLATIONS_WEST_DE_ES as SR } from '../settingsRegistryTranslations.west-de-es';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.de,
@@ -19,6 +21,8 @@ export const translations: Record<UiTranslationKey, string> = {
   ...PI.de,
   ...PF.de,
   ...SR.de,
+  ...EE.de,
+  ...MMC.de,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktiviere den Agentenmodus und versuche es erneut.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agentenmodus ist nicht aktiviert",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Anfrage nicht erfüllt; bitte überprüfen Sie die Details und versuchen Sie es erneut.",
@@ -736,9 +740,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextRecent": "Jüngste Analysen",
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextTitle": "Aktuelle Aktie",
   "i18n.uiText.UI_TEXT.decisionSignals.stopLoss": "Stop-Loss",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.feed": "Signale",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.history": "Verlauf",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.review": "Auswertung",
   "i18n.uiText.UI_TEXT.decisionSignals.tab.rules": "Regeln",
   "i18n.uiText.UI_TEXT.decisionSignals.targetPrice": "Zielpreis",
   "i18n.uiText.UI_TEXT.decisionSignals.timelineAlertShape": "Diamantpunkte zeigen Alarmbereitschaft an",
@@ -2897,7 +2898,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.portfolio.PORTFOLIO_TEXT.csvDryResult": "CSV Vorschau-Ergebnisse",
   "locales.portfolio.PORTFOLIO_TEXT.csvFile": "CSV- / Excel-Datei",
   "locales.portfolio.PORTFOLIO_TEXT.csvImport": "Makler CSV Import",
-  "locales.portfolio.PORTFOLIO_TEXT.openImport": "Positionen importieren",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseResult": "CSV Parse-Ergebnis",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseSummary": "{valid} gültig,{skipped} übersprungen,{errors} Fehler.",
   "locales.portfolio.PORTFOLIO_TEXT.currency": "Notierungswährung",
@@ -5255,7 +5255,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "Profil der Kontextkomprimierung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "Auslösende Tokenanzahl für Kontextkomprimierung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "Geschützte Dialogrunden im Kontext",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Begrenzter Multi-Agent-Critic",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.summary": "Optionale Debattenstufe, Limits und dediziertes Modell konfigurieren.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.title": "Bullen-Bären-Debatte",
   "utils.systemConfigI18n.fieldTitleMaps.DEBATE_ENABLED": "Strukturierte Bullen-Bären-Debatte",
@@ -5275,7 +5274,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Ereignislimit pro Tag",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent-Funktionen als deaktiviert bestätigen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Generierungsmethode für Aktienfragen",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "Investment-Committee-Modus",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Voreinstellung der Forschungshaltung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Eigene Forschungshaltung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Primäres Agentenmodell",
@@ -5295,7 +5293,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS": "Zeitlimit für Planvorschläge",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_STRATEGY": "Agent-Planungsstrategie",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MODE": "Agentenmodus",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_MULTI_STRATEGY_DELIBERATION": "Multi-Strategie-Beratung",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Natürlichsprachliches Agenten-Routing",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Agent-Observability: detaillierte Nutzdaten",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Agent-Observability-Ereignisse",
@@ -6446,7 +6443,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "Ereignis-Research-Briefing benachrichtigen",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "Ereignis-Research-Briefing Verlauf speichern",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "Ereignis-Research-Briefing Berichtsdatei speichern",
-
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "Beeinflusst die Latenz der Einzelwertpapier-Analyse und die Peak-Parallelität von Provider-Aufrufen innerhalb eines Laufs.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "Ändert nicht die MAX_WORKERS-Parallelität über die multi-symbol Queue hinweg.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "Die Merge-Reihenfolge in Stage-IO / AgentContext folgt den deklarierten Task-Keys, nie der Fertigstellungsreihenfolge.",
@@ -6462,7 +6458,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Parallele Abfrage – globales Limit",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Parallele Abfrage – Limit pro Provider",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Prozesswert",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_LOG_ENABLED.summary": "Speichert kompakte Agent-Episoden mit Verlauf, Erkenntnissen und optionalen Ergebnislabels.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_MAX_ROWS.summary": "Begrenzt die Episodentabelle; die ältesten Zeilen werden zuerst entfernt.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_RETENTION_DAYS.summary": "Maximales Alter von Episoden vor der Aufbewahrungsbereinigung.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.impact.0": "Ergänzt Qualitätsmetadaten, ohne Anlagehinweise zu ändern.",
@@ -6480,7 +6475,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "Steuert deterministische Positionsbänder anhand der aktuellen Portfoliogewichte.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "Portfoliobewusste Positionsgröße",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "Für portfoliobewusste Bänder aktiv lassen. Das maximale Einzeltitelgewicht liegt zwischen 0 und 1 und ist standardmäßig 0,15.",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_LOG_ENABLED": "Agent-Episodenprotokoll",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_MAX_ROWS": "Maximale Episodenanzahl",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_RETENTION_DAYS": "Aufbewahrung von Agent-Episoden",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_POSTMORTEM_ENABLED": "Nachbetrachtung aufgelöster Prognosen",
@@ -6489,6 +6483,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Laufinterne Reflexionsschleife",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "LLM-Aufrufbudget für Reflexion",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_MAX_REVISE": "Maximale Reflexionsüberarbeitungen",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Status",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Wahl",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "Portfoliobewusste Größenberechnung aktiviert",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "Maximales Einzeltitelgewicht",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_EXTRACT_ENABLED": "Prognoseextraktion",

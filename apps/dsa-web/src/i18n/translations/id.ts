@@ -9,6 +9,8 @@ import { PORTFOLIO_HEALTH_TRANSLATIONS_WEST as PH } from '../portfolioHealthTran
 import { PORTFOLIO_INSIGHTS_TRANSLATIONS_WEST as PI } from '../portfolioInsightsTranslations.west';
 import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_WEST as PF } from '../portfolioFutuImportTranslations.west';
 import { SETTINGS_REGISTRY_TRANSLATIONS_WEST_FR_ID as SR } from '../settingsRegistryTranslations.west-fr-id';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
@@ -19,6 +21,8 @@ export const translations: Record<UiTranslationKey, string> = {
   ...PI.id,
   ...PF.id,
   ...SR.id,
+  ...EE.id,
+  ...MMC.id,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",
@@ -736,9 +740,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextRecent": "Analisis terbaru",
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextTitle": "Saham saat ini",
   "i18n.uiText.UI_TEXT.decisionSignals.stopLoss": "Batas rugi",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.feed": "Sinyal",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.history": "Riwayat",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.review": "Tinjauan",
   "i18n.uiText.UI_TEXT.decisionSignals.tab.rules": "Aturan",
   "i18n.uiText.UI_TEXT.decisionSignals.targetPrice": "Harga target",
   "i18n.uiText.UI_TEXT.decisionSignals.timelineAlertShape": "Titik berlian menunjukkan peringatan",
@@ -2897,7 +2898,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.portfolio.PORTFOLIO_TEXT.csvDryResult": "CSV Pratinjau hasil",
   "locales.portfolio.PORTFOLIO_TEXT.csvFile": "File CSV / Excel",
   "locales.portfolio.PORTFOLIO_TEXT.csvImport": "Pialang CSV impor",
-  "locales.portfolio.PORTFOLIO_TEXT.openImport": "Impor posisi",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseResult": "CSV Hasil penguraian",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseSummary": "{valid} valid,{skipped} dilewati,{errors} kesalahan.",
   "locales.portfolio.PORTFOLIO_TEXT.currency": "Mata uang kutipan",
@@ -5255,7 +5255,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "Profil kompresi konteks",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "Jumlah token pemicu kompresi konteks",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "Jumlah giliran percakapan yang dilindungi",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent terbatas",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.summary": "Konfigurasikan tahap debat opsional, batas, dan model khusus.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.title": "Debat Bull-Bear",
   "utils.systemConfigI18n.fieldTitleMaps.DEBATE_ENABLED": "Debat Bull-Bear Terstruktur",
@@ -5275,7 +5274,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Batas pemicu per hari",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Konfirmasi fitur Agent nonaktif",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Metode pembuatan jawaban saham",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "Mode komite investasi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Preset Sikap Riset",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Teks Sikap Riset Khusus",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Model utama Agen",
@@ -5295,7 +5293,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS": "Batas Waktu Usulan",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_STRATEGY": "Strategi Perencanaan Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MODE": "Mode Agen",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_MULTI_STRATEGY_DELIBERATION": "Musyawarah multi-strategi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Perutean bahasa alami Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Payload Mendalam Observabilitas Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Peristiwa Observabilitas Agen",
@@ -6446,7 +6443,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "Beritahu brief riset peristiwa",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "Simpan riwayat brief riset peristiwa",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "Simpan file brief riset peristiwa",
-
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "Memengaruhi latensi analisis satu simbol dan puncak panggilan penyedia bersamaan dalam satu jalankan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "Tidak mengubah konkurensi MAX_WORKERS lintas antrean multi-simbol.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "Urutan penggabungan ke stage IO / AgentContext mengikuti kunci tugas yang dideklarasikan, bukan urutan selesai.",
@@ -6462,7 +6458,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Batas global tarikan paralel",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Batas per-penyedia tarikan paralel",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualitas proses",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_LOG_ENABLED.summary": "Menyimpan episode Agen ringkas berisi lintasan, pelajaran, dan label hasil opsional.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_MAX_ROWS.summary": "Membatasi tabel episode dan menghapus baris tertua terlebih dahulu.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_RETENTION_DAYS.summary": "Usia maksimum episode sebelum pembersihan retensi.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.impact.0": "Menambah metadata mutu tanpa mengubah saran investasi.",
@@ -6480,7 +6475,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "Mengatur rentang posisi deterministik dengan bobot portofolio saat ini.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "Ukuran posisi berbasis portofolio",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "Tetap aktifkan untuk rentang berbasis portofolio. Bobot maksimum satu saham adalah pecahan 0 sampai 1 dan default 0,15.",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_LOG_ENABLED": "Log episode Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_MAX_ROWS": "Maksimum episode Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_RETENTION_DAYS": "Retensi episode Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_POSTMORTEM_ENABLED": "Evaluasi prediksi terselesaikan",
@@ -6489,6 +6483,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Siklus refleksi dalam proses",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "Anggaran panggilan LLM refleksi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_MAX_REVISE": "Maksimum revisi refleksi",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Rezim pasar",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Override rezim",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "Ukuran berbasis portofolio diaktifkan",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "Bobot maksimum satu saham",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_EXTRACT_ENABLED": "Ekstraksi Prediksi",

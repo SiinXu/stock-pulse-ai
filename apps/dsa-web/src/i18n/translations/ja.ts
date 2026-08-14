@@ -9,6 +9,8 @@ import { PORTFOLIO_HEALTH_TRANSLATIONS_EAST as PH } from '../portfolioHealthTran
 import { PORTFOLIO_INSIGHTS_TRANSLATIONS_EAST as PI } from '../portfolioInsightsTranslations.east';
 import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuImportTranslations.east';
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_JA_KO as SR } from '../settingsRegistryTranslations.east-ja-ko';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ja,
@@ -19,6 +21,8 @@ export const translations: Record<UiTranslationKey, string> = {
   ...PI.ja,
   ...PF.ja,
   ...SR.ja,
+  ...EE.ja,
+  ...MMC.ja,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",
@@ -736,9 +740,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextRecent": "最近の分析",
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextTitle": "現在の銘柄",
   "i18n.uiText.UI_TEXT.decisionSignals.stopLoss": "損切り",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.feed": "シグナル",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.history": "履歴",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.review": "振り返り",
   "i18n.uiText.UI_TEXT.decisionSignals.tab.rules": "ルール",
   "i18n.uiText.UI_TEXT.decisionSignals.targetPrice": "目標価格",
   "i18n.uiText.UI_TEXT.decisionSignals.timelineAlertShape": "ダイヤモンドポイントは警戒を示します",
@@ -2897,7 +2898,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.portfolio.PORTFOLIO_TEXT.csvDryResult": "CSV プレビュー結果",
   "locales.portfolio.PORTFOLIO_TEXT.csvFile": "CSV / Excel ファイル",
   "locales.portfolio.PORTFOLIO_TEXT.csvImport": "ブローカー CSV インポート",
-  "locales.portfolio.PORTFOLIO_TEXT.openImport": "ポジションをインポート",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseResult": "CSV 解析結果",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseSummary": "{valid} 有効、 {skipped} スキップされた、 {errors} エラー。",
   "locales.portfolio.PORTFOLIO_TEXT.currency": "建値通貨",
@@ -5255,7 +5255,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "コンテキスト圧縮プロファイル",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "コンテキスト圧縮の開始トークン数",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "保護する会話ターン数",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "有界 Multi-Agent Critic",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.summary": "任意の討論ステージ、制限、専用モデルを設定します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.title": "強気・弱気討論",
   "utils.systemConfigI18n.fieldTitleMaps.DEBATE_ENABLED": "構造化された強気・弱気討論",
@@ -5275,7 +5274,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "1日あたりのイベント上限",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 機能を当面オフと確認",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "銘柄相談の生成方式",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "投資委員会モード",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "調査姿勢プリセット",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "独自の調査姿勢テキスト",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "エージェントのプライマリモデル",
@@ -5295,7 +5293,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS": "計画案タイムアウト",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_STRATEGY": "エージェント計画戦略",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MODE": "エージェントモード",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_MULTI_STRATEGY_DELIBERATION": "マルチ戦略合議",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "エージェントの自然言語ルーティング",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "エージェント可観測性の詳細ペイロード",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "エージェント可観測性イベント",
@@ -6446,7 +6443,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "イベントリサーチブリーフ通知",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "イベントリサーチブリーフ履歴保存",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "イベントリサーチブリーフ報告ファイル保存",
-
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "1銘柄分析のレイテンシと、1実行内でのプロバイダ同時呼び出しのピークに影響します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "キュー全体の複数銘柄向け MAX_WORKERS 同時実行数は変更しません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "stage IO / AgentContext へのマージ順は宣言されたタスクキー順であり、完了順ではありません。",
@@ -6462,7 +6458,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取得の全体上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取得のプロバイダ別上限",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "プロセス品質",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_LOG_ENABLED.summary": "軌跡、教訓、任意の結果ラベルを含むコンパクトな Agent エピソードを保存します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_MAX_ROWS.summary": "エピソード表の上限を設定し、古い行から削除します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_RETENTION_DAYS.summary": "保持期間の整理前にエピソードを保存する最大日数です。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.impact.0": "助言を変えずに品質管理メタデータを追加します。",
@@ -6480,7 +6475,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "現在のポートフォリオ比率を使って決定的なポジション範囲を制御します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "ポートフォリオ対応ポジションサイズ",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "ポートフォリオ対応範囲では有効にします。1銘柄の上限は 0～1 の小数で、既定値は 0.15 です。",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_LOG_ENABLED": "Agent エピソードログ",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_MAX_ROWS": "Agent エピソード最大件数",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_RETENTION_DAYS": "Agent エピソード保持日数",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_POSTMORTEM_ENABLED": "解決済み予測の振り返り",
@@ -6489,6 +6483,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "実行内リフレクションループ",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "リフレクション LLM 呼び出し予算",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_MAX_REVISE": "リフレクション最大修正回数",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "市場レジーム",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "レジーム上書き",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "ポートフォリオ対応サイズを有効化",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "1銘柄の最大比率",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_EXTRACT_ENABLED": "予測抽出",

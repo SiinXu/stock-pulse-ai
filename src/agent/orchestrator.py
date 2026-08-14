@@ -126,6 +126,7 @@ from src.agent.orchestrator_parts.dashboard import (
     _dashboard_content_json,
 )
 from src.agent.orchestrator_parts.execution import _ExecutionMethods
+from src.agent.orchestrator_parts import disagreement as _disagreement
 from src.agent.orchestrator_parts.pipeline import _PipelineMethods
 
 if TYPE_CHECKING:
@@ -299,10 +300,18 @@ class AgentOrchestrator:
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
         self.skill_manager = skill_manager
         self.config = config
+        from src.agent.disagreement_handling import disagreement_handling_thresholds
+
+        high_threshold, medium_threshold = disagreement_handling_thresholds(config)
         self.strategy_engine = StrategyEngine(
             deliberation_enabled=bool(
                 getattr(config, "agent_multi_strategy_deliberation", False)
             ),
+            disagreement_handling_enabled=bool(
+                getattr(config, "agent_disagreement_handling", False)
+            ),
+            disagreement_high_confidence_threshold=high_threshold,
+            disagreement_medium_confidence_threshold=medium_threshold,
         )
         self.runtime_guard_policy = (
             runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)
@@ -420,7 +429,7 @@ def _adjust_sentiment_score(score: int, signal: str) -> int:
     return max(low, min(high, score))
 
 
-def _adjust_operation_advice(advice: str, signal: str) -> str:
+def _adjust_operation_advice(advice: str, signal: str, *, source: str = "risk") -> str:
     """Normalize action wording to the overridden decision signal."""
     mapping = {
         "buy": "买入",
@@ -431,6 +440,8 @@ def _adjust_operation_advice(advice: str, signal: str) -> str:
         return advice
     if advice == mapping[signal]:
         return advice
+    if source == "disagreement":
+        return f"{mapping[signal]}（原建议因高分歧下调）"
     return f"{mapping[signal]}（原建议已被风控下调）"
 
 

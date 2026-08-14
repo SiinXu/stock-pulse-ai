@@ -889,6 +889,7 @@ P3 itself did not add API/Web/Bot parameters, persist fields into history/task s
 
 Before `DecisionAgent` runs, the multi-agent pipeline builds an internal low-sensitivity `agent_disagreement_summary` that summarizes directional disagreement across prior Agent opinions, risk-override evidence, whether risk override is enabled by the current `AGENT_RISK_OVERRIDE` setting, and non-critical stage degradation. The summary only contains agent name, signal, confidence, conflict type, decision path hint, low-sensitivity risk-control state, and degraded-stage markers. It does not include reasoning, raw data, raw error text, tokens, or private payloads.
 - `AGENT_MULTI_STRATEGY_DELIBERATION=false` — multi-strategy deliberation cluster (default off).
+- `AGENT_DISAGREEMENT_HANDLING=false` — structured disagreement handling (default off): record points, dual-layer cross-validation, and high-disagreement split verdict on final products.
 
 This is currently only internal Prompt input plumbing for `DecisionAgent`: the summary is stored in runtime `ctx.meta`, is not injected through Agent pre-fetched data, and does not add public API fields, Web/Desktop display, history/task-status/report metadata, dashboard schema, or final explanation fields. `risk_level=high` is risk evidence only and does not trigger override by itself; the summary and final `_apply_risk_override()` share the same override predicate and respect `AGENT_RISK_OVERRIDE=false`. Non-critical degraded stages reuse the orchestrator contract for `intel`, `risk`, and specialist/skill agents, so a remaining single directional opinion is not described as multi-agent consensus. User-visible final explanation output for #1904 remains a later phase.
 
@@ -1360,6 +1361,30 @@ A-share ETFs are identified as a distinct instrument type and take the **ETF ana
 | Report structure | Shared decision-dashboard JSON with equities; no separate ETF template |
 
 Representative regression codes: `510300`, `510050`, `159915`, `159919`, `512880`. Validation-layer ETF false-positive calibration is documented in `docs/data-validation-layer.md` and Issue #185.
+
+### Multi-Model Consensus Comparison (optional)
+
+Default **off**. When `MULTI_MODEL_CONSENSUS_ENABLED=true`, the legacy stock analysis path can run the **same shared data snapshot** across 2–3 models sequentially (explicit list, `fast`/`quality` preset, or primary + fallbacks; sequential by default because the shared analyzer is not thread-safe), then attach a structured product payload:
+
+- Agreement table: action / score band / key risks per model
+- Consensus level + agreement score (not a blended trading signal)
+- Disagreement points using the same low-sensitivity point contract as multi-agent disagreement handling (`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`)
+- Hard honesty rules: **no majority vote**, **no averaging** of opposing directions; high disagreement stays visible; single-model failure degrades to the surviving result with `single_model_fallback` annotation
+- With fewer than two usable conclusions, the agreement score is explicitly **Not evaluated** instead of a misleading `0`; `NaN` and `±Inf` are rejected in budgets, confidence metrics, and shared snapshots
+- `brief` keeps only the Decision Card, key risk, and explicit omission notice; the full comparison is limited to `standard` / `research`, history export, and non-brief notifications so push budgets remain bounded
+- Model id / version / provider identities are recorded under `dashboard.multi_model_comparison.trace` and each LLM diagnostic run uses `call_type=multi_model_consensus`
+
+```bash
+MULTI_MODEL_CONSENSUS_ENABLED=true
+MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
+# or: MULTI_MODEL_CONSENSUS_PRESET=fast
+MULTI_MODEL_CONSENSUS_MAX_MODELS=3
+# MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+# Budget rules: empty = MAX_MODELS only; 0 = close multi-model fan-out;
+# positive (no live pricing yet) = hard-cap to 2 models and record skipped models.
+```
+
+Agent multi-agent mode is unchanged by this flag. Related multi-agent disagreement handling remains a separate surface (Issues #246 / #193 / PR #1205).
 
 ### Multi-Model Switching
 

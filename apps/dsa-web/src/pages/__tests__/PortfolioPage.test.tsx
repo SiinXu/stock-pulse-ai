@@ -894,10 +894,10 @@ describe('PortfolioPage FX refresh', () => {
 
     renderPortfolioPage();
     await waitForInitialLoad();
-    await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
     expect(within(wizard).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
     expect(within(wizard).getByRole('combobox', { name: '券商' })).toBeDisabled();
@@ -926,9 +926,11 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
-    await screen.findByRole('region', { name: '导入持仓向导' });
-    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    const source = screen.getByLabelText('或粘贴表格文本');
+    const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    const nextButton = within(wizard).getByRole('button', { name: '下一步' });
+    await waitFor(() => expect(nextButton).toBeEnabled());
+    fireEvent.click(nextButton);
+    const source = within(wizard).getByLabelText('或粘贴表格文本');
     fireEvent.change(source, { target: { value: 'symbol,quantity\nAAPL,bad' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 

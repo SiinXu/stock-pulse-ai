@@ -748,6 +748,10 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         Path(__file__).resolve().parents[1]
         / "apps/dsa-web/src/utils/systemConfigI18n.ts"
     )
+    _FEATURE_FIELD_TITLE_FILE = (
+        Path(__file__).resolve().parents[1]
+        / "apps/dsa-web/src/i18n/evidenceExportErrorTranslations.ts"
+    )
     _FIELD_TITLE_MAP_RE = re.compile(
         r"const fieldTitleMapZh = \{\n(?P<body>.*?)\n\} as const;",
         flags=re.DOTALL,
@@ -756,12 +760,19 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         r"const fieldTitleMapEn = \{\n(?P<body>.*?)\n\} satisfies",
         flags=re.DOTALL,
     )
+    _FEATURE_FIELD_TITLE_MAP_RE = re.compile(
+        r"export const EVIDENCE_EXPORT_FIELD_TITLES = \{\n"
+        r"  zh: \{\n(?P<zh>.*?)\n  \},\n"
+        r"  en: \{\n(?P<en>.*?)\n  \},\n"
+        r"\} as const;",
+        flags=re.DOTALL,
+    )
     _FIELD_TITLE_KEY_RE = re.compile(
-        r"^\s{2}([A-Z][A-Z0-9_]*)\s*:",
+        r"^\s+([A-Z][A-Z0-9_]*)\s*:",
         flags=re.MULTILINE,
     )
     _FIELD_TITLE_EN_ENTRY_RE = re.compile(
-        r"^\s{2}([A-Z][A-Z0-9_]*)\s*:\s*'([^']*)',$",
+        r"^\s+([A-Z][A-Z0-9_]*)\s*:\s*'([^']*)',$",
         flags=re.MULTILINE,
     )
 
@@ -771,9 +782,14 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         match = cls._FIELD_TITLE_MAP_RE.search(content)
         if match is None:
             raise AssertionError("Unable to locate fieldTitleMapZh in systemConfigI18n.ts")
+        feature_content = cls._FEATURE_FIELD_TITLE_FILE.read_text(encoding="utf-8")
+        feature_match = cls._FEATURE_FIELD_TITLE_MAP_RE.search(feature_content)
+        if feature_match is None:
+            raise AssertionError("Unable to locate EVIDENCE_EXPORT_FIELD_TITLES")
         keys = cls._FIELD_TITLE_KEY_RE.findall(match.group("body"))
+        keys.extend(cls._FIELD_TITLE_KEY_RE.findall(feature_match.group("zh")))
         if len(keys) != len(set(keys)):
-            raise AssertionError("fieldTitleMapZh contains duplicate field keys")
+            raise AssertionError("Composed field-title catalog contains duplicate field keys")
         return set(keys)
 
     @classmethod
@@ -783,9 +799,14 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         if match is None:
             raise AssertionError("Unable to locate fieldTitleMapEn in systemConfigI18n.ts")
         entries = cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body"))
+        feature_content = cls._FEATURE_FIELD_TITLE_FILE.read_text(encoding="utf-8")
+        feature_match = cls._FEATURE_FIELD_TITLE_MAP_RE.search(feature_content)
+        if feature_match is None:
+            raise AssertionError("Unable to locate EVIDENCE_EXPORT_FIELD_TITLES")
+        entries.extend(cls._FIELD_TITLE_EN_ENTRY_RE.findall(feature_match.group("en")))
         titles = dict(entries)
         if len(entries) != len(titles):
-            raise AssertionError("fieldTitleMapEn contains duplicate field keys")
+            raise AssertionError("Composed English field-title catalog contains duplicate field keys")
         return titles
 
     def test_web_field_titles_match_registered_fields(self) -> None:
@@ -866,6 +887,25 @@ class TestSettingsHelpContract(unittest.TestCase):
         registry_help_keys = self._collect_registry_help_keys()
         missing = sorted(registry_help_keys - locale_keys)
         self.assertEqual(missing, [], f"Registry help keys missing locale: {missing}")
+
+    def test_market_regime_fields_share_help_contract(self) -> None:
+        help_key = "settings.agent.market_regime"
+        expected_titles = {
+            "MARKET_REGIME_ENABLED": "Market Regime",
+            "MARKET_REGIME_OVERRIDE": "Regime Override",
+        }
+        for field_key, title in expected_titles.items():
+            definition = get_field_definition(field_key)
+            self.assertEqual(definition["title"], title)
+            self.assertEqual(definition["help_key"], help_key)
+
+        for path in self._SETTINGS_HELP_FILES:
+            content = path.read_text(encoding="utf-8")
+            self.assertEqual(
+                len(re.findall(rf"^\s*'{re.escape(help_key)}'\s*:\s*\{{", content, re.MULTILINE)),
+                1,
+                f"{path.name} must define the shared market-regime help exactly once",
+            )
 
     def test_locale_help_keys_are_registry_or_llm_channel_internal(self) -> None:
         registry_help_keys = self._collect_registry_help_keys()

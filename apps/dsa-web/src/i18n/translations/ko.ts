@@ -9,6 +9,8 @@ import { PORTFOLIO_HEALTH_TRANSLATIONS_EAST as PH } from '../portfolioHealthTran
 import { PORTFOLIO_INSIGHTS_TRANSLATIONS_EAST as PI } from '../portfolioInsightsTranslations.east';
 import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuImportTranslations.east';
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_JA_KO as SR } from '../settingsRegistryTranslations.east-ja-ko';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ko,
@@ -19,6 +21,8 @@ export const translations: Record<UiTranslationKey, string> = {
   ...PI.ko,
   ...PF.ko,
   ...SR.ko,
+  ...EE.ko,
+  ...MMC.ko,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",
@@ -736,9 +740,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextRecent": "최근 분석",
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextTitle": "현재 종목",
   "i18n.uiText.UI_TEXT.decisionSignals.stopLoss": "손절",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.feed": "신호",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.history": "기록",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.review": "검토",
   "i18n.uiText.UI_TEXT.decisionSignals.tab.rules": "규칙",
   "i18n.uiText.UI_TEXT.decisionSignals.targetPrice": "목표 가격",
   "i18n.uiText.UI_TEXT.decisionSignals.timelineAlertShape": "다이아몬드 포인트는 경계 상태를 나타냅니다",
@@ -2897,7 +2898,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.portfolio.PORTFOLIO_TEXT.csvDryResult": "CSV 미리보기 결과",
   "locales.portfolio.PORTFOLIO_TEXT.csvFile": "CSV / Excel 파일",
   "locales.portfolio.PORTFOLIO_TEXT.csvImport": "중개인 CSV 임포트",
-  "locales.portfolio.PORTFOLIO_TEXT.openImport": "포지션 가져오기",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseResult": "CSV 파싱 결과",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseSummary": "{valid} 유효합니다,{skipped} 건너뛴,{errors} 오류들.",
   "locales.portfolio.PORTFOLIO_TEXT.currency": "표시 통화",
@@ -5255,7 +5255,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "컨텍스트 압축 프로필",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "컨텍스트 압축 시작 토큰 수",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "보호할 대화 턴 수",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "제한된 Multi-Agent Critic",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.summary": "선택적 토론 단계, 제한 및 전용 모델을 설정합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.title": "강세-약세 토론",
   "utils.systemConfigI18n.fieldTitleMaps.DEBATE_ENABLED": "구조화된 강세-약세 토론",
@@ -5275,7 +5274,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "일일 이벤트 한도",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Agent 기능 사용 안 함 확인",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "종목 질의 생성 방식",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "투자위원회 모드",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "연구 관점 프리셋",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "사용자 지정 연구 관점 텍스트",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "에이전트 기본 모델",
@@ -5295,7 +5293,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS": "계획 제안 시간 제한",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_STRATEGY": "에이전트 계획 전략",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MODE": "에이전트 모드",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_MULTI_STRATEGY_DELIBERATION": "다중 전략 합의",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "에이전트 자연어 라우팅",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "에이전트 관측 상세 페이로드",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "에이전트 관측 이벤트",
@@ -6446,7 +6443,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "이벤트 리서치 브리프 알림",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "이벤트 리서치 브리프 이력 저장",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "이벤트 리서치 브리프 보고서 저장",
-
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "단일 종목 분석 지연과 한 실행 내 제공자 동시 호출 피크에 영향을 줍니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "다중 종목 큐의 MAX_WORKERS 동시성을 바꾸지 않습니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "stage IO / AgentContext 병합 순서는 선언된 작업 키 순이며 완료 순이 아닙니다.",
@@ -6462,7 +6458,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "병렬 수집 전역 상한",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "병렬 수집 제공자별 상한",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "과정 품질",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_LOG_ENABLED.summary": "궤적, 교훈, 선택적 결과 레이블이 포함된 간결한 Agent 에피소드를 저장합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_MAX_ROWS.summary": "에피소드 테이블 크기를 제한하고 가장 오래된 행부터 삭제합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_RETENTION_DAYS.summary": "보존 정리 전에 에피소드를 유지하는 최대 기간입니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.impact.0": "조언은 바꾸지 않고 품질 운영 메타데이터를 추가합니다.",
@@ -6480,7 +6475,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "현재 포트폴리오 비중으로 결정적 포지션 범위를 제어합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "포트폴리오 인지 포지션 산정",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "포트폴리오 인지 범위에서는 활성화하세요. 단일 종목 최대 비중은 0~1 소수이며 기본값은 0.15입니다.",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_LOG_ENABLED": "Agent 에피소드 로그",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_MAX_ROWS": "Agent 에피소드 최대 행 수",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_RETENTION_DAYS": "Agent 에피소드 보존 기간",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_POSTMORTEM_ENABLED": "해결된 예측 회고",
@@ -6489,6 +6483,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "실행 내 성찰 루프",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "성찰 LLM 호출 예산",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_MAX_REVISE": "성찰 최대 수정 횟수",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "시장",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "강제",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "포트폴리오 인지 산정 활성화",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "단일 종목 최대 비중",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_EXTRACT_ENABLED": "예측 추출",

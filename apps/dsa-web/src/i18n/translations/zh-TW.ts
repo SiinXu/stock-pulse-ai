@@ -9,6 +9,8 @@ import { PORTFOLIO_HEALTH_TRANSLATIONS_EAST as PH } from '../portfolioHealthTran
 import { PORTFOLIO_INSIGHTS_TRANSLATIONS_EAST as PI } from '../portfolioInsightsTranslations.east';
 import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuImportTranslations.east';
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_MS_ZHTW as SR } from '../settingsRegistryTranslations.east-ms-zhtw';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M['zh-TW'],
@@ -19,6 +21,8 @@ export const translations: Record<UiTranslationKey, string> = {
   ...PI['zh-TW'],
   ...PF['zh-TW'],
   ...SR['zh-TW'],
+  ...EE['zh-TW'],
+  ...MMC['zh-TW'],
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",
@@ -736,9 +740,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextRecent": "最近分析",
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextTitle": "當前股票",
   "i18n.uiText.UI_TEXT.decisionSignals.stopLoss": "停損",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.feed": "訊號",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.history": "歷史",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.review": "復盤",
   "i18n.uiText.UI_TEXT.decisionSignals.tab.rules": "規則",
   "i18n.uiText.UI_TEXT.decisionSignals.targetPrice": "目標價",
   "i18n.uiText.UI_TEXT.decisionSignals.timelineAlertShape": "菱形點表示 alert",
@@ -2897,7 +2898,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.portfolio.PORTFOLIO_TEXT.csvDryResult": "CSV 預演結果",
   "locales.portfolio.PORTFOLIO_TEXT.csvFile": "CSV / Excel 檔案",
   "locales.portfolio.PORTFOLIO_TEXT.csvImport": "券商 CSV 匯入",
-  "locales.portfolio.PORTFOLIO_TEXT.openImport": "匯入持倉",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseResult": "CSV 解析結果",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseSummary": "有效 {valid} 條，跳過 {skipped} 條，錯誤 {errors} 條。",
   "locales.portfolio.PORTFOLIO_TEXT.currency": "計價幣種",
@@ -5255,7 +5255,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "上下文壓縮設定檔",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "上下文壓縮觸發 Token 數",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "保留的 Agent 對話輪數",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "有界 Multi-Agent Critic",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.summary": "設定可選辯論階段、限制與專用模型。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.title": "多空辯論",
   "utils.systemConfigI18n.fieldTitleMaps.DEBATE_ENABLED": "結構化多空辯論",
@@ -5275,7 +5274,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "事件觸發每日上限",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "確認暫不使用 Agent 功能",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "問股生成方式",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "投委會模式",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "研究立場預設",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "自訂研究立場",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Agent 主要模型",
@@ -5295,7 +5293,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS": "規劃提案逾時",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_STRATEGY": "Agent 規劃策略",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MODE": "Agent 模式",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_MULTI_STRATEGY_DELIBERATION": "多策略合議",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Agent 自然語言路由",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Agent 可觀測性深度負載",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Agent 可觀測性事件",
@@ -6446,7 +6443,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "事件研究簡報推送通知",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "事件研究簡報持久化历史",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "事件研究簡報儲存報告檔案",
-
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "影響單檔分析延遲，以及單次執行內對資料源的峰值並行。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "不改變跨股票佇列的 MAX_WORKERS 並行語意。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "寫入 stage IO / AgentContext 的合併順序依宣告 key，不依完成先後。",
@@ -6462,7 +6458,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "並行取數全域並行上限",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "並行取數單源並行上限",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "流程品質",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_LOG_ENABLED.summary": "寫入包含軌跡摘要、教訓與可選結果標籤的精簡 Agent episode。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_MAX_ROWS.summary": "限制 episode 資料表容量，超出時優先刪除最舊資料列。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_RETENTION_DAYS.summary": "episode 在保留清理前可保存的最長天數。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.impact.0": "新增品質營運中繼資料，不改變投資建議。",
@@ -6480,7 +6475,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "使用當前組合權重控制確定性倉位區間。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "組合感知倉位計算",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "需要組合感知區間時保持啟用。單一標的權重上限為 0 到 1 的小數，預設 0.15。",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_LOG_ENABLED": "Agent episode 日誌",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_MAX_ROWS": "Agent episode 最大列數",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_RETENTION_DAYS": "Agent episode 保留天數",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_POSTMORTEM_ENABLED": "已解析預測覆盤",
@@ -6489,6 +6483,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "執行內反思循環",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "反思 LLM 呼叫預算",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_MAX_REVISE": "反思最大修訂次數",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "市場狀態",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "狀態強制值",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "啟用組合感知倉位計算",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "組合單一標的最大權重",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_EXTRACT_ENABLED": "預測記錄抽取",

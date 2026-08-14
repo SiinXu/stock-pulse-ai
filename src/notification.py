@@ -61,6 +61,8 @@ from src.report_language import (
     localize_trend_prediction,
     normalize_report_language,
     normalize_strategy_synthesis_payload,
+    normalize_disagreement_handling_payload as _normalize_disagreement_handling_payload,
+    localize_disagreement_verdict_mode as _localize_disagreement_verdict_mode,
     strategy_invalid_opinion_count,
 )
 from src.schemas.decision_action import (
@@ -187,10 +189,27 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
-def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, labels: Dict[str, str], report_language: str) -> None:
-    """Append the full localized strategy synthesis block when present."""
+def _append_strategy_synthesis_block(
+    lines: List[str],
+    strategy_synthesis: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    dashboard: Any = None,
+) -> None:
+    """Append the strategy synthesis block and any standalone disagreement banner."""
     strategy_synthesis = normalize_strategy_synthesis_payload(strategy_synthesis)
     if not strategy_synthesis:
+        before = len(lines)
+        _append_disagreement_handling_block(
+            lines,
+            None,
+            labels,
+            report_language,
+            dashboard=dashboard,
+        )
+        if len(lines) > before:
+            lines.append("")
         return
     confidence = strategy_synthesis.get("confidence")
     confidence_text = f"{confidence:.0%}" if isinstance(confidence, (int, float)) else "N/A"
@@ -232,6 +251,90 @@ def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, 
             lines.append(
                 f"- {localize_conflict_severity(conflict.get('severity', 'medium'), report_language)}: "
                 f"{localize_strategy_conflict_description(conflict.get('conflict_type'), report_language)}{suffix}"
+            )
+    _append_disagreement_handling_block(
+        lines,
+        strategy_synthesis,
+        labels,
+        report_language,
+        dashboard=dashboard,
+    )
+    lines.append("")
+
+
+def _append_multi_model_comparison_block(
+    lines: List[str],
+    multi_model: Any,
+    labels: Dict[str, str],
+    report_language: str,
+) -> None:
+    """Append multi-model consensus comparison when present (#154)."""
+    if not isinstance(multi_model, dict) or not multi_model.get("enabled"):
+        return
+    handling = multi_model.get("disagreement_handling") or {}
+    if not isinstance(handling, dict):
+        handling = {}
+    lines.extend(
+        [
+            f"### 🤝 {labels.get('multi_model_comparison_heading', 'Multi-Model Consensus')}",
+            "",
+        ]
+    )
+    if handling.get("high_disagreement"):
+        lines.append(
+            f"> ⚠️ {labels.get('multi_model_high_disagreement_banner', 'High multi-model disagreement')}"
+        )
+    not_evaluated = labels.get("multi_model_not_evaluated_label", "Not evaluated")
+    consensus_score = multi_model.get("consensus_score")
+    lines.append(
+        f"- {labels.get('multi_model_status_label', 'Status')}: "
+        f"{multi_model.get('status', 'N/A')} | "
+        f"{labels.get('multi_model_consensus_level_label', 'Consensus')}: "
+        f"{localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language)} | "
+        f"{labels.get('multi_model_consensus_score_label', 'Agreement')}: "
+        f"{consensus_score if consensus_score is not None else not_evaluated}"
+    )
+    degradation = multi_model.get("degradation")
+    if isinstance(degradation, dict) and (
+        degradation.get("annotation") or degradation.get("reason")
+    ):
+        lines.append(
+            f"- {labels.get('multi_model_degraded_label', 'Degradation')}: "
+            f"{degradation.get('annotation') or degradation.get('reason')}"
+        )
+    lines.append(
+        f"- {labels.get('multi_model_no_majority_note', 'Disagreement was not averaged')}"
+    )
+    for row in (multi_model.get("agreement_table") or [])[:5]:
+        if not isinstance(row, dict):
+            continue
+        raw_signal = row.get("signal") or row.get("action")
+        localized_signal = (
+            localize_strategy_signal(raw_signal, report_language)
+            if raw_signal
+            else not_evaluated
+        )
+        lines.append(
+            f"- `{row.get('model_id') or row.get('model_version') or 'model'}` "
+            f"({row.get('status') or 'n/a'}): "
+            f"{localized_signal}"
+            f" | {row.get('score_band') or not_evaluated}"
+        )
+    points = handling.get("points")
+    if isinstance(points, list) and points:
+        lines.append(
+            f"**{labels.get('multi_model_disagreement_points_label', 'Disagreement points')}**"
+        )
+        for point in points[:8]:
+            if not isinstance(point, dict):
+                continue
+            participants = ", ".join(
+                str(p) for p in (point.get("participants") or []) if str(p).strip()
+            )
+            lines.append(
+                f"- [{point.get('severity') or 'medium'}] "
+                f"{point.get('kind') or 'unknown'}"
+                f"{(' — ' + participants) if participants else ''}"
             )
     lines.append("")
 
@@ -695,6 +798,39 @@ def get_notification_service() -> NotificationService:
     """获取通知服务实例"""
     return NotificationService()
 
+def _append_disagreement_handling_block(
+    lines: List[str],
+    strategy_synthesis: Any,
+    labels: Dict[str, str],
+    report_language: str,
+    *,
+    dashboard: Any = None,
+) -> None:
+    """Append high-disagreement annotation so final products never silently smooth conflicts."""
+    handling = None
+    if isinstance(strategy_synthesis, dict):
+        handling = strategy_synthesis.get("disagreement_handling")
+    if not isinstance(handling, dict) and isinstance(dashboard, dict):
+        handling = dashboard.get("disagreement_handling")
+    handling = _normalize_disagreement_handling_payload(handling)
+    if not handling or not handling.get("high_disagreement"):
+        return
+    lines.append(f"- ⚠️ {labels.get('disagreement_high_banner', 'High disagreement')}")
+    lines.append(
+        f"- {labels.get('disagreement_verdict_label', 'Verdict mode')}: "
+        f"{_localize_disagreement_verdict_mode(handling.get('verdict_mode'), report_language)} | "
+        f"{labels.get('disagreement_escalation_label', 'Escalation')}: {handling.get('escalation')} | "
+        f"{labels.get('disagreement_score_label', 'Disagreement score')}: "
+        f"{(handling.get('disagreement_score') or 0) * 100:.0f}%"
+    )
+    lines.append(f"- {labels.get('disagreement_no_majority_note', 'Majority vote was not used')}")
+    for point in (handling.get("points") or [])[:3]:
+        if not isinstance(point, dict):
+            continue
+        lines.append(
+            f"- {labels.get('disagreement_points_label', 'Disagreement points')}: "
+            f"[{point.get('source')}] {point.get('severity')}/{point.get('kind')}"
+        )
 
 def send_daily_report(results: List[AnalysisResult]) -> bool:
     """

@@ -40,6 +40,7 @@ from src.agent.skills.defaults import extract_skill_id
 from src.agent.tools.registry import ToolRegistry
 from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
+from src.market_regime_prompt import format_market_regime_prompt_section
 from src.report_language import normalize_report_language
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 from src.utils.sanitize import log_safe_exception
@@ -274,6 +275,13 @@ class BaseAgent(ABC):
         )
         if market_structure_section:
             messages.append({"role": "user", "content": market_structure_section})
+
+        market_regime_section = format_market_regime_prompt_section(
+            ctx.meta.get("market_regime_context"),
+            report_language=report_language,
+        )
+        if market_regime_section:
+            messages.append({"role": "user", "content": market_regime_section})
 
         analysis_context_pack_summary = ctx.meta.get("analysis_context_pack_summary")
         if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:

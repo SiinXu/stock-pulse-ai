@@ -83,6 +83,12 @@
 {% set strategy_synthesis = normalize_strategy_synthesis_payload(dashboard.get('strategy_synthesis')) %}
 {% if strategy_synthesis %}
 🧩 **{{ labels.strategy_synthesis_heading }}**: {{ localize_strategy_signal(strategy_synthesis.get('final_signal', 'N/A'), report_language) }} | {{ labels.strategy_consensus_level_label }} {{ localize_consensus_level(strategy_synthesis.get('consensus_level', 'N/A'), report_language) }} | {{ labels.strategy_conflict_label }} {{ localize_conflict_severity(strategy_synthesis.get('conflict_severity', 'none'), report_language) }}({{ strategy_synthesis.get('conflict_count', 0) }})
+{% endif %}
+{% set disagreement_handling = normalize_disagreement_handling_payload((strategy_synthesis.get('disagreement_handling') if strategy_synthesis else none) or (dashboard.get('disagreement_handling') if dashboard else none)) %}
+{% if disagreement_handling and disagreement_handling.get('high_disagreement') %}
+⚠️ **{{ labels.disagreement_high_banner }}** | {{ labels.disagreement_verdict_label }} {{ localize_disagreement_verdict_mode(disagreement_handling.get('verdict_mode'), report_language) }} | {{ labels.disagreement_no_majority_note }}
+{% endif %}
+{% if strategy_synthesis %}
 - {{ labels.strategy_supporting_skills_label }}: {{ format_strategy_skill_items(strategy_synthesis.get('supporting_skills'), report_language, include_details=false) }}
 - {{ labels.strategy_opposing_skills_label }}: {{ format_strategy_skill_items(strategy_synthesis.get('opposing_skills'), report_language, include_details=false) }}
 {% set invalid_opinion_count = strategy_invalid_opinion_count(strategy_synthesis) %}
@@ -114,6 +120,23 @@
 {% if committee.get('dissenting_opinions') %}
 {{ labels.committee_dissent_label }}: {% for item in (committee.get('dissenting_opinions') or [])[:2] %}{{ item.get('display_name') or item.get('persona_id') }}={{ localize_strategy_signal(item.get('signal') or 'N/A', report_language) }}{{ '、' if not loop.last else '' }}{% endfor %}
 {% endif %}
+{% endif %}
+
+{% set multi_model = dashboard.get('multi_model_comparison') if dashboard else none %}
+{% if multi_model and multi_model.get('enabled') and mode_limits.get('include_detail_sections') %}
+🤝 **{{ labels.multi_model_comparison_heading }}**
+{% set mm_handling = multi_model.get('disagreement_handling') or {} %}
+{% if mm_handling.get('high_disagreement') %}
+⚠️ {{ labels.multi_model_high_disagreement_banner }}
+{% endif %}
+- {{ labels.multi_model_consensus_level_label }}: {{ localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language) }}
+{% for row in (multi_model.get('agreement_table') or [])[:3] %}
+- {{ row.get('model_id') or 'model' }}: {{ localize_strategy_signal(row.get('signal'), report_language) if row.get('signal') else labels.multi_model_not_evaluated_label }}
+{% endfor %}
+{% if multi_model.get('degradation') %}
+- {{ labels.multi_model_degraded_label }}: {{ (multi_model.get('degradation') or {}).get('annotation') or (multi_model.get('degradation') or {}).get('reason') }}
+{% endif %}
+{{ labels.multi_model_no_majority_note }}
 {% endif %}
 
 {% set bull_bear_debate = dashboard.get('bull_bear_debate') if dashboard else none %}

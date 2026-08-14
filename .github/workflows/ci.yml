@@ -28,12 +28,17 @@ jobs:
       # shared runtime/config contracts change (provider templates, help copy,
       # public assets consumed outside the SPA).
       backend: ${{ steps.backend-filter.outputs.backend_non_web == 'true' || steps.filter.outputs.backend_web_contract == 'true' }}
+      backend_full: ${{ steps.backend-selection.outputs.full || 'false' }}
       docker: ${{ steps.filter.outputs.docker }}
       frontend: ${{ steps.filter.outputs.frontend }}
       web_e2e: ${{ steps.filter.outputs.web_e2e }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The PR test planner needs the merge base to distinguish FULL from
+          # selective coverage before backend jobs are scheduled.
+          fetch-depth: 0
       - name: 🧭 Filter paths
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -89,6 +94,23 @@ jobs:
               - '!apps/dsa-web/**'
               - '!docs/CHANGELOG.md'
               - '!docs/changelog.d/**'
+      - name: 🧪 Plan PR backend test tier
+        id: backend-selection
+        if: >-
+          github.event_name == 'pull_request' &&
+          (steps.backend-filter.outputs.backend_non_web == 'true' ||
+           steps.filter.outputs.backend_web_contract == 'true')
+        env:
+          CI_SELECT_BASE: origin/${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          selection="$(python scripts/ci_select_tests.py --base "${CI_SELECT_BASE}")"
+          if [ "${selection}" = "FULL" ]; then
+            echo "full=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "full=false" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "Backend test selection: ${selection}"
 
   ai-governance:
     name: ai-governance
@@ -166,15 +188,15 @@ jobs:
           rm -rf "${test_data_dir}"
 
   # ---------------------------------------------------------------------------
-  # PR tier: fast backend-gate (selective pytest; full suite on uncertain path
-  # maps). Required check name: backend-gate
+  # PR tier: fast backend-gate for selective pytest. FULL selections use the
+  # sharded suite and summary job below. Required check name: backend-gate.
   # ---------------------------------------------------------------------------
   backend-gate:
     name: backend-gate
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [changes, ai-governance]
-    if: github.event_name == 'pull_request' && needs.changes.outputs.backend == 'true'
+    if: github.event_name == 'pull_request' && needs.changes.outputs.backend == 'true' && needs.changes.outputs.backend_full != 'true'
     permissions:
       contents: read
     steps:
@@ -244,15 +266,15 @@ jobs:
           ./scripts/ci_gate.sh offline-tests-selective
 
   # ---------------------------------------------------------------------------
-  # Push-to-main tier: sharded full offline suite. Coverage floor runs once
-  # after combine. Required check name still: backend-gate (summary job below).
+  # Full-suite tier: sharded offline suite for push-to-main and PRs whose path
+  # mapping fails closed to FULL. Coverage floor runs once after combine.
   # ---------------------------------------------------------------------------
   backend-tests:
     name: backend-tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [changes, ai-governance]
-    if: github.event_name == 'push' && needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true' && (github.event_name == 'push' || (github.event_name == 'pull_request' && needs.changes.outputs.backend_full == 'true'))
     permissions:
       contents: read
     strategy:
@@ -336,7 +358,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [changes, ai-governance, backend-tests]
-    if: always() && github.event_name == 'push' && needs.changes.outputs.backend == 'true'
+    if: always() && needs.changes.outputs.backend == 'true' && (github.event_name == 'push' || (github.event_name == 'pull_request' && needs.changes.outputs.backend_full == 'true'))
     permissions:
       contents: read
     steps:

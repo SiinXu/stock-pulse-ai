@@ -9,6 +9,8 @@ import { PORTFOLIO_HEALTH_TRANSLATIONS_EAST as PH } from '../portfolioHealthTran
 import { PORTFOLIO_INSIGHTS_TRANSLATIONS_EAST as PI } from '../portfolioInsightsTranslations.east';
 import { PORTFOLIO_FUTU_IMPORT_TRANSLATIONS_EAST as PF } from '../portfolioFutuImportTranslations.east';
 import { SETTINGS_REGISTRY_TRANSLATIONS_EAST_MS_ZHTW as SR } from '../settingsRegistryTranslations.east-ms-zhtw';
+import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
+import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.ms,
@@ -19,6 +21,8 @@ export const translations: Record<UiTranslationKey, string> = {
   ...PI.ms,
   ...PF.ms,
   ...SR.ms,
+  ...EE.ms,
+  ...MMC.ms,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",
@@ -736,9 +740,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextRecent": "Analisis terkini",
   "i18n.uiText.UI_TEXT.decisionSignals.stockContextTitle": "Saham semasa",
   "i18n.uiText.UI_TEXT.decisionSignals.stopLoss": "Henti rugi",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.feed": "Isyarat",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.history": "Sejarah",
-  "i18n.uiText.UI_TEXT.decisionSignals.tab.review": "Semakan",
   "i18n.uiText.UI_TEXT.decisionSignals.tab.rules": "Peraturan",
   "i18n.uiText.UI_TEXT.decisionSignals.targetPrice": "Harga sasaran",
   "i18n.uiText.UI_TEXT.decisionSignals.timelineAlertShape": "Titik berlian menunjukkan amaran",
@@ -2897,7 +2898,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.portfolio.PORTFOLIO_TEXT.csvDryResult": "CSV Pratonton keputusan",
   "locales.portfolio.PORTFOLIO_TEXT.csvFile": "Fail CSV / Excel",
   "locales.portfolio.PORTFOLIO_TEXT.csvImport": "Import CSV broker",
-  "locales.portfolio.PORTFOLIO_TEXT.openImport": "Import pegangan",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseResult": "CSV Hasil penghuraian",
   "locales.portfolio.PORTFOLIO_TEXT.csvParseSummary": "{valid} sah,{skipped} dilangkau,{errors} ralat.",
   "locales.portfolio.PORTFOLIO_TEXT.currency": "Sebut harga mata wang",
@@ -5255,7 +5255,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_PROFILE": "Profil Pemampatan Konteks",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS": "Token Pencetus Pemampatan Konteks",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_CONTEXT_PROTECTED_TURNS": "Giliran Konteks Dilindungi",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_CRITIC_ENABLED": "Critic Multi-Agent terhad",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.summary": "Konfigurasikan peringkat debat pilihan, had dan model khusus.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEBATE.title": "Debat Bull-Bear",
   "utils.systemConfigI18n.fieldTitleMaps.DEBATE_ENABLED": "Debat Bull-Bear Berstruktur",
@@ -5275,7 +5274,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_TRIGGER_MAX_PER_DAY": "Had pencetus sehari",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_FEATURES_ACKNOWLEDGED_OFF": "Sahkan ciri Agent dimatikan",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_GENERATION_BACKEND": "Kaedah Penjanaan Tanya Saham",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_INVESTMENT_COMMITTEE_MODE": "Mod jawatankuasa pelaburan",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA": "Pratetap Pendirian Penyelidikan",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_RESEARCH_PERSONA_CUSTOM": "Teks Pendirian Penyelidikan Tersuai",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_LITELLM_MODEL": "Model Utama Ejen",
@@ -5295,7 +5293,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS": "Had Masa Cadangan",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_PLANNING_STRATEGY": "Strategi Perancangan Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_MODE": "Mod Ejen",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_MULTI_STRATEGY_DELIBERATION": "Perundingan multi-strategi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_NL_ROUTING": "Penghalaan Bahasa Semula Jadi Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_DEEP_PAYLOAD": "Muatan Mendalam Kebolehcerapan Ejen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_OBSERVABILITY_ENABLED": "Peristiwa Kebolehcerapan Ejen",
@@ -6446,7 +6443,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_NOTIFY": "Maklumkan ringkasan penyelidikan peristiwa",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_PERSIST_HISTORY": "Kekalkan sejarah ringkasan penyelidikan peristiwa",
   "utils.systemConfigI18n.fieldTitleMaps.EVENT_RESEARCH_BRIEF_SAVE_REPORT_FILE": "Simpan fail ringkasan penyelidikan peristiwa",
-
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.0": "Mempengaruhi kependaman analisis satu simbol dan puncak panggilan serentak kepada pembekal dalam satu larian.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.impact.1": "Tidak mengubah keserentakan MAX_WORKERS merentasi barisan multi-simbol.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ANALYSIS_PARALLEL_FETCH.notes.0": "Tertib cantuman ke stage IO / AgentContext mengikut kunci tugas yang diisytiharkan, bukan tertib siap.",
@@ -6462,7 +6458,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT": "Had global tarikan selari",
   "utils.systemConfigI18n.fieldTitleMaps.ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT": "Had per-pembekal tarikan selari",
   "locales.portfolio.PORTFOLIO_TEXT.processQualityLink": "Kualiti proses",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_LOG_ENABLED.summary": "Menyimpan episod Agen padat dengan trajektori, pengajaran dan label hasil pilihan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_MAX_ROWS.summary": "Mengehadkan jadual episod dan membuang baris paling lama dahulu.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_EPISODE_RETENTION_DAYS.summary": "Umur maksimum episod sebelum pembersihan pengekalan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.PREDICTION_EXTRACT_ENABLED.impact.0": "Menambah metadata mutu tanpa mengubah nasihat pelaburan.",
@@ -6480,7 +6475,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.summary": "Mengawal julat kedudukan deterministik menggunakan wajaran portfolio semasa.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.title": "Saiz kedudukan berasaskan portfolio",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.portfolio_aware_sizing.usage": "Kekalkan aktif untuk julat berasaskan portfolio. Wajaran maksimum satu saham ialah pecahan 0 hingga 1 dan lalai 0.15.",
-  "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_LOG_ENABLED": "Log episod Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_MAX_ROWS": "Maksimum episod Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_EPISODE_RETENTION_DAYS": "Pengekalan episod Agen",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_POSTMORTEM_ENABLED": "Ulasan ramalan selesai",
@@ -6489,6 +6483,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_ENABLED": "Gelung refleksi dalam larian",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_LLM_BUDGET": "Belanjawan panggilan LLM refleksi",
   "utils.systemConfigI18n.fieldTitleMaps.AGENT_REFLECTION_MAX_REVISE": "Maksimum semakan refleksi",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_ENABLED": "Rejim pasaran",
+  "utils.systemConfigI18n.fieldTitleMaps.MARKET_REGIME_OVERRIDE": "Gantian rejim",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_AWARE_SIZING_ENABLED": "Saiz berasaskan portfolio diaktifkan",
   "utils.systemConfigI18n.fieldTitleMaps.PORTFOLIO_MAX_SINGLE_NAME_WEIGHT": "Wajaran maksimum satu saham",
   "utils.systemConfigI18n.fieldTitleMaps.PREDICTION_EXTRACT_ENABLED": "Pengekstrakan Ramalan",
