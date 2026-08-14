@@ -172,7 +172,7 @@ jobs:
   backend-gate:
     name: backend-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs: [changes, ai-governance]
     if: github.event_name == 'pull_request' && needs.changes.outputs.backend == 'true'
     permissions:
