@@ -61,6 +61,29 @@ def test_classify_known_and_unknown_codes() -> None:
     assert is_classified_error_code("rate_limited")
 
 
+def test_research_pack_codes_preserve_remediation_semantics() -> None:
+    auth_required = classify_error_code("research_pack_auth_required")
+    export_disabled = classify_error_code("research_pack_export_disabled")
+    limit_exceeded = classify_error_code("research_pack_limit_exceeded")
+
+    assert (auth_required.category, auth_required.severity, auth_required.default_action) == (
+        "auth",
+        "error",
+        "settings",
+    )
+    assert auth_required.docs_path == "docs/security-baseline.md"
+    assert (export_disabled.category, export_disabled.severity, export_disabled.default_action) == (
+        "capability",
+        "warning",
+        "settings",
+    )
+    assert (limit_exceeded.category, limit_exceeded.severity, limit_exceeded.default_action) == (
+        "capability",
+        "warning",
+        "settings",
+    )
+
+
 def test_error_body_attaches_taxonomy_without_replacing_error_code() -> None:
     body = error_body("llm_not_configured", "No model configured", params={"hint": "configure"})
     assert body["error"] == "llm_not_configured"

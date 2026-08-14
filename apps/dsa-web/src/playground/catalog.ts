@@ -272,6 +272,8 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('watchlist', 'watchlist-score-column', 'WatchlistScoreColumn', 'components/watchlist/WatchlistScoreColumn.tsx', ['default', 'interactive', 'empty']),
   entry('watchlist', 'home-watchlist-groups-section', 'HomeWatchlistGroupsSection', 'components/watchlist/HomeWatchlistGroupsSection.tsx', ['default', 'loading', 'error']),
   entry('watchlist', 'watchlist-groups-panel', 'WatchlistGroupsPanel', 'components/watchlist/WatchlistGroupsPanel.tsx', ['interactive', 'empty', 'error']),
+  entry('reports', 'research-pack-export-controls', 'ResearchPackExportControls', 'components/report/ResearchPackExportControls.tsx', ['default', 'states']),
+
 ];
 
 export const PLAYGROUND_ENTRY_BY_ID = new Map(PLAYGROUND_CATALOG.map((item) => [item.id, item]));
