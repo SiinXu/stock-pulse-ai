@@ -1,5 +1,5 @@
 import type React from 'react';
-import { lazy, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   createBrowserRouter,
   Navigate,
@@ -14,7 +14,6 @@ import {
   RouteOutletBoundary,
   StandaloneRouteBoundary,
 } from './components/layout/RouteBoundary';
-import { DeepLinkGuard } from './components/routing/DeepLinkGuard';
 import { SessionContinuityGuard } from './components/routing/SessionContinuityGuard';
 import { RouteFocusCoordinator } from './components/routing';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -36,6 +35,11 @@ import { useAgentChatStore } from './stores/agentChatStore';
 import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
 
+const DeepLinkGuard = lazy(
+  () => import('./components/routing/DeepLinkGuard').then((module) => ({
+    default: module.DeepLinkGuard,
+  })),
+);
 const HomePage = lazy(() => import('./pages/HomePage'));
 const ResearchOverviewPage = lazy(() => import('./pages/ResearchOverviewPage'));
 const ResearchAnalysisWorkbenchPage = lazy(() => import('./pages/ResearchAnalysisWorkbenchPage'));
@@ -130,9 +134,11 @@ const routes = [
     element: (
       <AuthProvider>
         <RouteFocusCoordinator>
-          <DeepLinkGuard>
-            <AppLayout />
-          </DeepLinkGuard>
+          <Suspense fallback={<PageLoadingFallback />}>
+            <DeepLinkGuard>
+              <AppLayout />
+            </DeepLinkGuard>
+          </Suspense>
         </RouteFocusCoordinator>
       </AuthProvider>
     ),

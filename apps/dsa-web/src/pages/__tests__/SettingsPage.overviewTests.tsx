@@ -38,7 +38,7 @@ export function registerSettingsPageOverviewTests(): void {
 
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 1, name: '系统设置' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '用量与成本' }))
       .toHaveAttribute('aria-current', 'page');
     expect(useSystemConfigMock).toHaveBeenCalled();
@@ -229,7 +229,7 @@ export function registerSettingsPageOverviewTests(): void {
 
     fireEvent.click(screen.getByRole('button', { name: '刷新检查' }));
     fireEvent.click(screen.getByRole('button', { name: '查看配置项' }));
-    fireEvent.click(screen.getByRole('button', { name: 'merge stock list' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'merge stock list' }));
 
     await waitFor(() => expect(getSetupStatus).toHaveBeenCalledTimes(3));
 
@@ -919,7 +919,7 @@ export function registerSettingsPageOverviewTests(): void {
     expect(screen.queryByRole('button', { name: 'merge stock list' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '查看配置项' }));
     expect(screen.getByRole('dialog', { name: '智能导入' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'merge stock list' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'merge stock list' }));
 
     expect(refreshAfterExternalSave).toHaveBeenCalledWith(['STOCK_LIST']);
     expect(load).toHaveBeenCalledTimes(1);

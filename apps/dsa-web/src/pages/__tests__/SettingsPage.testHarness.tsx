@@ -237,6 +237,14 @@ vi.mock('../../utils/constants', async () => {
   };
 });
 
+vi.mock('../../components/settings/IntelligentImport', () => ({
+  IntelligentImport: ({ onMerged }: { onMerged: (value: string) => void }) => (
+    <button type="button" onClick={() => onMerged('SZ000001,SZ000002')}>
+      merge stock list
+    </button>
+  ),
+}));
+
 vi.mock('../../components/settings', async () => {
   return {
   ...(await import('../../components/settings/notificationFieldGroups')),

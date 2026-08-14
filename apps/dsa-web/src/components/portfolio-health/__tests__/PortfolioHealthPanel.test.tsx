@@ -53,10 +53,10 @@ const baseResponse: PortfolioHealthResponse = {
   weights: { concentration: 0.25, riskExposure: 0.25, diversification: 0.2, pnl: 0.15, cashRatio: 0.15 },
 };
 
-function renderPanel() {
+function renderPanel(accountId = 7) {
   return render(
     <UiLanguageProvider>
-      <PortfolioHealthPanel accountId={7} costMethod="fifo" />
+      <PortfolioHealthPanel accountId={accountId} costMethod="fifo" />
     </UiLanguageProvider>,
   );
 }
@@ -122,5 +122,25 @@ describe('PortfolioHealthPanel', () => {
     view.unmount();
     renderPanel();
     expect(await screen.findByTestId('portfolio-health-unavailable')).toHaveTextContent('Negative equity.');
+  });
+
+  it('hides the previous account snapshot as soon as the query changes', async () => {
+    vi.mocked(portfolioHealthApi.getSummary).mockResolvedValue(baseResponse);
+    const view = renderPanel(7);
+    expect(await screen.findByTestId('portfolio-health-score')).toHaveTextContent('82');
+
+    const deferred = createDeferred<PortfolioHealthResponse>();
+    vi.mocked(portfolioHealthApi.getSummary).mockReturnValue(deferred.promise);
+    view.rerender(
+      <UiLanguageProvider>
+        <PortfolioHealthPanel accountId={8} costMethod="fifo" />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.queryByTestId('portfolio-health-score')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading portfolio health…')).toBeInTheDocument();
+
+    deferred.resolve({ ...baseResponse, accountId: 8, score: 41 });
+    expect(await screen.findByTestId('portfolio-health-score')).toHaveTextContent('41');
   });
 });

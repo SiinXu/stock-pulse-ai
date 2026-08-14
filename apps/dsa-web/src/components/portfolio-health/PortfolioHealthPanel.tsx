@@ -46,6 +46,10 @@ function statusVariant(status: PortfolioHealthStatus): 'success' | 'warning' | '
   return 'default';
 }
 
+function healthQueryKey(query: { accountId?: number; costMethod: string; asOf?: string }): string {
+  return `${query.accountId ?? ''}:${query.costMethod}:${query.asOf ?? ''}`;
+}
+
 const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
   accountId,
   costMethod = 'fifo',
@@ -62,6 +66,9 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
   const [refreshError, setRefreshError] = useState<ParsedApiError | null>(null);
 
   const query = useMemo(() => ({ accountId, costMethod, asOf }), [accountId, asOf, costMethod]);
+  const queryKey = healthQueryKey(query);
+  const [loadedQueryKey, setLoadedQueryKey] = useState<string | null>(null);
+  const visibleData = loadedQueryKey === queryKey ? data : null;
 
   const load = useCallback(async () => {
     const requestId = requestIdRef.current + 1;
@@ -72,9 +79,11 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
       const response = await portfolioHealthApi.getSummary(query);
       if (requestIdRef.current !== requestId) return;
       setData(response);
+      setLoadedQueryKey(healthQueryKey(query));
     } catch (error) {
       if (requestIdRef.current !== requestId) return;
       setData(null);
+      setLoadedQueryKey(healthQueryKey(query));
       setLoadError(getParsedApiError(error, language));
     } finally {
       if (requestIdRef.current === requestId) setIsLoading(false);
@@ -97,7 +106,10 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
     setRefreshError(null);
     try {
       const response = await portfolioHealthApi.refresh({ ...query, persist: true });
-      if (requestIdRef.current === requestId) setData(response);
+      if (requestIdRef.current === requestId) {
+        setData(response);
+        setLoadedQueryKey(healthQueryKey(query));
+      }
     } catch (error) {
       if (requestIdRef.current === requestId) {
         setRefreshError(getParsedApiError(error, language));
@@ -108,24 +120,27 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
     }
   }, [language, query]);
 
-  const statusLabel = data
+  const isQueryCurrent = loadedQueryKey === queryKey;
+  const showLoading = !isQueryCurrent || isLoading;
+  const visibleLoadError = isQueryCurrent ? loadError : null;
+  const statusLabel = visibleData
     ? {
         ok: text.statusOk,
         partial: text.statusPartial,
         empty_portfolio: text.statusEmpty,
         unavailable: text.statusUnavailable,
-      }[data.status]
+      }[visibleData.status]
     : null;
-  const bandLabel = data?.band
+  const bandLabel = visibleData?.band
     ? ({
         healthy: text.bandHealthy,
         fair: text.bandFair,
         caution: text.bandCaution,
         poor: text.bandPoor,
-      } satisfies Record<PortfolioHealthBand, string>)[data.band]
+      } satisfies Record<PortfolioHealthBand, string>)[visibleData.band]
     : null;
-  const score = data?.score ?? data?.partialScore ?? null;
-  const scoreLabel = data?.score != null ? text.score : data?.partialScore != null
+  const score = visibleData?.score ?? visibleData?.partialScore ?? null;
+  const scoreLabel = visibleData?.score != null ? text.score : visibleData?.partialScore != null
     ? text.partialScore
     : text.noScore;
 
@@ -133,7 +148,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
     <section
       className="space-y-3"
       aria-label={text.title}
-      aria-busy={isLoading || isRefreshing || undefined}
+      aria-busy={showLoading || isRefreshing || undefined}
       data-testid="portfolio-health-panel"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -146,7 +161,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
           variant="secondary"
           size="comfortable"
           onClick={() => void refresh()}
-          disabled={isLoading || isRefreshing}
+          disabled={showLoading || isRefreshing}
           isLoading={isRefreshing}
           loadingText={text.refreshing}
         >
@@ -165,13 +180,13 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
         />
       ) : null}
 
-      {isLoading ? <Loading label={text.loading} className="min-h-28" /> : null}
+      {showLoading ? <Loading label={text.loading} className="min-h-28" /> : null}
 
-      {!isLoading && loadError ? (
+      {!showLoading && visibleLoadError ? (
         <StatePanel
           state="error"
           title={text.loadFailedTitle}
-          description={formatParsedApiError(loadError) || loadError.message}
+          description={formatParsedApiError(visibleLoadError) || visibleLoadError.message}
           action={(
             <Button type="button" variant="secondary" onClick={() => void load()}>
               {text.retry}
@@ -182,7 +197,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
         />
       ) : null}
 
-      {!isLoading && !loadError && !data ? (
+      {!showLoading && !visibleLoadError && !visibleData ? (
         <EmptyState
           title={text.notGeneratedTitle}
           description={text.notGeneratedDescription}
@@ -196,34 +211,34 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
         />
       ) : null}
 
-      {data?.status === 'empty_portfolio' ? (
+      {visibleData?.status === 'empty_portfolio' ? (
         <EmptyState
           title={text.emptyTitle}
-          description={data.statusMessage || text.emptyDescription}
+          description={visibleData.statusMessage || text.emptyDescription}
           compact
           data-testid="portfolio-health-empty-portfolio"
         />
       ) : null}
 
-      {data?.status === 'unavailable' ? (
+      {visibleData?.status === 'unavailable' ? (
         <StatePanel
           state="blocked"
           title={text.unavailableTitle}
-          description={data.statusMessage || text.unavailableDescription}
+          description={visibleData.statusMessage || text.unavailableDescription}
           size="compact"
           titleAs="h3"
           data-testid="portfolio-health-unavailable"
         />
       ) : null}
 
-      {data && data.status !== 'empty_portfolio' && data.status !== 'unavailable' ? (
+      {visibleData && visibleData.status !== 'empty_portfolio' && visibleData.status !== 'unavailable' ? (
         <>
-          {data.status === 'partial' ? (
+          {visibleData.status === 'partial' ? (
             <InlineAlert
               variant="warning"
               size="compact"
               title={text.partialTitle}
-              message={data.statusMessage || text.partialDescription}
+              message={visibleData.statusMessage || text.partialDescription}
               data-testid="portfolio-health-partial"
             />
           ) : null}
@@ -236,14 +251,14 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <Badge variant={statusVariant(data.status)}>{text.status}: {statusLabel}</Badge>
+                <Badge variant={statusVariant(visibleData.status)}>{text.status}: {statusLabel}</Badge>
                 {bandLabel ? <Badge variant="info">{bandLabel}</Badge> : null}
               </div>
             </div>
             <dl className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
-              <div><dt className="text-secondary">{text.coverage}</dt><dd className="font-medium text-foreground">{formatUiNumber(data.coverageRatio * 100, language, { maximumFractionDigits: 1 })}%</dd></div>
-              <div><dt className="text-secondary">{text.asOf}</dt><dd className="font-medium text-foreground">{data.asOf}</dd></div>
-              <div><dt className="text-secondary">{text.persisted}</dt><dd className="font-medium text-foreground">{data.persisted ? text.statusOk : '—'}</dd></div>
+              <div><dt className="text-secondary">{text.coverage}</dt><dd className="font-medium text-foreground">{formatUiNumber(visibleData.coverageRatio * 100, language, { maximumFractionDigits: 1 })}%</dd></div>
+              <div><dt className="text-secondary">{text.asOf}</dt><dd className="font-medium text-foreground">{visibleData.asOf}</dd></div>
+              <div><dt className="text-secondary">{text.persisted}</dt><dd className="font-medium text-foreground">{visibleData.persisted ? text.statusOk : '—'}</dd></div>
             </dl>
           </Card>
 
@@ -251,7 +266,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
             <h3 className="mb-2 text-sm font-semibold text-foreground">{text.dimensions}</h3>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
               {DIMENSION_KEYS.map((key) => {
-                const dimension = data.dimensions[key];
+                const dimension = visibleData.dimensions[key];
                 const label = {
                   concentration: text.dimensionConcentration,
                   riskExposure: text.dimensionRiskExposure,
@@ -280,9 +295,9 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
 
           <Card padding="md">
             <h3 className="text-sm font-semibold text-foreground">{text.insights}</h3>
-            {data.insights.length ? (
+            {visibleData.insights.length ? (
               <ul className="mt-2 space-y-2 text-xs text-secondary">
-                {data.insights.map((insight, index) => (
+                {visibleData.insights.map((insight, index) => (
                   <li key={`${insight.code}-${insight.symbol ?? 'portfolio'}-${index}`} className="flex items-start gap-2">
                     <Badge variant={insight.severity === 'warning' ? 'warning' : 'info'} size="sm">
                       {insight.severity}
@@ -292,7 +307,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({
                 ))}
               </ul>
             ) : <p className="mt-2 text-xs text-secondary">{text.noInsights}</p>}
-            <p className="mt-3 border-t border-subtle pt-3 text-xs text-muted-text">{data.disclaimer}</p>
+            <p className="mt-3 border-t border-subtle pt-3 text-xs text-muted-text">{visibleData.disclaimer}</p>
           </Card>
         </>
       ) : null}

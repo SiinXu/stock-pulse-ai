@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { lazy, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useState, type ReactNode } from 'react';
 import { Button, Surface } from '../../components/common';
 import { CredentialInput } from '../../components/security';
 import { AuthSettingsCard } from '../../components/settings/AuthSettingsCard';
@@ -11,7 +11,6 @@ import { GenerationBackendStatusPanel } from '../../components/settings/Generati
 import { KronosSettingsFields } from '../../components/settings/KronosSettingsFields';
 import { KronosStatusPanel } from '../../components/settings/KronosStatusPanel';
 import { LocalModelsWithKronos } from '../../components/settings/LocalModelsWithKronos';
-import { IntelligentImport } from '../../components/settings/IntelligentImport';
 import { IntelligenceSourcesPanel } from '../../components/settings/IntelligenceSourcesPanel';
 import { InvestmentFrameworkPromptPreview } from '../../components/settings/InvestmentFrameworkPromptPreview';
 import { InvestmentFrameworkSettingsCard } from '../../components/settings/InvestmentFrameworkSettingsCard';
@@ -34,7 +33,6 @@ import { SettingsErrorSummary } from '../../components/settings/SettingsErrorSum
 import { SettingsField } from '../../components/settings/SettingsField';
 import { SettingsHelpButton } from '../../components/settings/SettingsHelpButton';
 import { SettingsLoading } from '../../components/settings/SettingsLoading';
-import { RuntimeCapabilitiesPanel } from '../../components/settings/RuntimeCapabilitiesPanel';
 import { SettingsSectionNav, SettingsViewTabs } from '../../components/settings/SettingsNavigation';
 import { SettingsPanelErrorBoundary } from '../../components/settings/SettingsPanelErrorBoundary';
 import { SettingsSectionCard } from '../../components/settings/SettingsSectionCard';
@@ -138,6 +136,16 @@ const AVAILABLE_MODELS: AvailableModelEntry[] = [{
   available: true,
 }];
 
+const IntelligentImport = lazy(() =>
+  import('../../components/settings/IntelligentImport').then((module) => ({
+    default: module.IntelligentImport,
+  })),
+);
+const RuntimeCapabilitiesPanel = lazy(() =>
+  import('../../components/settings/RuntimeCapabilitiesPanel').then((module) => ({
+    default: module.RuntimeCapabilitiesPanel,
+  })),
+);
 const agentSettingsScenarios = () => import('./agentBehaviorPanelScenario');
 const LazyAgentSettingsStory = lazy(agentSettingsScenarios);
 const AiOverviewMatrixStory = () => <LazyAgentSettingsStory story="overview" />;
@@ -228,10 +236,18 @@ const LocalModelsWithKronosStory = () => (
 
 const IntelligentImportStory = () => {
   const [value, setValue] = useState('600519,AAPL');
-  return <IntelligentImport stockListValue={value} configVersion="fixture-v1" maskToken={MASK_TOKEN} onMerged={setValue} />;
+  return (
+    <Suspense fallback={null}>
+      <IntelligentImport stockListValue={value} configVersion="fixture-v1" maskToken={MASK_TOKEN} onMerged={setValue} />
+    </Suspense>
+  );
 };
 
-const RuntimeCapabilitiesPanelStory = () => <RuntimeCapabilitiesPanel />;
+const RuntimeCapabilitiesPanelStory = () => (
+  <Suspense fallback={null}>
+    <RuntimeCapabilitiesPanel />
+  </Suspense>
+);
 
 const LLMChannelEditorStory = () => {
   const { scenario } = usePlaygroundScenario();

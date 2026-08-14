@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useRouteFocusTarget } from '../routing';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BellRing, RefreshCw } from 'lucide-react';
 import { alertsApi } from '../../api/alerts';
 import type { ParsedApiError } from '../../api/error';
@@ -13,7 +13,11 @@ import {
   type AlertRuleEnabledFilter,
   type AlertTypeFilter,
 } from './AlertRuleList';
-import { AlertTriggerHistory } from './AlertTriggerHistory';
+const AlertTriggerHistory = lazy(
+  () => import('./AlertTriggerHistory').then((module) => ({
+    default: module.AlertTriggerHistory,
+  })),
+);
 import EventAlertsDiscoveryEntry from './EventAlertsDiscoveryEntry';
 import { useAlertsWorkspaceUrlState } from './useAlertsWorkspaceUrlState';
 import {
@@ -810,17 +814,19 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
         >
           <EventAlertsDiscoveryEntry />
           {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
-          <AlertTriggerHistory
-            triggers={triggers}
-            isLoading={triggersLoading}
-            page={triggersPage}
-            pageSize={PAGE_SIZE}
-            total={triggersTotal}
-            lastUpdated={triggersLastUpdated}
-            onPageChange={setTriggersPage}
-            onRefresh={() => void loadTriggers(triggersPage)}
-            selectedTriggerId={selectedTriggerId}
-          />
+          <Suspense fallback={<Loading />}>
+            <AlertTriggerHistory
+              triggers={triggers}
+              isLoading={triggersLoading}
+              page={triggersPage}
+              pageSize={PAGE_SIZE}
+              total={triggersTotal}
+              lastUpdated={triggersLastUpdated}
+              onPageChange={setTriggersPage}
+              onRefresh={() => void loadTriggers(triggersPage)}
+              selectedTriggerId={selectedTriggerId}
+            />
+          </Suspense>
         </ActivePanel>
       ) : null}
 

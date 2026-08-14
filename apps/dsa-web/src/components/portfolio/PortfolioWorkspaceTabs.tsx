@@ -19,6 +19,7 @@ import {
   formatSideLabel,
 } from '../../utils/portfolioFormat';
 import { Button, Card, EmptyState, IconButton, SegmentedControl } from '../common';
+import { PORTFOLIO_INSIGHTS_TEXT } from '../../locales/portfolioInsights';
 import type { PortfolioTab } from './portfolioUrlState';
 
 type PortfolioWorkspaceTabsProps = {
@@ -26,7 +27,6 @@ type PortfolioWorkspaceTabsProps = {
   language: UiLanguage;
   activeTab: PortfolioTab;
   onTabChange: (tab: PortfolioTab) => void;
-  insightsLabel: string;
   eventType: PortfolioEventType;
   eventLoading: boolean;
   eventPage: number;
@@ -43,7 +43,6 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
   language,
   activeTab,
   onTabChange,
-  insightsLabel,
   eventType,
   eventLoading,
   eventPage,
@@ -64,7 +63,7 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
         { value: 'positions', label: text.positionsTitle },
         { value: 'ledger', label: text.eventLog },
         { value: 'risk', label: text.tabRisk },
-        { value: 'insights', label: insightsLabel },
+        { value: 'insights', label: PORTFOLIO_INSIGHTS_TEXT[language].tabLabel },
       ]}
     />
 

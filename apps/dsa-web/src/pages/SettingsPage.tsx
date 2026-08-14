@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
 import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
@@ -23,12 +23,10 @@ import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
   InvestmentFrameworkSettingsCard,
   GenerationBackendStatusPanel,
-  IntelligentImport,
   LocalModelsWithKronos,
   LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationTestPanel,
-  RuntimeCapabilitiesPanel,
   NOTIFICATION_FIELD_GROUP_ORDER,
   getNotificationFieldGroupId,
   getNotificationFieldOrder,
@@ -120,7 +118,18 @@ import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import { isAgentExpertJsonKey } from '../components/settings/agentSetupPresets';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
-import TokenUsagePage from '../components/usage/TokenUsagePage';
+
+const IntelligentImport = lazy(() =>
+  import('../components/settings/IntelligentImport').then((module) => ({
+    default: module.IntelligentImport,
+  })),
+);
+const RuntimeCapabilitiesPanel = lazy(() =>
+  import('../components/settings/RuntimeCapabilitiesPanel').then((module) => ({
+    default: module.RuntimeCapabilitiesPanel,
+  })),
+);
+const TokenUsagePage = lazy(() => import('../components/usage/TokenUsagePage'));
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
 const CHANNEL_ROUTING_FIELD_KEYS = new Set([
@@ -1514,7 +1523,9 @@ const SettingsPage: React.FC = () => {
 
           <section ref={contentRegionRef} tabIndex={-1} className="space-y-4 outline-none">
             {activeSection === SETTINGS_SECTION_IDS.usage ? (
-              <TokenUsagePage embedded />
+              <Suspense fallback={<SettingsLoading />}>
+                <TokenUsagePage embedded />
+              </Suspense>
             ) : (
               <>
                 <SettingsViewTabs
@@ -1604,18 +1615,20 @@ const SettingsPage: React.FC = () => {
                   description={t('settings.intelligentImportDescription')}
                   size="wide"
                 >
-                  <IntelligentImport
-                    stockListValue={
-                      (activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''
-                    }
-                    configVersion={configVersion}
-                    maskToken={maskToken}
-                    onMerged={async () => {
-                      await refreshAfterExternalSave(['STOCK_LIST']);
-                      applyPostSaveEffects();
-                    }}
-                    disabled={isSaving || isLoading}
-                  />
+                  <Suspense fallback={<SettingsLoading />}>
+                    <IntelligentImport
+                      stockListValue={
+                        (activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''
+                      }
+                      configVersion={configVersion}
+                      maskToken={maskToken}
+                      onMerged={async () => {
+                        await refreshAfterExternalSave(['STOCK_LIST']);
+                        applyPostSaveEffects();
+                      }}
+                      disabled={isSaving || isLoading}
+                    />
+                  </Suspense>
                 </Modal>
               </>
             ) : null}
@@ -1728,7 +1741,9 @@ const SettingsPage: React.FC = () => {
               </SettingsSectionCard>
             ) : null}
             {isTopLevelAdvanced && activeView === 'capabilities' ? (
-              <RuntimeCapabilitiesPanel />
+              <Suspense fallback={<SettingsLoading />}>
+                <RuntimeCapabilitiesPanel />
+              </Suspense>
             ) : null}
             {activeCategory === 'ai_model' && !isAiOverview && !isAiLocalModels && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
               <section className="space-y-4" aria-labelledby="model-access-heading" data-testid="model-access-section">
