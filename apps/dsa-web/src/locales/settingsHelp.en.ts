@@ -1732,6 +1732,15 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Gates GET /api/v1/reasoning-trace/{record_id} and related export service behavior.'],
     notes: ['See docs/reasoning-trace-export_EN.md for the contract and rollback steps.'],
   },
+  'settings.agent.research_pack_export': {
+    title: 'Research Pack Export',
+    summary: 'One-click redacted research asset package (report, decision card, evidence refs, trace).',
+    usage: 'Keep RESEARCH_PACK_EXPORT_ENABLED=false unless operators need ZIP export. RESEARCH_PACK_MAX_ZIP_BYTES sets the ZIP size upper bound (1–64 MiB).',
+    valueNotes: ['Default is off; share-mode redaction is always on.', 'Full evidence-chain-v1 deferred until #986 / #127 merge.'],
+    impact: ['Gates GET /api/v1/history/{record_id}/research-pack.'],
+    notes: ['See docs/research-pack-export_EN.md.'],
+  },
+
   'settings.agent.observability': {
     title: 'Agent Observability',
     summary: 'Lightweight structured agent run events with trace/span ids for the run-flow view.',

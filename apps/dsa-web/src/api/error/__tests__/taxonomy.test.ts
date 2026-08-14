@@ -26,6 +26,18 @@ describe('error taxonomy', () => {
     expect(ERROR_CODE_TAXONOMY.not_changeable.defaultAction).toBe('docs');
   });
 
+  it('preserves research pack remediation semantics', () => {
+    expect(ERROR_CODE_TAXONOMY.research_pack_auth_required).toMatchObject({
+      category: 'auth', severity: 'error', defaultAction: 'settings',
+    });
+    expect(ERROR_CODE_TAXONOMY.research_pack_export_disabled).toMatchObject({
+      category: 'capability', severity: 'warning', defaultAction: 'settings',
+    });
+    expect(ERROR_CODE_TAXONOMY.research_pack_limit_exceeded).toMatchObject({
+      category: 'capability', severity: 'warning', defaultAction: 'settings',
+    });
+  });
+
   it('falls back to internal for unknown codes', () => {
     const unknown = classifyErrorCode('brand_new_code_not_registered');
     expect(unknown.category).toBe('internal');
