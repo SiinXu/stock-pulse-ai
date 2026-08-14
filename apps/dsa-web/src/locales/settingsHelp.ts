@@ -31,7 +31,8 @@ export function getSettingsHelpContent(
   }
 
   const language = getPreferredHelpLanguage(locale);
-  const localized = SETTINGS_HELP_MAPS[language][helpKey];
+  const localized = SETTINGS_HELP_MAPS[language][helpKey]
+    ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
   if (localized) {
     return localized;
   }
@@ -44,4 +45,24 @@ export function getSettingsHelpContent(
   }
 
   return null;
+}
+
+function findSettingsHelpByFieldKey(
+  fieldKey: string,
+  language: UiLanguage,
+): SettingsHelpContent | null {
+  const suffix = `.${fieldKey}`;
+  let match: SettingsHelpContent | null = null;
+
+  for (const [helpKey, content] of Object.entries(SETTINGS_HELP_MAPS[language])) {
+    if (!helpKey.endsWith(suffix)) {
+      continue;
+    }
+    if (match) {
+      return null;
+    }
+    match = content;
+  }
+
+  return match;
 }
