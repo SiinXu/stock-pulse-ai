@@ -20,6 +20,7 @@ from src.data.stock_index_loader import resolve_index_stock_code
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
     append_committee_deliberation_lines,
+    append_multi_model_comparison_lines,
     format_strategy_skill_items,
     get_bias_status_emoji,
     get_localized_stock_name,
@@ -1436,86 +1437,9 @@ class HistoryService:
                 report_lines.append(f"- {invalid_text}")
             report_lines.append("")
 
-        # ========== Multi-model consensus comparison (#154) ==========
-        multi_model = dashboard.get("multi_model_comparison") if dashboard else None
-        if isinstance(multi_model, dict) and multi_model.get("enabled"):
-            handling = multi_model.get("disagreement_handling") or {}
-            report_lines.extend(
-                [
-                    f"### 🤝 {labels.get('multi_model_comparison_heading', 'Multi-Model Consensus')}",
-                    "",
-                ]
-            )
-            if handling.get("high_disagreement"):
-                report_lines.append(
-                    f"> ⚠️ {labels.get('multi_model_high_disagreement_banner', 'High multi-model disagreement')}"
-                )
-            not_evaluated = labels.get(
-                "multi_model_not_evaluated_label", "Not evaluated"
-            )
-            consensus_score = multi_model.get("consensus_score")
-            report_lines.append(
-                f"- {labels.get('multi_model_status_label', 'Status')}: "
-                f"{multi_model.get('status', 'N/A')} | "
-                f"{labels.get('multi_model_consensus_level_label', 'Consensus')}: "
-                f"{localize_consensus_level(multi_model.get('consensus_level', 'N/A'), report_language)} | "
-                f"{labels.get('multi_model_consensus_score_label', 'Agreement')}: "
-                f"{consensus_score if consensus_score is not None else not_evaluated}"
-            )
-            degradation = multi_model.get("degradation")
-            if isinstance(degradation, dict) and (
-                degradation.get("annotation") or degradation.get("reason")
-            ):
-                report_lines.append(
-                    f"- {labels.get('multi_model_degraded_label', 'Degradation')}: "
-                    f"{degradation.get('annotation') or degradation.get('reason')}"
-                )
-            report_lines.append(
-                f"- {labels.get('multi_model_no_majority_note', 'Disagreement was not averaged')}"
-            )
-            for row in (multi_model.get("agreement_table") or [])[:5]:
-                if not isinstance(row, dict):
-                    continue
-                raw_signal = row.get("signal") or row.get("action")
-                localized_signal = (
-                    localize_strategy_signal(raw_signal, report_language)
-                    if raw_signal
-                    else not_evaluated
-                )
-                report_lines.append(
-                    f"- `{row.get('model_id') or row.get('model_version') or 'model'}` "
-                    f"({row.get('status') or 'n/a'}): "
-                    f"{localized_signal}"
-                    f" | {row.get('score_band') or not_evaluated}"
-                )
-            points = handling.get("points") if isinstance(handling, dict) else None
-            if isinstance(points, list) and points:
-                report_lines.append(
-                    f"**{labels.get('multi_model_disagreement_points_label', 'Disagreement points')}**"
-                )
-                for point in points[:8]:
-                    if not isinstance(point, dict):
-                        continue
-                    participants = ", ".join(
-                        str(p) for p in (point.get("participants") or []) if str(p).strip()
-                    )
-                    report_lines.append(
-                        f"- [{point.get('severity') or 'medium'}] "
-                        f"{point.get('kind') or 'unknown'}"
-                        f"{(' — ' + participants) if participants else ''}"
-                    )
-            report_lines.append("")
-
-        # ========== Investment Committee (real deliberation trace) ==========
-        committee = (
-            dashboard.get("committee_deliberation") if dashboard else None
-        )
-        append_committee_deliberation_lines(
-            report_lines,
-            committee,
-            labels,
-            report_language,
-        )
+        append_multi_model_comparison_lines(report_lines, dashboard, labels, report_language)
+        committee = dashboard.get("committee_deliberation") if dashboard else None
+        append_committee_deliberation_lines(report_lines, committee, labels, report_language)
 
         # ========== If no dashboard, display traditional format ==========
         if not dashboard:

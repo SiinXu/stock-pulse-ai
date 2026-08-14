@@ -484,3 +484,47 @@ def test_public_payload_rejects_non_finite_persisted_metrics(invalid):
 
     with pytest.raises(ValueError, match="must not contain NaN or infinity"):
         public_multi_model_comparison_payload(comparison)
+
+
+def test_append_multi_model_comparison_lines_renders_enabled_payload():
+    from src.report_language import append_multi_model_comparison_lines
+
+    lines: list[str] = []
+    append_multi_model_comparison_lines(
+        lines,
+        {
+            "multi_model_comparison": {
+                "enabled": True,
+                "status": "completed",
+                "consensus_level": "high",
+                "consensus_score": 0.9,
+                "disagreement_handling": {
+                    "high_disagreement": True,
+                    "points": [
+                        {
+                            "severity": "high",
+                            "kind": "direction",
+                            "participants": ["m1", "m2"],
+                        }
+                    ],
+                },
+                "agreement_table": [
+                    {"model_id": "m1", "status": "ok", "signal": "buy", "score_band": "A"},
+                ],
+                "degradation": {"annotation": "single_model_fallback"},
+            }
+        },
+        {},
+        "en",
+    )
+    joined = "\n".join(lines)
+    assert "Multi-Model Consensus" in joined
+    assert "single_model_fallback" in joined
+    assert "`m1`" in joined
+    assert "direction" in joined
+
+    skipped: list[str] = []
+    append_multi_model_comparison_lines(
+        skipped, {"multi_model_comparison": {"enabled": False}}, {}, "en"
+    )
+    assert skipped == []
