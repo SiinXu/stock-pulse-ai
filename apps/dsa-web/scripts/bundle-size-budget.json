@@ -27,57 +27,57 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 163973,
-      "measuredGzipBytes": 163273,
+      "maxGzipBytes": 165041,
+      "measuredGzipBytes": 164341,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 157084,
-      "measuredGzipBytes": 156384,
+      "maxGzipBytes": 158014,
+      "measuredGzipBytes": 157314,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 157012,
-      "measuredGzipBytes": 156312,
+      "maxGzipBytes": 157891,
+      "measuredGzipBytes": 157191,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 156626,
-      "measuredGzipBytes": 156026,
+      "maxGzipBytes": 157527,
+      "measuredGzipBytes": 156927,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 152356,
-      "measuredGzipBytes": 151656,
+      "maxGzipBytes": 153248,
+      "measuredGzipBytes": 152548,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 149487,
-      "measuredGzipBytes": 148787,
+      "maxGzipBytes": 150291,
+      "measuredGzipBytes": 149591,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 142260,
-      "measuredGzipBytes": 141560,
+      "maxGzipBytes": 143087,
+      "measuredGzipBytes": 142387,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 142420,
-      "measuredGzipBytes": 141720,
+      "maxGzipBytes": 143296,
+      "measuredGzipBytes": 142596,
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1262); overflowing named rule only, fixed headroom retained."
     },
     {
